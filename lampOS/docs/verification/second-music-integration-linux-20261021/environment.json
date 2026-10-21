@@ -1,0 +1,240 @@
+{
+  "actual_test_platform": "Linux-6.8.0-146-generic-aarch64-with-glibc2.36",
+  "architecture": "aarch64",
+  "build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "CARGO_CACHE",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "FRESH_TARGET",
+    "CARGO_TERM_COLOR": "never",
+    "GIT_NO_LAZY_FETCH": "1",
+    "HOME": "DISPOSABLE_HOME",
+    "RUSTUP_AUTO_INSTALL": "0",
+    "TMPDIR": "TEMP"
+  },
+  "bundle_allocated_bytes_at_finish": 6519996416,
+  "compiler_and_tools": {
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "cc": "cc (Debian 12.2.0-14+deb12u1) 12.2.0",
+    "clang": "Debian clang version 14.0.6",
+    "clippy": "clippy 0.1.96 (ac68faa20c 2026-05-25)",
+    "git": "git version 2.39.5",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2",
+    "rustfmt": "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)"
+  },
+  "container_os_release": {
+    "BUG_REPORT_URL": "https://bugs.debian.org/",
+    "HOME_URL": "https://www.debian.org/",
+    "ID": "debian",
+    "NAME": "Debian GNU/Linux",
+    "PRETTY_NAME": "Debian GNU/Linux 12 (bookworm)",
+    "SUPPORT_URL": "https://www.debian.org/support",
+    "VERSION": "12 (bookworm)",
+    "VERSION_CODENAME": "bookworm",
+    "VERSION_ID": "12"
+  },
+  "fresh_target": true,
+  "gid": 20,
+  "image_id": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "image_repo_digests": [],
+  "limits": "Local Debian Linux ARM64 in Colima with debug0 profiles; not the GitHub Ubuntu release-profile job or a physical lamp.",
+  "mounts": [
+    {
+      "kind": "volume",
+      "role": "CARGO_CACHE",
+      "writable": true
+    },
+    {
+      "kind": "bind",
+      "role": "GATE_CONTROL",
+      "writable": false
+    },
+    {
+      "kind": "bind",
+      "role": "DISPOSABLE_HOME",
+      "writable": true
+    },
+    {
+      "kind": "bind",
+      "role": "GATE_OUTPUT",
+      "writable": true
+    },
+    {
+      "kind": "bind",
+      "role": "SOURCE_BUNDLE",
+      "writable": false
+    },
+    {
+      "kind": "bind",
+      "role": "EXAMPLE_ARTIFACTS",
+      "writable": true
+    },
+    {
+      "kind": "bind",
+      "role": "FRESH_TARGET",
+      "writable": true
+    }
+  ],
+  "native_libraries": {
+    "alsa": "1.2.8",
+    "openssl": "3.0.20"
+  },
+  "network_mode": "none",
+  "outer_host_platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "preflight_commands_and_results": [
+    {
+      "command": [
+        "rustc",
+        "+1.96.0",
+        "-vV"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-rustc.log",
+      "raw_log_sha256": "f77b0143371b8a220549f762eacd32249d05c8c34f767890aef5fff616c3a07a",
+      "seconds": 0.01
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-cargo.log",
+      "raw_log_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+      "seconds": 0.01
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-rustfmt.log",
+      "raw_log_sha256": "58e77f09cbe97eb2d0ab9174e5523494d03814f2879c8e187ed66370320abc7c",
+      "seconds": 0.02
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-clippy.log",
+      "raw_log_sha256": "bbad497025b736fef6248108743f7d93b5421664e5d3c86c44119cad8d381ad9",
+      "seconds": 0.02
+    },
+    {
+      "command": [
+        "cat",
+        "/etc/os-release"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-os.log",
+      "raw_log_sha256": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
+      "seconds": 1.01
+    },
+    {
+      "command": [
+        "cc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-cc.log",
+      "raw_log_sha256": "7e575ab6fefd049c43d6a74b298b043016556f4e410e77194274a0414054e807",
+      "seconds": 0.02
+    },
+    {
+      "command": [
+        "clang",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-clang.log",
+      "raw_log_sha256": "26ebaed6b15cb1533cd59435674a3b224d78fb4193c556e713840b01ad7e14c9",
+      "seconds": 0.16
+    },
+    {
+      "command": [
+        "git",
+        "--version"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-git.log",
+      "raw_log_sha256": "469b1acf8275955250bdef50b4190688e8e36453cfcb29816ae6dcfb31097039",
+      "seconds": 0.0
+    },
+    {
+      "command": [
+        "pkg-config",
+        "--modversion",
+        "alsa",
+        "openssl"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-libraries.log",
+      "raw_log_sha256": "26452ab901fcd90860aba5e7d0f234d59da4bff92226f987f2c1a12c5345fecb",
+      "seconds": 0.0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fetch",
+        "--locked",
+        "--offline",
+        "--target",
+        "aarch64-unknown-linux-gnu"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-offline-dependencies.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.19
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "exit_code": 0,
+      "interrupted": null,
+      "log": "preflight-metadata.log",
+      "raw_log_sha256": "00274c17977e102a3d9b1f69f293bceec98fb8068b792be7eef73861b7b284b6",
+      "seconds": 0.06
+    }
+  ],
+  "python_version": "Not captured by the frozen gate; no exporter-host version is substituted",
+  "readonly_root": true,
+  "resource_receipt": {
+    "budget_monitor_interval_seconds": 60,
+    "bundle_allocated_bytes_at_start": 206110720,
+    "other_owned_bytes_at_start": 12027285504,
+    "scratch_limit_bytes": 21474836480,
+    "target_reserve_bytes": 8589934592
+  },
+  "source_readonly": true,
+  "uid": 501
+}

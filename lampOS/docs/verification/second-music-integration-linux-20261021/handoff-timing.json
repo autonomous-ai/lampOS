@@ -1,0 +1,43 @@
+{
+  "boundary": "Confirmation retirement with prepared recording to authored speaker IPC acceptance",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement",
+    "--",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "counts": {
+    "failed": 0,
+    "filtered_out": 3104,
+    "ignored": 0,
+    "passed": 1,
+    "summaries": 1
+  },
+  "exit_code": 0,
+  "host_platform": "Local Linux ARM64 container on Colima",
+  "limitations": "A local prepared host fixture; excludes cold preparation, spoken confirmation, acoustic onset and physical Stop or audible lamp behavior.",
+  "observed_measurements": [
+    {
+      "first_us": 401,
+      "repeated_us": 197,
+      "target_us": 250000
+    }
+  ],
+  "qualification_scope": "Focused repeat only; not added to complete-consumer totals",
+  "raw_log_basename": "voice_handoff.log",
+  "raw_log_sha256": "3f1494dc396c695a3a8f7dbe3e8ccd02c415ab60f7d290324468fa0e9b4c13bb",
+  "seconds": 0.54,
+  "source_tree_sha256": "5914224888cbb44e5035168d5dcd34ff2879eda5377d50d3695ea98f0534afd3",
+  "stage": "voice_handoff",
+  "status": "passed",
+  "verification_error": null
+}

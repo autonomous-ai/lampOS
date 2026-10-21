@@ -1,0 +1,88 @@
+{
+  "completed_root_process_exit_code": 1,
+  "driver_sha256": "cdb8aac9e76262a805a3a8ce49fe9397d4c36e04f47dbf57d1a1653c976a38d2",
+  "exporter_sha256": "e35a80bc3e604306c7c32ce3c79766a959bc7a3d9781a77c66ca1e04feb2a157",
+  "files": {
+    "consumers.json": {
+      "bytes": 1954,
+      "sha256": "ed6236ea0532984f4e6e7a23b546ea1cda0b2085c1a688a147d2686131381dab"
+    },
+    "diagnostics.json": {
+      "bytes": 157277,
+      "sha256": "5d9fd6294b36d7775b06fa5e95665de9f40e46432c8027ae8882957594c3ade2"
+    },
+    "environment.json": {
+      "bytes": 6484,
+      "sha256": "701ee985c93c85746e3dc313ddcb22b8dcebb9b2ddc9a91e665d0357bfeb4ab4"
+    },
+    "example.json": {
+      "bytes": 551,
+      "sha256": "902c2a303e85cfa2e0e8070dbef3bae678141b19da00cd792b0a3989665b793d"
+    },
+    "handoff-timing.json": {
+      "bytes": 1320,
+      "sha256": "63b71269df02d1770e9e1e1fee66cab2fff64727080fff90e102d6053f0bd15a"
+    },
+    "host.json": {
+      "bytes": 47290,
+      "sha256": "d687b61746871ba6d07e53179e7acda1f04453edb236a20edbafd9937d1f0ecb"
+    },
+    "scan-timing.json": {
+      "bytes": 1863,
+      "sha256": "22a6438251cf618f6e1af3ce6353244ee2bf0c3bbbe623239df142ba9c57931c"
+    },
+    "source-proof.json": {
+      "bytes": 6670,
+      "sha256": "57a85f1243ff6a9ae15eb9bbf4b063cbafc1a08c8fcdecc329c071b71d1ecfef"
+    }
+  },
+  "integration_base": "1c6b0152a2bf8d936a9ca729a49426f6fd96fa78",
+  "mac_history_url": "https://github.com/autonomous-ai/lampOS/tree/c00616bb10715a84496fc4903e59bff59e6e1e04/lampOS/docs/verification/second-music-integration-mac-20261021",
+  "raw_control_receipts_sha256": {
+    "binding.json": "011f19c12c342ae50a81611fc55a6a82064259760b99a0d7cbea2c170a8e92f2",
+    "consumers.json": "fc8287b8d61d42f6a2a08d0b28ec5c7ccc193ea7c9783baffbf6fb4fccd7cdd8",
+    "gate.py": "cdb8aac9e76262a805a3a8ce49fe9397d4c36e04f47dbf57d1a1653c976a38d2",
+    "source-files.json": "7ba077491638b01f0f194bb9c174888ca7e7c2884754b5297578d969008eef5a"
+  },
+  "raw_gate_receipts_and_logs_sha256": {
+    "actions_speaker_state.log": "98761fc359e2e4d53cf987e13a1b9a1fde0a7a40563df743d080b1829080cb47",
+    "build.log": "e542ff468261522427cf37d27049d348b3f7bed347d04feb452af914173f26cf",
+    "checkout_tests.log": "669f7dc9b3acc925e7ab0b8c8152ead5c6db9ea2c248d06be1ed9b2094eea157",
+    "clippy.log": "82108fc0586771897560eb204148559c0aa83277d67b9774fac14feb8d5c6633",
+    "container-console.log": "70929ef81e1b25b64e9f56c786016f9df5260389fda9ca710d45c3d39457f72d",
+    "docker-inspect-result.json": "e246cef298ff3e7a1efc68a58794d4e1a7fe3254d091793540c61aa4e96a22bc",
+    "example_install.log": "109b22dbfbfa36e7bf7852b6ae8ab7c5beb2f71827d9a31b98116d7541ca349a",
+    "example_pack.log": "ac15c6ca0841c17150c636df48e6b07d9599d0b85a2a653569f624c1db7ba0cf",
+    "example_render.log": "bc83a171eea2fcb09d1f694c51491f0b47e3c01bef398ca88526a60f2aa65c20",
+    "example_tests.log": "f868e640d5028e32e1ba0fa4ba0205413cb17783bb28e2a939b5105ee1345716",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "host-started.json": "682289bf60a21e1af2c37ddf5758e4600a08b7ef1b08aa74cb11167bab0592ac",
+    "host-terminal.json": "bd7d9676f15cf05f6c69b77071314d25e4b9060c9de6e3362040c795c139f8a8",
+    "preflight-cargo.log": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+    "preflight-cc.log": "7e575ab6fefd049c43d6a74b298b043016556f4e410e77194274a0414054e807",
+    "preflight-clang.log": "26ebaed6b15cb1533cd59435674a3b224d78fb4193c556e713840b01ad7e14c9",
+    "preflight-clippy.log": "bbad497025b736fef6248108743f7d93b5421664e5d3c86c44119cad8d381ad9",
+    "preflight-git.log": "469b1acf8275955250bdef50b4190688e8e36453cfcb29816ae6dcfb31097039",
+    "preflight-libraries.log": "26452ab901fcd90860aba5e7d0f234d59da4bff92226f987f2c1a12c5345fecb",
+    "preflight-metadata.log": "00274c17977e102a3d9b1f69f293bceec98fb8068b792be7eef73861b7b284b6",
+    "preflight-offline-dependencies.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preflight-os.log": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
+    "preflight-rustc.log": "f77b0143371b8a220549f762eacd32249d05c8c34f767890aef5fff616c3a07a",
+    "preflight-rustfmt.log": "58e77f09cbe97eb2d0ab9174e5523494d03814f2879c8e187ed66370320abc7c",
+    "skills_audio.log": "f2e00359cc35fe3221508dfd81d9724dc6108a32e788ea5d17b904844183ef1a",
+    "skills_scan_cost.log": "c03f87618fd6cec92d19678083396923c80e191a235ce17f1b6cf67253b7225a",
+    "skills_scan_files.log": "d7a3589c6a55eb0ab7af3abb5d1e27d2520025e84f0a9d53390cb364abda8d1e",
+    "source-check.json": "89d7bc10d1a2db78a24ed7f3e41b7096c04f304ff58b2777cb753624a3b3a74a",
+    "stages-progress.json": "1275ab1ceb44c39a7ec7942ad21b04368c98c45eda731184ac4c6c764f2a7991",
+    "terminal.json": "bc922d71ce34dc60494f5664e4a50ebe0fb1ae61b023d79e7bbff61db636e27f",
+    "tests.log": "a54feb770f6900c52ff3a3ff822a1bc6a92c209371a7bf9f4c5abe1889e10bbc",
+    "voice_audio.log": "cb4dfdf9fc2b201c958663a31353723dcc863cb361d90d7d9a0fd94fb333ed7f",
+    "voice_handoff.log": "3f1494dc396c695a3a8f7dbe3e8ccd02c415ab60f7d290324468fa0e9b4c13bb",
+    "voice_integration.log": "ac4b9373cb5d38e1c92e01b4c4450b5846bb29e36e255a8967ce8258ef07bd5d",
+    "voice_retained_snapshot.log": "0cf28e659772a7482920f048483e98ff907567030530c34c3983d6a4bc200b52"
+  },
+  "scope": "Compact normalized records, failure assertion sections and warning headers only; no complete raw logs, whole source maps, binaries, packages or audio copied. Export performs no tests, Docker operations or network access.",
+  "source_proof": "source-proof.json",
+  "source_tree_sha256": "5914224888cbb44e5035168d5dcd34ff2879eda5377d50d3695ea98f0534afd3",
+  "status": "failed"
+}

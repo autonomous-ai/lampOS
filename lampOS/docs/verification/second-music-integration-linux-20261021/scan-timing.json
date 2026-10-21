@@ -1,0 +1,67 @@
+{
+  "boundary": "Scan::unchanged after loading; excludes fixture creation, initial loading, cloning, authority refresh and logging",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-skills",
+    "--test",
+    "requested_audio",
+    "sixteen_maximum_recordings_report_full_content_scan_costs",
+    "--",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "counts": {
+    "failed": 0,
+    "filtered_out": 30,
+    "ignored": 0,
+    "passed": 1,
+    "summaries": 1
+  },
+  "exit_code": 0,
+  "host_platform": "Local Linux ARM64 container on Colima",
+  "limitations": "Three samples on one local ARM64 container with recently accessed pages; no cold-filesystem, whole-loop or physical-lamp latency qualification.",
+  "qualification_scope": "Focused repeat only; not added to complete-consumer totals",
+  "raw_log_basename": "skills_scan_cost.log",
+  "raw_log_sha256": "c03f87618fd6cec92d19678083396923c80e191a235ce17f1b6cf67253b7225a",
+  "samples": [
+    {
+      "assets": 16,
+      "elapsed_ns": 25720803,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "fresh",
+      "round": 0
+    },
+    {
+      "assets": 16,
+      "elapsed_ns": 25187061,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "followup",
+      "round": 1
+    },
+    {
+      "assets": 16,
+      "elapsed_ns": 25049146,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "followup",
+      "round": 2
+    }
+  ],
+  "seconds": 13.22,
+  "source_tree_sha256": "5914224888cbb44e5035168d5dcd34ff2879eda5377d50d3695ea98f0534afd3",
+  "stage": "skills_scan_cost",
+  "status": "passed",
+  "target_ns": 250000000,
+  "verification_error": null
+}

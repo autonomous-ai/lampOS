@@ -1,3 +1,38 @@
+## Current checkpoint: 2026-10-21 15:48 UTC, Linux failures retained and worker contention reproduced
+
+**Music #1757: ready: no.** The complete [local Linux ARM64 gate](verification/second-music-integration-linux-20261021/README.md)
+finished with **9,280 passed, 86 failed, 52 ignored**, actual exit **1**, all
+17 stages terminal. Two additional doctest targets failed before summaries.
+All 2,291 frozen source inputs and 30 parent fixtures stayed unchanged.
+Formatting, strict workspace Clippy and workspace build passed. Failed
+full-test fixtures comprise 69 explicit EACCES and 17 related indirect
+failures. A separate controlled probe confirms that the original tmpfs
+options create `noexec`; explicit `exec` permits the same fixed script.
+The probe does not qualify or waive the project tests.
+
+A bounded, independently reviewed diagnostic preserved the original binary,
+changed only diagnostic tracing in a separate source copy, and stopped after
+10 exact worker-test passes followed by failure on attempt 11. The first
+cancellation was `cache_contended` with a live offer and lease. That identifies
+the instrumented failure path, not the original uninstrumented cause. The
+production fail-closed contract is unchanged; a deterministic fixture fix is
+under review. Original packing's metadata-stability refusal remains unexplained
+although bounded original-binary storage/render probes passed. Those passing
+probes do not replace the failed stage or establish readiness. The historical
+Mac **9,268 / 2 / 49** failure record remains unchanged. Public Music head is
+still draft `c74b0f710`; a corrected complete gate and new-head native CI remain.
+
+**Release #2462: ready for reviewer integration**, head `924933afe34277d9a16efd4352417eb56b72bd3d`.
+Its [qualification](verification/second-release-cache-20261021/README.md)
+remains green: **9,650 nextest passes, 63 skipped**, four doctests, 12 own-harness
+tests, **35 + 12 + 7** Python passes and **49/49 artifact payload hashes**.
+Reviewer merge and #1812's agreed workflow/docs closure and Migrate handoff
+remain pending. Publication stays disabled. No device or audible playback was used.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21 15:26 UTC, release cache correction qualified and Music Linux failure under diagnosis
 
 **Release #2462: ready for reviewer integration.** Head

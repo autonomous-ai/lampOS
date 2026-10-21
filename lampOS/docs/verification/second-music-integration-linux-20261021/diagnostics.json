@@ -1,0 +1,1917 @@
+{
+  "failed_stages": [
+    "voice_audio",
+    "tests",
+    "checkout_tests",
+    "example_pack",
+    "example_install"
+  ],
+  "interpretation": "Assertion text is evidence, not a cause diagnosis. No failed focused stage, complete test, compile failure, warning or interruption is waived by a later pass.",
+  "logs": [
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-rustc.log",
+      "raw_log_sha256": "f77b0143371b8a220549f762eacd32249d05c8c34f767890aef5fff616c3a07a",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:rustc",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-cargo.log",
+      "raw_log_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:cargo",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-rustfmt.log",
+      "raw_log_sha256": "58e77f09cbe97eb2d0ab9174e5523494d03814f2879c8e187ed66370320abc7c",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:rustfmt",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-clippy.log",
+      "raw_log_sha256": "bbad497025b736fef6248108743f7d93b5421664e5d3c86c44119cad8d381ad9",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:clippy",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-os.log",
+      "raw_log_sha256": "59a77b5f2666d9c85c489bd1911a6eebbd91ef22fe48b90a3b75f1b21f3844d4",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:os",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-cc.log",
+      "raw_log_sha256": "7e575ab6fefd049c43d6a74b298b043016556f4e410e77194274a0414054e807",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:cc",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-clang.log",
+      "raw_log_sha256": "26ebaed6b15cb1533cd59435674a3b224d78fb4193c556e713840b01ad7e14c9",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:clang",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-git.log",
+      "raw_log_sha256": "469b1acf8275955250bdef50b4190688e8e36453cfcb29816ae6dcfb31097039",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:git",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-libraries.log",
+      "raw_log_sha256": "26452ab901fcd90860aba5e7d0f234d59da4bff92226f987f2c1a12c5345fecb",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:libraries",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-offline-dependencies.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:offline-dependencies",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "preflight-metadata.log",
+      "raw_log_sha256": "00274c17977e102a3d9b1f69f293bceec98fb8068b792be7eef73861b7b284b6",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "preflight:metadata",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "fmt.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "fmt",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "clippy.log",
+      "raw_log_sha256": "82108fc0586771897560eb204148559c0aa83277d67b9774fac14feb8d5c6633",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "clippy",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "actions_speaker_state.log",
+      "raw_log_sha256": "98761fc359e2e4d53cf987e13a1b9a1fde0a7a40563df743d080b1829080cb47",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "actions_speaker_state",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "voice_retained_snapshot.log",
+      "raw_log_sha256": "0cf28e659772a7482920f048483e98ff907567030530c34c3983d6a4bc200b52",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "voice_retained_snapshot",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "skills_scan_files.log",
+      "raw_log_sha256": "d7a3589c6a55eb0ab7af3abb5d1e27d2520025e84f0a9d53390cb364abda8d1e",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "skills_scan_files",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "skills_scan_cost.log",
+      "raw_log_sha256": "c03f87618fd6cec92d19678083396923c80e191a235ce17f1b6cf67253b7225a",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "skills_scan_cost",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "voice_integration.log",
+      "raw_log_sha256": "ac4b9373cb5d38e1c92e01b4c4450b5846bb29e36e255a8967ce8258ef07bd5d",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "voice_integration",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [
+        {
+          "code": null,
+          "context": {
+            "first_line": 72,
+            "last_line": 72,
+            "text": "error: test failed, to rerun pass `-p lamp-voice --lib`"
+          },
+          "line": 72,
+          "message": "error: test failed, to rerun pass `-p lamp-voice --lib`"
+        }
+      ],
+      "failing_test_names": [
+        "requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement"
+      ],
+      "failure_sections": [
+        {
+          "first_line": 58,
+          "last_line": 66,
+          "stream": "stdout",
+          "test": "requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement",
+          "text": "---- requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement stdout ----\n\nthread 'requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement' (10559) panicked at crates/voice/src/requested_audio/runtime.rs:1129:13:\nassertion `left == right` failed: offer 1: expected Renew\n  left: AudioFinish { offer: RequestedAudioOffer { skills_boot: \"skills-fixture\", definition_generation: 1, offer_id: 1, context: RequestedAudioContext { worker_boot: \"voice-fixture\", provider_session: 1, request: 1, privacy_generation: 1, call_id: \"call-1\", issued_us: 2144383099 }, skill: \"recording\", asset: \"TEMP/lamp-ra-10427-5/recording.wav\", sha256: \"b39856220a732e59c6087a01ed41e4897b29a3393bdb9326047e0b53af4a566f\", frames: 480, issued_us: 2144383099, start_before_us: 2154383099, finish_before_us: 2214383099 }, outcome: Cancelled }\n right: AudioAuthorize { offer: RequestedAudioOffer { skills_boot: \"skills-fixture\", definition_generation: 1, offer_id: 1, context: RequestedAudioContext { worker_boot: \"voice-fixture\", provider_session: 1, request: 1, privacy_generation: 1, call_id: \"call-1\", issued_us: 2144383099 }, skill: \"recording\", asset: \"TEMP/lamp-ra-10427-5/recording.wav\", sha256: \"b39856220a732e59c6087a01ed41e4897b29a3393bdb9326047e0b53af4a566f\", frames: 480, issued_us: 2144383099, start_before_us: 2154383099, finish_before_us: 2214383099 }, phase: Renew }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        }
+      ],
+      "panic_locations": [
+        {
+          "line": 60,
+          "location": "thread 'requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement' (10559) panicked at crates/voice/src/requested_audio/runtime.rs:1129:13:"
+        }
+      ],
+      "raw_log_basename": "voice_audio.log",
+      "raw_log_sha256": "cb4dfdf9fc2b201c958663a31353723dcc863cb361d90d7d9a0fd94fb333ed7f",
+      "reported_failed_test_occurrences": [
+        {
+          "line": 35,
+          "test": "requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement"
+        }
+      ],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "voice_audio",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "skills_audio.log",
+      "raw_log_sha256": "f2e00359cc35fe3221508dfd81d9724dc6108a32e788ea5d17b904844183ef1a",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "skills_audio",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "voice_handoff.log",
+      "raw_log_sha256": "3f1494dc396c695a3a8f7dbe3e8ccd02c415ab60f7d290324468fa0e9b4c13bb",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "voice_handoff",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [
+        {
+          "code": null,
+          "context": {
+            "first_line": 1599,
+            "last_line": 1599,
+            "text": "error: test failed, to rerun pass `-p lamp-cloud --lib`"
+          },
+          "line": 1599,
+          "message": "error: test failed, to rerun pass `-p lamp-cloud --lib`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 6527,
+            "last_line": 6527,
+            "text": "error: test failed, to rerun pass `-p lamp-tasks --test harness`"
+          },
+          "line": 6527,
+          "message": "error: test failed, to rerun pass `-p lamp-tasks --test harness`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 10124,
+            "last_line": 10124,
+            "text": "error: test failed, to rerun pass `-p lamp-voice --lib`"
+          },
+          "line": 10124,
+          "message": "error: test failed, to rerun pass `-p lamp-voice --lib`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 11093,
+            "last_line": 11094,
+            "text": "error: doctest failed, to rerun pass `-p lamp-bus --doc`\n   Doc-tests lamp_camera"
+          },
+          "line": 11093,
+          "message": "error: doctest failed, to rerun pass `-p lamp-bus --doc`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 11168,
+            "last_line": 11169,
+            "text": "error: doctest failed, to rerun pass `-p lamp-msgs --doc`\n   Doc-tests lamp_name"
+          },
+          "line": 11168,
+          "message": "error: doctest failed, to rerun pass `-p lamp-msgs --doc`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 11271,
+            "last_line": 11276,
+            "text": "error: 5 targets failed:\n    `-p lamp-cloud --lib`\n    `-p lamp-tasks --test harness`\n    `-p lamp-voice --lib`\n    `-p lamp-bus --doc`\n    `-p lamp-msgs --doc`"
+          },
+          "line": 11271,
+          "message": "error: 5 targets failed:"
+        }
+      ],
+      "failing_test_names": [
+        "changed_executable_after_preflight_proves_new_was_not_spawned",
+        "coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal",
+        "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+        "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+        "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+        "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once",
+        "coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps",
+        "coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps",
+        "coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted",
+        "coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup",
+        "coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening",
+        "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement",
+        "coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released",
+        "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch",
+        "coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return",
+        "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap",
+        "coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant",
+        "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+        "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+        "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+        "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+        "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+        "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+        "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+        "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+        "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+        "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+        "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+        "coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit",
+        "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+        "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue",
+        "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write",
+        "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released",
+        "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority",
+        "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token",
+        "coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping",
+        "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+        "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+        "coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure",
+        "coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn",
+        "executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused",
+        "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for",
+        "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute",
+        "process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained",
+        "process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure",
+        "process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it",
+        "process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned",
+        "process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace",
+        "process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps",
+        "process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child",
+        "process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod",
+        "process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract",
+        "process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on",
+        "process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only",
+        "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+        "process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker",
+        "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+        "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+        "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader",
+        "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out"
+      ],
+      "failure_sections": [
+        {
+          "first_line": 1577,
+          "last_line": 1584,
+          "stream": "stdout",
+          "test": "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for",
+          "text": "---- lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for stdout ----\n\nthread 'lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for' (18126) panicked at crates/cloud/src/lamp.rs:1084:9:\nassertion `left == right` failed\n  left: \"\"\n right: \"Example Home\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        },
+        {
+          "first_line": 1585,
+          "last_line": 1592,
+          "stream": "stdout",
+          "test": "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute",
+          "text": "---- lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute stdout ----\n\nthread 'lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute' (18134) panicked at crates/cloud/src/lamp.rs:982:9:\nassertion `left == right` failed\n  left: \"\"\n right: \"Example Home\""
+        },
+        {
+          "first_line": 6507,
+          "last_line": 6514,
+          "stream": "stdout",
+          "test": "changed_executable_after_preflight_proves_new_was_not_spawned",
+          "text": "---- changed_executable_after_preflight_proves_new_was_not_spawned stdout ----\n\nthread 'changed_executable_after_preflight_proves_new_was_not_spawned' (24326) panicked at crates/tasks/tests/harness.rs:905:5:\nassertion `left == right` failed\n  left: NotSent { code: \"preflight_spawn_failed\" }\n right: NotSent { code: \"executable_changed\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        },
+        {
+          "first_line": 6515,
+          "last_line": 6520,
+          "stream": "stdout",
+          "test": "executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused",
+          "text": "---- executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused stdout ----\n\nthread 'executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused' (24394) panicked at crates/tasks/tests/harness.rs:658:5:\nNotSent { code: \"preflight_spawn_failed\" }"
+        },
+        {
+          "first_line": 9772,
+          "last_line": 9777,
+          "stream": "stdout",
+          "test": "coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal",
+          "text": "---- coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal stdout ----\n\nthread 'coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal' (25949) panicked at crates/voice/src/coordinator/camera.rs:520:14:\nmandatory callback failure must not become optional camera absence\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        },
+        {
+          "first_line": 9778,
+          "last_line": 9782,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+          "text": "---- coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn stdout ----\n\nthread 'coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn' (26003) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9783,
+          "last_line": 9787,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+          "text": "---- coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup stdout ----\n\nthread 'coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup' (26005) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9788,
+          "last_line": 9792,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+          "text": "---- coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice stdout ----\n\nthread 'coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice' (26007) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9793,
+          "last_line": 9797,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once",
+          "text": "---- coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once stdout ----\n\nthread 'coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once' (26009) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9798,
+          "last_line": 9802,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps",
+          "text": "---- coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps stdout ----\n\nthread 'coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps' (26011) panicked at crates/voice/src/coordinator/motor/tests.rs:842:36:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9803,
+          "last_line": 9807,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps",
+          "text": "---- coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps stdout ----\n\nthread 'coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps' (26013) panicked at crates/voice/src/coordinator/motor/tests.rs:842:36:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9808,
+          "last_line": 9812,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted",
+          "text": "---- coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted stdout ----\n\nthread 'coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted' (26015) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9813,
+          "last_line": 9817,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup",
+          "text": "---- coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup stdout ----\n\nthread 'coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup' (26017) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9818,
+          "last_line": 9822,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening",
+          "text": "---- coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening stdout ----\n\nthread 'coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening' (26019) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9823,
+          "last_line": 9827,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement",
+          "text": "---- coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement stdout ----\n\nthread 'coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement' (26022) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9828,
+          "last_line": 9832,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released",
+          "text": "---- coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released stdout ----\n\nthread 'coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released' (26024) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9833,
+          "last_line": 9837,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch",
+          "text": "---- coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch stdout ----\n\nthread 'coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch' (26026) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9838,
+          "last_line": 9842,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return",
+          "text": "---- coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return' (26029) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9843,
+          "last_line": 9847,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap",
+          "text": "---- coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap' (26032) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9848,
+          "last_line": 9852,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant",
+          "text": "---- coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant' (26034) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9853,
+          "last_line": 9857,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+          "text": "---- coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants' (26036) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9858,
+          "last_line": 9862,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+          "text": "---- coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches' (26038) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9863,
+          "last_line": 9867,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+          "text": "---- coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only' (26040) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9868,
+          "last_line": 9872,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+          "text": "---- coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal' (26042) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9873,
+          "last_line": 9877,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+          "text": "---- coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests' (26044) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9878,
+          "last_line": 9882,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+          "text": "---- coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant' (26046) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9883,
+          "last_line": 9887,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+          "text": "---- coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority stdout ----\n\nthread 'coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority' (26048) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9888,
+          "last_line": 9892,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+          "text": "---- coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate stdout ----\n\nthread 'coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate' (26050) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9893,
+          "last_line": 9897,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+          "text": "---- coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released stdout ----\n\nthread 'coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released' (26052) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9898,
+          "last_line": 9902,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+          "text": "---- coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write stdout ----\n\nthread 'coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write' (26054) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9903,
+          "last_line": 9907,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+          "text": "---- coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure stdout ----\n\nthread 'coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure' (26056) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9908,
+          "last_line": 9912,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit",
+          "text": "---- coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit stdout ----\n\nthread 'coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit' (26058) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9913,
+          "last_line": 9917,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+          "text": "---- coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released stdout ----\n\nthread 'coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released' (26060) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9918,
+          "last_line": 9922,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue",
+          "text": "---- coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue stdout ----\n\nthread 'coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue' (26062) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9923,
+          "last_line": 9927,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write",
+          "text": "---- coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write stdout ----\n\nthread 'coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write' (26064) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9928,
+          "last_line": 9932,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released",
+          "text": "---- coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released stdout ----\n\nthread 'coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released' (26066) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9933,
+          "last_line": 9937,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority",
+          "text": "---- coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority stdout ----\n\nthread 'coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority' (26068) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9938,
+          "last_line": 9942,
+          "stream": "stdout",
+          "test": "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token",
+          "text": "---- coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token stdout ----\n\nthread 'coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token' (26070) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9943,
+          "last_line": 9947,
+          "stream": "stdout",
+          "test": "coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping",
+          "text": "---- coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping stdout ----\n\nthread 'coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping' (26082) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9948,
+          "last_line": 9952,
+          "stream": "stdout",
+          "test": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+          "text": "---- coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean stdout ----\n\nthread 'coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean' (26105) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9953,
+          "last_line": 9957,
+          "stream": "stdout",
+          "test": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+          "text": "---- coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean stdout ----\n\nthread 'coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean' (26138) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9958,
+          "last_line": 9962,
+          "stream": "stdout",
+          "test": "coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure",
+          "text": "---- coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure stdout ----\n\nthread 'coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure' (26169) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9963,
+          "last_line": 9967,
+          "stream": "stdout",
+          "test": "coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn",
+          "text": "---- coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn stdout ----\n\nthread 'coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn' (26171) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9968,
+          "last_line": 9972,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained",
+          "text": "---- process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained stdout ----\n\nthread 'process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained' (29423) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9973,
+          "last_line": 9977,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure",
+          "text": "---- process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure stdout ----\n\nthread 'process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure' (29425) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9978,
+          "last_line": 9982,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it",
+          "text": "---- process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it stdout ----\n\nthread 'process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it' (29427) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9983,
+          "last_line": 9987,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned",
+          "text": "---- process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned stdout ----\n\nthread 'process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned' (29429) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9988,
+          "last_line": 9992,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace",
+          "text": "---- process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace stdout ----\n\nthread 'process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace' (29431) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9993,
+          "last_line": 9997,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps",
+          "text": "---- process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps stdout ----\n\nthread 'process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps' (29435) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 9998,
+          "last_line": 10002,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child",
+          "text": "---- process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child stdout ----\n\nthread 'process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child' (29437) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10003,
+          "last_line": 10007,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod",
+          "text": "---- process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod stdout ----\n\nthread 'process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod' (29439) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10008,
+          "last_line": 10012,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract",
+          "text": "---- process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract stdout ----\n\nthread 'process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract' (29441) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10013,
+          "last_line": 10017,
+          "stream": "stdout",
+          "test": "process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on",
+          "text": "---- process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on stdout ----\n\nthread 'process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on' (29443) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10018,
+          "last_line": 10022,
+          "stream": "stdout",
+          "test": "process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only",
+          "text": "---- process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only stdout ----\n\nthread 'process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only' (29449) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10023,
+          "last_line": 10027,
+          "stream": "stdout",
+          "test": "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+          "text": "---- process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else stdout ----\n\nthread 'process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else' (29451) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10028,
+          "last_line": 10032,
+          "stream": "stdout",
+          "test": "process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker",
+          "text": "---- process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker stdout ----\n\nthread 'process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker' (30533) panicked at crates/voice/src/process.rs:597:37:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10033,
+          "last_line": 10037,
+          "stream": "stdout",
+          "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+          "text": "---- same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again stdout ----\n\nthread 'same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again' (31733) panicked at crates/voice/src/same_voice.rs:1010:40:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10038,
+          "last_line": 10042,
+          "stream": "stdout",
+          "test": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+          "text": "---- same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off stdout ----\n\nthread 'same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off' (31735) panicked at crates/voice/src/same_voice.rs:1010:40:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10043,
+          "last_line": 10047,
+          "stream": "stdout",
+          "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+          "text": "---- same_voice::tests::each_line_the_check_says_is_said_to_its_journal stdout ----\n\nthread 'same_voice::tests::each_line_the_check_says_is_said_to_its_journal' (31747) panicked at crates/voice/src/same_voice.rs:1010:40:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+        },
+        {
+          "first_line": 10048,
+          "last_line": 10054,
+          "stream": "stdout",
+          "test": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader",
+          "text": "---- task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader stdout ----\nlamp-voice: a made skill was not checked: Permission denied (os error 13)\nlamp-voice: a skill made by voice is not kept: the lamp couldn't check it\n\nthread 'task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader' (32889) panicked at crates/voice/src/task_news.rs:2546:9:\n(Nobody has spoken. News from work you handed over for the person. Claude Code just made a skill for them, but the lamp can't keep it: the lamp couldn't check it. Tell them so in one short sentence, and that the rest is on their computer. No question.)"
+        },
+        {
+          "first_line": 10055,
+          "last_line": 10062,
+          "stream": "stdout",
+          "test": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out",
+          "text": "---- task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out stdout ----\nlamp-voice: a made skill was not checked: Permission denied (os error 13)\nlamp-voice: a skill made by voice is not kept: the lamp couldn't check it\n\nthread 'task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out' (32893) panicked at crates/voice/src/task_news.rs:2343:9:\n(Nobody has spoken. News from work you handed over for the person. Claude Code just made a skill for them, but the lamp can't keep it: the lamp couldn't check it. Tell them so in one short sentence, and that the rest is on their computer. No question.)"
+        }
+      ],
+      "panic_locations": [
+        {
+          "line": 1579,
+          "location": "thread 'lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for' (18126) panicked at crates/cloud/src/lamp.rs:1084:9:"
+        },
+        {
+          "line": 1587,
+          "location": "thread 'lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute' (18134) panicked at crates/cloud/src/lamp.rs:982:9:"
+        },
+        {
+          "line": 6509,
+          "location": "thread 'changed_executable_after_preflight_proves_new_was_not_spawned' (24326) panicked at crates/tasks/tests/harness.rs:905:5:"
+        },
+        {
+          "line": 6517,
+          "location": "thread 'executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused' (24394) panicked at crates/tasks/tests/harness.rs:658:5:"
+        },
+        {
+          "line": 9774,
+          "location": "thread 'coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal' (25949) panicked at crates/voice/src/coordinator/camera.rs:520:14:"
+        },
+        {
+          "line": 9780,
+          "location": "thread 'coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn' (26003) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9785,
+          "location": "thread 'coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup' (26005) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9790,
+          "location": "thread 'coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice' (26007) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9795,
+          "location": "thread 'coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once' (26009) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9800,
+          "location": "thread 'coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps' (26011) panicked at crates/voice/src/coordinator/motor/tests.rs:842:36:"
+        },
+        {
+          "line": 9805,
+          "location": "thread 'coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps' (26013) panicked at crates/voice/src/coordinator/motor/tests.rs:842:36:"
+        },
+        {
+          "line": 9810,
+          "location": "thread 'coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted' (26015) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9815,
+          "location": "thread 'coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup' (26017) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9820,
+          "location": "thread 'coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening' (26019) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9825,
+          "location": "thread 'coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement' (26022) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9830,
+          "location": "thread 'coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released' (26024) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9835,
+          "location": "thread 'coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch' (26026) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9840,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return' (26029) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9845,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap' (26032) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9850,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant' (26034) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9855,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants' (26036) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9860,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches' (26038) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9865,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only' (26040) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9870,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal' (26042) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9875,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests' (26044) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9880,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant' (26046) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9885,
+          "location": "thread 'coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority' (26048) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9890,
+          "location": "thread 'coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate' (26050) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9895,
+          "location": "thread 'coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released' (26052) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9900,
+          "location": "thread 'coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write' (26054) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9905,
+          "location": "thread 'coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure' (26056) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9910,
+          "location": "thread 'coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit' (26058) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9915,
+          "location": "thread 'coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released' (26060) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9920,
+          "location": "thread 'coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue' (26062) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9925,
+          "location": "thread 'coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write' (26064) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9930,
+          "location": "thread 'coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released' (26066) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9935,
+          "location": "thread 'coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority' (26068) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9940,
+          "location": "thread 'coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token' (26070) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:"
+        },
+        {
+          "line": 9945,
+          "location": "thread 'coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping' (26082) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9950,
+          "location": "thread 'coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean' (26105) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9955,
+          "location": "thread 'coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean' (26138) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9960,
+          "location": "thread 'coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure' (26169) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9965,
+          "location": "thread 'coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn' (26171) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9970,
+          "location": "thread 'process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained' (29423) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9975,
+          "location": "thread 'process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure' (29425) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9980,
+          "location": "thread 'process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it' (29427) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9985,
+          "location": "thread 'process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned' (29429) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9990,
+          "location": "thread 'process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace' (29431) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 9995,
+          "location": "thread 'process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps' (29435) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10000,
+          "location": "thread 'process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child' (29437) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10005,
+          "location": "thread 'process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod' (29439) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10010,
+          "location": "thread 'process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract' (29441) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10015,
+          "location": "thread 'process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on' (29443) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10020,
+          "location": "thread 'process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only' (29449) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10025,
+          "location": "thread 'process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else' (29451) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10030,
+          "location": "thread 'process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker' (30533) panicked at crates/voice/src/process.rs:597:37:"
+        },
+        {
+          "line": 10035,
+          "location": "thread 'same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again' (31733) panicked at crates/voice/src/same_voice.rs:1010:40:"
+        },
+        {
+          "line": 10040,
+          "location": "thread 'same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off' (31735) panicked at crates/voice/src/same_voice.rs:1010:40:"
+        },
+        {
+          "line": 10045,
+          "location": "thread 'same_voice::tests::each_line_the_check_says_is_said_to_its_journal' (31747) panicked at crates/voice/src/same_voice.rs:1010:40:"
+        },
+        {
+          "line": 10052,
+          "location": "thread 'task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader' (32889) panicked at crates/voice/src/task_news.rs:2546:9:"
+        },
+        {
+          "line": 10059,
+          "location": "thread 'task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out' (32893) panicked at crates/voice/src/task_news.rs:2343:9:"
+        }
+      ],
+      "raw_log_basename": "tests.log",
+      "raw_log_sha256": "a54feb770f6900c52ff3a3ff822a1bc6a92c209371a7bf9f4c5abe1889e10bbc",
+      "reported_failed_test_occurrences": [
+        {
+          "line": 1469,
+          "test": "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for"
+        },
+        {
+          "line": 1473,
+          "test": "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute"
+        },
+        {
+          "line": 6475,
+          "test": "changed_executable_after_preflight_proves_new_was_not_spawned"
+        },
+        {
+          "line": 6483,
+          "test": "executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused"
+        },
+        {
+          "line": 6938,
+          "test": "coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal"
+        },
+        {
+          "line": 6987,
+          "test": "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn"
+        },
+        {
+          "line": 6988,
+          "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup"
+        },
+        {
+          "line": 6989,
+          "test": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice"
+        },
+        {
+          "line": 6990,
+          "test": "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once"
+        },
+        {
+          "line": 6991,
+          "test": "coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps"
+        },
+        {
+          "line": 6992,
+          "test": "coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps"
+        },
+        {
+          "line": 6993,
+          "test": "coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted"
+        },
+        {
+          "line": 6994,
+          "test": "coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup"
+        },
+        {
+          "line": 6995,
+          "test": "coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening"
+        },
+        {
+          "line": 6997,
+          "test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement"
+        },
+        {
+          "line": 6998,
+          "test": "coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released"
+        },
+        {
+          "line": 6999,
+          "test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch"
+        },
+        {
+          "line": 7001,
+          "test": "coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return"
+        },
+        {
+          "line": 7003,
+          "test": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap"
+        },
+        {
+          "line": 7004,
+          "test": "coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant"
+        },
+        {
+          "line": 7005,
+          "test": "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants"
+        },
+        {
+          "line": 7006,
+          "test": "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches"
+        },
+        {
+          "line": 7007,
+          "test": "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only"
+        },
+        {
+          "line": 7008,
+          "test": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal"
+        },
+        {
+          "line": 7009,
+          "test": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests"
+        },
+        {
+          "line": 7010,
+          "test": "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant"
+        },
+        {
+          "line": 7011,
+          "test": "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority"
+        },
+        {
+          "line": 7012,
+          "test": "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate"
+        },
+        {
+          "line": 7013,
+          "test": "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released"
+        },
+        {
+          "line": 7014,
+          "test": "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write"
+        },
+        {
+          "line": 7015,
+          "test": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure"
+        },
+        {
+          "line": 7016,
+          "test": "coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit"
+        },
+        {
+          "line": 7017,
+          "test": "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released"
+        },
+        {
+          "line": 7018,
+          "test": "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue"
+        },
+        {
+          "line": 7019,
+          "test": "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write"
+        },
+        {
+          "line": 7020,
+          "test": "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released"
+        },
+        {
+          "line": 7021,
+          "test": "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority"
+        },
+        {
+          "line": 7022,
+          "test": "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token"
+        },
+        {
+          "line": 7029,
+          "test": "coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping"
+        },
+        {
+          "line": 7036,
+          "test": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean"
+        },
+        {
+          "line": 7041,
+          "test": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean"
+        },
+        {
+          "line": 7046,
+          "test": "coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure"
+        },
+        {
+          "line": 7047,
+          "test": "coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn"
+        },
+        {
+          "line": 8078,
+          "test": "process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained"
+        },
+        {
+          "line": 8079,
+          "test": "process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure"
+        },
+        {
+          "line": 8080,
+          "test": "process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it"
+        },
+        {
+          "line": 8081,
+          "test": "process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned"
+        },
+        {
+          "line": 8082,
+          "test": "process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace"
+        },
+        {
+          "line": 8084,
+          "test": "process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps"
+        },
+        {
+          "line": 8085,
+          "test": "process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child"
+        },
+        {
+          "line": 8086,
+          "test": "process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod"
+        },
+        {
+          "line": 8087,
+          "test": "process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract"
+        },
+        {
+          "line": 8088,
+          "test": "process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on"
+        },
+        {
+          "line": 8092,
+          "test": "process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only"
+        },
+        {
+          "line": 8093,
+          "test": "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else"
+        },
+        {
+          "line": 8100,
+          "test": "process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker"
+        },
+        {
+          "line": 8804,
+          "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+        },
+        {
+          "line": 8805,
+          "test": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off"
+        },
+        {
+          "line": 8816,
+          "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+        },
+        {
+          "line": 9549,
+          "test": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader"
+        },
+        {
+          "line": 9550,
+          "test": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out"
+        }
+      ],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "tests",
+      "warning_count": 4,
+      "warnings": [
+        {
+          "code": null,
+          "context": {
+            "first_line": 1,
+            "last_line": 5,
+            "text": "warning: output filename collision at FRESH_TARGET/debug/examples/replay_cost\n  |\n  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (SOURCE_BUNDLE/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (SOURCE_BUNDLE/lampOS/crates/controls)`\n  = note: this may become a hard error in the future; see <https://github.com/rust-langCARGO_CACHE/issues/6313>\n  = help: consider changing their names to be unique or compiling them separately"
+          },
+          "line": 1,
+          "message": "warning: output filename collision at FRESH_TARGET/debug/examples/replay_cost"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 6,
+            "last_line": 10,
+            "text": "warning: output filename collision at FRESH_TARGET/debug/examples/replay_cost.dwp\n  |\n  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (SOURCE_BUNDLE/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (SOURCE_BUNDLE/lampOS/crates/controls)`\n  = note: this may become a hard error in the future; see <https://github.com/rust-langCARGO_CACHE/issues/6313>\n  = help: consider changing their names to be unique or compiling them separately"
+          },
+          "line": 6,
+          "message": "warning: output filename collision at FRESH_TARGET/debug/examples/replay_cost.dwp"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 11,
+            "last_line": 15,
+            "text": "warning: output filename collision at FRESH_TARGET/debug/examples/progress_cost\n  |\n  = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (SOURCE_BUNDLE/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (SOURCE_BUNDLE/lampOS/crates/policy)`\n  = note: this may become a hard error in the future; see <https://github.com/rust-langCARGO_CACHE/issues/6313>\n  = help: consider changing their names to be unique or compiling them separately"
+          },
+          "line": 11,
+          "message": "warning: output filename collision at FRESH_TARGET/debug/examples/progress_cost"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 16,
+            "last_line": 20,
+            "text": "warning: output filename collision at FRESH_TARGET/debug/examples/progress_cost.dwp\n  |\n  = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (SOURCE_BUNDLE/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (SOURCE_BUNDLE/lampOS/crates/policy)`\n  = note: this may become a hard error in the future; see <https://github.com/rust-langCARGO_CACHE/issues/6313>\n  = help: consider changing their names to be unique or compiling them separately"
+          },
+          "line": 16,
+          "message": "warning: output filename collision at FRESH_TARGET/debug/examples/progress_cost.dwp"
+        }
+      ]
+    },
+    {
+      "compiler_or_cargo_errors": [
+        {
+          "code": null,
+          "context": {
+            "first_line": 493,
+            "last_line": 494,
+            "text": "error: test failed, to rerun pass `-p lamp-update --test round`\n   Doc-tests lamp_update"
+          },
+          "line": 493,
+          "message": "error: test failed, to rerun pass `-p lamp-update --test round`"
+        },
+        {
+          "code": null,
+          "context": {
+            "first_line": 500,
+            "last_line": 501,
+            "text": "error: 1 target failed:\n    `-p lamp-update --test round`"
+          },
+          "line": 500,
+          "message": "error: 1 target failed:"
+        }
+      ],
+      "failing_test_names": [
+        "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+        "a_build_put_back_puts_the_product_skills_back",
+        "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+        "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+        "a_new_updater_that_confirms_keeps_its_switch",
+        "a_new_updater_that_exits_at_once_is_put_back",
+        "a_new_updater_that_refuses_every_manifest_is_put_back",
+        "a_round_after_install_keeps_lamp_updates_own_folder",
+        "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+        "a_round_by_hand_keeps_the_folder_it_runs_from",
+        "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+        "a_round_places_the_builds_product_skills_and_keeps_the_lamps_own",
+        "a_self_json_from_a_later_version_still_reads",
+        "an_old_updater_climbs_one_updater_a_round",
+        "an_unreadable_self_json_with_both_builds_known_is_put_back",
+        "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+        "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+        "install_writes_the_fallback_and_no_round_touches_it",
+        "lamp_update_back_puts_back_an_unreadable_self_json",
+        "no_second_round_begins_while_lamp_updates_own_switch_waits",
+        "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+        "the_fallback_reads_a_self_json_written_by_a_later_updater",
+        "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+        "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+        "with_the_switch_off_lamp_update_never_switches_itself"
+      ],
+      "failure_sections": [
+        {
+          "first_line": 317,
+          "last_line": 324,
+          "stream": "stdout",
+          "test": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+          "text": "---- a_build_of_only_new_product_skills_places_them_and_restarts_nothing stdout ----\n\nthread 'a_build_of_only_new_product_skills_places_them_and_restarts_nothing' (35674) panicked at crates/update/tests/round.rs:2093:5:\nassertion `left == right` failed: []\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpj7ITyL/opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: UpToDate(2)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+        },
+        {
+          "first_line": 325,
+          "last_line": 329,
+          "stream": "stdout",
+          "test": "a_build_put_back_puts_the_product_skills_back",
+          "text": "---- a_build_put_back_puts_the_product_skills_back stdout ----\n\nthread 'a_build_put_back_puts_the_product_skills_back' (35679) panicked at crates/update/tests/round.rs:2005:5:\nFailed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpcu4X3d/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")"
+        },
+        {
+          "first_line": 330,
+          "last_line": 334,
+          "stream": "stdout",
+          "test": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+          "text": "---- a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around stdout ----\n\nthread 'a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around' (35691) panicked at crates/update/tests/round.rs:4258:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 335,
+          "last_line": 339,
+          "stream": "stdout",
+          "test": "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+          "text": "---- a_new_updater_not_confirmed_by_the_deadline_is_put_back stdout ----\n\nthread 'a_new_updater_not_confirmed_by_the_deadline_is_put_back' (35712) panicked at crates/update/tests/round.rs:2544:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 340,
+          "last_line": 346,
+          "stream": "stdout",
+          "test": "a_new_updater_that_confirms_keeps_its_switch",
+          "text": "---- a_new_updater_that_confirms_keeps_its_switch stdout ----\n\nthread 'a_new_updater_that_confirms_keeps_its_switch' (35714) panicked at crates/update/tests/round.rs:2465:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpnBurEz/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: SelfSwitched { sequence: 2, from: \"bb513cb915a9c54e13ed009f78c8622a20ac920a4d79d41c4dda77361253516d\", to: \"10dbcea02567bfb08dcb3497954fc72b56b879e2488a367cd00b1ccd76a326b4\" }"
+        },
+        {
+          "first_line": 347,
+          "last_line": 351,
+          "stream": "stdout",
+          "test": "a_new_updater_that_exits_at_once_is_put_back",
+          "text": "---- a_new_updater_that_exits_at_once_is_put_back stdout ----\n\nthread 'a_new_updater_that_exits_at_once_is_put_back' (35716) panicked at crates/update/tests/round.rs:2507:5:\n[\"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]"
+        },
+        {
+          "first_line": 352,
+          "last_line": 356,
+          "stream": "stdout",
+          "test": "a_new_updater_that_refuses_every_manifest_is_put_back",
+          "text": "---- a_new_updater_that_refuses_every_manifest_is_put_back stdout ----\n\nthread 'a_new_updater_that_refuses_every_manifest_is_put_back' (35718) panicked at crates/update/tests/round.rs:2695:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 357,
+          "last_line": 363,
+          "stream": "stdout",
+          "test": "a_round_after_install_keeps_lamp_updates_own_folder",
+          "text": "---- a_round_after_install_keeps_lamp_updates_own_folder stdout ----\n\nthread 'a_round_after_install_keeps_lamp_updates_own_folder' (35727) panicked at crates/update/tests/round.rs:2269:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpNYMjAI/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 364,
+          "last_line": 368,
+          "stream": "stdout",
+          "test": "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+          "text": "---- a_round_after_its_own_switch_keeps_the_old_binarys_folder stdout ----\n\nthread 'a_round_after_its_own_switch_keeps_the_old_binarys_folder' (35729) panicked at crates/update/tests/round.rs:2765:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 369,
+          "last_line": 375,
+          "stream": "stdout",
+          "test": "a_round_by_hand_keeps_the_folder_it_runs_from",
+          "text": "---- a_round_by_hand_keeps_the_folder_it_runs_from stdout ----\n\nthread 'a_round_by_hand_keeps_the_folder_it_runs_from' (35731) panicked at crates/update/tests/round.rs:2749:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpnFrNwx/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 376,
+          "last_line": 380,
+          "stream": "stdout",
+          "test": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+          "text": "---- a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail stdout ----\n\nthread 'a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail' (35733) panicked at crates/update/tests/round.rs:1703:5:\nFailed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpERNCbK/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")"
+        },
+        {
+          "first_line": 381,
+          "last_line": 387,
+          "stream": "stdout",
+          "test": "a_round_places_the_builds_product_skills_and_keeps_the_lamps_own",
+          "text": "---- a_round_places_the_builds_product_skills_and_keeps_the_lamps_own stdout ----\n\nthread 'a_round_places_the_builds_product_skills_and_keeps_the_lamps_own' (35736) panicked at crates/update/tests/round.rs:1909:5:\nassertion `left == right` failed: [\"kept /var/lib/lampOS/skills/reminders/SKILL.md: this lamp's own; the build's is not written\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/93226828d1c0f2a5799d5d6cc69a7d43b59b251813c440949efc408ed3995d3a/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpa2D8HB/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 388,
+          "last_line": 392,
+          "stream": "stdout",
+          "test": "a_self_json_from_a_later_version_still_reads",
+          "text": "---- a_self_json_from_a_later_version_still_reads stdout ----\n\nthread 'a_self_json_from_a_later_version_still_reads' (35741) panicked at crates/update/tests/round.rs:4346:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 393,
+          "last_line": 399,
+          "stream": "stdout",
+          "test": "an_old_updater_climbs_one_updater_a_round",
+          "text": "---- an_old_updater_climbs_one_updater_a_round stdout ----\n\nthread 'an_old_updater_climbs_one_updater_a_round' (35748) panicked at crates/update/tests/round.rs:2921:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/update/10dbcea02567bfb08dcb3497954fc72b56b879e2488a367cd00b1ccd76a326b4/ beside /opt/lampOS/update/bb513cb915a9c54e13ed009f78c8622a20ac920a4d79d41c4dda77361253516d/\", \"lamp-update switches to its build 10dbcea02567; it must confirm itself within 10 min\", \"installed /opt/lampOS/update/94e674daaf8806f032e18c2f00aa9911581d2a4db582666a40c8af2b50dd14f5/ beside /opt/lampOS/update/10dbcea02567bfb08dcb3497954fc72b56b879e2488a367cd00b1ccd76a326b4/\", \"lamp-update switches to its build 94e674daaf88; it must confirm itself within 10 min\", \"installed /opt/lampOS/voice/5a6e2498ef4ce9f803386cc983e3c73b5f05bed89abb3afea407923f010b4e59/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/1ac13c5187e020d8979d4ec88943d51db7fcb6bd99d2fcb2b198a0b3e0d20578/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/decf08d598d851486126f460ad0dde903997c63b061ecadf2b2d6b78faf7c22d/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/75016a88c5b9a813121ca57b7ab13067e395c0a3e2f93b273a11f9597f8fb076/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7726ab5c358b474da840a758e463dc7edd1d3963209793bd11c435510e7b0492/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/5a4aba7f5398f2e30be9c579f6542d7fba2251b38da6e92475fb97efc96749f5/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/d58c035849ec4811bb290443fd4b8550b805f3125496204a96e342b546e7e2fa/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/cd1593018e2978ed135f4b6e6a669f6c4ad09795132f0926299616f50d436c3a/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/76cf027596092db54d2c3fe1f2884d4c94fb57d672f5bd45450aed46eb22a50c/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/0f24f742fbe03f5cc4f5959c69c290f8cbd7860f678ec8208e864540fb50dbd4/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/bf7eebc31a68ee0f759c9b5fcdd396bc62ad40e3af2d62bca3d9263ce1dd1a9a/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/ac52d999d52dbf45ae8eaf733570eb631a93f8a90100e804bf4090d34464cdc0/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/84a436bb97c9ebac0b6ac31859163c741cb63f0ea959650953ca90161e0fe782/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/d927d0acee2c248c066466adc1b67fbd685bc82469b82d1df7b3ec207ea66eb1/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/cb1aae02a0814ee0fda1df79632afe89538109fb8c811cbdd6be200bf4445520/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/331830872e92c4c0c6f6428131f05b1d9c84eec2f2f78c7d6dd79e28cf975836/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/9e85d2bd37c0d5fa64fda003917a5da8f371adf3216bf56cdc81df699eefe549/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/4213c381bb4f1885ca92210cabd36009c1015b5e1996c5d6f2f8e68eee504e91/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/33296a3da1e104824906d4083ce0574e71ae085fdde8593fa113f829e3ebd9ec/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/ac63b670433ce70da52e72308df7dcc8dbde76e8384f9034ef638ae6aa56ac90/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/8cdf78f1877788386b45c0f84773e92c537497ea1fd54e33ee4509e531045f54/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 3's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpDuEt8u/opt/lampOS/skills/ac63b670433ce70da52e72308df7dcc8dbde76e8384f9034ef638ae6aa56ac90/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(3)"
+        },
+        {
+          "first_line": 400,
+          "last_line": 404,
+          "stream": "stdout",
+          "test": "an_unreadable_self_json_with_both_builds_known_is_put_back",
+          "text": "---- an_unreadable_self_json_with_both_builds_known_is_put_back stdout ----\n\nthread 'an_unreadable_self_json_with_both_builds_known_is_put_back' (35754) panicked at crates/update/tests/round.rs:4158:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 405,
+          "last_line": 409,
+          "stream": "stdout",
+          "test": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+          "text": "---- an_unreadable_self_json_with_the_builds_unknown_is_set_aside stdout ----\n\nthread 'an_unreadable_self_json_with_the_builds_unknown_is_set_aside' (35756) panicked at crates/update/tests/round.rs:4225:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 410,
+          "last_line": 416,
+          "stream": "stdout",
+          "test": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+          "text": "---- an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest stdout ----\n\nthread 'an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest' (35759) panicked at crates/update/tests/round.rs:2840:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/update/10dbcea02567bfb08dcb3497954fc72b56b879e2488a367cd00b1ccd76a326b4/ beside /opt/lampOS/update/bb513cb915a9c54e13ed009f78c8622a20ac920a4d79d41c4dda77361253516d/\", \"lamp-update switches to its build 10dbcea02567; it must confirm itself within 10 min\", \"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmp8sfIqw/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 417,
+          "last_line": 421,
+          "stream": "stdout",
+          "test": "install_writes_the_fallback_and_no_round_touches_it",
+          "text": "---- install_writes_the_fallback_and_no_round_touches_it stdout ----\n\nthread 'install_writes_the_fallback_and_no_round_touches_it' (35764) panicked at crates/update/tests/round.rs:2673:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 422,
+          "last_line": 426,
+          "stream": "stdout",
+          "test": "lamp_update_back_puts_back_an_unreadable_self_json",
+          "text": "---- lamp_update_back_puts_back_an_unreadable_self_json stdout ----\n\nthread 'lamp_update_back_puts_back_an_unreadable_self_json' (35766) panicked at crates/update/tests/round.rs:4194:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 427,
+          "last_line": 431,
+          "stream": "stdout",
+          "test": "no_second_round_begins_while_lamp_updates_own_switch_waits",
+          "text": "---- no_second_round_begins_while_lamp_updates_own_switch_waits stdout ----\n\nthread 'no_second_round_begins_while_lamp_updates_own_switch_waits' (35771) panicked at crates/update/tests/round.rs:2564:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 432,
+          "last_line": 438,
+          "stream": "stdout",
+          "test": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+          "text": "---- only_a_skill_that_would_stop_loading_holds_lamp_skills_back stdout ----\n\nthread 'only_a_skill_that_would_stop_loading_holds_lamp_skills_back' (35773) panicked at crates/update/tests/round.rs:1758:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/skills/793f52a1ba7d4cee2966b581395330251dcee0560c27caa1daa386b886aaf6ec/ beside /opt/lampOS/skills/46f40092aebf20711502a762c40d52b5f8f3fd9b09450a6f84dce3e78ca26ea9/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpry0n2M/opt/lampOS/skills/793f52a1ba7d4cee2966b581395330251dcee0560c27caa1daa386b886aaf6ec/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 439,
+          "last_line": 443,
+          "stream": "stdout",
+          "test": "the_fallback_reads_a_self_json_written_by_a_later_updater",
+          "text": "---- the_fallback_reads_a_self_json_written_by_a_later_updater stdout ----\n\nthread 'the_fallback_reads_a_self_json_written_by_a_later_updater' (35779) panicked at crates/update/tests/round.rs:2723:5:\nassertion failed: matches!(lamp.round(), Outcome::SelfSwitched { .. })"
+        },
+        {
+          "first_line": 444,
+          "last_line": 448,
+          "stream": "stdout",
+          "test": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+          "text": "---- the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load stdout ----\n\nthread 'the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load' (35781) panicked at crates/update/tests/round.rs:1977:5:\nFailed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpWelvtM/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")"
+        },
+        {
+          "first_line": 449,
+          "last_line": 455,
+          "stream": "stdout",
+          "test": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+          "text": "---- with_models_off_a_new_updater_confirms_and_the_build_waits_for_models stdout ----\n\nthread 'with_models_off_a_new_updater_confirms_and_the_build_waits_for_models' (35790) panicked at crates/update/tests/round.rs:3562:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/update/10dbcea02567bfb08dcb3497954fc72b56b879e2488a367cd00b1ccd76a326b4/ beside /opt/lampOS/update/bb513cb915a9c54e13ed009f78c8622a20ac920a4d79d41c4dda77361253516d/\", \"lamp-update switches to its build 10dbcea02567; it must confirm itself within 10 min\", \"fetched /opt/lampOS/eyes/models/face.onnx into /opt/lampOS/models/c3880d875b92f62ac6a7943dc426247554336bbc84c222e140d018a80faed7d5\", \"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpYlxz3I/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        },
+        {
+          "first_line": 456,
+          "last_line": 463,
+          "stream": "stdout",
+          "test": "with_the_switch_off_lamp_update_never_switches_itself",
+          "text": "---- with_the_switch_off_lamp_update_never_switches_itself stdout ----\n\nthread 'with_the_switch_off_lamp_update_never_switches_itself' (35795) panicked at crates/update/tests/round.rs:2621:5:\nassertion `left == right` failed: [\"installed /opt/lampOS/voice/ac5af41fe9daceb4873ee154c27b9c6395379c9c838fb4ee49894af91e511743/ beside /opt/lampOS/voice/46421d137ba8334f2ec6d4080c9027718f14115b638af2b0a015ce7a1b1afede/\", \"installed /opt/lampOS/body/31544dc3227b59f790bcbc403f2d4532093a9e1a93abdc1fad2d81873e2cbe97/ beside /opt/lampOS/body/a3a1d61073b402460924220bc1f8ea796bcf7f2eabebea76115318ab5b3a9238/\", \"installed /opt/lampOS/actions/05a03d14233528e8489f927c5cd535aa11882c8dfdc33b2e3bbf2d1716c30097/ beside /opt/lampOS/actions/37bbe92fcebdfb1f7123ccc538c86b8b3550850c7aa95f6ffba06cdb8edc475f/\", \"installed /opt/lampOS/addons/e037bf0f15afe7129776824076eadecde4751443f330a0c7f7914a35709367f4/ beside /opt/lampOS/addons/abee13e69859fe003a960bff32e44b4c5669ddec9fd267e16ffb7c70d23ac8a8/\", \"installed /opt/lampOS/air/7929ccc0e07054b2957dfc28b8f39c3658b454f0f5ab5512834f32c404df8e84/ beside /opt/lampOS/air/f2397e4058fb7a1bf747995e01313a5a15070745c83b4c26f22d2486e05a50b6/\", \"installed /opt/lampOS/cloud/220ec1e6b94424893b82314f500ce6ad33453c86aa71e8e84fd42194d3a549ba/ beside /opt/lampOS/cloud/049f65c8d248a524aa5cf2ce5cbdee26fcc1f1f7c7fd4a42e837c7b36db60bc3/\", \"installed /opt/lampOS/controls/05f3b88ae6626e33b1e961bee22cc0389a1e833ada162b3a2ed50c85a23409b3/ beside /opt/lampOS/controls/d40a58ef9249d6445a5ef7fa9256f0f84d2f769085d1301919571e52595bc24e/\", \"installed /opt/lampOS/ears/90e2caa34d11a406bbada75dbb516e9174767f72afb1bf4af25cf3dab5895e04/ beside /opt/lampOS/ears/e8cd30b8b006af43fb8b00db27556d20ac4b86e6d6d09cf38ceeeca18a6e60df/\", \"installed /opt/lampOS/expression/39b732a7cb76f575e1fd3e8468d6990511337a3050f7bb630c6c08068a58c031/ beside /opt/lampOS/expression/90d46a52deedbce2ebca5abac3afc732a21f84021a16c13099237ebd351f7f67/\", \"installed /opt/lampOS/eyes/a85469a30254b25c2a355ff60d72cde488c8174799ff29245bfaa917af45906e/ beside /opt/lampOS/eyes/defd030c74516d076804652272b6834c652dcb6b91361ddedcb28826c4b4dbf4/\", \"installed /opt/lampOS/health/87ef32263431e45996c1c631e5709b48d796a203f7b6f2c7e89ea75f8e15b155/ beside /opt/lampOS/health/6da7119f4b39f7e034592309d476d29c2c1b6558e3ab4747a52e99ba39a2e4ae/\", \"installed /opt/lampOS/memory/6d867a6aa9d9657d7dc5ac3bcb20c10f9923e094e08063e2e3c70e63e823d852/ beside /opt/lampOS/memory/c4f4ed7bab4c0ed1eb1c5a0df3fc1d13e62272587200898b6edc82a825e4b54a/\", \"installed /opt/lampOS/mood/a4d2e0e639e737469cde4f5246eee57d30d693c13323a05412d0fc12fc439ea2/ beside /opt/lampOS/mood/17348fa01a9c116398d24c095c2a0a7ca1e6a56d198f40f23fc57c485efbf231/\", \"installed /opt/lampOS/name/a144e9311f75e4b2a868864a24d74ecd2c1ebeab3ede757eab7cf9fc67f11dbe/ beside /opt/lampOS/name/5db8fd74a2cbc30b758badd393c8fad1f95a55e87d148d13c89500045c2de165/\", \"installed /opt/lampOS/policy/74116e99f6b026d85f738cd690f93e616a6d03ba825f88cd8fe306bc0928d91a/ beside /opt/lampOS/policy/f8c1983d40e3a396c9895ab3e0c594c04f74abf7d3e46bb84ba6cd04f105a1a6/\", \"installed /opt/lampOS/records/600ab75567f9b6ade1a88c5461ce4af170ac4baec278e66a3aa53ef34a4e63da/ beside /opt/lampOS/records/7bc0ec1934de976bc8c0e39a64ae94693879b2798936d513e0473edde0ab4750/\", \"installed /opt/lampOS/schedule/2d82d241dc63416d005ff0cd6225f58732c44c8b3af8f1e9cc9d0efea10d3abb/ beside /opt/lampOS/schedule/f86d6f081ef62fc5c953c783e75b31d1fba6f96e7bd33a84cbf6fab99221c672/\", \"installed /opt/lampOS/selftest/8f9c817edc0bc344d96e50ecaa395b0dbcefb011ab7a102ae7fd52b090793d51/ beside /opt/lampOS/selftest/a688615c754ee778fb771962097297f24f30f94fb4b9cab85a7926ab3cc74b4a/\", \"installed /opt/lampOS/setup/fa365d8b9df3f09fd1e3e7f44a5855e0e7560298f502bd4c8e514df589a85f42/ beside /opt/lampOS/setup/60c3e266a5b8ee4b23d92f60b1bb316efa0556ee0cf656302ad341163100afb4/\", \"installed /opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/ beside /opt/lampOS/skills/95e43c9cacde194f788c54afd45975e5be9c03dea05c90515a6988258a6fb185/\", \"installed /opt/lampOS/tasks/dd82f9035598333243a818f3429c8243eac1fc97a5616a6d1cb5a1a80c180e7c/ beside /opt/lampOS/tasks/95b83f77cf09c36ad1bb1f2eeb1f326d258c85159126fa7736475ff1e42dcf5f/\"]\n  left: Failed(\"build 2's lamp-skills cannot list /var/lib/lampOS/skills: TEMP/.tmpNcBxyq/opt/lampOS/skills/b6d66838b0400f49f8bc655b81bc2eba6538e361d0c29f876ed6cce0ffad9cfb/lamp-skills: Permission denied (os error 13); nothing is switched\")\n right: Switched(2)"
+        }
+      ],
+      "panic_locations": [
+        {
+          "line": 319,
+          "location": "thread 'a_build_of_only_new_product_skills_places_them_and_restarts_nothing' (35674) panicked at crates/update/tests/round.rs:2093:5:"
+        },
+        {
+          "line": 327,
+          "location": "thread 'a_build_put_back_puts_the_product_skills_back' (35679) panicked at crates/update/tests/round.rs:2005:5:"
+        },
+        {
+          "line": 332,
+          "location": "thread 'a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around' (35691) panicked at crates/update/tests/round.rs:4258:5:"
+        },
+        {
+          "line": 337,
+          "location": "thread 'a_new_updater_not_confirmed_by_the_deadline_is_put_back' (35712) panicked at crates/update/tests/round.rs:2544:5:"
+        },
+        {
+          "line": 342,
+          "location": "thread 'a_new_updater_that_confirms_keeps_its_switch' (35714) panicked at crates/update/tests/round.rs:2465:5:"
+        },
+        {
+          "line": 349,
+          "location": "thread 'a_new_updater_that_exits_at_once_is_put_back' (35716) panicked at crates/update/tests/round.rs:2507:5:"
+        },
+        {
+          "line": 354,
+          "location": "thread 'a_new_updater_that_refuses_every_manifest_is_put_back' (35718) panicked at crates/update/tests/round.rs:2695:5:"
+        },
+        {
+          "line": 359,
+          "location": "thread 'a_round_after_install_keeps_lamp_updates_own_folder' (35727) panicked at crates/update/tests/round.rs:2269:5:"
+        },
+        {
+          "line": 366,
+          "location": "thread 'a_round_after_its_own_switch_keeps_the_old_binarys_folder' (35729) panicked at crates/update/tests/round.rs:2765:5:"
+        },
+        {
+          "line": 371,
+          "location": "thread 'a_round_by_hand_keeps_the_folder_it_runs_from' (35731) panicked at crates/update/tests/round.rs:2749:5:"
+        },
+        {
+          "line": 378,
+          "location": "thread 'a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail' (35733) panicked at crates/update/tests/round.rs:1703:5:"
+        },
+        {
+          "line": 383,
+          "location": "thread 'a_round_places_the_builds_product_skills_and_keeps_the_lamps_own' (35736) panicked at crates/update/tests/round.rs:1909:5:"
+        },
+        {
+          "line": 390,
+          "location": "thread 'a_self_json_from_a_later_version_still_reads' (35741) panicked at crates/update/tests/round.rs:4346:5:"
+        },
+        {
+          "line": 395,
+          "location": "thread 'an_old_updater_climbs_one_updater_a_round' (35748) panicked at crates/update/tests/round.rs:2921:5:"
+        },
+        {
+          "line": 402,
+          "location": "thread 'an_unreadable_self_json_with_both_builds_known_is_put_back' (35754) panicked at crates/update/tests/round.rs:4158:5:"
+        },
+        {
+          "line": 407,
+          "location": "thread 'an_unreadable_self_json_with_the_builds_unknown_is_set_aside' (35756) panicked at crates/update/tests/round.rs:4225:5:"
+        },
+        {
+          "line": 412,
+          "location": "thread 'an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest' (35759) panicked at crates/update/tests/round.rs:2840:5:"
+        },
+        {
+          "line": 419,
+          "location": "thread 'install_writes_the_fallback_and_no_round_touches_it' (35764) panicked at crates/update/tests/round.rs:2673:5:"
+        },
+        {
+          "line": 424,
+          "location": "thread 'lamp_update_back_puts_back_an_unreadable_self_json' (35766) panicked at crates/update/tests/round.rs:4194:5:"
+        },
+        {
+          "line": 429,
+          "location": "thread 'no_second_round_begins_while_lamp_updates_own_switch_waits' (35771) panicked at crates/update/tests/round.rs:2564:5:"
+        },
+        {
+          "line": 434,
+          "location": "thread 'only_a_skill_that_would_stop_loading_holds_lamp_skills_back' (35773) panicked at crates/update/tests/round.rs:1758:5:"
+        },
+        {
+          "line": 441,
+          "location": "thread 'the_fallback_reads_a_self_json_written_by_a_later_updater' (35779) panicked at crates/update/tests/round.rs:2723:5:"
+        },
+        {
+          "line": 446,
+          "location": "thread 'the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load' (35781) panicked at crates/update/tests/round.rs:1977:5:"
+        },
+        {
+          "line": 451,
+          "location": "thread 'with_models_off_a_new_updater_confirms_and_the_build_waits_for_models' (35790) panicked at crates/update/tests/round.rs:3562:5:"
+        },
+        {
+          "line": 458,
+          "location": "thread 'with_the_switch_off_lamp_update_never_switches_itself' (35795) panicked at crates/update/tests/round.rs:2621:5:"
+        }
+      ],
+      "raw_log_basename": "checkout_tests.log",
+      "raw_log_sha256": "669f7dc9b3acc925e7ab0b8c8152ead5c6db9ea2c248d06be1ed9b2094eea157",
+      "reported_failed_test_occurrences": [
+        {
+          "line": 223,
+          "test": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing"
+        },
+        {
+          "line": 227,
+          "test": "a_build_put_back_puts_the_product_skills_back"
+        },
+        {
+          "line": 230,
+          "test": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around"
+        },
+        {
+          "line": 250,
+          "test": "a_new_updater_not_confirmed_by_the_deadline_is_put_back"
+        },
+        {
+          "line": 251,
+          "test": "a_new_updater_that_confirms_keeps_its_switch"
+        },
+        {
+          "line": 252,
+          "test": "a_new_updater_that_exits_at_once_is_put_back"
+        },
+        {
+          "line": 253,
+          "test": "a_new_updater_that_refuses_every_manifest_is_put_back"
+        },
+        {
+          "line": 261,
+          "test": "a_round_after_install_keeps_lamp_updates_own_folder"
+        },
+        {
+          "line": 262,
+          "test": "a_round_after_its_own_switch_keeps_the_old_binarys_folder"
+        },
+        {
+          "line": 263,
+          "test": "a_round_by_hand_keeps_the_folder_it_runs_from"
+        },
+        {
+          "line": 264,
+          "test": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail"
+        },
+        {
+          "line": 266,
+          "test": "a_round_places_the_builds_product_skills_and_keeps_the_lamps_own"
+        },
+        {
+          "line": 270,
+          "test": "a_self_json_from_a_later_version_still_reads"
+        },
+        {
+          "line": 276,
+          "test": "an_old_updater_climbs_one_updater_a_round"
+        },
+        {
+          "line": 281,
+          "test": "an_unreadable_self_json_with_both_builds_known_is_put_back"
+        },
+        {
+          "line": 282,
+          "test": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside"
+        },
+        {
+          "line": 284,
+          "test": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest"
+        },
+        {
+          "line": 288,
+          "test": "install_writes_the_fallback_and_no_round_touches_it"
+        },
+        {
+          "line": 289,
+          "test": "lamp_update_back_puts_back_an_unreadable_self_json"
+        },
+        {
+          "line": 293,
+          "test": "no_second_round_begins_while_lamp_updates_own_switch_waits"
+        },
+        {
+          "line": 294,
+          "test": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back"
+        },
+        {
+          "line": 299,
+          "test": "the_fallback_reads_a_self_json_written_by_a_later_updater"
+        },
+        {
+          "line": 300,
+          "test": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load"
+        },
+        {
+          "line": 308,
+          "test": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models"
+        },
+        {
+          "line": 312,
+          "test": "with_the_switch_off_lamp_update_never_switches_itself"
+        }
+      ],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "checkout_tests",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "build.log",
+      "raw_log_sha256": "e542ff468261522427cf37d27049d348b3f7bed347d04feb452af914173f26cf",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "build",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "example_tests.log",
+      "raw_log_sha256": "f868e640d5028e32e1ba0fa4ba0205413cb17783bb28e2a939b5105ee1345716",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "example_tests",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "example_render.log",
+      "raw_log_sha256": "bc83a171eea2fcb09d1f694c51491f0b47e3c01bef398ca88526a60f2aa65c20",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "example_render",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "example_pack.log",
+      "raw_log_sha256": "ac15c6ca0841c17150c636df48e6b07d9599d0b85a2a653569f624c1db7ba0cf",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "example_pack",
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "compiler_or_cargo_errors": [],
+      "failing_test_names": [],
+      "failure_sections": [],
+      "panic_locations": [],
+      "raw_log_basename": "example_install.log",
+      "raw_log_sha256": "109b22dbfbfa36e7bf7852b6ae8ab7c5beb2f71827d9a31b98116d7541ca349a",
+      "reported_failed_test_occurrences": [],
+      "scope_note": "Every warning/error header, its contiguous diagnostic context, and explicit failed test in this log is listed. Full failed-test stdout/stderr sections are retained with normalized paths. Complete raw logs remain hash-bound separately; panic output alone does not establish a failed test.",
+      "stage": "example_install",
+      "warning_count": 0,
+      "warnings": []
+    }
+  ],
+  "stages_not_run": [],
+  "status": "All terminal stage diagnostics retained",
+  "warning_header_count": 4
+}

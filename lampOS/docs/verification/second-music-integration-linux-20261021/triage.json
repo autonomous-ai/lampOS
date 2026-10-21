@@ -1,0 +1,385 @@
+{
+  "additional_doctest_target_failures": [
+    {
+      "expected_examples": 2,
+      "line": 11093,
+      "log": "tests.log",
+      "text": "error: doctest failed, to rerun pass `-p lamp-bus --doc`"
+    },
+    {
+      "expected_examples": 1,
+      "line": 11168,
+      "log": "tests.log",
+      "text": "error: doctest failed, to rerun pass `-p lamp-msgs --doc`"
+    }
+  ],
+  "complete_consumer_counts": {
+    "failed": 86,
+    "filtered": 0,
+    "ignored": 52,
+    "passed": 9280
+  },
+  "darwin_comparison": {
+    "by_stage": {
+      "checkout_tests": 25,
+      "tests": 61
+    },
+    "exact_failed_names_matched_to_passes": 86,
+    "limit": "Passing exact names on Darwin supports the environment comparison; its separate gate still failed and supplies no Linux qualification.",
+    "raw_logs": {
+      "checkout_tests": {
+        "raw_log_basename": "second-music-integration-20261021-2-host-checkout_tests.log",
+        "raw_log_sha256": "4bb122e66725941aadb9ba40b4c10efb30bf468b646cd12bdc7aa8012467954c"
+      },
+      "tests": {
+        "raw_log_basename": "second-music-integration-20261021-2-host-tests.log",
+        "raw_log_sha256": "63ec42095d6a5f505d3b5c417202db3564206cd67daab83b3853f9d67964c444"
+      }
+    }
+  },
+  "doctest_limit": "The two Cargo doctest target errors precede any test summary and are additional to the 86 failed-test count. Their archived output contains neither EACCES nor another underlying cause; a temporary merged-harness execution failure remains an inference. The expected three no_run examples passed on Darwin.",
+  "environment": {
+    "cap_drop": "ALL",
+    "controlled_probe": "tmp-exec-probe.json",
+    "controlled_probe_original_flags": [
+      "rw",
+      "nosuid",
+      "nodev",
+      "noexec",
+      "relatime",
+      "size=1048576k",
+      "inode64"
+    ],
+    "gid": 20,
+    "limit": "Effective original-gate mount flags were not archived. The separate probe directly confirms noexec and EACCES with the same tmpfs argument and restrictions.",
+    "no_new_privileges": true,
+    "original_gate_effective_tmp_flags_retained": false,
+    "original_tmpfs_argument": "/tmp:rw,nosuid,nodev,size=1073741824",
+    "read_only_root": true,
+    "read_only_source": true,
+    "tmpdir": "/tmp",
+    "uid": 501
+  },
+  "evidence": "diagnostics.json retains every original failed name/assertion and raw-log location. Group line arrays identify those retained sections without duplicating the raw output.",
+  "explicit_eacces_failures": 69,
+  "groups": [
+    {
+      "darwin_passing_test_lines": [
+        1452,
+        1456
+      ],
+      "explicit_eacces": 0,
+      "failed_tests": 2,
+      "group": "cloud_temp_iw_empty_result",
+      "linux_failure_section_first_lines": [
+        1577,
+        1585
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        6425,
+        6433
+      ],
+      "explicit_eacces": 0,
+      "failed_tests": 2,
+      "group": "tasks_copied_binary_preflight_failed",
+      "linux_failure_section_first_lines": [
+        6507,
+        6515
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        6857
+      ],
+      "explicit_eacces": 0,
+      "failed_tests": 1,
+      "group": "voice_camera_spawn_before_callback",
+      "linux_failure_section_first_lines": [
+        9772
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        6906,
+        6907,
+        6908,
+        6909,
+        6910,
+        6911,
+        6912,
+        6913,
+        6914,
+        6916,
+        6917,
+        6918,
+        6920,
+        6922,
+        6923,
+        6924,
+        6925,
+        6926,
+        6927,
+        6928,
+        6929,
+        6930,
+        6931,
+        6932,
+        6933,
+        6934,
+        6935,
+        6936,
+        6937,
+        6938,
+        6939,
+        6940,
+        6941
+      ],
+      "explicit_eacces": 33,
+      "failed_tests": 33,
+      "group": "voice_motor_temp_script_eacces",
+      "linux_failure_section_first_lines": [
+        9778,
+        9783,
+        9788,
+        9793,
+        9798,
+        9803,
+        9808,
+        9813,
+        9818,
+        9823,
+        9828,
+        9833,
+        9838,
+        9843,
+        9848,
+        9853,
+        9858,
+        9863,
+        9868,
+        9873,
+        9878,
+        9883,
+        9888,
+        9893,
+        9898,
+        9903,
+        9908,
+        9913,
+        9918,
+        9923,
+        9928,
+        9933,
+        9938
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        6948,
+        6955,
+        6960,
+        6965,
+        6966,
+        7993,
+        7994,
+        7995,
+        7996,
+        7997,
+        7999,
+        8000,
+        8001,
+        8002,
+        8003,
+        8007,
+        8008,
+        8015
+      ],
+      "explicit_eacces": 18,
+      "failed_tests": 18,
+      "group": "voice_process_temp_script_eacces",
+      "linux_failure_section_first_lines": [
+        9943,
+        9948,
+        9953,
+        9958,
+        9963,
+        9968,
+        9973,
+        9978,
+        9983,
+        9988,
+        9993,
+        9998,
+        10003,
+        10008,
+        10013,
+        10018,
+        10023,
+        10028
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        8719,
+        8720,
+        8731
+      ],
+      "explicit_eacces": 3,
+      "failed_tests": 3,
+      "group": "voice_same_voice_temp_script_eacces",
+      "linux_failure_section_first_lines": [
+        10033,
+        10038,
+        10043
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        9463,
+        9464
+      ],
+      "explicit_eacces": 2,
+      "failed_tests": 2,
+      "group": "voice_made_skill_temp_script_eacces",
+      "linux_failure_section_first_lines": [
+        10048,
+        10055
+      ],
+      "linux_raw_log": "tests.log",
+      "stage": "tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        410,
+        414,
+        438,
+        448,
+        450,
+        451,
+        453,
+        463,
+        471,
+        481,
+        487,
+        495,
+        499
+      ],
+      "explicit_eacces": 13,
+      "failed_tests": 13,
+      "group": "update_temp_skills_explicit_eacces",
+      "linux_failure_section_first_lines": [
+        317,
+        325,
+        340,
+        357,
+        369,
+        376,
+        381,
+        393,
+        410,
+        432,
+        444,
+        449,
+        456
+      ],
+      "linux_raw_log": "checkout_tests.log",
+      "stage": "checkout_tests"
+    },
+    {
+      "darwin_passing_test_lines": [
+        417,
+        437,
+        439,
+        440,
+        449,
+        457,
+        468,
+        469,
+        475,
+        476,
+        480,
+        486
+      ],
+      "explicit_eacces": 0,
+      "failed_tests": 12,
+      "group": "update_expected_self_switch_missing",
+      "linux_failure_section_first_lines": [
+        330,
+        335,
+        347,
+        352,
+        364,
+        388,
+        400,
+        405,
+        417,
+        422,
+        427,
+        439
+      ],
+      "linux_raw_log": "checkout_tests.log",
+      "stage": "checkout_tests"
+    }
+  ],
+  "indirect_fixture_failures": 17,
+  "interpretation": "All 86 failed full-consumer tests involve temporary executable fixtures. The 69 explicit EACCES failures and 17 indirect fixture assertions are consistent with the confirmed noexec behavior under the original tmpfs configuration. The controlled probe does not individually reproduce or waive those tests.",
+  "next_qualification": "Original gate remains failed. Correct temporary executable storage, diagnose the independent worker and packing failures, and obtain a complete fresh qualification; no exemption or passing result is asserted.",
+  "separate_unresolved_failures": [
+    {
+      "counts": {
+        "failed": 1,
+        "filtered": 3055,
+        "passed": 49
+      },
+      "interpretation": "Independent unresolved cancellation; planned later full-suite pass does not explain earlier failure.",
+      "line": 60,
+      "log": "voice_audio.log",
+      "test": "requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement"
+    },
+    {
+      "interpretation": "Independent unresolved metadata-stability refusal on host-shared artifact mount; rejected file and differing fields were not logged.",
+      "line": 3,
+      "log": "example_pack.log",
+      "source": "lampOS/crates/skills/src/requested_audio.rs:121",
+      "text": "lamp-skills: not packed: audio file changed while checking"
+    },
+    {
+      "interpretation": "Missing archive follows unsuccessful pack; do not count installation as passed.",
+      "line": 3,
+      "log": "example_install.log"
+    }
+  ],
+  "source_checks": {
+    "limit": "The mode comparison concerns source files. Generated fixtures set their own executable modes; their failures occur at later execution boundaries.",
+    "source_files": 2291,
+    "source_hashes_unchanged": true,
+    "source_mode_differences_from_worktree": 0
+  },
+  "stage_counts": {
+    "checkout_tests": {
+      "failed": 25,
+      "ignored": 2,
+      "passed": 250
+    },
+    "tests": {
+      "failed": 61,
+      "ignored": 50,
+      "passed": 9030
+    }
+  },
+  "status": "failed_gate_no_waiver"
+}
