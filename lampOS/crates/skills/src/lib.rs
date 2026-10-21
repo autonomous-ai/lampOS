@@ -826,7 +826,20 @@ pub struct Permissions {
     /// output, and an add-on's alone.
     #[serde(default)]
     pub propose: Vec<String>,
+    /// Core-only grants ([`CORE_GRANTS`]): what a skill that comes with the
+    /// lamp may do that no other may, declared here rather than known by its
+    /// name. Any other kind declaring one is refused when it loads, and a
+    /// copy of the skill without the declaration gets nothing of it.
+    #[serde(default)]
+    pub core: Vec<String>,
 }
+
+/// The core-only grants a `kind = "core"` skill may list in `[permissions]
+/// core`: `onboarding`, a say from the voice's onboarding invitations
+/// (`say = { from = "onboarding" }`) and their first snapshot; and
+/// `prepare_unplug`, the composite unplug operation (`body = {
+/// prepare_unplug = true }`), its reads and the reserved never-mind tool.
+pub const CORE_GRANTS: [&str; 2] = ["onboarding", "prepare_unplug"];
 
 impl Permissions {
     /// Why a skill with these permissions may not make `call`, if not.
@@ -834,6 +847,11 @@ impl Permissions {
         // The composite unplug operation moves the body, reads completion
         // evidence and speaks separately; none of those can be undeclared.
         if *call == Call::PrepareUnplug {
+            if !self.grants("prepare_unplug") {
+                return Some(
+                    "body.prepare_unplug needs core = [\"prepare_unplug\"] in [permissions]".into(),
+                );
+            }
             if !self.body || !self.speak {
                 return Some(
                     "body.prepare_unplug needs body = true and speak = true in [permissions]"
@@ -843,6 +861,11 @@ impl Permissions {
             return unplug::READ_TOPICS
                 .iter()
                 .find_map(|topic| self.refuses_reading(topic));
+        }
+        if matches!(call, Call::SayFrom(Source::Onboarding, _)) && !self.grants("onboarding") {
+            return Some(
+                "a say from onboarding needs core = [\"onboarding\"] in [permissions]".into(),
+            );
         }
         let (key, given) = match call {
             Call::Gaze { .. }
@@ -875,6 +898,35 @@ impl Permissions {
                 call.named().0
             )
         })
+    }
+
+    /// Whether it lists the core-only grant `grant` ([`CORE_GRANTS`]).
+    pub fn grants(&self, grant: &str) -> bool {
+        self.core.iter().any(|given| given == grant)
+    }
+
+    /// Core-only grants are known ones, once each, and a core skill's alone.
+    fn check_core(&self, kind: SkillKind) -> Result<(), String> {
+        if let Some(wrong) = self
+            .core
+            .iter()
+            .find(|grant| !CORE_GRANTS.contains(&grant.as_str()))
+        {
+            return Err(format!(
+                "[permissions] core: {wrong:?} is not one of {CORE_GRANTS:?}"
+            ));
+        }
+        if (1..self.core.len()).any(|at| self.core[..at].contains(&self.core[at])) {
+            return Err("[permissions] core lists one twice".into());
+        }
+        match self.core.first() {
+            Some(grant) if kind != SkillKind::Core => Err(format!(
+                "[permissions] core = [{grant:?}] requires kind = core: the core {grant} grant \
+                 is the lamp's own skills' alone, never an {} skill's",
+                kind.name()
+            )),
+            _ => Ok(()),
+        }
     }
 
     /// Why new output ceilings may not be installed. Cleanup of ceilings
@@ -930,6 +982,9 @@ impl Permissions {
         }
         if !self.propose.is_empty() {
             parts.push(format!("proposes {}", self.propose.join(", ")));
+        }
+        if !self.core.is_empty() {
+            parts.push(format!("core {}", self.core.join(", ")));
         }
         if parts.is_empty() {
             "nothing".into()
@@ -2133,6 +2188,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     let file: SkillFile =
         toml::from_str(&read("skill.toml")?).map_err(|error| format!("skill.toml: {error}"))?;
     let kind = SkillKind::read(file.kind.as_deref())?;
+    file.permissions.check_core(kind)?;
     if kind == SkillKind::Addon {
         addon_file(&file, file.trigger.is_none())?;
     } else if !file.permissions.propose.is_empty() {
@@ -2629,15 +2685,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 if !prepare || file.tool.is_none() || !triggers.is_empty() {
                     return Err("prepare_unplug = true needs a tool and no trigger".into());
                 }
-                if !unplug::core_identity(&name, file.tool.as_deref().unwrap_or_default()) {
+                if !file.permissions.grants("prepare_unplug") {
                     return Err(
-                        "prepare_unplug belongs only to prepare-unplug / prepare_to_unplug".into(),
-                    );
-                }
-                if SkillKind::read(file.kind.as_deref())? != SkillKind::Core {
-                    return Err(
-                        "prepare_unplug requires kind = core; it cannot be installed as a package"
-                            .into(),
+                        "prepare_unplug belongs only to a core skill granted core = [\"prepare_unplug\"] in [permissions]".into(),
                     );
                 }
                 steps.push(Step::Call(Call::PrepareUnplug));
@@ -2760,8 +2810,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         if let Some(say) = step.say {
             let call = say_step(say)?;
             if matches!(call, Call::SayFrom(Source::Onboarding, _)) {
-                let canonical = name == "onboarding"
-                    && file.kind.as_deref() == Some("core")
+                let canonical = file.permissions.grants("onboarding")
                     && conditions.is_empty()
                     && triggers.len() == 1
                     && triggers[0].test == Test::Equals("ready".into(), json!(true))
@@ -2771,7 +2820,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                         .as_ref()
                         .is_some_and(|(list, key)| list == "invitations" && key == "invitation");
                 if !canonical {
-                    return Err("say.from onboarding belongs only to the core onboarding skill's invitation trigger".into());
+                    return Err("say.from onboarding belongs only to a core onboarding skill, granted core = [\"onboarding\"] in [permissions], on its invitation trigger".into());
                 }
             }
             // A tool's run tells the model what to say, and what the voice
@@ -4586,8 +4635,7 @@ impl Engine {
                     // list. The first message since the program started
                     // only says what is there: what was there then is not
                     // news. After a reload the value kept then is the last.
-                    let onboarding = skill.name == "onboarding"
-                        && skill.kind == SkillKind::Core
+                    let onboarding = skill.permissions.grants("onboarding")
                         && skill.steps.iter().any(|(_, step)| {
                             matches!(step, Step::Call(Call::SayFrom(Source::Onboarding, _)))
                         });

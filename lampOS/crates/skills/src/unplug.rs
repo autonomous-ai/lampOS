@@ -4,13 +4,8 @@ use lamp_bus::{Bus, Message};
 use serde_json::Value;
 use std::io;
 
-pub const SKILL: &str = "prepare-unplug";
-pub const TOOL: &str = "prepare_to_unplug";
-
-/// This operation belongs only to the installed core skill, never an alias.
-pub fn core_identity(skill: &str, tool: &str) -> bool {
-    skill == SKILL && tool == TOOL
-}
+// The operation is the `prepare_unplug` core grant's ([`crate::CORE_GRANTS`]),
+// never a skill's or a tool's name.
 
 pub const EXPRESSION_TOPIC: &str = "expression/unplug_state";
 pub const RING_TOPIC: &str = "ring/unplug_state";
@@ -101,13 +96,10 @@ pub fn progress(
 
 /// Do not replace an existing latch, including one from before a skills restart.
 /// A repeated request observes that preparation instead of inventing a new one.
-pub fn begin(bus: &Bus, skill: &str, tool: &str, now: u64) -> io::Result<(String, u64)> {
+pub fn begin(bus: &Bus, may: &crate::Permissions, now: u64) -> io::Result<(String, u64)> {
     // Check before reading or writing the latch, including repeated calls.
-    if !core_identity(skill, tool) {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "unplug preparation belongs only to prepare-unplug / prepare_to_unplug",
-        ));
+    if let Some(why) = may.refuses(&crate::Call::PrepareUnplug) {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, why));
     }
     if let Some(message) = bus.latest(Request::TOPIC)? {
         let request = message.parse::<Request>()?;
@@ -307,18 +299,33 @@ mod tests {
     fn ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request() {
         let dir = tempfile::tempdir().unwrap();
         let bus = Bus::new(dir.path()).unwrap();
-        for (skill, tool) in [("desk-rest", TOOL), (SKILL, "desk_rest")] {
-            assert_eq!(
-                begin(&bus, skill, tool, 100).unwrap_err().kind(),
-                io::ErrorKind::PermissionDenied
-            );
-            assert!(bus.latest(Request::TOPIC).unwrap().is_none());
-        }
-        let kept = begin(&bus, SKILL, TOOL, 100).unwrap();
+        let granted = granted();
+        let mut ungranted = granted.clone();
+        ungranted.core.clear();
+        assert_eq!(
+            begin(&bus, &ungranted, 100).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(bus.latest(Request::TOPIC).unwrap().is_none());
+        let kept = begin(&bus, &granted, 100).unwrap();
         let original = bus.latest(Request::TOPIC).unwrap().unwrap();
-        assert!(begin(&bus, "desk-rest", TOOL, 200).is_err());
+        assert!(begin(&bus, &ungranted, 200).is_err());
         assert_eq!(bus.latest(Request::TOPIC).unwrap().unwrap(), original);
-        assert_eq!(begin(&bus, SKILL, TOOL, 200).unwrap(), kept);
+        assert_eq!(begin(&bus, &granted, 200).unwrap(), kept);
+    }
+
+    /// What the shipped skill declares: the grant, body, speech and reads.
+    fn granted() -> crate::Permissions {
+        crate::Permissions {
+            body: true,
+            speak: true,
+            topics: READ_TOPICS
+                .iter()
+                .map(|topic| (*topic).to_owned())
+                .collect(),
+            core: vec!["prepare_unplug".into()],
+            ..crate::Permissions::default()
+        }
     }
 
     fn publish(bus: &Bus, topic: &str, source: &str, value: Value) {
@@ -337,11 +344,11 @@ mod tests {
         let bus = Bus::new(dir.path()).unwrap();
         assert_eq!(stay_tool()["name"], STAY_TOOL);
         assert_eq!(may_stay(&bus, 0, false).unwrap_err(), no, "no latch");
-        let (request, _) = begin(&bus, SKILL, TOOL, 100).unwrap();
+        let (request, _) = begin(&bus, &granted(), 100).unwrap();
         assert_ne!(may_stay(&bus, 0, false).unwrap_err(), no, "latched");
         cancel(&bus, &request, 200).unwrap();
         assert_eq!(may_stay(&bus, 0, false).unwrap_err(), no, "cancelled");
-        let (next, _) = begin(&bus, SKILL, TOOL, 300).unwrap();
+        let (next, _) = begin(&bus, &granted(), 300).unwrap();
         assert_ne!(next, request, "the next unplug gets a fresh request");
         let foreign = tempfile::tempdir().unwrap();
         let foreign = Bus::new(foreign.path()).unwrap();
@@ -401,7 +408,7 @@ mod tests {
     fn repeated_calls_keep_the_original_latch() {
         let dir = tempfile::tempdir().unwrap();
         let bus = Bus::new(dir.path()).unwrap();
-        let first = begin(&bus, SKILL, TOOL, 100).unwrap();
-        assert_eq!(begin(&bus, SKILL, TOOL, 200).unwrap(), first);
+        let first = begin(&bus, &granted(), 100).unwrap();
+        assert_eq!(begin(&bus, &granted(), 200).unwrap(), first);
     }
 }

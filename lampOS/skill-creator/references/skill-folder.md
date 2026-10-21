@@ -99,7 +99,9 @@ core protection and reserved tool names still apply.
 
 `kind` is `installable` for every skill an owner makes (leave it out, or
 write it). `core` is for the skills that come with the lamp; the runtime's
-`lamp-skills install` refuses one.
+`lamp-skills install` refuses one. Only a core skill may list core-only
+grants in `[permissions] core` (`"onboarding"`, `"prepare_unplug"`); a skill
+of any other kind that lists one is refused.
 
 ### The trigger (`[trigger]`)
 

@@ -142,7 +142,7 @@ must not leave a step silently undone)*.
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
 | `kind` | no | `core` (comes with the lamp, always there, never removed), `installable` (its owner puts it on and takes it off), or `addon` (a partner's: it only proposes, [addons.md](addons.md)), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out; and for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)). A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out; for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)); and for a core skill alone, `core`, its core-only grants (below, "Permissions"). A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
@@ -1178,7 +1178,19 @@ known_faces = true  # whether a face at the lamp is known, never whose (a watch'
 output_limits = true  # private declarative light/volume restrictions
 propose = []    # an add-on's alone (kind = "addon"): the acts it may propose
 actions = []    # the actions part's functions it may call by name
+core = []       # a core skill's alone (kind = "core"): its core-only grants
 ```
+
+- **Core-only grants.** `core` lists what a skill that comes with the lamp
+  may do that no other may: `"onboarding"`, a `say = { from = "onboarding" }`
+  on the onboarding invitation trigger, and that trigger's first snapshot;
+  `"prepare_unplug"`, `body = { prepare_unplug = true }`, its completion
+  reads and the reserved `stay_plugged_in` tool. The runtime knows these by
+  the declaration, never by the skill's name: a renamed copy without it is
+  refused, one with it gets the same, and a skill of kind `installable` or
+  `addon` declaring any is not loaded (nor installed): `[permissions] core =
+  ["onboarding"] requires kind = core: ...`. Each grant is checked again
+  where its call leaves the program, like every other permission.
 
 - **At load.** Every topic the skill reads must be in `topics`: those its
   triggers and `[[while]]` conditions name, `humans/faces/tracked` for a
@@ -1657,11 +1669,12 @@ published.
 ## Core skill: prepare to unplug (#1674)
 
 `skills/prepare-unplug` is tool-only (`prepare_to_unplug`) with `kind = "core"`.
-It declares body, speech and its four completion/latch topic reads. These grants
+It declares body, speech, its five completion/latch topic reads and the core
+grant `core = ["prepare_unplug"]`. These grants
 are checked both while loading and at the dedicated runtime boundaries, using
 the existing captured-grant lifetime for admitted runs (see [unplug.md](unplug.md)).
-Both names are reserved for this operation: the loader, runtime admission and bus request
-boundary reject aliases before folding can be requested. Its only step is
+The operation is the grant's, not the name's: the loader, runtime admission and bus request
+boundary refuse a skill without it before folding can be requested. Its only step is
 `body = { prepare_unplug = true }`; triggers, extra steps, choice and flag are
 refused so a readiness statement cannot run as an ordinary early `say`. The
 initial response is explicitly not readiness. A bounded background run waits
