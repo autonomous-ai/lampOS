@@ -5703,7 +5703,10 @@ fn conversation_with_gate(
         for _ in 0..16 {
             let received = rig.privacy.channels.control.receive::<WorkerEvent>();
             let received = match received {
-                Err(error) if privacy_controls => return Err(service_privacy::unavailable(error)),
+                Err(error) if privacy_controls => {
+                    gap_ended(&gap_ride, trace, "privacy worker failed")?;
+                    return Err(service_privacy::unavailable(error));
+                }
                 received => received?,
             };
             let Some(event) = received else {
@@ -5786,8 +5789,14 @@ fn conversation_with_gate(
                         }
                     }
                 }
-                WorkerEvent::Fault { code } => return Err(lost(code)),
-                _ => return Err(io::Error::other("unexpected privacy event").into()),
+                WorkerEvent::Fault { code } => {
+                    gap_ended(&gap_ride, trace, "privacy worker failed")?;
+                    return Err(lost(code));
+                }
+                _ => {
+                    gap_ended(&gap_ride, trace, "privacy worker failed")?;
+                    return Err(io::Error::other("unexpected privacy event").into());
+                }
             }
         }
         // Provider loss closes cloud submissions, never the microphone authority

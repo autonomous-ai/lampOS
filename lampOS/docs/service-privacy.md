@@ -118,7 +118,8 @@ allowed no longer ends the conversation at once (`privacy_gap.rs`):
 - **No fresh reading within 1 s:** the conversation ends as before, and the
   wait reads again. That's before capture's own 1.5 s (`REOPEN_US`).
 - **What it says:** the trace's `privacy_gap` (`began`, `reopened`, or `ended`
-  with `why` on every exit while one is ridden, each with `lasted_us`) and one
+  on every privacy exit while one is ridden, with `why`: `no fresh reading`,
+  `read closed` or `privacy worker failed`; each with `lasted_us`) and one
   journal line at each. Off, every lapse ends the conversation as it always has.
 - **No recording of the lease's tail:** the ride runs only in serve, which
   refuses raw audio diagnostics, so no local recording holds what capture read
