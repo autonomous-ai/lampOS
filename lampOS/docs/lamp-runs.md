@@ -4,7 +4,7 @@ The one list of every merged row and fix that now waits only for a run on a real
 
 **How to use it:** book your lamp with its person, run the row on the build named, and post the result on the row's PR. The first builder then strikes the row here. A row that moves the body needs the person at the arm. **Build** is the branch the switch is on: `#1712` for the voice (the second route), `lamp-voice` for every other part.
 
-**As of** `lamp-voice` `892b1d323` and #1712 `6d2551bd0` (21 Oct, 07:52 +07), with the runs and merges up to 08:0x struck or noted. A row's owner says on #1722 when a run is done, and the first builder strikes it here. The sources are every `until` row of `switches.md` on both branches, `build-rows.md` (the 20 Oct 18:28 copy), the morning list of 21 Oct and the open PRs.
+**As of** `lamp-voice` `04571ea1d` and #1712 `167325721` (21 Oct, 11:0x +07), with the runs and merges up to 11:0x struck or noted. A row's owner says on #1722 when a run is done, and the first builder strikes it here. The sources are every `until` row of `switches.md` on both branches, `build-rows.md` (the 20 Oct 18:28 copy), the morning list of 21 Oct and the open PRs.
 
 ## lamp-4ace (the first builder)
 
@@ -14,7 +14,7 @@ The owner's desk. Most of these ride on a few sessions: the owner at the desk, t
 |---|---|---|---|---|
 | `LAMP_SECOND_OPEN_NAME` | #1722 | Name lines with a 400–800 ms pause before the name, with and without it: names that go on, names let go, and replies to "my name is" alone (morning list 1; #2394 widens it to 2.5 s). | played lines, then the owner's voice | #1712 |
 | `LAMP_MEMORY_ROOM_NOT_ASKER` | #2176 (#2367) | `open-name.sh` and `names.sh` "new session" with a room-kept played name: "What's my name?" never answered with it as the asker's. | nothing (played) | #1712 |
-| `LAMP_CAMERA_FOLLOWS_EYES` | #2233 | A product lamp's run with #2401's scoped context: a played test and `open-name.sh` stay the room's, then the owner's turns are theirs (the first builder's 07:33 plan; the lead's yes asked). | the owner's face and voice | #1712 |
+| `LAMP_CAMERA_FOLLOWS_EYES` | #2233, #2402 | On in the product (#2402) and on lamp-4ace with `LAMP_SECOND_SCOPED_CONTEXT` since 21 Oct 09:51 (the lead's yes, 09:1x). Played test b1034 at 10:34 stayed the room's: day 12 of 12, scenes 1, 0, 3. **Left:** the owner says "remember my face", then their turns are theirs (the name, then "what's my name?"). | the owner's face and voice | #1712 |
 | `LAMP_SECOND_SCOPED_CONTEXT` | #1839 | Person A, then B at the lamp: B's turn is told none of A's exchanges. | two people | #1712 |
 | `LAMP_MEMORY_STABLE_ID` | #2176 | A person renamed A to B asks "what did I tell you?" and hears what they told it as A; an old face keeps its memory; a new face under the old name hears none of it. | the owner's face, and a second person | #1712 |
 | `LAMP_SECOND_PREPARED` | #1712 | The played test and ten minutes of the owner's use, both ways: the median first word under 2.0 s, the pick-up unchanged. | the owner's voice | #1712 |
@@ -58,6 +58,7 @@ The owner's desk. Most of these ride on a few sessions: the owner at the desk, t
 | `LAMP_SECOND_DEEPSEEK_BASE_URL` | #1934 | The relay route with no `deepseek.key`: the played check 5 of 5, and `probe-cascade`'s relay first token within 0.2 s of the direct median. | nothing (played) | #1712 |
 | `LAMP_UNCLEAR_HUM` | #1417 | The light lines: the hum after an empty "Sorry?", and nothing new elsewhere. | nothing (played) | #1712 |
 | `LAMP_SHORT_SOUNDS` | commit 3e3de2d7a | The not-speech played set under `quiet-room-checked`: short words kept, room sounds not answered. | nothing (played) | #1712 |
+| `lamp-skills` `LAMP_WHO_WAS_HERE_NAMES` | #1997 (#2115) | Who was here with a person who said yes to being named: "Was anyone here while I was out?" names them; someone who didn't say yes is "someone the lamp knows" at most. Third's privacy read of part 3 is on #2115, merged into #1712 (20 Oct 11:01). | a known person's yes, and a visit while the owner is out | #1712 |
 | `LAMP_ASKER_FIRST` | #1092 | A `record` run through the two-person scenes sets the 6 dB margin. | nothing (played) | #1712 |
 | `LAMP_ROOM_FILE` | #1465 | A deliberate voice restart in a quiet room, then the 10:57 follow-up, with #1474. | nothing (played) | #1712 |
 | `LAMP_RESEND_LOST_LINE` | #705 | A recorded drop replayed: answered once, and a line with a tool call not resent. | nothing (replay) | #1712 |
@@ -82,6 +83,7 @@ Seventh borrows it this morning. Fifth offered (07:4x on #1722) to take runs the
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
+| `LAMP_SECOND_SPEAKING_FACE` and `LAMP_EYES_SPEAKING`, the "Seeing someone speak" row (Fifth, from Ten) | #2008, #2026, #2407 | #2407's units as drop-ins with the camera switch and scoped context on; the known person says something to keep, then the unknown one, facing the lamp and speaking, asks what they said: told none of it, none of their words kept as the known one's; the known one asks again and is answered (the first builder's 10:39 on #2407, in one booking with #1810). #2407 goes on the product only after it. | two people | #1712 |
 | `LAMP_GOING_ON_NOT_OWN` (Seventh) | #1722 | Run sheet arms D on #2341 with `LAMP_EYES_SPEAKING`: the caller's follow-up answered after a call the eyes didn't see, and after the caller looks away 2 s; a second person facing the lamp first. | the person's face and voice; a second person | #1712 |
 | `LAMP_QUIET_GOING_ON_SAME_ONE` (Seventh) | #1722 | The same arms D. | the person's face and voice; a second person | #1712 |
 | `LAMP_GOING_ON_SAME_ONE` (Seventh) | #2191 | Before and after: a named line answered, then two others' office talk held with it and answered without; the answered person's follow-up said looking away, counted both ways. | the person's face and voice; a busy room | #1712 |
@@ -169,7 +171,7 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
-| `LAMP_APP_UPDATE`, the app's update page | #2360 (#2194) | Install lamp-voice `d90cc8b8e` with it on, then #2194's steps 1 to 8 from the app (on #1396). | the app | lamp-voice |
+| `LAMP_APP_UPDATE`, the app's update page | #2360 (#2194) | Install lamp-voice `d90cc8b8e` with it on, then #2194's steps 1 to 8 from the app (on #1396). Done in part on lamp-0c89 at 10:3x (#1396). (The switch isn't in `switches.md` yet.) | the app | lamp-voice |
 | `lamp-eyes --photo-dir`, `LAMP_PHOTO_FACES` (voice and cloud), the "Faces from a photo" row | #1968 | #1968's steps 4 to 6, with Ten: a selfie added in the app, a two-face photo refused, the person asked once at the lamp; yes then recognised, no or silence then gone. | the person's face; the app | lamp-voice |
 | `LAMP_FACES_PAGE` | #2192 | From the app: the list as the eyes keep it, one face removed and no longer recognised. | the person's face; the app | lamp-voice |
 | `LAMP_MESSAGES`, the "Text your lamp" row | #1673 | The app's chat shows a reply on the second route's config; one hand-made `task_news` pushed through this lamp's `lamp-cloud`, then off. | the app | lamp-voice |
@@ -190,13 +192,12 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
-| `LAMP_SECOND_SPEAKING_FACE`, the "Seeing someone speak" row (Ten) | #2008, #2026 | Two people at the lamp, the unknown one speaking: told none of the known one's memory, and none kept as theirs (with `LAMP_CAMERA_FOLLOWS_EYES` and `LAMP_EYES_SPEAKING`, as #2402 sets). | two people | #1712 |
 | `LAMP_MOOD`, the "One inner state" row (Ten) | #1670, #1728 | `lamp-bus tap mood/state` for a minute (`trials.sh mood`): by day the ring and head breathe together, a clap quickens both, dozing at night slows both, neither jumps. | person at the arm | lamp-voice |
 | `lamp-eyes` `LAMP_ACTIVITY` and `--look-on-change` (Ten) | #1678, #705 | The eyes' CPU in an empty room against `presence-check.sh`'s baseline with `--look-on-change on`; a scripted sitting, each state a minute, twice, scored against its times; a sit-down looked at within 0.6 s. | the person sitting | lamp-voice |
 | `LAMP_USE_SKILL` (Ten) | #1668 | With Desk tutor installed: "dance", "a long jazzy dance" and "check my work", each answered by its skill; the same lines with it off; tool turns against 2.02–2.21 s. | person at the arm; a page | #1712 |
 | `LAMP_LOOK_FULL_SIDE` (Ten) | #987 | A handwriting look shown (the PR named no check). | a handwritten page | #1712 |
 | `LAMP_PLACE`, `LAMP_SECOND_WEATHER` (Ten) | #1712 | With `LAMP_PLACE` set to this lamp's own town: "what's the weather" answered for it, with no search. | nothing (one line) | #1712 |
-| The "Hand-overs from a home lamp" row (Eighth) | #1854 | The first real hand-over from a home lamp: what the lamp said, what Harness ran, and what came back (morning list 8). | the person's voice | #1712 |
+| The "Hand-overs from a home lamp" and "Email, calendar and other connectors" rows (Eighth) | #1854, #2240, #2307, #2309 | From the merged build, with 75c9's person: Slack through Devin Cloud, and "what's on my calendar tomorrow?" through the laptop's agent, each checked by what the lamp said, what Harness ran and what came back (Eighth, 10:4x on #1722). | the person's voice; the laptop's agent with a calendar connector | lamp-voice |
 | `LAMP_SECOND_WRITTEN_WAIT` (Eighth) | #1854 | Task news told after a slow first round. | nothing | #1712 |
 | `lamp-tasks --sign-in-by-code` (Eighth) | #1676 | A person signs the lamp in by its code. | the person | lamp-voice |
 | `lamp-tasks --set-up-later` (Eighth) | #1676 | Shown on a lamp without Harness, and then signed in. | the person | lamp-voice |
@@ -214,6 +215,7 @@ Its voice can't reach speech until #2231 is fixed, so only the move itself runs 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
 | #2396: a V1 lamp to V2 with one `ACTIVATE=1` | #2163 (#2170, #2225, #2228, #2245, #2249) | One promotion: every part active, the poses measured, the body seated until its person confirms, then the first stand. No fleet promotion. | person at the arm | lamp-voice |
+| "Updates cover the whole lamp, V3 to V5" row (Migrate, with Tests) | #1369, #1505, #2421 | After #2396's move, only what 19 and 20 Oct's lamp-4ace trials (#737, #1788) didn't show: a round from the installed `lamp-update.service` under its sandbox, build A to B; models, settings and the image's files in one update (`LAMP_UPDATE_MODELS`, `_APPLY`, `_IMAGE` on for the run); the body in the update; a failed part put back under the unit. A test key made for this run only. The run sheet goes on #2396 first. | a63e's person, at the arm for the body | lamp-voice |
 
 ## lamp-dbda (the hardware side)
 
@@ -236,7 +238,6 @@ From #2208, the bench run on build 3309. Third asks for `head_move` here. The re
 - `lamp-eyes --visits` (#1670): waits for a ruling on keeping visit counts.
 - `LAMP_MEMORY_OBSERVE` (#1693): a dry run on recorded conversations comes first (#1988). `LAMP_MEMORY_THREADS` needs its observations. This is the "Remembers what matters" row.
 - `lamp-eyes --seems` and `--seems-blendshapes` (#1671): the measure's log (#2306) isn't merged, and the model's research-only training pictures need a decision.
-- `lamp-skills` `LAMP_WHO_WAS_HERE_NAMES` (#1997): Third's privacy read and the voice's question (part 3) come before a lamp run.
 - `LAMP_TASKS_ACCOUNTS` (#1676): waits for a computer whose agent has calendar and email connectors (the "Email, calendar" row).
 - `LAMP_SKILLS_STORE` (#1983, on lamp-voice only): waits for the Store's server and key.
 - `LAMP_PRIVACY_CONTROLS=no-slide` (#1722): needs a lamp with no privacy slide, and none is named.
