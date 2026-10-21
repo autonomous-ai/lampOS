@@ -2120,6 +2120,14 @@ pub(crate) mod tests {
             fs::create_dir_all(&kept.exits).unwrap();
             fs::write(kept.exits.join("lamp-voice.service@5521000000.json"), exit).unwrap();
             let mut reports = Reports::open(kept.clone());
+            // The queue's state whole: `Kept` takes a field it can't find as
+            // its default, so a renamed `crashes` would forget the crashes
+            // already counted (the reviewer-lead on #2473).
+            assert_eq!(
+                serde_json::to_value(&reports.kept).unwrap(),
+                serde_json::from_str::<Value>(state).unwrap(),
+                "{day}"
+            );
             // The same boot: its note was taken for the crash that waits.
             assert_eq!(reports.new_notes(), Vec::new(), "{day}");
             let consent = reports.consent();
