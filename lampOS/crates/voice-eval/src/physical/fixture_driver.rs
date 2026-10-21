@@ -26,6 +26,11 @@ use std::{
 };
 
 const POLL_US: u64 = 2_000;
+/// The poll while a round has changed nothing: the fake runtime's own tick,
+/// as the serve fixture does. Most of a physical loopback's rounds change
+/// nothing, and at 2 ms throughout its tests took 1.0 to 1.6 s (#1806).
+/// After any round that changes something, the next is the lamp's 2 ms again.
+const IDLE_POLL_US: u64 = crate::fake::TICK_US;
 const BOOTSTRAP_US: u64 = POLL_US;
 
 /// A read-only handle for backend and player timestamps. It owns no control
@@ -398,12 +403,29 @@ impl ClockedFixture {
             return Ok(());
         }
         let host_until = Instant::now() + DEFAULT_WATCHDOG;
+        let before = self.progress();
         self.runtime_step(host_until)?;
         self.relay_step(sent_frames, enqueued, host_until)?;
+        let step = if self.progress() == before {
+            IDLE_POLL_US
+        } else {
+            POLL_US
+        };
         self.next_poll_us = next
-            .checked_add(POLL_US)
+            .checked_add(step)
             .ok_or_else(|| invalid("fixture poll time overflow"))?;
         self.finish_runtime_exit(sent_frames, enqueued)
+    }
+
+    /// What a round can change: anything said, room, input or frame.
+    fn progress(&self) -> (u64, u64, u64, u64, u64) {
+        (
+            self.runtime_stdout,
+            self.runtime_rooms,
+            self.runner_inputs,
+            self.output_frames,
+            self.expected_room_inputs.get(),
+        )
     }
 }
 
