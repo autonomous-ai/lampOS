@@ -2343,7 +2343,7 @@ async fn a_slow_first_round_makes_one_soft_sound_and_waits_longer() {
     assert!(before_words(&heard) > 0, "{heard:?}");
     assert!(!heard.contains(&"said".to_owned()));
     assert!(
-        begun.elapsed() >= BEGIN_WITHIN_AFTER_CUE,
+        begun.elapsed() >= CUE_AFTER + BEGIN_WITHIN_AFTER_CUE,
         "{:?}",
         begun.elapsed()
     );
@@ -2411,6 +2411,212 @@ async fn each_request_sends_its_times_before_its_end() {
         times_of(&mut written).await,
         (Some([false, false, true, true]), true)
     );
+}
+
+/// Fourth's breakdown of the silences (#2602, 21 Oct): with
+/// `LAMP_SECOND_CUE_AFTER_MS`, the wait sound comes that long after the
+/// words. A chat that begins before it has no sound, one that begins after
+/// it has one; unset, it comes at 1.5 s as before.
+#[tokio::test(start_paused = true)]
+async fn the_wait_sound_comes_when_it_is_told() {
+    async fn cued(mut engine: Engine) -> bool {
+        spoken_turn(&mut engine);
+        let mut cue = None;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(30), engine.next())
+                .await
+                .expect("the turn ends")
+            {
+                ProviderOutput::Stages { cue_ms, .. } => cue = Some(cue_ms.is_some()),
+                ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
+                    return cue.expect("its times before its end");
+                }
+                _ => {}
+            }
+        }
+    }
+    let answer = || vec![vec![text("It is noon."), Ok(ChatEvent::Done)]];
+    let at = Duration::from_millis;
+    assert!(
+        cued(waiting(Some(at(2_000)), answer())).await,
+        "1.5 s, as before"
+    );
+    assert!(
+        !cued(waiting(Some(at(2_000)), answer()).sounding_after(at(3_000))).await,
+        "a chat begun before the time has none"
+    );
+    assert!(
+        cued(waiting(Some(at(3_500)), answer()).sounding_after(at(3_000))).await,
+        "one begun after it has one"
+    );
+}
+
+/// Keep rendering out of the timing tests: either a sound is already in
+/// memory, or its background render has not produced one yet.
+fn wait_clip_ready(engine: &Engine, ready: bool) {
+    let cues = engine.shared.cues.as_ref().unwrap();
+    cues.rendering.store(true, Ordering::Release);
+    if ready {
+        *cues.clips.lock().unwrap() = vec![vec![1]];
+    }
+}
+
+/// A later cue moves the first-chat deadline too: at 4 s, a ready clip
+/// leaves until 7 s, so an answer at 6 s is still heard. Without a clip,
+/// the deadline is the later of the cue time and the plain 3 s bound.
+/// All measurements start at the final words, on the paused runtime
+/// clock; neither cue rendering nor speech-to-text latency counts in them.
+#[tokio::test(start_paused = true)]
+async fn a_later_wait_sound_preserves_the_answer_window() {
+    async fn timings(
+        cue_after: Duration,
+        answer_after: Option<Duration>,
+        ready: bool,
+    ) -> (Option<Duration>, Option<Duration>, Duration) {
+        let chat = if answer_after.is_some() {
+            vec![text("It is noon."), Ok(ChatEvent::Done)]
+        } else {
+            vec![]
+        };
+        let words_at = Arc::new(Mutex::new(None));
+        let heard_at = words_at.clone();
+        let mut engine = waiting(answer_after, vec![chat])
+            .sounding_after(cue_after)
+            .announcing(false)
+            .hearing_words(Arc::new(move |_, _| {
+                *heard_at.lock().unwrap() = Some(tokio::time::Instant::now());
+            }));
+        wait_clip_ready(&engine, ready);
+        let from_words = || words_at.lock().unwrap().expect("the words came").elapsed();
+        spoken_turn(&mut engine);
+        let mut cue = None;
+        let mut answer = None;
+        let mut saying = false;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(8), engine.next())
+                .await
+                .expect("the turn ends within its bound")
+            {
+                ProviderOutput::Transcript {
+                    request: Some(1),
+                    text,
+                    ..
+                } => saying |= !text.is_empty(),
+                ProviderOutput::Audio { request: 1, .. } => {
+                    if saying {
+                        answer.get_or_insert_with(from_words);
+                    } else {
+                        cue.get_or_insert_with(from_words);
+                    }
+                }
+                ProviderOutput::TurnComplete { request: 1, .. } => {
+                    return (cue, answer, from_words());
+                }
+                ProviderOutput::TurnFailed { .. } => panic!("the scripted services succeed"),
+                _ => {}
+            }
+        }
+    }
+    let at = Duration::from_millis;
+    let near = |actual: Duration, expected: Duration| {
+        assert!(
+            actual >= expected && actual < expected + at(10),
+            "from words: {actual:?}, expected {expected:?} within the timer's tick"
+        );
+    };
+    for cue_after in [at(1_500), at(4_000)] {
+        let answer_after = cue_after + at(2_000);
+        let (cue, answer, ended) = timings(cue_after, Some(answer_after), true).await;
+        near(cue.expect("one ready cue"), cue_after);
+        near(
+            answer.unwrap_or_else(|| {
+                panic!("no answer before {ended:?} from the words (cue at {cue_after:?})")
+            }),
+            answer_after,
+        );
+        near(ended, answer_after);
+
+        let (cue, answer, ended) = timings(cue_after, None, true).await;
+        near(cue.expect("one ready cue"), cue_after);
+        assert!(answer.is_none(), "a pending chat says nothing");
+        near(ended, cue_after + at(3_000));
+
+        let (cue, answer, ended) = timings(cue_after, None, false).await;
+        assert!(cue.is_none() && answer.is_none(), "no clip, no sound");
+        near(ended, cue_after.max(at(3_000)));
+    }
+    // A late cue still waits for a chat through its scheduled time when
+    // no clip is ready; it does not give up early at the plain 3 s bound.
+    let (cue, answer, ended) = timings(at(4_000), Some(at(3_500)), false).await;
+    assert!(cue.is_none());
+    near(answer.expect("the answer precedes the cue time"), at(3_500));
+    near(ended, at(3_500));
+}
+
+/// Cancellation during the extra wait drops the chat stream immediately;
+/// its later answer and the 7 s deadline send nothing for the retired turn.
+#[tokio::test(start_paused = true)]
+async fn a_later_wait_sound_does_not_delay_cancellation() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        chats: Mutex::new([vec![text("It is noon."), Ok(ChatEvent::Done)]].into()),
+        first_event_after: Some(Duration::from_secs(6)),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let words_at = Arc::new(Mutex::new(None));
+    let heard_at = words_at.clone();
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .waiting_with_a_sound(true)
+        .sounding_after(Duration::from_secs(4))
+        .announcing(false)
+        .hearing_words(Arc::new(move |_, _| {
+            *heard_at.lock().unwrap() = Some(tokio::time::Instant::now());
+        }));
+    wait_clip_ready(&engine, true);
+    spoken_turn(&mut engine);
+    loop {
+        match tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the cue comes at 4 s")
+        {
+            ProviderOutput::Audio { request: 1, .. } => break,
+            ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
+                panic!("the cue precedes the turn's end");
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(Arc::strong_count(&script.token), 2, "the chat is alive");
+    tokio::time::advance(Duration::from_secs(1)).await;
+    let at = words_at.lock().unwrap().unwrap().elapsed();
+    assert!(at >= Duration::from_secs(5) && at < Duration::from_millis(5_010));
+    engine.retire_through(1);
+    tokio::task::yield_now().await;
+    assert_eq!(Arc::strong_count(&script.token), 1, "the chat was dropped");
+    tokio::time::advance(Duration::from_secs(3)).await;
+    tokio::task::yield_now().await;
+    assert!(
+        engine.try_output().is_none(),
+        "no output after cancellation"
+    );
+}
+
+/// The switch's value: milliseconds from 500 to 4,000, or unset.
+#[test]
+fn the_wait_sounds_time_is_milliseconds_in_its_bounds() {
+    use super::cue_after;
+    assert_eq!(cue_after(None), Ok(None));
+    assert_eq!(cue_after(Some("3000")), Ok(Some(Duration::from_secs(3))));
+    assert_eq!(
+        cue_after(Some(" 500 ")),
+        Ok(Some(Duration::from_millis(500)))
+    );
+    assert_eq!(cue_after(Some("4000")), Ok(Some(Duration::from_secs(4))));
+    for wrong in ["499", "4001", "3s", "", "-1", "on"] {
+        assert!(cue_after(Some(wrong)).is_err(), "{wrong:?}");
+    }
 }
 
 /// The next sound is never the one played last.
