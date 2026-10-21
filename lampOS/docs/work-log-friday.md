@@ -9,6 +9,7 @@ says so, and any other is not a result on a lamp.
 
 | Id | Proposal | Answer |
 |----|----------|--------|
+| friday-P1 | Memory: take from other systems after #2176: finish #2291's hits (gate, Vietnamese, bytes told), replace-by-link for kept facts with link-only-what-was-used (finding 14), "kept" only from the store's answer, since/until from `replacements`, an embeddings bench before any build (#1722, 21 Oct 13:0x) | |
 
 ## Found, not mine
 
@@ -98,3 +99,12 @@ Ready for lamp-voice: yes (all merged)
 - Open for #2176: lamp-06c1 re-test with the person (previous-day recall
   of 20 Oct room facts; the cases with the new switches), the probe after
   #2063 once it has #2279, twelve's #2226.
+
+## 2026-10-21: the lamp re-tests, the row, friday-P1
+
+Ready for lamp-voice: yes (#2446 waits behind #2439)
+
+- lamp-06c1, 4576 (room's scope): the previous-day recall shown by voice for the first time (yesterday's entries found); remember-once, forget-about and the journal-stop line pass; "green now" answered but never kept.
+- lamp-06c1, #1712 4510 (with #2233), its person at the lamp: per-person scope shown (every op `p-`); the observation's day 1 kept 2 threads for the person, 0 for the room. Finding 14: a forget reaches later turns and observations linked to the forgotten thing.
+- Row "Remembers what matters" (#1693): part 1 #2446 (re-ask the note after 10 quiet minutes); part 2 observe-dry on 20 synthetic conversations through the relay: 10/10 kept right, 0 wrong, 0 intrusive; the real-store run declined by the person.
+- friday-P1 posted on #1722, from the architecture review with the person.
