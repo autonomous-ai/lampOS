@@ -90,4 +90,7 @@ The owner does not relay routine agent reports.
   (`grep -E '^test result|FAILED|panicked'`). On a lamp, read `journalctl`
   through `grep` or `tail`, never a whole log.
 - Do not commit, push or deploy without the authorization required by the
-  repository and current conversation.
+  repository and current conversation. For a lampOS builder that authorization
+  is standing for its own branches (`<name>/*`, `lamp-<name>`): it commits,
+  pushes and opens its pull request once its gate passes, as `joining.md` and
+  the root `AGENTS.md` say, and never pushes to `lamp-voice` or `main`.
