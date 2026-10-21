@@ -5,9 +5,9 @@ on:
   # lampos-arm64.yml and lampos-clippy.yml check those. A change touching
   # anything else still runs them.
   push:
-    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml']
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml', '.github/workflows/lampos-ci-trial.yml']
   pull_request:
-    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml']
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml', '.github/workflows/lampos-ci-trial.yml']
 
 jobs:
   go:

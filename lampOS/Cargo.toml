@@ -26,3 +26,15 @@ unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = "warn"
+
+# Trial only (devops007/ci-trial, never merged): a fast test profile for CI.
+[profile.ci]
+inherits = "dev"
+opt-level = 1
+debug = false
+debug-assertions = false
+overflow-checks = false
+incremental = false
+
+[profile.ci.package."*"]
+opt-level = 3

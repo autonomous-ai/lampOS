@@ -1,0 +1,86 @@
+name: lampOS CI trial (devops007)
+
+# A one-off measurement of the CI speed proposals (devops007, 21 Oct 2026),
+# never merged. Each variant runs cold on its own runner, with no cache read or
+# saved, so it evicts no one's cache:
+#   v0  today: release binaries, then release test binaries, in one job
+#   v1  test job alone (the binaries moved to a parallel job)
+#   v2  v1 linked with lld
+#   v3  v1 in a `ci` profile (our crates opt-level 1, dependencies 3)
+#   v4  v3 linked with lld
+# After the cold build and the tests, each edits lamp-memory, lamp-voice and
+# lamp-msgs in turn and rebuilds the test binaries, as a pull request would
+# once only changed crates rebuild (#2451).
+on:
+  push:
+    branches: ['devops007/ci-trial']
+  workflow_dispatch:
+
+jobs:
+  trial:
+    name: ${{ matrix.v }}
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { v: v0-today, bins: true, cargo: '--release', nextest: '--release', flags: '' }
+          - { v: v1-tests-alone, bins: false, cargo: '--release', nextest: '--release', flags: '' }
+          - { v: v2-lld, bins: false, cargo: '--release', nextest: '--release', flags: '-C link-arg=-fuse-ld=lld' }
+          - { v: v3-ci-profile, bins: false, cargo: '--profile ci', nextest: '--cargo-profile ci', flags: '' }
+          - { v: v4-ci-profile-lld, bins: false, cargo: '--profile ci', nextest: '--cargo-profile ci', flags: '-C link-arg=-fuse-ld=lld' }
+    env:
+      RUSTFLAGS: ${{ matrix.flags }}
+    steps:
+      - name: system packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file lld
+      - uses: actions/checkout@v4
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: fetch
+        working-directory: lampOS
+        run: cargo fetch --locked
+      - name: build (release, the lamps' binaries)
+        if: matrix.bins
+        working-directory: lampOS
+        run: cargo build --locked --release --workspace --bins --examples
+      - name: compile test binaries (cold)
+        working-directory: lampOS
+        run: |
+          s=$(date +%s); cargo test --locked --no-run --workspace ${{ matrix.cargo }}
+          echo "| ${{ matrix.v }} | cold test compile | $(( $(date +%s) - s )) s |" >> ../times.md
+      - name: linker used
+        working-directory: lampOS
+        run: |
+          f=$(ls -S target/*/deps/lamp_voice-* | grep -v '\.d$' | head -1)
+          echo "$f"; readelf -p .comment "$f" | tee -a ../linker.txt
+      - name: run tests
+        working-directory: lampOS
+        continue-on-error: true
+        run: |
+          s=$(date +%s); rc=0
+          cargo nextest run --locked --workspace ${{ matrix.nextest }} --profile pr --no-fail-fast -j num-cpus \
+            -E 'not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))' 2>&1 | tee ../tests.log || rc=$?
+          echo "| ${{ matrix.v }} | run tests (rc=$rc) | $(( $(date +%s) - s )) s |" >> ../times.md
+      - name: rebuild after an edit (memory, voice, msgs)
+        working-directory: lampOS
+        run: |
+          for c in memory voice msgs; do
+            echo "// trial edit $(date +%s%N)" >> crates/$c/src/lib.rs
+            s=$(date +%s); cargo test --locked --no-run --workspace ${{ matrix.cargo }} 2>&1 | tail -1
+            echo "| ${{ matrix.v }} | edit lamp-$c, rebuild tests | $(( $(date +%s) - s )) s |" >> ../times.md
+          done
+      - name: summary
+        if: always()
+        run: |
+          { echo "### ${{ matrix.v }}"; echo "| variant | step | time |"; echo "|---|---|---|"; cat times.md 2>/dev/null
+            echo; echo '```'; cat linker.txt 2>/dev/null; grep -E "Summary \[|^ +(FAIL|TIMEOUT|SIGSEGV|SIGABRT) \[" tests.log 2>/dev/null | tail -40; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
