@@ -460,6 +460,31 @@ impl HandControls {
         Ok(owner)
     }
 
+    /// As [`Self::with_test_asleep`], muted by the person, not asleep: a
+    /// plain mute, with head touch and its durable mute at `record`.
+    #[cfg(test)]
+    pub(crate) fn with_test_muted(
+        clock_id: &str,
+        started_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        let (_sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let mut muted = MuteRecord::new(clock_id)?;
+        assert!(muted.request_mute(started_us / 2));
+        Self::from_parts(
+            ControlsOptions {
+                head_touch: true,
+                mute_record: Some(record.to_path_buf()),
+                ..Default::default()
+            },
+            clock_id,
+            muted,
+            input,
+            Arc::new(Shared::default()),
+            started_us,
+        )
+    }
+
     /// As [`Self::with_test_touch`], already put to sleep by a hand held on
     /// the head (#711), its durable mute at `record` (never written here).
     #[cfg(test)]

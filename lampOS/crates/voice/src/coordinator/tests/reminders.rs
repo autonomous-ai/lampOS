@@ -1378,6 +1378,7 @@ fn told_the_face(
         &controls,
         &reminders,
         None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
         None,
         Some(owed.clone()),
         None,

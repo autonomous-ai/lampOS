@@ -1194,6 +1194,17 @@ fn tap_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -
     head_touch && !asleep_on && !privacy_controls
 }
 
+/// Whether a hand's sleep shows the asleep face while the service waits
+/// (#1362, the first builder on #1362, 21 Oct 09:21), and if so whether it
+/// yields to a closing slide: with head touch, where the face is not
+/// already shown all along by `LAMP_RING_ASLEEP=on`, and on the Controls
+/// privacy route too, while its slide is open, giving the ring to the
+/// slide's indication when it closes ([`crate::ring_asleep::SleepFace`]).
+/// A dark ring reads as idle.
+fn sleep_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -> Option<bool> {
+    (head_touch && (privacy_controls || !asleep_on)).then_some(privacy_controls)
+}
+
 /// What the journal says, once, when `LAMP_REMINDER_PULSE=on` has no
 /// asleep face to draw on (#1545, the first builder, 18 Oct 18:03): the
 /// pulse is drawn over that face, so rather than pulse nothing, it says
@@ -1245,7 +1256,16 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
-        trace, cues, controls, reminders, tap_face, health, None, None, wait,
+        trace,
+        cues,
+        controls,
+        reminders,
+        tap_face,
+        None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        health,
+        None,
+        None,
+        wait,
     )
 }
 
@@ -1263,12 +1283,16 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 ///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
-fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
+fn muted_wait_pulsing<
+    F: FnMut() -> Option<crate::ring_asleep::Asleep>,
+    G: FnMut() -> Option<crate::ring_asleep::Asleep>,
+>(
     trace: &mut SessionState,
     cues: &mut Option<CueSink>,
     controls: &RefCell<Option<HandControls>>,
     reminders: &RefCell<Option<crate::reminders::Reminders>>,
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
+    sleep_face: Option<crate::ring_asleep::SleepFace<G>>,
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
     light: Option<crate::ring_light::RingLight>,
@@ -1285,11 +1309,17 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     // "cannot be read" (#1376): only past the wait's own grace.
     let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
+    let sleep_face = RefCell::new(sleep_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
     let light = RefCell::new(light);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
+            // The slide closed: a hand's sleep's face gives the ring to the
+            // slide's indication before the wait starts it (#1362, #795).
+            if let Some(face) = sleep_face.borrow_mut().as_mut() {
+                face.slide(state);
+            }
             unread_since.set(match state {
                 crate::privacy::PrivacyState::Unavailable => {
                     Some(unread_since.get().unwrap_or(at_us))
@@ -1317,10 +1347,25 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
                 Some(controls) => {
                     let (allowed, observation) = controls.quiescent_observation()?;
                     record_hand_pats(&mut trace.borrow_mut(), observation.pets)?;
+                    // A hand's sleep shows the asleep face (#1362), and a
+                    // tap's face is not drawn over it.
+                    let sleeping = match sleep_face.borrow_mut().as_mut() {
+                        Some(face) => {
+                            if face.poll(observation.asleep) {
+                                record(
+                                    &mut trace.borrow_mut(),
+                                    json!({"kind":"head_sleep_face","at_us":monotonic_us()}),
+                                )?;
+                            }
+                            face.showing()
+                        }
+                        None => false,
+                    };
                     answer_muted_tap(
                         tap_face.borrow_mut().as_mut(),
                         &observation,
                         may_hear(allowed, slide.get()),
+                        sleeping,
                         &mut trace.borrow_mut(),
                     )?;
                     (allowed, observation.asleep, controls.restored_after_fault())
@@ -1375,6 +1420,9 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
+    if let Some(face) = sleep_face.into_inner() {
+        face.stop();
+    }
     // Let go before the next session's ring worker takes the light up.
     drop(light.into_inner());
     // The wait ends on the look that read the switch open, with no look
@@ -1390,14 +1438,17 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 
 /// One look of the muted wait at the head (#711): a tap taken while the
 /// lamp still may not hear gets the asleep face for about a second, said in
-/// the trace as `head_tap_muted_face`.
+/// the trace as `head_tap_muted_face`. Not while a hand's sleep's face is
+/// `sleeping` (#1362): it is shown already, and the ring has one writer.
 fn answer_muted_tap<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     face: Option<&mut crate::ring_asleep::TapFace<F>>,
     observation: &crate::hand_controls::Observation,
     allowed: bool,
+    sleeping: bool,
     trace: &mut SessionState,
 ) -> Result<()> {
-    if let Some(face) = face
+    if !sleeping
+        && let Some(face) = face
         && face.poll(observation.head_tap_at_us.is_some(), allowed)
     {
         record(
@@ -1415,6 +1466,19 @@ fn answer_muted_tap<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// mute open is still a muted lamp (the reviewer on #1288).
 fn may_hear(allowed: bool, slide: Option<crate::privacy::PrivacyState>) -> bool {
     allowed && slide != Some(crate::privacy::PrivacyState::Muted)
+}
+
+/// The asleep face for a hand's sleep, on the lamp's own ring (Linux).
+fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
+    #[cfg(target_os = "linux")]
+    {
+        crate::ring_asleep::Asleep::start(ceiling)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = ceiling;
+        None
+    }
 }
 
 /// The asleep face for a tap, on the lamp's own ring (Linux).
@@ -2349,6 +2413,14 @@ fn run_source(
                     privacy_controls,
                 )
             });
+            // A hand's sleep shows the asleep face where it is not shown
+            // all along, on the privacy route too while its slide is open
+            // (#1362).
+            let sleep_face_ceiling = options.ring_channel_ceiling.zip(sleep_face_allowed(
+                crate::hand_controls::head_touch_from_environment(),
+                crate::ring_asleep::enabled_from_environment(),
+                privacy_controls,
+            ));
             if let Some(line) = pulse_without_face(
                 crate::ring_asleep::pulse_enabled_from_environment(),
                 options.ring_channel_ceiling.is_some(),
@@ -2369,6 +2441,9 @@ fn run_source(
                     let tap_face = tap_face_ceiling.map(|ceiling| {
                         crate::ring_asleep::TapFace::new(move || tapped_face(ceiling))
                     });
+                    let sleep_face = sleep_face_ceiling.map(|(ceiling, yields)| {
+                        crate::ring_asleep::SleepFace::new(move || sleeping_face(ceiling), yields)
+                    });
                     // A reminder owed while it waits pulses on the asleep
                     // face (#1545, `LAMP_REMINDER_PULSE=on`).
                     #[cfg(target_os = "linux")]
@@ -2384,6 +2459,7 @@ fn run_source(
                         &controls,
                         &reminders,
                         tap_face,
+                        sleep_face,
                         crate::bus_out::WaitHealth::from_environment(),
                         pulse,
                         crate::ring_light::while_muted_from_environment(
