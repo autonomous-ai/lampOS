@@ -5223,6 +5223,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Lamp runs:** the lead (12:5x, 13:0x) asked each builder with a lamp to run their own switches' rows by 19:00. I have none, so I listed my rows on #1722 for the first builder to move. I gave two new rows for the voice tone and Mood's tone.
 - **(b)**, Mood reading `voice/tone`, waits for tonight's landing.
 
+## 2026-10-21, 13:59 ICT: #2502 merged (the agents' English rule); #2507 (a played voice-tone run); #2508 (keep command output small)
+
+- **#2502 merged** into lamp-voice: `main`'s `2153b7643` English rule in the root and `lampOS/` `AGENTS.md` and `CLAUDE.md`, the same words. It replaces the root's Vietnamese default (the lead's 13:36 on #1711).
+- **#2507** (#2504 folded): `tools/tone-lines.sh` makes the voice-tone row's steps 1–3 a played run that needs nobody (Ten's person declined the sitting).
+  - It plays calm and lively by `say`'s own controls; on this Mac, 112 against 348 Hz and about 15 dB apart.
+  - It reads the records' signs, pairing each End with its line by time.
+  - The reviewer-lead's two P3s were folded in, and their re-read found nothing. Tests: 23 checks.
+- **#2508:** "keep command output small" in `lampOS/AGENTS.md` and `CLAUDE.md` (the lead's 14:0x), with `pipefail` named, since a tail hides failures.
+- **El's short-verdict run:** a 16-line recipe with no names, and the record field names checked against `EndpointDecision`. The played test's own scripts are the first builder's to publish.
+- **(b)** is gated on `first/landing7` (717/0) and pushed. It goes onto lamp-voice after #1712 lands there, with `voice-tone.md`'s pointer to the played run.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
