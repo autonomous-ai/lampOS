@@ -10387,11 +10387,16 @@ fn conversation_with_gate(
         // `LAMP_TASK_NEWS_AT_PAUSE=on`, at the first pause of a second, as
         // a due reminder waits, #560), nothing is owed, and the room is not
         // busy with other talk.
+        // A sign-in's news, put first, is told at the next pause whatever
+        // the switch says (#2602, finding 4): the person just asked for it,
+        // and its question has a deadline. Put first before the switch is
+        // looked at, so it goes ahead with the switch on too (the
+        // reviewer-lead's P2 on #2642).
         if let Some(news) = task_news.as_mut()
             && !reminder_waiting
             && news.waiting().is_some()
             && crate::task_news::quiet_for_news(
-                news_at_pause,
+                news.sign_in_first() || news_at_pause,
                 clock,
                 last_turn_us,
                 last_spoke_us,
@@ -10446,7 +10451,7 @@ fn conversation_with_gate(
             record(
                 trace,
                 json!({"kind":"task_news","at_us":clock,"key":told.key,"also":told.also,"provider_session":provider_session,
-                    "at_pause":news_at_pause,"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
+                    "at_pause":news_at_pause || crate::sign_in::is_news(&told.key),"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
             )?;
             snapshot = commit_written_turn(
                 owner,

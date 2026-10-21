@@ -855,6 +855,27 @@ impl TaskNews {
         self.found.get(key).copied()
     }
 
+    /// Whether a sign-in's news waits (#2602, finding 4), put first if so:
+    /// it is told at the next pause, as [`AT_PAUSE_ENVIRONMENT`] tells all
+    /// news, whatever that switch says. The person just asked for it, and
+    /// it has a deadline: on lamp-75c9 on 21 October it waited for a quiet
+    /// room like a task's news, and a sign-in's question goes unanswered in
+    /// two minutes. Others keep their order behind it. Call after
+    /// [`Self::waiting`]; it never blocks.
+    pub fn sign_in_first(&mut self) -> bool {
+        let Some(place) = self
+            .waiting
+            .iter()
+            .position(|news| crate::sign_in::is_news(&news.key))
+        else {
+            return false;
+        };
+        if let Some(news) = self.waiting.remove(place) {
+            self.waiting.push_front(news);
+        }
+        true
+    }
+
     /// For a test of the voice's turn: `news` waiting, come in `ago`.
     #[cfg(test)]
     pub(crate) fn waiting_for_test(news: News, ago: Duration) -> Self {
@@ -868,6 +889,16 @@ impl TaskNews {
         news: News,
         ago: Duration,
     ) -> (Self, Receiver<(String, u64)>) {
+        Self::all_waiting_for_test(vec![news], ago)
+    }
+
+    /// [`Self::waiting_for_test_heard`], with all of `news` waiting in
+    /// order.
+    #[cfg(test)]
+    pub(crate) fn all_waiting_for_test(
+        news: Vec<News>,
+        ago: Duration,
+    ) -> (Self, Receiver<(String, u64)>) {
         let (heard, heard_out) = mpsc::channel();
         let came = Instant::now()
             .checked_sub(ago)
@@ -875,8 +906,8 @@ impl TaskNews {
         let news = Self {
             offered: mpsc::channel().1,
             told: mpsc::channel().0,
-            found: BTreeMap::from([(news.key.clone(), came)]),
-            waiting: VecDeque::from([news]),
+            found: news.iter().map(|news| (news.key.clone(), came)).collect(),
+            waiting: VecDeque::from(news),
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
@@ -2993,6 +3024,41 @@ mod tests {
         assert_eq!(news.waiting(), Some(&soon));
         std::thread::sleep(Duration::from_millis(60));
         assert!(news.waiting().is_none());
+    }
+
+    /// #2602, finding 4: a sign-in's news goes ahead of a task's, and the
+    /// task's keeps its place behind it.
+    #[test]
+    fn a_sign_ins_news_is_put_first() {
+        let (offer, offered) = mpsc::channel();
+        let mut news = TaskNews {
+            offered,
+            told: mpsc::channel().0,
+            waiting: VecDeque::new(),
+            found: BTreeMap::new(),
+            told_already: Arc::new(Mutex::new(BTreeSet::new())),
+            stopping: Arc::new(AtomicBool::new(false)),
+            status: Arc::new(Mutex::new(None)),
+            heard: mpsc::channel().0,
+        };
+        let waiting = |key: &str| News {
+            key: key.into(),
+            note: "(…)".into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+        };
+        for key in ["s:1:1", "s:2:1", "sign-in-3-asking"] {
+            offer.send(waiting(key)).unwrap();
+        }
+        assert_eq!(news.waiting().unwrap().key, "s:1:1");
+        assert!(news.sign_in_first());
+        let order: Vec<String> = std::iter::from_fn(|| news.tell().map(|told| told.key)).collect();
+        assert_eq!(order, ["sign-in-3-asking", "s:1:1", "s:2:1"]);
+        offer.send(waiting("s:4:1")).unwrap();
+        assert!(news.waiting().is_some());
+        assert!(!news.sign_in_first());
     }
 
     #[test]

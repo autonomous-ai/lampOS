@@ -1601,6 +1601,18 @@ never have asked or taken an answer on a lamp).
   it), nor does the end after a no. Each is told once; its key
   (`sign-in-<id>-code`, `-asking`, `-done`) has no `:`, so it is never taken
   for a task's or sent as `told`.
+- **Told at the next pause** (#2602, finding 4): a sign-in's news goes
+  ahead of any task's waiting (`TaskNews::sign_in_first`) and is told at
+  the first pause, as `LAMP_TASK_NEWS_AT_PAUSE=on` tells all news, whether
+  that switch is on or not. On lamp-75c9 on 21 October it waited for 15 s
+  with no turn like a task's news, though the person had just asked for
+  it and its question goes unanswered in two minutes. Someone there, the
+  room not busy and nothing owed still hold it; a task's news keeps its
+  15 s without the switch, and the record's `task_news` says `at_pause`
+  true for a sign-in's. Tests:
+  `a_sign_ins_news_is_told_at_the_first_pause_without_the_switch`,
+  `with_the_switch_on_a_sign_ins_news_goes_ahead_of_a_tasks` (as on
+  product lamps) and `a_sign_ins_news_is_put_first`.
 - **The question heard:** once the question's turn was heard whole
   (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
   sign-in's id and that turn's number, the same number the worker's tools
