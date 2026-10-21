@@ -1,0 +1,6 @@
+{
+  "lampOS/crates/skills/tests/it/addon.rs": "4f0367b475237afc69a77eab20592b08ebbd9ca1f3e48e26f6fc4a9827fa7961",
+  "lampOS/crates/skills/tests/it/skills.rs": "6bd14887c6c5a3a8da07c1c5cb83029cde18e6cfeb22902df4de8e5ad7246727",
+  "lampOS/crates/skills/src/main.rs": "7fdc2ef17bce562301d3dc56034a5457a7ddea207f982efa75a4ace3f729549c",
+  "lampOS/crates/skills/src/addon.rs": "cdfb0cee0c3a84815f0f08c762c7cb36c9afc70dea8a233034fb7cd9ef2fd476"
+}

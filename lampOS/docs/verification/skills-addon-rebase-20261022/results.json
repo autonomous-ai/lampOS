@@ -1,0 +1,482 @@
+{
+  "head_before_correction": "b564aa0647921f822b14e40b8f8fe871a12427ad",
+  "base": "74b90c317b39b0320fcf342e40a232240578a626",
+  "source_sha256": {
+    "lampOS/crates/skills/tests/it/addon.rs": "3604ea36dd9bb059973e8cf510f2a8b6ca4c3a25c93a2c27b68aa5b47d6db83b",
+    "lampOS/crates/skills/tests/it/skills.rs": "e53754fdc3a4421d153cc37f3c81b01710cb1b033ac55c1a5e1b95743ada2602",
+    "lampOS/crates/skills/src/main.rs": "8a851c583cae9eec4b5573c65e8143da142d99a5f7af9a2922096c9353710122",
+    "lampOS/crates/skills/src/addon.rs": "cdfb0cee0c3a84815f0f08c762c7cb36c9afc70dea8a233034fb7cd9ef2fd476",
+    "lampOS/docs/skills.md": "b13f5844e5c306fa301c62eb32cecf506a3b4bd4d8b3b88cd25491e25f1d2b7f"
+  },
+  "source_freshness": {
+    "files": 1323,
+    "all_byte_hashes_equal": true,
+    "aggregate_sha256": "a3de9bfc15f0e971be9eeec52e953407e2be1e9d17162adbbc7b4648702baa97"
+  },
+  "commands": [
+    {
+      "label": "metadata",
+      "command": [
+        "cargo",
+        "metadata",
+        "--format-version",
+        "1",
+        "--no-deps",
+        "--offline",
+        "--locked"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.07174,
+      "stdout": "metadata.stdout",
+      "stderr": "metadata.stderr",
+      "stdout_sha256": "7449ac9e9b36b61840e5d67f063e1de3f7a3e21faef17f84c1f63c555c2bab70",
+      "stdout_bytes": 177840,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "before-rename-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 43.269271,
+      "stdout": "before-rename-compile.stdout",
+      "stderr": "before-rename-compile.stderr",
+      "stdout_sha256": "0918811c75305274558d84b66e157af8bbada6aef13240d69081f139bc7585bc",
+      "stdout_bytes": 182013,
+      "stderr_sha256": "1aa97ca6d06120fccfaf92150144d1f8014487088ba0e3f62c4f838a033614d6",
+      "stderr_bytes": 2344
+    },
+    {
+      "label": "before-rename-failure",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 101,
+      "exit_code": 101,
+      "wall_s": 11.585355,
+      "stdout": "before-rename-failure.stdout",
+      "stderr": "before-rename-failure.stderr",
+      "stdout_sha256": "6e7f102512e30d607af27a99dbdce0c8f93b49735e23b585442984b26860da1c",
+      "stdout_bytes": 319,
+      "stderr_sha256": "bed371825f7cf51ce3bd3ff566054ce0a5ac4e0aa43b370067ed0f96004993e7",
+      "stderr_bytes": 722
+    },
+    {
+      "label": "after-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 5.127454,
+      "stdout": "after-compile.stdout",
+      "stderr": "after-compile.stderr",
+      "stdout_sha256": "a8e62782a26626eeae8d874176843ca390aa03cdabe4cc005470be1851fbba46",
+      "stdout_bytes": 181989,
+      "stderr_sha256": "ba9d19065e66d5fc24926bbd252855bdd2f9c58e43a7694898f13c13d69aa3c0",
+      "stderr_bytes": 163
+    },
+    {
+      "label": "after-enabled-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.378542,
+      "stdout": "after-enabled-1.stdout",
+      "stderr": "after-enabled-1.stderr",
+      "stdout_sha256": "568f83c6fb98fb399a630e23e7584fd2f49e93e5ed8a25b1599750f6bd39ea71",
+      "stdout_bytes": 205,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "after-disabled-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.645774,
+      "stdout": "after-disabled-1.stdout",
+      "stderr": "after-disabled-1.stderr",
+      "stdout_sha256": "1be05bb36c0f890ca5cb3172c2db162495ad8a98cb21f6636a0b016f908130bf",
+      "stdout_bytes": 195,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "after-enabled-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.695748,
+      "stdout": "after-enabled-2.stdout",
+      "stderr": "after-enabled-2.stderr",
+      "stdout_sha256": "7e5dfb740fb3c7c919da9a32e1c3dc97e7b50922fe96ee58c6fd559356d19a94",
+      "stdout_bytes": 205,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "after-disabled-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.646402,
+      "stdout": "after-disabled-2.stdout",
+      "stderr": "after-disabled-2.stderr",
+      "stdout_sha256": "1be05bb36c0f890ca5cb3172c2db162495ad8a98cb21f6636a0b016f908130bf",
+      "stdout_bytes": 195,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "after-enabled-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.68963,
+      "stdout": "after-enabled-3.stdout",
+      "stderr": "after-enabled-3.stderr",
+      "stdout_sha256": "7e5dfb740fb3c7c919da9a32e1c3dc97e7b50922fe96ee58c6fd559356d19a94",
+      "stdout_bytes": 205,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "after-disabled-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.639772,
+      "stdout": "after-disabled-3.stdout",
+      "stderr": "after-disabled-3.stderr",
+      "stdout_sha256": "e49ac814ed4bc54777e56b4a7c956d3edae8a5ef96e95a56aa2bdef83c5be2bb",
+      "stdout_bytes": 195,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "mutant-rate-limit-bypassed-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.121982,
+      "stdout": "mutant-rate-limit-bypassed-compile.stdout",
+      "stderr": "mutant-rate-limit-bypassed-compile.stderr",
+      "stdout_sha256": "0d2e97a41b3921515e5836fc6b9277e774647dab13037447c5a15be81a936b80",
+      "stdout_bytes": 181989,
+      "stderr_sha256": "f8c36d128404e33973f787c1e5a7f762388d4846eca4d7bf205a7b765ef98108",
+      "stderr_bytes": 163
+    },
+    {
+      "label": "mutant-rate-limit-bypassed",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 101,
+      "exit_code": 101,
+      "wall_s": 1.395909,
+      "stdout": "mutant-rate-limit-bypassed.stdout",
+      "stderr": "mutant-rate-limit-bypassed.stderr",
+      "stdout_sha256": "f446a9014fec66cf26877e3ea9aa14d119f1113931a8e503e4320b32c4ab9232",
+      "stdout_bytes": 318,
+      "stderr_sha256": "04652591b004c4f1b71837dcac63961e04796531436e059824b04d75a4f01aa4",
+      "stderr_bytes": 912
+    },
+    {
+      "label": "mutant-off-filter-ignored-with-slow-startup-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.052888,
+      "stdout": "mutant-off-filter-ignored-with-slow-startup-compile.stdout",
+      "stderr": "mutant-off-filter-ignored-with-slow-startup-compile.stderr",
+      "stdout_sha256": "e44e195b0865e0080b6503d35d2e7e109177ca084a05d0b56814a164bb31b426",
+      "stdout_bytes": 181989,
+      "stderr_sha256": "4bd1ba4f6dd16a6d57734eab53058c0900d3d615c13397d41b6396499d5ea1f2",
+      "stderr_bytes": 163
+    },
+    {
+      "label": "mutant-off-filter-ignored-with-slow-startup",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 101,
+      "exit_code": 101,
+      "wall_s": 1.936602,
+      "stdout": "mutant-off-filter-ignored-with-slow-startup.stdout",
+      "stderr": "mutant-off-filter-ignored-with-slow-startup.stderr",
+      "stdout_sha256": "59a26bf9b07fc75c5b8be073c35abb033a2882b3d65bf9695174f8f349af44e8",
+      "stdout_bytes": 298,
+      "stderr_sha256": "d2be8f80d36c3cf37b39e094cd29735c7f0fc5af55a78d1fcd7da512af0ba83a",
+      "stderr_bytes": 260
+    },
+    {
+      "label": "mutant-done-suppressed-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.082551,
+      "stdout": "mutant-done-suppressed-compile.stdout",
+      "stderr": "mutant-done-suppressed-compile.stderr",
+      "stdout_sha256": "2f023d192c3dc147641cb92513f83111bbe14222d47ad1901c449ca36f5c5cfd",
+      "stdout_bytes": 181989,
+      "stderr_sha256": "f2894ac64413f5c3c7689a309abc2805ce620053c7e33bb558a8fae898e633aa",
+      "stderr_bytes": 163
+    },
+    {
+      "label": "mutant-done-suppressed",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 101,
+      "exit_code": 101,
+      "wall_s": 10.768874,
+      "stdout": "mutant-done-suppressed.stdout",
+      "stderr": "mutant-done-suppressed.stderr",
+      "stdout_sha256": "83dc508b13fb1fca28ef4909e346d154f40c66cb65777254983437316a9cd878",
+      "stdout_bytes": 319,
+      "stderr_sha256": "e3f4abdaaceca1b03e62f337adae65dfbabed0922322c1393558e93ccf80e46f",
+      "stderr_bytes": 644
+    },
+    {
+      "label": "gate-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 10.41566,
+      "stdout": "gate-fmt.stdout",
+      "stderr": "gate-fmt.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "label": "gate-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-Dwarnings"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 80.354662,
+      "stdout": "gate-clippy.stdout",
+      "stderr": "gate-clippy.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    }
+  ],
+  "final_gates": [
+    {
+      "label": "gate-skills-final",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-skills"
+      ],
+      "timeout_s": 1800,
+      "log": "gate-skills-final.log",
+      "exit": 0,
+      "status": "passed",
+      "wall_s": 71.115714,
+      "log_sha256": "04f40d1d3ad6790c1975366b3db5fd49cb6992c8c8e00ea560d0c83a8cdfc5a5"
+    },
+    {
+      "label": "gate-workspace-final",
+      "command": [
+        "cargo",
+        "build",
+        "-q",
+        "--workspace"
+      ],
+      "timeout_s": 1800,
+      "log": "gate-workspace-final.log",
+      "exit": 0,
+      "status": "passed",
+      "wall_s": 80.24555,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "gate-diff-final",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "timeout_s": 1800,
+      "log": "gate-diff-final.log",
+      "exit": 0,
+      "status": "passed",
+      "wall_s": 0.961768,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "optional_broad_gate": {
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-voice-eval"
+    ],
+    "status": "timed_out",
+    "timeout_seconds": 600,
+    "runner_exit": 1,
+    "partial_output_retained": false,
+    "note": "The initial external runner did not persist TimeoutExpired buffered output. No pass/failure counts can be recovered or claimed. Targeted process inspection afterwards found no remaining executable under this owned Cargo target. This broad optional check is not treated as passed; final local gates cover the changed Skills fixture and full workspace build, with full workspace tests required in Linux ARM64 CI."
+  },
+  "metadata_preflight_note": "The first metadata-only attempt rejected the incorrect no-reverse-dependency assumption. The actual twelve-package closure was then recorded; no test or source mutation had run in that first attempt.",
+  "external_directory": "/private/tmp/tests-codex-skills-rename-20261022",
+  "external_runner_sha256": {
+    "verify.py": "9312d7e53ead03e787399ef953ce8644452a73c1227fe0cf6dcca90b762a516f",
+    "finish_gates.py": "cba755a65e79d33f8fc8fb46da3d76c9da2a447ec5b6dce581e46d5e39baedfa"
+  },
+  "success_output_policy": "Full passing command output remains external with hashes; failed controls and stale-name reproduction are retained in failures.txt. The optional timeout did not persist its partial buffered output, so no test counts are claimed for it."
+}
