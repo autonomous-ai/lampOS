@@ -154,7 +154,8 @@ mod tests {
     }
 
     fn quiet_bus(name: &str) -> (Bus, std::path::PathBuf) {
-        let root = std::path::PathBuf::from(format!("/tmp/ls-{name}-{}", std::process::id()));
+        // Not ring.rs's `/tmp/ls-`: the crate's unit tests are one process.
+        let root = std::path::PathBuf::from(format!("/tmp/lsk-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         (Bus::new(&root).unwrap(), root)
