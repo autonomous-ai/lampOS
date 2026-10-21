@@ -16,6 +16,11 @@
 //! decision model on a connection of its own; with no answer in time, a
 //! rule. The answer is published for the skill to act on (`shadow`
 //! false), naming the ask.
+//!
+//! With `--addons` (#2530 part 2) an add-on's say past the add-ons' judge
+//! (`addon/ask`) is put to the same question as something unprompted, shown
+//! only the add-on's name and why, never its words; its decision has `about`
+//! `addon` and names the `proposal`, and is shadow unless `--act addon`.
 use crate::{
     attention::Room,
     decide::{Answer, Asked, Connection, Decider, Failed, Question, Usage},
@@ -23,7 +28,7 @@ use crate::{
     progress::{Choice, LocalTime},
     rules::{Kept, Kind},
 };
-use lamp_msgs::{Decision, Rules, SkillAsk};
+use lamp_msgs::{AddonAsk, Decision, Rules, SkillAsk};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
@@ -65,6 +70,8 @@ pub struct Options {
     /// (`--utc-offset-minutes`) or a zone (`--zone`, #820), as the hello
     /// question's.
     pub local: Option<Arc<LocalTime>>,
+    /// An add-on's say is answered for real (`--act addon`); else shadow.
+    pub act_addon: bool,
 }
 
 impl Options {
@@ -72,6 +79,7 @@ impl Options {
         Self {
             deadline: deadline.min(MOST_ASKING),
             local,
+            act_addon: false,
         }
     }
 }
@@ -99,6 +107,10 @@ pub struct Context {
     pub room: Room,
     pub spoke_up_last_hour: u32,
     pub hour: Option<u8>,
+    /// For an add-on's say: why it suggests it ([`lamp_msgs::ADDON_WHYS`]).
+    /// Its words are never here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub addon_why: Option<String>,
 }
 
 const LAMP: &str = "A small desk lamp robot on the desk of the person it works for: it keeps quiet unless there is a good reason, and when it starts something itself it is brief.";
@@ -111,12 +123,16 @@ fn room_told(room: Room) -> &'static str {
     }
 }
 
-fn what_told(act: &str) -> &'static str {
-    match act {
+fn what_told(context: &Context) -> String {
+    if let Some(why) = &context.addon_why {
+        return format!("say one short line an add-on on the lamp suggests, about: {why}");
+    }
+    match context.act.as_str() {
         "news" => "tell one short piece of news about work it handed to a coding agent",
         REMINDER => "say a reminder the person set, now due",
         _ => "start something small itself, such as inviting a stretch or noting the air",
     }
+    .to_owned()
 }
 
 /// The state as the text that is sent, its fields in this order. The
@@ -128,7 +144,7 @@ pub fn state_text(context: &Context) -> String {
          \"times_the_lamp_spoke_up_unasked_in_the_last_hour\":{},\"hour_of_day\":{}}}}}",
         json!(LAMP),
         json!(context.skill),
-        json!(what_told(&context.act)),
+        json!(what_told(context)),
         json!(context.someone_here),
         context.quiet_s,
         json!(room_told(context.room)),
@@ -273,6 +289,8 @@ pub struct Moment {
     /// ask was received, which its 2 s count from.
     asking: Option<(Context, Instant, Instant)>,
     waiting: VecDeque<(SkillAsk, Instant)>,
+    /// The asks waiting or out that are add-ons' says, by number, with why.
+    addons: BTreeMap<u64, String>,
     /// The newest rules about speaking first, given with `--rules` only.
     rules: Kept,
     totals: Totals,
@@ -308,6 +326,7 @@ impl Moment {
             asker_gone: false,
             asking: None,
             waiting: VecDeque::new(),
+            addons: BTreeMap::new(),
             rules: Kept::default(),
             totals: Totals::default(),
         })
@@ -374,6 +393,34 @@ impl Moment {
         self.waiting.push_back((ask.clone(), now));
     }
 
+    /// An add-on's say past its judge (`addon/ask`, `--addons`): put to
+    /// the question as something unprompted, its decision `about` `addon`.
+    /// One that fails its check is passed over.
+    pub fn asked_addon(&mut self, ask: &AddonAsk, now: Instant) {
+        if ask.check().is_err() {
+            return;
+        }
+        let unprompted = SkillAsk {
+            ask: ask.proposal,
+            skill: ask.addon.clone(),
+            act: "unprompted".into(),
+            person: None,
+            away_min: None,
+            there_s: None,
+        };
+        if self.waiting.len() == MOST_WAITING {
+            self.waiting.pop_front();
+            self.totals.late += 1;
+        }
+        self.waiting.push_back((unprompted, now));
+        self.addons.insert(ask.proposal, ask.why.clone());
+        // Only those still waiting or out are kept.
+        let out = self.asking.as_ref().map(|(context, ..)| context.ask);
+        let waiting: Vec<u64> = self.waiting.iter().map(|(ask, _)| ask.ask).collect();
+        self.addons
+            .retain(|number, _| Some(*number) == out || waiting.contains(number));
+    }
+
     /// What is known of `ask` now.
     fn context(&self, ask: SkillAsk, room_now: Now, unix_ms: u64) -> Context {
         Context {
@@ -389,6 +436,7 @@ impl Moment {
                 .local
                 .as_ref()
                 .map(|local| local.hour_of_day(unix_ms)),
+            addon_why: self.addons.get(&ask.ask).cloned(),
         }
     }
 
@@ -548,24 +596,30 @@ impl Moment {
         self.totals.decided += 1;
         self.totals.by_rule += u64::from(judgement.from_rule);
         let took_ms = u32::try_from(took.as_millis()).unwrap_or(u32::MAX);
+        let addon = context.addon_why.is_some();
+        if addon {
+            self.addons.remove(&context.ask);
+        }
+        let about = if addon { AddonAsk::ABOUT } else { ABOUT };
+        let shadow = addon && !self.options.act_addon;
         let decision = Decision {
-            about: ABOUT.to_owned(),
+            about: about.to_owned(),
             choice: judgement.choice.as_str().to_owned(),
             probability: judgement.probability,
             answers: answers.clone(),
             by: by.clone(),
             took_ms,
-            shadow: false,
+            shadow,
             request: None,
             task: None,
             arrival: None,
-            ask: Some(context.ask),
-            proposal: None,
+            ask: (!addon).then_some(context.ask),
+            proposal: addon.then_some(context.ask),
         };
         let line = Line {
             at_unix_ms: unix_ms,
-            about: ABOUT,
-            shadow: false,
+            about,
+            shadow,
             state: state(&context),
             context,
             asked: self.judge_name.clone(),
@@ -597,6 +651,7 @@ mod tests {
             room: Room::Quiet,
             spoke_up_last_hour: 0,
             hour: Some(14),
+            addon_why: None,
         }
     }
 
@@ -1176,6 +1231,175 @@ mod tests {
                 .turn(t + Duration::from_millis(20), 1_000_000, quiet)
                 .is_none(),
             "nothing else decided"
+        );
+    }
+
+    /// Says yes, and keeps the state it was shown.
+    struct Shown(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+    impl Decider for Shown {
+        fn ask(
+            &mut self,
+            state: &str,
+            _: &[(String, Question)],
+            _: Duration,
+        ) -> Result<Asked, Failed> {
+            self.0.lock().unwrap().push(state.to_owned());
+            Ok(Asked {
+                answers: BTreeMap::from([("good_moment".to_owned(), Answer::Noul(0.9))]),
+                model: "shown".into(),
+                took: Duration::ZERO,
+                usage: None,
+                connection: None,
+            })
+        }
+        fn name(&self) -> &str {
+            "shown"
+        }
+    }
+
+    /// One add-on's say through the moment question, acting or not.
+    fn addon_said(act_addon: bool) -> (Decided, Vec<String>) {
+        let shown = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let options = Options {
+            act_addon,
+            ..Options::new(Duration::from_secs(1), None)
+        };
+        let mut moment = Moment::start(Shown(shown.clone()), options).unwrap();
+        let room_now = Now {
+            room: Room::Quiet,
+            someone_here: Some(true),
+            quiet_s: 300,
+            talking: false,
+            spoke_up_last_hour: 0,
+        };
+        let t = Instant::now();
+        moment.asked_addon(
+            &AddonAsk {
+                proposal: 77,
+                addon: "happy-with-music".into(),
+                why: "music".into(),
+                sure: 0.7,
+            },
+            t,
+        );
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let decided = loop {
+            if let Some(decided) = moment.turn(Instant::now(), 1_000_000, room_now) {
+                break decided;
+            }
+            assert!(Instant::now() < deadline, "not decided");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        let shown = shown.lock().unwrap().clone();
+        (decided, shown)
+    }
+
+    /// #2530 part 2: an add-on's say is the moment question's, shown only
+    /// the add-on and why; its decision is `about` `addon`, names the
+    /// proposal and no skill's ask, and is shadow unless `--act addon`.
+    #[test]
+    fn an_add_ons_say_is_decided_about_addon_naming_its_proposal() {
+        let (decided, shown) = addon_said(true);
+        let decision = &decided.decision;
+        assert_eq!(
+            (
+                decision.about.as_str(),
+                decision.choice.as_str(),
+                decision.proposal,
+                decision.ask,
+                decision.shadow
+            ),
+            ("addon", "say_now", Some(77), None, false)
+        );
+        let [state] = shown.as_slice() else {
+            panic!("{shown:?}")
+        };
+        assert!(
+            state.contains("an add-on on the lamp suggests, about: music"),
+            "{state}"
+        );
+        assert!(state.contains("happy-with-music"), "{state}");
+        let (shadowed, _) = addon_said(false);
+        assert!(shadowed.decision.shadow);
+        assert_eq!(shadowed.decision.about, "addon");
+    }
+
+    /// The reviewer on #2667: a skill's ask and an add-on's say, queued
+    /// together, are each decided as their own: the skill's `about`
+    /// `moment` naming its `ask` and acting, the add-on's `about` `addon`
+    /// naming its `proposal`, shadow without `--act addon`.
+    #[test]
+    fn a_skills_ask_still_names_its_ask_beside_an_add_ons() {
+        let shown = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let options = Options::new(Duration::from_secs(1), None);
+        let mut moment = Moment::start(Shown(shown.clone()), options).unwrap();
+        let room_now = Now {
+            room: Room::Quiet,
+            someone_here: Some(true),
+            quiet_s: 300,
+            talking: false,
+            spoke_up_last_hour: 0,
+        };
+        let t = Instant::now();
+        moment.asked(
+            &SkillAsk {
+                ask: 11,
+                skill: "stretch-break".into(),
+                act: "unprompted".into(),
+                person: None,
+                away_min: None,
+                there_s: None,
+            },
+            t,
+        );
+        moment.asked_addon(
+            &AddonAsk {
+                proposal: 22,
+                addon: "happy-with-music".into(),
+                why: "music".into(),
+                sure: 0.7,
+            },
+            t,
+        );
+        let deadline = Instant::now() + Duration::from_secs(3);
+        let mut decided = Vec::new();
+        while decided.len() < 2 {
+            if let Some(one) = moment.turn(Instant::now(), 1_000_000, room_now) {
+                decided.push(one.decision);
+            }
+            assert!(Instant::now() < deadline, "decided {decided:?}");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let skill = decided
+            .iter()
+            .find(|d| d.ask == Some(11))
+            .expect("the skill's");
+        assert_eq!(
+            (
+                skill.about.as_str(),
+                skill.proposal,
+                skill.shadow,
+                skill.choice.as_str()
+            ),
+            (ABOUT, None, false, "say_now")
+        );
+        let addon = decided
+            .iter()
+            .find(|d| d.proposal == Some(22))
+            .expect("the add-on's");
+        assert_eq!(
+            (addon.about.as_str(), addon.ask, addon.shadow),
+            ("addon", None, true)
+        );
+        let states = shown.lock().unwrap();
+        assert_eq!(states.len(), 2);
+        assert_eq!(
+            states
+                .iter()
+                .filter(|state| state.contains("add-on"))
+                .count(),
+            1,
+            "only the add-on's state names an add-on"
         );
     }
 }

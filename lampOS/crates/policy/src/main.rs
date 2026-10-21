@@ -32,7 +32,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--hedge-after-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
+const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--hedge-after-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--addons] [--act addon] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
 const HELP: &str = "The lamp's policy, in shadow mode: judges whether each thing the voice hears was said to\n\
 the lamp, publishes the decision on the bus (policy/decisions) and writes it down. Nothing\n\
 acts on it. See docs/policy.md.\n\
@@ -128,6 +128,10 @@ struct Arguments {
     rules: bool,
     /// Skills' asks are answered (`--gate`, #939): off unless set.
     gate: bool,
+    /// Add-ons' says are answered (`--addons`, #2530 part 2), and act
+    /// (`--act addon`): off unless set.
+    addons: bool,
+    act_addon: bool,
     /// The second attention judgement, in shadow (`--attention-next`,
     /// #1040): off unless set.
     attention_next: bool,
@@ -153,6 +157,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     let mut rules = false;
     let mut zone = None;
     let mut gate = false;
+    let (mut addons, mut act_addon) = (false, false);
     let mut attention_next = false;
     let mut rule_decides: Option<Vec<lamp_policy::replay::Kind>> = None;
     let mut hedge_after = None;
@@ -167,6 +172,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
             || option == "--hello"
             || option == "--rules"
             || option == "--gate"
+            || option == "--addons"
             || option == "--attention-next"
         {
             let flag = match option.as_str() {
@@ -174,6 +180,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
                 "--hello" => &mut hello,
                 "--rules" => &mut rules,
                 "--attention-next" => &mut attention_next,
+                "--addons" => &mut addons,
                 _ => &mut gate,
             };
             if std::mem::replace(flag, true) {
@@ -226,9 +233,10 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
                 "progress" => std::mem::replace(&mut act_progress, true),
                 "hello" => std::mem::replace(&mut act_hello, true),
                 "attention" => std::mem::replace(&mut act_attention, true),
+                "addon" => std::mem::replace(&mut act_addon, true),
                 _ => {
                     return Err(
-                        "--act takes progress, hello or attention, the questions that may act"
+                        "--act takes progress, hello, attention or addon, the questions that may act"
                             .into(),
                     );
                 }
@@ -312,6 +320,14 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     if gate && !act_hello {
         return Err("--gate needs --hello and --act hello".into());
     }
+    // An add-on's say is put to the moment question, which runs with the
+    // gate only (#2530 part 2).
+    if addons && !gate {
+        return Err("--addons needs --gate".into());
+    }
+    if act_addon && !addons {
+        return Err("--act addon needs --addons".into());
+    }
     if sight_file.is_some() && images.is_none() {
         return Err("--sight-file needs --images".into());
     }
@@ -332,6 +348,8 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
         act_attention,
         rules,
         gate,
+        addons,
+        act_addon,
         attention_next,
         rule_decides: rule_decides.unwrap_or_default(),
         hedge_after,
@@ -365,6 +383,9 @@ fn questions(arguments: &Arguments) -> String {
     if arguments.gate {
         said.push_str(" gate=true");
     }
+    if arguments.addons {
+        said.push_str(" addons=true");
+    }
     if arguments.attention_next {
         said.push_str(" attention_next=true");
     }
@@ -378,6 +399,7 @@ fn questions(arguments: &Arguments) -> String {
         (arguments.act_progress, "progress"),
         (arguments.act_hello, "hello"),
         (arguments.act_attention, "attention"),
+        (arguments.act_addon, "addon"),
     ]
     .into_iter()
     .filter_map(|(acts, name)| acts.then_some(name))
@@ -466,6 +488,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         let options = hello::Options {
             act: arguments.act_hello,
             gate: arguments.gate,
+            addons: arguments.addons,
             rules: arguments.rules,
             quiet_to_the_lamp: arguments.hello_quiet_to_the_lamp,
             ..hello::Options::new(arguments.deadline, local.clone())
@@ -474,7 +497,10 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         // Answering skills, the moment question too, with a judge of its
         // own (#939).
         Some(if arguments.gate {
-            let options = moment::Options::new(arguments.deadline, local);
+            let options = moment::Options {
+                act_addon: arguments.act_addon,
+                ..moment::Options::new(arguments.deadline, local)
+            };
             hello.with_moment(Moment::start(judge()?, options)?)
         } else {
             hello
@@ -566,6 +592,8 @@ mod tests {
                 act_attention: false,
                 rules: false,
                 gate: false,
+                addons: false,
+                act_addon: false,
                 attention_next: false,
                 rule_decides: Vec::new(),
                 hedge_after: None,
@@ -593,6 +621,8 @@ mod tests {
                 act_attention: false,
                 rules: false,
                 gate: false,
+                addons: false,
+                act_addon: false,
                 attention_next: false,
                 rule_decides: Vec::new(),
                 hedge_after: None,
@@ -782,6 +812,20 @@ mod tests {
         }
     }
 
+    /// #2530 part 2: an add-on's say is answered with the gate, and acts
+    /// only with `--act addon`.
+    #[test]
+    fn add_ons_are_answered_with_the_gate_and_act_when_asked() {
+        let gated = "--key-file /k --log-dir /d --hello --act hello --gate";
+        let answered = of(&format!("{gated} --addons")).unwrap().unwrap();
+        assert!(answered.addons && !answered.act_addon);
+        let acting = of(&format!("{gated} --addons --act addon"))
+            .unwrap()
+            .unwrap();
+        assert!(acting.addons && acting.act_addon);
+        assert!(questions(&acting).contains(" addons=true"));
+    }
+
     #[test]
     fn anything_else_is_refused_with_the_reason() {
         let paths = "--key-file /k --log-dir /d";
@@ -823,6 +867,10 @@ mod tests {
             "--key-file /k --log-dir /d --gate",
             "--key-file /k --log-dir /d --hello --gate",
             "--key-file /k --log-dir /d --hello --act hello --gate --gate",
+            "--key-file /k --log-dir /d --addons",
+            "--key-file /k --log-dir /d --hello --act hello --addons",
+            "--key-file /k --log-dir /d --hello --act hello --gate --act addon",
+            "--key-file /k --log-dir /d --hello --act hello --gate --addons --addons",
             "--key-file /k --log-dir /d --attention-next --attention-next",
             "--key-file /k --log-dir /d --progress --act progress --act progress",
             "--key-file /k --log-dir /d --progress --act",
