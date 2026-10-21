@@ -1166,6 +1166,10 @@ fn observe(
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         // A voice that started again numbers its turns from 1 again: its
         // turns are newer than any of the boot before (lamp-c0a4, #1871).
+        // Boots aren't ordered: a late line of the old boot, read after the
+        // new one's first, takes the old boot back until the new boot's
+        // next line, and a search asked then stops on the new boot's words
+        // at once. Narrow, and the safe way round: the search stops.
         let boot = &message.header.boot;
         *newest = match newest.take() {
             Some((was, newer)) if was == *boot => Some((was, newer.max(turn))),
