@@ -7,7 +7,7 @@ machine is explicitly named. Third has no lamp access.
 
 ## 2026-10-21 — Controls CPU pacing follow-up — PR #2677
 
-Ready for lamp-voice: no (native gates running; stacked on #2651).
+Ready for review: yes (native gates passed; stacked on #2651).
 
 - Changes every lamp's default Controls pacing. Branch
   `third/controls-cpu-pacing`, head `b671a8435`, based on #2651's unchanged
@@ -27,7 +27,10 @@ Ready for lamp-voice: no (native gates running; stacked on #2651).
   and x86 Linux Clippy run
   [39632029374](https://github.com/autonomous-ai/lampOS/actions/runs/39632029374)
   were dispatched on the PR head because its stacked base is outside the
-  automatic workflow filter. Results pending. No Mac ARM64 link is a gate.
+  automatic workflow filter. Both passed on `b671a8435`. ARM64 built the
+  release binaries and ran 9,628 nextest tests: all passed, one reported
+  leaky, 63 skipped. Its separate timed tests, doc tests and 12 own-harness
+  tests passed too. No Mac ARM64 link is a gate.
 - Posted on #2602. The owner confirmed 4ace and 75c9's kernel results:
   `5.15.147-sun60iw2`, no `CONFIG_RT_GROUP_SCHED`. Mobile and Twelve own the
   other two lamps. The first builder measures latency on 4ace after merge.
