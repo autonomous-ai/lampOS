@@ -900,6 +900,22 @@ fn unasked_session(cloud: &CloudAvailability, paused: bool) -> Option<u64> {
     cloud.ready_session().filter(|_| !paused)
 }
 
+/// The conversation's privacy worker as started: on the Controls route
+/// (`controls`), one that ended cleanly before its start was read is an
+/// unreadable switch ([`service_privacy::unavailable_io`]), as the wait's
+/// is (`service_privacy_controls::started`, #1396). On the direct GPIO
+/// route, for a worker that crashed and for any other start failure, the
+/// error is as it was.
+fn privacy_started(worker: io::Result<Worker>, controls: bool) -> io::Result<Worker> {
+    worker.map_err(|error| {
+        if controls && Worker::ended_cleanly(&error) {
+            service_privacy::unavailable_io(error)
+        } else {
+            error
+        }
+    })
+}
+
 /// Whether the Controls privacy route's wait owns the ring: with a slide
 /// (`on`), whose wait paints the physical-mute indication. A lamp with no
 /// slide (`no-slide`) has no LOW to paint, so its ring is as with the route
@@ -3336,13 +3352,20 @@ fn spawn_rig(
         second_arguments.as_deref(),
         || later_tick(None),
     )?;
-    let privacy = Worker::spawn_with_tick(
-        &executable,
-        directory,
-        "privacy",
-        boot,
-        &privacy_arguments,
-        || later_tick(second.as_mut()),
+    // On the Controls route a privacy worker that ends before its start is
+    // read is an unreadable switch, as one that ends while it runs
+    // (`running`): the conversation ends closed and the wait reads the
+    // switch again (Seventh on #1396).
+    let privacy = privacy_started(
+        Worker::spawn_with_tick(
+            &executable,
+            directory,
+            "privacy",
+            boot,
+            &privacy_arguments,
+            || later_tick(second.as_mut()),
+        ),
+        privacy_route.is_some(),
     )?;
     for (worker, expected_stream) in [
         (&capture, DiagnosticStream::Capture),

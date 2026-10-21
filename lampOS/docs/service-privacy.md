@@ -66,7 +66,20 @@ that cannot be read (no source, a fault, stale or broken evidence, its worker
 ended) is closed instead: the cycle ends as a fresh mute does, with the same
 verified cleanup, and the wait reads the switch again each second with a fresh
 worker, so the voice stays up with its microphones shut and never crash-loops
-(#795; lamp-4ace, 2026-10-16). The worker's own `privacy switch unreadable:`
+(#795; lamp-4ace, 2026-10-16). That includes a worker that ends cleanly
+(status 0) before the wait has read its start, as one does at once while
+Controls restarts under it: a clean end is the worker's own
+(`Worker::ended_cleanly`), so the wait counts it as an unreadable switch and
+reads again, where it once ended the voice and rolled back lamp-0c89's
+update (#1396, 21 Oct 13:13: the voice switched 0.76 s before Controls).
+The conversation's own privacy worker counts the same if it ends cleanly at
+its start (`privacy_started`, Seventh on #1396): the conversation ends closed
+and the wait reads the switch again. A worker that crashed (a panic, a
+signal, any other status) and any other start failure end it as before
+(the reviewer-lead on #2506). Each read again tells the wait the switch
+reads unavailable, so after 1 s the health says the microphones are off
+until the privacy switch can be read, while every fresh worker ends at its
+start as well as when one ends running (the first builder on #2506). The worker's own `privacy switch unreadable:`
 fault, queued before it ended, and a message of its aged out after a clean
 exit are part of that ending, not a failed cleanup; its exit status is still
 checked. A failed cleanup still ends it. One window is left: in the muted

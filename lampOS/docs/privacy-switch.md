@@ -68,8 +68,12 @@ second, datagrams or not, a skipped publication ends the worker (#1569 row
 `controls/state`'s declared 100 ms the bus says Controls is late.
 It ends cleanly, telling the voice the switch is unreadable (a fault beginning
 `privacy switch unreadable: `), and the voice keeps the microphones closed and
-reads again with a fresh worker each second instead of exiting (#795). Any
-other failure of the worker is still an abnormal exit that ends the service.
+reads again with a fresh worker each second instead of exiting (#795). So
+it does when the worker ends cleanly before the voice has read its start, as
+it does at once while Controls restarts (an update round that switches the
+voice before Controls, #1396), and the health says the microphones are off
+until the switch can be read. Any other failure of the worker, a crash at
+its start included, is still an abnormal exit that ends the service.
 Source acquisition sequence can advance several times between publications;
 it must advance, but need not be consecutive at the consumer.
 
