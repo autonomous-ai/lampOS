@@ -2340,6 +2340,8 @@ fn gesture_run(
                 still: false,
                 paused: false,
                 unplug: false,
+                asleep: false,
+                woken: false,
             }
         },
         |glimpse| {
@@ -2409,6 +2411,8 @@ fn expression_run_with(
             still: false,
             paused: false,
             unplug: false,
+            asleep: false,
+            woken: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -2568,6 +2572,8 @@ fn speaking_run_with(
             still: false,
             paused: false,
             unplug: false,
+            asleep: false,
+            woken: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -3329,6 +3335,8 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             still: false,
             paused: false,
             unplug: false,
+            asleep: false,
+            woken: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -3389,6 +3397,8 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             still: false,
             paused: false,
             unplug: false,
+            asleep: false,
+            woken: false,
         },
         |_| {},
     );
@@ -3467,6 +3477,8 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 still: false,
                 paused: false,
                 unplug: false,
+                asleep: false,
+                woken: false,
             }
         },
         |glimpse| {
@@ -3884,6 +3896,8 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     still: false,
                     paused: false,
                     unplug: false,
+                    asleep: false,
+                    woken: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -3957,6 +3971,8 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 still: false,
                 paused: false,
                 unplug: false,
+                asleep: false,
+                woken: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -3971,6 +3987,92 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
     };
     assert_eq!(at(11), 1.0);
     assert_eq!(at(33), 0.0);
+}
+
+/// Put to sleep by a hand on its head (#1362) with somebody in front of it
+/// and a long awake time, a standing lamp folds at once, not when its awake
+/// time runs out: the slow fold is the sleep a person sees. Asked to listen
+/// once it is awake again, it stands back up: the lift.
+#[test]
+fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_now() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(44));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = clock.time.clone();
+    let moods = clock.time.clone();
+    let watched = clock.time.clone();
+    let mut last = Duration::ZERO;
+    let mut stood: Vec<(Duration, f32)> = Vec::new();
+    let asleep = Duration::from_secs(12)..Duration::from_secs(30);
+    let sleeping = asleep.clone();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        // Awake for 90 s after the last mood or face, as the product.
+        Some(standing(100, 90)),
+        Some(Looking::new([342, 200], [250, 120]).unwrap()),
+        // Listening once woken, as the voice is after the tap.
+        move || {
+            let now = moods.get();
+            Some(
+                if now >= sleeping.end && now < sleeping.end + Duration::from_secs(2) {
+                    (Mood::Listening, 0)
+                } else {
+                    (Mood::Resting, 0)
+                },
+            )
+        },
+        move || {
+            let now = time.get();
+            if now.saturating_sub(last) < Duration::from_millis(150) {
+                return Asked::default();
+            }
+            last = now;
+            // A face from two seconds on, all the way; asleep from twelve
+            // to thirty.
+            if asleep.contains(&now) {
+                return Asked::ASLEEP;
+            }
+            Asked {
+                toward: None,
+                seen: Some(Seen {
+                    face: (now >= Duration::from_secs(2)).then_some(crate::gaze::Sight {
+                        x: 0.0,
+                        y: 0.0,
+                        size: 0.2,
+                        turned: 0.0,
+                    }),
+                }),
+                gesture: None,
+                expression: None,
+                called: false,
+                still: false,
+                paused: false,
+                asleep: false,
+                woken: false,
+                unplug: false,
+            }
+        },
+        |glimpse| stood.push((watched.get(), glimpse.stand)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |seconds: u64| {
+        stood
+            .iter()
+            .rfind(|step| step.0 <= Duration::from_secs(seconds))
+            .unwrap()
+            .1
+    };
+    assert_eq!(at(11), 1.0);
+    // Folding from the hold on, and down within its four seconds and a
+    // little settling, with the face still there.
+    assert!(at(13) < 1.0, "{}", at(13));
+    assert_eq!(at(20), 0.0);
+    assert_eq!(at(29), 0.0);
+    // Woken and spoken to: up again.
+    assert_eq!(at(38), 1.0);
 }
 
 /// Told to take hold: what would refuse it for want of torque is given
@@ -6051,6 +6153,8 @@ fn called_run(
                 still: false,
                 paused: false,
                 unplug: false,
+                asleep: false,
+                woken: false,
             }
         },
         |glimpse| {
@@ -6660,6 +6764,156 @@ fn a_paused_lamp_drops_a_gesture_and_says_so() {
     assert_eq!(report.gestures, 0);
     assert_eq!(fates, [("nod", "dropped: paused")]);
     assert!(steps.iter().all(|s| s.1 == 0.0 && s.2.is_none()));
+}
+
+/// A lamp a hand put to sleep (#1362) is not stood up for a gesture: it is
+/// dropped and said as asleep.
+#[test]
+fn a_lamp_put_to_sleep_drops_a_gesture_and_says_so() {
+    let mut asked = false;
+    let (report, fates, steps) = skill_run(
+        8,
+        standing(100, 5),
+        gesture_limits(),
+        |_| {},
+        || Some((Mood::Resting, 0)),
+        move |now| {
+            let due = !asked && now >= Duration::from_secs(1);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&crate::clips::NOD),
+                ..Asked::ASLEEP
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(!report.stood);
+    assert_eq!(report.gestures, 0);
+    assert_eq!(fates, [("nod", "dropped: asleep")]);
+    assert!(steps.iter().all(|s| s.1 == 0.0 && s.2.is_none()));
+}
+
+/// Nor does a standing lamp a hand put to sleep nod as it folds: a gesture
+/// asked then is dropped as it is asked, never begun.
+#[test]
+fn a_standing_lamp_put_to_sleep_drops_a_gesture_as_it_folds() {
+    let mut steps_heard = 0u32;
+    let mut asked = false;
+    let (report, fates, steps) = skill_run(
+        14,
+        standing(100, 90),
+        gesture_limits(),
+        |_| {},
+        // Spoken to for six seconds: it stands.
+        move || {
+            steps_heard += 1;
+            Some(if TICK * steps_heard < Duration::from_secs(6) {
+                (Mood::Listening, 0)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        // Asleep from eight seconds; a nod asked half a second later.
+        move |now| {
+            if now < Duration::from_secs(8) {
+                return Asked::default();
+            }
+            let due = !asked && now >= Duration::from_millis(8_500);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&crate::clips::NOD),
+                ..Asked::ASLEEP
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.stood);
+    assert_eq!(report.gestures, 0);
+    assert_eq!(fates, [("nod", "dropped: asleep")]);
+    assert!(steps.iter().all(|s| s.2.is_none()));
+    let at = |seconds: u64| {
+        steps
+            .iter()
+            .rfind(|step| step.0 <= Duration::from_secs(seconds))
+            .unwrap()
+            .1
+    };
+    assert_eq!(at(7), 1.0);
+    assert_eq!(at(13), 0.0);
+}
+
+/// Woken by a tap (#1362), a lamp a hand put to sleep stands up at once,
+/// the lift, though the voice has said no mood yet.
+#[test]
+fn woken_after_a_hands_sleep_it_stands_at_once() {
+    let mut steps_heard = 0u32;
+    let mut woken = false;
+    let (report, _, steps) = skill_run(
+        24,
+        standing(100, 90),
+        gesture_limits(),
+        |_| {},
+        // Spoken to for six seconds, and never again.
+        move || {
+            steps_heard += 1;
+            Some(if TICK * steps_heard < Duration::from_secs(6) {
+                (Mood::Listening, 0)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        // Asleep from eight seconds to fourteen, then woken.
+        move |now| {
+            if (Duration::from_secs(8)..Duration::from_secs(14)).contains(&now) {
+                return Asked::ASLEEP;
+            }
+            let wakes = !woken && now >= Duration::from_secs(14);
+            woken |= wakes;
+            Asked {
+                woken: wakes,
+                ..Asked::default()
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |at: Duration| steps.iter().rfind(|step| step.0 <= at).unwrap().1;
+    let secs = Duration::from_secs;
+    assert_eq!(at(secs(7)), 1.0);
+    assert_eq!(at(secs(13)), 0.0);
+    // Rising within a fifth of a second of the wake, and up by six.
+    assert!(at(secs(14) + Duration::from_millis(200)) > 0.0);
+    assert_eq!(at(secs(20)), 1.0);
+    assert_eq!(at(secs(23)), 1.0);
+}
+
+/// A gesture a folded lamp was rising for when a hand put it to sleep is
+/// dropped then, and the lamp goes back down.
+#[test]
+fn a_gesture_waiting_when_the_lamp_is_put_to_sleep_is_dropped() {
+    let mut asked = false;
+    let (report, fates, steps) = skill_run(
+        12,
+        standing(100, 5),
+        gesture_limits(),
+        |_| {},
+        || Some((Mood::Resting, 0)),
+        move |now| {
+            if now >= Duration::from_millis(1_500) {
+                return Asked::ASLEEP;
+            }
+            let due = !asked && now >= Duration::from_secs(1);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&crate::clips::NOD),
+                ..Asked::default()
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures, 0);
+    assert_eq!(fates, [("nod", "dropped: asleep")]);
+    assert!(steps.iter().all(|s| s.2.is_none()));
+    assert_eq!(steps.last().unwrap().1, 0.0);
 }
 
 /// Held by a hand where it gave way, a folded lamp that may stand is asked
@@ -9685,6 +9939,78 @@ fn a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_droppe
             ("nod", "dropped: another gesture plays"),
         ]
     );
+}
+
+/// Under arbitration, a gesture asked of a lamp a hand put to sleep (#1362)
+/// is dropped as asleep however high it is asked: it does not end the one
+/// already playing and play on a sleeping lamp.
+#[test]
+fn asleep_a_gesture_asked_higher_does_not_end_the_one_playing() {
+    let secs = Duration::from_secs;
+    let (mut lamp, mut clock) = folded(secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        arbitration: true,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let moods = clock.time.clone();
+    let mut asks = VecDeque::from([
+        (secs(8), &crate::clips::STRETCHING, Priority::Skill),
+        (
+            Duration::from_millis(9_500),
+            &crate::clips::NOD,
+            Priority::Person,
+        ),
+    ]);
+    let mut fates = Vec::new();
+    let report = run_arbitrated(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        // Speaking until the hand puts it to sleep at nine seconds.
+        move || {
+            Some(if moods.get() < secs(9) {
+                (Mood::Speaking, 60)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        move || {
+            let now = time.get();
+            let base = if now >= secs(9) {
+                Asked::ASLEEP
+            } else {
+                Asked::default()
+            };
+            match asks.front() {
+                Some((at, clip, by)) if now >= *at => {
+                    let by = *by;
+                    let asked = Asked {
+                        gesture: Some(*clip),
+                        ..base
+                    };
+                    asks.pop_front();
+                    (asked, by)
+                }
+                _ => (base, Priority::Conversation),
+            }
+        },
+        |glimpse| fates.extend(glimpse.gesture_fates),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it plays"),
+            ("nod", "dropped: asleep"),
+        ]
+    );
+    assert_eq!(report.gestures, 1);
 }
 
 /// An ask at a time, of a clip, at a priority, naming its asker or nobody.

@@ -344,6 +344,14 @@ pub struct Asked {
     /// Paused by the keeper (`lamp/pause`): a gesture asked is dropped and
     /// said, and nothing else is taken.
     pub paused: bool,
+    /// A hand held on the head put the lamp to sleep (`voice/mute` with the
+    /// reason `sleep`, `crate::sleep_in`, #1362): it folds now, whoever is
+    /// in front of it, and a gesture asked is dropped and said.
+    pub asleep: bool,
+    /// The voice said, since the last step, that it is open again after a
+    /// hand's sleep (a tap on the head, #1362): it stands up at once, the
+    /// lift, whatever the voice's own mood says yet.
+    pub woken: bool,
     /// With the reading pose a skill holds: the place across the camera's
     /// picture (-1 its left edge, 1 its right) the base turns toward, as it
     /// would to a face seen there (#1679, "light my book"). Only with a
@@ -365,6 +373,26 @@ impl Asked {
         called: false,
         still: true,
         paused: true,
+        asleep: false,
+        woken: false,
+        toward: None,
+        unplug: false,
+    };
+
+    /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
+    /// nobody, so a person in front of it does not keep it up, and it is
+    /// held still; a gesture asked is passed on only to be dropped and
+    /// said. What Expression asks of the head (its sleeping breath) is
+    /// added by the caller.
+    pub const ASLEEP: Asked = Asked {
+        seen: Some(Seen { face: None }),
+        gesture: None,
+        expression: None,
+        called: false,
+        still: true,
+        paused: false,
+        asleep: true,
+        woken: false,
         toward: None,
         unplug: false,
     };
@@ -2910,6 +2938,8 @@ pub(crate) fn run_looking(
         called: false,
         still: false,
         paused: false,
+        asleep: false,
+        woken: false,
         toward: None,
         unplug: false,
     };
@@ -4137,7 +4167,7 @@ fn run_on<P: PortIo, R: Runtime>(
         let mut arm_goals = arm_written;
         // Taken up again after it let go, the arm stays where it slumped
         // until something asks the lamp to stand.
-        if slumped && leaving.is_none() && (mood != Mood::Resting || company) {
+        if slumped && leaving.is_none() && (mood != Mood::Resting || company || asked_now.woken) {
             slumped = false;
         }
         // A hand holds a joint where it gave way: a gesture is not begun.
@@ -4152,7 +4182,25 @@ fn run_on<P: PortIo, R: Runtime>(
         if let Some(up) = standing.filter(|_| !slumped) {
             // Spoken to, or with somebody sitting in front of it: awake.
             // It does not fold away from a person who is still there.
-            if mood != Mood::Resting || company {
+            if asked_now.asleep {
+                // Put to sleep by a hand on its head (#1362): it folds now,
+                // whoever is there, once a gesture from outside that already
+                // plays has ended; one still waiting is dropped and said.
+                if let Some((clip, _)) = pending.filter(|(clip, _)| from_outside(clip)) {
+                    pending = None;
+                    gesture_fates.push_told(
+                        (clip.name, "dropped: asleep"),
+                        Told {
+                            source: pending_by.1,
+                            by: None,
+                        },
+                    );
+                }
+                pending_window = None;
+                awake_until = playing
+                    .filter(|(clip, _)| from_outside(clip))
+                    .map(|(clip, began)| began + Duration::from_micros(clip.duration_us()));
+            } else if mood != Mood::Resting || company || asked_now.woken {
                 awake_until = Some(now + up.awake);
             }
             // Paused after a gesture was taken: one still waiting is
@@ -4182,6 +4230,7 @@ fn run_on<P: PortIo, R: Runtime>(
             window_before_ask = awake_until;
             if asked_now.gesture.is_some()
                 && !asked_now.paused
+                && !asked_now.asleep
                 && leaving.is_none()
                 && !in_hand_now
                 && awake_until.is_none_or(|until| now >= until)
@@ -4331,6 +4380,8 @@ fn run_on<P: PortIo, R: Runtime>(
             // skill or the conversation that named itself, or nobody.
             let dropped = if asked_now.paused {
                 Some(("dropped: paused", None))
+            } else if asked_now.asleep {
+                Some(("dropped: asleep", None))
             } else if leaving.is_some() {
                 Some(("dropped: it is stopping", None))
             } else if slumped {
@@ -4657,6 +4708,8 @@ fn run_on<P: PortIo, R: Runtime>(
             None
         } else if asked_now.paused {
             Some("paused")
+        } else if asked_now.asleep {
+            Some("asleep")
         } else if !awake_now {
             Some("folded or folding")
         } else if !matches!(mood, Mood::Listening | Mood::Speaking) {
