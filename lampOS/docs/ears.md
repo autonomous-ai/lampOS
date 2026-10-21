@@ -57,7 +57,13 @@ a living thing. One of the 52 rose more than 30 dB (-18.1 dBFS out of
     lamp-ears --device plug:device_micro1 --rise-db 30 --bus-root /run/lampos-bus
 
 Unit `lamp-ears.service` (in the first builder's deploy folder for
-lamp-4ace). `lamp-ears check FILE...` runs the same listening over
+lamp-4ace). **The capture level is pinned** before ears starts:
+`amixer -c device_cmedia sset Mic capture 4` (-8 dB), the level lamp-4ace's
+numbers here were measured at (#694). A lamp left at another level hears
+another room: lamp-75c9 at capture 20 (+8 dB) read its quiet at -37.6 dBFS
+against -53.6 at 4, with the card's Auto Gain Control on in both, so a 30 dB
+rise was out of reach there. A lamp without that card starts ears all the
+same (the line may fail). `lamp-ears check FILE...` runs the same listening over
 recordings (16 kHz, one channel, 16 bits) and prints each sudden sound.
 
 ## Optional microphone privacy boundary (#755)
