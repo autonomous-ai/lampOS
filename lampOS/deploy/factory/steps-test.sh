@@ -321,6 +321,11 @@ wait "$script"; status=$?
 took=$(($(date +%s) - started))
 check "a body still running past STOP_WAIT is killed, and the person told" '[[ $status == 130 && $took -le 3 ]] && grep -q "did not fold and end within 1 s of SIGTERM: it is killed now" "$T/out" && grep -q "the arm was not eased back" "$T/out" && ! grep -q "the arm was eased back" "$T/out" && ! grep -q "^body folded" "$T/log"'
 
+# A stand that ends on its own but whose body does not fold within STOP_WAIT
+# stops the steps there: the arm is held part-way down, so nothing runs after
+# it, not even a rest read (the reviewer-lead on #2597).
+lamp; ASK_ANSWER=y STAND_WAIT=1 STOP_WAIT=1 FAKE_FOLD_SECONDS=5 run --write --update-key "$KEYFILE"; status=$?
+check "a body that does not fold in time stops the steps, with no rest read after it" '[[ $status == 1 ]] && grep -q "the arm did not fold in time: stopped here, the arm held" "$T/out" && [[ $(grep -c "^body --device" "$T/log") == 1 ]] && [[ $(sed -n "/^body --device/,\$p" "$T/log" | grep -c "^measure") == 0 ]] && [[ ! -e $T/root/$ENV ]]'
 # Ctrl-C while the body is left alone: lamp-expression is started again.
 lamp; set -m
 ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood QUIET_WAIT=30 HEAD_STAND_WAIT=0 \

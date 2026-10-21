@@ -123,7 +123,8 @@ STAND_PID=''
 EASED='was eased back'
 ease_back() {
   [[ -n $STAND_PID ]] || return 0
-  local pid=$STAND_PID tenths=0
+  local pid=$STAND_PID tenths=0 folded=0
+  EASED='was eased back'
   kill -TERM "$pid" 2>/dev/null
   while kill -0 "$pid" 2>/dev/null && ((tenths < STOP_WAIT * 10)); do
     pause 0.1
@@ -133,9 +134,17 @@ ease_back() {
     echo "factory: WARNING: the body did not fold and end within $STOP_WAIT s of SIGTERM: it is killed now, and the arm may be held where it is; keep a hand on it and take the power off" >&2
     kill -KILL "$pid" 2>/dev/null
     EASED='was not eased back (see the warning above)'
+    folded=1
   fi
   wait "$pid" 2>/dev/null
   STAND_PID=''
+  return "$folded"
+}
+# A body killed while folding left the arm part-way down, torque on: nothing
+# after it may run, not even a rest read (the reviewer-lead on #2597).
+not_folded() {
+  echo "factory: the arm did not fold in time: stopped here, the arm held; a person supports it and the lamp is let go with step 1's let-go run" >&2
+  exit 1
 }
 trap 'ease_back; echo "factory: stopped; the arm $EASED and no step after it was run" >&2; exit 130' INT TERM
 # lamp-controls is stopped while the touch step reads its lines; it is
@@ -204,10 +213,10 @@ body_once() {
   if ! kill -0 "$pid" 2>/dev/null; then STAND_PID=''; cat "$log" >&2; return 1; fi
   if [[ -n $share ]]; then
     as_body "$MOOD_BIN" --socket "$dir/mood.sock" --mood listening --level 128 \
-      || { ease_back; cat "$log" >&2; return 1; }
+      || { ease_back || not_folded; cat "$log" >&2; return 1; }
     pause "$STAND_WAIT"
   fi
-  ease_back
+  ease_back || not_folded
 }
 stand_once() { body_once "$1" "$2"; }
 
