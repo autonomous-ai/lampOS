@@ -18,13 +18,17 @@ use std::{
 pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 
 /// How long past its last fresh sighting (the known file's 3 s freshness, so
-/// about 11 s after the eyes last saw it), and past the lamp's last answer to
-/// them, a known face's scope is held while the eyes see no face at all: a
-/// hand across, a step out of the picture. A head turned away is usually
-/// still a face in the eyes' look, so it holds nothing. On lamp-4ace on 20
-/// October at 12:13 a known person lost for a moment went back to the room's
-/// scope mid-conversation.
-pub const GAP: Duration = Duration::from_secs(8);
+/// about 15 s after the eyes last saw it), and past the end of the lamp's
+/// last answer to them, a known face's scope is held while the eyes see no
+/// face at all: a hand across, a step out of the picture. A head turned away
+/// is usually still a face in the eyes' look, so it holds nothing. On
+/// lamp-4ace on 20 October at 12:13 a known person lost for a moment went
+/// back to the room's scope mid-conversation. 12 s, not 8: on lamp-c0a4 a
+/// person who turned away and asked again took 8 to 9 s from the end of the
+/// lamp's answer (the first builder on #1722, 21 Oct). One window for both
+/// bounds: a face last seen as the answer ends is fresh 3 s more, so the
+/// answer's 12 s end first.
+pub const GAP: Duration = Duration::from_secs(12);
 
 /// [`GAP`] when [`GAP_ENVIRONMENT`] is `on`.
 pub fn gap_from_environment() -> Option<Duration> {
@@ -95,7 +99,10 @@ impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
     /// for someone known the lamp answered within it, so mid-conversation
     /// (the reviewer's P2 on #2265). Someone who has left the picture and
-    /// isn't being talked with is not held for whoever speaks next.
+    /// isn't being talked with is not held for whoever speaks next. `at` is
+    /// the answer's end (its turn complete); only a turn the lamp spoke in
+    /// marks it, so a sound with no words between the answer and the next
+    /// question neither starts the gap again nor ends it.
     pub fn answered(&self, scope: &ScopeSnapshot, at: Instant) {
         if self.gap.is_some()
             && scope.person().is_some()
@@ -604,6 +611,43 @@ mod tests {
         }
     }
 
+    /// The first builder on #1722 (21 Oct): on lamp-c0a4 a person who
+    /// turned away and asked again took 8 to 9 s from the end of the lamp's
+    /// answer, and the turn-away's sound came first as a request of no words.
+    /// That request, about 1.5 s after the answer, is admitted held but ends
+    /// unanswered, so it marks no one: the gap neither starts again nor ends
+    /// with it. The question admitted 9 s after the answer's end is still
+    /// held and theirs; off, the room's; 12 s on, the room's.
+    #[test]
+    fn lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words() {
+        let known = Some(crate::remember::person_id("Example Name"));
+        for gap in [Some(GAP), None] {
+            let cache = FaceCache::holding_gaps(gap);
+            let until = seen(&cache, "Example Name", Some(1));
+            let answer_ends = until - crate::known_faces::FRESH;
+            talked_with(&cache, "Example Name", answer_ends);
+            lost(&cache, Some(0));
+            // The sound with no words: admitted, never answered.
+            let sound = answer_ends + Duration::from_millis(1_500);
+            assert_eq!(cache.snapshot(sound).held(), gap.is_some());
+            // The eyes go on looking, and still see no face.
+            lost(&cache, Some(0));
+            let question = answer_ends + Duration::from_secs(9);
+            let scope = cache.snapshot(question);
+            if gap.is_some() {
+                assert!(scope.held(), "9 s after the answer's end");
+                assert_eq!(whose(&cache, question), known);
+                let past = answer_ends + Duration::from_secs(12);
+                assert_eq!(whose(&cache, past - Duration::from_millis(1)), known);
+                assert!(!cache.snapshot(past).held());
+                assert_eq!(whose(&cache, past), None, "12 s on");
+            } else {
+                assert!(!scope.held());
+                assert_eq!(whose(&cache, question), None, "off");
+            }
+        }
+    }
+
     /// Any face in view may be someone else's, and not knowing is not
     /// knowing that nobody is there: then nothing is held. Off, nothing is.
     /// A different known face is theirs at once, and a privacy change
@@ -659,9 +703,9 @@ mod tests {
         talked_with(&cache, "Another Name", until);
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, five_on(until)), None, "answered someone else");
-        // Answered 6 s before the last sighting: held 2 s past it, not 8.
+        // Answered 10 s before the last sighting: held 2 s past it, not 12.
         let until = seen(&cache, "Example Name", Some(1));
-        talked_with(&cache, "Example Name", until - Duration::from_secs(6));
+        talked_with(&cache, "Example Name", until - Duration::from_secs(10));
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, until + Duration::from_secs(1)), known);
         assert_eq!(whose(&cache, until + Duration::from_secs(2)), None);

@@ -4992,6 +4992,81 @@ async fn only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with() {
     }
 }
 
+/// The first builder on #1722 (21 Oct, `LAMP_FACE_GAP_HOLD`): on lamp-c0a4
+/// the turn-away's sound came as a request of no words before the question.
+/// Admitted while the gap holds, it is held too, but it ends with nothing
+/// said, so its turn's end marks no one: the gap still ends 12 s after the
+/// answer before it, neither started again nor used up, and the question
+/// after it is held and the person's.
+#[tokio::test]
+async fn a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let known = crate::remember::person_id("A");
+    let path = std::env::temp_dir().join(format!("twelve-gap-sound-{}", std::process::id()));
+    std::fs::write(&path, "A").unwrap();
+    let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What did I keep?".to_owned()),
+                Ok(String::new()),
+                Ok("And what else?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Your umbrella."), Ok(ChatEvent::Done)],
+                vec![text("That's all I have."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine.with_memory_scope(
+        lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+        cache.clone(),
+        runner,
+        None,
+    );
+    engine.memory_camera(true, 1);
+    let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+    cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    // The answer's end, as the worker marks it on its turn complete.
+    let answer_ends = Instant::now();
+    engine.memory_answered(1, answer_ends);
+    cache.replace_seen(cache.begin_refresh(), None, Some(0));
+    // The sound: admitted held, ended with no words and nothing said.
+    engine.submit(start(2));
+    assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    assert_eq!(turn(&mut engine).await, ["started:2", "heard:", "complete"]);
+    engine.memory_answered(2, Instant::now());
+    cache.replace_seen(cache.begin_refresh(), None, Some(0));
+    // The window is still the answer's: 9 s on held, 12 s on the room's.
+    let at_9 = cache.snapshot(answer_ends + Duration::from_secs(9));
+    assert!(at_9.held());
+    assert_eq!(at_9.person(), Some(known.as_str()));
+    assert_eq!(cache.snapshot(answer_ends + GAP).person(), None, "12 s on");
+    // The question after it is held, and the person's.
+    engine.submit(start(3));
+    let question = engine.memory_lease().unwrap();
+    assert!(question.scope().unwrap().held());
+    assert_eq!(question.scope().unwrap().person(), Some(known.as_str()));
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    turn(&mut engine).await;
+    std::fs::remove_file(&path).unwrap();
+}
+
 /// The first builder's 22:10 and 01:43 on #2265 (`LAMP_FACE_GAP_HOLD`):
 /// someone known answered aloud, then lost with no face in view, and a line
 /// comes within the gap. That line's scope is held only by the gap, so its

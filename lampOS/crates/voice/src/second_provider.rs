@@ -1136,7 +1136,9 @@ impl Engine {
     /// person is the one the lamp is talking with now, for the face cache's
     /// held gap (`LAMP_FACE_GAP_HOLD`). A line left unclear, judged not for
     /// the lamp, held or given up marks no one (the reviewers' P2 and P3 on
-    /// #2265).
+    /// #2265), nor does a request of no words left unanswered (a sound):
+    /// the gap runs on from the answer before it. Called at the
+    /// turn's end, so the gap is measured from the end of the answer.
     pub(crate) fn memory_answered(&self, request: u64, at: Instant) {
         let spoken = self
             .shared
@@ -3919,7 +3921,7 @@ const MEMORY_CALLS: &[&str] = &[
 const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything for anyone. Say so, and ask them to come back where I can see them.";
 
 /// Whether this turn's scope is a known face's kept only by its held gap
-/// (`LAMP_FACE_GAP_HOLD`): someone who left within 8 s of the lamp's last
+/// (`LAMP_FACE_GAP_HOLD`): someone who left within 12 s of the lamp's last
 /// answer to them may not be the one speaking, so the line is answered from
 /// the conversation as it stood: no recall or search, no memory hits, and no
 /// held forget run on it (the first builder's 22:10 and 01:43 on #2265).
