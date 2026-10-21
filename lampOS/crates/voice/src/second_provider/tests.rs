@@ -5353,6 +5353,196 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
     );
 }
 
+/// What the chat was asked for `second`, a line that cut `first` short
+/// while `first`'s answer was still searching, begun `gap` after `first`
+/// ended, with `same` telling whether one person said both
+/// (`LAMP_JOIN_CUT_WORDS`), and `second` let out or `held` by the rule.
+async fn asked_after_a_cut(
+    (first, second): (&'static str, &'static str),
+    gap: Duration,
+    same: Option<SameSpeaker>,
+    held: bool,
+) -> Message {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(first.to_owned()), Ok(second.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "weather"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Sunny all weekend."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            json!({"results": []})
+        })
+    });
+    let now = Arc::new(Mutex::new(Instant::now()));
+    let clock = now.clone();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(move || *clock.lock().unwrap()),
+    )
+    .announcing(false)
+    .heeding(Arc::new(move |request, _, _, _| {
+        (held && request == 2).then_some("not said to the lamp")
+    }));
+    if let Some(same) = same {
+        engine = engine.joining_cut_words(same);
+    }
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Until the first line's search is under way: its answer not heard.
+    loop {
+        if searched.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    *now.lock().unwrap() += gap;
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the second line's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: 2, .. }) {
+            break;
+        }
+    }
+    script.asked.lock().unwrap()[1].last().unwrap().clone()
+}
+
+/// `LAMP_JOIN_CUT_WORDS` (Eighth's long request with a pause, the first
+/// builder on Queue #2602 at 17:22): a line answered that cut the one before
+/// it short, begun within `CARRY_AFTER_END` of its end, is asked with that
+/// one's words before its own when one person said both. Two people, too
+/// long a pause, or the switch off: that one's words are let go, as before,
+/// so in a two-person scene the second person is answered alone.
+#[tokio::test]
+async fn a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it() {
+    let lines = ("What's the weather like", "in Saigon this weekend?");
+    let joined = Message::user("What's the weather like in Saigon this weekend?");
+    let alone = Message::user("in Saigon this weekend?");
+    let saying = |joined: Joined| -> Option<SameSpeaker> {
+        Some(Arc::new(move |cut, request| {
+            assert_eq!((cut, request), (1, 2));
+            joined
+        }))
+    };
+    let soon = Duration::from_millis(600);
+    assert_eq!(
+        asked_after_a_cut(
+            lines,
+            soon,
+            saying(Joined::Same("the same voice said both")),
+            false,
+        )
+        .await,
+        joined,
+        "the same person: one line"
+    );
+    assert_eq!(
+        asked_after_a_cut(lines, soon, saying(Joined::Not), false).await,
+        alone,
+        "two people: the second answered alone"
+    );
+    assert_eq!(
+        asked_after_a_cut(
+            lines,
+            CARRY_AFTER_END + Duration::from_millis(100),
+            saying(Joined::Same("the same voice said both")),
+            false,
+        )
+        .await,
+        alone,
+        "begun too long after the first ended"
+    );
+    assert_eq!(
+        asked_after_a_cut(lines, soon, None, false).await,
+        alone,
+        "the switch off"
+    );
+}
+
+/// `LAMP_JOIN_CUT_WORDS`: a request's second half held on its own (no
+/// name, a busy room) answers the words it cut short in its place, as
+/// before; the same person's, its own words go with them.
+#[tokio::test]
+async fn a_held_second_half_of_the_same_persons_request_is_answered_with_the_first() {
+    let lines = ("What's the weather like", "in Saigon this weekend?");
+    let same: SameSpeaker = Arc::new(|_, _| Joined::Same("the same voice said both"));
+    let two: SameSpeaker = Arc::new(|_, _| Joined::Not);
+    let soon = Duration::from_millis(600);
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(same), true).await,
+        Message::user("What's the weather like in Saigon this weekend?")
+    );
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(two), true).await,
+        Message::user("What's the weather like"),
+        "two people: the cut words alone, as before"
+    );
+}
+
+/// `LAMP_JOIN_CUT_WORDS`: a print still to come is waited for, up to
+/// `JOIN_WAIT`; past it, what the eyes saw decides, and with nothing seen
+/// the first line's words are let go.
+#[tokio::test]
+async fn a_print_still_to_come_is_waited_for_before_the_lines_are_joined() {
+    let lines = ("What's the weather like", "in Saigon this weekend?");
+    let joined = Message::user("What's the weather like in Saigon this weekend?");
+    let alone = Message::user("in Saigon this weekend?");
+    let soon = Duration::from_millis(600);
+    // The print comes on the third ask.
+    let asks = Arc::new(AtomicU64::new(0));
+    let counted = asks.clone();
+    let late: SameSpeaker = Arc::new(move |_, _| {
+        if counted.fetch_add(1, Ordering::Relaxed) < 2 {
+            Joined::Coming(None)
+        } else {
+            Joined::Same("the same voice said both")
+        }
+    });
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(late), false).await,
+        joined
+    );
+    assert_eq!(asks.load(Ordering::Relaxed), 3);
+    // Never comes: the face, when one face spoke both; else let go.
+    let faced: SameSpeaker =
+        Arc::new(|_, _| Joined::Coming(Some("one face was seen speaking both")));
+    let begun = Instant::now();
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(faced), false).await,
+        joined
+    );
+    assert!(begun.elapsed() >= JOIN_WAIT, "it waited for the print");
+    let unseen: SameSpeaker = Arc::new(|_, _| Joined::Coming(None));
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(unseen), false).await,
+        alone
+    );
+}
+
 /// A frame of the line's sound read at `at_us`.
 fn audio_at(request: u64, sequence: u64, at_us: u64) -> ProviderInput {
     ProviderInput::Audio {

@@ -2033,6 +2033,25 @@ after a take-over, but now for every turn:
   itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
   which was held, and were never said.
+  - **The same person going on** (`LAMP_JOIN_CUT_WORDS=on`; with
+    `--attention`; the first builder on Queue #2602, 21 Oct 17:22). Let
+    out, the new line is asked with the words it cut short before its own,
+    as one line, when one person said both: `request M goes on from
+    request N's words, cut short D ms before it began: WHY; both are asked
+    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 1.5 s
+    (`CARRY_AFTER_END`) of that line's end, in the same session, and
+    neither that line's sound nor its words began it already. One person
+    is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
+    every pair of two voices on 18 Oct's labelled set), when the same-voice
+    check runs for another rule; or else one face, the same passing id,
+    seen speaking each line and no other face speaking either. Prints
+    under 0.30 are two people whatever the eyes saw, and a print still to
+    come is waited for up to 300 ms (`JOIN_WAIT`). Nothing to tell is two
+    people. Why: on lamp-4ace on 21 Oct cut-short words were let go 31
+    times, most in two-person scenes, where answering the second person
+    alone is right; Eighth's long request with a pause lost its first half
+    the same way. Risk: two people with one face in view, one silent, and
+    a speaking read that takes one for the other, are joined.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its

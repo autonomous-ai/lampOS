@@ -8,7 +8,7 @@
 //! turn kept in that thread and the memory's journal as the Live route
 //! keeps its own.
 use super::{
-    Engine, Net, Told, ToolRunner,
+    Engine, Joined, Net, Told, ToolRunner,
     net::{Message, search::Search},
     output_request,
 };
@@ -2423,6 +2423,26 @@ pub fn serve(
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
+        // A line that cuts the one before it short is asked with that one's
+        // words when one person said both (`LAMP_JOIN_CUT_WORDS`): by the
+        // prints, when the same-voice check runs for a rule above, or by
+        // one face seen speaking both, the same reader as above.
+        if std::env::var(crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line that cuts the one before it short, that one unanswered, is asked with its words when the same voice or one face said both (LAMP_JOIN_CUT_WORDS)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+            let same = heeding.clone();
+            engine = engine.joining_cut_words(Arc::new(move |cut, request| {
+                same.lock().map_or(Joined::Not, |mut heeding| {
+                    heeding.same_speaker(cut, request)
+                })
+            }));
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -3299,7 +3319,19 @@ pub(crate) struct Heeding {
     busy_called_strict: bool,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
+    /// The faces the eyes saw speaking each of the last lines judged, newest
+    /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
+    spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
 }
+
+/// Lines whose speaking faces [`Heeding`] keeps: the line cut short is the
+/// one just before the line that cut it.
+const SPOKE_KEPT: usize = 4;
+/// Why one person said two lines, by their voices
+/// (`LAMP_JOIN_CUT_WORDS`, [`crate::same_voice::SAME_FROM`]).
+pub(crate) const SAME_VOICE_JOINS: &str = "the same voice said both";
+/// Why, by the eyes: one face, the same, seen speaking each, and no other.
+pub(crate) const SAME_FACE_JOINS: &str = "one face was seen speaking both";
 
 /// The same-voice check (#829) on `heeding`, its child made by `start` with
 /// `model`, when a rule reads its prints (`read`): `LAMP_SPOKEN_TO`'s
@@ -3789,6 +3821,7 @@ impl Heeding {
             said_until_free_us: None,
             busy_called_strict: false,
             turned_speaking: false,
+            spoke: std::collections::VecDeque::new(),
         }
     }
 
@@ -3834,6 +3867,55 @@ impl Heeding {
     /// [`crate::speaking_faces::SpeakingFaces::turned_only_silent`]).
     pub(crate) fn counting_only_turned_speakers(&mut self) {
         self.turned_speaking = true;
+    }
+
+    /// Whether one person said `cut`, a line cut short before any of its
+    /// answer was heard, and `request`, the line that cut it
+    /// (`LAMP_JOIN_CUT_WORDS`, `Engine::joining_cut_words`):
+    /// - their prints, when both have come: under
+    ///   [`crate::same_voice::DIFFERENT_BELOW`] two people, whatever the eyes
+    ///   saw; at or over [`crate::same_voice::SAME_FROM`] the same one;
+    /// - else the eyes: one face, the same passing id, seen speaking each
+    ///   line and no other face speaking either;
+    /// - a print still to come (said with the lamp quiet, long enough to
+    ///   know) is waited for, with what the eyes saw, if anything, for when
+    ///   the wait is over.
+    ///
+    /// Nothing to tell is two people: the cut words go, as without it.
+    pub(crate) fn same_speaker(&mut self, cut: u64, request: u64) -> Joined {
+        let likeness = self
+            .voices
+            .as_mut()
+            .and_then(|voices| voices.alike(cut, request));
+        match likeness {
+            Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => return Joined::Not,
+            Some(likeness) if likeness >= crate::same_voice::SAME_FROM => {
+                return Joined::Same(SAME_VOICE_JOINS);
+            }
+            _ => {}
+        }
+        let spoke = |of: u64| {
+            self.spoke
+                .iter()
+                .rev()
+                .find(|(line, _)| *line == of)
+                .map(|(_, faces)| faces.as_slice())
+        };
+        let one_face = match (spoke(cut), spoke(request)) {
+            (Some([a]), Some([b])) => a == b,
+            _ => false,
+        };
+        let face = one_face.then_some(SAME_FACE_JOINS);
+        let coming = likeness.is_none()
+            && self
+                .voices
+                .as_ref()
+                .is_some_and(|voices| voices.print_coming(cut) || voices.print_coming(request));
+        match (face, coming) {
+            (face, true) => Joined::Coming(face),
+            (Some(why), false) => Joined::Same(why),
+            (None, false) => Joined::Not,
+        }
     }
 
     /// Whether `request` was judged as begun with the lamp's name said to
@@ -4536,6 +4618,10 @@ impl Heeding {
         let (going_on, other_voice, same_voice, likeness) =
             self.voice_going_on(request, signs.going_on);
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+        if self.spoke.len() == SPOKE_KEPT {
+            self.spoke.pop_front();
+        }
+        self.spoke.push_back((request, speakers.clone()));
         let attention = &mut self.attention;
         let seen = Seen {
             room: signs.room,
@@ -9888,6 +9974,114 @@ mod tests {
             judged(true, Some(No), None),
             judged(false, Some(No), None),
             "the eyes said nothing fresh"
+        );
+    }
+
+    /// `LAMP_JOIN_CUT_WORDS`: one person said a line cut short and the line
+    /// that cut it when their prints are alike, or, with no print to tell,
+    /// when one face, the same, was seen speaking each. Two voices are two
+    /// people whatever the eyes saw; a print still to come is waited for.
+    #[test]
+    fn one_person_said_both_lines_by_voice_or_by_one_face() {
+        use crate::second_provider::Heard;
+        // Prints by the line's first sample: 1 one voice, -1 another, 2 a
+        // middling likeness to the first (cosine 0.5); held back while `slow`.
+        #[derive(Default)]
+        struct Voice {
+            slow: bool,
+            waiting: std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>,
+        }
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = match samples[0] {
+                    1 => vec![1.0, 0.0],
+                    2 => vec![0.5, 0.866],
+                    _ => vec![0.0, 1.0],
+                };
+                self.waiting.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                if self.slow {
+                    return None;
+                }
+                self.waiting.pop_front()
+            }
+        }
+        let line = |heeding: &mut Heeding, request: u64, voice: i16| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+        };
+        let faces = |heeding: &mut Heeding, request: u64, faces: &[&str]| {
+            heeding.spoke.push_back((
+                request,
+                faces.iter().map(|face| (*face).to_owned()).collect(),
+            ));
+        };
+        let voiced = |slow: bool| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.checking_the_voice(Box::new(Voice {
+                slow,
+                ..Voice::default()
+            }));
+            heeding
+        };
+        // The same voice: one person.
+        let mut heeding = voiced(false);
+        line(&mut heeding, 1, 1);
+        line(&mut heeding, 2, 1);
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_VOICE_JOINS));
+        // Two voices: two people, though one face was seen speaking both.
+        let mut heeding = voiced(false);
+        line(&mut heeding, 1, 1);
+        line(&mut heeding, 2, -1);
+        faces(&mut heeding, 1, &["a"]);
+        faces(&mut heeding, 2, &["a"]);
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Not);
+        // A middling likeness tells nothing: the face does.
+        let mut heeding = voiced(false);
+        line(&mut heeding, 1, 1);
+        line(&mut heeding, 2, 2);
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Not);
+        faces(&mut heeding, 1, &["a"]);
+        faces(&mut heeding, 2, &["a"]);
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Same(SAME_FACE_JOINS));
+        // A print still to come: waited for, with the face's why for after.
+        let mut heeding = voiced(true);
+        line(&mut heeding, 1, 1);
+        line(&mut heeding, 2, 1);
+        assert_eq!(heeding.same_speaker(1, 2), Joined::Coming(None));
+        faces(&mut heeding, 1, &["a"]);
+        faces(&mut heeding, 2, &["a"]);
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Coming(Some(SAME_FACE_JOINS))
+        );
+        // No voice check: the eyes alone. One face, the same, each time.
+        let unvoiced = |first: &[&str], second: &[&str]| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            faces(&mut heeding, 1, first);
+            faces(&mut heeding, 2, second);
+            heeding.same_speaker(1, 2)
+        };
+        assert_eq!(unvoiced(&["a"], &["a"]), Joined::Same(SAME_FACE_JOINS));
+        assert_eq!(unvoiced(&["a"], &["b"]), Joined::Not, "two faces");
+        assert_eq!(
+            unvoiced(&["a"], &["a", "b"]),
+            Joined::Not,
+            "another face spoke too"
+        );
+        assert_eq!(unvoiced(&[], &["a"]), Joined::Not, "nobody seen speaking");
+        assert_eq!(
+            Heeding::new(true, true, None, None).same_speaker(1, 2),
+            Joined::Not,
+            "nothing known"
         );
     }
 

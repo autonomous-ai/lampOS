@@ -101,6 +101,17 @@ const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
 /// With the lamp's voice in a print it is at chance, so the check stays off, and is at most
 /// one weak sign beside a face, lips and the name (#829).
 pub const DIFFERENT_BELOW: f32 = 0.30;
+/// Two lines' prints at or over this are one person's: a line that cut
+/// the one before it short is asked with that one's words as one line
+/// (`LAMP_JOIN_CUT_WORDS`, `second_provider::JOIN_CUT_WORDS_ENVIRONMENT`).
+/// A question of its own, so a bar of its own: joining two people's words
+/// answers neither, where letting the first person's go is today's way.
+/// Over every pair of two voices on 18 October's labelled set (highest
+/// 0.69, `docs/verification/same-voice-20261018`), whose own voices' pairs
+/// had a median of 0.62, so fewer than half of one person's pairs reach it
+/// there; two 6 s lines of one voice with the lamp quiet scored a median
+/// 0.95 (`docs/same-voice.md`).
+pub const SAME_FROM: f32 = 0.70;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not
@@ -657,6 +668,14 @@ impl<P: Printer> Voices<P> {
         let likeness = self.likest(self.print(request)?)?;
         self.judged = Some(request);
         Some(likeness)
+    }
+
+    /// How alike the lines `a` and `b` sound: the cosine of their two
+    /// prints, once both have come ([`SAME_FROM`]). Asked of a line going
+    /// on from the one it cut short, which the rule judged already.
+    pub fn alike(&mut self, a: u64, b: u64) -> Option<f32> {
+        self.poll();
+        cosine(self.print(a)?, self.print(b)?)
     }
 
     /// The highest cosine of `print` against the conversation's prints.
