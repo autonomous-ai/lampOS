@@ -2391,6 +2391,13 @@ impl Engine {
         }
     }
 
+    /// `event`, as if the engine had made it, for a test of what the worker
+    /// does with its output.
+    #[cfg(test)]
+    pub(crate) fn queue_for_test(&mut self, event: ProviderOutput) {
+        self.urgent.push_back(event);
+    }
+
     /// The next output, waiting for it.
     #[cfg(test)]
     async fn next(&mut self) -> ProviderOutput {

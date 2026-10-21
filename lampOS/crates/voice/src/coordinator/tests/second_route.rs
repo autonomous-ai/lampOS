@@ -3410,7 +3410,13 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
         );
         assert_eq!(run.played(1), vec![voice; 48], "only {only}");
         assert_eq!(run.played(2), vec![voice; 48], "only {only}");
-        assert_eq!(heard, ["s1:2:4"], "only {only}: {}", run.summary());
+        // Heard in the turn that told it, the news's.
+        assert_eq!(
+            heard,
+            [("s1:2:4".to_owned(), 2)],
+            "only {only}: {}",
+            run.summary()
+        );
         if only {
             assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
         }

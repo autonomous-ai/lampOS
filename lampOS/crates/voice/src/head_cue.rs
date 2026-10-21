@@ -7,6 +7,10 @@
 //! ear on a lamp; under 150 ms from the tap to the first sample; and only
 //! when the lamp is quiet, listening is ready and no reply is owed.
 //!
+//! A hand's sleep (#1362) has two more of the lamp's own sounds, as quiet:
+//! a falling breath in the hold's last second ([`breath`]), and this "hm?"
+//! as the person wakes it again.
+//!
 //! Nothing here plays, reads a device or keeps a clock: the coordinator
 //! gives it times and what it knows.
 
@@ -102,6 +106,107 @@ pub fn hum(dbfs: f64) -> Vec<i16> {
     }
     samples.resize(samples.len().div_ceil(CHUNK) * CHUNK, 0);
     samples
+}
+
+/// The falling breath as a hand's sleep settles (#1362): a sigh, an exhale
+/// whose breathy noise darkens as it fades, with a faint hum under it
+/// falling from [`SIGH_HZ`]'s first to its second, so a small speaker
+/// carries it as a creature's and not as a hiss. Never a tone that stands
+/// alone: a breath, not a beep.
+pub const BREATH_MS: u32 = 900;
+/// It comes in over this, then fades over the rest.
+pub const BREATH_IN_MS: u32 = 120;
+/// The hum under it, falling a fourth, as a voice falls settling down.
+pub const SIGH_HZ: [f64; 2] = [247.0, 185.0];
+/// Where the breathy noise is brightest at its start, and its end.
+pub const BREATH_BRIGHT_HZ: [f64; 2] = [1_400.0, 350.0];
+/// The hum's share of the sound, by amplitude: under the breath.
+const SIGH_SHARE: f64 = 0.35;
+
+/// The sigh at `dbfs` RMS over its loudest tenth of a second: a whole
+/// number of chunks, zero after the end of the sound. The same every time.
+pub fn breath(dbfs: f64) -> Vec<i16> {
+    let length = (RATE * BREATH_MS / 1_000) as usize;
+    let rise = (RATE * BREATH_IN_MS / 1_000) as usize;
+    // A small fixed noise source (xorshift), so the sound is the same
+    // every time and a test can hold it.
+    let mut state: u32 = 0x9E37_79B9;
+    let mut noise = move || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        f64::from(state) / f64::from(u32::MAX) * 2.0 - 1.0
+    };
+    let mut shaped = Vec::with_capacity(length);
+    let (mut low, mut phase) = (0.0_f64, 0.0_f64);
+    for n in 0..length {
+        let along = n as f64 / length as f64;
+        // In fast, out slowly, as breath leaves.
+        let gain = if n < rise {
+            0.5 - 0.5 * (std::f64::consts::PI * n as f64 / rise as f64).cos()
+        } else {
+            let out = (n - rise) as f64 / (length - rise) as f64;
+            (1.0 - out).powi(2)
+        };
+        // The noise through a one-pole low-pass whose corner falls.
+        let corner = BREATH_BRIGHT_HZ[0] * (BREATH_BRIGHT_HZ[1] / BREATH_BRIGHT_HZ[0]).powf(along);
+        let pole = (-2.0 * std::f64::consts::PI * corner / f64::from(RATE)).exp();
+        low = (1.0 - pole) * noise() + pole * low;
+        let pitch = SIGH_HZ[0] * (SIGH_HZ[1] / SIGH_HZ[0]).powf(along);
+        phase += 2.0 * std::f64::consts::PI * pitch / f64::from(RATE);
+        shaped.push(gain * ((1.0 - SIGH_SHARE) * low + SIGH_SHARE * phase.sin()));
+    }
+    // Scaled so that its loudest tenth of a second has the asked-for RMS.
+    let window = (RATE / 10) as usize;
+    let loudest = (0..=length - window)
+        .step_by(CHUNK)
+        .map(|start| {
+            let sum: f64 = shaped[start..start + window].iter().map(|v| v * v).sum();
+            (sum / window as f64).sqrt()
+        })
+        .fold(0.0_f64, f64::max);
+    let scale = 32_767.0 * 10f64.powf(dbfs / 20.0) / loudest;
+    let mut samples: Vec<i16> = shaped
+        .iter()
+        .map(|value| (value * scale).round() as i16)
+        .collect();
+    samples.resize(length.div_ceil(CHUNK) * CHUNK, 0);
+    samples
+}
+
+/// A hand on the head this long, of the [`SLEEP_HOLD_US`] that put the
+/// lamp to sleep, begins the breath (#1362, the first builder on #1362, 21
+/// Oct 10:35): in the hold's last second, so the microphones still close
+/// at the sleep's own time and not one sample later. A hand lifted before
+/// then gets a sigh and no sleep.
+pub const BREATH_FROM_US: u64 = 2_000_000;
+/// Controls' hold that puts the lamp to sleep (`lamp_controls::touch`).
+pub const SLEEP_HOLD_US: u64 = lamp_controls::touch::HEAD_SLEEP_US;
+/// The latest hand time the breath may begin at: while all but its last
+/// tenth of a second, already fading, fits before the sleep cuts it. A
+/// hand seen later (a busy loop, or a conversation opened late in the hold)
+/// gets no breath, never one cut to a tick (the reviewer's P3 on #2487).
+pub const BREATH_UNTIL_US: u64 = SLEEP_HOLD_US - BREATH_MS as u64 * 1_000 + 100_000;
+
+/// Whether a hand on the head `held_us` may begin the breath.
+pub fn sighs_at(held_us: u64) -> bool {
+    (BREATH_FROM_US..=BREATH_UNTIL_US).contains(&held_us)
+}
+
+/// Whether the breath plays now, or why not: the microphone allowed, the
+/// lamp quiet and listening ready. Not held to the tap's 30 s: once a
+/// hold, which the person made.
+pub fn may_sigh(now: &Now) -> Result<(), &'static str> {
+    if !now.allowed {
+        return Err("microphone_not_allowed");
+    }
+    if !now.quiet {
+        return Err("not_quiet");
+    }
+    if !now.listening_ready {
+        return Err("listening_not_ready");
+    }
+    Ok(())
 }
 
 /// What the voice knows when a tap comes, on its monotonic clock.
@@ -297,5 +402,93 @@ mod tests {
             }),
             Ok(())
         );
+    }
+
+    /// #1362: the sigh is about 0.9 s of breath in whole chunks, at the
+    /// hum's level at its loudest, starting and ending from nothing, under
+    /// the speech's level, and falling: quieter and darker as it goes. The
+    /// same every time.
+    #[test]
+    fn the_breath_is_a_quiet_falling_sigh_in_whole_chunks() {
+        let sigh = breath(DBFS);
+        assert_eq!(sigh, breath(DBFS), "the same every time");
+        let sounding = (RATE * BREATH_MS / 1_000) as usize;
+        assert_eq!(sigh.len(), sounding.div_ceil(CHUNK) * CHUNK);
+        assert!(sigh[sounding..].iter().all(|&s| s == 0));
+        assert!(sigh[0].abs() <= 1 && sigh[sounding - 1].abs() <= 2);
+        let tenth = (RATE / 10) as usize;
+        let loudest = (0..=sounding - tenth)
+            .step_by(CHUNK)
+            .map(|start| dbfs(&sigh[start..start + tenth]))
+            .fold(f64::MIN, f64::max);
+        assert!((loudest - DBFS).abs() < 0.5, "{loudest}");
+        let peak = sigh.iter().map(|s| s.unsigned_abs()).max().unwrap();
+        assert!(
+            f64::from(peak) < 32_767.0 * 10f64.powf(-20.0 / 20.0),
+            "{peak}"
+        );
+        // Falling: its second half quieter than its first by far, and its
+        // last third darker than its first (fewer zero crossings).
+        let half = sounding / 2;
+        assert!(dbfs(&sigh[..half]) - dbfs(&sigh[half..sounding]) > 6.0);
+        let crossings = |part: &[i16]| {
+            part.windows(2).filter(|w| (w[0] < 0) != (w[1] < 0)).count() as f64 / part.len() as f64
+        };
+        let third = sounding / 3;
+        assert!(
+            crossings(&sigh[..third]) > crossings(&sigh[2 * third..sounding]) * 1.3,
+            "{} {}",
+            crossings(&sigh[..third]),
+            crossings(&sigh[2 * third..sounding])
+        );
+        // A quieter level is quieter by as much.
+        let quieter = breath(DBFS - 6.0);
+        let level = |sound: &[i16]| dbfs(&sound[..tenth * 3]);
+        assert!((level(&sigh) - level(&quieter) - 6.0).abs() < 0.5);
+    }
+
+    /// #1362: the breath begins in the hold's last second, before Controls'
+    /// sleep at three, only while most of it fits before the sleep; and it
+    /// sighs only quiet, allowed and ready, however lately it hummed.
+    #[test]
+    fn it_sighs_in_the_holds_last_second_when_quiet_and_ready() {
+        assert_eq!(SLEEP_HOLD_US, 3_000_000);
+        assert_eq!(BREATH_UNTIL_US, 2_200_000);
+        assert!(!sighs_at(1_999_999));
+        assert!(sighs_at(2_000_000));
+        assert!(sighs_at(2_200_000));
+        assert!(!sighs_at(2_200_001));
+        assert!(!sighs_at(2_970_000), "too late: it would be cut to a tick");
+        let now = Now {
+            last_hum_us: Some(99_999_000),
+            reply_owed: true,
+            ..ready()
+        };
+        assert_eq!(may_sigh(&now), Ok(()));
+        for (refused, why) in [
+            (
+                Now {
+                    allowed: false,
+                    ..now
+                },
+                "microphone_not_allowed",
+            ),
+            (
+                Now {
+                    quiet: false,
+                    ..now
+                },
+                "not_quiet",
+            ),
+            (
+                Now {
+                    listening_ready: false,
+                    ..now
+                },
+                "listening_not_ready",
+            ),
+        ] {
+            assert_eq!(may_sigh(&refused), Err(why));
+        }
     }
 }

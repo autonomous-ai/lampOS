@@ -162,6 +162,11 @@ pub struct Observation {
     /// The software mute is set because a hand held on the head put the lamp
     /// to sleep (#711); always with `muted`.
     pub asleep: bool,
+    /// A hand on the head now, as the newest touch state taken in this poll
+    /// says: its contact and how long it has been there (Controls' own
+    /// `held_us`), for the breath in a hold's last second (#1362). None
+    /// with no hand, or one Controls gives no time.
+    pub head_held: Option<(u64, u64)>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -217,6 +222,10 @@ struct Shared {
     passes: AtomicU64,
 }
 
+/// How long a wake from a hand's sleep waits for the conversation it opens
+/// ([`HandControls::take_woken`]): a lamp opens in well under this.
+pub const WOKEN_FRESH_US: u64 = 2_000_000;
+
 const LATCH_NONE: u8 = 0;
 const LATCH_OPEN: u8 = 1;
 const LATCH_MUTED: u8 = 2;
@@ -236,6 +245,19 @@ fn latch_message(latch: u8) -> Option<VoiceMute> {
             muted: true,
             reason: Some(MuteReason::Sleep),
         }),
+        _ => None,
+    }
+}
+
+/// A hand on the head in a touch state: its contact and Controls' time
+/// for it, while it is there (#1362).
+fn head_held(state: &TouchState) -> Option<(u64, u64)> {
+    let head = state
+        .sources
+        .iter()
+        .find(|source| source.source == TouchSource::Head)?;
+    match (head.active, head.contact_id, head.held_us) {
+        (Some(true), Some(contact), Some(held)) => Some((contact, held)),
         _ => None,
     }
 }
@@ -373,6 +395,16 @@ pub struct HandControls {
     /// its save (a test presses then).
     #[cfg(test)]
     while_held: Option<Box<dyn FnOnce() + Send>>,
+    /// The person woke a hand's sleep (#1362): the acquisition of the input
+    /// that did, until the next conversation takes it for its "hm?"
+    /// ([`Self::take_woken`]).
+    woken: Option<u64>,
+    /// Inputs a test has queue later, each when the poll's clock reaches
+    /// its time, through the sender kept here.
+    #[cfg(test)]
+    scheduled: Vec<(u64, Input)>,
+    #[cfg(test)]
+    scheduler: Option<SyncSender<Queued>>,
     // One handle for the entire service, not one per supervised audio cycle.
     _pump: Option<Pump>,
 }
@@ -526,6 +558,118 @@ impl HandControls {
             Arc::new(Shared::default()),
             started_us,
         )
+    }
+
+    /// A hand on the head since `now_us - held_us` (#1362), lifted when it
+    /// has been there `lifted_us` (3.2 s or more: kept past the sleep), with
+    /// head sleep and its durable mute at `record` (in a private
+    /// directory): every step before `now_us` taken now but the last, which
+    /// waits for the first poll, and every later one, to 0.4 s after the
+    /// lift, queued when the poll's clock reaches it. So the first poll sees
+    /// the hand `held_us` in, and Controls' sleep, if the hand stays, comes
+    /// on the poll that reaches its own time.
+    #[cfg(test)]
+    pub(crate) fn with_test_hold(
+        clock_id: &str,
+        now_us: u64,
+        held_us: u64,
+        lifted_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let began_us = now_us - held_us;
+        let mut owner = Self::from_parts(
+            ControlsOptions {
+                head_touch: true,
+                mute_record: Some(record.to_path_buf()),
+                ..Default::default()
+            },
+            clock_id,
+            MuteRecord::new(clock_id)?,
+            input,
+            Arc::new(Shared::default()),
+            began_us - 1_000_000,
+        )?;
+        let mut head = TestHead::new(clock_id, began_us - 900_000);
+        let mut ticks = head.run(began_us - 10_000, false);
+        ticks.extend(head.run(began_us + lifted_us, true));
+        ticks.extend(head.run(began_us + lifted_us + 400_000, false));
+        let later = ticks.split_off(ticks.partition_point(|(at, _, _)| *at <= now_us));
+        let (first, earlier) = ticks.split_last().expect("steps before now");
+        for (at, state, events) in earlier {
+            enqueue(
+                &sender,
+                &owner.shared,
+                Input::TouchState(Box::new(state.clone())),
+            );
+            for event in events {
+                enqueue(
+                    &sender,
+                    &owner.shared,
+                    Input::Touch(Box::new(event.clone())),
+                );
+            }
+            owner.poll_with_clock(|| *at)?;
+        }
+        let (_, state, events) = first;
+        enqueue(
+            &sender,
+            &owner.shared,
+            Input::TouchState(Box::new(state.clone())),
+        );
+        for event in events {
+            enqueue(
+                &sender,
+                &owner.shared,
+                Input::Touch(Box::new(event.clone())),
+            );
+        }
+        for (at, state, events) in later {
+            owner
+                .scheduled
+                .push((at, Input::TouchState(Box::new(state))));
+            for event in events {
+                owner.scheduled.push((at, Input::Touch(Box::new(event))));
+            }
+        }
+        owner.scheduler = Some(sender);
+        Ok(owner)
+    }
+
+    /// A lamp the person woke from a hand's sleep at `woken_us` (#1362),
+    /// as the muted wait leaves it for the conversation the wake opens.
+    #[cfg(test)]
+    pub(crate) fn with_test_woken(clock_id: &str, woken_us: u64) -> io::Result<Self> {
+        let (_sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let mut owner = Self::from_parts(
+            ControlsOptions {
+                head_touch: true,
+                ..Default::default()
+            },
+            clock_id,
+            MuteRecord::new(clock_id)?,
+            input,
+            Arc::new(Shared::default()),
+            woken_us,
+        )?;
+        owner.woken = Some(woken_us);
+        std::mem::forget(_sender);
+        Ok(owner)
+    }
+
+    /// Queues each scheduled input whose time the poll's clock has reached.
+    #[cfg(test)]
+    fn release_scheduled(&mut self, now_us: u64) {
+        let Some(sender) = self.scheduler.as_ref() else {
+            return;
+        };
+        let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut self.scheduled)
+            .into_iter()
+            .partition(|(at, _)| *at <= now_us);
+        self.scheduled = later;
+        for (_, input) in due {
+            enqueue(sender, &self.shared, input);
+        }
     }
 
     /// As [`Self::with_test_touch`], already put to sleep by a hand held on
@@ -716,6 +860,11 @@ impl HandControls {
             polled_at: None,
             #[cfg(test)]
             while_held: None,
+            woken: None,
+            #[cfg(test)]
+            scheduled: Vec::new(),
+            #[cfg(test)]
+            scheduler: None,
             _pump: None,
         };
         controls.share_latch();
@@ -763,6 +912,22 @@ impl HandControls {
     /// The head pads' requests are read (`LAMP_HEAD_TOUCH=on`, #711).
     pub fn head_touch(&self) -> bool {
         self.options.head_touch
+    }
+
+    /// A hand held on the head may put the lamp to sleep: head touch with
+    /// the durable mute (#711).
+    pub fn head_sleep(&self) -> bool {
+        self.options.head_sleep()
+    }
+
+    /// When the person woke a hand's sleep, if they did within
+    /// [`WOKEN_FRESH_US`] of `now_us`: once, for the conversation the wake
+    /// opened to say its "hm?" (#1362). A wake older than that, held back
+    /// by a closed slide, is let go: the hum belongs to the wake.
+    pub fn take_woken(&mut self, now_us: u64) -> Option<u64> {
+        self.woken
+            .take()
+            .filter(|at| now_us.saturating_sub(*at) < WOKEN_FRESH_US)
     }
 
     fn asleep(&self) -> bool {
@@ -908,6 +1073,8 @@ impl HandControls {
 
     fn poll_with_clock(&mut self, mut now: impl FnMut() -> u64) -> io::Result<Observation> {
         let now_us = now();
+        #[cfg(test)]
+        self.release_scheduled(now_us);
         self.polled_at = Some(SystemTime::now());
         let mut observation = Observation::default();
         let generation = self.shared.discontinuities.load(Ordering::Acquire);
@@ -973,9 +1140,12 @@ impl HandControls {
                         .as_mut()
                         .map(|touch| touch.observe(now_us, &state));
                     match accepted {
-                        Some(Ok(events)) => events
-                            .iter()
-                            .for_each(|event| self.head_event(now_us, event, &mut observation)),
+                        Some(Ok(events)) => {
+                            observation.head_held = head_held(&state);
+                            events
+                                .iter()
+                                .for_each(|event| self.head_event(now_us, event, &mut observation));
+                        }
                         Some(Err(_)) => add(&self.shared.rejected, 1),
                         None => {}
                     }
@@ -1121,11 +1291,20 @@ impl HandControls {
         &mut self,
         mut now: impl FnMut() -> u64,
     ) -> io::Result<(bool, Observation)> {
+        let was_asleep = self.asleep();
         let mut observation = self.poll_with_clock(&mut now)?;
         self.persist_muted()?;
         let allowed = self.after_persistence(now)?;
         observation.muted = self.muted();
         observation.asleep = self.asleep();
+        // Open again after a hand's sleep, by the person's tap or button:
+        // the next conversation says its "hm?" (#1362).
+        if was_asleep && allowed && !observation.muted {
+            self.woken = observation
+                .head_tap_at_us
+                .or(observation.acquired_at_us)
+                .or(observation.observed_at_us);
+        }
         self.share_latch();
         Ok((allowed, observation))
     }

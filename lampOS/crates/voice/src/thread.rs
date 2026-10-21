@@ -530,6 +530,8 @@ impl Thread {
         if self.count_only.is_some() {
             return;
         }
+        // A sign-in's code or email is never kept (#1676).
+        let text = &crate::sign_in::scrub(text);
         // Something new after something that was never answered: the old
         // was not said to the lamp.
         let stale = self
@@ -540,6 +542,9 @@ impl Thread {
             self.heard_done = false;
         }
         add(&mut self.heard, text, PERSON_BYTES);
+        // Scrubbed joined too: a code or an account split across pieces is
+        // whole only here (Jarvis's P2 on #2137).
+        self.heard = crate::sign_in::scrub_piece(&self.heard);
         self.heard_at = Some(now);
         self.heard_done = finished;
     }
@@ -576,6 +581,7 @@ impl Thread {
 
     /// Keep a written note under its admitted scope, including explicit room scope.
     pub fn written_for(&mut self, request: u64, text: &str, scope: Option<&str>) {
+        let text = &crate::sign_in::scrub(text);
         let mut note = String::new();
         add(&mut note, text, PERSON_BYTES);
         self.note = Some(Pending {
@@ -612,6 +618,7 @@ impl Thread {
 
     /// Attribute an answer to its admitted scope rather than a later face observation.
     pub fn lamp_for(&mut self, request: u64, text: &str, now: Instant, scope: Option<&str>) {
+        let text = &crate::sign_in::scrub(text);
         // The name of a function said where it should have been called is
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
@@ -675,6 +682,9 @@ impl Thread {
         if let Some(last) = self.exchanges.back_mut() {
             add(&mut last.lamp, text, LAMP_BYTES);
             keep_end(&mut last.tail, text, TAIL_BYTES);
+            // Scrubbed joined too (Jarvis's P2 on #2137).
+            last.lamp = crate::sign_in::scrub_piece(&last.lamp);
+            last.tail = crate::sign_in::scrub_piece(&last.tail);
             self.changed = true;
         }
     }
@@ -760,6 +770,8 @@ impl Thread {
         } else {
             said
         };
+        // A sign-in's code or account is never kept (#1676), here either.
+        let said = &crate::sign_in::scrub_piece(said);
         exchange.lamp.clear();
         exchange.tail.clear();
         add(&mut exchange.lamp, said, LAMP_BYTES);

@@ -798,6 +798,8 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         .zip(pids)
         .map(|((peer, input), pid)| SteppedPeer {
             speaker: false,
+            privacy: false,
+            privacy_said_us: None,
             peer,
             input: Some(input),
             pid,
@@ -1106,10 +1108,22 @@ enum Clocking {
     Stepped,
 }
 
+thread_local! {
+    /// Until when, on the scenario clock, the stepped privacy worker says
+    /// the switch is open every 5 ms, so a loop runs past the privacy
+    /// freshness that otherwise ends it at 50 ms. Unset, it says nothing,
+    /// as before (#1362's hold tests).
+    static PRIVACY_FRESH_UNTIL: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
 /// A fixture worker's side read on the stepped clock, as the thread in
 /// [`run_loop_with`] reads it on the host's.
 struct SteppedPeer {
     speaker: bool,
+    /// The privacy worker's side, which [`PRIVACY_FRESH_UNTIL`] may keep
+    /// fresh, and when it last said the switch open.
+    privacy: bool,
+    privacy_said_us: Option<u64>,
     peer: WorkerChannels,
     input: Option<std::process::ChildStdin>,
     pid: u32,
@@ -1141,8 +1155,28 @@ impl SteppedPeer {
                     self.told.push(snapshot)
                 }
                 Control::Authority { .. } => {}
-                _ => panic!("unexpected command to a head-touch fixture worker"),
+                // A loop kept running past the privacy freshness (#1362's
+                // hold tests) gets as far as asking for capture: nothing is
+                // owed back.
+                Control::StartCapture | Control::ProviderOutputCapacity { .. } => {}
+                other => panic!("unexpected command to a head-touch fixture worker: {other:?}"),
             }
+        }
+        let now_us = monotonic_us();
+        if self.privacy
+            && PRIVACY_FRESH_UNTIL
+                .with(std::cell::Cell::get)
+                .is_some_and(|until| now_us < until)
+            && self
+                .privacy_said_us
+                .is_none_or(|said| now_us >= said + 5_000)
+        {
+            self.privacy_said_us = Some(now_us);
+            self.peer.control.send(WorkerEvent::Privacy {
+                receipt: None,
+                acquired_at_us: now_us,
+                muted: false,
+            })?;
         }
         if self.speaker {
             while let Some(chunk) = self.peer.data.receive::<SpeakerChunk>().unwrap() {
@@ -1291,8 +1325,12 @@ fn run_loop_ringed(
             peers
                 .into_iter()
                 .zip(pids)
-                .map(|((speaker, peer, input), pid)| SteppedPeer {
+                .enumerate()
+                .map(|(index, ((speaker, peer, input), pid))| SteppedPeer {
                     speaker,
+                    // The fourth side: speaker, capture, provider, privacy.
+                    privacy: index == 3,
+                    privacy_said_us: None,
                     peer,
                     input: Some(input),
                     pid,
@@ -1342,7 +1380,9 @@ fn run_loop_ringed(
                                     told.push(snapshot)
                                 }
                                 Control::Authority { .. } => {}
-                                _ => panic!("unexpected command to a head-touch fixture worker"),
+                                other => panic!(
+                                    "unexpected command to a head-touch fixture worker: {other:?}"
+                                ),
                             }
                         }
                         if speaker {
@@ -2084,6 +2124,167 @@ fn a_tap_on_a_quiet_lamps_head_plays_its_hm_as_a_turn_of_its_own() {
             .iter()
             .all(|row| row["kind"] != "provider_request_started")
     );
+}
+
+/// A hand on the head `held_us` in, lifted at `lifted_us`, run through the
+/// loop with the privacy switch kept fresh for `fresh_us` (#1362): what the
+/// loop left, and the scenario time Controls' sleep would come at if the
+/// hand stays.
+fn held_run(held_us: u64, lifted_us: u64, fresh_us: u64) -> (Ran, u64) {
+    use std::os::unix::fs::PermissionsExt;
+    // One folder each: the stepped tests share their scenario clock's start.
+    static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let directory =
+        std::env::temp_dir().join(format!("lv-sleep-breath-{}-{run}", std::process::id()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let sleeps_at = std::cell::Cell::new(0);
+    let ran = run_loop_with(
+        || {
+            let now = monotonic_us();
+            sleeps_at.set(now + crate::head_cue::SLEEP_HOLD_US - held_us);
+            PRIVACY_FRESH_UNTIL.with(|until| until.set((fresh_us > 0).then_some(now + fresh_us)));
+            HandControls::with_test_hold("test-hand-clock", now, held_us, lifted_us, &record)
+                .unwrap()
+        },
+        || (quiet_owner(), None),
+        false,
+        Clocking::Stepped,
+    );
+    PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
+    let _ = fs::remove_dir_all(&directory);
+    (ran, sleeps_at.get())
+}
+
+/// The sleep's end of a held run, checked where Controls put it: the
+/// conversation ends `head_sleep` within 4 ms of Controls' time, not one
+/// step later for anything that plays.
+fn slept_on_time(ran: &Ran, sleeps_at: u64) {
+    assert!(ran.error.contains("software mute"), "{}", ran.error);
+    let cancel = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "hand_control_cancel")
+        .expect("the sleep ends it");
+    assert_eq!(cancel["reason"], "head_sleep");
+    let at = cancel["at_us"].as_u64().unwrap();
+    assert!(
+        (sleeps_at..sleeps_at + 4_000).contains(&at),
+        "slept {} us after Controls' time",
+        at as i64 - sleeps_at as i64
+    );
+}
+
+/// #1362 (the first builder on #1362, 21 Oct 10:35): a hand kept on the
+/// head into the hold's last second gets the falling breath, once, as a
+/// turn of its own; and the breath never moves the sleep. Begun 2.15 s in,
+/// it still plays at three seconds, and Controls' sleep then ends the
+/// conversation on the pass that reaches it, the breath cut there, so the
+/// microphones close when they would without it.
+#[test]
+fn a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time() {
+    let (ran, sleeps_at) = held_run(2_150_000, 3_200_000, 1_500_000);
+    let breaths: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_sleep_breath")
+        .collect();
+    assert_eq!(breaths.len(), 1, "once a hold: {breaths:?}");
+    assert_eq!(breaths[0]["plays"], true, "{}", breaths[0]);
+    let held = breaths[0]["held_us"].as_u64().unwrap();
+    assert!(crate::head_cue::sighs_at(held), "{held}");
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_breath");
+    let breath = crate::head_cue::breath(crate::head_cue::DBFS);
+    let first = ran.chunks.first().expect("the breath reached the speaker");
+    assert_eq!(first.samples, breath[..240]);
+    slept_on_time(&ran, sleeps_at);
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "turn_finished" && row["outcome"] == "head_sleep"),
+        "the breath's turn ended by the sleep"
+    );
+}
+
+/// #1362 (the reviewer's P3 on #2487): a hand first seen too late in the
+/// hold for most of the breath to fit gets none, never one cut to a tick,
+/// and the sleep comes on time.
+#[test]
+fn a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time() {
+    let (ran, sleeps_at) = held_run(2_970_000, 3_200_000, 0);
+    assert!(
+        ran.trace
+            .iter()
+            .all(|row| row["kind"] != "head_sleep_breath"),
+        "no breath"
+    );
+    assert!(ran.chunks.is_empty(), "nothing played");
+    slept_on_time(&ran, sleeps_at);
+}
+
+/// #1362 (the reviewer's P3 on #2487): a hand lifted between two seconds
+/// and three gets its sigh and no sleep: one breath, no mute, and the
+/// conversation goes on until the test lets the switch go stale.
+#[test]
+fn a_hand_lifted_after_its_breath_sighs_and_stays_awake() {
+    // The switch kept fresh past where the sleep would have come.
+    let (ran, sleeps_at) = held_run(2_050_000, 2_500_000, 1_200_000);
+    let breaths: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_sleep_breath")
+        .collect();
+    assert_eq!(breaths.len(), 1, "{breaths:?}");
+    assert_eq!(breaths[0]["plays"], true, "{}", breaths[0]);
+    assert!(
+        ran.trace
+            .iter()
+            .all(|row| row["kind"] != "hand_control_cancel"),
+        "no sleep"
+    );
+    assert!(
+        ran.error.contains("privacy") && !ran.error.contains("software mute"),
+        "ended only by the stale switch: {}",
+        ran.error
+    );
+    assert!(ran.ended_us > sleeps_at, "ran past the sleep's time");
+}
+
+/// #1362: woken from a hand's sleep by the person, the conversation the
+/// wake opened says the rising "hm?" first, once, as a turn of its own,
+/// however lately it last hummed.
+#[test]
+fn woken_from_a_hands_sleep_the_lamp_says_hm_first() {
+    let ran = run_loop_with(
+        || HandControls::with_test_woken("test-hand-clock", monotonic_us() - 60_000).unwrap(),
+        || (quiet_owner(), None),
+        false,
+        Clocking::Stepped,
+    );
+    let cues: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_wake_cue")
+        .collect();
+    assert_eq!(cues.len(), 1, "once: {cues:?}");
+    assert_eq!(cues[0]["plays"], true, "{}", cues[0]);
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_wake_cue");
+    assert!(admitted["provider_session"].is_null());
+    let hum = crate::head_cue::hum(crate::head_cue::DBFS);
+    let first = ran.chunks.first().expect("the hum reached the speaker");
+    assert_eq!(first.samples, hum[..240]);
 }
 
 #[test]

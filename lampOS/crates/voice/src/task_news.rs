@@ -257,7 +257,7 @@ pub struct TaskNews {
     /// checked against it, never waited on.
     status: Arc<Mutex<Option<TaskStatus>>>,
     /// News heard whole, for the tasks part to be told ([`Self::heard`]).
-    heard: Sender<String>,
+    heard: Sender<(String, u64)>,
 }
 
 impl Drop for TaskNews {
@@ -395,14 +395,25 @@ fn asked(made: Option<&crate::made_skill::Keeping>, key: &str) {
 /// Ends when the news is let go.
 fn send_heard(
     directory: &Path,
-    heard: &Receiver<String>,
+    heard: &Receiver<(String, u64)>,
     stopping: &AtomicBool,
     made: Option<&crate::made_skill::Keeping>,
 ) {
     let mut unsent: Vec<(String, u32)> = Vec::new();
     loop {
         match heard.recv_timeout(READ_EVERY) {
-            Ok(key) => {
+            Ok((key, request)) => {
+                // A sign-in's question heard whole: its answer may come in a
+                // later request (#1676). Told once; a question not taken
+                // there (done, or another sign-in) opens nothing.
+                if let Some(id) = crate::sign_in::asked_of(&key) {
+                    if !crate::sign_in::tell_asked(directory, id, request) {
+                        eprintln!(
+                            "lamp-voice: the sign-in question heard ({key}) was not taken by the tasks part"
+                        );
+                    }
+                    continue;
+                }
                 asked(made, &key);
                 if observation_of(&key).is_some() && !unsent.iter().any(|(kept, _)| *kept == key) {
                     unsent.push((key, 0));
@@ -682,6 +693,8 @@ impl TaskNews {
         clock: fn() -> Option<BootClock>,
     ) -> Option<Self> {
         let directory = directory.to_path_buf();
+        // A sign-in by voice is followed only with its switch (#1676).
+        let sign_in = std::env::var(crate::agent_tasks::SIGN_IN_ENVIRONMENT).as_deref() == Ok("on");
         let (offer, offered) = mpsc::channel();
         let (told, heard_told) = mpsc::channel();
         let told_already = Arc::new(Mutex::new(BTreeSet::new()));
@@ -769,6 +782,7 @@ impl TaskNews {
                     &shared,
                     &clock,
                     WOKEN_GAP,
+                    sign_in,
                 )
             })
             .ok()?;
@@ -785,13 +799,14 @@ impl TaskNews {
     }
 
     /// News told in a turn that was heard whole, on the proof a say's
-    /// `spoken` takes (`coordinator`): the tasks part is told so, so that
-    /// with `--close-told` the harness its task started is closed (#1390).
-    /// News taken to tell but cut short, or not heard, never comes here.
-    /// Never waits.
-    pub fn heard(&self, keys: Vec<String>) {
+    /// `spoken` takes (`coordinator`), in the voice's `request`: the tasks
+    /// part is told so, so that with `--close-told` the harness its task
+    /// started is closed (#1390), and a sign-in's question may be answered
+    /// in a later request (#1676). News taken to tell but cut short, or not
+    /// heard, never comes here. Never waits.
+    pub fn heard(&self, request: u64, keys: Vec<String>) {
         for key in keys {
-            let _ = self.heard.send(key);
+            let _ = self.heard.send((key, request));
         }
     }
 
@@ -849,7 +864,10 @@ impl TaskNews {
     /// [`Self::waiting_for_test`], with what the voice says was heard
     /// ([`Self::heard`]) coming out of the receiver.
     #[cfg(test)]
-    pub(crate) fn waiting_for_test_heard(news: News, ago: Duration) -> (Self, Receiver<String>) {
+    pub(crate) fn waiting_for_test_heard(
+        news: News,
+        ago: Duration,
+    ) -> (Self, Receiver<(String, u64)>) {
         let (heard, heard_out) = mpsc::channel();
         let came = Instant::now()
             .checked_sub(ago)
@@ -955,7 +973,9 @@ impl TaskNews {
 /// Read the tasks part every [`READ_EVERY`], and at once when a task newly
 /// settled is seen on `tasks/status` ([`Wake::Settled`], #560), though
 /// never sooner than `woken_gap` ([`WOKEN_GAP`] on the lamp) after the read
-/// before, with the tasks part's own clock (`clock`).
+/// before, with the tasks part's own clock (`clock`). With `sign_in`, a
+/// sign-in's news too (#1676).
+#[allow(clippy::too_many_arguments)]
 fn read_forever(
     directory: &Path,
     told_file: &Path,
@@ -964,9 +984,11 @@ fn read_forever(
     shared: &Mutex<BTreeSet<String>>,
     clock: &dyn Fn() -> Option<BootClock>,
     woken_gap: Duration,
+    sign_in: bool,
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
+    let mut follow = crate::sign_in::Follow::default();
     let made = crate::made_skill::Keeping::from_environment();
     loop {
         // A settled task's wake waiting here is answered by the read just
@@ -990,6 +1012,31 @@ fn read_forever(
                 }
             }
         }
+        // A sign-in the person began by voice (#1676, `crate::sign_in`): its
+        // code if it came late, the question once approved in Harness, and
+        // how it ended, each told once; read again soon while one is open.
+        let (sign_in_news, sign_in_open) = if sign_in {
+            crate::sign_in::news(directory, &offered, &mut follow)
+        } else {
+            (Vec::new(), false)
+        };
+        for (key, note) in sign_in_news {
+            if told_keys.contains(&key) {
+                continue;
+            }
+            offered.insert(key.clone());
+            let news = News {
+                key,
+                note,
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            };
+            if offer.send(news).is_err() {
+                return;
+            }
+        }
         // Wait for the next read, keeping what is told the moment it is
         // told: on lamp-4ace on 2026-10-15 a build whose provider ended
         // just after news was told told the same news three times, each
@@ -998,7 +1045,12 @@ fn read_forever(
         // above was under way, though never sooner than `woken_gap` after
         // that read.
         let read_at = std::time::Instant::now();
-        let mut next = read_at + READ_EVERY;
+        let mut next = read_at
+            + if sign_in_open {
+                crate::sign_in::READ_OPEN_EVERY
+            } else {
+                READ_EVERY
+            };
         loop {
             let left = next.saturating_duration_since(std::time::Instant::now());
             if left.is_zero() {
@@ -1883,6 +1935,38 @@ mod tests {
         os::unix::net::UnixListener,
     };
 
+    /// The reviewer's P3 1 on #2137: the sign-in question heard whole is
+    /// told to the tasks part with the very request it was heard in, the
+    /// number the worker's tools get as `request`, so a yes in a later one
+    /// is taken.
+    #[test]
+    fn a_sign_in_question_heard_is_told_with_its_own_request() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let directory =
+            std::env::temp_dir().join(format!("voice-news-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = crate::agent_tasks::tests::tasks_part(
+            &directory,
+            vec![(
+                "voice.sock",
+                serde_json::json!({"ok":true,"sign_in":"asking"}),
+            )],
+        );
+        let (heard, hearing) = mpsc::channel();
+        let stopping = AtomicBool::new(false);
+        heard.send(("sign-in-5-asking".to_owned(), 42)).unwrap();
+        drop(heard);
+        send_heard(&directory, &hearing, &stopping, None);
+        assert_eq!(
+            seen.recv_timeout(Duration::from_secs(5)).unwrap(),
+            serde_json::json!({"op":"sign_in_asked","id":5,"request":42})
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     fn task(engine: &str, observations: Value) -> Value {
         json!({"ok":true,"text":"Suggest three \"friendly\" names for a desk lamp",
             "target":{"engine":engine,"machine_id":"c533fbfda3de5f8f1fdb6619ae2e30b5","project":"lamp-tasks"},
@@ -2456,6 +2540,7 @@ mod tests {
             staff_note: false,
             make_skill: true,
             named_only: false,
+            sign_in: false,
         };
         let kept = read(&on);
         assert!(kept.contains(crate::made_skill::ASK_TO_PUT_ON), "{kept}");
@@ -2467,6 +2552,7 @@ mod tests {
         );
         let plain = read(&crate::agent_tasks::Place {
             make_skill: false,
+            sign_in: false,
             ..on.clone()
         });
         assert!(!plain.contains(crate::made_skill::ASK_TO_PUT_ON), "{plain}");
@@ -3307,6 +3393,7 @@ mod tests {
                     &shared,
                     &|| Some(now()),
                     woken_gap,
+                    false,
                 );
             })
         };

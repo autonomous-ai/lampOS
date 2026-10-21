@@ -1001,6 +1001,52 @@ at rest for the rest of the window. A tap the voice doesn't answer gets no
 hum and no face (First on #705, 17 Oct 07:26). The tap is still a call for
 the attention rule.
 
+**A hand's sleep: a sigh, and the "hm?" as it wakes** (#1362, the first
+builder on #1362, 21 Oct 09:21 and 10:35). With `LAMP_HEAD_TOUCH=on` and
+`--controls-mute`, a hand held on the head puts the lamp to sleep at 3 s.
+Two quiet sounds of the lamp's own let the person hear that it worked; no
+chime, never a beep:
+- **The breath, in the hold's last second.** When Controls says the hand
+  has been on the head 2 s (`controls/touch_state`, the head's `held_us`,
+  as the ring's countdown reads it), the voice plays a falling sigh
+  (`head_cue::breath`): 0.9 s of breathy noise that darkens as it fades
+  (brightest at 1.4 kHz falling to 350 Hz), with a faint hum under it
+  falling from 247 to 185 Hz. It comes in over 120 ms and fades out over the
+  rest, with its loudest tenth of a second at the hum's level
+  (`LAMP_HEAD_TAP_CUE_DBFS`). It is its own sound turn
+  (`admission_basis: head_sleep_breath`), once a hold (one contact), and only
+  while the lamp is quiet, allowed and listening ready (`head_cue::may_sigh`;
+  not held to the tap's 30 s). It begins only between 2.0 and 2.2 s of the
+  hand (`BREATH_UNTIL_US`), while all but its last, already fading tenth of
+  a second fits before the sleep: a hand first seen later (a busy loop, or a
+  conversation opened late in the hold) gets none, never one cut to a tick
+  (the reviewer on #2487). The trace row is `head_sleep_breath`, with
+  `held_us`, `plays` and `why`. The ring shows nothing for it: the hold's own
+  dimming goes on. **It never moves the sleep:** the speaker plays only
+  while the microphones may hear (it drops all sound when they are denied,
+  `PrivacyClosed`), so the breath can't follow the mute. It comes before
+  it instead. Controls' sleep at 3 s ends the conversation on the pass that
+  sees it, as before, with the breath cut there if it still plays, so the
+  microphones and the camera close not one sample later for it. A hand
+  lifted between 2 and 3 s gets a sigh and no sleep: a creature that starts
+  to settle and doesn't.
+- **The "hm?", as the person wakes it.** A tap on the head (or the button)
+  that opens a hand's sleep marks the wake in the controls
+  (`HandControls::take_woken`, fresh for 2 s). The conversation the wake
+  opens says this same rising "hm?" first, as its own turn
+  (`admission_basis: head_wake_cue`), once it is quiet and listening is
+  ready, within 1.5 s of its start or not at all. It is not held to the
+  tap's 30 s, since the person asked for it. The ring shows the listening
+  face with it. The trace row is `head_wake_cue`, with `acquired_at_us` (the
+  waking input), `plays` and `why`. No sound comes for a mute the restart
+  guard left, or for the person's own mute: only for a sleep a hand chose.
+  Expression's night sleep is not the voice's, so neither sound plays for it.
+
+Not measured on a lamp yet: the breath's first sample against the 2 s mark,
+and the tap to the "hm?". Both follow `head_sleep_breath_first_write` and
+`head_wake_cue_first_write` in the trace. The targets are the breath within
+50 ms of 2 s, and the "hm?" within 500 ms of the tap.
+
 **The same "hm?" after an empty "Sorry?"** (`LAMP_UNCLEAR_HUM=on`, off unless
 set; #1417). When the lamp can't make out a turn, it asks again with a
 written turn of its own that tells the model to say only "Sorry?" (#926). On

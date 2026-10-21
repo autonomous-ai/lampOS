@@ -4719,6 +4719,21 @@ fn conversation_with_gate(
     } else {
         None
     };
+    // A hand's sleep (#1362): the falling breath in a hold's last second,
+    // where a hold may put the lamp to sleep, at the hum's level; the hold
+    // it last sighed for; and a wake the person made, for its "hm?" once
+    // this conversation can say it.
+    let sleep_breath = if controls.as_ref().is_some_and(HandControls::head_sleep) {
+        let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
+        Some(crate::head_cue::breath(level))
+    } else {
+        None
+    };
+    let mut sighed_for: Option<u64> = None;
+    let mut waking = controls
+        .as_mut()
+        .and_then(|controls| controls.take_woken(monotonic_us()))
+        .map(|woken_us| (woken_us, monotonic_us()));
     let mut last_hum_us: Option<u64> = None;
     let mut took_over_turn: Option<u64> = None;
     // The turn whose speech last ended as something said, not a sound, and
@@ -5628,6 +5643,8 @@ fn conversation_with_gate(
         let head_tap = observation
             .as_ref()
             .and_then(|seen| seen.head_tap_at_us.zip(seen.head_tap_began_us));
+        // A hand on the head now, and how long (#1362).
+        let head_held = observation.as_ref().and_then(|seen| seen.head_held);
         let speaking = reply
             .as_ref()
             .is_some_and(|current| current.had_audio || current.playback.is_some());
@@ -8548,7 +8565,7 @@ fn conversation_with_gate(
             if !heard.is_empty()
                 && let Some(news) = task_news.as_ref()
             {
-                news.heard(heard);
+                news.heard(turn, heard);
             }
             record(
                 trace,
@@ -9655,6 +9672,112 @@ fn conversation_with_gate(
                 last_publish = monotonic_us();
             }
         }
+        // A hand kept on the head into the last second of the three that put
+        // the lamp to sleep (#1362): the falling breath, once a hold, as it
+        // starts to settle. The sleep is Controls' own, at three seconds:
+        // the mute above ends this conversation on the pass that sees it,
+        // the breath cut there if it still plays, so the microphones close
+        // not one sample later for it (the first builder on #1362, 10:35).
+        if let (Some(sound), Some((contact, held_us))) = (sleep_breath.as_ref(), head_held)
+            && crate::head_cue::sighs_at(held_us)
+            && sighed_for != Some(contact)
+        {
+            sighed_for = Some(contact);
+            let at_us = monotonic_us();
+            let decided = crate::head_cue::may_sigh(&crate::head_cue::Now {
+                at_us,
+                began_us: at_us.saturating_sub(held_us),
+                allowed: snapshot.microphone_permission() == Permission::Allowed,
+                quiet: reply.is_none()
+                    && provider_queue.is_empty()
+                    && speaker_pending.is_none()
+                    && !admission.owns_stream()
+                    && admission.idle_for_reminder()
+                    && !submission_draining
+                    && !paused
+                    && playback_mask.available(at_us),
+                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                reply_owed: look_wanted.is_some(),
+                last_said_us: last_spoke_us,
+                last_hum_us,
+            });
+            record(
+                trace,
+                json!({"kind":"head_sleep_breath","held_us":held_us,"at_us":at_us,
+                    "plays":decided.is_ok(),"why":decided.err(),
+                    "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
+            )?;
+            if decided.is_ok() {
+                let (now_state, _) = speaker_tone::commit_sound_turn(
+                    owner,
+                    reply,
+                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, sound.clone()),
+                    "head_sleep_breath",
+                    "a hand kept on the head: the lamp settles to sleep, nothing heard, nothing sent to the provider",
+                    0,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                snapshot = now_state;
+                last_publish = monotonic_us();
+            }
+        }
+        // Woken by the person from a hand's sleep (#1362): its rising "hm?",
+        // the first thing this conversation says, once it is quiet and
+        // listening is ready, within a second and a half of its start or not
+        // at all. Not held to the tap's 30 s: the person asked for it.
+        if let (Some(sound), Some((woken_us, began_us))) = (head_cue.as_ref(), waking) {
+            let at_us = monotonic_us();
+            let decided = crate::head_cue::may_hum(&crate::head_cue::Now {
+                at_us,
+                began_us: woken_us,
+                allowed: snapshot.microphone_permission() == Permission::Allowed,
+                quiet: reply.is_none()
+                    && provider_queue.is_empty()
+                    && speaker_pending.is_none()
+                    && !admission.owns_stream()
+                    && admission.idle_for_reminder()
+                    && !submission_draining
+                    && !paused
+                    && playback_mask.available(at_us),
+                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                reply_owed: look_wanted.is_some(),
+                last_said_us: last_spoke_us,
+                last_hum_us: None,
+            });
+            let waits = matches!(decided, Err("not_quiet" | "listening_not_ready"))
+                && at_us.saturating_sub(began_us) < WAKE_HUM_WITHIN_US;
+            if !waits {
+                waking = None;
+                record(
+                    trace,
+                    json!({"kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":at_us,
+                        "plays":decided.is_ok(),"why":decided.err(),
+                        "boundary":"the waking input's acquisition to this decision; the first sample is head_wake_cue_first_write"}),
+                )?;
+            }
+            if decided.is_ok() {
+                if let Some(choreography) = choreography.as_mut() {
+                    choreography.set_unshown(false);
+                    choreography.set_listening(true);
+                }
+                let (now_state, _) = speaker_tone::commit_sound_turn(
+                    owner,
+                    reply,
+                    NoticeDelivery::sound(SpeechOrigin::WakeHum, sound.clone()),
+                    "head_wake_cue",
+                    "the person woke the lamp: nothing heard, nothing sent to the provider",
+                    0,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                snapshot = now_state;
+                last_hum_us = Some(at_us);
+                last_publish = monotonic_us();
+            }
+        }
         // Onboarding persistence runs only after any immediate tap cue has
         // been dispatched and its reply has drained. It never precedes revoke.
         if let Some(walk) = onboarding.as_mut() {
@@ -10524,15 +10647,21 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
     }
 }
 
+/// How long a wake from a hand's sleep waits for its conversation to be
+/// quiet and ready for its "hm?" (#1362): a late one would not answer it.
+const WAKE_HUM_WITHIN_US: u64 = 1_500_000;
+
 /// What the ring is told of the turn in hand, from what plays in it. The
-/// head tap's "hm?" (#711), and the same hum after an empty "Sorry?"
-/// (#1417), show the listening face, with the hum, which the ring keeps at
-/// rest for the tap's window; a skill's sound (#1144) shows nothing, so no
-/// frame is asked for while it plays.
+/// head tap's "hm?" (#711), the same hum after an empty "Sorry?" (#1417)
+/// and as the person wakes a hand's sleep (#1362), show the listening face,
+/// with the hum, which the ring keeps at rest for the tap's window; a
+/// skill's sound (#1144) and a hand's sleep's breath (#1362, under the
+/// hold's own dimming) show nothing, so no frame is asked for while they
+/// play.
 fn tell_ring_of_turn(choreography: &mut RingChoreographer, origin: Option<SpeechOrigin>) {
     let cue = matches!(
         origin,
-        Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum)
+        Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum | SpeechOrigin::WakeHum)
     );
     choreography.set_listening(cue);
     choreography.set_unshown(origin.is_some_and(SpeechOrigin::unshown) && !cue);
