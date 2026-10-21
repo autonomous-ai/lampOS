@@ -5,6 +5,17 @@
 | id | proposal | where |
 |---|---|---|
 | devops007-P1 | Link the ARM64 run's test binaries with lld: 34% off a cold test compile, 33–35% off each rebuild after an edit, every test passing | #1806 |
+| devops007-P2 | lamp-voice's ARM64 push runs: the binaries and the cache save in a job no newer merge cancels, the tests keep their one-at-a-time limit | #1806 |
+
+## Found, not mine
+
+- **The clippy cache crowds out ARM64's** (21 Oct 12:4x +07). Since #2465 each lamp-voice clippy run saves about 2.2 GB, three in four minutes (12:43–12:47), against ARM64's 1.1 GB and the repository's 10 GB, which GitHub evicts least recently used first. `gh api repos/autonomous-ai/lampOS/actions/caches` shows it. Posted on #1806.
+
+## 2026-10-21 12:55 +0700 — P2, the clippy cache, and asking to write P1
+
+Ready for lamp-voice: no
+
+Asked by its person: post what was found and ask for a plan so devops007 writes P1 without waiting. On #1806: the clippy cache (above), devops007-P2 (2 of the last 5 lamp-voice ARM64 runs cancelled while waiting, so the cache's renewal and those commits' binaries are lost), and a two-step P1 that needs no lamp check first: lld on a test job of its own, the binaries' job unchanged, then one job with lld everywhere after the first builder's yes and a lamp check. On #1722: the ask for a `builder:devops007` task for it.
 
 ## 2026-10-21 11:45 +0700 — the ARM64 run measured, and lld proposed
 
