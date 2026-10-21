@@ -48,16 +48,37 @@ chối giao việc hay tự làm. Lượt sau một lần gọi kết thúc bằ
 của lần gọi đó, và được hỏi như trước.
 
 - **Là lời nhờ:** "ask", "tell", "get" hoặc "have" đứng ngay trước tên đầy đủ
-  của agent, theo sau là "to" ("ask Claude Code to …", "tell Codex to …"), hoặc
-  "can", "could", "would", "will" + "you ask/get <tên> …".
+  của agent, theo sau là "to" ("ask Claude Code to …", "tell Codex to …"), có
+  thể có một nơi chốn trước "to" ("ask Claude Code on my office computer to
+  …": chữ ngay sau tên là "on", "at", "in" hoặc "from", và "to" nằm trong 6
+  chữ sau nó), hoặc "can", "could", "would", "will" + "you ask/get <tên> …".
+- **Theo cách speech to text nghe** (b0934 trên lamp-4ace, 2026-10-21): tên viết
+  hoa hay thường đều được, và cả khi bị nghe sai (`Kind::heard` cạnh `KINDS`):
+  Claude Code thành "cloud code", "Claude Coat", "Claude Cold", "clawed code"
+  hoặc "ClaudeCode"; Codex thành "code X", "codecs" hoặc "Kodex". Một dạng nghe
+  sai chỉ được tính với "ask" hoặc "tell": "get" và "have" chỉ dành cho tên
+  thật ("Claude Code", "ClaudeCode", "Codex"), vì "I can't get codecs to work"
+  là câu tiếng Anh bình thường. "ask <tên> …" không có "to" ở chỗ bắt đầu một
+  câu ("Ask Claude Code write a poem.", "…. Ask Codex, write a haiku."), trừ
+  khi ngay sau tên là "?" hoặc "." ("Ask Claude Code? No, never mind." không
+  phải lời nhờ; dấu phẩy không tính là dấu dừng). "asked", "sk" hoặc "k" thay
+  cho "ask", chỉ khi là chữ đầu tiên của câu nói, trước nó chỉ có "Hey Lamp,"
+  hay tương tự ("Asked Claude Code to …", "sk Claude Code to …"); "k" chỉ khi
+  có "to" sau tên, vì nó cũng là "OK" ("K, Claude Code finished?" không phải
+  lời nhờ). Sau một chủ ngữ thì đó là kể lại,
+  không phải lời nhờ ("I asked Claude Code to do it yesterday, is it done?").
+  Một câu mở đầu bằng "Asked Claude Code to …" được coi là lời nhờ, kể cả khi
+  người dùng muốn kể lại.
 - **Không phải lời nhờ:** khi chỉ nhắc đến ("I told Claude Code yesterday",
   "is Codex done?", "what did Claude Code say?", "did you ask Codex to …",
-  "tell Claude Code I'm late"); một lời phủ định ngay trước động từ ("don't
-  ask Claude Code to …", "do not tell …", "never ask Codex to …", "not get …");
-  một câu người dùng tự hỏi mình ("should I ask Claude Code to …", "shall I …",
-  "do I …"); khi tên không thuộc đội ("ask Devin to …" lúc
-  Devin chưa được cài); khi tên bị nghe sai ("Claude Co", "cloud code"; ghi chú
-  của đội vẫn nhận ra các tên này). Khi chưa đọc được ai trong đội, chỉ nhận
+  "tell Claude Code I'm late", "Claude Code's answer", "get Codex's answer",
+  "have Claude Code's PR reviewed", "I'll ask Claude Code later"); một lời phủ
+  định ngay trước động từ ("don't ask Claude Code to …", "do not tell …",
+  "never ask Codex to …", "not get …"); một câu người dùng tự hỏi mình ("should
+  I ask Claude Code to …", "shall I …", "do I …"); khi tên không thuộc đội ("ask
+  Devin to …" lúc Devin chưa được cài); một dạng nghe sai mà không có chữ nhờ
+  ("the cloud code is broken", "a cold coat"); khi tên bị cắt cụt ("Claude Co"; ghi chú
+  của đội vẫn nhận ra tên này). Khi chưa đọc được ai trong đội, chỉ nhận
   Claude Code.
 - **Đánh đổi:** các quy tắc có thể cho qua một câu nói với người khác (trong
   phòng yên tĩnh mà không có `LAMP_SPOKEN_TO`, hoặc như một cuộc trò chuyện

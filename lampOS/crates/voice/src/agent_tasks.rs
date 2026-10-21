@@ -191,14 +191,16 @@ struct Pending {
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
 
 /// An agent the tasks part can start: what the person calls it, how the
-/// model is told it may sound, and the close forms the voice takes for it
-/// (lower case, letters and digits only).
+/// model is told it may sound, the close forms the voice takes for it
+/// (lower case, letters and digits only), and the forms of its whole name
+/// a named ask takes ([`named_ask`]: lower case, words split by a space).
 #[derive(Debug, Eq, PartialEq)]
 struct Kind {
     engine: &'static str,
     name: &'static str,
     sounds: &'static str,
     close: &'static [&'static str],
+    heard: &'static [&'static str],
 }
 
 /// The agents the lamp hands work to, as the person calls them: what the
@@ -226,30 +228,43 @@ const KINDS: [Kind; 5] = [
         name: CLAUDE_CODE,
         sounds: "\"Claude\" or \"Claude Code\", which can sound like \"cloud\" or \"cloud code\"",
         close: &["claudecode", "claude", "cloudcode", "cloud"],
+        // What the office's speech to text gave for it (b0934, #1722).
+        heard: &[
+            "claude code",
+            "claudecode",
+            "cloud code",
+            "claude coat",
+            "claude cold",
+            "clawed code",
+        ],
     },
     Kind {
         engine: "codex",
         name: "Codex",
         sounds: "\"Codex\", which can sound like \"codecs\" or \"code X\"",
         close: &["codex", "codecs", "codec"],
+        heard: &["codex", "code x", "codecs", "kodex"],
     },
     Kind {
         engine: "opencode",
         name: "OpenCode",
         sounds: "\"OpenCode\" or \"Open Code\"",
         close: &["opencode"],
+        heard: &["opencode"],
     },
     Kind {
         engine: "devin",
         name: "Devin",
         sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
         close: &["devin", "devon"],
+        heard: &["devin"],
     },
     Kind {
         engine: "devin-cloud",
         name: "Devin",
         sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
         close: &["devin", "devon"],
+        heard: &["devin"],
     },
 ];
 
@@ -296,56 +311,140 @@ const NOT: [&str; 3] = ["not", "never", "dont"];
 /// The words before "I" that make it a question the person asks themself
 /// ("should I ask Claude Code to …").
 const SHOULD_I: [&str; 3] = ["should", "shall", "do"];
+/// The words a line may open with before its first word of its own
+/// ("Hey Lamp, …").
+const OPENING: [&str; 6] = ["hey", "hi", "ok", "okay", "lamp", "please"];
+/// What speech to text gives for "ask" as the line's first word: "asked",
+/// or the first sound clipped ("sk", "k"). Taken only there, with nothing
+/// before but [`OPENING`], so that "I asked Codex to …", a report, is not.
+/// "k" is also an "OK" ("K, Claude Code finished?"), so it is "ask" only
+/// with "to" after the name.
+const ASK_AT_THE_START: [&str; 3] = ["asked", "sk", "k"];
+/// The asking words a misheard name (a form of `Kind::heard` that is not
+/// the name itself: "codecs", "cloud code") is taken with: "get codecs to
+/// work" is ordinary English, so "get" and "have" are for the true names.
+const ASKING_MISHEARD: [&str; 2] = ["ask", "tell"];
+/// The words that open a place between the name and "to" ("ask Claude
+/// Code on my office computer to …"), and the most words it may take.
+const PLACE_WORDS: [&str; 4] = ["on", "at", "in", "from"];
+const MOST_PLACE_WORDS: usize = 6;
 
 /// Each of the staff whose name the person's own words ask to do
 /// something (#1722, `LAMP_TASKS_NAMED_ASK`), once each, in the order the
 /// words first ask them (empty for none): "ask/tell/get/have <name> to
-/// …", or "can/could you ask/get <name> …". The name is the agent's own,
-/// whole ("Claude Code", "Codex"), of the staff as last read, or the one who
-/// does the work when none is read. A mention is none: "I told Claude Code
-/// yesterday", "is Codex done?", "what did Claude Code say?", "did you ask
-/// Codex to …", a negation right before the verb ("don't ask …", "never
-/// ask …") or a question to oneself ("should I ask …"); nor a name garbled ("Claude Co") or not of the staff.
+/// …" (a place may come before "to": "… on my office computer to …"),
+/// "can/could you ask/get <name> …", or "ask <name> …" with no "to" where a
+/// sentence starts, unless a "?" or "." comes right after the name ("Ask
+/// Claude Code? No, never mind."). "asked", "sk" or "k" is "ask" at the
+/// line's start (after "Hey Lamp," or the like), never after a subject: "I
+/// asked Codex to …" is a report; "k" only with "to" after the name. The
+/// name is one of the forms of the agent's whole name that speech to text
+/// gives (`Kind::heard`: "cloud code", "code x"), of the staff as last
+/// read, or the one who does the work when none is read; a misheard form
+/// only with "ask" or "tell". A mention is none: "I told Claude Code yesterday", "is Codex
+/// done?", "what did Claude Code say?", "get Codex's answer", "did you ask
+/// Codex to …", a negation right before the verb ("don't ask …", "never ask
+/// …") or a question to oneself ("should I ask …"); nor a heard form with
+/// no asking word ("the cloud code is broken"), a name clipped ("Claude
+/// Co") or not of the staff.
 pub fn named_ask(place: &Place, heard: &str) -> Vec<&'static str> {
     let staff = staff_now(place);
-    let names: Vec<&'static str> = if staff.is_empty() {
-        vec![CLAUDE_CODE]
+    let mut kinds: Vec<&'static Kind> = Vec::new();
+    if staff.is_empty() {
+        kinds.extend(KINDS.iter().find(|kind| kind.name == CLAUDE_CODE));
     } else {
-        staff.iter().map(|member| member.kind.name).collect()
-    };
-    let words: Vec<String> = heard
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .map(str::to_lowercase)
-        .collect();
+        for member in &staff {
+            if !kinds.iter().any(|kind| kind.name == member.kind.name) {
+                kinds.push(member.kind);
+            }
+        }
+    }
+    // Each word, lower case, whether a stop or comma comes right before it,
+    // and whether a "?" or "." does.
+    let mut words: Vec<String> = Vec::new();
+    let mut stopped: Vec<bool> = Vec::new();
+    let mut ended: Vec<bool> = Vec::new();
+    let mut stop = true;
+    let mut end = false;
+    for piece in heard.split_inclusive(|letter: char| !letter.is_alphanumeric()) {
+        let word: String = piece
+            .chars()
+            .filter(|letter| letter.is_alphanumeric())
+            .collect::<String>()
+            .to_lowercase();
+        if !word.is_empty() {
+            words.push(word);
+            stopped.push(stop);
+            ended.push(end);
+            stop = false;
+            end = false;
+        }
+        stop |= piece.chars().any(|letter| ".!?,;:".contains(letter));
+        end |= piece.chars().any(|letter| ".?".contains(letter));
+    }
     let word = |at: Option<usize>| at.and_then(|at| words.get(at)).map(String::as_str);
+    let first = words
+        .iter()
+        .position(|word| !OPENING.contains(&word.as_str()))
+        .unwrap_or(words.len());
+    let asks = |at: usize, said: &[&str], misheard: bool| -> bool {
+        let verb_at = at - 1;
+        let mut verb = words[verb_at].as_str();
+        let clipped_k = verb_at == first && verb == "k";
+        if verb_at == first && ASK_AT_THE_START.contains(&verb) {
+            verb = "ask";
+        }
+        if !ASKING.contains(&verb) || (misheard && !ASKING_MISHEARD.contains(&verb)) {
+            return false;
+        }
+        let after = at + said.len();
+        if word(Some(after)) == Some("s") {
+            return false;
+        }
+        let you = word(at.checked_sub(2)) == Some("you");
+        let before_you = word(at.checked_sub(3)).unwrap_or_default();
+        if you && DID_YOU.contains(&before_you) {
+            return false;
+        }
+        let before_verb = word(at.checked_sub(2)).unwrap_or_default();
+        let negated = NOT.contains(&before_verb)
+            || (before_verb == "t" && word(at.checked_sub(3)) == Some("don"));
+        if negated || (before_verb == "i" && SHOULD_I.contains(&before_you)) {
+            return false;
+        }
+        let to = word(Some(after)) == Some("to")
+            || (word(Some(after)).is_some_and(|next| PLACE_WORDS.contains(&next))
+                && (after + 1..after + 1 + MOST_PLACE_WORDS)
+                    .any(|at| word(Some(at)) == Some("to")));
+        if clipped_k {
+            return to;
+        }
+        let sentence_starts = verb_at == first || stopped[verb_at];
+        to || (you && CAN_YOU.contains(&before_you) && ASKING_THE_LAMP.contains(&verb))
+            || (verb == "ask" && sentence_starts && after < words.len() && !ended[after])
+    };
     let mut asked: Vec<(usize, &'static str)> = Vec::new();
-    for name in names {
-        let said: Vec<String> = name.split(' ').map(str::to_lowercase).collect();
-        for at in 1..words.len() {
-            if words.get(at..at + said.len()) != Some(&said[..]) {
-                continue;
-            }
-            let verb = word(Some(at - 1)).unwrap_or_default();
-            if !ASKING.contains(&verb) {
-                continue;
-            }
-            let you = word(at.checked_sub(2)) == Some("you");
-            let before_you = word(at.checked_sub(3)).unwrap_or_default();
-            if you && DID_YOU.contains(&before_you) {
-                continue;
-            }
-            let before_verb = word(at.checked_sub(2)).unwrap_or_default();
-            let negated = NOT.contains(&before_verb)
-                || (before_verb == "t" && word(at.checked_sub(3)) == Some("don"));
-            if negated || (before_verb == "i" && SHOULD_I.contains(&before_you)) {
-                continue;
-            }
-            let to = word(Some(at + said.len())) == Some("to");
-            if to || (you && CAN_YOU.contains(&before_you) && ASKING_THE_LAMP.contains(&verb)) {
-                asked.push((at, name));
-                break;
-            }
+    for kind in kinds {
+        // The first place any form of the name is asked.
+        let found = kind
+            .heard
+            .iter()
+            .filter_map(|form| {
+                let said: Vec<&str> = form.split(' ').collect();
+                // The name itself, or run together ("claudecode"); not
+                // split ("code x") or misheard.
+                let name = kind.name.to_lowercase();
+                let misheard = *form != name && *form != name.replace(' ', "");
+                (1..words.len()).find(|&at| {
+                    words
+                        .get(at..at + said.len())
+                        .is_some_and(|here| here == said)
+                        && asks(at, &said, misheard)
+                })
+            })
+            .min();
+        if let Some(at) = found {
+            asked.push((at, kind.name));
         }
     }
     asked.sort_by_key(|(at, _)| *at);
@@ -2384,7 +2483,6 @@ pub(crate) mod tests {
             "Ask Devin to write a poem.",
             "Ask OpenCode to write a poem.",
             "Ask Claude Co to write a poem.",
-            "Ask cloud code to write a poem.",
             "Tell me a story about a clever fox, at least eight sentences.",
             "Write a poem about Codex.",
             // The reviewer on #2365: a negation, or a question the person
@@ -2426,6 +2524,138 @@ pub(crate) mod tests {
             vec!["Claude Code"]
         );
         assert!(asked("ask Codex to write a poem").is_empty());
+    }
+
+    /// `LAMP_TASKS_NAMED_ASK` (#1722): the forms the office's speech to text
+    /// gives for an ask are asks too: a name misheard as `Kind::heard` has
+    /// it, "asked" or a clipped "sk"/"k" for "ask" at the line's start, and
+    /// "ask <name>" with no "to" where a sentence starts. A mention, a
+    /// negation, a question to oneself, "asked" after a subject, and a
+    /// heard form with no asking word stay out.
+    #[test]
+    fn a_named_ask_takes_the_forms_speech_to_text_gives() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut on = place(Path::new("/run/t"), true);
+        on.asked = true;
+        *STAFF.lock().unwrap() = two();
+        let asked = |heard: &str| named_ask(&on, heard);
+        for (heard, who) in [
+            // Names as heard (b0934 on lamp-4ace, 21 Oct).
+            ("Ask cloud code to write a poem.", "Claude Code"),
+            ("Hey Lamp, ask Claude Coat to write a poem.", "Claude Code"),
+            ("Ask Claude Cold to write a poem.", "Claude Code"),
+            ("tell clawed code to fix the test", "Claude Code"),
+            ("ASK CLAUDE CODE TO WRITE A POEM", "Claude Code"),
+            ("ask claude code to write a poem", "Claude Code"),
+            ("Ask ClaudeCode to write a poem.", "Claude Code"),
+            ("Ask Code X to write a haiku about coffee.", "Codex"),
+            ("Tell codecs to check the build.", "Codex"),
+            ("Ask Kodex to write a haiku.", "Codex"),
+            ("ask codecs to write a haiku", "Codex"),
+            ("Get Codex to check the build.", "Codex"),
+            ("Have Claude Code to look at it.", "Claude Code"),
+            // Verb forms as heard.
+            ("Asked Claude Code to write a two-line poem.", "Claude Code"),
+            (
+                "Hey Lamp, asked Claude Code to write a two-line poem.",
+                "Claude Code",
+            ),
+            (
+                "Ask Claude Code write a poem about the rain.",
+                "Claude Code",
+            ),
+            ("Hey Lamp, ask Claude Code for a poem.", "Claude Code"),
+            ("Ask Codex, write a haiku about coffee.", "Codex"),
+            (
+                "The keeper smiled. Ask Claude Code write a poem.",
+                "Claude Code",
+            ),
+            ("sk Claude Code to write a poem.", "Claude Code"),
+            ("k Claude Code to write a poem.", "Claude Code"),
+            ("Hey Lamp, sk Codex to write a haiku.", "Codex"),
+            // As before, and a place between the name and "to".
+            ("Can you ask cloud code to write a poem?", "Claude Code"),
+            ("Could you ask code x to check the logs?", "Codex"),
+            ("Could you get Codex to check the logs?", "Codex"),
+            ("Have Codex to look at the build.", "Codex"),
+            (
+                "Ask Claude Code on my office computer to write a short story.",
+                "Claude Code",
+            ),
+            (
+                "Tell Codex on the office computer to fix the test.",
+                "Codex",
+            ),
+        ] {
+            assert_eq!(asked(heard), vec![who], "{heard}");
+        }
+        for heard in [
+            // Mentions.
+            "I told Claude Code yesterday.",
+            "Is Codex done?",
+            "What did Claude Code say?",
+            "Claude Code's answer was long.",
+            "Get Codex's answer.",
+            "Have Claude Code's PR reviewed.",
+            "Ask Codex's opinion later.",
+            "Tell Claude Code I'm late.",
+            "I'll ask Claude Code later.",
+            // Negations and questions to oneself.
+            "Don't ask Claude Code to write it.",
+            "Don't ask cloud code write it.",
+            "Never ask Codex to touch my notes.",
+            "Should I ask Claude Code to fix it?",
+            "Should I ask Claude Code write it?",
+            // "asked" reported, with a subject or not at the line's start.
+            "I asked Claude Code to do it yesterday, is it done?",
+            "We asked Codex to fix it.",
+            "Hey Lamp, I asked Claude Code to write a poem.",
+            "You asked Codex to check it, right?",
+            "Yesterday asked Claude Code to start.",
+            // "sk" or "k" not at the line's start, or "k" (an "OK") with no
+            // "to" after the name (the reviewer on #2479).
+            "I said k Claude Code to go.",
+            "K, Claude Code finished?",
+            "k, Claude Code is slow",
+            // A misheard name with "get" or "have", ordinary English (the
+            // reviewer on #2479): the true names only.
+            "I can't get codecs to work",
+            "We need to get codecs to play this file.",
+            "Do I get codecs to work?",
+            "Get codecs to check the build.",
+            "Could you get code x to check the logs?",
+            "Have cloud code to look at it.",
+            // A stop right after the name ends the no-"to" form (the
+            // reviewer on #2479).
+            "Ask Claude Code? No, never mind.",
+            "Ask Codex. Then nothing.",
+            // A heard form with no asking word.
+            "The cloud code is broken.",
+            "A cold coat is no good.",
+            "The Claude Coat is red.",
+            "Which codecs does it use?",
+            "Save it in the cloud code folder.",
+        ] {
+            assert!(asked(heard).is_empty(), "{heard}");
+        }
+        // Several, in word order, heard forms among them.
+        assert_eq!(
+            asked("Ask code x to check the build and ask cloud code to write a poem."),
+            vec!["Codex", "Claude Code"]
+        );
+        assert_eq!(
+            asked("Asked Claude Code to write it, then tell codecs to review it."),
+            vec!["Claude Code", "Codex"]
+        );
+        // With none of the staff read, Claude Code alone, as heard.
+        STAFF.lock().unwrap().clear();
+        assert_eq!(asked("sk cloud code to write a poem"), vec!["Claude Code"]);
+        assert!(asked("ask code x to write a poem").is_empty());
     }
 
     /// The reviewer on #1446: a named member keeps its own engine through

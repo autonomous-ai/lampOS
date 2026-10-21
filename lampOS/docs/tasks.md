@@ -2257,14 +2257,36 @@ hand-over or do the work itself. A round after a call ends with the call's
 result and is asked as before.
 
 - **Asks:** "ask", "tell", "get" or "have" right before the agent's whole name
-  with "to" after it ("ask Claude Code to …", "tell Codex to …"), or "can",
-  "could", "would" or "will" "you ask/get <name> …".
+  with "to" after it ("ask Claude Code to …", "tell Codex to …"), a place
+  allowed before "to" ("ask Claude Code on my office computer to …": the word
+  right after the name is "on", "at", "in" or "from", and "to" comes within
+  the 6 words after it), or "can", "could", "would" or "will" "you ask/get
+  <name> …".
+- **As speech to text hears them** (b0934 on lamp-4ace, 2026-10-21): the name
+  in any case and as misheard (`Kind::heard` beside `KINDS`): Claude Code as
+  "cloud code", "Claude Coat", "Claude Cold", "clawed code" or "ClaudeCode";
+  Codex as "code X", "codecs" or "Kodex". A misheard form counts only with
+  "ask" or "tell": "get" and "have" are for the true names ("Claude Code",
+  "ClaudeCode", "Codex"), since "I can't get codecs to work" is ordinary
+  English. "ask <name> …" with no "to" where a sentence starts ("Ask Claude
+  Code write a poem.", "…. Ask Codex, write a haiku."), unless a "?" or "."
+  comes right after the name ("Ask Claude Code? No, never mind." is none; a
+  comma is no stop). "asked", "sk" or "k" for "ask", only as the line's
+  first word, after nothing but "Hey Lamp," or the like ("Asked Claude Code
+  to …", "sk Claude Code to …"); "k" only with "to" after the name, since it
+  is also an "OK" ("K, Claude Code finished?" is none). After a subject it is a report and no ask ("I asked
+  Claude Code to do it yesterday, is it done?"). A line that opens "Asked
+  Claude Code to …" is taken as an ask even when the person meant a report.
 - **Not asks:** a mention ("I told Claude Code yesterday", "is Codex done?",
   "what did Claude Code say?", "did you ask Codex to …", "tell Claude Code I'm
-  late"), a negation right before the verb ("don't ask Claude Code to …",
-  "do not tell …", "never ask Codex to …", "not get …"), a question the person
-  asks themself ("should I ask Claude Code to …", "shall I …", "do I …"), a name not of the staff ("ask Devin to …" when Devin isn't set up), a
-  garbled name ("Claude Co", "cloud code"; the staff's note still hears those).
+  late", "Claude Code's answer", "get Codex's answer", "have Claude Code's PR
+  reviewed", "I'll ask Claude Code later"), a negation right before the verb
+  ("don't ask Claude Code to …", "do not tell …", "never ask Codex to …", "not
+  get …"), a question the person asks themself ("should I ask Claude Code to
+  …", "shall I …", "do I …"), a name not of the staff ("ask Devin to …" when
+  Devin isn't set up), a heard form with no asking word ("the cloud code is
+  broken", "a cold coat"), a clipped name ("Claude Co"; the staff's note still
+  hears it).
   With none of the staff read, only Claude Code.
 - **The trade:** the rules can let through a line said to someone else (in a
   quiet room without `LAMP_SPOKEN_TO`, or as a conversation going on). Today the
