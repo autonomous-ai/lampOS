@@ -479,3 +479,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #2226 rebased onto lamp-voice `cdc734188` past RECALL_V2/KEEP_HEARD; the
   reviewer-lead's P3: another person's ids still refused on conversation_end.
   Status table to the first builder on #1722; free: twelve.
+- 21 Oct: back after a usage block and a restart (cron recreated). #2265
+  merged; #2449 onto #1712: its follow-up (a gap-held line told no recall,
+  no hits, no held forget), with #2265 cherry-picked. Friday's #2367 took
+  ROOM_NOT_ASKER; my local start dropped.
