@@ -958,6 +958,21 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
         held.iter()
             .all(|(at, seen, _)| (*at < slept_at) != seen.muted)
     );
+    // The hand's time is told as it grows, one contact all along (#1362).
+    let times: Vec<(u64, u64)> = held
+        .iter()
+        .filter_map(|(_, seen, _)| seen.head_held)
+        .collect();
+    assert!(
+        times
+            .windows(2)
+            .all(|w| w[0].0 == w[1].0 && w[0].1 <= w[1].1)
+    );
+    assert!(
+        times
+            .iter()
+            .any(|(_, held)| crate::head_cue::sighs_at(*held))
+    );
     assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_ASLEEP);
     // Saved before anything else, as any mute; a restart keeps it asleep.
     owner.persist_muted().unwrap();
@@ -988,6 +1003,16 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
     assert!(seen.head_tap_at_us.is_some());
     assert!(woke_at < START + 5_500_000);
     assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_OPEN);
+    // The person woke it: the next conversation's "hm?" (#1362), once, and
+    // only while fresh.
+    assert_eq!(owner.take_woken(woke_at), seen.head_tap_at_us);
+    assert_eq!(owner.take_woken(woke_at), None, "once");
+    owner.woken = seen.head_tap_at_us;
+    assert_eq!(
+        owner.take_woken(seen.head_tap_at_us.unwrap() + WOKEN_FRESH_US),
+        None,
+        "a wake held back past its time is let go"
+    );
     let saved = MuteRecord::load(&directory.file(), CLOCK, START + 5_600_000).unwrap();
     assert!(!saved.muted && saved.reason.is_none());
 }
@@ -1028,6 +1053,8 @@ fn a_tap_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons() {
         let opened = seen.iter().any(|(_, _, allowed)| *allowed);
         let saved = MuteRecord::load(&directory.file(), CLOCK, START + 1_300_000).unwrap();
         assert_eq!(saved.muted, !opened);
+        // Not a hand's sleep: no "hm?" for it (#1362).
+        assert_eq!(owner.take_woken(START + 1_300_000), None);
         (opened, owner.restored_after_fault())
     };
     assert_eq!(tapped(true, true), (true, false), "the guard's mute wakes");
