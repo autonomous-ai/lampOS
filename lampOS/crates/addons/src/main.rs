@@ -8,7 +8,7 @@ use std::{
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     if args.next().as_deref() != Some("serve") {
-        return Err("usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] (LAMP_ADDONS=on is --enable)".into());
+        return Err("usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N, for tests: below 15000] (LAMP_ADDONS=on is --enable)".into());
     }
     let mut config = Config::default();
     let mut enabled = std::env::var(ENVIRONMENT).as_deref() == Ok("on");
@@ -36,6 +36,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     return Err("--run-for-ms must be 1..86400000".into());
                 }
                 config.run_for = Some(Duration::from_millis(ms));
+            }
+            // For tests only: the quiet before a say, shorter than the
+            // product's 15 s, which is kept without it.
+            "--say-quiet-ms" => {
+                let ms: u64 = args
+                    .next()
+                    .ok_or("--say-quiet-ms needs milliseconds")?
+                    .parse()?;
+                if ms > 15_000 {
+                    return Err("--say-quiet-ms is for tests, at most 15000".into());
+                }
+                config.say_quiet = Some(Duration::from_millis(ms));
             }
             _ => return Err("unknown option".into()),
         }

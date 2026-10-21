@@ -168,9 +168,14 @@ on a lamp without the head's controls):
 | A busy room | `room/state` | not `quiet` (`unknown` included), or nothing fresh (3 s) |
 | Colder (a `mood` only) | the proposal | its warmth is below 0: an add-on may warm the lamp, never cool it |
 | The person's light (a `light` only) | `light/command`, `light/state`, `mood/state` | the newest `light/command` this boot came from the actions part or the app, and `light/state` shows it (or one of the judge's own glows is over it); with none, the ring shows its own idle light. It stays the person's base for good. Once it **rests**, an add-on light is not dropped but asked for **5 s at most** (`BRIEF_GLOW_US`), and the ring then shows their light again by itself. A light they set **off** never rests: off stays dark. An on light rests when Mood has said `asleep` (on the judge's own boot clock) since they set it, or 12 h have passed (`PERSONS_LIGHT_RESTS_US`, the first builder on #2530, 20:1x, after the lamp-75c9 run). Their next choice is fresh again |
-| Not yet | the act | `say`, `note` or `move` (#2530 part 2) |
+| Not yet | the act | `note` or `move` |
+| Too soon (a `say` only) | `voice/state` | the voice has not rested for 15 s since it last spoke or was spoken to (`SAY_QUIET_US`), as progress news waits |
+| Enough this hour (a `say` only) | the judge's own memory | add-ons together had 4 says kept within the hour (`SAYS_AN_HOUR`) |
+| Asking (a `say` only) | the judge's own memory | another say is being put to the policy: one at a time |
 | Late | the proposal's age | judged after its `holds_ms` |
 | Rate (rule 8) | the judge's own memory | its add-on had one kept within 2 minutes, or 10 within the hour; a dropped one is not counted |
+
+**A say (part 2, #2530).** A `say` past every rule is not kept by the rules alone: the judge puts it to the policy as one `AddonAsk` on `addon/ask` (the proposal's number, the add-on, `why`, `sure`; no words), one at a time, and waits 3 s (`ASK_WAIT_US`) for a `Decision` from `lamp-policy` with `about` `addon` naming the proposal. Only `say_now` that acts (`shadow` false), with the rules holding again as it comes, keeps it, `by` `jev`; `wait` or a shadow answer drops it, `by` `jev`, with why; no answer drops it, `by` `rule`. Only a kept say counts toward the rates. In this PR a kept say is said kept and not spoken: the policy's question and the voice's side come in part 2's next PRs. `--say-quiet-ms` shortens the 15 s for tests only.
 
 A kept `light` becomes one `LightRequest` on `light/request` from
 `addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on

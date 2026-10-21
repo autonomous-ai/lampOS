@@ -997,6 +997,7 @@ impl Progress {
             task: Some(context.key()),
             arrival: None,
             ask: None,
+            proposal: None,
         };
         let line = Line {
             at_unix_ms: unix_ms,

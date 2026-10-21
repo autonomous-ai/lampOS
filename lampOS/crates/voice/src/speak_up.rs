@@ -724,6 +724,7 @@ mod tests {
                 task: None,
                 arrival: Some(number),
                 ask: None,
+                proposal: None,
             },
         )
         .unwrap();

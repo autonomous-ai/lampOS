@@ -663,6 +663,7 @@ impl Judges {
             task: None,
             arrival: None,
             ask: None,
+            proposal: None,
         });
         let at = unix_ms();
         policy.watch = Some((

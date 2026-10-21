@@ -1132,6 +1132,7 @@ impl Hello {
             task: None,
             arrival: skill_ask.is_none().then_some(context.arrival),
             ask: skill_ask,
+            proposal: None,
         };
         let line = Line {
             at_unix_ms: unix_ms,

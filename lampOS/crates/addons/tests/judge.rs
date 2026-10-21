@@ -3,9 +3,9 @@
 //! judge asks of the ring read back.
 use lamp_bus::Bus;
 use lamp_msgs::{
-    AddonDecision, AddonLight, AddonMood, AddonProposal, ClockStamp, Light, LightRequest,
-    MicrophonePrivacy, MoodNudge, MoodState, Pause, Priority, Room, RoomState, Voice, VoiceMute,
-    VoiceState,
+    AddonAsk, AddonDecision, AddonLight, AddonMood, AddonProposal, ClockStamp, Decision, Light,
+    LightRequest, MicrophonePrivacy, MoodNudge, MoodState, Pause, Priority, Room, RoomState, Voice,
+    VoiceMute, VoiceState,
 };
 use std::{
     path::Path,
@@ -355,4 +355,136 @@ fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
     assert_eq!(request.claim.priority, Priority::Idle);
     let holds_us = request.claim.until_us - lamp_ipc::monotonic_us();
     assert!(holds_us <= 5_000_000, "{holds_us}");
+}
+
+/// What the policy answers a say with, in the stand-in below.
+#[derive(Clone, Copy)]
+enum Answer {
+    SayNow,
+    Wait,
+    Shadow,
+    None,
+}
+
+/// One say through the judge (#2530 part 2), with a stand-in policy that
+/// answers its ask: the ask it saw, and the judge's decision.
+fn say_through(answer: Answer) -> (AddonAsk, AddonDecision) {
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let bus = Bus::new(dir.path()).unwrap();
+    let mut asks = bus.subscribe(AddonAsk::TOPIC, "policy").unwrap();
+    let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-addons"));
+    command
+        .args([
+            "serve",
+            "--enable",
+            "--say-quiet-ms",
+            "200",
+            "--clock-id",
+            "test-boot",
+            "--bus-root",
+        ])
+        .arg(dir.path())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let _judge = Running(command.spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    calm(&bus, false, false);
+    // The voice has rested past the test's quiet, each reading still fresh
+    // (said once: a second publisher would be a restarted voice).
+    std::thread::sleep(Duration::from_millis(400));
+    let proposal = lamp_ipc::monotonic_us();
+    let say = AddonProposal {
+        act: "say".into(),
+        why: "music".into(),
+        light: None,
+        note: Some("Music is playing.".into()),
+        ..glow(proposal)
+    };
+    bus.publisher_declared(
+        AddonProposal::TOPIC,
+        &AddonProposal::declaration(),
+        "skills",
+    )
+    .unwrap()
+    .publish_json(lamp_ipc::monotonic_us(), &say)
+    .unwrap();
+    let ask: AddonAsk = asks
+        .recv(Duration::from_secs(5))
+        .unwrap()
+        .expect("asked")
+        .parse()
+        .unwrap();
+    let (choice, shadow) = match answer {
+        Answer::SayNow => (Some("say_now"), false),
+        Answer::Wait => (Some("wait"), false),
+        Answer::Shadow => (Some("say_now"), true),
+        Answer::None => (None, false),
+    };
+    if let Some(choice) = choice {
+        bus.publisher_declared(Decision::TOPIC, &Decision::declaration(), "policy")
+            .unwrap()
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &Decision {
+                    about: AddonAsk::ABOUT.into(),
+                    choice: choice.into(),
+                    probability: 0.8,
+                    answers: Default::default(),
+                    by: "jev".into(),
+                    took_ms: 300,
+                    shadow,
+                    request: None,
+                    task: None,
+                    arrival: None,
+                    ask: None,
+                    proposal: Some(ask.proposal),
+                },
+            )
+            .unwrap();
+    }
+    let decision: AddonDecision = said
+        .recv(Duration::from_secs(6))
+        .unwrap()
+        .expect("decided")
+        .parse()
+        .unwrap();
+    (ask, decision)
+}
+
+/// Part 2: a say past the rules is put to the policy with no words, and
+/// only the policy's acting `say_now` keeps it; no answer drops it.
+#[test]
+fn a_say_is_asked_of_the_policy_and_kept_or_dropped_by_its_answer() {
+    let (ask, kept) = say_through(Answer::SayNow);
+    assert_eq!(
+        (ask.addon.as_str(), ask.why.as_str()),
+        ("evening-glow", "music")
+    );
+    assert!(serde_json::to_value(&ask).unwrap().get("note").is_none());
+    assert_eq!(
+        (kept.choice.as_str(), kept.by.as_str()),
+        ("kept", "jev"),
+        "{kept:?}"
+    );
+    assert_eq!(kept.proposal, ask.proposal);
+    for (answer, by, why) in [
+        (Answer::Wait, "jev", "the policy said to wait"),
+        (Answer::Shadow, "jev", "the policy's answer is shadow"),
+        (Answer::None, "rule", "the policy did not answer"),
+    ] {
+        let (_, dropped) = say_through(answer);
+        assert_eq!(
+            (dropped.choice.as_str(), dropped.by.as_str()),
+            ("dropped", by),
+            "{dropped:?}"
+        );
+        assert!(dropped.why.starts_with(why), "{dropped:?}");
+    }
 }

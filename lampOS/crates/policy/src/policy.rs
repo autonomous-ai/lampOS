@@ -1073,6 +1073,7 @@ impl Policy<'_> {
             task: None,
             arrival: None,
             ask: None,
+            proposal: None,
         });
         let at_unix_ms = unix_ms();
         self.watch = Some((
@@ -1244,6 +1245,7 @@ impl Policy<'_> {
                 task: None,
                 arrival: None,
                 ask: Some(ask),
+                proposal: None,
             });
         }
     }

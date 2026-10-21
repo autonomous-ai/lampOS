@@ -2785,6 +2785,7 @@ mod tests {
             task: Some(task.into()),
             arrival: None,
             ask: None,
+            proposal: None,
         }
     }
     const STORE: &str = "0123456789abcdef0123456789abcdef";
