@@ -399,3 +399,16 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - `calm()` keeps privacy said every 20 ms behind a `#[must_use]` guard.
 - **Shown:** with a temporary 1 s pause in the judge, the old test fails as on CI, and the fixed one passes.
 - The first builder read it clean. It was rebased over #2738, and `moved()` now uses both fixes.
+
+## 22 Oct, 05:3x–05:5x: #2741 merged; the made-skill check, #2745
+
+- **#2741** (the judge-test flake) merged as `08e091245`. #2530's code is all in. Only lamp rows are left, for the morning.
+- **First builder (05:34):** next is a played check for "An owner makes their own skill" (#2424). Claimed.
+- **Built as #2745** (tools and docs only): `tools/played/make-skill.sh LABEL [yes|no|both]`.
+  - It turns `LAMP_MAKE_SKILL` on with a `/run` drop-in, removed on exit along with any skill it put on.
+  - It asks for a stand-up reminder skill and says yes to the hand-over.
+  - It waits up to 8 min for the kept SHA-256 and for "Shall I put it on the lamp?".
+  - **Yes arm:** nothing on before the yes; that SHA-256 put on, enabled, loaded and removed.
+  - **No arm:** nothing installed.
+- **Its stand-in test** passes, and a mutant without the SHA-256 comparison fails it.
+- **Docs:** the lamp-runs row, replacing the stale "waits for the lead's ruling" line, and the README.
