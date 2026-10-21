@@ -166,6 +166,11 @@ pub enum WorkerEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         receipt: Option<PrivacyReceipt>,
     },
+    /// The selected worker's acquisition expired. This is not a new physical
+    /// reading; the coordinator closes its gate and may ride the bounded gap.
+    PrivacyUnavailable {
+        since_us: u64,
+    },
     CapturePrepared {
         epoch: u64,
         privacy_generation: u64,

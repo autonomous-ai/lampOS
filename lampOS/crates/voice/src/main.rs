@@ -791,10 +791,10 @@ fn run() -> Result<()> {
         [command,role,dir,parent,worker,flags @ ..] if command=="worker" && role=="privacy" && flags.first().is_some_and(|flag| flag==lamp_voice::privacy_bus::ROOT_FLAG) => {
             let parent=parse_boot(parent)?;
             let worker=parse_boot(worker)?;
-            let (root,route)=lamp_voice::privacy_bus::worker_route(flags)?;
+            let (root,route,ride)=lamp_voice::privacy_bus::worker_route(flags)?;
             let mut channels=WorkerChannels::bind(Path::new(dir),role,parent,worker,true)?;
             channels.connect(Path::new(dir),role,true)?;
-            lamp_voice::privacy_bus::run(channels,parent,&root,route)?;
+            lamp_voice::privacy_bus::run(channels,parent,&root,route,ride)?;
         },
         #[cfg(target_os="linux")]
         [command,role,dir,parent,worker,mode,flag,root] if command=="worker" && role=="ring" && mode=="--privacy" && flag=="--bus-root" => {

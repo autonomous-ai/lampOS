@@ -74,9 +74,21 @@ impl GapRide {
         true
     }
 
+    /// A worker noticed the same gap earlier. Its acquisition-based start
+    /// may shorten the remaining budget, never renew it.
+    pub fn noticed_since(&mut self, since_us: u64) {
+        if let Some(since) = &mut self.since {
+            *since = (*since).min(since_us);
+        }
+    }
+
     /// A fresh reading said open at `now_us`: the gap is over, and how long
-    /// it lasted. None when no gap was ridden.
+    /// it lasted. None when no gap was ridden or its deadline has passed;
+    /// an expired gap stays active so the caller must end it, never reopen.
     pub fn reopened(&mut self, now_us: u64) -> Option<u64> {
+        if self.lasted(now_us).is_some_and(|lasted| lasted >= RIDE_US) {
+            return None;
+        }
         self.since.take().map(|since| now_us.saturating_sub(since))
     }
 
@@ -152,5 +164,27 @@ mod tests {
         );
         assert!(ride.takes_frame(1_300, reopened, 1_310));
         assert!(ride.takes_frame(1_305, reopened, 1_310));
+    }
+
+    #[test]
+    fn a_workers_earlier_expiry_shortens_but_never_renews_the_ride() {
+        let mut ride = GapRide::new(true);
+        assert!(ride.begin(true, 100_000));
+        ride.noticed_since(90_000);
+        ride.noticed_since(110_000);
+        assert_eq!(ride.lasted(120_000), Some(30_000));
+        assert!(ride.rides(true, 90_000 + RIDE_US - 1));
+        assert!(!ride.rides(true, 90_000 + RIDE_US));
+    }
+
+    #[test]
+    fn recovery_at_the_deadline_does_not_use_an_earlier_successful_check() {
+        for late in [0, 1, 10_000] {
+            let mut ride = GapRide::new(true);
+            assert!(ride.begin(true, 100));
+            assert!(ride.rides(true, 100 + RIDE_US - 1));
+            assert_eq!(ride.reopened(100 + RIDE_US + late), None);
+            assert_eq!(ride.lasted(100 + RIDE_US + late), Some(RIDE_US + late));
+        }
     }
 }

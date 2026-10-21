@@ -801,6 +801,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
             speaker: false,
             privacy: false,
             privacy_said_us: None,
+            source: None,
             authorities: Vec::new(),
             chunk_times: Vec::new(),
             peer,
@@ -1138,9 +1139,20 @@ thread_local! {
     static PRIVACY_CLOSED_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     /// The privacy worker fails once, 100 ms into its silent span (#2602).
     static PRIVACY_FAULT_IN_GAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Exercise the bus worker's production expiry state machine, rather
+    /// than a silent mock that cannot fail at its own freshness deadline.
+    static PRIVACY_SOURCE_EXPIRY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The loop's rig with a camera of its own, whose side records each
     /// authority it is given (#2602, the first builder's P1 on #2623).
     static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+struct SourcePeer {
+    gap: crate::privacy_bus::SourceGap,
+    gate: PrivacyGate,
+    permitted: bool,
+    granted: bool,
+    failed: bool,
 }
 
 /// A fixture worker's side read on the stepped clock, as the thread in
@@ -1151,6 +1163,7 @@ struct SteppedPeer {
     /// fresh, and when it last said the switch open.
     privacy: bool,
     privacy_said_us: Option<u64>,
+    source: Option<SourcePeer>,
     /// When each authority reached this side, on the scenario clock.
     authorities: Vec<u64>,
     /// When each speaker chunk reached this side.
@@ -1186,7 +1199,10 @@ impl SteppedPeer {
                     self.authorities.push(monotonic_us());
                     self.told.push(snapshot)
                 }
-                Control::Authority { .. } => {
+                Control::Authority { snapshot } => {
+                    if let Some(source) = &mut self.source {
+                        source.permitted = snapshot.microphone_permission() == Permission::Allowed;
+                    }
                     if self.keeping {
                         self.authorities.push(monotonic_us());
                     }
@@ -1200,6 +1216,7 @@ impl SteppedPeer {
         }
         let now_us = monotonic_us();
         if self.privacy
+            && self.source.as_ref().is_none_or(|source| !source.failed)
             && PRIVACY_FRESH_UNTIL
                 .with(std::cell::Cell::get)
                 .is_some_and(|until| now_us < until)
@@ -1210,14 +1227,66 @@ impl SteppedPeer {
                 .privacy_said_us
                 .is_none_or(|said| now_us >= said + 5_000)
         {
+            let muted = PRIVACY_CLOSED_FROM
+                .with(std::cell::Cell::get)
+                .is_some_and(|from| now_us >= from);
+            if let Some(source) = &mut self.source {
+                if let Some(event) = source
+                    .gap
+                    .before_observation(
+                        self.privacy_said_us,
+                        source.permitted && source.granted,
+                        now_us,
+                    )
+                    .map_err(io::Error::other)?
+                {
+                    source.gate.close();
+                    self.peer.control.send(event)?;
+                }
+                source.gate.observe(now_us, now(), now(), muted);
+                source.granted |= source.permitted && source.gate.allowed(now());
+            }
             self.privacy_said_us = Some(now_us);
             self.peer.control.send(WorkerEvent::Privacy {
                 receipt: None,
                 acquired_at_us: now_us,
-                muted: PRIVACY_CLOSED_FROM
-                    .with(std::cell::Cell::get)
-                    .is_some_and(|from| now_us >= from),
+                muted,
             })?;
+        }
+        if let Some(source) = &mut self.source
+            && !source.failed
+        {
+            let expired = source.gap.check(now_us).and_then(|()| {
+                if let Some(last) = self.privacy_said_us
+                    && now_us.saturating_sub(last) >= crate::privacy::PRIVACY_FRESH_US
+                {
+                    return source.gap.missing(
+                        last + crate::privacy::PRIVACY_FRESH_US,
+                        source.permitted && source.granted,
+                        now_us,
+                    );
+                }
+                if matches!(
+                    source.gate.state(now()),
+                    PrivacyState::Allowed | PrivacyState::Muted
+                ) {
+                    source.gap.recovered();
+                }
+                Ok(None)
+            });
+            match expired {
+                Ok(Some(event)) => {
+                    source.gate.close();
+                    self.peer.control.send(event)?;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    source.failed = true;
+                    self.peer.control.send(WorkerEvent::Fault {
+                        code: format!("{}{error}", crate::privacy_bus::UNREADABLE),
+                    })?;
+                }
+            }
         }
         if self.privacy
             && PRIVACY_SILENT
@@ -1406,6 +1475,17 @@ fn run_loop_ringed(
                     // The fourth side: speaker, capture, provider, privacy.
                     privacy: index == 3,
                     privacy_said_us: None,
+                    source: (index == 3 && PRIVACY_SOURCE_EXPIRY.with(std::cell::Cell::get)).then(
+                        || SourcePeer {
+                            gap: crate::privacy_bus::SourceGap::new(
+                                TEST_PRIVACY_GAP_RIDE.with(std::cell::Cell::get),
+                            ),
+                            gate: PrivacyGate::default(),
+                            permitted: false,
+                            granted: false,
+                            failed: false,
+                        },
+                    ),
                     authorities: Vec::new(),
                     chunk_times: Vec::new(),
                     peer,
@@ -2172,6 +2252,55 @@ fn gap_marks(ran: &Ran, state: &str) -> Vec<(u64, Option<u64>)> {
         .filter(|row| row["kind"] == "privacy_gap" && row["state"] == state)
         .map(|row| (row["at_us"].as_u64().unwrap(), row["lasted_us"].as_u64()))
         .collect()
+}
+
+/// Eighth's 75c9 finding on #2602: the real worker's expiry rule must feed
+/// the ride instead of ending this conversation before recovery is seen.
+#[test]
+fn the_workers_own_expiry_rides_a_sixty_millisecond_silence_in_one_conversation() {
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(true));
+    let (ran, began) = gap_run(true, 900_000, (300_000, 360_000), None);
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(false));
+    let started = gap_marks(&ran, "began");
+    let reopened = gap_marks(&ran, "reopened");
+    assert_eq!(started.len(), 2, "{}", ran.error);
+    assert_eq!(reopened.len(), 1, "{}", ran.error);
+    let gap_at = started[0].0;
+    let open_at = reopened[0].0;
+    assert!((began + 340_000..began + 360_000).contains(&gap_at));
+    assert!((began + 420_000..began + 440_000).contains(&open_at));
+    assert!(ran.left.is_none(), "the cancelled reply was not resumed");
+    assert!(
+        ran.chunk_times
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at))
+    );
+    assert!(
+        ran.capture_authorities
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at))
+    );
+    assert!(ran.capture_authorities.iter().any(|at| *at >= open_at));
+    assert_eq!(gap_marks(&ran, "ended").len(), 1);
+    assert!(
+        ran.error.contains("privacy switch unreadable"),
+        "{}",
+        ran.error
+    );
+    assert!(
+        ran.ended_us
+            <= began + 900_000 + crate::privacy::PRIVACY_FRESH_US + crate::privacy_gap::RIDE_US
+    );
+}
+
+#[test]
+fn without_the_ride_the_workers_own_expiry_still_ends_the_conversation() {
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(true));
+    let (ran, began) = gap_run(false, 900_000, (300_000, 360_000), None);
+    PRIVACY_SOURCE_EXPIRY.with(|on| on.set(false));
+    assert!(gap_marks(&ran, "began").is_empty());
+    assert!(gap_marks(&ran, "reopened").is_empty());
+    assert!(ran.ended_us < began + 360_000, "{}", ran.error);
 }
 
 /// #2602 (finding 3, the first builder's (B) at 17:4x;
