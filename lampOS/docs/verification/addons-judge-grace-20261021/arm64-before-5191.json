@@ -1,0 +1,16 @@
+{
+  "run": 39633785316,
+  "number": 5191,
+  "head": "0af798d348ba06f7163f7aac90b79a381263888c",
+  "sum_s": 19.064,
+  "tests": {
+    "a_kept_mood_is_said_to_lamp_mood": 0.357,
+    "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle": 2.218,
+    "a_kept_light_is_said_kept_on_addon_decision": 2.193,
+    "over_a_persons_light_that_rests_a_glow_is_asked_briefly": 0.358,
+    "a_proposal_not_from_lamp_skills_is_not_judged": 2.175,
+    "the_persons_own_light_wins_and_nothing_is_asked": 2.202,
+    "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light": 5.401,
+    "without_the_switch_nothing_runs_and_nothing_is_asked": 4.16
+  }
+}

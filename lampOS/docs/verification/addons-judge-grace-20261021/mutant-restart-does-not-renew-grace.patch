@@ -1,0 +1,5 @@
+--- a/lampOS/crates/addons/src/situation.rs
++++ b/lampOS/crates/addons/src/situation.rs
+@@ -157 +157 @@
+-            self.began_us = at_us;
++            self.began_us = 0;

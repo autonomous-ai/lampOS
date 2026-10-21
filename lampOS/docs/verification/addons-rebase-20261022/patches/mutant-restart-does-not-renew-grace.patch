@@ -1,0 +1,11 @@
+--- a/lampOS/crates/addons/src/situation.rs
++++ b/lampOS/crates/addons/src/situation.rs
+@@ -157,7 +157,7 @@
+             .is_some_and(|known| known != boot)
+         {
+             self.muted_asleep = None;
+-            self.began_us = at_us;
++            self.began_us = 0;
+         }
+         if self.voice_boot.as_deref() != Some(boot) {
+             self.voice_boot = Some(boot.to_owned());

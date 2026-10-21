@@ -1,0 +1,172 @@
+{
+  "copied_files": [
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/source-freshness.json",
+      "artifact": "source-freshness.json",
+      "sha256": "1bf0dc1f622ddc990307c183962d2148310bedd44cc6c41b241de42452fc5440",
+      "bytes": 500
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/prepared.json",
+      "artifact": "prepared-controls.json",
+      "sha256": "daaa456086c06402e4d91c6b5f86395ae2b136dd075466bbb487674391520bd1",
+      "bytes": 9121
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-before-light-50ms.patch",
+      "artifact": "patches/mutant-decision-before-light-50ms.patch",
+      "sha256": "362a6e1d2778699d00fbcd8f1d61bf75a7d4f406f675abf904afc60db018be8e",
+      "bytes": 1148
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch",
+      "artifact": "patches/mutant-decision-duplicated-50ms.patch",
+      "sha256": "2ed5fae73d58ee8a5a7cd6a82228c855f6cfaa6dd146fdfc6982b7083f0e1277",
+      "bytes": 450
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-default-grace-zero.patch",
+      "artifact": "patches/mutant-default-grace-zero.patch",
+      "sha256": "dcaa4b36a8d606f7a68ba428e27a6e4f0f8c6e27a0fdbd1411ea7f5d76e6cbea",
+      "bytes": 286
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-restart-does-not-renew-grace.patch",
+      "artifact": "patches/mutant-restart-does-not-renew-grace.patch",
+      "sha256": "16645ffa2580fc97050f64d9726ec686e6d8b843127b501c48a7d624c9269a62",
+      "bytes": 395
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-runtime-ignores-override.patch",
+      "artifact": "patches/mutant-runtime-ignores-override.patch",
+      "sha256": "d38840614596eab252b67c1ee2bc2953929fa5aa39df40ecfabb9b768e25d77d",
+      "bytes": 575
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-said-mute-age-refreshed.patch",
+      "artifact": "patches/mutant-said-mute-age-refreshed.patch",
+      "sha256": "eca024b56a4bd3019621a2d391ea0df70bdd20c63cb5e7b9afeee2c9c3aba274",
+      "bytes": 587
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/summary.json",
+      "artifact": "failed-cache-attempt/summary.json",
+      "sha256": "7b83c702638799e4af380c4ccd069ac9c0509377dd409d40fb126ded19f5805a",
+      "bytes": 319
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/verification-results.json",
+      "artifact": "failed-cache-attempt/verification-results.json",
+      "sha256": "c4656f6419e8ec1e0e58902be1c98ed51bab6f3731fddee64c70856dc0fd9ec7",
+      "bytes": 20205
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/environment.json",
+      "artifact": "failed-cache-attempt/environment.json",
+      "sha256": "72a7b4d26de41edf85a0db6efda39678b1c72befa62201ab687908341b8f6f10",
+      "bytes": 1887
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/restorations.json",
+      "artifact": "failed-cache-attempt/restorations.json",
+      "sha256": "39d3889e650fba863bc0c6d947cdf91757cc1968ecb447916eec63e415293950",
+      "bytes": 3089
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/reverse-dependents.json",
+      "artifact": "failed-cache-attempt/reverse-dependents.json",
+      "sha256": "5137440d51fdd0c5b3e370cb46a3d89fee1fc66df7f53518d8a7963532f82dc0",
+      "bytes": 77
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/source-before-sha256.json",
+      "artifact": "failed-cache-attempt/source-before-sha256.json",
+      "sha256": "93c5386b86897d70ae239653524054cbbd3f8557cded9ade2876fe0e30e89d74",
+      "bytes": 1243
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/source-after-sha256.json",
+      "artifact": "failed-cache-attempt/source-after-sha256.json",
+      "sha256": "93c5386b86897d70ae239653524054cbbd3f8557cded9ade2876fe0e30e89d74",
+      "bytes": 1243
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/initial-status.txt",
+      "artifact": "failed-cache-attempt/initial-status.txt",
+      "sha256": "dd1006eb9ffba91bbc44ddc8fe1d58bd2776918e1ef985d727dc018651c75027",
+      "bytes": 25
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T185833.868402Z/final-status.txt",
+      "artifact": "failed-cache-attempt/final-status.txt",
+      "sha256": "dd1006eb9ffba91bbc44ddc8fe1d58bd2776918e1ef985d727dc018651c75027",
+      "bytes": 25
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/summary.json",
+      "artifact": "passed/summary.json",
+      "sha256": "1d54055ab1a06758d30e90cc29a7cbe5e73393702ff7ee82ccd361451ec96ab3",
+      "bytes": 258
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/verification-results.json",
+      "artifact": "passed/verification-results.json",
+      "sha256": "1228cf9dbe7e95f668cbe0d0b7c1824c26deab5a96e76ab033366a9113c4539c",
+      "bytes": 20451
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/environment.json",
+      "artifact": "passed/environment.json",
+      "sha256": "72a7b4d26de41edf85a0db6efda39678b1c72befa62201ab687908341b8f6f10",
+      "bytes": 1887
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/restorations.json",
+      "artifact": "passed/restorations.json",
+      "sha256": "39d3889e650fba863bc0c6d947cdf91757cc1968ecb447916eec63e415293950",
+      "bytes": 3089
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/reverse-dependents.json",
+      "artifact": "passed/reverse-dependents.json",
+      "sha256": "5137440d51fdd0c5b3e370cb46a3d89fee1fc66df7f53518d8a7963532f82dc0",
+      "bytes": 77
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/source-before-sha256.json",
+      "artifact": "passed/source-before-sha256.json",
+      "sha256": "93c5386b86897d70ae239653524054cbbd3f8557cded9ade2876fe0e30e89d74",
+      "bytes": 1243
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/source-after-sha256.json",
+      "artifact": "passed/source-after-sha256.json",
+      "sha256": "93c5386b86897d70ae239653524054cbbd3f8557cded9ade2876fe0e30e89d74",
+      "bytes": 1243
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/initial-status.txt",
+      "artifact": "passed/initial-status.txt",
+      "sha256": "dd1006eb9ffba91bbc44ddc8fe1d58bd2776918e1ef985d727dc018651c75027",
+      "bytes": 25
+    },
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/run-20261021T190249.917628Z/final-status.txt",
+      "artifact": "passed/final-status.txt",
+      "sha256": "dd1006eb9ffba91bbc44ddc8fe1d58bd2776918e1ef985d727dc018651c75027",
+      "bytes": 25
+    }
+  ],
+  "consolidated_outputs": "Each run output-index.json records original-log hashes and where the unchanged raw bytes are retained. Only bulk dependency metadata stdout and raw source snapshots are omitted.",
+  "derived_files": [
+    {
+      "source": "/private/tmp/tests-codex-addons-review-20261022/rebase-range-diff.txt",
+      "source_sha256": "5ffe4ba8f646d6c0156180fb2dc2dda84c17d14b919d6d00aa4a04c995557cd8",
+      "raw_artifact": "rebase-range-diff-raw.json",
+      "raw_text_field": "raw_text",
+      "display_artifact": "rebase-range-diff.txt",
+      "display_sha256": "eb68667e1e186ca17fc6cf05625062240289b53c2af7b3231d57d23c25e3c62b",
+      "normalization": "Remove generated trailing whitespace from the range-diff text display; preserve exact original output in raw_text."
+    }
+  ]
+}

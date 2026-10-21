@@ -1,0 +1,40 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -259,7 +259,27 @@
+             }
+             continue;
+         }
+-        let why = decide(
++        let decision = AddonDecision {
++            proposal: proposal.proposal,
++            addon: proposal.addon.clone(),
++            act: proposal.act.clone(),
++            choice: if verdict == Verdict::Kept {
++                "kept"
++            } else {
++                "dropped"
++            }
++            .into(),
++            by: "rule".into(),
++            why: "kept".into(),
++        };
++        if let Err(error) = decisions.publish_json(now_us, &decision) {
++            eprintln!(
++                "lamp-addons: the decision on #{} not written: {error}",
++                proposal.proposal
++            );
++        }
++        std::thread::sleep(Duration::from_millis(50));
++        let _why = decide(
+             &proposal,
+             verdict,
+             &clock_id,
+@@ -273,7 +293,7 @@
+             },
+             &mut report,
+         );
+-        write(&mut decisions, &proposal, verdict, "rule", &why, now_us);
++
+     }
+     Ok(report)
+ }

@@ -7,7 +7,7 @@
 //! dropped by its answer on `policy/decisions`, `by` `jev`. A kept move is
 //! asked of the body as one gesture at idle on its mood socket.
 use crate::carry;
-use crate::rules::{Drop, Judge, Verdict};
+use crate::rules::{ASLEEP_FRESH_US, Drop, Judge, Verdict};
 use crate::situation::{TOPICS, Watcher};
 use lamp_bus::{Bus, Message, Publisher, Subscriber};
 use lamp_msgs::{
@@ -37,7 +37,7 @@ pub const BODY_SOCKET: &str = "/run/lampos-body/mood.sock";
 const PASS: Duration = Duration::from_millis(100);
 
 /// How it runs.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Config {
     pub bus_root: Option<PathBuf>,
     /// The claims' clock: the host's boot, or a test's.
@@ -49,6 +49,23 @@ pub struct Config {
     pub move_quiet: Option<Duration>,
     /// The body's mood socket, [`BODY_SOCKET`] if unset.
     pub body_socket: Option<PathBuf>,
+    /// Wait for a mute never said after startup or a voice restart. Tests
+    /// may shorten it; a mute that was said keeps its own 3 s freshness.
+    pub mute_grace_us: u64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            bus_root: None,
+            clock_id: None,
+            run_for: None,
+            say_quiet: None,
+            move_quiet: None,
+            body_socket: None,
+            mute_grace_us: ASLEEP_FRESH_US,
+        }
+    }
 }
 
 /// What it did, said when it stops.
@@ -101,7 +118,8 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
     let mut answers = bus.subscribe(Decision::TOPIC, "addons")?;
     // The say put to the policy, while it waits for an answer.
     let mut asked: Option<AddonProposal> = None;
-    let mut watcher = Watcher::new(lamp_ipc::monotonic_us()).on_clock(&clock_id);
+    let mut watcher =
+        Watcher::new(lamp_ipc::monotonic_us(), config.mute_grace_us).on_clock(&clock_id);
     // What was there before it started: the kept values of each topic.
     for topic in TOPICS {
         if let Ok(Some(message)) = bus.latest(topic) {
@@ -420,4 +438,26 @@ fn take(watcher: &mut Watcher, message: &Message, now_us: u64) {
         "light/state" => message.parse().map(|value| watcher.light_state(&value)),
         _ => Ok(()),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_product_waits_three_seconds_for_a_mute_never_said() {
+        let config = Config::default();
+        assert_eq!(config.mute_grace_us, 3_000_000);
+        let watcher = Watcher::new(1_000_000, config.mute_grace_us);
+        assert_eq!(watcher.situation(3_999_999).asleep, None);
+        assert!(!watcher.situation(4_000_000).asleep.unwrap().value);
+        assert_eq!(Watcher::default().situation(2_999_999).asleep, None);
+        assert!(
+            !Watcher::default()
+                .situation(3_000_000)
+                .asleep
+                .unwrap()
+                .value
+        );
+    }
 }

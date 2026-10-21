@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "head": "2b53b580fd3511efec3a7aa315f37dadee7b804e",
+  "started_utc": "2026-10-21T19:02:49.918030+00:00",
+  "sources_match_preparation": true,
+  "finished_utc": "2026-10-21T19:04:25.869339+00:00",
+  "verified_expected_failures": 8
+}

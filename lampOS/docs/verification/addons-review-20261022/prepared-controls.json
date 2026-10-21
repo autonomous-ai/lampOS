@@ -1,0 +1,223 @@
+{
+  "head": "2b53b580fd3511efec3a7aa315f37dadee7b804e",
+  "old_head": "0f961123bae4ef804acd04ac53db6e074d2dd161",
+  "old_base": "8029dbd30e171e609a706bbc622f27a781075510",
+  "base": "7292627491ad742ae50a259db4cd6a9cfe09a270",
+  "source_sha256": {
+    "lampOS/crates/addons/Cargo.toml": "0ba18b83569133ada50b367510d6596a0989f8b625f5608923329ef977746292",
+    "lampOS/crates/addons/src/carry.rs": "7477ce3758326abc4fdd4e57c156057e4f0e24b6be48e5431cbd4ba7bc71ab92",
+    "lampOS/crates/addons/src/lib.rs": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8",
+    "lampOS/crates/addons/src/main.rs": "c5e86a5071cad5aca9cb744f4b0d4346c120f67172cff63b050f022e407a1cac",
+    "lampOS/crates/addons/src/rules.rs": "0f0441d6638ef1d891cf1e8a21f75f9dd8a490a26b3f0e5893dad592d955d936",
+    "lampOS/crates/addons/src/runtime.rs": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "lampOS/crates/addons/src/situation.rs": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+    "lampOS/crates/addons/tests/judge.rs": "fd1dcf0eedbafe668d554551e00685b6d2151a63c87ffc90476d5abbeea7141d",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/Cargo.lock": "2200c948079b33bb2a948d663aebc035cee979e5841678a512451c693e03b982",
+    "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+    "lampOS/.cargo/config.toml": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+  },
+  "controls": [
+    {
+      "label": "mutant-default-grace-zero-1",
+      "mutation": "mutant-default-grace-zero",
+      "test": "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--lib",
+        "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-runtime-ignores-override-1",
+      "mutation": "mutant-runtime-ignores-override",
+      "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--test",
+        "judge",
+        "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-restart-does-not-renew-grace-1",
+      "mutation": "mutant-restart-does-not-renew-grace",
+      "test": "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--lib",
+        "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-said-mute-age-refreshed-1",
+      "mutation": "mutant-said-mute-age-refreshed",
+      "test": "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--lib",
+        "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-decision-before-light-50ms-1",
+      "mutation": "mutant-decision-before-light-50ms",
+      "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--test",
+        "judge",
+        "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-decision-before-light-50ms-2",
+      "mutation": "mutant-decision-before-light-50ms",
+      "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--test",
+        "judge",
+        "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-decision-duplicated-50ms-1",
+      "mutation": "mutant-decision-duplicated-50ms",
+      "test": "a_kept_light_is_said_kept_on_addon_decision",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--test",
+        "judge",
+        "a_kept_light_is_said_kept_on_addon_decision",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    {
+      "label": "mutant-decision-duplicated-50ms-2",
+      "mutation": "mutant-decision-duplicated-50ms",
+      "test": "a_kept_light_is_said_kept_on_addon_decision",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "-p",
+        "lamp-addons",
+        "--test",
+        "judge",
+        "a_kept_light_is_said_kept_on_addon_decision",
+        "--",
+        "--exact",
+        "--nocapture"
+      ]
+    }
+  ],
+  "patches": {
+    "mutant-default-grace-zero": {
+      "source": "lampOS/crates/addons/src/runtime.rs",
+      "patch": "patches/mutant-default-grace-zero.patch",
+      "patch_sha256": "dcaa4b36a8d606f7a68ba428e27a6e4f0f8c6e27a0fdbd1411ea7f5d76e6cbea",
+      "historical_patch_sha256": "81b3cbc6075d294bfc35bd112bff5ac889c88b25f81be8db0a874aa23bcce0a7",
+      "mutated_sha256": "20ba3e0b0bebc14f1a7104c947c97174aed6a823cf48a2ac4a6b0fbd9e92be06",
+      "adaptation": "Exact historical removed/added text; only line numbers and surrounding context refreshed."
+    },
+    "mutant-runtime-ignores-override": {
+      "source": "lampOS/crates/addons/src/runtime.rs",
+      "patch": "patches/mutant-runtime-ignores-override.patch",
+      "patch_sha256": "d38840614596eab252b67c1ee2bc2953929fa5aa39df40ecfabb9b768e25d77d",
+      "historical_patch_sha256": "e6a9fb89d31bec93d7b301bd1212ee2946fe76ffd5ed3df6ae2025bd20d2b536",
+      "mutated_sha256": "ca609d705a9b85975a37dac07c64714975c01b6e61fee91a87c3263d578897c8",
+      "adaptation": "Exact historical removed/added text; only line numbers and surrounding context refreshed."
+    },
+    "mutant-restart-does-not-renew-grace": {
+      "source": "lampOS/crates/addons/src/situation.rs",
+      "patch": "patches/mutant-restart-does-not-renew-grace.patch",
+      "patch_sha256": "16645ffa2580fc97050f64d9726ec686e6d8b843127b501c48a7d624c9269a62",
+      "historical_patch_sha256": "2e9b7a5aa55094349dc6f4fb8073ab96d7cf89fdf569dc0650b4ebc49b7c0f72",
+      "mutated_sha256": "99774133ba42eb69af60fb8d6c544b8887b35fc387fe4b28edbe79eea37ee835",
+      "adaptation": "Exact historical removed/added text; only line numbers and surrounding context refreshed."
+    },
+    "mutant-said-mute-age-refreshed": {
+      "source": "lampOS/crates/addons/src/situation.rs",
+      "patch": "patches/mutant-said-mute-age-refreshed.patch",
+      "patch_sha256": "eca024b56a4bd3019621a2d391ea0df70bdd20c63cb5e7b9afeee2c9c3aba274",
+      "historical_patch_sha256": "a93166a39bf39cb99ef0ef38ed17aaac0fda1a3203493e8d399eb843cf8bd27b",
+      "mutated_sha256": "a886dc20ff88c60a47d0c1bf832819e595ec1495f1e31fe6258da6065cb7fa76",
+      "adaptation": "Exact historical removed/added text; only line numbers and surrounding context refreshed."
+    },
+    "mutant-decision-before-light-50ms": {
+      "source": "lampOS/crates/addons/src/runtime.rs",
+      "patch": "patches/mutant-decision-before-light-50ms.patch",
+      "patch_sha256": "362a6e1d2778699d00fbcd8f1d61bf75a7d4f406f675abf904afc60db018be8e",
+      "historical_patch_sha256": "4f17c88bbc2700349386e1e2317ead093d7d082d1e1bda854c3761d2b04ced60",
+      "mutated_sha256": "c5086f86517ebe0b7026cccd737088d706b1143f544f0e70ac1f7711771bc6a5",
+      "adaptation": "Exact historical first-hunk payload; normal write() call removed in place of the former inline decision publication."
+    },
+    "mutant-decision-duplicated-50ms": {
+      "source": "lampOS/crates/addons/src/runtime.rs",
+      "patch": "patches/mutant-decision-duplicated-50ms.patch",
+      "patch_sha256": "2ed5fae73d58ee8a5a7cd6a82228c855f6cfaa6dd146fdfc6982b7083f0e1277",
+      "historical_patch_sha256": "50b5dee4c580d8bbcde7be29b677cc52bf50a0f23bb49b8838b8f25eec8c39c5",
+      "mutated_sha256": "55ead66129a93295c171fcaea7959cbd9b40fa3d7db12500986af1fcd03ae4cb",
+      "adaptation": "Exact historical two added statements, dedented into upstream write() immediately before its normal publication."
+    }
+  },
+  "range_diff_command": [
+    "git",
+    "--no-pager",
+    "range-diff",
+    "--no-color",
+    "8029dbd30e171e609a706bbc622f27a781075510..0f961123bae4ef804acd04ac53db6e074d2dd161",
+    "7292627491ad742ae50a259db4cd6a9cfe09a270..2b53b580fd3511efec3a7aa315f37dadee7b804e"
+  ],
+  "validator_check": "All eight historical failures accepted; four invalid examples per run rejected.",
+  "unrun": true
+}

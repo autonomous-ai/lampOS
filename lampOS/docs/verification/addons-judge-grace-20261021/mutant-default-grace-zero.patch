@@ -1,0 +1,5 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -48 +48 @@
+-            mute_grace_us: ASLEEP_FRESH_US,
++            mute_grace_us: 0,

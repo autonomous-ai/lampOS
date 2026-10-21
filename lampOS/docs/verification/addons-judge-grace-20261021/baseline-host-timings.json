@@ -1,0 +1,218 @@
+[
+  {
+    "run": 1,
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "exit": 0,
+    "wall_s": 1.0577,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.05s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "a_kept_light_is_said_kept_on_addon_decision",
+    "exit": 0,
+    "wall_s": 0.4918,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.48s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "a_kept_mood_is_said_to_lamp_mood",
+    "exit": 0,
+    "wall_s": 0.393,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.38s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "exit": 0,
+    "wall_s": 3.6924,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.68s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "a_proposal_not_from_lamp_skills_is_not_judged",
+    "exit": 0,
+    "wall_s": 0.4936,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.48s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "exit": 0,
+    "wall_s": 0.3984,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.39s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "the_persons_own_light_wins_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.4911,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.48s"
+    ]
+  },
+  {
+    "run": 1,
+    "test": "without_the_switch_nothing_runs_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.3475,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.33s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "exit": 0,
+    "wall_s": 0.4966,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "a_kept_light_is_said_kept_on_addon_decision",
+    "exit": 0,
+    "wall_s": 0.4989,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "a_kept_mood_is_said_to_lamp_mood",
+    "exit": 0,
+    "wall_s": 0.3937,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.38s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "exit": 0,
+    "wall_s": 3.6991,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.69s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "a_proposal_not_from_lamp_skills_is_not_judged",
+    "exit": 0,
+    "wall_s": 0.4925,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.48s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "exit": 0,
+    "wall_s": 0.3955,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.39s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "the_persons_own_light_wins_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.4972,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 2,
+    "test": "without_the_switch_nothing_runs_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.3436,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.33s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "exit": 0,
+    "wall_s": 0.4971,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "a_kept_light_is_said_kept_on_addon_decision",
+    "exit": 0,
+    "wall_s": 0.4935,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.48s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "a_kept_mood_is_said_to_lamp_mood",
+    "exit": 0,
+    "wall_s": 0.3872,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.38s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "exit": 0,
+    "wall_s": 3.7015,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.69s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "a_proposal_not_from_lamp_skills_is_not_judged",
+    "exit": 0,
+    "wall_s": 0.4968,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "exit": 0,
+    "wall_s": 0.3942,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.38s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "the_persons_own_light_wins_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.5005,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.49s"
+    ]
+  },
+  {
+    "run": 3,
+    "test": "without_the_switch_nothing_runs_and_nothing_is_asked",
+    "exit": 0,
+    "wall_s": 0.3409,
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.33s"
+    ]
+  }
+]

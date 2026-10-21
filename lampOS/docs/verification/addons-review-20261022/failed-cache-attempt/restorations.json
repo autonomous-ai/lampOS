@@ -1,0 +1,66 @@
+[
+  {
+    "label": "mutant-default-grace-zero-1",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-default-grace-zero-1.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-runtime-ignores-override-1",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-runtime-ignores-override-1.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-restart-does-not-renew-grace-1",
+    "source": "lampOS/crates/addons/src/situation.rs",
+    "before_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+    "snapshot": "mutant-restart-does-not-renew-grace-1.source-before",
+    "after_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-said-mute-age-refreshed-1",
+    "source": "lampOS/crates/addons/src/situation.rs",
+    "before_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+    "snapshot": "mutant-said-mute-age-refreshed-1.source-before",
+    "after_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-1",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-decision-before-light-50ms-1.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-2",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-decision-before-light-50ms-2.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-1",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-decision-duplicated-50ms-1.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-2",
+    "source": "lampOS/crates/addons/src/runtime.rs",
+    "before_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "snapshot": "mutant-decision-duplicated-50ms-2.source-before",
+    "after_sha256": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+    "restored_exactly": true
+  }
+]

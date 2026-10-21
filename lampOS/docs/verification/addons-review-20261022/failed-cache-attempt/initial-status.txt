@@ -1,0 +1,1 @@
+ M lampOS/docs/addons.md

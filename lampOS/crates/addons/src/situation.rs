@@ -33,11 +33,13 @@ pub const TOPICS: [&str; 10] = [
 ];
 
 /// The readings as they came.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Watcher {
     /// When the judge began reading, so a `voice/mute` never said can be
     /// told from one not read yet.
     began_us: u64,
+    /// Only the wait for a mute never said, not a said mute's freshness.
+    mute_grace_us: u64,
     privacy_closed: Option<Reading<bool>>,
     paused: Option<bool>,
     muted_asleep: Option<Reading<bool>>,
@@ -67,6 +69,29 @@ pub struct Watcher {
     shown: Option<Light>,
 }
 
+impl Default for Watcher {
+    fn default() -> Self {
+        Self {
+            began_us: 0,
+            mute_grace_us: ASLEEP_FRESH_US,
+            privacy_closed: None,
+            paused: None,
+            muted_asleep: None,
+            resting: None,
+            setting_up: false,
+            voice_boot: None,
+            voice_resting: None,
+            resting_since_us: None,
+            room_quiet: None,
+            persons: None,
+            slept_since_persons: false,
+            clock_id: None,
+            glow_until_us: 0,
+            shown: None,
+        }
+    }
+}
+
 /// How fresh the rest skill's word must be to count: its topic lasts 500 ms.
 const REST_FRESH_US: u64 = 1_000_000;
 
@@ -77,10 +102,13 @@ impl Watcher {
         self
     }
 
-    /// A watcher that began reading at `began_us`.
-    pub fn new(began_us: u64) -> Self {
+    /// A watcher that began reading at `began_us`, waiting `mute_grace_us`
+    /// before a mute never said is known absent. The product passes
+    /// [`ASLEEP_FRESH_US`]; tests may pass a shorter wait.
+    pub fn new(began_us: u64, mute_grace_us: u64) -> Self {
         Self {
             began_us,
+            mute_grace_us,
             ..Self::default()
         }
     }
@@ -191,8 +219,9 @@ impl Watcher {
     /// off on most lamps, so its silence does not count as awake or asleep.
     /// The voice says its mute every second only with the head's controls
     /// on; on a lamp without them, nothing said once the judge has read for
-    /// [`ASLEEP_FRESH_US`] means it has no sleep to say, and the rest skill
-    /// alone tells it. A mute said once and then gone stale stays cautious.
+    /// its configured grace ([`ASLEEP_FRESH_US`] on the product) means it has
+    /// no sleep to say, and the rest skill alone tells it. A mute said once
+    /// and then gone stale stays cautious.
     /// The person's light is shown while the ring's light is the one a
     /// person set this boot, or one of the judge's own glows is over it;
     /// with none set, the ring shows its own. It rests once the lamp has
@@ -206,7 +235,7 @@ impl Watcher {
             paused: self.paused,
             asleep: match self.muted_asleep {
                 Some(reading) => Some(Reading::new(reading.value || resting, reading.at_us)),
-                None if now_us.saturating_sub(self.began_us) >= ASLEEP_FRESH_US => {
+                None if now_us.saturating_sub(self.began_us) >= self.mute_grace_us => {
                     Some(Reading::new(resting, now_us))
                 }
                 None => None,
@@ -403,7 +432,7 @@ mod tests {
 
     #[test]
     fn without_a_sleep_mute_said_the_rest_skill_alone_tells_asleep() {
-        let mut watcher = Watcher::new(1_000_000);
+        let mut watcher = Watcher::new(1_000_000, ASLEEP_FRESH_US);
         // Not read long enough to know the voice says no mute.
         assert_eq!(watcher.situation(2_000_000).asleep, None);
         let awake = watcher.situation(4_000_000).asleep.unwrap();
@@ -436,7 +465,7 @@ mod tests {
     /// controls says no mute, so the old one must not hold the lamp asleep.
     #[test]
     fn a_restarted_voice_forgets_the_old_mute_and_is_waited_for_afresh() {
-        let mut watcher = Watcher::new(0);
+        let mut watcher = Watcher::new(0, ASLEEP_FRESH_US);
         let resting = VoiceState {
             state: Voice::Resting,
         };
@@ -458,6 +487,88 @@ mod tests {
         watcher.voice(&resting, 10_000_000, "voice-b");
         assert_eq!(watcher.situation(11_000_000).asleep, None);
         assert!(!watcher.situation(13_000_000).asleep.unwrap().value);
+    }
+
+    #[test]
+    fn a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice() {
+        let resting = VoiceState {
+            state: Voice::Resting,
+        };
+        for grace in [0, 200_000] {
+            let mut watcher = Watcher::new(1_000_000, grace);
+            watcher.voice(&resting, 1_000_000, "voice-a");
+            if grace > 0 {
+                assert_eq!(watcher.situation(1_000_000 + grace - 1).asleep, None);
+            }
+            assert_eq!(
+                watcher.situation(1_000_000 + grace).asleep,
+                Some(Reading::new(false, 1_000_000 + grace))
+            );
+            watcher.mute(
+                &VoiceMute {
+                    muted: true,
+                    reason: Some(lamp_msgs::MuteReason::Sleep),
+                },
+                2_000_000,
+            );
+            watcher.voice(&resting, 3_000_000, "voice-b");
+            if grace > 0 {
+                assert_eq!(watcher.situation(3_000_000 + grace - 1).asleep, None);
+            }
+            // A repeated state from this boot does not begin the wait again.
+            watcher.voice(&resting, 3_000_000 + grace / 2, "voice-b");
+            assert_eq!(
+                watcher.situation(3_000_000 + grace).asleep,
+                Some(Reading::new(false, 3_000_000 + grace))
+            );
+        }
+    }
+
+    #[test]
+    fn a_test_mute_grace_keeps_a_said_mutes_three_second_freshness() {
+        use crate::rules::{Drop, Judge, Verdict};
+
+        let proposal = lamp_msgs::AddonProposal {
+            proposal: 1,
+            addon: "test".into(),
+            version: "1.0.0".into(),
+            act: "light".into(),
+            why: "evening".into(),
+            sure: 0.6,
+            holds_ms: 30_000,
+            light: Some(lamp_msgs::AddonLight {
+                colour: "warm".into(),
+                level: 2,
+                pattern: None,
+            }),
+            gesture: None,
+            mood: None,
+            note: None,
+        };
+        for grace in [0, 200_000] {
+            let mut watcher = Watcher::new(0, grace);
+            watcher.mute(
+                &VoiceMute {
+                    muted: false,
+                    reason: None,
+                },
+                1_000_000,
+            );
+            for (now_us, expected) in [
+                (4_000_000, Verdict::Kept),
+                (4_000_001, Verdict::Dropped(Drop::Asleep)),
+            ] {
+                let mut situation = watcher.situation(now_us);
+                assert_eq!(situation.asleep, Some(Reading::new(false, 1_000_000)));
+                situation.privacy_closed = Some(Reading::new(false, now_us));
+                situation.voice_resting = Some(Reading::new(true, now_us));
+                situation.room_quiet = Some(Reading::new(true, now_us));
+                assert_eq!(
+                    Judge::default().judge(&proposal, 0, &situation, now_us),
+                    expected
+                );
+            }
+        }
     }
 
     #[test]

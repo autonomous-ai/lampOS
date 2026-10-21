@@ -195,6 +195,35 @@ on a lamp without the head's controls):
 
 **A move.** A kept `move` is sent by the judge itself to the body's mood socket (`--body-socket`, `/run/lampos-body/mood.sock` by default) as one datagram, `{"gesture", "source": "addon:<name>", "priority": "idle"}`, the fields a skill's gesture carries with `skill:`. A body that weighs who asks drops it while anything else holds the body and ends it for whatever comes after; it is never resumed. The body plays a gesture only while the lamp stands, and the judge's own rules keep it from a lamp asleep or paused and from a room that is not quiet. `--move-quiet-ms` shortens the minute for tests only. Its decision says `asked of the body at idle: nod`; the exit line counts `moves_asked`.
 
+For tests, `serve --mute-grace-ms N` accepts 0..3000 ms for the wait before
+a `voice/mute` never said counts as absent, both at startup and after a
+new voice publisher boot. `--help` identifies it as a test option. The
+product default remains **3000 ms** and the product service passes no
+override. The ordinary binary accepts this test-oriented option: explicitly
+passing a smaller value shortens the absent-mute startup and restart wait.
+It is not restricted by a separate test mode.
+`runtime::Config::mute_grace_us` passes that wait to
+`Watcher::new(began_us, mute_grace_us)`; the freshness of a mute that was
+said remains **3 s**, independently of this wait.
+
+The light and mood process fixtures publish the lamp's retained state before
+starting it, then wait for all its input subscriptions (the last is
+`policy/decisions`) and decision, or its exit with add-ons off. The fixture
+writes its first privacy value synchronously and keeps renewing it every
+20 ms from that same publisher until the guard is dropped, so startup does
+not race the renewal thread and a loaded runner still receives fresh privacy.
+The move and say fixtures keep their existing readiness and quiet waits.
+The product-lamp fixture alone passes a zero grace, while unit tests using
+explicit timestamps check the default, custom
+startup and restart boundaries, and the unchanged freshness of an actual
+mute. The process fixture does not verify the default timing window or
+that `serve` forwards the default into `Watcher`; it has no injected clock.
+The light requests are read immediately after the first decision, before the
+100 ms observation that catches a second decision on the same proposal.
+No light request may arrive during that observation: the decision must
+follow the light it acknowledges. Host timings and controls are recorded in
+[the grace verification](verification/addons-judge-grace-20261021/README.md).
+
 A kept `light` becomes one `LightRequest` on `light/request` from
 `addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on
 the boot's clock: every skill, the conversation, safety and a person

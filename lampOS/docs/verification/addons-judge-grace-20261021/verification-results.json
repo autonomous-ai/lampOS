@@ -1,0 +1,749 @@
+[
+  {
+    "label": "after-judge-compile",
+    "log": "after-judge-compile.log",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit": 0,
+    "wall_s": 1.2708,
+    "expected_failure": false,
+    "results": []
+  },
+  {
+    "label": "after-judge-list",
+    "log": "after-judge-list.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "--list"
+    ],
+    "exit": 0,
+    "wall_s": 1.2664,
+    "expected_failure": false,
+    "results": []
+  },
+  {
+    "label": "after-host-1-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "log": "after-host-1-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.7504,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.74s"
+    ]
+  },
+  {
+    "label": "after-host-1-a_kept_light_is_said_kept_on_addon_decision",
+    "log": "after-host-1-a_kept_light_is_said_kept_on_addon_decision.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1443,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-1-a_kept_mood_is_said_to_lamp_mood",
+    "log": "after-host-1-a_kept_mood_is_said_to_lamp_mood.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_mood_is_said_to_lamp_mood",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0414,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-1-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "log": "after-host-1-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1378,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-1-a_proposal_not_from_lamp_skills_is_not_judged",
+    "log": "after-host-1-a_proposal_not_from_lamp_skills_is_not_judged.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_proposal_not_from_lamp_skills_is_not_judged",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1407,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-1-over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "log": "after-host-1-over_a_persons_light_that_rests_a_glow_is_asked_briefly.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.042,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-1-the_mute_grace_override_is_described_and_bounded_for_tests",
+    "log": "after-host-1-the_mute_grace_override_is_described_and_bounded_for_tests.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_mute_grace_override_is_described_and_bounded_for_tests",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0401,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-1-the_persons_own_light_wins_and_nothing_is_asked",
+    "log": "after-host-1-the_persons_own_light_wins_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_persons_own_light_wins_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1394,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-1-without_the_switch_nothing_runs_and_nothing_is_asked",
+    "log": "after-host-1-without_the_switch_nothing_runs_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "without_the_switch_nothing_runs_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0353,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-2-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "log": "after-host-2-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1406,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-2-a_kept_light_is_said_kept_on_addon_decision",
+    "log": "after-host-2-a_kept_light_is_said_kept_on_addon_decision.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1389,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-2-a_kept_mood_is_said_to_lamp_mood",
+    "log": "after-host-2-a_kept_mood_is_said_to_lamp_mood.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_mood_is_said_to_lamp_mood",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0366,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-2-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "log": "after-host-2-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1373,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-2-a_proposal_not_from_lamp_skills_is_not_judged",
+    "log": "after-host-2-a_proposal_not_from_lamp_skills_is_not_judged.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_proposal_not_from_lamp_skills_is_not_judged",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1434,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-2-over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "log": "after-host-2-over_a_persons_light_that_rests_a_glow_is_asked_briefly.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.048,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.04s"
+    ]
+  },
+  {
+    "label": "after-host-2-the_mute_grace_override_is_described_and_bounded_for_tests",
+    "log": "after-host-2-the_mute_grace_override_is_described_and_bounded_for_tests.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_mute_grace_override_is_described_and_bounded_for_tests",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0421,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-2-the_persons_own_light_wins_and_nothing_is_asked",
+    "log": "after-host-2-the_persons_own_light_wins_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_persons_own_light_wins_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1433,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-2-without_the_switch_nothing_runs_and_nothing_is_asked",
+    "log": "after-host-2-without_the_switch_nothing_runs_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "without_the_switch_nothing_runs_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0331,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.02s"
+    ]
+  },
+  {
+    "label": "after-host-3-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "log": "after-host-3-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1395,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-3-a_kept_light_is_said_kept_on_addon_decision",
+    "log": "after-host-3-a_kept_light_is_said_kept_on_addon_decision.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1428,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-3-a_kept_mood_is_said_to_lamp_mood",
+    "log": "after-host-3-a_kept_mood_is_said_to_lamp_mood.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_kept_mood_is_said_to_lamp_mood",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0378,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-3-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "log": "after-host-3-a_product_lamp_with_no_pause_or_mute_said_keeps_a_light.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.1348,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.12s"
+    ]
+  },
+  {
+    "label": "after-host-3-a_proposal_not_from_lamp_skills_is_not_judged",
+    "log": "after-host-3-a_proposal_not_from_lamp_skills_is_not_judged.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "a_proposal_not_from_lamp_skills_is_not_judged",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.137,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-3-over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+    "log": "after-host-3-over_a_persons_light_that_rests_a_glow_is_asked_briefly.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0422,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-3-the_mute_grace_override_is_described_and_bounded_for_tests",
+    "log": "after-host-3-the_mute_grace_override_is_described_and_bounded_for_tests.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_mute_grace_override_is_described_and_bounded_for_tests",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.042,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "after-host-3-the_persons_own_light_wins_and_nothing_is_asked",
+    "log": "after-host-3-the_persons_own_light_wins_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "the_persons_own_light_wins_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.144,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "label": "after-host-3-without_the_switch_nothing_runs_and_nothing_is_asked",
+    "log": "after-host-3-without_the_switch_nothing_runs_and_nothing_is_asked.log",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c",
+      "without_the_switch_nothing_runs_and_nothing_is_asked",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "wall_s": 0.0371,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "mutant-default-grace-zero-1",
+    "log": "mutant-default-grace-zero-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 1.3041,
+    "expected_failure": true,
+    "results": [
+      "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s",
+      "thread 'runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said' (685754636) panicked at crates/addons/src/runtime.rs:280:9:",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-runtime-ignores-override-1",
+    "log": "mutant-runtime-ignores-override-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 2.1666,
+    "expected_failure": true,
+    "results": [
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.74s",
+      "thread 'a_product_lamp_with_no_pause_or_mute_said_keeps_a_light' (685754881) panicked at crates/addons/tests/judge.rs:297:5:",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-restart-does-not-renew-grace-1",
+    "log": "mutant-restart-does-not-renew-grace-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 1.366,
+    "expected_failure": true,
+    "results": [
+      "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s",
+      "thread 'situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice' (685755086) panicked at crates/addons/src/situation.rs:503:17:",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-said-mute-age-refreshed-1",
+    "log": "mutant-said-mute-age-refreshed-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 1.3307,
+    "expected_failure": true,
+    "results": [
+      "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s",
+      "thread 'situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness' (685755244) panicked at crates/addons/src/situation.rs:549:17:",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-1",
+    "log": "mutant-decision-before-light-50ms-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 2.229,
+    "expected_failure": true,
+    "results": [
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.79s",
+      "thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (685755531) panicked at crates/addons/tests/judge.rs:240:5:",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-2",
+    "log": "mutant-decision-before-light-50ms-2.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 0.7356,
+    "expected_failure": true,
+    "results": [
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.51s",
+      "thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (685755597) panicked at crates/addons/tests/judge.rs:240:5:",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-1",
+    "log": "mutant-decision-duplicated-50ms-1.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 2.2372,
+    "expected_failure": true,
+    "results": [
+      "a_kept_light_is_said_kept_on_addon_decision --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.83s",
+      "thread 'a_kept_light_is_said_kept_on_addon_decision' (685755909) panicked at crates/addons/tests/judge.rs:283:9:",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-2",
+    "log": "mutant-decision-duplicated-50ms-2.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit": 101,
+    "wall_s": 0.8288,
+    "expected_failure": true,
+    "results": [
+      "a_kept_light_is_said_kept_on_addon_decision --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.61s",
+      "thread 'a_kept_light_is_said_kept_on_addon_decision' (685755978) panicked at crates/addons/tests/judge.rs:283:9:",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "gate-format",
+    "log": "gate-format.log",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit": 0,
+    "wall_s": 10.3334,
+    "expected_failure": false,
+    "results": []
+  },
+  {
+    "label": "gate-clippy",
+    "log": "gate-clippy.log",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "exit": 0,
+    "wall_s": 8.0623,
+    "expected_failure": false,
+    "results": []
+  },
+  {
+    "label": "gate-tests",
+    "log": "gate-tests.log",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons"
+    ],
+    "exit": 0,
+    "wall_s": 3.297,
+    "expected_failure": false,
+    "results": [
+      "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "label": "gate-workspace-build",
+    "log": "gate-workspace-build.log",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "exit": 0,
+    "wall_s": 62.6647,
+    "expected_failure": false,
+    "results": []
+  },
+  {
+    "label": "gate-diff-check",
+    "log": "gate-diff-check.log",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "wall_s": 0.0999,
+    "expected_failure": false,
+    "results": []
+  }
+]

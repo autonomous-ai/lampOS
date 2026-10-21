@@ -61,6 +61,23 @@ fn listening(bus: &Bus, root: &Path) {
     }
 }
 
+/// The same final subscription, with the child checked while waiting and
+/// the completion fixture's deadline shared with its later decision wait.
+fn wait_for_inputs(bus: &Bus, root: &Path, judge: &mut Running, deadline: Instant) {
+    while bus.subscribers(Decision::TOPIC).unwrap().is_empty() {
+        assert!(
+            judge.0.try_wait().unwrap().is_none(),
+            "the judge ended before listening"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "the judge never listened; its journal:\n{}",
+            std::fs::read_to_string(root.join("judge.log")).unwrap_or_default()
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 fn glow(proposal: u64) -> AddonProposal {
     AddonProposal {
         proposal,
@@ -112,31 +129,38 @@ fn calm(bus: &Bus, persons_light: bool, product: bool) -> Privacy {
             "voice",
         )
         .unwrap();
+    let mut say = move |sequence| {
+        let now = lamp_ipc::monotonic_us();
+        privacy.publish_json(
+            now,
+            &MicrophonePrivacy {
+                stamp: ClockStamp {
+                    clock_id: "test-boot".into(),
+                    at_us: now,
+                    sequence,
+                },
+                session_id: "0123456789abcdef".into(),
+                controller_boot: "0123456789abcdef0123456789abcdef".into(),
+                microphone_generation: 1,
+                observed_us: now,
+                expires_at_us: now + 50_000,
+                permitted: true,
+                physical_muted: Some(false),
+                no_slide: false,
+            },
+        )
+    };
+    // The light and mood fixtures start the judge after calm(). Its first
+    // privacy value must already be retained, even if the renewal thread
+    // has not run yet. Keep that same publisher for every renewal.
+    say(1).unwrap();
     let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let stopped = stop.clone();
     let saying = std::thread::spawn(move || {
-        let mut sequence = 0;
+        let mut sequence = 1;
         while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
             sequence += 1;
-            let now = lamp_ipc::monotonic_us();
-            let _ = privacy.publish_json(
-                now,
-                &MicrophonePrivacy {
-                    stamp: ClockStamp {
-                        clock_id: "test-boot".into(),
-                        at_us: now,
-                        sequence,
-                    },
-                    session_id: "0123456789abcdef".into(),
-                    controller_boot: "0123456789abcdef0123456789abcdef".into(),
-                    microphone_generation: 1,
-                    observed_us: now,
-                    expires_at_us: now + 50_000,
-                    permitted: true,
-                    physical_muted: Some(false),
-                    no_slide: false,
-                },
-            );
+            let _ = say(sequence);
             std::thread::sleep(Duration::from_millis(20));
         }
     });
@@ -212,37 +236,90 @@ fn run(
     let bus = Bus::new(dir.path()).unwrap();
     let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
     let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
-    let _judge = judge(dir.path(), enabled);
-    // On, it is waited for; off, it never subscribes: two seconds show it.
-    if enabled {
-        listening(&bus, dir.path());
-    } else {
-        std::thread::sleep(Duration::from_secs(2));
-    }
-    if product {
-        // Long enough that a sleep mute never said is known never said.
-        std::thread::sleep(Duration::from_millis(3_200));
-    }
+    // The judge reads these retained topics before its first proposal.
+    // Privacy's first value is already there; its guard keeps it renewed.
     let _privacy = calm(&bus, persons_light, product);
-    std::thread::sleep(Duration::from_millis(300));
+    let mut judge = if product {
+        judge_with(dir.path(), enabled, &["--mute-grace-ms", "0"])
+    } else {
+        judge(dir.path(), enabled)
+    };
+    // Wait for every input subscription. Off, it says so and ends
+    // without subscribing: its end waited for, not 2 s of no subscriber
+    // (#1806).
+    let deadline = Instant::now() + Duration::from_secs(30);
+    if enabled {
+        wait_for_inputs(&bus, dir.path(), &mut judge, deadline);
+    } else {
+        while judge.0.try_wait().unwrap().is_none() {
+            assert!(Instant::now() < deadline, "off, it did not end");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty());
+    }
     let mut skills = bus
         .publisher_declared(AddonProposal::TOPIC, &AddonProposal::declaration(), source)
         .unwrap();
     skills
         .publish_json(lamp_ipc::monotonic_us(), &glow(lamp_ipc::monotonic_us()))
         .unwrap();
-    let mut requests = Vec::new();
-    while let Some(message) = ring.recv(Duration::from_millis(1_500)).unwrap() {
+    // The judge says its decision on a proposal after the light it asks for
+    // it, so once the decision is read the light is there too: waited for,
+    // not 1.5 s of quiet from the ring (#1806). A proposal it does not judge
+    // says nothing, so one of lamp-skills' under another name follows it,
+    // is judged after it, and ends the wait. Off, it has ended already.
+    if enabled && source != "skills" {
+        bus.publisher_declared(
+            AddonProposal::TOPIC,
+            &AddonProposal::declaration(),
+            "skills",
+        )
+        .unwrap()
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &AddonProposal {
+                addon: LAST.into(),
+                ..glow(lamp_ipc::monotonic_us())
+            },
+        )
+        .unwrap();
+    }
+    let mut decisions: Vec<AddonDecision> = Vec::new();
+    while enabled && decisions.is_empty() {
+        let left = deadline.saturating_duration_since(Instant::now());
+        assert!(!left.is_zero(), "no decision");
+        if let Some(message) = said.recv(left).unwrap() {
+            decisions.push(message.parse().unwrap());
+        }
+    }
+    // The light precedes its decision, so take this snapshot at the first
+    // decision, before the duplicate-decision observation below. A light
+    // asked after its receipt must not be accepted during that window.
+    let mut requests: Vec<LightRequest> = Vec::new();
+    while let Some(message) = ring.recv(Duration::ZERO).unwrap() {
         requests.push(message.parse().unwrap());
     }
-    let mut decisions = Vec::new();
-    while let Some(message) = said.recv(Duration::from_millis(300)).unwrap() {
+    // And 100 ms of quiet after it, so a second decision on the same
+    // proposal, a little late, is still seen.
+    while let Some(message) = said
+        .recv(Duration::from_millis(if enabled { 100 } else { 0 }))
+        .unwrap()
+    {
         decisions.push(message.parse().unwrap());
     }
     let journal = std::fs::read_to_string(dir.path().join("judge.log")).unwrap_or_default();
     JOURNAL.with(|kept| *kept.borrow_mut() = journal);
+    assert!(
+        ring.recv(Duration::ZERO).unwrap().is_none(),
+        "a light was asked after its decision"
+    );
+    requests.retain(|request| request.claim.source != format!("addon:{LAST}"));
+    decisions.retain(|decision| decision.addon != LAST);
     (requests, decisions)
 }
+
+/// The add-on of the proposal that ends the wait after one not judged.
+const LAST: &str = "the-last-glow";
 
 thread_local! {
     /// The judge's journal in this test's last run, for a failure to show.
@@ -329,10 +406,10 @@ fn a_kept_mood_is_said_to_lamp_mood() {
         .unwrap();
     let bus = Bus::new(dir.path()).unwrap();
     let mut mood = bus.subscribe(MoodNudge::TOPIC, "mood").unwrap();
-    let _judge = judge(dir.path(), true);
-    listening(&bus, dir.path());
     let _privacy = calm(&bus, false, false);
-    std::thread::sleep(Duration::from_millis(300));
+    let mut judge = judge(dir.path(), true);
+    let deadline = Instant::now() + Duration::from_secs(30);
+    wait_for_inputs(&bus, dir.path(), &mut judge, deadline);
     let lift = AddonProposal {
         act: "mood".into(),
         why: "music".into(),
@@ -471,8 +548,6 @@ fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
     let bus = Bus::new(dir.path()).unwrap();
     let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
     let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
-    let _judge = judge(dir.path(), true);
-    listening(&bus, dir.path());
     let _privacy = calm(&bus, true, false);
     let asleep = MoodState {
         stamp: ClockStamp {
@@ -494,7 +569,13 @@ fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
         .unwrap()
         .publish_json(lamp_ipc::monotonic_us(), &asleep)
         .unwrap();
-    std::thread::sleep(Duration::from_millis(300));
+    let mut judge = judge(dir.path(), true);
+    wait_for_inputs(
+        &bus,
+        dir.path(),
+        &mut judge,
+        Instant::now() + Duration::from_secs(30),
+    );
     bus.publisher_declared(
         AddonProposal::TOPIC,
         &AddonProposal::declaration(),
@@ -646,5 +727,41 @@ fn a_say_is_asked_of_the_policy_and_kept_or_dropped_by_its_answer() {
             "{dropped:?}"
         );
         assert!(dropped.why.starts_with(why), "{dropped:?}");
+    }
+}
+
+#[test]
+fn the_mute_grace_override_is_described_and_bounded_for_tests() {
+    let binary = env!("CARGO_BIN_EXE_lamp-addons");
+    for args in [vec!["--help"], vec!["serve", "--help"]] {
+        let output = Command::new(binary).args(args).output().unwrap();
+        assert!(output.status.success());
+        let help = String::from_utf8(output.stdout).unwrap();
+        assert!(help.contains("--mute-grace-ms"), "{help}");
+        assert!(help.contains("Tests only"), "{help}");
+        assert!(help.contains("default 3000 ms"), "{help}");
+    }
+    for ms in ["0", "3000"] {
+        let output = Command::new(binary)
+            .args(["serve", "--mute-grace-ms", ms])
+            .env_remove("LAMP_ADDONS")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+    }
+    for args in [
+        vec!["--mute-grace-ms"],
+        vec!["--mute-grace-ms", "-1"],
+        vec!["--mute-grace-ms", "3001"],
+        vec!["--mute-grace-ms", "not-a-number"],
+        vec!["--mute-grace-ms", "0", "--mute-grace-ms", "1"],
+    ] {
+        let output = Command::new(binary)
+            .arg("serve")
+            .args(&args)
+            .env_remove("LAMP_ADDONS")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{args:?}: {output:?}");
     }
 }

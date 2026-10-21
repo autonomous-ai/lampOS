@@ -1,0 +1,8 @@
+{
+  "purpose": "Invalidate all workspace crate source freshness after a shared-target artifact disagreed with the rebased source. Source contents are unchanged. Registry dependency artifacts are kept.",
+  "files": 1314,
+  "before_tree_sha256": "efb20a92ed31bf8f8fa4920ace7122108a04e743f011fe1ca808083284f3ff88",
+  "after_tree_sha256": "efb20a92ed31bf8f8fa4920ace7122108a04e743f011fe1ca808083284f3ff88",
+  "mtime_ns": 1792609369628038000,
+  "source_head": "2b53b580fd3511efec3a7aa315f37dadee7b804e"
+}

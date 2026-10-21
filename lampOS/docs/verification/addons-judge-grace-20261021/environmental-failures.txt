@@ -1,0 +1,39 @@
+===== baseline-judge-1.log =====
+COMMAND: cargo nextest run -p lamp-addons --test judge --test-threads 1 --status-level pass --final-status-level fail
+error: no such command: `nextest`
+
+help: a command with a similar name exists: `test`
+
+help: view all installed commands with `cargo --list`
+help: find a package to install `nextest` with `cargo search cargo-nextest`
+
+===== baseline-1-a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle.log =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/judge-118df33f9a03ac3c a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --exact --nocapture
+
+running 1 test
+test a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle ... FAILED
+
+failures:
+
+failures:
+    a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+
+thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (685597118) panicked at crates/addons/tests/judge.rs:156:63:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/adRXg8L2/light/request/subs/ring.11925.0.new: Operation not permitted (os error 1)" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+===== baseline-timings.json =====
+[
+  {
+    "run": 1,
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "exit": 101,
+    "wall_s": 0.0142,
+    "summary": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s"
+    ]
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "head": "adfcad8f63f23e2dc337c4cdcb5166637d6388b2",
+  "all_before_after_and_prepared_hashes_equal": true,
+  "all_current_files_match_after_hashes": true,
+  "note": "Hashes identify the verified source before evidence-only documentation additions. Each restoration hash equals the same source entry below; raw snapshots remain in the external run directory.",
+  "sources": [
+    {"path": "lampOS/crates/addons/Cargo.toml", "sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd"},
+    {"path": "lampOS/crates/addons/src/carry.rs", "sha256": "4793645d93448370ec1295e8ec716dad0f276869f5238ac3ef1a56dd05f5cb2d"},
+    {"path": "lampOS/crates/addons/src/lib.rs", "sha256": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8"},
+    {"path": "lampOS/crates/addons/src/main.rs", "sha256": "115293d404b97d16efa5c4d8680fb8d2366d26255380d1bfff7669ec9830a255"},
+    {"path": "lampOS/crates/addons/src/rules.rs", "sha256": "5a11f3e68ccac424329f0f1f1015ecd5809fc9ebb0863305bcec180cfca2c1c5"},
+    {"path": "lampOS/crates/addons/src/runtime.rs", "sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7"},
+    {"path": "lampOS/crates/addons/src/situation.rs", "sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b"},
+    {"path": "lampOS/crates/addons/tests/judge.rs", "sha256": "26fa9cd4376ca5375058741210f798c8389d166bbf0e0aba635ce5ec171165e3"},
+    {"path": "lampOS/Cargo.toml", "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"},
+    {"path": "lampOS/Cargo.lock", "sha256": "c794022c8517e5f2da9ba6446b7b26cd65e8ec6ee2eebf5442f511b983a48c28"},
+    {"path": "lampOS/docs/addons.md", "sha256": "ae2f4522efd0cd2e0c57648047cdd622c783c0b1802954b27f2dfd0be02ba889"},
+    {"path": "lampOS/rust-toolchain.toml", "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"},
+    {"path": "lampOS/.cargo/config.toml", "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"}
+  ],
+  "restorations": [
+    {"label": "mutant-default-grace-zero-1", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true},
+    {"label": "mutant-runtime-ignores-override-1", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true},
+    {"label": "mutant-restart-does-not-renew-grace-1", "source": "lampOS/crates/addons/src/situation.rs", "before_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b", "after_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b", "restored_exactly": true},
+    {"label": "mutant-said-mute-age-refreshed-1", "source": "lampOS/crates/addons/src/situation.rs", "before_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b", "after_sha256": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b", "restored_exactly": true},
+    {"label": "mutant-decision-before-light-50ms-1", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true},
+    {"label": "mutant-decision-before-light-50ms-2", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true},
+    {"label": "mutant-decision-duplicated-50ms-1", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true},
+    {"label": "mutant-decision-duplicated-50ms-2", "source": "lampOS/crates/addons/src/runtime.rs", "before_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "after_sha256": "00fc2b59c89926f1e2347e47fcaf6f541c77e7fb5ec80c95d94e0c31bce72da7", "restored_exactly": true}
+  ]
+}

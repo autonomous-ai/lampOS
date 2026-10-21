@@ -5,10 +5,21 @@ use std::{
     time::Duration,
 };
 
+const HELP: &str = "usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N] [--move-quiet-ms N] [--body-socket PATH] [--mute-grace-ms N]
+LAMP_ADDONS=on is --enable.
+--say-quiet-ms N  Tests only: wait 0..15000 ms of quiet before a say (default 15000 ms).
+--move-quiet-ms N  Tests only: wait 0..60000 ms of quiet before a move (default 60000 ms).
+--mute-grace-ms N  Tests only: wait 0..3000 ms for a voice/mute never said (default 3000 ms).";
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    if args.next().as_deref() != Some("serve") {
-        return Err("usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N, for tests: below 15000] [--move-quiet-ms N, for tests: below 60000] [--body-socket PATH] (LAMP_ADDONS=on is --enable)".into());
+    match args.next().as_deref() {
+        Some("--help" | "-h") => {
+            println!("{HELP}");
+            return Ok(());
+        }
+        Some("serve") => {}
+        _ => return Err(HELP.into()),
     }
     let mut config = Config::default();
     let mut enabled = std::env::var(ENVIRONMENT).as_deref() == Ok("on");
@@ -18,6 +29,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             return Err("duplicate option".into());
         }
         match arg.as_str() {
+            "--help" | "-h" => {
+                println!("{HELP}");
+                return Ok(());
+            }
             "--enable" => enabled = true,
             "--bus-root" => {
                 config.bus_root = Some(PathBuf::from(
@@ -64,6 +79,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     return Err("--move-quiet-ms is for tests, at most 60000".into());
                 }
                 config.move_quiet = Some(Duration::from_millis(ms));
+            }
+            "--mute-grace-ms" => {
+                let ms: u64 = args
+                    .next()
+                    .ok_or("--mute-grace-ms needs milliseconds")?
+                    .parse()?;
+                if ms > 3_000 {
+                    return Err("--mute-grace-ms must be 0..3000 (tests only)".into());
+                }
+                config.mute_grace_us = ms * 1_000;
             }
             _ => return Err("unknown option".into()),
         }

@@ -1,0 +1,5 @@
+--- a/lampOS/crates/addons/src/situation.rs
++++ b/lampOS/crates/addons/src/situation.rs
+@@ -225 +225 @@
+-                Some(reading) => Some(Reading::new(reading.value || resting, reading.at_us)),
++                Some(reading) => Some(Reading::new(reading.value || resting, now_us)),
