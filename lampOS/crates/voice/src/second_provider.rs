@@ -1152,7 +1152,9 @@ impl Engine {
     /// person is the one the lamp is talking with now, for the face cache's
     /// held gap (`LAMP_FACE_GAP_HOLD`). A line left unclear, judged not for
     /// the lamp, held or given up marks no one (the reviewers' P2 and P3 on
-    /// #2265).
+    /// #2265), nor does a request of no words left unanswered (a sound):
+    /// the gap runs on from the answer before it. Called at the
+    /// turn's end, so the gap is measured from the end of the answer.
     pub(crate) fn memory_answered(&self, request: u64, at: Instant) {
         let spoken = self
             .shared
@@ -1186,7 +1188,19 @@ impl Engine {
     ) -> Option<crate::memory_scope::RequestScope> {
         self.memory.as_ref().map(|(worker, cache)| {
             let scope = if heard && self.memory_camera_allowed {
-                cache.snapshot(std::time::Instant::now())
+                let now = std::time::Instant::now();
+                let scope = cache.snapshot(now);
+                // With `LAMP_FACE_GAP_HOLD`, why the line is or isn't
+                // held: counts and ms only (c0a4's run on #2449).
+                if let Some(told) = cache.gap_told(now) {
+                    let whose = match (scope.held(), scope.person()) {
+                        (true, _) => "held by a gap",
+                        (false, Some(_)) => "a known face's",
+                        (false, None) => "the room's",
+                    };
+                    eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
+                }
+                scope
             } else {
                 crate::memory_scope::ScopeSnapshot::room()
             };
@@ -3048,6 +3062,8 @@ async fn spoken(
         .filter(|prepared| plain_words(&prepared.words) == plain_words(&text))
     {
         Some(prepared) => prepared.remembered.clone(),
+        // A line held only by a gap is told no hits ([`held_by_gap`]).
+        None if held_by_gap(scope.as_ref()) => None,
         None => match shared.remembered.clone() {
             Some(note) => {
                 let words = text.clone();
@@ -3264,7 +3280,7 @@ impl Prepared {
         let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
-        let mut chat = shared.services.chat(messages.clone());
+        let mut chat = chat_for(shared, scope, messages.clone());
         let (kept, events) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             while let Some(event) = chat.next().await {
@@ -3472,6 +3488,7 @@ fn prepared_on(
             let remembered = shared
                 .remembered
                 .as_ref()
+                .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
             Some(Prepared::begin(shared, scope, words, notes, remembered))
         }
@@ -3916,11 +3933,60 @@ type SightRead = (
     Option<(String, String)>,
 );
 
+/// Every function that reads or writes someone's memory, their rules or
+/// their face, never declared to or run for a line held only by a known
+/// face's gap (the reviewer's P2 on #2449): it may not be theirs.
+const MEMORY_CALLS: &[&str] = &[
+    crate::remember::RECALL,
+    crate::remember::REMEMBER,
+    crate::remember::FORGET,
+    crate::remember::FORGET_EVERYTHING,
+    crate::rules::KEEP_RULE,
+    crate::rules::FORGET_RULE,
+    crate::rules::LIST_RULES,
+    crate::known_faces::REMEMBER,
+    crate::known_faces::FORGET,
+];
+
+/// What a memory call on a gap-held line is told instead of running.
+const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything for anyone. Say so, and ask them to come back where I can see them.";
+
+/// Whether this turn's scope is a known face's kept only by its held gap
+/// (`LAMP_FACE_GAP_HOLD`): someone who left within 12 s of the lamp's last
+/// answer to them may not be the one speaking, so the line is answered from
+/// the conversation as it stood: no recall or search, no memory hits, and no
+/// held forget run on it (the first builder's 22:10 and 01:43 on #2265).
+fn held_by_gap(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    scope
+        .and_then(crate::memory_scope::ScopeLease::scope)
+        .is_some_and(crate::memory_scope::ScopeSnapshot::held)
+}
+
+/// The turn's chat: every function, or none of memory's for a line held
+/// only by a gap ([`held_by_gap`]).
+fn chat_for(
+    shared: &Shared,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    messages: Vec<Message>,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    if held_by_gap(scope) {
+        shared.services.chat_without(messages, MEMORY_CALLS)
+    } else {
+        shared.services.chat(messages)
+    }
+}
+
 /// Whom a turn's forget is held for, or whose yes runs one: the admitted
 /// request's session and known person. None with nobody known (the room)
 /// or no admitted scope: a forget isn't undone, so it takes no anonymous
 /// yes, and such a turn is told to ask in words, as without the hold.
 fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, String)> {
+    // A scope held only by a known face's gap runs no one's forget: a yes
+    // from out of the picture may not be theirs (the first builder's 01:43
+    // on #2265).
+    if held_by_gap(scope) {
+        return None;
+    }
     let scope = scope?;
     let person = scope.scope()?.person()?.to_owned();
     Some((scope.key().session, person))
@@ -4130,6 +4196,14 @@ async fn run_tool(
     call: &net::ToolCall,
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Value {
+    // A memory call on a line held only by a gap runs for no one, however
+    // it was asked: not declared to it, and refused if written anyway.
+    if held_by_gap(scope) && MEMORY_CALLS.contains(&call.name.as_str()) {
+        eprintln!(
+            "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
+        );
+        return serde_json::json!({ "error": HELD_MEMORY_CALL });
+    }
     match (&shared.scoped_tools, scope) {
         (Some(run), Some(scope)) => {
             run(
@@ -4398,7 +4472,7 @@ async fn answer(
             let mut refused = false;
             let mut stream = match prepared.take() {
                 Some(prepared) if round == 1 => prepared.into_events(),
-                _ => shared.services.chat(messages.clone()),
+                _ => chat_for(shared, scope.as_ref(), messages.clone()),
             };
             let mut first = true;
             let mut split = Sentences::default();
@@ -4496,7 +4570,7 @@ async fn answer(
                                     "lamp-voice second: request {request} lost on the network ({error}): the link is back, asked once more"
                                 );
                                 from = tokio::time::Instant::now();
-                                stream = shared.services.chat(messages.clone());
+                                stream = chat_for(shared, scope.as_ref(), messages.clone());
                                 continue;
                             }
                         }

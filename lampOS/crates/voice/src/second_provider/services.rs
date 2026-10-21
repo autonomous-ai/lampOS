@@ -32,6 +32,18 @@ pub trait Services: Send + Sync + 'static {
         ))])
         .boxed()
     }
+    /// [`Self::chat`], never declaring the functions named in `without`: a
+    /// line held only by a known face's gap is answered from the
+    /// conversation as it stood, without memory's reads (#2265's follow-up).
+    /// Services that can't leave them out chat as [`Self::chat`].
+    fn chat_without(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let _ = without;
+        self.chat(messages)
+    }
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
     /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
@@ -481,6 +493,22 @@ impl Services for Net {
         only: &'static [&'static str],
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         self.chat_told(messages, Some(only))
+    }
+
+    fn chat_without(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        stream::once(async move { chat.send_without(&messages, None, without).await })
+            .map_ok(|answer| {
+                stream::try_unfold(answer, |mut answer| async move {
+                    Ok(answer.next().await?.map(|event| (event, answer)))
+                })
+            })
+            .try_flatten()
+            .boxed()
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
