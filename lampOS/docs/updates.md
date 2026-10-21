@@ -600,6 +600,33 @@ not set it yet.
    systemd's unit states, so a skipped or failed lamp-update-back is no part
    in error either way.
 
+**Recovery must be ready before handover** (#2700). With the self-update
+switch on, an actual candidate is taken only when the fixed fallback is a
+regular executable file, its service is loaded and unmasked, and its timer
+is loaded, persistently enabled, active and waiting or running, with
+`lamp-update-back.service` as its target. A timer enabled only at runtime
+does not qualify: it would lose its enablement on reboot. A service reported
+as `transient`, `linked-runtime`, `enabled-runtime` or `generated` is also
+refused; these states do not establish a recovery service for the next boot.
+The usual timer-started service is `static` and may be inactive. `install` enables
+the timer but does not start it; before a self-update it must also have
+started, normally during boot.
+
+The check runs after unchanged or previously refused candidates are skipped
+and before the updater is downloaded, `self.json` is written or its link
+moves. It never installs recovery or starts/enables a unit. If recovery
+cannot be established, a journal line says why and only self-update waits:
+the parts' completed result is kept. A later round can retry the same
+candidate when recovery is ready. The updater-first `min_updater` path uses
+the same check and keeps its existing refusal until it can climb. With the
+switch off there is no recovery query. The check observes the selected
+systemd properties at handover; it does not verify the service fragment's
+storage location, certify arbitrary unit overrides or protect against an
+administrator changing recovery afterward. The `systemctl show` query uses
+`output_within` with the existing 5 s `JOURNAL_WITHIN` command deadline. A
+failed or timed-out query defers self-update just as unavailable recovery
+does. It does not enable or start the recovery timer.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
@@ -1048,6 +1075,13 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   Prune keeps the running binary's folder, both in a round by hand with no
   lamp-update unit and in one made by the old binary after its own switch.
   Without the fix both tests fail.
+- Independent self-update recovery (#2700, `tests/round/self_recovery.rs`):
+  a missing, non-executable, directory or symlink fallback defers only the
+  updater; an unavailable recovery query also defers it, then a later ready
+  round takes the same candidate. The `min_updater` path leaves all parts
+  unchanged while recovery is unavailable. Off, unchanged and refused
+  candidates do not query recovery. `world.rs` tests distinguish a running,
+  persistently enabled timer from inactive or runtime-only enablement.
 - The real HTTPS path, once, by hand (the ignored test
   `a_release_file_from_github`): 646 bytes of this repository's
   `models/ambernet` release, through GitHub's redirect to

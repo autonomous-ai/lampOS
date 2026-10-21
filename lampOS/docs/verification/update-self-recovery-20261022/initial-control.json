@@ -1,0 +1,58 @@
+{
+  "mode": "control",
+  "base": "66518bb4c803a8a3439cc3ff2d0743bf460ba92e",
+  "sources_before": {
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "98f5e6925f824460ac7715040e5cd49401809fc3f7b9bd352f044b6de7473ea0",
+    "crates/update/tests/round.rs": "42c66ace64d3723202c860ccc5a3fd00791c6cd01646c65b36d483e0c0da6605",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "crates/update/tests/round/self_cuts.rs": "925de73624a3f76a6fbab06feb880d89250ddb236553bec92d68c36285744f40"
+  },
+  "stages": [
+    {
+      "name": "guard-removed-control",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "self_recovery::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "timed_out": false,
+      "elapsed_seconds": 43.264,
+      "log_name": "guard-removed-control.log",
+      "log_sha256": "7296a99fbe864679f594b0edd7de7d850797bd7d7d83767ccbb5fa0caee5b552",
+      "summaries": [
+        "test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 99 filtered out; finished in 18.40s"
+      ],
+      "counts": {
+        "passed": 1,
+        "failed": 3,
+        "ignored": 0,
+        "filtered out": 99
+      }
+    }
+  ],
+  "status": "expected-failure-observed",
+  "sources_after": {
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "98f5e6925f824460ac7715040e5cd49401809fc3f7b9bd352f044b6de7473ea0",
+    "crates/update/tests/round.rs": "42c66ace64d3723202c860ccc5a3fd00791c6cd01646c65b36d483e0c0da6605",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "crates/update/tests/round/self_cuts.rs": "925de73624a3f76a6fbab06feb880d89250ddb236553bec92d68c36285744f40"
+  },
+  "source_unchanged": true,
+  "started_at": "2026-10-22T01:09:50.026852+07:00",
+  "finished_at": "2026-10-22T01:10:33.308650+07:00",
+  "note": "Receipt copied from the private driver; timestamps rendered in +07. Log contents remain private; their SHA-256 and exact test result lines are retained."
+}
