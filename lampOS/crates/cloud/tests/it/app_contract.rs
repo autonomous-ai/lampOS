@@ -593,7 +593,9 @@ fn keeper(socket: &std::path::Path, installing: Vec<bool>) -> std::thread::JoinH
 /// this lamp lacks.
 #[test]
 fn a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update() {
-    let root = PathBuf::from(format!("/tmp/lcr-{}", std::process::id()));
+    // Not ring.rs's `/tmp/lcr-`: since #1806 both run in one process, and
+    // each removes its folder first.
+    let root = PathBuf::from(format!("/tmp/lcr-restart-{}", std::process::id()));
     let places = lamp(&root);
     let socket = root.join("restart.sock");
     let serving = keeper(&socket, vec![false, true]);

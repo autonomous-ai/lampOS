@@ -120,7 +120,10 @@ impl Rig {
 
     /// With `rules`, as `lamp-policy --rules`.
     fn all(name: &str, utc_offset_minutes: Option<i32>, act: bool, rules: bool) -> Self {
-        let root = PathBuf::from(format!("/tmp/lpp-{name}-{}", std::process::id()));
+        // `lpg-`, not program.rs's `lpp-`: since #1806 both files run in one
+        // process, so a name used in each (`act`) would share one bus and
+        // each test would hear the other's policy.
+        let root = PathBuf::from(format!("/tmp/lpg-{name}-{}", std::process::id()));
         let log_dir = std::env::temp_dir().join(format!(
             "lamp-policy-progress-{name}-{}",
             std::process::id()
@@ -642,7 +645,7 @@ fn with_rules_a_kept_rule_holds_progress_news_and_no_model_is_asked() {
 
 #[test]
 fn without_the_switch_the_tasks_topic_is_not_listened_to_and_the_report_is_as_before() {
-    let root = PathBuf::from(format!("/tmp/lpp-off-{}", std::process::id()));
+    let root = PathBuf::from(format!("/tmp/lpg-off-{}", std::process::id()));
     let log_dir =
         std::env::temp_dir().join(format!("lamp-policy-progress-off-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
