@@ -143,6 +143,11 @@ pub fn listed(role: &str) -> io::Result<lamp_voice_processes::WorkerRole> {
 }
 
 impl Worker {
+    /// The worker's process id, for a test that reads how it runs (#1608).
+    pub fn process_id(&self) -> u32 {
+        self.child.id()
+    }
+
     #[cfg(test)]
     pub(crate) fn sleeping_fixture(directory: &Path, role: &str) -> (Self, WorkerChannels) {
         Self::command_fixture(directory, role, "exec sleep 60")
@@ -376,14 +381,34 @@ impl Worker {
         parent: BootId,
         boot: BootId,
         extra: &[&str],
+        on_wait: impl FnMut() -> io::Result<()>,
+    ) -> io::Result<Self> {
+        Self::spawn_given(
+            executable,
+            directory,
+            role,
+            (parent, boot),
+            extra,
+            on_wait,
+            |name| std::env::var_os(name),
+        )
+    }
+
+    /// [`Self::spawn_with_boot_and_tick`] with the switches read by `var`
+    /// rather than from the voice's own environment: a test's own (#1608).
+    pub fn spawn_given(
+        executable: &Path,
+        directory: &Path,
+        role: &str,
+        (parent, boot): (BootId, BootId),
+        extra: &[&str],
         mut on_wait: impl FnMut() -> io::Result<()>,
+        var: impl Fn(&str) -> Option<std::ffi::OsString>,
     ) -> io::Result<Self> {
         listed(role)?;
         let channels = WorkerChannels::bind(directory, role, parent, boot, false)?;
-        let child = worker_command(executable, directory, role, (parent, boot), extra, |name| {
-            std::env::var_os(name)
-        })
-        .spawn()?;
+        let child =
+            worker_command(executable, directory, role, (parent, boot), extra, var).spawn()?;
         let mut worker = Self {
             channels,
             child,
@@ -1023,6 +1048,10 @@ fn worker_command(
             role,
             var(lamp_body::unplug::ENVIRONMENT).as_deref(),
         ))
+        .envs(scheduling_worker_environment(
+            role,
+            var(crate::worker_scheduling::ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1038,6 +1067,17 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// Each worker's own scheduling (#1608, `LAMP_WORKER_SCHEDULING`): the exact
+// `on`, to every worker on the voice's list, each of which reads it in `main`.
+fn scheduling_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (lamp_voice_processes::WorkerRole::parse(role).is_some()
+        && value == Some(std::ffi::OsStr::new("on")))
+    .then_some((crate::worker_scheduling::ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -1691,6 +1731,13 @@ mod tests {
                         memory_days_worker_environment as fn(_, _) -> _,
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
+                    ),
+                    // Each worker's own scheduling reaches every listed
+                    // worker, and no other (#1608).
+                    (
+                        scheduling_worker_environment,
+                        "LAMP_WORKER_SCHEDULING",
+                        ["provider", "second", "capture", "speaker"].as_slice(),
                     ),
                     // The second route's scoped context reaches it alone.
                     (
