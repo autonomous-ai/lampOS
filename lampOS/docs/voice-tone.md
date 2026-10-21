@@ -76,6 +76,12 @@ isn't taken here: it sends a person's voice to a server for every line.
 - **Forgets:** a line whose words ask to forget their face lets that
   person's baseline go, or the room's if no face is known. One that asks to
   forget everything lets every baseline go, the room's too.
+  - "Their face" is the known face at the lamp at the line's End, as for
+    whose the line is, not always the speaker's: someone unseen beside a
+    known person who says "forget my face" lets the known person's baseline
+    go, not their own (the reviewer's P3 on #2457). It's the same scope the
+    memory's own forget uses, and only a tone baseline, learned again in a
+    few lines.
   - The heard words decide, before any function runs, so a forget the lamp
     then holds back still lets it go; it is learned again in a few lines.
   - A forget from elsewhere (the app, another lamp) doesn't reach it, but
