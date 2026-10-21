@@ -1,7 +1,8 @@
 # Requested-audio asset scan, 21 October 2026
 
-Status: before/after measurements and focused regressions passed; complete
-consumer gate in progress.
+Status: this measured revision passed its complete consumer gate at
+`301ad8e2f9b019fc8d088fd9226131a7902a6d21`: 8,620 passed, zero failed, 36 ignored
+and none filtered. A later integration rebase has a separate gate.
 
 The host debug fixture has sixteen independent 60-second, 24 kHz mono PCM16
 recordings, each 1,440,000 frames. All three files per skill total 46,085,516
@@ -13,18 +14,21 @@ logging are excluded. No microphone, speaker, provider or lamp is used.
 files per skill on every successful scan. The test passed **1 / 0 failed /
 0 ignored / 0 filtered**. The helper changes only diagnostic byte accounting
 for the old API and removes the new zero-read assertion. All baseline source
-and raw logs are retained privately; the complete final record follows the gate.
+and raw logs are retained privately; the
+[completed host record](https://github.com/autonomous-ai/lampOS/blob/301ad8e2f9b019fc8d088fd9226131a7902a6d21/lampOS/docs/verification/requested-audio-host-20261021/host.json)
+records the measured revision’s full gate.
 
 The revised implementation must prove zero payload reads on unchanged files,
 recheck bytes after metadata changes, reject restored-mtime edits and never
 restore revoked inventory from a stale scan. Host timing does not establish
 ARM64 scan latency, acoustic onset or the audible behavior of Music.
 
-The [current frozen run](scan-benchmark.json) measured **1.481916 ms** on the
+The [measured revision](scan-benchmark.json) measured **1.481916 ms** on the
 first scan after loading and **0.749791 / 0.762500 ms** on repeats, reading
 **zero payload bytes** each time. The exact focused result was **1 passed /
 0 failed / 0 ignored / 29 filtered out**; those filters select this benchmark
-only. Its full 30-test integration file also passed. Complete consumer counts
-and native qualification remain pending. The before/after implementations use
+only. Its full 30-test integration file also passed. The complete host gate
+passed as above; native qualification did not run before newer integration
+changes required another rebase. The before/after implementations use
 the same fixture and measured boundary; this is three samples on one host,
 with no cold-cache or lamp-latency claim.
