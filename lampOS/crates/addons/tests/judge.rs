@@ -44,6 +44,23 @@ fn judge_with(root: &Path, enabled: bool, more: &[&str]) -> Running {
     Running(command.spawn().unwrap())
 }
 
+/// Waits until the judge listens to everything it reads, at most 30 s.
+/// `policy/decisions` is the last topic it subscribes to, after
+/// `addon/proposal` and the lamp's own topics: a lamp said calm before then
+/// could be missed, and a say dropped as "talking" is never asked (the first
+/// builder on #2602, 22 Oct 04:50, a run of #2737).
+fn listening(bus: &Bus, root: &Path) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while bus.subscribers(Decision::TOPIC).unwrap().is_empty() {
+        assert!(
+            Instant::now() < deadline,
+            "the judge never listened; its journal:\n{}",
+            std::fs::read_to_string(root.join("judge.log")).unwrap_or_default()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 fn glow(proposal: u64) -> AddonProposal {
     AddonProposal {
         proposal,
@@ -64,10 +81,30 @@ fn glow(proposal: u64) -> AddonProposal {
     }
 }
 
-/// A calm lamp at rest, freshly said. `product`: as a product lamp says it,
+/// The voice's privacy said every 20 ms from one publisher, as the voice
+/// says it, until dropped: one said once can be passed over by a judge on a
+/// loaded runner, since a reading claims 50 ms at most
+/// (`MICROPHONE_PRIVACY_FRESH_US`) and the bus skips one past it.
+struct Privacy {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    saying: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for Privacy {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(saying) = self.saying.take() {
+            let _ = saying.join();
+        }
+    }
+}
+
+/// A calm lamp at rest, freshly said, its privacy said for as long as the
+/// returned [`Privacy`] is kept. `product`: as a product lamp says it,
 /// with no `lamp/pause` (only `lamp-keeper` says one) and no `voice/mute`
 /// (only the head's controls say one).
-fn calm(bus: &Bus, persons_light: bool, product: bool) {
+#[must_use = "privacy is said only while the guard is kept"]
+fn calm(bus: &Bus, persons_light: bool, product: bool) -> Privacy {
     let mut privacy = bus
         .publisher_declared(
             MicrophonePrivacy::TOPIC,
@@ -75,27 +112,35 @@ fn calm(bus: &Bus, persons_light: bool, product: bool) {
             "voice",
         )
         .unwrap();
-    let now = lamp_ipc::monotonic_us();
-    privacy
-        .publish_json(
-            now,
-            &MicrophonePrivacy {
-                stamp: ClockStamp {
-                    clock_id: "test-boot".into(),
-                    at_us: now,
-                    sequence: 1,
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stopped = stop.clone();
+    let saying = std::thread::spawn(move || {
+        let mut sequence = 0;
+        while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
+            sequence += 1;
+            let now = lamp_ipc::monotonic_us();
+            let _ = privacy.publish_json(
+                now,
+                &MicrophonePrivacy {
+                    stamp: ClockStamp {
+                        clock_id: "test-boot".into(),
+                        at_us: now,
+                        sequence,
+                    },
+                    session_id: "0123456789abcdef".into(),
+                    controller_boot: "0123456789abcdef0123456789abcdef".into(),
+                    microphone_generation: 1,
+                    observed_us: now,
+                    expires_at_us: now + 50_000,
+                    permitted: true,
+                    physical_muted: Some(false),
+                    no_slide: false,
                 },
-                session_id: "0123456789abcdef".into(),
-                controller_boot: "0123456789abcdef0123456789abcdef".into(),
-                microphone_generation: 1,
-                observed_us: now,
-                expires_at_us: now + 50_000,
-                permitted: true,
-                physical_muted: Some(false),
-                no_slide: false,
-            },
-        )
-        .unwrap();
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    });
+    let now = lamp_ipc::monotonic_us();
     if !product {
         bus.publisher_declared(Pause::TOPIC, &Pause::declaration(), "keeper")
             .unwrap()
@@ -136,6 +181,10 @@ fn calm(bus: &Bus, persons_light: bool, product: bool) {
             .publish_json(now, &blue)
             .unwrap();
     }
+    Privacy {
+        stop,
+        saying: Some(saying),
+    }
 }
 
 /// What the ring was asked after one proposal, with the judge on or off.
@@ -164,16 +213,17 @@ fn run(
     let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
     let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
     let _judge = judge(dir.path(), enabled);
-    // It subscribes to addon/proposal once it runs; off, it never does.
-    let deadline = Instant::now() + Duration::from_secs(if enabled { 10 } else { 2 });
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
+    // On, it is waited for; off, it never subscribes: two seconds show it.
+    if enabled {
+        listening(&bus, dir.path());
+    } else {
+        std::thread::sleep(Duration::from_secs(2));
     }
     if product {
         // Long enough that a sleep mute never said is known never said.
         std::thread::sleep(Duration::from_millis(3_200));
     }
-    calm(&bus, persons_light, product);
+    let _privacy = calm(&bus, persons_light, product);
     std::thread::sleep(Duration::from_millis(300));
     let mut skills = bus
         .publisher_declared(AddonProposal::TOPIC, &AddonProposal::declaration(), source)
@@ -242,7 +292,8 @@ fn a_kept_light_is_said_kept_on_addon_decision() {
     };
     assert_eq!(
         (decision.choice.as_str(), decision.addon.as_str()),
-        ("kept", "evening-glow")
+        ("kept", "evening-glow"),
+        "{decision:?}"
     );
     assert_eq!(decision.check(), Ok(()));
 }
@@ -279,11 +330,8 @@ fn a_kept_mood_is_said_to_lamp_mood() {
     let bus = Bus::new(dir.path()).unwrap();
     let mut mood = bus.subscribe(MoodNudge::TOPIC, "mood").unwrap();
     let _judge = judge(dir.path(), true);
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    calm(&bus, false, false);
+    listening(&bus, dir.path());
+    let _privacy = calm(&bus, false, false);
     std::thread::sleep(Duration::from_millis(300));
     let lift = AddonProposal {
         act: "mood".into(),
@@ -336,11 +384,8 @@ fn moved(quiet_ms: Option<u64>) -> (Option<serde_json::Value>, Vec<AddonDecision
         more.extend(["--move-quiet-ms", quiet.as_str()]);
     }
     let _judge = judge_with(dir.path(), true, &more);
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    calm(&bus, false, false);
+    listening(&bus, dir.path());
+    let _privacy = calm(&bus, false, false);
     std::thread::sleep(Duration::from_millis(300));
     let nod = AddonProposal {
         act: "move".into(),
@@ -427,11 +472,8 @@ fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
     let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
     let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
     let _judge = judge(dir.path(), true);
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    calm(&bus, true, false);
+    listening(&bus, dir.path());
+    let _privacy = calm(&bus, true, false);
     let asleep = MoodState {
         stamp: ClockStamp {
             clock_id: "test-boot".into(),
@@ -510,13 +552,10 @@ fn say_through(answer: Answer) -> (AddonAsk, AddonDecision) {
         ])
         .arg(dir.path())
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(std::fs::File::create(dir.path().join("judge.log")).unwrap());
     let _judge = Running(command.spawn().unwrap());
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    calm(&bus, false, false);
+    listening(&bus, dir.path());
+    let _privacy = calm(&bus, false, false);
     // The voice has rested past the test's quiet, each reading still fresh
     // (said once: a second publisher would be a restarted voice).
     std::thread::sleep(Duration::from_millis(400));
