@@ -1,0 +1,30 @@
+{
+  "build": {
+    "sequence": 4576,
+    "commit": "4f5e62507"
+  },
+  "units": [
+    {
+      "unit": "lamp-voice.service",
+      "was_active": true,
+      "link": {
+        "path": "/opt/lampOS/voice/current",
+        "build": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    }
+  ],
+  "models": [
+    {
+      "path": "/opt/lampOS/eyes/models/face.onnx",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "settings": true,
+  "skills": [
+    {
+      "path": "/var/lib/lampOS/skills/dance/skill.toml",
+      "before": "name = \"dance\"\n",
+      "wrote": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ]
+}

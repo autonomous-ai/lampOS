@@ -639,4 +639,143 @@ mod tests {
         drop(held);
         assert!(other.lock().is_ok());
     }
+
+    /// lamp-update's own records as today's build writes them: every field
+    /// of the state and of a switch under way filled in.
+    fn todays_records() -> (super::State, super::Journal) {
+        use super::{Build, Journal, LinkBack, Refusal, SkillBack, State, Switching};
+        use crate::models::ModelBack;
+        let state = State {
+            installed: Some(Build {
+                sequence: 4576,
+                commit: "4f5e62507".into(),
+            }),
+            previous: Some(Build {
+                sequence: 4570,
+                commit: "d90cc8b8e".into(),
+            }),
+            refused: vec![Refusal {
+                sequence: 4573,
+                commit: "c902a95cf".into(),
+                why: "lamp-voice.service was not well within a minute".into(),
+                at_unix_ms: 1_760_000_000_000,
+            }],
+            made: vec!["/opt/lampOS/voice/".to_owned() + &"a".repeat(64)],
+            settings: [("/etc/lampOS/voice/second.json".to_owned(), "b".repeat(64))].into(),
+            settings_writing: [("/etc/lampOS/records.json".to_owned(), "c".repeat(64))].into(),
+            systemd_owed: true,
+            models: [(
+                "/opt/lampOS/eyes/models/face.onnx".to_owned(),
+                "d".repeat(64),
+            )]
+            .into(),
+            models_before: [(
+                "/opt/lampOS/eyes/models/face.onnx".to_owned(),
+                "e".repeat(64),
+            )]
+            .into(),
+            later: Default::default(),
+        };
+        let journal = Journal {
+            build: Build {
+                sequence: 4576,
+                commit: "4f5e62507".into(),
+            },
+            units: vec![Switching {
+                unit: "lamp-voice.service".into(),
+                was_active: true,
+                link: Some(LinkBack {
+                    path: "/opt/lampOS/voice/current".into(),
+                    build: "f".repeat(64),
+                }),
+            }],
+            models: vec![ModelBack {
+                path: "/opt/lampOS/eyes/models/face.onnx".into(),
+                sha256: Some("e".repeat(64)),
+                file: false,
+            }],
+            settings: true,
+            skills: vec![SkillBack {
+                path: "/var/lib/lampOS/skills/dance/skill.toml".into(),
+                before: Some("name = \"dance\"\n".into()),
+                wrote: "9".repeat(64),
+                made: Vec::new(),
+            }],
+        };
+        (state, journal)
+    }
+
+    /// Writes [`todays_records`] as this build saves them into the folder in
+    /// `LAMP_UPDATE_RECORDS_FIXTURE`, as `state.json` and `journal.json`.
+    /// Run by hand when either's shape changes, keeping the ones kept.
+    #[test]
+    #[ignore = "writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"]
+    fn write_records_fixtures() {
+        let folder =
+            std::env::var_os("LAMP_UPDATE_RECORDS_FIXTURE").expect("LAMP_UPDATE_RECORDS_FIXTURE");
+        let records = super::Records::new(folder.into());
+        let (state, journal) = todays_records();
+        records.save_state(&state).unwrap();
+        records.save_journal(&journal).unwrap();
+    }
+
+    /// lamp-update's records kept as fixtures, each day's as its build saved
+    /// them ([`write_records_fixtures`]): every later lamp-update reads each
+    /// with every field as it was, so an update never loses what the one
+    /// before it knew of the lamp, and a switch it began can still be put
+    /// back (the build row "Updates cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_state_and_journal_reads_as_saved() {
+        let kept: [(&str, &[u8], &[u8]); 1] = [(
+            "2026-10-21",
+            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+            include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
+        )];
+        let (state, journal) = todays_records();
+        for (day, state_bytes, journal_bytes) in kept {
+            let folder = tempfile::tempdir().unwrap();
+            std::fs::write(folder.path().join("state.json"), state_bytes).unwrap();
+            std::fs::write(folder.path().join("journal.json"), journal_bytes).unwrap();
+            let records = super::Records::new(folder.path().to_owned());
+            let mut said = Vec::new();
+            let read = records
+                .state(&mut |line: &str| said.push(line.to_owned()))
+                .unwrap_or_else(|error| panic!("{day}: {error}"));
+            assert!(said.is_empty(), "{day}: {said:?}");
+            assert_eq!(
+                (&read.installed, &read.previous, &read.refused, &read.made),
+                (
+                    &state.installed,
+                    &state.previous,
+                    &state.refused,
+                    &state.made
+                ),
+                "{day}"
+            );
+            assert_eq!(
+                (&read.settings, &read.settings_writing, read.systemd_owed),
+                (&state.settings, &state.settings_writing, state.systemd_owed),
+                "{day}"
+            );
+            assert_eq!(
+                (&read.models, &read.models_before),
+                (&state.models, &state.models_before),
+                "{day}"
+            );
+            let under_way = records
+                .journal()
+                .unwrap_or_else(|error| panic!("{day}: {error}"))
+                .unwrap_or_else(|| panic!("{day}: no switch under way"));
+            assert_eq!(
+                (&under_way.build, &under_way.units, under_way.settings),
+                (&journal.build, &journal.units, journal.settings),
+                "{day}"
+            );
+            assert_eq!(
+                (&under_way.models, &under_way.skills),
+                (&journal.models, &journal.skills),
+                "{day}"
+            );
+        }
+    }
 }
