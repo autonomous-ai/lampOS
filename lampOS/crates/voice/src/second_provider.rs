@@ -106,7 +106,9 @@ pub const LOOK_BEGIN_WITHIN: Duration = Duration::from_secs(5);
 /// begin this late. Nobody asked and nobody waits, so [`BEGIN_WITHIN`]'s
 /// reason doesn't hold, and a turn given up is news lost: on lamp-75c9 on
 /// 20 Oct at 18:19 "Devin finished" began past 3 s, ended unanswered, and
-/// was never told (`no_audio_answer`). Under the coordinator's 8 s.
+/// was never told (`no_audio_answer`). Once its chat has begun, nothing on
+/// this route bounds its first audio (the provider file's 8 s no-reply
+/// wait, `config::PATIENT_NO_REPLY_MS`, is a Live session's).
 pub const WRITTEN_BEGIN_WITHIN: Duration = Duration::from_secs(7);
 /// What the lamp says when a look's first round has not begun within
 /// [`LOOK_BEGIN_WITHIN`]: after "Let me look.", silence reads as broken.
