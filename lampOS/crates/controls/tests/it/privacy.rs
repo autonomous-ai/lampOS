@@ -2,6 +2,7 @@ use lamp_bus::Bus;
 use lamp_controls::{
     engine::Config,
     input::{Level, Observation, ScriptedPins},
+    pace::rest_us,
     pins::{Lines, Pull},
     privacy::{self, LineReader, Monitor, Reader, Source},
     replay,
@@ -812,6 +813,108 @@ fn controls_says_the_switch_on_diagnostics_beside_its_own_report() {
                 "closed, not moved since Controls started".to_owned()
             )),
             "{touch}: {said:?}"
+        );
+    }
+}
+
+/// The outer loop includes hand logging and can be descheduled after its
+/// sample was published. Charging that wait again as sleep must not turn a
+/// recoverable 30 ms delay into a gap past the switch's 50 ms freshness.
+#[test]
+fn a_blocked_step_does_not_double_the_gap_between_privacy_readings() {
+    for touch in [false, true] {
+        let root = Root::new();
+        let bus = root.bus();
+        let (lines, _, _, _) = line(true);
+        let source = Source::new(
+            Box::new(LineReader::new(lines, CLOCK, "privacy-reader")),
+            CLOCK,
+        );
+        let mut step: Box<dyn FnMut(u64)> = if touch {
+            let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
+                "../../fixtures/strip-711-working-pins-example.json"
+            ))
+            .unwrap();
+            let config = Config {
+                base_selected_mask: Some(
+                    wiring
+                        .base
+                        .as_ref()
+                        .unwrap()
+                        .pads
+                        .iter()
+                        .fold(0, |mask, &pad| mask | (1 << pad)),
+                ),
+                ..Config::default()
+            };
+            let mut service =
+                touch_runtime::Service::new(&bus, config, wiring, NoGpio, None::<Worker>, CLOCK)
+                    .unwrap();
+            service.attach_privacy(&bus, source).unwrap();
+            Box::new(move |at| {
+                service.step(|| at);
+            })
+        } else {
+            // This is also the --touch path for a privacy-only pins profile.
+            let mut service = Service::new(&bus, Config::default(), NoGpio, CLOCK).unwrap();
+            service.attach_privacy(source);
+            Box::new(move |at| {
+                service.step(|| at);
+            })
+        };
+        for at in (0..=100_000).step_by(1_000) {
+            step(at);
+        }
+        let mut at = 100_000;
+        for attempt in 0..3 {
+            let elapsed = 30_000;
+            at += elapsed + rest_us(elapsed, 200, privacy::STEP_US);
+            step(at);
+            let state: ControlsState = bus
+                .latest(ControlsState::TOPIC)
+                .unwrap()
+                .unwrap()
+                .parse()
+                .unwrap();
+            let privacy = state.privacy.unwrap();
+            assert!(
+                privacy.fresh_at(CLOCK, at),
+                "touch={touch}, attempt={attempt}, at={at}: {privacy:?}"
+            );
+            assert_eq!(privacy.muted, Some(false));
+        }
+    }
+}
+
+/// The privacy-only pins profile uses the legacy service even with --touch.
+/// It reports the same loop diagnostics as the ordinary touch service.
+#[test]
+fn a_privacy_only_loop_counts_slow_steps_and_gaps() {
+    let root = Root::new();
+    let bus = root.bus();
+    let (lines, _, _, _) = line(true);
+    let mut service = Service::new(&bus, Config::default(), NoGpio, CLOCK).unwrap();
+    service.attach_privacy(Source::new(
+        Box::new(LineReader::new(lines, CLOCK, "privacy-reader")),
+        CLOCK,
+    ));
+    service.step(|| 0);
+    let time = Cell::new(100_000);
+    let output = service.step(|| {
+        let now = time.get();
+        time.set(now + 200);
+        now
+    });
+    let report = service.report(&output);
+    for (key, expected) in [
+        ("longest_gap_us", "100000"),
+        ("long_gaps", "1"),
+        ("slow_steps", "1"),
+    ] {
+        assert_eq!(
+            report.values.iter().find(|v| v.key == key).unwrap().value,
+            expected,
+            "{key}"
         );
     }
 }

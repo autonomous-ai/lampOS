@@ -3,6 +3,7 @@
 use crate::{
     engine::{Config, Engine},
     input::{InputError, Observation, PinReader},
+    pace::Pace,
     runtime::{Counts, owner_lock},
     strip_worker::StripReader,
     touch::{TouchEngine, TouchOutput},
@@ -31,73 +32,6 @@ pub const STATE_EVERY_US: u64 = 100_000;
 /// #1469). A press, a release or a tier is said at once. A publish the bus
 /// refused is tried again this long after.
 pub const MOVING_EVERY_US: u64 = 20_000;
-/// A gap this long between two steps outlasts the privacy reading's
-/// freshness ([`lamp_msgs::PRIVACY_SWITCH_TTL_US`]): the voice lapses.
-pub const LONG_GAP_US: u64 = lamp_msgs::PRIVACY_SWITCH_TTL_US;
-
-/// A step whose own work takes this long is slow: the privacy route's step
-/// ([`crate::privacy::STEP_US`]). Controls runs at real-time priority 30,
-/// above the voice (#2602), so its work must stay small.
-pub const SLOW_STEP_US: u64 = crate::privacy::STEP_US;
-
-/// The loop's pace (#2602, lamp-75c9: the loop that also reads the privacy
-/// switch didn't run for 100 ms, and the voice lost the switch): the
-/// longest gap between two steps' starts, how many outlasted
-/// [`LONG_GAP_US`], and how many steps' own work took [`SLOW_STEP_US`] or
-/// more. A long gap is said in the journal at most once a second, with how
-/// many more there were.
-#[derive(Debug, Default)]
-pub struct Pace {
-    last_us: Option<u64>,
-    pub longest_gap_us: u64,
-    pub long_gaps: u64,
-    pub slow_steps: u64,
-    said_us: Option<u64>,
-    unsaid: u64,
-}
-
-impl Pace {
-    /// A step begins at `at_us`: the journal line, if one is due.
-    pub fn step(&mut self, at_us: u64) -> Option<String> {
-        let gap = at_us.saturating_sub(self.last_us.replace(at_us)?);
-        self.longest_gap_us = self.longest_gap_us.max(gap);
-        if gap < LONG_GAP_US {
-            return None;
-        }
-        self.long_gaps += 1;
-        if self
-            .said_us
-            .is_some_and(|said| at_us.saturating_sub(said) < 1_000_000)
-        {
-            self.unsaid += 1;
-            return None;
-        }
-        self.said_us = Some(at_us);
-        let more = match std::mem::take(&mut self.unsaid) {
-            0 => String::new(),
-            more => format!(" ({more} more since the last line)"),
-        };
-        Some(format!(
-            "the loop didn't run for {} ms, past the privacy reading's {} ms{more}",
-            gap / 1_000,
-            LONG_GAP_US / 1_000
-        ))
-    }
-
-    /// A step's own work took `worked_us`.
-    pub fn worked(&mut self, worked_us: u64) {
-        self.slow_steps += u64::from(worked_us >= SLOW_STEP_US);
-    }
-}
-
-/// How long the loop rests after a step whose own work took `worked_us`:
-/// what is left of `poll_us`, and never less than the work itself, so a
-/// step gone slow at real-time priority takes at most half of one core and
-/// never spins (#2602, the first builder's guard).
-pub fn rest_us(worked_us: u64, poll_us: u64) -> u64 {
-    poll_us.saturating_sub(worked_us).max(worked_us)
-}
-
 /// How often the body's `body/hand` is looked at. The body says it with
 /// every step it passes on, every 80 ms.
 pub const HAND_EVERY_US: u64 = 20_000;
