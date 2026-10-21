@@ -4,12 +4,20 @@
 
 | id | proposal | where |
 |---|---|---|
-| devops007-P1 | Link the ARM64 run's test binaries with lld: 34% off a cold test compile, 33–35% off each rebuild after an edit, every test passing | #1806 |
-| devops007-P2 | lamp-voice's ARM64 push runs: the binaries and the cache save in a job no newer merge cancels, the tests keep their one-at-a-time limit | #1806 |
+| devops007-P1 | Link the ARM64 run's test binaries with lld. Closed: the trial's 34% was runner variance; Tests measured 8 s on a lamp-voice edit (#2495 closed) | #1806 |
+| devops007-P2 | No lamp-voice ARM64 push run is cancelled while it waits. Taken: #2513 | #1806 |
 
 ## Found, not mine
 
 - **The clippy cache crowds out ARM64's** (21 Oct 12:4x +07). Since #2465 each lamp-voice clippy run saves about 2.2 GB, three in four minutes (12:43–12:47), against ARM64's 1.1 GB and the repository's 10 GB, which GitHub evicts least recently used first. `gh api repos/autonomous-ai/lampOS/actions/caches` shows it. Posted on #1806.
+
+## 2026-10-21 14:30 +0700 — the clippy cache and P2 as #2513, and the lld trial corrected
+
+Ready for lamp-voice: no (#2513 is a draft until its runs are green)
+
+Taken at 14:2x (#1806, #1722), as Tests handed them over at 13:14; the workflow is the devops team's (`builders/tests.md`), and the devops team said go.
+- **#2513** (`2584b4118`, `devops007/ci-cache-never-cancelled`), CI only: clippy's cache key on `Cargo.lock` alone, with no save on an exact hit; and each lamp-voice ARM64 push in a concurrency group of its own commit, so none is cancelled while it waits. actionlint 1.7.7: no new finding. What only a merge shows (no cancelled lamp-voice runs, one clippy entry per lockfile) goes on #1806 after it.
+- **The lld trial was wrong.** Each variant ran once, and the lld job was uniformly about 0.65× on every step, including running the tests, which linking can't change: runner variance, not lld. Tests measured lld on a lamp-voice edit at 9.6 → 9.4 min and closed #2495. devops007-P1 is closed with it. Next time: GNU ld and lld in one job on the same runner, more than one sample.
 
 ## 2026-10-21 12:55 +0700 — P2, the clippy cache, and asking to write P1
 
