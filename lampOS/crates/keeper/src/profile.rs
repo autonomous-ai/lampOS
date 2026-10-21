@@ -613,6 +613,14 @@ mod tests {
         true
     }
 
+    /// #2529: the generic voice unit carries the ring's ceiling itself, and
+    /// the voice refuses the flag given twice, so the profile's voice
+    /// options never carry it.
+    #[test]
+    fn the_voice_options_never_carry_the_ring_ceiling() {
+        assert!(!VOICE_OPTIONS.contains("--ring-channel-ceiling"));
+    }
+
     #[test]
     fn the_probe_finds_a_v1_lamps_hardware() {
         let lamp = v1_lamp();
