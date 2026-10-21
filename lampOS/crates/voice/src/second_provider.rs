@@ -1200,6 +1200,14 @@ impl Engine {
                     };
                     eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
                 }
+                // A line held only by a gap is never journalled, whether or
+                // not its exchange is filed by its scope
+                // (`LAMP_SECOND_SCOPED_CONTEXT`): kept out as it is admitted,
+                // before any of its words or its end (the reviewer's P2 on
+                // #2616).
+                if scope.held() {
+                    crate::remember::keep_out(request);
+                }
                 scope
             } else {
                 crate::memory_scope::ScopeSnapshot::room()
@@ -3934,8 +3942,15 @@ type SightRead = (
 );
 
 /// Every function that reads or writes someone's memory, their rules or
-/// their face, never declared to or run for a line held only by a known
-/// face's gap (the reviewer's P2 on #2449): it may not be theirs.
+/// their face, or grants something as them, never declared to or run for a
+/// line held only by a known face's gap (the reviewer's P2s on #2449 and
+/// #2616): it may not be theirs. That is every function the memory runs
+/// ([`crate::remember::is_tool_with`]), and every one of the eyes' that
+/// keeps, forgets or says yes for someone: their face, a yes to being named
+/// in Who was here (run as the line's cached person, so a held line would
+/// save the absent person's consent), and a yes to a face added from a photo.
+/// Only the eyes' two refusals stay, `dont_tell_others_i_was_here` and
+/// `photo_face_no`: a no grants nothing, whoever says it.
 const MEMORY_CALLS: &[&str] = &[
     crate::remember::RECALL,
     crate::remember::REMEMBER,
@@ -3946,10 +3961,17 @@ const MEMORY_CALLS: &[&str] = &[
     crate::rules::LIST_RULES,
     crate::known_faces::REMEMBER,
     crate::known_faces::FORGET,
+    crate::known_faces::TELL,
+    crate::photo_faces::YES,
 ];
 
+/// The eyes' functions a line held only by a gap may still call: refusals,
+/// which grant nothing ([`MEMORY_CALLS`]).
+#[cfg(test)]
+const HELD_REFUSALS: &[&str] = &[crate::known_faces::DONT_TELL, crate::photo_faces::NO];
+
 /// What a memory call on a gap-held line is told instead of running.
-const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything for anyone. Say so, and ask them to come back where I can see them.";
+const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything, or take a yes, for anyone. Say so, and ask them to come back where I can see them.";
 
 /// Whether this turn's scope is a known face's kept only by its held gap
 /// (`LAMP_FACE_GAP_HOLD`): someone who left within 12 s of the lamp's last

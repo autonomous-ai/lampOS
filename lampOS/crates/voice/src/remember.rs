@@ -1437,15 +1437,28 @@ fn room_facts(socket: &Path, within: Duration) -> Option<lamp_msgs::Rules> {
     Some(crate::rules::facts(None, &room, &[]))
 }
 
-/// The request used a function that keeps or forgets: its exchange stays
-/// out of the journal.
+/// The request used a function that keeps or forgets, or its line was held
+/// only by a known face's gap (`LAMP_FACE_GAP_HOLD`): its exchange stays out
+/// of the journal. Marking a request again keeps one entry, so a long
+/// answer marked at each piece pushes no other request out.
 pub fn keep_out(request: u64) {
     if let Ok(mut kept_out) = KEPT_OUT.lock() {
+        if kept_out.contains(&request) {
+            return;
+        }
         if kept_out.len() == 16 {
             kept_out.pop_front();
         }
         kept_out.push_back(request);
     }
+}
+
+/// Whether `request` is kept out of the journal ([`keep_out`]).
+#[cfg(test)]
+pub(crate) fn kept_out(request: u64) -> bool {
+    KEPT_OUT
+        .lock()
+        .is_ok_and(|kept_out| kept_out.contains(&request))
 }
 
 /// The request is over: hand every finished exchange not handed on before
@@ -7886,6 +7899,112 @@ mod tests {
         assert_eq!(read[0]["source_ids"], json!([5]));
         assert_eq!(read[2]["source_ids"], json!([7]));
         assert_eq!(read[4]["source_ids"], json!([5]));
+    }
+
+    /// The reviewer's P2 on #2616 (`LAMP_FACE_GAP_HOLD`): A is answered and
+    /// leaves view; within the gap someone says a plain line, admitted held
+    /// as A's. It is never sent to Days, as A's or anyone's, though it stays
+    /// in the spoken thread; A's seen lines before and after it are A's.
+    #[test]
+    fn a_line_held_only_by_a_faces_gap_is_never_journalled() {
+        use crate::memory_scope::{FaceCache, GAP, RequestKey, RequestScope};
+        use crate::provider_worker::ProviderOutput;
+        let _one = crate::provider_worker::tests::one_thread();
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let known = std::env::temp_dir().join(format!("journal-held-{}", std::process::id()));
+        std::fs::write(&known, "A").unwrap();
+        let cache = FaceCache::holding_gaps(Some(GAP));
+        let a = person_id("A");
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.at_lamp(Some(a.clone()));
+            thread.seen_now(Some(a.clone()));
+            thread.opening(Instant::now());
+        }
+        let first = u64::MAX - 500;
+        let line = |request: u64, words: &str, held: bool| {
+            let scope = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([19; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                cache.snapshot(Instant::now()),
+            );
+            let lease = scope.lease();
+            assert_eq!(lease.scope().unwrap().held(), held, "{words}");
+            assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: words.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: "Understood.".into(),
+                    finished: true,
+                },
+            ] {
+                crate::second_provider::worker::keep_admitted(&event, &lease);
+            }
+            cache.answered(lease.scope().unwrap(), Instant::now());
+        };
+        let seen = || crate::known_faces::FaceObservation::read(&known);
+        cache.replace_seen(cache.begin_refresh(), seen(), Some(1));
+        line(first, "My tea is green.", false);
+        // A leaves view: no face at all, so the next line is held as A's.
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        line(first + 1, "My private fact belongs to B.", true);
+        cache.replace_seen(cache.begin_refresh(), seen(), Some(1));
+        line(first + 2, "I'm back.", false);
+        let done = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .finished(first + 2, Instant::now());
+        *crate::thread::THREAD.lock().unwrap() = kept;
+        std::fs::remove_file(known).unwrap();
+        // The spoken thread still has all three, each under A.
+        assert_eq!(done.len(), 3);
+
+        let (jobs, work) = sync_channel(8);
+        let client = held_test_client(jobs);
+        hand_on_days(done, NOW, &client);
+        let (send, receive) = sync_channel(8);
+        while let Ok(job) = work.try_recv() {
+            send.send(job).unwrap();
+        }
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        let (socket, served) = memory("journal-held", 3, |request| match request["op"].as_str() {
+            Some("append_linked") => json!({"ok":true,"id":11}),
+            _ => json!({"ok":true}),
+        });
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        let heard: Vec<_> = read
+            .iter()
+            .filter(|r| r["op"] == "append_linked")
+            .map(|r| (r["heard"].as_str().unwrap(), r["person"].as_str()))
+            .collect();
+        assert_eq!(
+            heard,
+            [
+                ("My tea is green.", Some(a.as_str())),
+                ("I'm back.", Some(a.as_str()))
+            ]
+        );
+        assert!(!format!("{read:?}").contains("belongs to B"), "{read:?}");
     }
 
     #[test]
