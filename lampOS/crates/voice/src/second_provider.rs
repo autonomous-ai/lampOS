@@ -169,6 +169,20 @@ pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
 /// The last line's sound is let go this long after it ended, whatever comes.
 pub const KEEP_AFTER_END: Duration = Duration::from_secs(2);
+/// How long a line that may go on from the one it cut short waits for a
+/// voice print still to come ([`Joined::Coming`]): the same-voice child's
+/// prints came 181–311 ms after they were asked on lamp-52e6 on 21 Oct
+/// (Seventh on Queue #2602, 17:3x). Only such a line pays it.
+pub const JOIN_WAIT: Duration = Duration::from_millis(300);
+/// How often it asks again meanwhile.
+const JOIN_POLL: Duration = Duration::from_millis(25);
+/// How soon after the cut line's end a line must begin to be joined with
+/// its words ([`Engine::joining_cut_words`]): its own, longer than
+/// [`CARRY_AFTER_END`], as [`OPEN_NAME_WITHIN`] is, since a join needs one
+/// person's sign as well. On lamp-4ace on 21 Oct at 18:36 a played request
+/// with a 1.2 s pause in it began its second half 1635 ms after the first
+/// half's end, past 1.5 s.
+pub const JOIN_WITHIN: Duration = Duration::from_millis(2_500);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
@@ -352,6 +366,15 @@ pub const BUSY_CALLED_STRICT_ENVIRONMENT: &str = "LAMP_BUSY_CALLED_STRICT";
 /// talk out; `Heeding::counting_only_turned_speakers`).
 pub const TURNED_SPEAKING_ENVIRONMENT: &str = "LAMP_TURNED_SPEAKING";
 
+/// Where the worker reads whether a line that cut the one before it short
+/// is asked with that one's words when the same person said both: `on`,
+/// and nothing else ([`Engine::joining_cut_words`]). On lamp-4ace on 21 Oct
+/// a line's words were let go when the next one cut them short 31 times,
+/// most in two-person scenes, where that is right (the first builder on
+/// Queue #2602 at 17:22); a person who paused mid-request lost its first
+/// half the same way (Eighth's long request).
+pub const JOIN_CUT_WORDS_ENVIRONMENT: &str = "LAMP_JOIN_CUT_WORDS";
+
 /// Where the worker reads whether a busy room ends sooner (the first
 /// builder on Queue #1722, 04:00): `on`, and nothing else. A minute after
 /// the last talk when the lamp has not answered since, and a minute after
@@ -409,6 +432,22 @@ pub(crate) fn said_once_note(said: &str) -> String {
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Whether the same person said a line cut short and the line that cut it
+/// ([`Engine::joining_cut_words`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Joined {
+    /// The same person, and why: the two lines' voices, or one face seen
+    /// speaking both.
+    Same(&'static str),
+    /// A print still to come, and what is known without it: the face's why
+    /// if one face spoke both, once [`JOIN_WAIT`] is over.
+    Coming(Option<&'static str>),
+    /// Two people, or nothing to tell, and which: the cut line's words go,
+    /// as today, and the journal says why.
+    Not(String),
+}
+/// Asked of the line cut short and the line that cut it, by request.
+pub type SameSpeaker = Arc<dyn Fn(u64, u64) -> Joined + Send + Sync>;
 /// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
 /// request, and whether it is answered or its answer held back.
 pub type Verdicts = Arc<dyn Fn(u64, lamp_msgs::TurnVerdict) + Send + Sync>;
@@ -665,6 +704,9 @@ struct Shared {
     /// was heard (a newer line began): answered in the next line's place
     /// if that line is held ([`CARRY_WITHIN`], #1712).
     cut: Mutex<Option<Carried>>,
+    /// Whether one person said a line cut short and the line that cut it
+    /// ([`Engine::joining_cut_words`]).
+    same_speaker: Option<SameSpeaker>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
@@ -717,6 +759,11 @@ struct Carried {
     request: u64,
     text: String,
     at: Instant,
+    /// The request whose line said these words: `request`'s own, or, for
+    /// words answered in a held line's place, the line they came from. A
+    /// join compares that line's speaker, never the held line's
+    /// ([`joined_with_cut`]).
+    said_by: u64,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -939,6 +986,10 @@ struct Marks {
     /// Onboarding's sentence (#1803): its words are counted, never asked
     /// of the model nor kept ([`ProviderInput::CountOnly`]).
     count_only: AtomicBool,
+    /// The line before it in this session and how long after that one's
+    /// end this one began, when none of that one's words or sound began
+    /// this one already ([`Engine::joining_cut_words`]).
+    after_end: Option<(u64, Duration)>,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -1098,6 +1149,7 @@ impl Engine {
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
+                same_speaker: None,
                 first_words: None,
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
@@ -1546,6 +1598,21 @@ impl Engine {
         self
     }
 
+    /// A line that cut the one before it short, that one's answer not yet
+    /// heard, is asked with that one's words before its own, as one line,
+    /// when `same` says one person said both (`LAMP_JOIN_CUT_WORDS`): begun
+    /// within [`JOIN_WITHIN`] of that one's end, in the same session.
+    /// Let out, it is answered so; held, so are the words it cut short,
+    /// which alone would be answered in its place. Otherwise as without it:
+    /// in a two-person scene the second person's line let out is answered
+    /// alone, and that one's words are let go. Before any turn only.
+    pub fn joining_cut_words(mut self, same: SameSpeaker) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.same_speaker = Some(same);
+        }
+        self
+    }
+
     /// A line the rule held as unclear (another script, a number alone, a
     /// cut-in with no English word) is told to the coordinator as
     /// `ProviderOutput::Unclear`, before its `TurnComplete`, as the Live
@@ -1959,6 +2026,16 @@ impl Engine {
                         .filter(|(of, _)| *of == kept.request)
                         .map(|(_, words)| words.trim())
                 };
+                // How long after the line before it, in this session, this
+                // one began (`LAMP_JOIN_CUT_WORDS`).
+                let after_end = self
+                    .kept
+                    .as_ref()
+                    .filter(|kept| kept.session == session && kept.request < request)
+                    .and_then(|kept| {
+                        kept.ended
+                            .map(|end| (kept.request, now.saturating_duration_since(end)))
+                    });
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
                     // Only the name cut off on its own: a piece that came
@@ -2034,6 +2111,9 @@ impl Engine {
                     called: AtomicBool::new(false),
                     privacy: privacy_generation,
                     count_only: AtomicBool::new(false),
+                    // Never twice: a line its sound or words begin already
+                    // goes on from it.
+                    after_end: after_end.filter(|_| carried.is_none() && before.is_none()),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -3031,6 +3111,32 @@ async fn spoken(
             }
         };
         if let Some(carried) = carried {
+            // The same person going on: its own words after them
+            // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
+            // its own is not lost either.
+            let (words, said_by) = if empty {
+                (carried.text.clone(), carried.said_by)
+            } else {
+                // While the join waits for a print, the carried words are
+                // where a newer line's cut finds them (the Reviewer on
+                // #2657).
+                let joining = holding_while_joining(
+                    &shared,
+                    Carried {
+                        request,
+                        ..carried.clone()
+                    },
+                );
+                let joined =
+                    joined_with_cut(&shared, request, &marks, carried.clone(), text.clone()).await;
+                if joining && !still_holding(&shared, request) {
+                    return;
+                }
+                match joined {
+                    (joined, None) => (joined, request),
+                    (_, Some(carried)) => (carried.text, carried.said_by),
+                }
+            };
             eprintln!(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
@@ -3038,7 +3144,9 @@ async fn spoken(
             if let Ok(mut in_flight) = shared.in_flight.lock() {
                 *in_flight = Some(Carried {
                     request,
-                    ..carried.clone()
+                    text: words.clone(),
+                    at: carried.at,
+                    said_by,
                 });
             }
             let lease = scope.clone();
@@ -3047,7 +3155,7 @@ async fn spoken(
                 answer(
                     &shared,
                     (request, lease),
-                    carried.text,
+                    words,
                     Asker::Spoken,
                     None,
                     Vec::new(),
@@ -3094,6 +3202,30 @@ async fn spoken(
         }
         return;
     }
+    // Words cut short by this line, the same person's: asked before its
+    // own, as one line (`LAMP_JOIN_CUT_WORDS`).
+    let (text, carried) = match carried {
+        Some(carried) => {
+            // While the join waits for a print, this line's own words are
+            // where a newer line's cut finds them, as an answered line's are
+            // once it is asked (the Reviewer on #2657).
+            let joining = holding_while_joining(
+                &shared,
+                Carried {
+                    request,
+                    text: text.clone(),
+                    at: Instant::now(),
+                    said_by: request,
+                },
+            );
+            let joined = joined_with_cut(&shared, request, &marks, carried, text).await;
+            if joining && !still_holding(&shared, request) {
+                return;
+            }
+            joined
+        }
+        None => (text, None),
+    };
     // The first request answered after a misheard cut-in was hummed for,
     // within `NOTE_WITHIN_US`: the model is told it did not catch it, as the
     // Live worker tells it (`LAMP_MISHEARD_HUM`, #828). Once.
@@ -3223,6 +3355,7 @@ async fn spoken(
             request,
             text: text.clone(),
             at: Instant::now(),
+            said_by: request,
         });
     }
     if let Some(heard) = &shared.words_heard {
@@ -3249,6 +3382,106 @@ pub const STT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_STT_WARM";
 /// lines come seconds apart, and after this the lamp keeps nothing open
 /// (#1712, the first builder at 00:31: "at most a few minutes").
 pub const KEPT_FOR: Duration = Duration::from_secs(180);
+
+/// With `LAMP_JOIN_CUT_WORDS`, the words a line holds while its join waits
+/// for a print, put in flight before the wait: a third line begun during
+/// it is a cut, as any line's is, and carries them. Before, they were out
+/// of every slot through the wait, and a line held after it found nothing:
+/// the first question was lost (the Reviewer on #2657). `true` when the
+/// join can wait.
+fn holding_while_joining(shared: &Shared, held: Carried) -> bool {
+    if shared.same_speaker.is_none() {
+        return false;
+    }
+    if let Ok(mut in_flight) = shared.in_flight.lock() {
+        *in_flight = Some(held);
+    }
+    true
+}
+
+/// The line still holds its words after its join's wait: no newer line's
+/// cut took them. Once one has, the line stops, as a cut line's task does,
+/// and the newer line has the words.
+fn still_holding(shared: &Shared, request: u64) -> bool {
+    shared.in_flight.lock().ok().is_some_and(|in_flight| {
+        in_flight
+            .as_ref()
+            .is_some_and(|held| held.request == request)
+    })
+}
+
+/// `text`, the words of `request`, which is answered, and `carried`, the
+/// words of the line it cut short, none of whose answer was heard: the two
+/// asked as one line when one person said both ([`Engine::joining_cut_words`]),
+/// begun within [`JOIN_WITHIN`] of its end, and nothing carried then. A print
+/// still to come is waited for up to [`JOIN_WAIT`]. Otherwise both as they
+/// came, and the journal says why.
+async fn joined_with_cut(
+    shared: &Shared,
+    request: u64,
+    marks: &Marks,
+    carried: Carried,
+    text: String,
+) -> (String, Option<Carried>) {
+    let Some(same) = shared.same_speaker.as_ref() else {
+        return (text, Some(carried));
+    };
+    let not_joined = |why: &str| {
+        eprintln!(
+            "lamp-voice second: request {request}: not joined with request {}'s words, cut short by it: {why} (LAMP_JOIN_CUT_WORDS)",
+            carried.request
+        );
+    };
+    // Words carried through a held line are another line's: whose they are
+    // is not what the held line's voice or face tells (the review of #2620).
+    if carried.said_by != carried.request {
+        not_joined(&format!(
+            "its words were said in request {}, answered in a held line's place",
+            carried.said_by
+        ));
+        return (text, Some(carried));
+    }
+    let Some((_, gap)) = marks.after_end.filter(|(of, _)| *of == carried.request) else {
+        not_joined("its sound or words began this line already, or it was not the line before");
+        return (text, Some(carried));
+    };
+    if gap > JOIN_WITHIN {
+        not_joined(&format!(
+            "begun {} ms after its end, past {} ms",
+            gap.as_millis(),
+            JOIN_WITHIN.as_millis()
+        ));
+        return (text, Some(carried));
+    }
+    let bound = tokio::time::Instant::now() + JOIN_WAIT;
+    let why = loop {
+        match same(carried.request, request) {
+            Joined::Same(why) => break Ok(why),
+            Joined::Not(why) => break Err(why),
+            Joined::Coming(Some(why)) if tokio::time::Instant::now() >= bound => break Ok(why),
+            Joined::Coming(None) if tokio::time::Instant::now() >= bound => {
+                break Err(format!(
+                    "a voice print did not come in {} ms, and no one face was seen speaking both",
+                    JOIN_WAIT.as_millis()
+                ));
+            }
+            Joined::Coming(_) => tokio::time::sleep(JOIN_POLL).await,
+        }
+    };
+    let why = match why {
+        Ok(why) => why,
+        Err(why) => {
+            not_joined(&why);
+            return (text, Some(carried));
+        }
+    };
+    eprintln!(
+        "lamp-voice second: request {request} goes on from request {}'s words, cut short {} ms before it began: {why}; both are asked as one line (LAMP_JOIN_CUT_WORDS)",
+        carried.request,
+        gap.as_millis()
+    );
+    (format!("{} {}", carried.text.trim(), text.trim()), None)
+}
 
 /// Opens a listener for the next line under privacy `generation` and keeps
 /// it, in place of any kept before, at most [`KEPT_FOR`]: a lamp nobody

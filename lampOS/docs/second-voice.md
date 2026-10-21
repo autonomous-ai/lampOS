@@ -2079,6 +2079,41 @@ after a take-over, but now for every turn:
   itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
   which was held, and were never said.
+  - **The same person going on** (`LAMP_JOIN_CUT_WORDS=on`; with
+    `--attention`; the first builder on Queue #2602, 21 Oct 17:22). Let
+    out, the new line is asked with the words it cut short before its own,
+    as one line, when one person said both: `request M goes on from
+    request N's words, cut short D ms before it began: WHY; both are asked
+    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 2.5 s
+    (`JOIN_WITHIN`, longer than the sound's 1.5 s since a join needs one
+    person's sign too: on lamp-4ace on 21 Oct a 1.2 s pause began the
+    second half 1635 ms after the first's end) of that line's end, in the
+    same session, neither that line's sound nor its words began it
+    already, and the words were that line's own: words answered in a held
+    line's place are never joined with the line after it. A held new line
+    joins too: the cut words are answered in its place, as before, with its
+    own words after them. Otherwise the journal says why: `request M: not joined with
+    request N's words, cut short by it: WHY (LAMP_JOIN_CUT_WORDS)`, with
+    the gap, the cosine, which line has no print, or no one face seen. One person
+    is the two lines' prints at 0.70 or over (`same_voice::SAME_FROM`, over
+    every pair of two voices on 18 Oct's labelled set), when the same-voice
+    check runs for another rule; or else one face, the same passing id,
+    seen speaking each line and no other face speaking either. **The eyes
+    come first:** more than one face seen speaking either line, or each
+    line's face another, is two people, whatever the voices say (the
+    review of #2620: 0.70 is 0.01 over the office set's highest two-person
+    pair, and a family's voices may be closer). Prints under 0.30 are two
+    people whatever the eyes saw, and a print still to come is waited for
+    up to 300 ms (`JOIN_WAIT`). Nothing to tell is two people. A camera
+    closed or a mute forgets the lines' faces, as it does the caller's. Why: on lamp-4ace on 21 Oct cut-short words were let go 31
+    times, most in two-person scenes, where answering the second person
+    alone is right; Eighth's long request with a pause lost its first half
+    the same way. Risk: two people with one face in view, one silent, and
+    a speaking read that takes one for the other, are joined. Found on
+    lamp-4ace on 21 Oct at 18:36: the lamp's wait sound, played 1.5 s
+    after a line with no chat begun, fell into the person's pause, so the
+    second half began over the lamp's sound and was never printed; the
+    eyes are then the join's only sign.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
