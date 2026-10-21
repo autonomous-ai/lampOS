@@ -57,6 +57,15 @@ pub fn to_stderr() -> Journal {
 
 /// Where the coordinator reads the model's absolute path.
 pub const ENVIRONMENT: &str = "LAMP_SAME_VOICE_MODEL";
+/// `on` exactly, beside [`ENVIRONMENT`], on the second route: the
+/// conversation's voice is its caller's only, the prints of lines let out
+/// for themselves (the name, a call, a face turned to it), never of a line
+/// let out only as the conversation going on. On lamp-4ace on 21 Oct at
+/// 20:06 (sv-ab, the first builder on #2602), one of the other person's
+/// lines let out before its print was back made their voice the
+/// conversation's, and the two people's talk then went on as one
+/// conversation, at cosines of 0.55-0.84. Off unless set.
+pub const CALLER_ONLY_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CALLER_ONLY";
 /// The provider worker's flag for it, with the path, right after
 /// `--spoken-to`.
 pub const FLAG: &str = "--same-voice-model";
@@ -507,6 +516,9 @@ pub struct Voices<P: Printer> {
     /// its verdict, was another voice's: the worker ends the conversation
     /// at the next verdict ([`Self::take_late_other`]).
     late_other: Option<u64>,
+    /// The conversation's voice is its caller's only
+    /// ([`CALLER_ONLY_ENVIRONMENT`], [`Self::callers_only`]).
+    caller_only: bool,
     /// Where its lines are said ([`to_stderr`] on a lamp).
     journal: Journal,
 }
@@ -522,8 +534,22 @@ impl<P: Printer> Voices<P> {
             answered: None,
             judged: None,
             late_other: None,
+            caller_only: false,
             journal: to_stderr(),
         }
+    }
+
+    /// The conversation's voice is its caller's only, with `on`
+    /// ([`CALLER_ONLY_ENVIRONMENT`]): a line let out only as the
+    /// conversation going on is judged against it, and never becomes it.
+    pub fn callers_only(mut self, on: bool) -> Self {
+        self.caller_only = on;
+        self
+    }
+
+    /// Whether the conversation's voice is its caller's only.
+    pub fn is_callers_only(&self) -> bool {
+        self.caller_only
     }
 
     /// [`Self::new`], its lines said to `journal` (#1444).
@@ -728,6 +754,8 @@ impl<P: Printer> Voices<P> {
     /// after its verdict made the other person the conversation's voice, so
     /// on a slow lamp scene 3 went on with B). Let out for itself, the line
     /// began a conversation of its own, and its print is that one's voice.
+    /// With [`Self::callers_only`], a going-on line's print is never one
+    /// more: the conversation's voice is its caller's alone.
     fn adopt(&mut self, request: u64, print: Vec<f32>, going_on: bool) {
         let likeness = (going_on && self.judged != Some(request))
             .then(|| self.likest(&print))
@@ -739,6 +767,9 @@ impl<P: Printer> Voices<P> {
                 );
                 self.late_other = Some(request);
             }
+            // The caller's voice only: a going-on line is judged against
+            // it, never added to it.
+            _ if going_on && self.caller_only => {}
             _ if going_on => self.keep(print),
             _ => {
                 self.begin_afresh();
@@ -1367,6 +1398,41 @@ exec sleep 30"#,
         assert_eq!(voices.take_late_other(), None);
         said(&mut voices, 6, -1, 48_000);
         assert_eq!(voices.likeness(6), Some(1.0));
+    }
+
+    /// sv-ab on lamp-4ace (21 Oct 20:06, the first builder on #2602): with
+    /// [`CALLER_ONLY_ENVIRONMENT`], the conversation's voice is its caller's
+    /// alone. A calls and A's follow-up goes on. B's line, its print back
+    /// only after its answer, is let out as going on (0.35 against A's, over
+    /// the bar). Without the switch, B's print joins the conversation's, and
+    /// B's next line (0.20 against A's, 0.99 against B's) goes on with it.
+    /// With the switch, that line is another voice. A's own follow-ups go on
+    /// either way.
+    #[test]
+    fn with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice() {
+        for caller_only in [false, true] {
+            let mut voices = Voices::new(StandIn::default()).callers_only(caller_only);
+            said(&mut voices, 1, 1, 48_000);
+            voices.decided(1, true, false);
+            said(&mut voices, 2, 1, 48_000);
+            assert_eq!(voices.likeness(2), Some(1.0));
+            voices.decided(2, true, true);
+            voices.printer.slow = true;
+            said(&mut voices, 3, 5, 48_000);
+            assert_eq!(voices.likeness(3), None, "its print not back");
+            voices.decided(3, true, true);
+            voices.printer.slow = false;
+            assert_eq!(voices.take_late_other(), None, "over the bar");
+            said(&mut voices, 4, 4, 48_000);
+            let likeness = voices.likeness(4).unwrap();
+            if caller_only {
+                assert!(likeness < DIFFERENT_BELOW, "{likeness}: another voice");
+            } else {
+                assert!(likeness > 0.9, "{likeness}: B's voice was taken in");
+            }
+            said(&mut voices, 5, 1, 48_000);
+            assert_eq!(voices.likeness(5), Some(1.0), "the caller goes on");
+        }
     }
 
     /// A voice at 0.20 against the conversation's is another, whether its
