@@ -1,5 +1,50 @@
 # Tests work log
 
+## 2026-10-22 01:12:22 +0700 — memory completion pushed as #2703; Voice bus startup batch begun
+
+Ready for lamp-voice: [#2703](https://github.com/autonomous-ai/lampOS/pull/2703)
+no, draft for native checks; test harness only. Pushed
+`e61ca8015cb428fe2cc8eaf2cf347a57cc00660e` on
+`tests/1806-memory-completion`, from `4efcf4eb0`, Part of #1806,
+`builder:tests`. [Posted on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6323108683).
+
+The set-aside health case uses the existing explicit reporter schedule,
+but still requires the actual warning, kept file's name/bytes and a working
+memory write. The held-rule case releases its committed answer after the
+original unsuccessful client-call assertion, retaining its real 1.5 s
+budget. The release token drops before cleanup joins on unwind. Its ten-second
+watchdog fails a stuck hold; cleanup propagates a sole worker failure and
+avoids a second panic during an existing assertion unwind.
+
+Same-base Mac, 3/3 before and after each. Health: 2.3883 / 1.0952 /
+1.0938 s -> 2.4220 / 1.0462 / 1.0560 s. Held rule: 2.8086 / 2.7496 /
+2.7495 s -> 2.5028 / 2.4877 / 2.4808 s. The original 0.5 s / 1.65 s
+local targets remain missed, and the slower first health invocation is
+retained. Five compiled controls failed: absent set-aside field, early
+release, bypassed unlinked-journal rejection, unwind before release and
+leaked release. The last exits 101, not a double-panic abort. The missing
+field hit the existing eight-second logical-window bound; an outer evidence
+script expected host-watchdog wording and was corrected after inspecting
+the retained failure. No assertion or product change was made for it.
+
+Source hashes restored. Fmt, Memory and dependent Voice-eval strict
+all-target Clippy, 282 Memory tests (six existing measurement/manual-fixture
+ignores), 608 Voice-eval tests (none ignored), workspace build and diff check
+all passed, zero failures. Independent static review found no blockers.
+[Verification record](https://github.com/autonomous-ai/lampOS/tree/e61ca8015cb428fe2cc8eaf2cf347a57cc00660e/lampOS/docs/verification/memory-completion-20261022).
+[ARM64 #5238](https://github.com/autonomous-ai/lampOS/actions/runs/39650087675)
+and [Linux Clippy #1247](https://github.com/autonomous-ai/lampOS/actions/runs/39650087734)
+are running.
+
+Next: `tests/1806-voice-bus-ready`, fresh base `789f1f609`. Four ordinary
+Mac/Linux Voice bus tests sleep 250 ms before first publication even though
+subscribe_typed has bound/published the socket path and first delivery scans
+synchronously. Baselines are running; every 30/100 ms drain, WAIT=500 ms,
+exact tuple/vector and separate real silence/lease case will stay unchanged.
+The 11 open owned Tests PRs had no unresolved review threads or new review
+requests at the latest audit. No ARM64 build on the Mac, no device access;
+all implemented task source is pushed. #1806 remains open.
+
 ## 2026-10-22 00:56:20 +0700 — setup light ready on ARM64; memory completion batch begun
 
 Ready for lamp-voice: [#2699](https://github.com/autonomous-ai/lampOS/pull/2699)

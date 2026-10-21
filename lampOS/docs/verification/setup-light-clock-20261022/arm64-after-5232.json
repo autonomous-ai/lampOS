@@ -9,5 +9,7 @@
       "binary": "lamp-setup::it",
       "test": "light::stopping_ends_with_black_and_a_closed_ring"
     }
-  ]
+  ],
+  "checkout": "0b59e129178e36560be5a4f538032e8fd3167235",
+  "integration_base": "4efcf4eb0cda0ef730d30658572f49da7592a0b8"
 }
