@@ -1335,6 +1335,21 @@ wrong at most 1 in 10, or "too few" under 20 reads judged, and removes both
 files: stop lamp-eyes, or take `--seems-log` off it, first. Only after that may
 the conversation be told "they seem low".
 
+**The session's plan (#1671, #2132).** With its person's yes and nobody
+else near, both readers on (`--seems`, `--mouth-model`,
+`--seems-blendshapes`) with `--seems-log`, and `LAMP_SEEMS_BROW_LOW=on`, so
+the brows' long face is measured with the rest. About 3 minutes each, a
+label every 5 s from a builder's notes:
+1. resting, looking at the lamp: `neutral`;
+2. smiling: `positive`;
+3. resting again: `neutral`;
+4. a long face, as when tired or low: `negative`;
+5. **reading or working at the desk, concentrating:** `neutral`. Drawn-down
+   brows there must not read `negative` (the first builder's P3 on #2723).
+Then `lamp-seems-measure … --delete`, by reader and confidence. A screen
+face is no stand-in for it: on lamp-75c9 a screen face sits under the 10 px
+line and isn't read.
+
 **Only for the session:** it reads whoever is near the lamp, not only the
 labelled person, so at a desk it would keep the reads of anyone who stops by
 and never said yes. Turn `--seems-log` on for the labelled session alone,
@@ -1405,6 +1420,12 @@ newest, whichever reader that was.
   0.84–0.94 there against 0.63–0.72 on his smiles and resting face. This
   line named 33 of the 70 and none of 50 others. It's one generated face,
   so the line is authored, for the real person's labelled session to set.
+  **Drawn-down brows also come with concentration** (the first builder's P3
+  on #2723): someone reading or working at the desk the lamp lights, which
+  isn't a low mood, and the smiles' brows already sat at 0.63–0.72. So the
+  session has a stretch of plain reading and concentrating, labelled
+  `neutral` (below), and the switch goes on only if those stay under the
+  bar.
 - **A far face gets no read** (Ten on #2602, 22 Oct 02:4x). One smile frame
   of a screen face, shrunk, reads smile 0.97 with the eyes 14.2 px apart,
   0.87 at 9.9 px and 0.18 at 7.0 px (`unsure`). On lamp-75c9 a screen
