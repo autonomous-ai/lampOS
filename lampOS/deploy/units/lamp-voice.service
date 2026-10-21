@@ -43,6 +43,9 @@ RuntimeDirectory=lampos-voice
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=yes
 Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
+# The say service (docs/speaking-first.md): how the first stand asks (lamp-first-stand.service).
+# Root only: no group is given the socket.
+Environment=LAMP_SAY=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock

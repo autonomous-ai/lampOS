@@ -1796,6 +1796,50 @@ factory's watched stand. A read with torque on is refused here too: the tool
 never turns torque off to get a read, since an arm that is up would drop
 (Fifth on #2163).
 
+**The first stand of a moved lamp, confirmed at the lamp** (#2396; the
+first builder on #1711, 21 Oct). `lamp-body-measure first-stand`
+(`crates/body/src/first_stand.rs`, run by `deploy/units/lamp-first-stand.service`
+as root) is how a seated lamp gets its standing file without the factory:
+
+- **The ask.** Once a face at least 0.12 of the picture's height has been in
+  the eyes' presence file for 5 s, the lamp says "I'd like to stretch for
+  the first time. Touch the top of my head when you're ready." through the
+  voice's say service (`LAMP_SAY=on` in the generic voice unit). The say
+  service says it only after 15 s of quiet. Nothing is asked in the run's
+  first 2 minutes, so an update's 45 s check that every part runs never
+  meets the body stopped.
+- **The yes.** A touch on the head pads or a button, held 1 s, read from
+  `controls/state` (`head_active`, `buttons[].pressed`). It counts only if
+  begun after the ask began: a hand already on the head must be lifted and
+  put back.
+- **The stand.** `steps.sh`'s body step:
+  1. `lamp-body.service` is stopped and the lamp is read at rest. A lamp
+     held with torque on is first let go by a body run.
+  2. The arm stands at 30% and then at 100%, by `lamp-body` run by hand as
+     the body's user, with `--wake on` and the same options.
+  3. The shoulder and elbow of its last full stand are written into
+     `/etc/lampOS/body/lamp.env`, never over one already there.
+  4. `lamp-body.service` is started again, on that file.
+- **A second touch while it moves stops it.** The body is sent SIGTERM,
+  eases back and lets go, and nothing is written.
+  - Controls that aren't known for 1 s while it moves stop it the same way,
+    since a touch could no longer be seen.
+  - A body run by hand is eased back and waited for however its run ends, so
+    none is left holding the servo lock.
+  - Its folder is a new one in the unit's private `/tmp`.
+  - `lamp.env` is synced to disk before it is linked into place.
+- **No yes, nothing moves.** Without a touch within 2 minutes the lamp
+  waits. It asks at most twice, 10 minutes apart. After that a person asks
+  again by removing the record and restarting the unit.
+- **The record.** `/var/lib/lampos-body/first-stand.json`: `asks`,
+  `outcome` (`no_answer`, `stood`, `stopped` or `failed`), `at_unix_ms`,
+  and `shoulder` and `elbow` once it stood. The app and the rollback read it
+  there.
+- **It always ends well.** A failed stand leaves the lamp seated and the
+  unit active (`RemainAfterExit`).
+- **Not built yet.** The app showing the same line has no path on a moved
+  lamp, which has no `lamp-cloud`.
+
 The body does **not** read that file one release forward, on purpose
 (#1680's one exception, a safety rule): an option a newer measure wrote that
 this build does not read still stops the body, and the journal names it and
