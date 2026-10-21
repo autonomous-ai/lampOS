@@ -580,6 +580,15 @@ each with why in words. `lamp-skills` also subscribes to the topics its
 skills' triggers name; Welcome back's is `humans/faces/tracked`. Without
 the service installed the topic is never made.
 
+## Optional add-on topic (blue, 2026-10-21)
+
+| Topic | Kind | Published by | Intended reader |
+|---|---|---|---|
+| `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | The add-ons' judge, still to come ([addons.md](addons.md)) |
+
+[`AddonProposal`](msgs.md): what a partner's add-on suggests, never an
+order. Without `LAMP_ADDONS=on` the topic is never made.
+
 ## Optional arrival topic (second builder, 2026-10-15)
 
 | Topic | Kind | Published by | Intended reader |

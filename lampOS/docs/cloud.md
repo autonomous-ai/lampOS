@@ -380,7 +380,10 @@ shows no Skills row. Its envelope is V1's, as `reports.*`'s.
 `skills.install` needs `LAMP_SKILLS_STORE=on` as well; without it, `not on
 this lamp: skills.install`. The manage helper checks the same switch in
 its own environment and refuses with the same words ([skills.md](skills.md),
-"The manage helper").
+"The manage helper"). `LAMP_ADDONS` is read the same way: without
+`LAMP_ADDONS=on` in `lamp-cloud`'s unit, an add-on (`kind = "addon"`,
+[addons.md](addons.md)) is listed with `loads: false` and `why: "add-ons
+are off on this lamp"`, as `lamp-skills` does not run it then.
 
 **Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
 (the product unit's `--dir`), with `lamp-skills`' own loader
