@@ -242,7 +242,7 @@ pub fn serve_reporting_with_caps<S: Mixer, L: Light>(
         health,
         schedule,
         &Instant::now,
-        || config.map(crate::caps_service::Service::open).transpose(),
+        || config.map(crate::caps_service::Service::start).transpose(),
     )
 }
 
@@ -270,7 +270,7 @@ pub fn serve_with_clock_and_caps<S: Mixer, L: Light>(
     health: Option<lamp_bus::Publisher>,
     schedule: Option<&crate::schedule::Adapter>,
     now: &dyn Fn() -> Instant,
-    caps: Option<crate::caps_service::Service>,
+    caps: Option<crate::caps_service::Started>,
 ) -> io::Result<()> {
     serve_configured(directory, executive, stop, health, schedule, now, || {
         Ok(caps)
@@ -310,14 +310,21 @@ fn serve_configured<S: Mixer, L: Light>(
     mut health: Option<lamp_bus::Publisher>,
     schedule: Option<&crate::schedule::Adapter>,
     now: &dyn Fn() -> Instant,
-    start_caps: impl FnOnce() -> io::Result<Option<crate::caps_service::Service>>,
+    start_caps: impl FnOnce() -> io::Result<Option<crate::caps_service::Started>>,
 ) -> io::Result<()> {
     std::fs::create_dir_all(directory)?;
     let listener = listen(directory)?;
     let _files = ServingFiles(directory);
     let mut ready = None;
     set_ready(directory, false, &mut ready)?;
-    let mut caps = start_caps()?;
+    let (mut caps, held_back) = match start_caps()? {
+        Some(crate::caps_service::Started::Serving(service)) => (Some(*service), None),
+        Some(crate::caps_service::Started::HeldBack(why)) => {
+            eprintln!("lamp-actions: {why}");
+            (None, Some(why))
+        }
+        None => (None, None),
+    };
     if let Some(caps) = caps.as_mut() {
         caps.tick(&mut executive.sound)?;
     }
@@ -358,6 +365,10 @@ fn serve_configured<S: Mixer, L: Light>(
             let mut diagnostic = report(&offered, answered);
             if let Some(caps) = caps.as_ref() {
                 diagnostic = diagnostic.with("output_caps_ready", caps.ready());
+            }
+            if let Some(why) = held_back.as_ref() {
+                diagnostic.level = lamp_msgs::Level::Warn;
+                diagnostic.message = why.clone();
             }
             let _ = health.publish_json(lamp_ipc::monotonic_us(), &diagnostic);
         }

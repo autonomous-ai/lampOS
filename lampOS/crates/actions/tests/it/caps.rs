@@ -1,7 +1,7 @@
 //! Real Actions socket with private storage, bus and deterministic cap clocks.
 use lamp_actions::{
     Executive, caps,
-    caps_service::{Config, Moment, Service},
+    caps_service::{Config, Moment, Service, Started},
     light::Light,
     server::{self, CALL_SOCKET, CATALOG_FILE, READY_FILE},
     sound::{Mixer, Volume},
@@ -105,11 +105,13 @@ impl Running {
         let at = Arc::new(AtomicU64::new(1_000_000));
         let clock = at.clone();
         let service = enabled.then(|| {
-            Service::with_clock(&config, "socket-fixture", move || Moment {
-                at_us: clock.load(Ordering::SeqCst),
-                unix_ms: Some(WALL),
-            })
-            .unwrap()
+            Started::Serving(Box::new(
+                Service::with_clock(&config, "socket-fixture", move || Moment {
+                    at_us: clock.load(Ordering::SeqCst),
+                    unix_ms: Some(WALL),
+                })
+                .unwrap(),
+            ))
         });
         let raw = Arc::new(AtomicU8::new(80));
         let writes = Arc::new(AtomicUsize::new(0));

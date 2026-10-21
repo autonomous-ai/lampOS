@@ -58,6 +58,24 @@ impl Config {
     }
 }
 
+/// An opened service, or why the caps are off for this run when their
+/// store is from a later build ([`Service::start`]).
+fn started(opened: io::Result<Service>) -> io::Result<Started> {
+    match opened {
+        Ok(service) => Ok(Started::Serving(Box::new(service))),
+        Err(error) => match error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<caps::Error>())
+            .and_then(caps::Error::newer)
+        {
+            Some(schema) => Ok(Started::HeldBack(format!(
+                "output caps are off: their store is from a later build (schema {schema}), kept as it is"
+            ))),
+            None => Err(error),
+        },
+    }
+}
+
 pub fn safe_path(path: &Path) -> bool {
     path.is_absolute()
         && !path
@@ -139,6 +157,14 @@ fn failure(error: caps::Error) -> Value {
     json!({"ok":false,"accepted":false,"code":code,"error":message})
 }
 
+/// What starting the caps leaves the server with.
+pub enum Started {
+    Serving(Box<Service>),
+    /// Their store is from a later build: kept as it is, and the caps are
+    /// off for this run. Why, for the journal and the part's health.
+    HeldBack(String),
+}
+
 pub struct Service {
     controller: caps::Controller,
     bus: Bus,
@@ -160,6 +186,15 @@ impl Service {
         // Host boot identity, never the publisher's randomly chosen session.
         let clock = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         Self::with_clock(config, clock.trim(), system_moment)
+    }
+
+    /// [`Service::open`], except that a store a later build wrote is kept as
+    /// it is and the caps are off for this run, said in the journal and as a
+    /// warning on the part's health. Never fresh defaults: a lamp put back
+    /// from an update keeps the person's mute and volume as they were, not a
+    /// default (the first builder and Jarvis, 21 Oct).
+    pub fn start(config: &Config) -> io::Result<Started> {
+        started(Self::open(config))
     }
 
     /// Fixture seam: real storage and bus, caller-supplied clocks. No fixture
@@ -465,6 +500,47 @@ mod tests {
             self.raw.store(level, Ordering::SeqCst);
             Ok(())
         }
+    }
+
+    /// A caps store a later build wrote (the first builder and Jarvis, 21
+    /// Oct, for "Updates cover the whole lamp, V3 to V5"): the caps are off
+    /// for this run with why, and the store is kept byte for byte, nothing
+    /// fresh written over it. A store that can't be read at all still stops
+    /// the start, as before.
+    #[test]
+    fn a_store_from_a_later_build_holds_the_caps_off_and_is_kept_as_it_is() {
+        let root = tempfile::Builder::new().prefix("ac-").tempdir().unwrap();
+        let config = Config {
+            directory: root.path().join("caps"),
+            bus_root: root.path().join("bus"),
+        };
+        drop(caps::Controller::open(&config.directory, Some(WALL)).unwrap());
+        let later = b"{\"schema\":2,\"entirely_new_state\":true}";
+        let store = |bytes: &[u8]| {
+            lamp_schedule::store::Store::open(&config.directory)
+                .unwrap()
+                .commit(bytes)
+                .unwrap()
+        };
+        store(later);
+        let clock = || Moment {
+            at_us: 1_000_000,
+            unix_ms: Some(WALL),
+        };
+        match started(Service::with_clock(&config, "fixture-host", clock)) {
+            Ok(Started::HeldBack(why)) => {
+                assert!(why.contains("from a later build (schema 2)"), "{why}")
+            }
+            Ok(Started::Serving(_)) => panic!("caps served from a later build's store"),
+            Err(error) => panic!("the start stopped: {error}"),
+        }
+        let kept = lamp_schedule::store::Store::open(&config.directory)
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(kept.as_deref(), Some(&later[..]));
+        store(b"{");
+        assert!(started(Service::with_clock(&config, "fixture-host", clock)).is_err());
     }
 
     struct Bench {

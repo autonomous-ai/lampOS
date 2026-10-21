@@ -2,7 +2,9 @@
 use lamp_actions::{
     Executive,
     light::{BusLight, Light, STATE},
-    server::{CALL_SOCKET, CATALOG_FILE, READY_FILE, serve, serve_with_clock},
+    server::{
+        CALL_SOCKET, CATALOG_FILE, READY_FILE, serve, serve_with_clock, serve_with_clock_and_caps,
+    },
     sound::{Mixer, Volume},
 };
 use serde_json::{Value, json};
@@ -569,4 +571,69 @@ fn a_caller_is_answered_at_once_and_an_idle_server_still_reports_and_stops() {
     serving.join().unwrap().unwrap();
     std::fs::remove_dir_all(home).unwrap();
     std::fs::remove_dir_all(root).unwrap();
+}
+
+/// The caps' store is from a later build (`LAMP_OUTPUT_CAPS`; the first
+/// builder and Jarvis, 21 Oct, for "Updates cover the whole lamp, V3 to
+/// V5"): the server still starts and answers with the caps off, and its
+/// health is a warning that says why.
+#[test]
+fn caps_held_back_leave_the_server_serving_with_a_warning() {
+    use lamp_actions::caps_service::Started;
+    let home = directory("held-back");
+    // A short root: a Unix socket's address holds 103 bytes.
+    let root = PathBuf::from(format!("/tmp/lah-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut heard = bus
+        .subscribe_typed(
+            lamp_msgs::Diagnostic::TOPIC,
+            "test",
+            lamp_msgs::Diagnostic::TYPE,
+        )
+        .unwrap();
+    let health = bus
+        .publisher_declared(
+            lamp_msgs::Diagnostic::TOPIC,
+            &lamp_msgs::Diagnostic::declaration(),
+            "actions",
+        )
+        .unwrap();
+    let why = "output caps are off: their store is from a later build (schema 2), kept as it is";
+    let stop = Arc::new(AtomicBool::new(false));
+    let serving = {
+        let (home, stop) = (home.clone(), stop.clone());
+        std::thread::spawn(move || {
+            let mut executive = Executive {
+                sound: Some(Volume::new(Shared(Arc::new(AtomicU8::new(50))), 100)),
+                light: None::<NoLight>,
+                short: false,
+            };
+            serve_with_clock_and_caps(
+                &home,
+                &mut executive,
+                &stop,
+                Some(health),
+                None,
+                &Instant::now,
+                Some(Started::HeldBack(why.into())),
+            )
+        })
+    };
+    until("ready", || home.join(READY_FILE).exists());
+    let report: lamp_msgs::Diagnostic = heard
+        .recv(Duration::from_secs(5))
+        .unwrap()
+        .expect("a health report")
+        .parse()
+        .unwrap();
+    assert_eq!(
+        (report.level, report.message.as_str()),
+        (lamp_msgs::Level::Warn, why)
+    );
+    let answer = ask(&home, b"{\"op\":\"call\",\"name\":\"volume_up\"}\n");
+    assert_eq!(answer["ok"], true, "{answer}");
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap().unwrap();
+    let _ = std::fs::remove_dir_all(&root);
 }

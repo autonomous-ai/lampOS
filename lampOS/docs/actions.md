@@ -293,7 +293,13 @@ a replacement must be newer. Removal must name the current token.
 
 The existing Schedule store commits the complete cap state before success.
 Added fields in schema 1 are tolerated; unknown enum values, unsupported
-schemas and invalid state are preserved and refused. A storage error makes
+schemas and invalid state are preserved and refused. A store from a later
+build (a higher `schema`, as after an update is put back) is kept as it is
+and the caps are off for that run: Actions starts and serves, says so in
+one journal line, and its health is a warning naming why. It never starts
+fresh caps, so a lamp put back keeps the person's mute and volume as they
+were (#1505; the first builder and Jarvis, 21 Oct). Any other store it
+can't read still stops the start. A storage error makes
 later snapshots unavailable until reopen. Initialized time means 2020–2099;
 it is a sanity check, not proof of synchronization. Unknown time retains
 restored restrictions and refuses new caps; an explicit token removal works.
