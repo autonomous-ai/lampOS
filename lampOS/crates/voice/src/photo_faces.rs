@@ -385,12 +385,22 @@ mod tests {
         forget_asked();
         let watch = Watch::start(socket.clone());
         let mut said = 0;
-        let until = std::time::Instant::now() + Duration::from_secs(2);
-        while std::time::Instant::now() < until {
+        // Until the question is said and nothing more is wanted, then four
+        // more of the watch's passes (100 ms each) for a second ask to show,
+        // not a fixed 2 s (#1806). Without `was_asked` in the watch, the
+        // second comes about 250 ms after the first is said.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let mut settled: Option<std::time::Instant> = None;
+        while std::time::Instant::now() < until
+            && settled.is_none_or(|at| at.elapsed() < Duration::from_millis(400))
+        {
             if watch.asked().is_some() {
                 said += 1;
             } else if let Some(name) = watch.to_ask() {
                 watch.ask(name);
+            }
+            if settled.is_none() && said == 1 && watch.state.lock().unwrap().want.is_none() {
+                settled = Some(std::time::Instant::now());
             }
             std::thread::sleep(Duration::from_millis(5));
         }
