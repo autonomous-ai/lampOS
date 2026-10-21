@@ -4984,6 +4984,12 @@ impl Heeding {
         // and their voice is the conversation's (the Reviewer's P2 on #2650).
         // Without it, as before.
         if let (Some(voices), Some(_)) = (self.voices.as_mut(), verdict) {
+            // Seen spoken by the caller's face and no other: with
+            // `LAMP_SAME_VOICE_CALLER_ONLY`, the voice of a conversation whose
+            // call was too short to print.
+            if spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces) {
+                voices.seen_from_the_caller(request);
+            }
             let new_call = if voices.is_callers_only() {
                 called
             } else {
@@ -5215,6 +5221,17 @@ fn hits_whose(
         );
     }
     person
+}
+
+/// Whether the faces seen speaking a line are the caller's one face and no
+/// other: no face, two faces or another face is not, and a call seen spoken
+/// by two faces names no caller (the first builder's and the reviewer-lead's
+/// P2 on #2663).
+fn spoken_by_the_caller_alone(
+    speakers: &crate::speaking_faces::Speakers,
+    caller_faces: &crate::speaking_faces::Speakers,
+) -> bool {
+    matches!((speakers.as_slice(), caller_faces.as_slice()), ([face], [caller]) if face == caller)
 }
 
 /// Whose the second route's turns are, and the Days note of that person's
@@ -9569,6 +9586,35 @@ mod tests {
         );
         assert_eq!(next, (false, ossa));
         assert_eq!(other, None, "a face the session isn't for");
+    }
+
+    /// The first builder on #2602 (21 Oct 21:19): a line is the caller's
+    /// alone only with the caller's one face seen speaking it.
+    #[test]
+    fn a_line_is_the_callers_alone_only_with_their_one_face_speaking() {
+        let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
+        let caller = ids(&["b/f1"]);
+        assert!(super::spoken_by_the_caller_alone(&ids(&["b/f1"]), &caller));
+        assert!(
+            !super::spoken_by_the_caller_alone(&ids(&["b/f1", "b/f2"]), &caller),
+            "two faces"
+        );
+        assert!(
+            !super::spoken_by_the_caller_alone(&ids(&["b/f2"]), &caller),
+            "another face"
+        );
+        assert!(
+            !super::spoken_by_the_caller_alone(&ids(&[]), &caller),
+            "no face"
+        );
+        assert!(
+            !super::spoken_by_the_caller_alone(&ids(&["b/f1"]), &ids(&[])),
+            "no caller seen"
+        );
+        assert!(
+            !super::spoken_by_the_caller_alone(&ids(&["b/f1"]), &ids(&["b/f1", "b/f2"])),
+            "a call seen spoken by two faces names no caller"
+        );
     }
 
     /// The reviewer-lead's P3 on #2537: with a request's lease, its hits are
