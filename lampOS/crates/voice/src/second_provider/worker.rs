@@ -676,6 +676,59 @@ pub fn own_key_report(switch_on: bool, own: bool) -> Option<lamp_msgs::Diagnosti
     switch_on.then(|| own_key_health(own, 0))
 }
 
+/// `voice-keys` stopping on purpose (#2415's P3), said at this worker's
+/// start with the switch off: own keys turned off at runtime restart the
+/// voice, and the part a run before reported would otherwise stay quiet
+/// until lamp-health restarts, counted as a part that stopped working (Not
+/// feeling well's droop). lamp-health forgets a part that never reported,
+/// so on a lamp that never had the switch on it changes nothing. On, none:
+/// the part reports.
+pub fn own_key_stopping_at_start(switch_on: bool) -> Option<lamp_msgs::Diagnostic> {
+    (!switch_on).then(|| lamp_msgs::Diagnostic::stopping(OWN_KEY_HEALTH))
+}
+
+/// `voice-keys` stopping on purpose when the second route's worker is
+/// dropped (#960): the voice goes on with Gemini alone, and the part that
+/// worker reported is gone with it, not failing. With the switch off it
+/// never reported, so none.
+pub fn own_key_stopping_on_drop(switch_on: bool) -> Option<lamp_msgs::Diagnostic> {
+    switch_on.then(|| lamp_msgs::Diagnostic::stopping(OWN_KEY_HEALTH))
+}
+
+/// `report` said once under `voice-keys`' publisher, if there is a bus;
+/// nothing, and no error, if not.
+pub fn say_own_key_once(bus_root: Option<&Path>, report: &lamp_msgs::Diagnostic) {
+    let Some(mut out) = bus_root
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .and_then(|bus| {
+            bus.publisher_declared(
+                lamp_msgs::Diagnostic::TOPIC,
+                &lamp_msgs::Diagnostic::declaration(),
+                OWN_KEY_PUBLISHER,
+            )
+            .ok()
+        })
+    else {
+        return;
+    };
+    let _ = out.publish_json(lamp_ipc::monotonic_us(), report);
+}
+
+/// The voice's own side of [`own_key_stopping_on_drop`]: with the bus on
+/// (`LAMP_BUS=on`) and `LAMP_OWN_KEYS=on` in its environment, `voice-keys`
+/// is said to be stopping once the second worker was dropped.
+pub fn own_key_dropped_from_environment() {
+    let switch_on =
+        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on");
+    let Some(report) = own_key_stopping_on_drop(switch_on) else {
+        return;
+    };
+    let flags = crate::bus_out::worker_arguments_from_environment();
+    if let Ok((root, _)) = crate::bus_out::take_root(&flags) {
+        say_own_key_once(root.as_deref(), &report);
+    }
+}
+
 /// With `LAMP_OWN_KEYS=on` and a bus: `voice-keys` reported to lamp-health
 /// every second, as a running part reports, for as long as this worker
 /// runs, with the person's DeepSeek key (`own`) or without it. A key kept
@@ -1369,6 +1422,8 @@ pub fn serve(
             files.bus_root.as_deref(),
             config.hosted.own_deepseek.is_some(),
         );
+    } else if let Some(stopping) = own_key_stopping_at_start(own_keys_on) {
+        say_own_key_once(files.bus_root.as_deref(), &stopping);
     }
     // As the lamp's only voice, its link follows whether the services'
     // hosts answer (#1844, `link.rs`): the hosts checked.
@@ -7607,6 +7662,52 @@ mod tests {
                     && uses(said).as_deref() == Some("lamp")),
             "{heard:?}"
         );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #2415's P3: own keys turned off at runtime (the second worker starts
+    /// again with the switch off) and the second worker dropped (#960) each
+    /// say once that `voice-keys` is stopping, so lamp-health forgets it
+    /// instead of counting it quiet. Started with the switch on, or dropped
+    /// with it off (the part never reported), nothing is said. On the bus,
+    /// as lamp-health reads it.
+    #[test]
+    fn own_keys_turned_off_or_the_worker_dropped_says_voice_keys_is_stopping() {
+        let stopping = lamp_msgs::Diagnostic::stopping(super::OWN_KEY_HEALTH);
+        // Own keys turned off: the worker's start with the switch off.
+        assert_eq!(
+            super::own_key_stopping_at_start(false),
+            Some(stopping.clone())
+        );
+        assert_eq!(super::own_key_stopping_at_start(true), None);
+        // The second worker dropped, with the switch on.
+        assert_eq!(
+            super::own_key_stopping_on_drop(true),
+            Some(stopping.clone())
+        );
+        assert_eq!(super::own_key_stopping_on_drop(false), None);
+        let root = std::path::PathBuf::from(format!("/tmp/lks-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(
+                lamp_msgs::Diagnostic::TOPIC,
+                "test",
+                lamp_msgs::Diagnostic::TYPE,
+            )
+            .unwrap();
+        super::say_own_key_once(Some(&root), &stopping);
+        let said = hears
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("voice-keys says it is stopping")
+            .parse::<lamp_msgs::Diagnostic>()
+            .unwrap();
+        assert_eq!(said, stopping);
+        assert!(said.is_stopping());
+        // Without a bus, nothing, and nothing fails.
+        super::say_own_key_once(None, &stopping);
         let _ = std::fs::remove_dir_all(root);
     }
 
