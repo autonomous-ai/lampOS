@@ -150,6 +150,11 @@ struct Handed {
     /// Those the connection took before their ack, oldest first, to go
     /// again.
     unasked_lost: Vec<crate::unasked::Piece>,
+    /// Changes' results the broker acknowledged, for `Changes::acked`.
+    changes_acked: Vec<crate::settings::Outcome>,
+    /// Journal lines, one per step of a change's result (Mobile on #1959,
+    /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
+    journal: Vec<String>,
 }
 
 /// What a handed publish was.
@@ -190,6 +195,13 @@ impl Handed {
         let handed = client
             .try_publish(topic, QoS::AtLeastOnce, false, payload)
             .is_ok();
+        if let Tagged::Change(outcome) = &tag {
+            self.journal.push(if handed {
+                format!("{}: handed to the client at QoS 1", outcome.journal())
+            } else {
+                format!("{}: not handed to the client, kept", outcome.journal())
+            });
+        }
         if handed {
             self.in_order.push_back(tag);
         }
@@ -201,6 +213,10 @@ impl Handed {
         match self.in_order.pop_front() {
             Some(Tagged::Other) | None => {}
             Some(tag) => {
+                if let Tagged::Change(outcome) = &tag {
+                    self.journal
+                        .push(format!("{}: sent as packet {pkid}", outcome.journal()));
+                }
                 self.by_packet.insert(pkid, tag);
             }
         }
@@ -215,6 +231,14 @@ impl Handed {
                 self.unasked_acked.push(piece.skill);
                 None
             }
+            Some(Tagged::Change(outcome)) => {
+                self.journal.push(format!(
+                    "{}: acked by the broker, packet {pkid}",
+                    outcome.journal()
+                ));
+                self.changes_acked.push(outcome);
+                None
+            }
             _ => None,
         }
     }
@@ -225,12 +249,21 @@ impl Handed {
     fn lost(&mut self) -> Vec<crate::settings::Outcome> {
         let mut by_packet: Vec<_> = self.by_packet.drain().collect();
         by_packet.sort_by_key(|(pkid, _)| *pkid);
+        let journal = &mut self.journal;
         by_packet
             .into_iter()
-            .map(|(_, tag)| tag)
-            .chain(self.in_order.drain(..))
-            .filter_map(|tag| match tag {
-                Tagged::Change(outcome) => Some(outcome),
+            .map(|(pkid, tag)| (Some(pkid), tag))
+            .chain(self.in_order.drain(..).map(|tag| (None, tag)))
+            .filter_map(|(pkid, tag)| match tag {
+                Tagged::Change(outcome) => {
+                    let packet =
+                        pkid.map_or_else(|| "not sent".to_owned(), |p| format!("packet {p}"));
+                    journal.push(format!(
+                        "{}: no ack before the connection ended ({packet}), said again on the next",
+                        outcome.journal()
+                    ));
+                    Some(outcome)
+                }
                 Tagged::Unasked(piece) => {
                     self.unasked_lost.push(piece);
                     None
@@ -266,6 +299,49 @@ async fn woken(reports: &Option<Arc<crate::reports::Shared>>) {
     match reports {
         Some(shared) => shared.wake.notified().await,
         None => std::future::pending().await,
+    }
+}
+
+/// The connection is gone: what it held unacknowledged goes again on the
+/// next one.
+fn dropped(
+    handed: &mut Handed,
+    lamp: &mut impl Lamp,
+    changes: &Option<Arc<crate::settings::Changes>>,
+    reports: &Option<Arc<crate::reports::Shared>>,
+) {
+    let again = handed.lost();
+    let unasked = std::mem::take(&mut handed.unasked_lost);
+    if !unasked.is_empty() {
+        lamp.owe_unasked(unasked);
+    }
+    if let Some(changes) = changes {
+        changes.owe(again);
+    }
+    if let Some(shared) = reports {
+        shared.with(|reports| reports.unhand(None));
+    }
+}
+
+/// Woken when a Wi-Fi change may want the link made again; never without
+/// the changes' switch.
+async fn relink_asked(changes: &Option<Arc<crate::settings::Changes>>) {
+    match changes {
+        Some(changes) => changes.relink_asked().await,
+        None => std::future::pending().await,
+    }
+}
+
+/// Once a Wi-Fi change wants the link made again (taken).
+async fn relink_wanted(changes: &Option<Arc<crate::settings::Changes>>) {
+    loop {
+        relink_asked(changes).await;
+        if changes
+            .as_ref()
+            .is_some_and(|changes| changes.take_relink())
+        {
+            return;
+        }
     }
 }
 
@@ -319,7 +395,7 @@ async fn session(
     say: &mut impl Say,
     first: Duration,
 ) {
-    let (client, mut events) = AsyncClient::new(options(account), 64);
+    let (mut client, mut events) = AsyncClient::new(options(account), 64);
     let mut wait = first;
     // Health and crash reports, with their switch (#1683): handed over only
     // while connected, and kept until the broker acknowledges them.
@@ -348,67 +424,96 @@ async fn session(
         // Changes after setup (#1959): their results are looked for on the
         // same tick, only with their switch.
         let changes = lamp.changes();
-        let poll = events.poll();
-        tokio::pin!(poll);
-        let polled = loop {
-            tokio::select! {
-                polled = &mut poll => break polled,
-                _ = tick.tick(), if texting || changes.is_some() => {
-                    let me = identity.borrow().clone();
-                    if texting {
-                        for data in lamp.chat_events(crate::chat::now_ms()) {
-                            let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
-                            handed.publish(&client, account.fd_channel.as_str(), event, None);
+        let polled = {
+            let poll = events.poll();
+            tokio::pin!(poll);
+            loop {
+                tokio::select! {
+                    polled = &mut poll => break Some(polled),
+                    // A Wi-Fi change moved the lamp to another network (#2617's
+                    // P2-1): the link is dropped at once, not left to the
+                    // keepalive's 60 to 120 s.
+                    () = relink_asked(&changes) => {
+                        if changes.as_ref().is_some_and(|changes| changes.take_relink()) {
+                            break None;
                         }
-                        // A skill's lines for the phone (`crate::unasked`):
-                        // taken off the bus always, sent only while
-                        // connected, and kept until the broker's ack.
-                        let heard = lamp.unasked(crate::chat::now_ms(), connected);
-                        for line in heard.lines {
-                            say.line(&line);
-                        }
-                        let mut owed = Vec::new();
-                        for piece in heard.due {
+                    }
+                    _ = tick.tick(), if texting || changes.is_some() => {
+                        let me = identity.borrow().clone();
+                        if texting {
+                            for data in lamp.chat_events(crate::chat::now_ms()) {
+                                let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
+                                handed.publish(&client, account.fd_channel.as_str(), event, None);
+                            }
+                            // A skill's lines for the phone (`crate::unasked`):
+                            // taken off the bus always, sent only while
+                            // connected, and kept until the broker's ack.
+                            let heard = lamp.unasked(crate::chat::now_ms(), connected);
+                            for line in heard.lines {
+                                say.line(&line);
+                            }
+                            let mut owed = Vec::new();
+                            for piece in heard.due {
+                                if !owed.is_empty() {
+                                    owed.push(piece);
+                                    continue;
+                                }
+                                let event = me
+                                    .data(&now(), "chat.event", &Ok(Some(piece.data.clone())))
+                                    .to_string();
+                                let tag = Tagged::Unasked(piece.clone());
+                                if !handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                    owed.push(piece);
+                                }
+                            }
                             if !owed.is_empty() {
-                                owed.push(piece);
-                                continue;
-                            }
-                            let event = me
-                                .data(&now(), "chat.event", &Ok(Some(piece.data.clone())))
-                                .to_string();
-                            let tag = Tagged::Unasked(piece.clone());
-                            if !handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
-                                owed.push(piece);
+                                lamp.owe_unasked(owed);
                             }
                         }
-                        if !owed.is_empty() {
-                            lamp.owe_unasked(owed);
-                        }
-                    }
-                    // Only while connected, and kept until the broker's ack:
-                    // a Wi-Fi change's result is often ready only once the
-                    // lamp is back online.
-                    if connected && let Some(changes) = &changes {
-                        for outcome in changes.take() {
-                            let reply = outcome.reply(&me, &now()).to_string();
-                            let tag = Tagged::Change(outcome.clone());
-                            if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
-                                changes.owe(vec![outcome]);
+                        // Only while connected, and kept until the broker's ack:
+                        // a Wi-Fi change's result is often ready only once the
+                        // lamp is back online.
+                        if connected && let Some(changes) = &changes {
+                            for outcome in changes.take() {
+                                let reply = outcome.reply(&me, &now()).to_string();
+                                let tag = Tagged::Change(outcome.clone());
+                                if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
+                                    changes.owe(vec![outcome]);
+                                }
                             }
                         }
                     }
-                }
-                () = woken(&reports), if connected => {
-                    let id = identity.borrow().id.clone();
-                    hand_reports(&reports, &client, account, &id, &mut handed);
+                    () = woken(&reports), if connected => {
+                        let id = identity.borrow().id.clone();
+                        hand_reports(&reports, &client, account, &id, &mut handed);
+                    }
                 }
             }
+        };
+        for line in std::mem::take(&mut handed.journal) {
+            say.line(&line);
+        }
+        let Some(polled) = polled else {
+            dropped(&mut handed, lamp, &changes, &reports);
+            connected = false;
+            for line in std::mem::take(&mut handed.journal) {
+                say.line(&line);
+            }
+            tell(
+                say,
+                "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
+                    .to_owned(),
+            );
+            (client, events) = AsyncClient::new(options(account), 64);
+            wait = first;
+            continue;
         };
         match polled {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 wait = first;
                 if let Some(changes) = &changes {
                     changes.set_broker(account.mqtt_endpoint.trim(), account.mqtt_port);
+                    changes.online();
                 }
                 let _ = client.try_subscribe(account.fa_channel.as_str(), QoS::AtLeastOnce);
                 let info = identity.borrow().info(&now()).to_string();
@@ -439,10 +544,23 @@ async fn session(
                 // `reports.set` may have put a last word in the queue.
                 hand_reports(&reports, &client, account, &me.id, &mut handed);
             }
-            Ok(Event::Outgoing(Outgoing::Publish(pkid))) => handed.sent(pkid),
+            Ok(Event::Outgoing(Outgoing::Publish(pkid))) => {
+                handed.sent(pkid);
+                for line in std::mem::take(&mut handed.journal) {
+                    say.line(&line);
+                }
+            }
             Ok(Event::Incoming(Packet::PubAck(ack))) => {
                 if let (Some(seq), Some(shared)) = (handed.acked(ack.pkid), &reports) {
                     shared.with(|reports| reports.acked(seq));
+                }
+                for outcome in std::mem::take(&mut handed.changes_acked) {
+                    if let Some(changes) = &changes {
+                        changes.acked(&outcome);
+                    }
+                }
+                for line in std::mem::take(&mut handed.journal) {
+                    say.line(&line);
                 }
                 // One line a piece, the skill and the count, never its text.
                 for skill in std::mem::take(&mut handed.unasked_acked) {
@@ -453,21 +571,23 @@ async fn session(
             Ok(_) => {}
             Err(error) => {
                 connected = false;
-                let again = handed.lost();
-                let unasked = std::mem::take(&mut handed.unasked_lost);
-                if !unasked.is_empty() {
-                    lamp.owe_unasked(unasked);
-                }
-                if let Some(changes) = &changes {
-                    changes.owe(again);
-                }
-                if let Some(shared) = &reports {
-                    shared.with(|reports| reports.unhand(None));
+                dropped(&mut handed, lamp, &changes, &reports);
+                for line in std::mem::take(&mut handed.journal) {
+                    say.line(&line);
                 }
                 // The error names a code or an I/O kind, never the login.
                 tell(say, format!("offline, trying again: {error}"));
-                tokio::time::sleep(wait).await;
-                wait = (wait * 2).min(crate::ping::MOST);
+                // A Wi-Fi change that moves the lamp meanwhile cuts the wait
+                // short: one try at once, then the waits from the first.
+                let relinked = tokio::select! {
+                    () = tokio::time::sleep(wait) => false,
+                    () = relink_wanted(&changes) => true,
+                };
+                wait = if relinked {
+                    first
+                } else {
+                    (wait * 2).min(crate::ping::MOST)
+                };
             }
         }
     }
@@ -556,6 +676,29 @@ mod tests {
         /// the lamp's account channel, then on it (the reviewer's P3 1 on
         /// #2214).
         OtherTopicsFirst,
+        /// Sends `commands` on the first connection, then goes silent on it
+        /// after its second reply, the socket held open: the radio switched
+        /// under a link only the keepalive would notice (#2617's P2-1).
+        /// Later connections are taken, with a `wifi.joined` acked 1 s late.
+        StaleFirstLateAck,
+        /// Sends `commands` on the first connection and closes it after its
+        /// second reply; later ones are refused until [`GATE`] opens.
+        DropsThenGated,
+    }
+
+    /// When the tests' brokers saw each CONNECT, by port.
+    static CONNECTS: Mutex<Vec<(u16, std::time::Instant)>> = Mutex::new(Vec::new());
+    /// [`Broker::DropsThenGated`]'s gate: open, its connections are taken.
+    static GATE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+    fn connects_at(port: u16) -> Vec<std::time::Instant> {
+        CONNECTS
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(at, _)| *at == port)
+            .map(|(_, when)| *when)
+            .collect()
     }
 
     /// Topics a command must never be taken from: the lamp's own reply
@@ -591,6 +734,10 @@ mod tests {
                     let mut out = BytesMut::new();
                     match packet {
                         Packet::Connect(connect, _, login) => {
+                            CONNECTS
+                                .lock()
+                                .unwrap()
+                                .push((port, std::time::Instant::now()));
                             log.lock().unwrap().push(Seen::Connect {
                                 client_id: connect.client_id.clone(),
                                 keep_alive: connect.keep_alive,
@@ -604,7 +751,11 @@ mod tests {
                             if behaves == Broker::SlowConnAck {
                                 tokio::time::sleep(Duration::from_millis(300)).await;
                             }
-                            let code = if behaves == Broker::Refuses {
+                            let refuses = behaves == Broker::Refuses
+                                || (behaves == Broker::DropsThenGated
+                                    && connections > 1
+                                    && !GATE.load(std::sync::atomic::Ordering::SeqCst));
+                            let code = if refuses {
                                 ConnectReturnCode::BadUserNamePassword
                             } else {
                                 ConnectReturnCode::Success
@@ -617,7 +768,7 @@ mod tests {
                             .write(&mut out, None)
                             .unwrap();
                             let _ = socket.write_all(&out).await;
-                            if behaves == Broker::Refuses {
+                            if refuses {
                                 break 'connection;
                             }
                             continue;
@@ -635,7 +786,12 @@ mod tests {
                             })
                             .write(&mut out, None)
                             .unwrap();
-                            let once = behaves == Broker::CommandsOnceThenDrops;
+                            let once = matches!(
+                                behaves,
+                                Broker::CommandsOnceThenDrops
+                                    | Broker::StaleFirstLateAck
+                                    | Broker::DropsThenGated
+                            );
                             let commands = if once && connections > 1 {
                                 &[][..]
                             } else {
@@ -665,9 +821,15 @@ mod tests {
                             }
                         }
                         Packet::Publish(publish) => {
+                            let payload = String::from_utf8_lossy(&publish.payload).into_owned();
+                            if behaves == Broker::StaleFirstLateAck
+                                && payload.contains("\"kind\":\"wifi.joined\"")
+                            {
+                                tokio::time::sleep(Duration::from_secs(1)).await;
+                            }
                             log.lock().unwrap().push(Seen::Publish(
                                 String::from_utf8_lossy(&publish.topic).into_owned(),
-                                String::from_utf8_lossy(&publish.payload).into_owned(),
+                                payload,
                             ));
                             Packet::PubAck(PubAck::new(publish.pkid, None))
                                 .write(&mut out, None)
@@ -685,8 +847,18 @@ mod tests {
                     if behaves == Broker::DropsOnce && connections == 1 && replies == 1 {
                         break;
                     }
-                    if behaves == Broker::CommandsOnceThenDrops && connections == 1 && replies == 2
+                    if matches!(
+                        behaves,
+                        Broker::CommandsOnceThenDrops | Broker::DropsThenGated
+                    ) && connections == 1
+                        && replies == 2
                     {
+                        break;
+                    }
+                    if behaves == Broker::StaleFirstLateAck && connections == 1 && replies == 2 {
+                        // Silent, the socket held: reads go nowhere.
+                        let mut chunk = [0u8; 4096];
+                        while matches!(socket.read(&mut chunk).await, Ok(n) if n > 0) {}
                         break;
                     }
                 }
@@ -1122,6 +1294,223 @@ mod tests {
                 assert!(!payload.contains("fake-pass-NEW-1234"), "{payload}");
             }
         }
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// A fake `lamp-setup wifi` on `socket`: it proves the new network
+    /// `after` its request and says `joined`, then waits for `{"online":
+    /// true}`; with `back`, it then goes back and says so. It hands back
+    /// when it said `joined` and when it heard `online`.
+    fn joining_helper(
+        socket: &std::path::Path,
+        after: Duration,
+        back: bool,
+    ) -> std::thread::JoinHandle<(std::time::Instant, std::time::Instant, String)> {
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            std::thread::sleep(after);
+            stream
+                .write_all(b"{\"joined\":{\"ssid\":\"New Home\",\"online_within_ms\":10000,\"confirm_within_ms\":120000}}\n")
+                .unwrap();
+            let joined_at = std::time::Instant::now();
+            let mut online = String::new();
+            reader.read_line(&mut online).unwrap();
+            let online_at = std::time::Instant::now();
+            if back {
+                stream
+                    .write_all(b"{\"refused\":\"the app did not confirm the new Wi-Fi within 120 s; the lamp is back on its old Wi-Fi\"}\n")
+                    .unwrap();
+            }
+            // Held open: lamp-cloud waits for the app's confirmation.
+            std::thread::sleep(Duration::from_secs(3));
+            (joined_at, online_at, online)
+        })
+    }
+
+    /// The lamp with the Wi-Fi's switch against `port` until `until` holds,
+    /// or 10 s; then the lines it said.
+    async fn wifi_against(
+        port: u16,
+        seen: &Arc<Mutex<Vec<Seen>>>,
+        socket: &std::path::Path,
+        first: Duration,
+        until: impl Fn(&[Seen]) -> bool,
+    ) -> Vec<String> {
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let changes = crate::settings::Changes::with_wifi(
+            std::env::temp_dir().join("lco-never.sock"),
+            Duration::from_secs(5),
+            Some((socket.to_owned(), Duration::from_secs(10))),
+        );
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let said = lines.clone();
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                changes: Some(changes),
+                ..Fake::default()
+            };
+            let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
+            run(accounts, me, &mut lamp, &mut say, first).await;
+        });
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while !until(&seen.lock().unwrap()) && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        Arc::try_unwrap(lines).unwrap().into_inner().unwrap()
+    }
+
+    fn wifi_replies(seen: &[Seen]) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .map(|(_, reply)| reply)
+            .filter(|reply| {
+                reply["kind"]
+                    .as_str()
+                    .is_some_and(|kind| kind.starts_with("wifi."))
+            })
+            .collect()
+    }
+
+    const WIFI_SET: &str = r#"{"cmd":"data","kind":"wifi.set","data":{"ssid":"New Home","password":"fake-pass-NEW-1234","request_id":"r-7"}}"#;
+
+    /// The reviewer-lead's P2 and the first builder's P2-1 on #2617: once
+    /// the helper says `joined`, the old link, which only the keepalive
+    /// would notice dead after 60 to 120 s, is dropped and made again at
+    /// once; `wifi.joined` goes out on the new one, and the window starts
+    /// only when the broker acks it, 1 s late here. Each step of each
+    /// result is journalled, with neither the name nor the password.
+    #[tokio::test]
+    async fn p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack()
+    {
+        let socket = std::env::temp_dir().join(format!("lco-{}-stale.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let helper = joining_helper(&socket, Duration::from_millis(300), false);
+        let (port, seen) = broker(Broker::StaleFirstLateAck, vec![WIFI_SET]).await;
+        let lines = wifi_against(port, &seen, &socket, Duration::from_secs(1), |seen| {
+            wifi_replies(seen).len() >= 2
+        })
+        .await;
+        let (joined_at, online_at, online) = helper.join().unwrap();
+        assert_eq!(online, "{\"online\":true}\n");
+        let connects = connects_at(port);
+        assert_eq!(connects.len(), 2, "{connects:?}");
+        // At once, not after the keepalive.
+        let again = connects[1].duration_since(joined_at);
+        assert!(again < Duration::from_millis(500), "{again:?}");
+        // The window starts at the broker's ack, 1 s after the publish.
+        let window = online_at.duration_since(connects[1]);
+        assert!(window >= Duration::from_secs(1), "{window:?}");
+        let seen = seen.lock().unwrap().clone();
+        let replies = wifi_replies(&seen);
+        assert_eq!(replies[0]["status"], "starting");
+        assert_eq!(
+            (
+                &replies[1]["kind"],
+                &replies[1]["status"],
+                &replies[1]["data"]
+            ),
+            (
+                &serde_json::json!("wifi.joined"),
+                &serde_json::json!("success"),
+                &serde_json::json!({"ssid": "New Home", "confirm_within_s": 120, "request_id": "r-7"})
+            )
+        );
+        // On the second connection: after its info.
+        let second_info = seen
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| matches!(s, Seen::Publish(_, p) if p.contains("\"type\":\"info\"")))
+            .map(|(at, _)| at)
+            .nth(1)
+            .unwrap();
+        let joined_at = seen
+            .iter()
+            .position(|s| matches!(s, Seen::Publish(_, p) if p.contains("wifi.joined")))
+            .unwrap();
+        assert!(joined_at > second_info);
+        let result = "a change's result, wifi.joined success, request_id r-7";
+        for step in [
+            "handed to the client at QoS 1",
+            "sent as packet",
+            "acked by the broker, packet",
+        ] {
+            assert!(
+                lines
+                    .iter()
+                    .any(|line| line.starts_with(&format!("{result}: {step}"))),
+                "{step}: {lines:?}"
+            );
+        }
+        for line in &lines {
+            assert!(
+                !line.contains("New Home") && !line.contains("fake-pass"),
+                "{line}"
+            );
+        }
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// The reviewer-lead's P2 on #2617, the backoff: a `joined` that comes
+    /// while the lamp waits between refused tries cuts the wait short, one
+    /// try at once and then the waits from the first again, not the grown
+    /// one. And the lamp's going back after it, a failure after an outage,
+    /// is said on the link made again after it and acked (Mobile on #1959).
+    #[tokio::test]
+    async fn p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-gated.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        GATE.store(false, std::sync::atomic::Ordering::SeqCst);
+        // Waits of 100, 200, 400, 800 ms, then 1.6 s: `joined` at 1.6 s
+        // comes in the 1.6 s wait.
+        let helper = joining_helper(&socket, Duration::from_millis(1_600), true);
+        let (port, seen) = broker(Broker::DropsThenGated, vec![WIFI_SET]).await;
+        let opener = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(2_400));
+            GATE.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        let lines = wifi_against(port, &seen, &socket, Duration::from_millis(100), |seen| {
+            wifi_replies(seen).len() >= 3
+        })
+        .await;
+        opener.join().unwrap();
+        let (joined_at, _, online) = helper.join().unwrap();
+        assert_eq!(online, "{\"online\":true}\n");
+        let connects = connects_at(port);
+        let after: Vec<_> = connects
+            .iter()
+            .filter(|at| **at >= joined_at)
+            .map(|at| at.duration_since(joined_at))
+            .collect();
+        assert!(after.len() >= 3, "{after:?}");
+        assert!(after[0] < Duration::from_millis(300), "at once: {after:?}");
+        // From the first wait again: 100 ms, not the grown 3.2 s.
+        let next = after[1] - after[0];
+        assert!(next < Duration::from_millis(600), "reset: {after:?}");
+        let replies = wifi_replies(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 3, "{replies:?}");
+        assert_eq!(replies[1]["kind"], "wifi.joined");
+        assert_eq!(
+            (&replies[2]["kind"], &replies[2]["status"]),
+            (
+                &serde_json::json!("wifi.set"),
+                &serde_json::json!("failure")
+            )
+        );
+        assert_eq!(replies[2]["data"], serde_json::json!({"request_id": "r-7"}));
+        assert!(
+            lines.iter().any(|line| line.starts_with(
+                "a change's result, wifi.set failure, request_id r-7: acked by the broker"
+            )),
+            "{lines:?}"
+        );
         let _ = std::fs::remove_file(&socket);
     }
 

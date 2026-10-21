@@ -2,8 +2,9 @@
 //! the networks it can see, what each gives, and a clock of its own.
 use lamp_setup::wifi::Host;
 use lamp_setup::wifi_change::{
-    Asked, BACK_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth, RECORDING_LOST, Rejoin, SAY_BACK,
-    SAY_JOINED, SAY_LOST, SayService, answer, change, line_for, parse, say_after,
+    Asked, BACK_TRIES, BACK_WAIT, CONFIRM_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth,
+    RECORDING_LOST, Rejoin, Restored, SAY_BACK, SAY_JOINED, SAY_LOST, SayService, answer, change,
+    line_for, parse, restore, say_after,
 };
 use serde_json::json;
 use std::{collections::HashMap, io, time::Duration};
@@ -41,6 +42,12 @@ struct Fake {
     brokers: Vec<String>,
     /// The file as it was each time the radio started.
     radio: Vec<Vec<u8>>,
+    /// `wpa_cli reconfigure`s asked.
+    reloads: u32,
+    /// Whether the app confirms a proven network (through it).
+    app_confirms: bool,
+    /// The confirmations asked for.
+    asked_confirm: u32,
 }
 
 fn hex(text: &str) -> String {
@@ -68,6 +75,9 @@ impl Fake {
             hotspots: 0,
             brokers: Vec::new(),
             radio: Vec::new(),
+            reloads: 0,
+            app_confirms: true,
+            asked_confirm: 0,
         };
         fake.start_radio();
         fake.stations = 0;
@@ -77,6 +87,11 @@ impl Fake {
 
     fn start_radio(&mut self) {
         self.stations += 1;
+        self.load();
+    }
+
+    /// wpa_supplicant reading its file: the network it runs is the file's.
+    fn load(&mut self) {
         self.started_ms = self.now_ms;
         self.wrong_key = false;
         self.joined = None;
@@ -163,6 +178,28 @@ impl Rejoin for Fake {
         self.previous = bytes.map(<[u8]>::to_vec);
         Ok(())
     }
+    fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+        Ok(self.previous.clone())
+    }
+    fn reload(&mut self) -> io::Result<()> {
+        self.reloads += 1;
+        self.load();
+        Ok(())
+    }
+    fn app_confirms(&mut self, _ssid: &str, most: Duration) -> bool {
+        self.asked_confirm += 1;
+        // The app's confirmation comes through the new network, or never.
+        let through = self
+            .up()
+            .is_some_and(|(_, network)| network.address && network.broker);
+        if self.app_confirms && through {
+            self.now_ms += 2_000;
+            true
+        } else {
+            self.now_ms += most.as_millis() as u64;
+            false
+        }
+    }
 }
 
 const GOOD: Network = Network {
@@ -209,8 +246,8 @@ fn a_network_that_joins_and_reaches_the_broker_is_kept_and_the_old_file_goes() {
         "the old file is removed once confirmed"
     );
     assert_eq!(fake.brokers.last().map(String::as_str), Some(BROKER));
-    // Joined at 8 s, within the bound.
-    assert!(fake.now_ms <= 9_000, "{}", fake.now_ms);
+    // Joined at 8 s, within the bound, and the app's confirmation 2 s later.
+    assert!(fake.now_ms <= 11_000, "{}", fake.now_ms);
 }
 
 #[test]
@@ -270,6 +307,15 @@ fn the_old_file_is_kept_until_the_new_network_is_confirmed() {
         }
         fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
             self.0.keep_previous(bytes)
+        }
+        fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+            self.0.read_previous()
+        }
+        fn reload(&mut self) -> io::Result<()> {
+            self.0.reload()
+        }
+        fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
+            self.0.app_confirms(ssid, most)
         }
     }
     let mut watch = Watch(&mut fake, true);
@@ -375,12 +421,14 @@ fn an_old_network_that_does_not_come_back_is_kept_and_tried_never_the_hotspot() 
         panic!("{changed:?}");
     };
     assert!(
-        why.ends_with("the old Wi-Fi did not come back within 60 s, and the lamp keeps trying it"),
+        why.ends_with(
+            "the old Wi-Fi did not come back after 3 tries, and the lamp keeps trying it"
+        ),
         "{why}"
     );
     assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
     assert_eq!(fake.hotspots, 0);
-    let bound = (JOIN_WAIT + BACK_WAIT).as_millis() as u64 + 2_000;
+    let bound = (JOIN_WAIT + BACK_WAIT * BACK_TRIES).as_millis() as u64 + 5_000;
     assert!(fake.now_ms - started <= bound, "{}", fake.now_ms);
 }
 
@@ -547,8 +595,9 @@ impl Mouth for Heard {
     fn say(&mut self, text: &str) {
         self.0.push((self.1, text.to_owned()));
     }
-    fn play(&mut self, recording: &str) {
+    fn play(&mut self, recording: &str) -> bool {
         self.0.push((self.1, format!("played {recording}")));
+        true
     }
 }
 
@@ -562,9 +611,10 @@ impl Mouth for Timed<'_> {
     fn say(&mut self, text: &str) {
         self.heard.push((self.clock.get(), text.to_owned()));
     }
-    fn play(&mut self, recording: &str) {
+    fn play(&mut self, recording: &str) -> bool {
         self.heard
             .push((self.clock.get(), format!("played {recording}")));
+        true
     }
 }
 
@@ -674,6 +724,15 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
         }
         fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
             self.0.keep_previous(bytes)
+        }
+        fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+            self.0.read_previous()
+        }
+        fn reload(&mut self) -> io::Result<()> {
+            self.0.reload()
+        }
+        fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
+            self.0.app_confirms(ssid, most)
         }
     }
     let mut host = Clocked(&mut fake, &clock);
@@ -815,4 +874,603 @@ fn the_product_voice_loads_its_recorded_lines_from_the_fixed_folder() {
         "{start}"
     );
     assert!(unit.contains("\nEnvironment=LAMP_SAY=on\n"));
+}
+
+/// #1959's P1 (lamp-0c89, build 4814): a wrong password left the lamp off
+/// every network. The fake as above, with what a real lamp can do after the
+/// helper has decided: the radio's script failing on the way back, the
+/// network dropping right after it was confirmed, the helper cut mid-change.
+struct Twist<'a> {
+    fake: &'a mut Fake,
+    /// The radio's start, counted from 1, that fails, as `device-sta-mode`
+    /// under `set -e` does: the radio is not restarted, so wpa_supplicant
+    /// keeps the network it last loaded.
+    fail_station: Option<u32>,
+    station_calls: u32,
+    /// The new network goes away right after the broker was first reached.
+    drop_after_confirm: bool,
+    dropped: bool,
+    /// The helper is cut here (killed, a power cut): its next wait panics.
+    cut_at_ms: Option<u64>,
+    /// The radio's start, counted from 1, that hangs until its bound
+    /// (`wifi::RADIO_TIMEOUT`) and is killed there, the radio untouched.
+    hang_station: Option<u32>,
+    /// `wpa_cli reconfigure`s that fail before one is taken.
+    reloads_failing: u32,
+    /// Every radio start fails from here on (the first builder's P3 1).
+    stations_failing: bool,
+    /// The write of the file, counted from 1, that fails (P3 2).
+    fail_write: Option<u32>,
+    write_calls: u32,
+    /// Removals of `.lamp-previous` that fail before one is taken (P3 3).
+    removes_failing: u32,
+    /// `.lamp-previous` cannot be read (P3 5).
+    previous_unreadable: bool,
+}
+
+impl<'a> Twist<'a> {
+    fn new(fake: &'a mut Fake) -> Self {
+        Self {
+            fake,
+            fail_station: None,
+            station_calls: 0,
+            drop_after_confirm: false,
+            dropped: false,
+            cut_at_ms: None,
+            hang_station: None,
+            reloads_failing: 0,
+            stations_failing: false,
+            fail_write: None,
+            write_calls: 0,
+            removes_failing: 0,
+            previous_unreadable: false,
+        }
+    }
+}
+
+impl Host for Twist<'_> {
+    fn read_conf(&mut self) -> io::Result<Option<Vec<u8>>> {
+        self.fake.read_conf()
+    }
+    fn write_conf(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
+        self.write_calls += 1;
+        if self.fail_write == Some(self.write_calls) {
+            return Err(io::Error::other("no space left on device"));
+        }
+        self.fake.write_conf(bytes)
+    }
+    fn station(&mut self) -> io::Result<()> {
+        self.station_calls += 1;
+        if self.stations_failing || self.fail_station == Some(self.station_calls) {
+            return Err(io::Error::other(
+                "device-sta-mode ended with exit status: 1",
+            ));
+        }
+        if self.hang_station == Some(self.station_calls) {
+            self.fake.now_ms += lamp_setup::wifi::RADIO_TIMEOUT.as_millis() as u64;
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "device-sta-mode hung",
+            ));
+        }
+        self.fake.station()
+    }
+    fn hotspot(&mut self) -> io::Result<()> {
+        self.fake.hotspot()
+    }
+    fn internet(&mut self) -> bool {
+        !self.dropped && self.fake.internet()
+    }
+    fn current_ssid(&mut self) -> Option<String> {
+        if self.dropped {
+            return None;
+        }
+        self.fake.current_ssid()
+    }
+    fn has_station_ip(&mut self) -> bool {
+        !self.dropped && self.fake.has_station_ip()
+    }
+    fn wpa_state(&mut self) -> String {
+        self.fake.wpa_state()
+    }
+    fn wpa_events(&mut self) -> Vec<String> {
+        self.fake.wpa_events()
+    }
+    fn now_ms(&mut self) -> u64 {
+        self.fake.now_ms()
+    }
+    fn sleep(&mut self, duration: Duration) {
+        if self.cut_at_ms.is_some_and(|at| self.fake.now_ms >= at) {
+            panic!("the helper was cut mid-change");
+        }
+        self.fake.sleep(duration);
+    }
+}
+
+impl Rejoin for Twist<'_> {
+    fn broker(&mut self, address: &str) -> bool {
+        if self.dropped {
+            return false;
+        }
+        let reached = self.fake.broker(address);
+        if reached && self.drop_after_confirm {
+            self.dropped = true;
+        }
+        reached
+    }
+    fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
+        if bytes.is_none() && self.removes_failing > 0 {
+            self.removes_failing -= 1;
+            return Err(io::Error::other("read-only file system"));
+        }
+        self.fake.keep_previous(bytes)
+    }
+    fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+        if self.previous_unreadable {
+            return Err(io::Error::other("input/output error"));
+        }
+        self.fake.read_previous()
+    }
+    fn reload(&mut self) -> io::Result<()> {
+        if self.reloads_failing > 0 {
+            self.reloads_failing -= 1;
+            return Err(io::Error::other("wpa_cli reconfigure was not taken"));
+        }
+        self.fake.reload()
+    }
+    fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
+        if self.dropped {
+            self.fake.now_ms += most.as_millis() as u64;
+            return false;
+        }
+        self.fake.app_confirms(ssid, most)
+    }
+}
+
+fn wrong_password_fake() -> Fake {
+    Fake::new(&[
+        ("Old Home", OLD),
+        (
+            "New Home",
+            Network {
+                password: "another-fake-pass",
+                ..GOOD
+            },
+        ),
+    ])
+}
+
+#[test]
+fn p1_a_radio_restart_that_fails_on_the_way_back_is_tried_again_until_the_old_network_is_back() {
+    // The join's restart works; the way back's (the 2nd) fails once, as
+    // `device-sta-mode` exits under `set -e` (e.g. `ip link set wlan0 up`).
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.fail_station = Some(2);
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert!(
+        matches!(changed, Changed::Back { .. }),
+        "a failed restart on the way back is not tried again: {changed:?}"
+    );
+    assert_eq!(
+        fake.radio.last().unwrap(),
+        &old_conf(),
+        "the radio runs the old network"
+    );
+}
+
+#[test]
+fn p1_a_network_lost_right_after_it_was_confirmed_comes_back_to_the_old_one() {
+    // Confirmed at the decision point (name, address, broker once), then gone:
+    // the app has not confirmed it, so the old network must still be there.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    let mut twist = Twist::new(&mut fake);
+    twist.drop_after_confirm = true;
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert_ne!(
+        changed,
+        Changed::Joined,
+        "a network confirmed once and then lost is kept, and the old file deleted"
+    );
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+}
+
+#[test]
+fn p1_a_helper_cut_mid_change_leaves_the_old_network_to_boot_on() {
+    // Cut 1 s into the join (killed, or the power cut the held lamp needed):
+    // nothing after that runs, so what is on disk is what the lamp boots on.
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.cut_at_ms = Some(1_000);
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        change(&mut twist, "VN", &asked("New Home"))
+    }));
+    assert!(cut.is_err(), "the helper was not cut");
+    // What boots next: lamp-setup-wifi-restore.service, before wpa_supplicant.
+    let stations = fake.stations;
+    assert_eq!(restore(&mut fake, false), Restored::Put);
+    assert_eq!(
+        fake.conf.as_deref(),
+        Some(&old_conf()[..]),
+        "the unverified new network is the file the lamp boots on"
+    );
+    assert_eq!(fake.previous, None);
+    assert_eq!(fake.stations, stations, "at boot only the file");
+    assert_eq!(fake.reloads, 0);
+}
+
+#[test]
+fn p1_a_radio_script_that_hangs_is_timed_out_and_the_radio_tried_again() {
+    // The way back's first restart hangs (a `systemctl restart` stuck) and
+    // wpa_supplicant's control socket refuses the first reconfigure: killed
+    // at its bound, then tried again, and the old network comes back.
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.hang_station = Some(2);
+    twist.reloads_failing = 1;
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
+    assert!(
+        twist.station_calls >= 3,
+        "not tried again: {}",
+        twist.station_calls
+    );
+    assert_eq!(fake.radio.last().unwrap(), &old_conf());
+    assert_eq!(fake.previous, None);
+}
+
+/// And the real bound: a command that hangs is killed there.
+#[test]
+fn p1_a_command_that_hangs_is_killed_at_its_bound() {
+    let started = std::time::Instant::now();
+    let mut command = std::process::Command::new("sleep");
+    command.arg("30");
+    let ran = lamp_setup::wifi::within(&mut command, Duration::from_millis(300));
+    assert_eq!(ran.unwrap_err().kind(), io::ErrorKind::TimedOut);
+    assert!(started.elapsed() < Duration::from_secs(5));
+    let mut command = std::process::Command::new("echo");
+    command.arg("OK");
+    let (status, out) = lamp_setup::wifi::within(&mut command, Duration::from_secs(5)).unwrap();
+    assert!(status.success());
+    assert_eq!(out, b"OK\n");
+}
+
+#[test]
+fn p1_a_proven_network_the_app_does_not_confirm_within_120_s_goes_back() {
+    // Joined, an address, the broker reached: but the app closed, the phone
+    // gone. Back as if the join had failed.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    fake.app_confirms = false;
+    let started = fake.now_ms;
+    let changed = change(&mut fake, "VN", &asked("New Home"));
+    let Changed::Back { why } = changed else {
+        panic!("{changed:?}");
+    };
+    assert_eq!(
+        why,
+        "the app did not confirm the new Wi-Fi within 120 s; the lamp is back on its old Wi-Fi"
+    );
+    assert_eq!(fake.asked_confirm, 1);
+    assert!(fake.now_ms - started >= CONFIRM_WAIT.as_millis() as u64);
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.radio.last().unwrap(), &old_conf());
+    assert_eq!(fake.previous, None);
+    // And with it: kept, the old file gone only then.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    assert_eq!(change(&mut fake, "VN", &asked("New Home")), Changed::Joined);
+    assert_eq!(fake.asked_confirm, 1);
+    assert_eq!(fake.previous, None);
+}
+
+#[test]
+fn p1_the_helpers_stop_puts_a_cut_changes_old_network_back_live() {
+    // Killed while waiting for the new network (RuntimeMaxSec, a crash):
+    // ExecStopPost's `wifi-restore` writes the old file, wpa_supplicant
+    // re-reads it, the radio restarts.
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.cut_at_ms = Some(1_000);
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        change(&mut twist, "VN", &asked("New Home"))
+    }));
+    assert!(cut.is_err());
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    let stations = fake.stations;
+    assert_eq!(restore(&mut fake, true), Restored::Put);
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.reloads, 1);
+    assert_eq!(fake.stations, stations + 1);
+    assert_eq!(fake.radio.last().unwrap(), &old_conf());
+    assert_eq!(fake.previous, None);
+    // A change that ended left nothing: the stop after it changes nothing.
+    let mut fake = wrong_password_fake();
+    let _ = change(&mut fake, "VN", &asked("New Home"));
+    let (stations, reloads) = (fake.stations, fake.reloads);
+    assert_eq!(restore(&mut fake, true), Restored::Nothing);
+    assert_eq!((fake.stations, fake.reloads), (stations, reloads));
+}
+
+#[test]
+fn p1_the_units_restore_at_the_helpers_stop_and_at_boot() {
+    let unit = include_str!("../../../../deploy/product/lamp-setup-wifi@.service");
+    assert!(unit.contains("\nExecStopPost=/opt/lampOS/setup/current/lamp-setup wifi-restore\n"));
+    assert!(unit.contains("\nRuntimeMaxSec=25min\n"));
+    // ExecStopPost's restore tries the radio BACK_TRIES times, each
+    // RADIO_TIMEOUT and BACK_WAIT (the first builder's P3 1): systemd's
+    // default 90 s would kill it.
+    assert!(unit.contains("\nTimeoutStopSec=8min\n"));
+    let tries = BACK_TRIES as u64
+        * (lamp_setup::wifi::RADIO_TIMEOUT + lamp_setup::wifi::QUERY_TIMEOUT + BACK_WAIT).as_secs();
+    assert!(tries + 30 <= 8 * 60, "{tries}");
+    let boot = include_str!("../../../../deploy/product/lamp-setup-wifi-restore.service");
+    for line in [
+        "\nDefaultDependencies=no\n",
+        // dhcpcd's wpa_supplicant hook (device-sta-mode drops `nohook
+        // wpa_supplicant`) would start one on the new file (P3 4).
+        "\nBefore=wpa_supplicant@wlan0.service dhcpcd.service network-pre.target\n",
+        "\nConditionPathExists=/etc/wpa_supplicant/wpa_supplicant-wlan0.conf.lamp-previous\n",
+        "\nType=oneshot\n",
+        "\nExecStart=/opt/lampOS/setup/current/lamp-setup wifi-restore --boot\n",
+        "\nWantedBy=multi-user.target\n",
+    ] {
+        assert!(boot.contains(line), "{line}");
+    }
+}
+
+#[test]
+fn p1_a_lost_line_the_voice_lacks_is_said_in_plain_words() {
+    // The wifi_lost clip is not rendered yet: the voice refuses the
+    // recording, so the same words go as text.
+    struct NoClip(Vec<String>);
+    impl Mouth for NoClip {
+        fn say(&mut self, text: &str) {
+            self.0.push(text.to_owned());
+        }
+        fn play(&mut self, recording: &str) -> bool {
+            self.0.push(format!("asked {recording}"));
+            false
+        }
+    }
+    let mut fake = Fake::new(&[]);
+    let mut mouth = NoClip(Vec::new());
+    let changed = Changed::NotBack { why: String::new() };
+    assert!(say_after(&mut fake, &mut mouth, &changed, BROKER) >= 1);
+    assert_eq!(mouth.0[0], format!("asked {RECORDING_LOST}"));
+    assert_eq!(mouth.0[1], SAY_LOST);
+}
+
+/// The reviewer-lead's P2 and P3 on #2617: the helper's confirmation window
+/// is the one that counts, and it starts only once `lamp-cloud` says its
+/// link is up again over the new network. `lamp-cloud`'s side of the
+/// helper's socket, the confirmation sent `confirm_at` after it says so; whether the helper kept the network, what it said, and how long
+/// after the window line it decided.
+fn confirmed_with(
+    window: Duration,
+    confirm_at: Duration,
+) -> (bool, Vec<serde_json::Value>, Duration) {
+    use std::io::{BufRead, BufReader, Write};
+    let (helper_end, mut cloud) = std::os::unix::net::UnixStream::pair().unwrap();
+    let reader = BufReader::new(helper_end.try_clone().unwrap());
+    let helper = std::thread::spawn(move || {
+        let mut out = helper_end;
+        let kept = lamp_setup::wifi_change::confirmed_on(
+            reader,
+            &mut out,
+            "New Home",
+            Duration::from_secs(5),
+            window,
+        );
+        (kept, std::time::Instant::now())
+    });
+    let mut lines = BufReader::new(cloud.try_clone().unwrap());
+    let mut read = || {
+        let mut line = String::new();
+        lines.read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    };
+    let joined = read();
+    // The link comes back a while after the join: the window is not spent.
+    std::thread::sleep(Duration::from_millis(400));
+    cloud.write_all(b"{\"online\":true}\n").unwrap();
+    let window_at = std::time::Instant::now();
+    std::thread::sleep(confirm_at);
+    let _ = cloud.write_all(b"{\"confirm\":true}\n");
+    let (kept, decided) = helper.join().unwrap();
+    (kept, vec![joined], decided - window_at)
+}
+
+#[test]
+fn p2_the_window_starts_when_lamp_cloud_is_online_again_and_a_confirm_1_s_before_its_end_keeps_the_network()
+ {
+    let (kept, said, _) = confirmed_with(Duration::from_secs(2), Duration::from_secs(1));
+    assert!(kept);
+    // The bounds lamp-cloud keeps, the helper's: the whole window, from the
+    // moment the link is up, not less the 400 ms it took to come back.
+    assert_eq!(
+        said[0],
+        json!({"joined": {"ssid": "New Home", "online_within_ms": 5_000, "confirm_within_ms": 2_000}})
+    );
+}
+
+#[test]
+fn p3_a_confirm_1_s_after_the_helpers_window_is_no_confirmation() {
+    let (kept, _, decided) = confirmed_with(Duration::from_secs(1), Duration::from_secs(2));
+    assert!(!kept);
+    // Decided at the window's end and its slack, not at the late
+    // confirmation.
+    assert!(decided < Duration::from_millis(1_800), "{decided:?}");
+}
+
+#[test]
+fn p2_no_link_back_within_its_bound_is_no_confirmation() {
+    use std::io::{BufRead, BufReader};
+    let (helper_end, cloud) = std::os::unix::net::UnixStream::pair().unwrap();
+    let reader = BufReader::new(helper_end.try_clone().unwrap());
+    let started = std::time::Instant::now();
+    let helper = std::thread::spawn(move || {
+        let mut out = helper_end;
+        lamp_setup::wifi_change::confirmed_on(
+            reader,
+            &mut out,
+            "New Home",
+            Duration::from_millis(300),
+            Duration::from_secs(5),
+        )
+    });
+    let mut joined = String::new();
+    BufReader::new(cloud.try_clone().unwrap())
+        .read_line(&mut joined)
+        .unwrap();
+    assert!(!helper.join().unwrap());
+    assert!(started.elapsed() < Duration::from_secs(2));
+}
+
+#[test]
+fn p3_1_the_stop_time_restore_with_the_radio_failing_keeps_the_old_file_and_tries_again() {
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.cut_at_ms = Some(1_000);
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        change(&mut twist, "VN", &asked("New Home"))
+    }));
+    assert!(cut.is_err());
+    twist.cut_at_ms = None;
+    twist.stations_failing = true;
+    twist.reloads_failing = u32::MAX;
+    let calls = twist.station_calls;
+    assert_eq!(restore(&mut twist, true), Restored::NotBack);
+    assert_eq!(twist.station_calls - calls, BACK_TRIES);
+    // The file is the old one, and `.lamp-previous` stays for the boot's
+    // restore: nothing is deleted before the old network is back.
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    // With the radio working again, it is back and the old file goes.
+    let mut twist = Twist::new(&mut fake);
+    twist.reloads_failing = 1;
+    assert_eq!(restore(&mut twist, true), Restored::Put);
+    assert_eq!(fake.previous, None);
+}
+
+#[test]
+fn p3_2_the_old_files_write_failing_once_still_ends_on_the_old_network() {
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    // The 1st write is the new network's, the 2nd the old one's.
+    twist.fail_write = Some(2);
+    let started = twist.fake.now_ms;
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
+    assert!(twist.write_calls >= 3);
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.radio.last().unwrap(), &old_conf());
+    assert_eq!(fake.previous, None);
+    // At once: not after the 10 minutes of the lost line.
+    assert!(fake.now_ms - started < 5 * 60_000);
+}
+
+#[test]
+fn p3_3_a_confirmed_change_whose_old_file_will_not_go_cannot_be_undone_by_a_restore() {
+    let new_conf = lamp_setup::wifi::wpa_conf("VN", "New Home", FAKE_PASSWORD)
+        .unwrap()
+        .into_bytes();
+    // Removed on the second try.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    let mut twist = Twist::new(&mut fake);
+    twist.removes_failing = 1;
+    assert_eq!(
+        change(&mut twist, "VN", &asked("New Home")),
+        Changed::Joined
+    );
+    assert_eq!(fake.previous, None);
+    // Never removed: `.lamp-previous` is the new network, so a restore at
+    // the stop or the boot keeps the confirmed change.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    let mut twist = Twist::new(&mut fake);
+    twist.removes_failing = u32::MAX;
+    assert_eq!(
+        change(&mut twist, "VN", &asked("New Home")),
+        Changed::Joined
+    );
+    assert_eq!(fake.previous.as_deref(), Some(&new_conf[..]));
+    let _ = restore(&mut fake, false);
+    assert_eq!(fake.conf.as_deref(), Some(&new_conf[..]));
+}
+
+#[test]
+fn p3_5_an_unreadable_old_file_is_an_error_not_nothing() {
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    twist.previous_unreadable = true;
+    assert_eq!(restore(&mut twist, true), Restored::Failed);
+    assert_eq!(restore(&mut twist, false), Restored::Failed);
+}
+
+#[test]
+fn p3_a_cut_during_the_confirm_wait_leaves_the_old_network_to_restore() {
+    // Killed while the app's confirmation is waited for (RuntimeMaxSec, a
+    // crash): the new network is live, `.lamp-previous` the old one.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    let mut twist = Twist::new(&mut fake);
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        struct Panicking<'a, 'b>(&'a mut Twist<'b>);
+        impl Host for Panicking<'_, '_> {
+            fn read_conf(&mut self) -> io::Result<Option<Vec<u8>>> {
+                self.0.read_conf()
+            }
+            fn write_conf(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
+                self.0.write_conf(bytes)
+            }
+            fn station(&mut self) -> io::Result<()> {
+                self.0.station()
+            }
+            fn hotspot(&mut self) -> io::Result<()> {
+                self.0.hotspot()
+            }
+            fn internet(&mut self) -> bool {
+                self.0.internet()
+            }
+            fn current_ssid(&mut self) -> Option<String> {
+                self.0.current_ssid()
+            }
+            fn has_station_ip(&mut self) -> bool {
+                self.0.has_station_ip()
+            }
+            fn wpa_state(&mut self) -> String {
+                self.0.wpa_state()
+            }
+            fn wpa_events(&mut self) -> Vec<String> {
+                self.0.wpa_events()
+            }
+            fn now_ms(&mut self) -> u64 {
+                self.0.now_ms()
+            }
+            fn sleep(&mut self, duration: Duration) {
+                self.0.sleep(duration);
+            }
+        }
+        impl Rejoin for Panicking<'_, '_> {
+            fn broker(&mut self, address: &str) -> bool {
+                self.0.broker(address)
+            }
+            fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
+                self.0.keep_previous(bytes)
+            }
+            fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+                self.0.read_previous()
+            }
+            fn reload(&mut self) -> io::Result<()> {
+                self.0.reload()
+            }
+            fn app_confirms(&mut self, _ssid: &str, _most: Duration) -> bool {
+                panic!("the helper was cut while the app's confirmation was waited for");
+            }
+        }
+        change(&mut Panicking(&mut twist), "VN", &asked("New Home"))
+    }));
+    assert!(cut.is_err());
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(restore(&mut fake, true), Restored::Put);
+    assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
+    assert_eq!(fake.radio.last().unwrap(), &old_conf());
+    assert_eq!(fake.previous, None);
 }

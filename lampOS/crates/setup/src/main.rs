@@ -48,10 +48,16 @@ usage: lamp-setup COMMAND [OPTIONS]
       Root's helper for the Wi-Fi changed after setup (#1959): one request
       line on standard input from lamp-cloud, the new network and the broker
       it is on; the new network is kept only once joined with an address and
-      the broker reached within 60 s, else the old one comes back. One reply
+      the broker reached within 60 s, and the app's confirm line within
+      120 s after the joined line, else the old one comes back. One reply
       line on standard output, at the end; then the lamp says what happened.
       The password is never printed.
       Without --enable every request is refused.
+  wifi-restore [--boot]
+      A Wi-Fi change cut before it ended (#1959): the old network's file kept
+      beside the live one goes back. After the helper's stop (ExecStopPost)
+      wpa_supplicant re-reads it and the radio restarts; with --boot, before
+      wpa_supplicant starts, only the file.
   keys [--folder DIR] [--bus-root PATH] [--enable]
       Root's helper for a person's own DeepSeek and Deepgram keys (#2094):
       one request line on standard input from lamp-cloud, a key to check and
@@ -146,6 +152,20 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     if command == "keys" {
         return own_keys(given);
+    }
+    if command == "wifi-restore" {
+        let boot = match given.next().as_deref() {
+            None => false,
+            Some("--boot") if given.next().is_none() => true,
+            Some(_) => return Err("wifi-restore takes only --boot".into()),
+        };
+        let mut host = lamp_setup::wifi_change::ImageRejoin::new();
+        let restored = lamp_setup::wifi_change::restore(&mut host, !boot);
+        eprintln!("lamp-setup: wifi-restore: {restored:?}");
+        return Ok(matches!(
+            restored,
+            lamp_setup::wifi_change::Restored::Put | lamp_setup::wifi_change::Restored::Nothing
+        ));
     }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);

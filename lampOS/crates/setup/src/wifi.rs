@@ -129,7 +129,10 @@ pub enum Refused {
 /// and last quote as it is, so V1's `\"` and `\\` escapes made a name or a
 /// password holding `"` or `\` never match. The name is written as hex, which
 /// holds any bytes, and the password raw between quotes, which is safe since
-/// line breaks and other control characters are refused.
+/// line breaks and other control characters are refused. A password holding
+/// `"` is written as its 64-hex PSK ([`psk`]) instead: wpa_supplicant 2.10
+/// ends a line at a `#` after a closing quote, so `pa"ss#word` would be cut
+/// (the first builder's P3 7 on #2617).
 pub fn wpa_conf(country: &str, ssid: &str, password: &str) -> Result<String, Refused> {
     let ssid = ssid.trim();
     if ssid.is_empty() {
@@ -153,6 +156,8 @@ pub fn wpa_conf(country: &str, ssid: &str, password: &str) -> Result<String, Ref
     let hex: String = ssid.bytes().map(|byte| format!("{byte:02x}")).collect();
     let key = if password.is_empty() {
         "\tkey_mgmt=NONE\n".to_owned()
+    } else if password.contains('"') {
+        format!("\tpsk={}\n", psk(ssid, password))
     } else {
         format!("\tpsk=\"{password}\"\n")
     };
@@ -160,6 +165,21 @@ pub fn wpa_conf(country: &str, ssid: &str, password: &str) -> Result<String, Ref
         "ctrl_interface=DIR=/run/wpa_supplicant\nupdate_config=1\ncountry={country}\n\
          fast_reauth=1\nap_scan=1\nnetwork={{\n\tssid={hex}\n{key}\tscan_ssid=1\n}}\n"
     ))
+}
+
+/// WPA's PSK for `password` on the network `ssid`, as `wpa_passphrase`
+/// writes it: PBKDF2-HMAC-SHA1, 4096 rounds, the name as the salt, 32 bytes
+/// in hex.
+pub fn psk(ssid: &str, password: &str) -> String {
+    let mut key = [0u8; 32];
+    ring::pbkdf2::derive(
+        ring::pbkdf2::PBKDF2_HMAC_SHA1,
+        std::num::NonZeroU32::new(4_096).unwrap_or(std::num::NonZeroU32::MIN),
+        ssid.as_bytes(),
+        password.as_bytes(),
+        &mut key,
+    );
+    key.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// `wpa_cli` prints a network name with C escapes (`\xNN` for any byte
@@ -538,6 +558,84 @@ impl io::Write for Timed {
     }
 }
 
+/// The longest a radio script (`device-sta-mode`, `device-ap-mode`) may
+/// take: its own sleeps are 7 s, and a `systemctl restart` that hangs must
+/// not hold the join or the way back (#1959's P1).
+pub const RADIO_TIMEOUT: Duration = Duration::from_secs(45);
+/// The longest V1's `device-ap-mode` may take, setup's own hotspot (the
+/// first builder's P3 6 on #2617): it restarts hostapd up to twice, each
+/// up to systemd's 90 s start limit, then dnsmasq and nginx, with 6 s of
+/// its own sleeps. Killed earlier, a slow hostapd would leave a lamp in
+/// setup with no hotspot at all.
+pub const HOTSPOT_TIMEOUT: Duration = Duration::from_secs(4 * 60);
+/// The longest `wpa_cli` or `journalctl` may take.
+pub const QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long a command's output is read after it ended, for what it left.
+const OUTPUT_GRACE: Duration = Duration::from_secs(1);
+
+/// Runs `command` with its output read, killed once `most` has passed: its
+/// exit status and standard output, or a timeout error.
+pub fn within(
+    command: &mut std::process::Command,
+    most: Duration,
+) -> std::io::Result<(std::process::ExitStatus, Vec<u8>)> {
+    use std::{io::Read, os::unix::process::CommandExt};
+    // Its own process group, so a timeout kills the script's children too
+    // (a `systemctl restart` that hangs).
+    let mut child = command
+        .process_group(0)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .spawn()?;
+    let mut stdout = child.stdout.take();
+    let (send, read) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        if let Some(stdout) = stdout.as_mut() {
+            let _ = stdout.read_to_end(&mut bytes);
+        }
+        let _ = send.send(bytes);
+    });
+    let group = child.id();
+    let kill_group = || {
+        let _ = std::process::Command::new("kill")
+            .args(["-KILL", "--", &format!("-{group}")])
+            .stderr(std::process::Stdio::null())
+            .status();
+    };
+    let deadline = Instant::now() + most;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            // A child of its own may keep the output open after it ends
+            // (the first builder's P3 6 on #2617): waited on only to the
+            // bound and a second's grace, then its group is killed.
+            let grace = deadline
+                .saturating_duration_since(Instant::now())
+                .min(OUTPUT_GRACE);
+            let bytes = read.recv_timeout(grace).unwrap_or_else(|_| {
+                kill_group();
+                read.recv_timeout(OUTPUT_GRACE).unwrap_or_default()
+            });
+            return Ok((status, bytes));
+        }
+        if Instant::now() >= deadline {
+            kill_group();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!(
+                    "{:?} took longer than {} s",
+                    command.get_program(),
+                    most.as_secs()
+                ),
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
 /// The lamp as V1's image leaves it: wpa_supplicant on `wlan0`, its file in
 /// `/etc/wpa_supplicant`, and the image's two radio scripts.
 pub struct ImageHost {
@@ -566,8 +664,9 @@ impl ImageHost {
         }
     }
 
-    fn run(&self, program: &std::path::Path) -> std::io::Result<()> {
-        let status = std::process::Command::new(program).status()?;
+    fn run(&self, program: &std::path::Path, most: Duration) -> std::io::Result<()> {
+        let mut command = std::process::Command::new(program);
+        let (status, _) = within(&mut command, most)?;
         if status.success() {
             Ok(())
         } else {
@@ -580,17 +679,31 @@ impl ImageHost {
 
     /// `wpa_cli status`, as its key=value lines.
     fn status(&self) -> Vec<(String, String)> {
-        std::process::Command::new("wpa_cli")
-            .args(["-i", &self.interface, "status"])
-            .output()
-            .map(|output| {
-                String::from_utf8_lossy(&output.stdout)
+        let mut command = std::process::Command::new("wpa_cli");
+        command.args(["-i", &self.interface, "status"]);
+        within(&mut command, QUERY_TIMEOUT)
+            .map(|(_, stdout)| {
+                String::from_utf8_lossy(&stdout)
                     .lines()
                     .filter_map(|line| line.split_once('='))
                     .map(|(key, value)| (key.trim().to_owned(), value.trim().to_owned()))
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// `wpa_cli reconfigure`: wpa_supplicant reads its file again, so the
+    /// network it runs is the file's even when the radio's script fails
+    /// (#1959's P1).
+    pub fn reconfigure(&self) -> std::io::Result<()> {
+        let mut command = std::process::Command::new("wpa_cli");
+        command.args(["-i", &self.interface, "reconfigure"]);
+        let (status, stdout) = within(&mut command, QUERY_TIMEOUT)?;
+        if status.success() && String::from_utf8_lossy(&stdout).trim_end().ends_with("OK") {
+            Ok(())
+        } else {
+            Err(std::io::Error::other("wpa_cli reconfigure was not taken"))
+        }
     }
 
     fn field(&self, key: &str) -> Option<String> {
@@ -644,11 +757,11 @@ impl Host for ImageHost {
         self.since_unix = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
-        self.run(&self.station_script.clone())
+        self.run(&self.station_script.clone(), RADIO_TIMEOUT)
     }
 
     fn hotspot(&mut self) -> std::io::Result<()> {
-        self.run(&self.hotspot_script.clone())
+        self.run(&self.hotspot_script.clone(), HOTSPOT_TIMEOUT)
     }
 
     fn internet(&mut self) -> bool {
@@ -675,12 +788,13 @@ impl Host for ImageHost {
     }
 
     fn wpa_events(&mut self) -> Vec<String> {
-        std::process::Command::new("journalctl")
+        let mut command = std::process::Command::new("journalctl");
+        command
             .args(["-t", "wpa_supplicant", "--no-pager", "-o", "cat", "--since"])
-            .arg(format!("@{}", self.since_unix))
-            .output()
-            .map(|output| {
-                String::from_utf8_lossy(&output.stdout)
+            .arg(format!("@{}", self.since_unix));
+        within(&mut command, QUERY_TIMEOUT)
+            .map(|(_, stdout)| {
+                String::from_utf8_lossy(&stdout)
                     .lines()
                     .map(str::trim)
                     .filter(|line| !line.is_empty())

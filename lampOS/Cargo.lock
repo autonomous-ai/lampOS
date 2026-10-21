@@ -2155,6 +2155,7 @@ dependencies = [
  "lamp-ring",
  "lamp-update",
  "reqwest",
+ "ring",
  "rustix",
  "rustls",
  "serde",

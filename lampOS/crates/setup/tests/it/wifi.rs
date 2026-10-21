@@ -143,7 +143,14 @@ fn the_file_is_v1s_with_the_name_in_hex_and_nothing_can_add_a_line_to_it() {
         quoted.contains("\tssid=4d792022486f6d6522205c206e6574\n"),
         "{quoted}"
     );
-    assert!(quoted.contains(r#"psk="pa"ss\word""#), "{quoted}");
+    // A password holding `"` is its PSK (#2617's P3 7); a `\` alone is raw.
+    let psk = lamp_setup::wifi::psk(r#"My "Home" \ net"#, r#"pa"ss\word"#);
+    assert!(quoted.contains(&format!("\tpsk={psk}\n")), "{quoted}");
+    assert!(
+        wpa_conf("US", "Home", r"pass\word")
+            .unwrap()
+            .contains(r#"psk="pass\word""#)
+    );
     // A 63-character password with a backslash stays 63 characters.
     let long = format!("{}\\", "p".repeat(62));
     assert!(wpa_conf("US", "Home", &long).is_ok());
@@ -508,4 +515,51 @@ fn a_name_that_is_not_found_in_time_is_waited_for_once_and_never_twice() {
     }
     // The first lookup is still out; the next checks wait on it.
     assert_eq!(LOOKUPS.load(Ordering::SeqCst), 1);
+}
+
+/// The first builder's P3 7 on #2617: wpa_supplicant 2.10 ends a line at a
+/// `#` after a closing quote, so a password holding `"` and then `#` would
+/// be cut. Such a password is written as its 64-hex PSK, which holds any
+/// characters; IEEE 802.11i's own vector.
+#[test]
+fn p3_7_a_password_with_a_quote_then_a_hash_is_written_as_its_psk() {
+    assert_eq!(
+        lamp_setup::wifi::psk("IEEE", "password"),
+        "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e"
+    );
+    let conf = wpa_conf("US", "Home", r#"pa"ss#word"#).unwrap();
+    let psk = lamp_setup::wifi::psk("Home", r#"pa"ss#word"#);
+    assert!(conf.contains(&format!("\tpsk={psk}\n")), "{conf}");
+    assert!(!conf.contains('#'), "{conf}");
+    // Without a quote, the passphrase as before.
+    assert!(
+        wpa_conf("US", "Home", "pass#word1")
+            .unwrap()
+            .contains("\tpsk=\"pass#word1\"\n")
+    );
+}
+
+/// The first builder's P3 6 on #2617: a command that ends while a child of
+/// its own keeps its output open is not waited on past the bound.
+#[test]
+fn p3_6_a_command_whose_child_keeps_its_output_open_is_not_waited_on() {
+    let started = std::time::Instant::now();
+    let mut command = std::process::Command::new("sh");
+    command.args(["-c", "sleep 20 & echo OK"]);
+    let (status, out) =
+        lamp_setup::wifi::within(&mut command, std::time::Duration::from_secs(3)).unwrap();
+    assert!(status.success());
+    assert_eq!(out, b"OK\n");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+/// The first builder's P3 6 on #2617: setup's own hotspot waits out a slow
+/// hostapd: `device-ap-mode` restarts it twice, each up to systemd's 90 s.
+#[test]
+fn p3_6_the_hotspot_script_has_room_for_two_slow_hostapd_restarts() {
+    assert!(lamp_setup::wifi::HOTSPOT_TIMEOUT >= std::time::Duration::from_secs(2 * 90 + 30));
 }
