@@ -283,6 +283,15 @@ lamp installed before and keeps running. Taking a skill out is the removal
 work's (`lamp-skills remove` and the core and installable kinds, on
 `first/skills-core-installable`), not install's.
 
+A product skill's file is the build's, never the lamp's own (#1722): one
+changed by hand is written over at install, as one removed is, and as an
+update round puts both back ([updates.md](updates.md), "The product's
+skills"). The person's own stays: the skills turned off
+(`/var/lib/lampos-skills-state/off`), a skill's state beside it, and any
+skill they installed in the same folder. A core skill turned on stays on:
+install keeps it in `/var/lib/lampos-skills-state/on` and writes its
+`skill.toml` turned on ([skills.md](skills.md), #2585).
+
 The core `onboarding` folder is installed too. It contributes no model tool;
 its privacy invitation bridge remains inactive without the voice's explicit
 onboarding switch, Controls' privacy receipts (`LAMP_PRIVACY_CONTROLS=on`,

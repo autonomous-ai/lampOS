@@ -1227,7 +1227,26 @@ pub fn install(
         TMPFILES_PATH.to_owned(),
         manifest::sha256_hex(TMPFILES.as_bytes()),
     );
-    let mut defaults = SETTINGS.to_vec();
+    // A core skill turned on on this lamp stays on (the first builder on
+    // #2585, 22:24): its skill.toml is written turned on.
+    let mut texts: Vec<String> = SETTINGS
+        .iter()
+        .map(|(_, text)| (*text).to_owned())
+        .collect();
+    crate::product_skills::keep_turned_on(
+        &config.root,
+        SETTINGS.iter().map(|(path, _)| *path).zip(texts.iter_mut()),
+        &state.settings,
+        &state.settings_writing,
+        true,
+        say,
+    )
+    .map_err(|error| format!("the product skills cannot be read: {error}"))?;
+    let mut defaults: Vec<(&str, &str)> = SETTINGS
+        .iter()
+        .zip(&texts)
+        .map(|((path, _), text)| (*path, text.as_str()))
+        .collect();
     if config.setup {
         defaults.extend_from_slice(SETUP_SETTINGS);
     }
@@ -1607,6 +1626,7 @@ pub fn settings_with_mode(
 ) -> Result<(), String> {
     let before = state.clone();
     let mut writes = Vec::new();
+    let skills = format!("{}/", crate::product_skills::FOLDER);
     for (path, text) in defaults {
         let default = manifest::sha256_hex(text.as_bytes());
         let now = match fs::read(config.on(path)) {
@@ -1626,7 +1646,9 @@ pub fn settings_with_mode(
                 set_mode(config, path, text.as_bytes(), mode, changed)?;
                 state.settings.insert((*path).to_owned(), default);
             }
-            Some(now) if !installs(&now) => {
+            // A product skill's file is the build's, never the lamp's own
+            // (#1722): written over below, as a round puts it back.
+            Some(now) if !installs(&now) && !path.starts_with(&skills) => {
                 say(&format!(
                     "kept {path}: this lamp's own, not a default an install wrote; the build's default is not written"
                 ));
@@ -1644,6 +1666,15 @@ pub fn settings_with_mode(
                 }
             }
             _ => {
+                if let Some(now) = &now
+                    && !installs(now)
+                {
+                    // Only a product skill's file gets here changed: said
+                    // as a round's put-back is (the reviewer on #2585).
+                    say(&format!(
+                        "put back {path}: changed on this lamp; a core skill's files are the build's"
+                    ));
+                }
                 // A file that is install's only by an earlier run's intent
                 // (written, then that run failed or stopped) is settled as
                 // install's now, before this run's intent takes the

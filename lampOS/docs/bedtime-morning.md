@@ -17,6 +17,11 @@ Expression sleeps by its own schedule (the fallback, for one release).
 
 The product installer includes the [core skill](../skills/bedtime-morning/skill.toml)
 at `/var/lib/lampOS/skills/bedtime-morning/`, disabled with `enabled = false`.
+Turning it on means editing that installed `skill.toml` to `enabled = true`.
+It stays on through the next install or update round: the round keeps it in
+`/var/lib/lampos-skills-state/on` and writes the build's file turned on
+([skills.md](skills.md), #2585). A multi-night lamp run survives an
+overnight round.
 It copies `skill.toml` and `SKILL.md`, excluding `tests/`: eighteen product
 skills are installed and nine are enabled (Not feeling well came with the
 product after its lamp check, #1681). Light out, Watches you leave, Music

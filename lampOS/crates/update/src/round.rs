@@ -570,16 +570,6 @@ impl Run<'_, '_> {
             commit: manifest.commit.clone(),
         };
         let writes = placing.as_ref().is_some_and(Placing::writes);
-        if let Some(placing) = &placing {
-            for step in &placing.steps {
-                if let product_skills::Act::Keep(why) = step.act {
-                    self.say(&format!(
-                        "kept {}: {why}; the build's is not written",
-                        step.path
-                    ));
-                }
-            }
-        }
         if writes
             && let Err(error) = product_skills::writable(&self.config.root, product_skills::FOLDER)
         {
@@ -632,6 +622,19 @@ impl Run<'_, '_> {
         self.switch(&mut state, build, changes, placing)
     }
 
+    /// Each core skill's file put back over what the lamp did to it, said
+    /// once it is written, never before (the reviewer on #2585).
+    fn say_put_back(&mut self, steps: &[product_skills::Step]) {
+        for step in steps {
+            if let product_skills::Act::PutBack(why) = step.act {
+                self.say(&format!(
+                    "put back {}: {why}; a core skill's files are the build's",
+                    step.path
+                ));
+            }
+        }
+    }
+
     /// The product skills of a build that changes no part here: written
     /// (each file as it was put back if one cannot be), recorded, and the
     /// build is the lamp's.
@@ -660,6 +663,7 @@ impl Run<'_, '_> {
                 Err(also) => format!("{why}; and putting them back: {also}"),
             });
         }
+        self.say_put_back(&steps);
         self.say(&format!(
             "placed {} files of the product skills",
             backs.len()
@@ -828,7 +832,26 @@ impl Run<'_, '_> {
                 file.name
             )));
         }
-        let bundle = product_skills::parse(&bytes).map_err(Outcome::Refused)?;
+        let mut bundle = product_skills::parse(&bytes).map_err(Outcome::Refused)?;
+        // A core skill turned on on this lamp stays on (the first builder
+        // on #2585, 22:24), kept in its record only by a round that writes.
+        let paths: Vec<String> = bundle
+            .files
+            .iter()
+            .map(|file| format!("{}/{}", product_skills::FOLDER, file.path))
+            .collect();
+        product_skills::keep_turned_on(
+            &self.config.root,
+            paths
+                .iter()
+                .map(String::as_str)
+                .zip(bundle.files.iter_mut().map(|file| &mut file.text)),
+            &state.settings,
+            &state.settings_writing,
+            self.config.apply,
+            self.world.say,
+        )
+        .map_err(|error| Outcome::Failed(format!("the product skills cannot be read: {error}")))?;
         let steps = product_skills::plan(
             &self.config.root,
             &bundle,
@@ -1836,6 +1859,7 @@ impl Run<'_, '_> {
             if let Err(why) = product_skills::write(&self.config.root, &steps) {
                 return self.put_back(state, &build, &backs, None, why, String::new());
             }
+            self.say_put_back(&steps);
             self.say(&format!(
                 "placed {} files of the product skills",
                 self.skills_back.len()
@@ -2448,8 +2472,8 @@ fn describe(
             product_skills::Act::Write => {
                 lines.push(format!("product skills: write {}", step.path))
             }
-            product_skills::Act::Keep(why) => {
-                lines.push(format!("product skills: keep {} ({why})", step.path));
+            product_skills::Act::PutBack(why) => {
+                lines.push(format!("product skills: put back {} ({why})", step.path));
             }
             product_skills::Act::Record => {}
         }
@@ -2476,14 +2500,9 @@ fn describe(
 /// install records its own: the build's before at the next round.
 fn record_skills(state: &mut State, steps: &[product_skills::Step]) {
     for step in steps {
-        if matches!(
-            step.act,
-            product_skills::Act::Write | product_skills::Act::Record
-        ) {
-            state
-                .settings
-                .insert(step.path.clone(), step.sha256.clone());
-        }
+        state
+            .settings
+            .insert(step.path.clone(), step.sha256.clone());
     }
 }
 
