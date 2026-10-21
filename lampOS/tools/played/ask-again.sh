@@ -19,7 +19,7 @@ FIXTURE=${2:?FIXTURE: an ARM64 lamp-tasks-harness-fixture}
 [[ -z ${TASKS:-} || -f $TASKS ]] || { echo "no file at TASKS=$TASKS" >&2; exit 2; }
 RATE=${LAMP_SAY_RATE:-185}
 OUT="$PLAYED_OUT/scenarios/ask-again-$L.txt"
-REMOTE=/usr/local/lib/played-ask-again   # /run may be noexec; this folder is removed when the run ends
+REMOTE=/usr/local/lib/played-stand-in   # /run may be noexec; this folder is removed when the run ends
 ./lamp_ssh 'sudo -n true' </dev/null || { echo "the lamp's user needs sudo -n" >&2; exit 2; }
 ./quiet_gate.sh 45 || { echo "the lamp is not quiet: nothing played" >&2; exit 3; }
 
@@ -51,13 +51,13 @@ if [[ -n ${TASKS:-} ]]; then
   SETUP_ENV="$SETUP_ENV PLAYED_TASKS=$REMOTE/lamp-tasks"
 fi
 
-# The stand-in in (ask-again-setup.sh, on the lamp as root), and put back whatever happens. A setup that fails says
+# The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens. A setup that fails says
 # which step and stops here: nothing is played (#2715's first run, lamp-4ace, 22 Oct 02:5x).
 put_back() {
-  ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < ask-again-setup.sh
+  ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < stand-in.sh
 }
 trap 'put_back 2>&1 | tee -a "$OUT"' EXIT
-if ! ./lamp_ssh "sudo -n env $SETUP_ENV sh -s -- in" < ask-again-setup.sh >> "$OUT" 2>&1; then
+if ! ./lamp_ssh "sudo -n env $SETUP_ENV sh -s -- in" < stand-in.sh >> "$OUT" 2>&1; then
   tail -2 "$OUT" >&2
   echo "ask-again $L: the stand-in's setup failed; nothing was played (see $OUT)" | tee -a "$OUT" >&2
   exit 9
