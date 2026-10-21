@@ -645,6 +645,59 @@ mod tests {
         (format!("http://{address}"), served)
     }
 
+    /// The service's error body is never read or passed on: a 401 whose
+    /// body names a made-up key and the provider's words is said only as
+    /// "refused", in the reply and in the journal's line alike.
+    #[test]
+    fn the_services_error_body_is_never_passed_on() {
+        const BODY: &str = r#"{"error":{"message":"Incorrect API key provided: sk-made-up-body-2094","type":"provider_said_this"}}"#;
+        /// The real check, sent to the local server in place of the
+        /// endpoint the request named (which must be https).
+        struct Local(String);
+        impl Check for Local {
+            fn check(&mut self, given: &Given) -> Verdict {
+                let local = Given {
+                    base_url: Some(self.0.clone()),
+                    ..given.clone()
+                };
+                HttpCheck::local(String::new()).check(&local)
+            }
+        }
+        let (base, served) = answering_with(&format!(
+            "HTTP/1.1 401 Unauthorized\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{BODY}",
+            BODY.len()
+        ));
+        let folder =
+            std::env::temp_dir().join(format!("lamp-setup-keys-body-{}", std::process::id()));
+        let store = Store(folder.join("own"));
+        let line = r#"{"set":"deepseek","key":"sk-made-up-request-2094","base_url":"https://api.deepseek.com"}"#;
+        let (reply, done) = answer(line, &store, &mut Local(base), true);
+        let asked = served.join().unwrap();
+        assert!(asked.starts_with("get /models http/1.1"), "{asked}");
+        assert_eq!(
+            reply,
+            json!({"refused": "that key was refused", "code": "refused"})
+        );
+        let said = done.unwrap().said;
+        assert_eq!(
+            said,
+            "the person's DeepSeek key: refused by the service, not kept"
+        );
+        for part in [
+            "sk-",
+            "made-up",
+            "Incorrect",
+            "provider_said_this",
+            "error",
+            "401",
+        ] {
+            assert!(!reply.to_string().contains(part), "{part} in {reply}");
+            assert!(!said.contains(part), "{part} in {said}");
+        }
+        assert!(!store.0.exists());
+        let _ = fs::remove_dir_all(folder);
+    }
+
     /// One request each, the key in its header alone, and the status read
     /// as works, refused or not reached.
     #[test]

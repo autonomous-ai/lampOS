@@ -1,7 +1,10 @@
 //! A person's own keys (#2094): root's helper keeps a key only once its
 //! service took it, removes it on "use the lamp's own again", and never says
 //! a key in a reply or a journal line.
-use lamp_setup::keys::{self, Check, Given, Service, Store, Verdict};
+use lamp_setup::{
+    keys::{self, Check, Given, Service, Store, Verdict},
+    serve::{self, SetupRequest},
+};
 use serde_json::{Value, json};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf};
 
@@ -223,6 +226,85 @@ fn a_bad_request_is_refused_before_any_check_and_never_quoted() {
         assert!(done.is_none());
     }
     assert!(!store.0.exists());
+}
+
+/// An endpoint with a user, a query or a fragment could carry a key past
+/// its header, so it is refused before any check, in the same fixed words
+/// from the helper and from setup's page, and no part of it is said back.
+#[test]
+fn an_endpoint_with_a_user_query_or_fragment_is_refused_and_never_quoted() {
+    let store = Store(folder("endpoint"));
+    for url in [
+        "https://user:secret@api.deepseek.com",
+        "https://api.deepseek.com/v1?api_key=sk-made-up-query-2094",
+        "https://api.deepseek.com/#sk-made-up-fragment-2094",
+    ] {
+        assert_eq!(
+            keys::fit_url(url),
+            Err("the endpoint must be an https address"),
+            "{url}"
+        );
+        let line = json!({"set": "deepseek", "key": PLANTED, "base_url": url}).to_string();
+        let mut check = Told(Verdict::Works, vec![]);
+        let (reply, done) = keys::answer(&line, &store, &mut check, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "the endpoint must be an https address", "code": "bad_field"}),
+            "{url}"
+        );
+        never_said(&reply, &done);
+        for part in [
+            "user",
+            "secret",
+            "deepseek.com",
+            "api_key",
+            "made-up",
+            "?",
+            "#",
+            "@",
+        ] {
+            assert!(
+                !reply.to_string().contains(part),
+                "{url}: {part} in {reply}"
+            );
+        }
+        assert!(check.1.is_empty(), "{url}");
+        assert!(done.is_none(), "{url}");
+        // Setup's page: the same check, and the relay stays.
+        let request: SetupRequest =
+            serde_json::from_value(json!({"deepseek_api_key": PLANTED, "deepseek_base_url": url}))
+                .unwrap();
+        match serve::own_keys(&request).as_slice() {
+            [Err((Service::DeepSeek, why))] => {
+                assert_eq!(*why, "the endpoint must be an https address", "{url}")
+            }
+            other => panic!("{url}: {}", other.len()),
+        }
+    }
+    assert!(!store.0.exists());
+}
+
+/// A plain endpoint, with a path or without, is still taken and checked.
+#[test]
+fn a_plain_endpoint_is_still_taken() {
+    for url in ["https://api.deepseek.com", "https://api.deepseek.com/v1"] {
+        assert_eq!(keys::fit_url(url).as_deref(), Ok(url));
+        let store = Store(folder("plain"));
+        let line = json!({"set": "deepseek", "key": PLANTED, "base_url": url}).to_string();
+        let mut check = Told(Verdict::Refused, vec![]);
+        let (reply, done) = keys::answer(&line, &store, &mut check, true);
+        assert_eq!(reply["code"], "refused", "{url}: {reply}");
+        never_said(&reply, &done);
+        assert_eq!(check.1.len(), 1, "{url}");
+        assert_eq!(check.1[0].base_url.as_deref(), Some(url));
+        let request: SetupRequest =
+            serde_json::from_value(json!({"deepseek_api_key": PLANTED, "deepseek_base_url": url}))
+                .unwrap();
+        match serve::own_keys(&request).as_slice() {
+            [Ok(given)] => assert_eq!(given.base_url.as_deref(), Some(url)),
+            other => panic!("{url}: {}", other.len()),
+        }
+    }
 }
 
 /// Off: nothing is checked, kept or read.
