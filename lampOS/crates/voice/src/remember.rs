@@ -6902,4 +6902,37 @@ mod tests {
         assert_eq!(served.join().unwrap().len(), 4);
         std::fs::remove_file(&socket).unwrap();
     }
+
+    /// The reviewer-lead's P3 on #2226: a `forget {about}` whose first
+    /// forget gets no acknowledgement forgot nothing it knows of, but may
+    /// have committed: it stays uncertain and is lost, for a fresh session
+    /// to settle.
+    #[test]
+    fn a_forget_about_whose_first_forget_is_unanswered_is_lost() {
+        const MINH: &str = "p-be9688998f085098";
+        let (socket, served) = memory("forget-about-none", 2, |request| {
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[
+                    {"id":1,"at_unix_ms":NOW,"text":"My bicycle is red"}
+                ]}),
+                _ => json!({"ok":false,"error":"io"}),
+            }
+        });
+        let client = resumes_test_client(socket.clone(), true);
+        client.forget_about.store(true, Ordering::Release);
+        let (_, answered) = client.run_at(
+            &call(FORGET, json!({"about":"bicycle"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(MINH),
+        );
+        assert!(!answered);
+        let context = client.context.lock().unwrap();
+        assert_eq!((context.uncertain_writes, context.lost_writes), (1, 1));
+        drop(context);
+        assert!(client.wants_fresh_session());
+        served.join().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+    }
 }
