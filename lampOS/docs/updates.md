@@ -15,17 +15,18 @@ simplest version that works end to end ("wide first, deep later"):
   switches at a quiet moment, watches each part for a minute, and puts the
   previous build back by itself if a part is not well.
 
-**Kind: off unless set.** Nothing changes on a lamp until `lamp-update` is
-installed there, and then nothing is written until its switch
-`--apply on` is given: with `--apply off` (the default) it reads the
+**Apply is off by default on the command line.** Nothing changes on a lamp
+until `lamp-update` is installed there, and then nothing is written until
+`--apply on` is given: with `--apply off` (the command's default) it reads the
 channel and says what it would do, and writes nothing, not even its own
 records. A test shows it
 (`without_apply_nothing_is_written_and_what_would_change_is_said`: every
 file under the lamp's root byte for byte the same, and systemd not asked).
 It publishes nothing on the bus at any setting, and with `--apply off` it
-does not even subscribe. After
-its minute on lamp-4ace the default becomes `on` and `off` stays to turn it
-off ([joining.md](joining.md), "The switch is for that first minute").
+does not even subscribe. The product unit already passes `--apply on`.
+The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS`, `LAMP_UPDATE_APPLY`
+and `LAMP_UPDATE_IMAGE` switches remain off unless set to `on`; the product
+unit sets none of them. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -103,8 +104,9 @@ that is the channel's head.**
 - The sequence is the workflow's run number, which only goes up. A lamp
   takes a build only if its sequence is greater than the one it runs.
 - `min_updater` (#1680), when set, is the oldest updater that can apply the
-  build. It's a level, `manifest::UPDATER` in `lamp-update` (2 now: 2 reads `models`), raised
-  whenever the updater learns to apply something an older one can't. It
+  build. It's a level, `manifest::UPDATER` in `lamp-update` (4 now: 2 reads
+  `models`, 3 reads `settings`, and 4 reads `image`), raised whenever the
+  updater learns to apply something an older one can't. It
   isn't the sequence, because a binary doesn't know its CI run number. It
   sits in the manifest's signed bytes like every other field. Left out
   (`lamp-update manifest` without `--min-updater`), it isn't written, and
@@ -544,10 +546,11 @@ later install takes them as its own.
 
 ### lamp-update's own build on a product lamp
 
-A round never switches lamp-update itself (`lamp-update.service` is never
-a part), on either kind of lamp. On a product lamp its unit also runs
-through `/opt/lampOS/update/current/`. It moves to its own newer build only
-when `lamp-update install` is run again, which installs every product
+With `LAMP_UPDATE_SELF` off, a round never switches lamp-update itself
+(`lamp-update.service` is never a part), on either kind of lamp. On a
+product lamp its unit also runs through `/opt/lampOS/update/current/`. It
+moves to its own newer build only when `lamp-update install` is run again,
+which installs every product
 part's newest build beside the old and moves each link, its own among them,
 without restarting anything; the new updater runs from its next start.
 Replacing the link under a running updater is safe on Linux: the program
@@ -664,9 +667,9 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. `UPDATER` is 2. A manifest without models
-doesn't write the field and is byte for byte what it was. A model's path
-must be under `/opt/lampOS/`, neither the store nor in it, nor in a
+before the field climbs first. The current `UPDATER` is 4. A manifest
+without models doesn't write the field and is byte for byte what it was.
+A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
 plain parts.
 
@@ -740,7 +743,8 @@ A build can carry the product's settings and tmpfiles (`apply.rs`,
 (`install::SETTINGS` and `lampos.conf`, `install::product_settings`), but
 for the product skills' files under `/var/lib/lampOS/skills/`: those are
 `lamp-product-skills`', placed by the round and judged by the skills
-guard, so one file never has two writers at the switch. It also raises `min_updater` to 3 (`manifest::SETTINGS_UPDATER`). `UPDATER` is 3.
+guard, so one file never has two writers at the switch. It also raises
+`min_updater` to 3 (`manifest::SETTINGS_UPDATER`). The current `UPDATER` is 4.
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -1009,6 +1013,29 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   the templates are not parts installed by build). `check` against a lamp
   made of lamp-4ace's units, with a key made for that check and thrown
   away, printed the plan for nine units and wrote nothing.
+
+### Lamp trials: local channels signed with test keys
+
+- **19 October 2026, 10:54–10:59 (+07), lamp-4ace:** the first builder's
+  [parts update proof on #737](https://github.com/autonomous-ai/lampOS/issues/737#issuecomment-6259361314)
+  ran `lamp-update once --apply on`. Build 3005 installed 15 parts beside
+  the old ones, switched at a quiet moment and passed the health watch.
+  Build 3006 deliberately failed the voice and was put back automatically.
+  The body was excluded from the channel and kept its build.
+- **20 October 2026, 05:54–06:11 (+07), lamp-4ace:**
+  [the self-update proof on #1788](https://github.com/autonomous-ai/lampOS/pull/1788#issuecomment-6279387052)
+  ran `run-1788.sh` v3b on merged commit `647f1ee63`. Cases A, B and C and
+  restoration passed: a good updater confirmed; one that exited was put
+  back 107 s after the restart; one that never confirmed was put back about
+  693 s after its switch (the 600 s deadline plus a timer pass). The channel
+  used the lamp's installed sequence, so only lamp-update switched: no
+  product part or skill changed. Restoration checked the records, units,
+  fallback binary and key against their originals, removed the trial's
+  unit and drop-in, and left lamp-update inactive as before.
+
+Both trials used local channels and test keys. They do not show a release
+fetched over the internet with the real signing key, an update including
+the body, or a combined update of models, settings and image files.
 
 ## On lamp-4ace: from one build of `lamp-voice` to the next
 
@@ -1285,23 +1312,25 @@ test does (#1512):
   made again right after the units are written, but someone who starts
   speaking in the second before the restart is cut off: the voice has no
   pause that closes it to new turns yet.
-- **`ProtectSystem=strict` and systemd's own calls.** `daemon-reload` and
-  `restart` from inside the unit's sandbox were not tried on a lamp.
+- **Switching parts from the updater's sandbox.** The 19 October
+  parts trial ran `once` directly; the 20 October service trial switched
+  only the updater. Neither shows a round that switches parts under the product
+  updater unit's `ProtectSystem=strict` sandbox.
 - **The body's restart folds the lamp** (body.md); at a quiet moment it
   may still be standing from the last conversation.
 
 ## Not shown
 
-- Anything on a lamp: no lamp-update has run on any lamp, and no number
-  above is a lamp's.
-- CI publishing: the job above has not run; no key exists.
+- A published release fetched over the internet, verified with the real
+  signing key, switched quietly and put back on failure, including an
+  attended run with the body. These remain
+  [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s acceptance
+  checks. That issue records the owner's deferral of publishing and the
+  real key until about 20 November; the local trials do not complete them.
+- CI publishing: the job above remains a proposal. Test keys used by the
+  lamp trials are not the real signing key.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
-- lamp-update switching itself on a lamp (`LAMP_UPDATE_SELF`): tested on
-  the Mac only (`tests/round.rs`, #1680), with a new binary that exits at
-  once run for real and lamp-update-back called as its unit would call it.
-  The `exec`, `OnFailure=`, the timer and the `systemctl` calls haven't run
-  under systemd. The rehearsal on lamp-4ace is the first builder's.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
   (`tests/round.rs`). A download cut short starts again from nothing; it
   isn't resumed. No published build carries models yet.
@@ -1329,5 +1358,3 @@ test does (#1512):
   switch: everything changed is put back together, but a part that stores
   data in a new form (memory, schedule) before being put back is not
   undone.
-- The Linux build: built and tested natively on Linux ARM64 by CI on this
-  branch, not run there by hand.
