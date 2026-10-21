@@ -13,7 +13,52 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-20
+## Current checkpoint: 2026-10-21, resumed builder work
+
+Ready for lamp-voice: no — Music's rebase and asset-scan fix are under validation.
+
+First restored Music and Internet Updates to Second in the
+[07:53 assignment](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305254890).
+Music is first, with Sixth reading and First running lamp-4ace. Updates is next;
+V3–V5 compatibility stays with Tests. Review follow-up and the next task remain
+part of this builder loop after a PR's gate passes.
+
+- Music #1757 is draft while the revision is checked. It is rebased locally
+  onto `892b1d3233efb1f339ca60e64e4004b40659e006`, preserving the newer
+  Actions and Skills readiness waits. Its old CI qualifies only the old head.
+- The asset-scan correction checks inode, size, permissions, owner and both
+  nanosecond modification/change times. A stable scan reads no payload;
+  changed metadata rechecks the bounded bytes. The proof is copied back only
+  into the accepted generation. Restored-mtime changes, revoked inventory,
+  stale scan results and path replacements have explicit regressions.
+- The pre-fix host scan of sixteen 60-second WAVs took **1,380.945167 ms**
+  first, then **1,401.177416 / 1,407.403209 ms**, reading **46,085,516 bytes**
+  each time. This is host debug timing of `Scan::unchanged` after load,
+  excluding fixture creation, snapshot cloning and copyback. No sound played.
+  [Benchmark evidence](verification/second-music-scan-20261021/README.md).
+- The fresh source-only gate covers **36 crates**, with **2,152** source
+  inputs frozen. Formatting passed; strict workspace/all-target Clippy,
+  complete consumer tests, build and packaging are running. Final counts
+  and the new native runs have not been claimed.
+- The separate caps behavior is documented: with `LAMP_OUTPUT_CAPS=on`,
+  rejected volume arguments that never touch the mixer retain a confirmed
+  cap, including when requested audio is off.
+- #2005 has merged. #694 is Nine's, and #871's remaining replay requires
+  lamp-4ace; those stale Second labels are not concurrent host tasks.
+
+The Internet Updates row remains **0.65**. [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)
+requires a published real-key release fetched over the internet, a quiet switch,
+automatic bad-release recovery and an attended run including the body. The
+[20 Oct 06:11 proof](https://github.com/autonomous-ai/lampOS/pull/1788#issuecomment-6279387052)
+shows updater-only recovery on a local test-key channel: **107 s** after exit,
+**about 693 s** without confirmation. No product part changed. Publication and
+the real key remain explicitly deferred until about 20 November in #1812;
+First has the question of reconciling that deferral with the current priority.
+The next host preparation is release-workflow wiring and the stale update docs,
+after Music. No publication, key change or device action is authorized by this
+checkpoint.
+
+## Previous checkpoint: 2026-10-20
 
 Ready for reviewer integration: yes — both exact heads passed their complete
 host gates and automatic ARM64 and x86 Clippy. No lamp qualification is claimed.
