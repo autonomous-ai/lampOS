@@ -730,7 +730,11 @@ when those features are switched off. These stores belong to the previous
 owner; the private service directories remain for the next start. The zone
 is the one setup setting it keeps. The installed plan comes from
 `crates/setup/fixtures/reset-plan-product.json`; its wipe list matches the
-keeper example in `reset-plan-example.json`.
+keeper example in `reset-plan-example.json`. It follows the build (#806):
+each install, and each update round with `LAMP_UPDATE_APPLY=on`, writes the
+build's over any plan the lamp has, the old one kept in lamp-update's
+records, so a store a later build adds is wiped by a lamp set up earlier.
+A lamp with no plan gets none (docs/updates.md, "Setup's reset plan").
 
 **The units the marker starts.** `lampos-setup-done.path` starts
 `lampos.target` once the marker exists. Every part that is `PartOf` it waits

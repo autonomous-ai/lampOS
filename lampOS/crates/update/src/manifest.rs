@@ -30,8 +30,8 @@ pub const SCHEMA: u32 = 1;
 /// something an older one cannot. A manifest whose `min_updater` is above
 /// it is refused whole, before anything is fetched or written. 2: the
 /// build's `models` (#1680). 3: its `settings` (#1680). 4: the image's
-/// own files, `image` (#1369).
-pub const UPDATER: u64 = 4;
+/// own files, `image` (#1369). 5: the reset plan, `reset_plan` (#806).
+pub const UPDATER: u64 = 5;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -39,6 +39,13 @@ pub const MODELS_UPDATER: u64 = 2;
 pub const SETTINGS_UPDATER: u64 = 3;
 /// The level a build that carries the image's files needs.
 pub const IMAGE_UPDATER: u64 = 4;
+/// The level a build that carries the reset plan needs.
+pub const RESET_PLAN_UPDATER: u64 = 5;
+/// Setup's reset plan (#806): what the 5 s reset wipes. The product's and
+/// never the person's, so a build carries it in a field of its own
+/// (`reset_plan`), never in `settings`, and it is written over any plan a
+/// lamp has (crate::apply, docs/updates.md).
+pub const RESET_PLAN: &str = "/etc/lampOS/setup/reset-plan.json";
 /// The image's own files a build may carry (#1369): those of
 /// `robots/lamp/rootfs/` and its overrides that are the product's to keep
 /// up to date after a lamp ships. Not V1's HAL (`/opt/hal`, the LED boot
@@ -164,6 +171,13 @@ pub struct Manifest {
     /// there are none, and not written.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub image: Vec<ImageFile>,
+    /// Setup's reset plan at [`RESET_PLAN`] (#806): written by
+    /// `lamp-update-apply` over the lamp's plan wherever there is one, the
+    /// old one kept in the records first. Not in `settings`, for the same
+    /// reason as `image`. Left out when there is none, and not written.
+    /// Boxed, so a manifest stays small beside [`TooOld`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_plan: Option<Box<Setting>>,
 }
 
 /// One of the image's own files, for one variant of the lamp
@@ -339,36 +353,7 @@ pub fn check_settings(settings: &[Setting]) -> Result<(), Refused> {
         if !paths.insert(setting.path.as_str()) {
             return Err(refused(format!("{} is listed twice", setting.path)));
         }
-        if setting.removed {
-            if setting.text.is_some() || setting.sha256.is_some() || setting.mode.is_some() {
-                return Err(refused(format!(
-                    "{} is removed, and has a text, SHA-256 or mode",
-                    setting.path
-                )));
-            }
-            continue;
-        }
-        let (Some(text), Some(sha256)) = (&setting.text, &setting.sha256) else {
-            return Err(refused(format!("{} has no text or SHA-256", setting.path)));
-        };
-        if sha256_hex(text.as_bytes()) != *sha256 {
-            return Err(refused(format!(
-                "{} does not match its SHA-256",
-                setting.path
-            )));
-        }
-        if !setting
-            .mode
-            .as_deref()
-            .is_some_and(|mode| SETTING_MODES.contains(&mode))
-        {
-            return Err(refused(format!(
-                "{}'s mode is not one of {}",
-                setting.path,
-                SETTING_MODES.join(", ")
-            )));
-        }
-        bytes += text.len();
+        bytes += check_setting(setting)?;
     }
     if bytes > MOST_SETTINGS_BYTES {
         return Err(refused(format!(
@@ -376,6 +361,63 @@ pub fn check_settings(settings: &[Setting]) -> Result<(), Refused> {
         )));
     }
     Ok(())
+}
+
+/// The reset plan checked: at [`RESET_PLAN`], never removed, its text with
+/// its SHA-256, 0644 (every part's reset reads it), and at most 16 KiB, as
+/// `lamp-setup` reads.
+pub fn check_reset_plan(plan: &Setting) -> Result<(), Refused> {
+    if plan.path != RESET_PLAN {
+        return Err(refused(format!(
+            "{:?} is not the reset plan's path, {RESET_PLAN}",
+            plan.path
+        )));
+    }
+    if plan.removed {
+        return Err(refused("the reset plan is never removed by a build"));
+    }
+    if plan.mode.as_deref() != Some("0644") {
+        return Err(refused("the reset plan's mode is not 0644"));
+    }
+    if check_setting(plan)? > 16 * 1024 {
+        return Err(refused("the reset plan exceeds 16 KiB"));
+    }
+    Ok(())
+}
+
+/// One setting's text, SHA-256 and mode checked: its text's length, or 0
+/// for one removed.
+fn check_setting(setting: &Setting) -> Result<usize, Refused> {
+    if setting.removed {
+        if setting.text.is_some() || setting.sha256.is_some() || setting.mode.is_some() {
+            return Err(refused(format!(
+                "{} is removed, and has a text, SHA-256 or mode",
+                setting.path
+            )));
+        }
+        return Ok(0);
+    }
+    let (Some(text), Some(sha256)) = (&setting.text, &setting.sha256) else {
+        return Err(refused(format!("{} has no text or SHA-256", setting.path)));
+    };
+    if sha256_hex(text.as_bytes()) != *sha256 {
+        return Err(refused(format!(
+            "{} does not match its SHA-256",
+            setting.path
+        )));
+    }
+    if !setting
+        .mode
+        .as_deref()
+        .is_some_and(|mode| SETTING_MODES.contains(&mode))
+    {
+        return Err(refused(format!(
+            "{}'s mode is not one of {}",
+            setting.path,
+            SETTING_MODES.join(", ")
+        )));
+    }
+    Ok(text.len())
 }
 
 /// A model a part reads: where it goes on the lamp, where it is fetched
@@ -739,6 +781,14 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
         )));
     }
     check_settings(&manifest.settings)?;
+    if let Some(plan) = &manifest.reset_plan {
+        if manifest.min_updater.unwrap_or(1) < RESET_PLAN_UPDATER {
+            return Err(refused(format!(
+                "a build with the reset plan needs min_updater {RESET_PLAN_UPDATER} or more"
+            )));
+        }
+        check_reset_plan(plan)?;
+    }
     if !manifest.image.is_empty() && manifest.min_updater.unwrap_or(1) < IMAGE_UPDATER {
         return Err(refused(format!(
             "a build with the image's files needs min_updater {IMAGE_UPDATER} or more"
@@ -967,6 +1017,7 @@ mod tests {
             models: Vec::new(),
             settings: Vec::new(),
             image: Vec::new(),
+            reset_plan: None,
         }
     }
 
@@ -1385,5 +1436,46 @@ mod tests {
         assert!(is_token("lamp-4ace"));
         assert!(!is_token("4ace"));
         assert_eq!(fingerprint(&[0; 32]).len(), 16);
+    }
+
+    /// #806: the reset plan is a field of its own, not a setting, so a
+    /// lamp-update-back from before it, which refuses a setting path it
+    /// does not know, passes it over. It needs updater 5, its own path,
+    /// its text with its SHA-256, and 0644.
+    #[test]
+    fn the_reset_plan_is_read_only_with_its_updater_and_its_own_path() {
+        let plain = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&plain).contains("reset_plan"));
+        let mut with = manifest();
+        with.reset_plan = Some(Box::new(Setting::new(RESET_PLAN, "{}\n")));
+        with.min_updater = Some(IMAGE_UPDATER);
+        let why = parse(&serde_json::to_vec(&with).unwrap()).unwrap_err().0;
+        assert!(why.contains("min_updater 5"), "{why}");
+        with.min_updater = Some(RESET_PLAN_UPDATER);
+        assert_eq!(parse(&serde_json::to_vec(&with).unwrap()).unwrap(), with);
+        assert!(!is_setting_path(RESET_PLAN));
+        let mut elsewhere = with.clone();
+        elsewhere.reset_plan = Some(Box::new(Setting::new(
+            "/etc/lampOS/setup/serve.json",
+            "{}\n",
+        )));
+        assert!(parse(&serde_json::to_vec(&elsewhere).unwrap()).is_err());
+        let mut wrong = with.clone();
+        wrong.reset_plan.as_mut().unwrap().sha256 = Some("0".repeat(64));
+        assert!(parse(&serde_json::to_vec(&wrong).unwrap()).is_err());
+        let mut closed = with.clone();
+        closed.reset_plan.as_mut().unwrap().mode = Some("0600".into());
+        assert!(parse(&serde_json::to_vec(&closed).unwrap()).is_err());
+        // An updater one level behind refuses it for its updater, so it
+        // climbs, never for a field it does not know.
+        let key = throwaway();
+        let envelope = seal(&serde_json::to_vec(&with).unwrap(), &key).unwrap();
+        let why = open_as(&envelope, &public(&key), RESET_PLAN_UPDATER - 1)
+            .unwrap_err()
+            .0;
+        assert!(
+            why.contains(&format!("needs updater {RESET_PLAN_UPDATER}")),
+            "{why}"
+        );
     }
 }

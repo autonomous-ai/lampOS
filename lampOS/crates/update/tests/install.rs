@@ -281,6 +281,7 @@ impl Lamp {
             models: Vec::new(),
             settings: Vec::new(),
             image: Vec::new(),
+            reset_plan: None,
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(
@@ -3548,4 +3549,113 @@ fn lamp_update_back_waits_for_its_binary_rather_than_failing() {
         .find(|line| line.starts_with("ExecStart="))
         .unwrap();
     assert!(exec.starts_with(&format!("ExecStart={} ", lamp_update::own::BACK)));
+}
+
+const RESET_PLAN: &str = "/etc/lampOS/setup/reset-plan.json";
+const PLAN_KEPT: &str = "/var/lib/lampos-update/reset-plan.json.before-188";
+
+fn put_plan(lamp: &Lamp, text: &str) {
+    let at = lamp.on(RESET_PLAN);
+    fs::create_dir_all(at.parent().unwrap()).unwrap();
+    fs::write(at, text).unwrap();
+}
+
+/// #806, found on lamp-06c1 on 21 Oct: `install --setup on` kept a plan it
+/// had no record of as "this lamp's own". The plan is the product's and
+/// never the person's: install places the build's, the old one kept in the
+/// records first, and records it.
+#[test]
+fn install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records() {
+    for old in [
+        "{\"placed\": \"by hand\"}\n",
+        include_str!("fixtures/reset-plan-4de8ebe1c.json"),
+    ] {
+        let mut lamp = Lamp::new(188, &[]);
+        lamp.config.setup = true;
+        put_plan(&lamp, old);
+        lamp.install().unwrap();
+        assert_eq!(
+            fs::read_to_string(lamp.on(RESET_PLAN)).unwrap(),
+            install::RESET_PLAN
+        );
+        assert_eq!(fs::read_to_string(lamp.on(PLAN_KEPT)).unwrap(), old);
+        assert_eq!(
+            lamp.state().settings[RESET_PLAN],
+            sha256_hex(install::RESET_PLAN.as_bytes())
+        );
+        assert!(
+            !lamp
+                .said
+                .iter()
+                .any(|line| line.starts_with(&format!("kept {RESET_PLAN}"))),
+            "{:?}",
+            lamp.said
+        );
+    }
+}
+
+/// The build's plan already there, recorded or not: no change, no backup.
+#[test]
+fn the_builds_plan_already_there_is_no_change_and_no_backup() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.config.setup = true;
+    put_plan(&lamp, install::RESET_PLAN);
+    lamp.install().unwrap();
+    assert!(!lamp.on(PLAN_KEPT).exists());
+    assert_eq!(
+        lamp.state().settings[RESET_PLAN],
+        sha256_hex(install::RESET_PLAN.as_bytes())
+    );
+    let before = tree(&lamp.root);
+    assert_eq!(lamp.install().unwrap().changed, Vec::<String>::new());
+    assert_eq!(tree(&lamp.root), before);
+}
+
+/// Without `--setup on`, a lamp with a plan (set up from the app) gets the
+/// build's, and a lamp with none (set up by hand, as lamp-4ace) gets none:
+/// with setup's marker a plan would arm the 5 s reset.
+#[test]
+fn without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added() {
+    let mut none = Lamp::new(188, &[]);
+    none.install().unwrap();
+    assert!(!none.on(RESET_PLAN).exists());
+    assert!(!none.state().settings.contains_key(RESET_PLAN));
+
+    let mut lamp = Lamp::new(188, &[]);
+    put_plan(&lamp, include_str!("fixtures/reset-plan-ef6a2b9a7.json"));
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on(RESET_PLAN)).unwrap(),
+        install::RESET_PLAN
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.on(PLAN_KEPT)).unwrap(),
+        include_str!("fixtures/reset-plan-ef6a2b9a7.json")
+    );
+}
+
+/// (c) on #1722, 08:24: every plan install has shipped, from git, the two
+/// read on lamps among them; the one it ships now first.
+#[test]
+fn the_plans_install_shipped_are_listed() {
+    let now = sha256_hex(install::RESET_PLAN.as_bytes());
+    assert_eq!(install::RESET_PLAN_SHIPPED[0], now, "put {now} first");
+    for (text, start) in [
+        (
+            include_str!("fixtures/reset-plan-4de8ebe1c.json"),
+            "5dff6f81",
+        ),
+        (
+            include_str!("fixtures/reset-plan-ef6a2b9a7.json"),
+            "de872e78cb60",
+        ),
+    ] {
+        let sha = sha256_hex(text.as_bytes());
+        assert!(sha.starts_with(start));
+        assert!(install::RESET_PLAN_SHIPPED.contains(&sha.as_str()), "{sha}");
+    }
+    let mut unique = install::RESET_PLAN_SHIPPED.to_vec();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), install::RESET_PLAN_SHIPPED.len());
 }

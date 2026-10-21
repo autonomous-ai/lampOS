@@ -458,7 +458,12 @@ reads itself:
   `/etc/lampOS/setup/reset-plan.json` (docs/setup.md, "On a lamp"). Written
   by `install --setup on` (below); without it they are not, and
   `lamp-setup.service` does not start (its conditions), so a lamp does not
-  enter setup.
+  enter setup. The reset plan is the product's and never the person's
+  (#806): at every install, with or without `--setup on`, a plan there that
+  isn't the build's is replaced by it, the old one kept first as
+  `/var/lib/lampos-update/reset-plan.json.before-<build>` unless it is the
+  plan install recorded. A lamp with no plan gets none without `--setup on`
+  (docs/updates.md, "Setup's reset plan").
 
 ## At the factory, once per lamp
 
