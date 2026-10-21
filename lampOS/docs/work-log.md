@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-22 01:56 +07, updater native green; review revision underway
+
+**Ready for lamp-voice: no (#2709, requested P2 revision).** Its initial
+head `52b2f5f3dc21dabda8f043650295dd8984ccb657` passed ARM64
+39652804662: **9,795 passed (one leaky), 0 failed, 63 skipped**, plus
+four doc tests, relay and twelve own-harness tests. Linux Clippy passed.
+[Native evidence](verification/update-self-recovery-native-20261022/README.md)
+keeps the exact tested merge and artifact metadata. First's 01:31 review
+requests the existing bounded query helper and removal of the separate
+query code, cut fixtures and process dev-dependency; that work is underway.
+
+The next named slice is First's cloud-report visibility for an updater
+waiting without its recovery timer, plus the install explanation in
+`updates.md`. Source audit started. #1672 is Seventh's; no Second edits.
+#1757 is next for Reviewer-lead; Nine is reading its own-music/ears path.
+Second-P8 remains pushed, **425/0/0/0**, dependent on #1757's merge.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 01:50 +07, diagnostics pushed and pending branches checked
 
 **Ready for lamp-voice: no (#2709, ARM64 pending; second-P8, dependency).**
