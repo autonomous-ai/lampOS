@@ -4073,7 +4073,12 @@ impl Heeding {
     /// `LAMP_QUIET_GOING_ON_SAME_ONE=on` or `LAMP_GOING_ON_NOT_OWN=on`
     /// ([`checking_the_voice_for`]).
     pub(crate) fn checking_the_voice(&mut self, printer: Box<dyn crate::same_voice::Printer>) {
-        self.voices = Some(crate::same_voice::Voices::new(printer));
+        self.voices = Some(
+            crate::same_voice::Voices::new(printer).callers_only(
+                std::env::var(crate::same_voice::CALLER_ONLY_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on"),
+            ),
+        );
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -4974,12 +4979,17 @@ impl Heeding {
             played && (attention.called_for_itself() || turned == Some(true) || seen.named_faced);
         // Let out as the conversation going on, or for itself: a line that
         // called the lamp begins a conversation of its own (Eighth on #829).
+        // With the caller's voice only, the same call as the caller's face
+        // takes below (`called`): a face turned to the lamp is a new caller,
+        // and their voice is the conversation's (the Reviewer's P2 on #2650).
+        // Without it, as before.
         if let (Some(voices), Some(_)) = (self.voices.as_mut(), verdict) {
-            voices.decided(
-                request,
-                played,
-                seen.going_on && !attention.called_for_itself(),
-            );
+            let new_call = if voices.is_callers_only() {
+                called
+            } else {
+                attention.called_for_itself()
+            };
+            voices.decided(request, played, seen.going_on && !new_call);
         }
         // The verdict for the room this route keeps (`super::room`), and a
         // call let out, which ends the count of talk past the lamp; a line
@@ -6521,6 +6531,92 @@ mod tests {
         };
         assert_eq!(judge(1), None, "the conversation's voice goes on");
         assert!(judge(-1).is_some(), "another voice is held");
+    }
+
+    /// The Reviewer's P2 on #2650: a new caller let in by a face turned to
+    /// the lamp is a call, for the conversation's voice as for the caller's
+    /// face. A names the lamp; B, turned to it, asks; B goes on unturned. B's
+    /// voice is the conversation's now, with the caller's voice only or
+    /// without it, so B's follow-up goes on in a quiet room.
+    #[test]
+    fn a_caller_let_in_by_a_turned_face_takes_the_conversations_voice() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let signs = |going_on, turned| Signs {
+            room: Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: Some(turned),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        for caller_only in [false, true] {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let mut heeding = Heeding::new(true, true, None, None);
+            // `LAMP_SPOKEN_TO` off, as on lamp-52e6: the print is only read.
+            heeding.as_the_only_voice(false, false, false);
+            heeding.going_on_quiet_only_for_the_same_one();
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            heeding.voices = Some(
+                crate::same_voice::Voices::new(
+                    Box::new(Voice::default()) as Box<dyn crate::same_voice::Printer>
+                )
+                .callers_only(caller_only),
+            );
+            for (request, voice) in [(1, 1), (2, -1), (3, -1)] {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            assert_eq!(
+                heeding.judge(
+                    1,
+                    said,
+                    "Lamp, what's the weather today?",
+                    signs(false, false)
+                ),
+                None,
+                "A's named call"
+            );
+            assert_eq!(
+                heeding.judge(2, said, "What time is it there?", signs(true, true)),
+                None,
+                "B's call, turned to the lamp"
+            );
+            assert_eq!(
+                heeding.judge(3, said, "And what about tomorrow?", signs(true, false)),
+                None,
+                "B's follow-up goes on (caller-only {caller_only})"
+            );
+        }
     }
 
     /// #1712, the first builder at 17:26: a call the lamp never answered

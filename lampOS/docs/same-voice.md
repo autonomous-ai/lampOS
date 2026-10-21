@@ -526,6 +526,32 @@ and `with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_as_ta
 The child with the real model, its timing and memory on the A733, and
 real voices are not shown.
 
+## The caller's voice only (#2602, 21 October)
+
+On lamp-4ace on 21 October at 20:06 (sv-ab, after a quiet-gated restart),
+the check held none of the two-person scenes' talk: scene replies were 2 5 5
+with the model, against 2 3 4 without it. Every scene line printed read as
+the conversation's voice, at 0.55 to 0.84, while two voices were speaking;
+at 18:33, with the conversation still the caller's alone, the other person
+read 0.11 to 0.29. The conversation's voice had taken in the second person:
+`Voices::adopt` kept the print of every line let out as the conversation
+going on, and once one of theirs was let out before its print was back,
+their voice was the conversation's too.
+
+With `LAMP_SAME_VOICE_CALLER_ONLY=on` on the second route
+(`Voices::callers_only`), the conversation's voice is its caller's only:
+the prints of lines let out for themselves (the name, a call, a face turned
+to it). A line let out only as the conversation going on is judged against
+it and never added to it, so the second person's lines stay another voice
+(a line let out for a face turned to the lamp is a new call, as for the
+caller's face, so its speaker's voice becomes the conversation's: the
+Reviewer's P2 on #2650, `a_caller_let_in_by_a_turned_face_takes_the_conversations_voice`)
+(`with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice`).
+A caller whose call was too short to print has no voice known for that
+whole conversation, unlike without the switch, where the next going-on
+line's print becomes its voice: the check then stays silent until the next
+call, on the side of holding nothing. Not yet run on a lamp.
+
 ## Not shown
 
 - **People.** Every voice was synthetic and played from one loudspeaker.
