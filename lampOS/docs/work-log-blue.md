@@ -258,3 +258,26 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **Tests' #2630** (faster judge tests): yes, and it passes merged with
   #2577. Said yes on #1806 to the `ASLEEP_FRESH_US` `serve` option for
   tests.
+
+## 2026-10-21 20:1x–21:3x — #2577 merged; #2640; part 1's rows passed on lamp-75c9
+
+- **The first builder's (b) on the person's light (#2530, 20:1x):** it
+  stays their base. Once it rests (Mood asleep since, or 12 h), an add-on
+  may lay a brief glow over it.
+  - Built as **#2640**: 5 s at `Idle`, and the judge's own glow keeps the
+    light theirs.
+  - The reviewer-lead's P2 (a light set off rested too) and P3 (Mood's
+    clock) are fixed as `3d10c65ca`. I caught my own precedence slip on the
+    way.
+- **#2577 merged** as `26a949ffa`, read clean by the reviewer-lead. #2640
+  is retargeted and rebased.
+- **lamp-75c9, 21:17–21:24,** on #2577's build:
+  - the busy room, the person's light, a kept mood, the rate (51 s after a
+    kept one), the pause and the rate freeing after 2 min, all as designed;
+  - recorded on the bus;
+  - root steps by the helper's `[hand-off]`;
+  - lock released at 21:24, everything restored, and `/var/lib/blue-addons`
+    removed.
+- **#2662:** the `lamp-runs.md` rows. Part 1 is struck; #2640's glow row
+  waits for its build.
+- **Next:** the glow row on #2640's build, then part 2 (`say`).
