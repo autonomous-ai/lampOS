@@ -166,7 +166,12 @@ pub fn heard_instead(model: &str, heard: Option<&str>, on: bool) -> Option<Strin
 /// the heard words in place of the model's, and those words, when
 /// [`heard_instead`] keeps them. `heard` is false for a line not heard at
 /// the lamp.
-pub fn call_as_heard(call: &ToolCall, request: u64, heard: bool) -> Option<(ToolCall, String)> {
+pub fn call_as_heard(
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<(ToolCall, String)> {
     if !heard || call.name != super::REMEMBER || !on() {
         return None;
     }
@@ -174,22 +179,46 @@ pub fn call_as_heard(call: &ToolCall, request: u64, heard: bool) -> Option<(Tool
         .lock()
         .ok()?
         .heard_for(request, Instant::now());
-    call_with(call, words.as_deref())
+    // The replaced fact's words, only for a correction whose sentence
+    // was not all heard: as this session was shown them, no store call.
+    let replaced = || {
+        let id = call.args.get("replaces")?.as_u64()?;
+        super::shown_text(id, lease)
+    };
+    call_with(call, words.as_deref(), replaced)
 }
 
-/// [`call_as_heard`] with the words heard in its line. A heard line kept
-/// instead is sent without the model's `replaces` (#2510, reviewer-lead
-/// P2): it may lack the fact's subject ("They said: it's green now"), so
-/// the old fact stays and the heard line is kept beside it. Its `on`
-/// (#1693) stays: by now an `on` is left only when these same heard words
-/// name that day ([`super::on::call_as_heard`]), so the heard line is
+/// [`call_as_heard`] with the words heard in its line, and `replaced`, the
+/// text of the fact a `replaces` names as this session was shown it. A
+/// heard line kept instead is sent without the model's `replaces` (#2510,
+/// reviewer-lead P2): it may lack the fact's subject ("They said: it's
+/// green now"), so the old fact stays and the heard line is kept beside it.
+/// Its `on` (#1693) stays: by now an `on` is left only when these same heard
+/// words name that day ([`super::on::call_as_heard`]), so the heard line is
 /// exactly what dates it (reviewer-lead P3 on #2680).
-pub(super) fn call_with(call: &ToolCall, heard: Option<&str>) -> Option<(ToolCall, String)> {
+pub(super) fn call_with(
+    call: &ToolCall,
+    heard: Option<&str>,
+    replaced: impl FnOnce() -> Option<String>,
+) -> Option<(ToolCall, String)> {
     if call.name != super::REMEMBER {
         return None;
     }
     let model = call.args.get("text")?.as_str()?;
     let kept = heard_instead(model, heard, true)?;
+    // A correction (#2602) keeps the model's words when each is checkable:
+    // the old fact's or heard, both without accents as for the heard words.
+    if call.args.get("replaces").is_some_and(|id| !id.is_null())
+        && let Some(old) = replaced()
+    {
+        let known: Vec<String> = words(&old)
+            .chain(heard.into_iter().flat_map(words))
+            .map(|word| bare(&word))
+            .collect();
+        if key_words(model).iter().all(|word| known.contains(word)) {
+            return None;
+        }
+    }
     let mut call = call.clone();
     let on = call.args.get("on").cloned();
     call.args = json!({"text": kept});
@@ -333,27 +362,92 @@ mod tests {
             name: name.into(),
             args: json!({"text": text}),
         };
-        let (sent, kept) = call_with(&call(super::super::REMEMBER, WRONG), Some(TEA)).unwrap();
+        let (sent, kept) =
+            call_with(&call(super::super::REMEMBER, WRONG), Some(TEA), || None).unwrap();
         assert_eq!(kept, "They said: my favourite tea is jasmine");
         assert_eq!(sent.args, json!({"text": kept}));
         assert_eq!(sent.name, super::super::REMEMBER);
         assert_eq!(
-            call_with(&call(super::super::RECALL, WRONG), Some(TEA)),
+            call_with(&call(super::super::RECALL, WRONG), Some(TEA), || None),
             None
         );
-        assert_eq!(call_with(&call(super::super::REMEMBER, WRONG), None), None);
+        assert_eq!(
+            call_with(&call(super::super::REMEMBER, WRONG), None, || None),
+            None
+        );
         // A correction (#2510) whose heard line is kept drops its `replaces`.
         let mut correction = call(super::super::REMEMBER, WRONG);
         correction.args["replaces"] = json!(4);
-        let (sent, kept) = call_with(&correction, Some(TEA)).unwrap();
+        let (sent, kept) = call_with(&correction, Some(TEA), || None).unwrap();
         assert_eq!(sent.args, json!({"text": kept}));
         // Its day stays with the heard line that named it (#1693,
         // reviewer-lead P3 on #2680).
         let mut dated = call(super::super::REMEMBER, "Dentist appointment on Friday.");
         dated.args["on"] = json!("2026-10-23");
-        let (sent, kept) = call_with(&dated, Some("remember my dentist is on friday")).unwrap();
+        let (sent, kept) =
+            call_with(&dated, Some("remember my dentist is on friday"), || None).unwrap();
         assert_eq!(kept, "They said: my dentist is on friday");
         assert_eq!(sent.args, json!({"text": kept, "on": "2026-10-23"}));
+    }
+
+    /// lamp-06c1, 21 Oct (#2602): "it's green now" against kept thing 8.
+    /// A correction keeps the model's words, with `replaces`, when each of
+    /// them is the old fact's or was heard; else the heard line, without.
+    #[test]
+    fn a_correction_keeps_the_models_words_when_each_is_the_old_facts_or_heard() {
+        const VIOLET: &str = "Her favourite colour is violet";
+        const GREEN_NOW: &str = "it's green now";
+        let correction = |text: &str, replaces: Option<u64>| {
+            let mut args = json!({"text": text});
+            if let Some(id) = replaces {
+                args["replaces"] = json!(id);
+            }
+            ToolCall {
+                id: String::new(),
+                name: super::super::REMEMBER.into(),
+                args,
+            }
+        };
+        let old = |text: &'static str| move || Some(text.to_owned());
+        // (a) Every word the old fact's or heard: sent as the model wrote it.
+        let green = correction("Her favourite colour is green.", Some(8));
+        assert_eq!(call_with(&green, Some(GREEN_NOW), old(VIOLET)), None);
+        // (b) "dark" was neither: the heard line, without `replaces`.
+        let dark = correction("Her favourite colour is dark green", Some(8));
+        let (sent, kept) = call_with(&dark, Some(GREEN_NOW), old(VIOLET)).unwrap();
+        assert_eq!(kept, "They said: it's green now");
+        assert_eq!(sent.args, json!({"text": kept}));
+        // An old fact this session was not shown checks nothing.
+        let (sent, _) = call_with(&green, Some(GREEN_NOW), || None).unwrap();
+        assert_eq!(sent.args, json!({"text": "They said: it's green now"}));
+        // (c) Accents folded on both sides, as for the heard words.
+        let xanh = correction("Màu yêu thích của chị là xanh lá", Some(3));
+        assert_eq!(
+            call_with(
+                &xanh,
+                Some("giờ là xanh lá rồi"),
+                old("màu yêu thích của chị là tím")
+            ),
+            None
+        );
+        let mau = correction("Mau yeu thich cua chi la xanh la", Some(3));
+        assert_eq!(
+            call_with(
+                &mau,
+                Some("giờ là xanh lá rồi"),
+                old("Màu yêu thích của chị là tím")
+            ),
+            None
+        );
+        // (d) Without `replaces`, as before: the heard line, the old fact
+        // never asked for.
+        let plain = correction("Her favourite colour is green.", None);
+        let (sent, kept) = call_with(&plain, Some(GREEN_NOW), || -> Option<String> {
+            panic!("asked for an old fact without replaces")
+        })
+        .unwrap();
+        assert_eq!(sent.args, json!({"text": kept}));
+        assert_eq!(kept, "They said: it's green now");
     }
 
     #[test]

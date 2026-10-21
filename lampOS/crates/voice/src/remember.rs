@@ -418,6 +418,26 @@ pub fn replaces_on() -> bool {
     REPLACES.get() == Some(&true)
 }
 
+/// The text of kept thing `id` as this session was shown it (the session
+/// note as it opened, recall, a hit, a follow-up, or one it kept), in the
+/// scope a call with `lease` runs in (as [`run_scoped`], else [`run`]), for
+/// a correction held against what was heard ([`heard`], #2510) and counted
+/// against in the journal ([`noted`]). Never asks the store.
+pub(crate) fn shown_text(
+    id: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<String> {
+    let person = match lease {
+        Some(lease) => lease.scope()?.person().map(str::to_owned),
+        None => person_now(),
+    };
+    let client = DAYS
+        .get()
+        .and_then(Option::as_ref)
+        .filter(|client| client.replaces.load(Ordering::Acquire))?;
+    client.context.lock().ok()?.text(person.as_deref(), id)
+}
+
 /// Set it once for this process, as [`start`] does from the environment;
 /// the first setting stands.
 pub fn switch_replaces(on: bool) -> bool {
@@ -1866,6 +1886,7 @@ impl DaysClient {
         let linking = self.link_used.load(Ordering::Acquire);
         let said = match self.context.lock() {
             Ok(mut context) => {
+                context.shown_as(Some(person), id, text);
                 let said = context.include(Some(person), &[id]);
                 if linking {
                     context.says(Some(person), id, content_words(text));
@@ -2120,6 +2141,10 @@ struct DaysContext {
     /// session closes, and when journalling stops; never more than
     /// `sources`.
     carried: Vec<Source>,
+    /// Kept things' texts as this session was shown them, by id, each with
+    /// its person ([`REPLACES_ENVIRONMENT`]): a correction's words are held
+    /// against them ([`shown_text`]). The newest [`SOURCE_IDS`].
+    texts: Vec<(Option<String>, u64, String)>,
 }
 
 /// Why memory's journal stopped until a fresh worker (#2176): said in the
@@ -2258,6 +2283,25 @@ impl DaysContext {
             }
             self.hits.push(hit);
         }
+    }
+
+    /// Kept thing `id` of this person's was shown as `text` (#2510).
+    fn shown_as(&mut self, person: Option<&str>, id: u64, text: &str) {
+        self.texts
+            .retain(|(whose, told, _)| !(whose.as_deref() == person && *told == id));
+        if self.texts.len() == SOURCE_IDS {
+            self.texts.remove(0);
+        }
+        self.texts
+            .push((person.map(str::to_owned), id, text.to_owned()));
+    }
+
+    /// The text kept thing `id` of this person's was shown as.
+    fn text(&self, person: Option<&str>, id: u64) -> Option<String> {
+        self.texts
+            .iter()
+            .find(|(whose, told, _)| whose.as_deref() == person && *told == id)
+            .map(|(_, _, text)| text.clone())
     }
 
     /// What this session was shown of this person's: its sources and the
@@ -2405,6 +2449,9 @@ pub fn hits_note(
         && let Ok(mut context) = client.context.lock()
     {
         context.hit(person, &shown);
+        for (id, text) in entry_texts(&answer, &shown) {
+            context.shown_as(person, id, &text);
+        }
     }
     Some(match person {
         Some(_) => told,
@@ -2499,6 +2546,21 @@ fn hits_told(
         })
         .collect();
     (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown))
+}
+
+/// The texts of a kept list's entries with these ids, as a hit line tells
+/// them.
+fn entry_texts(answer: &Value, ids: &[u64]) -> Vec<(u64, String)> {
+    let entries = answer.get("entries").and_then(Value::as_array);
+    entries
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let id = entry.get("id")?.as_u64().filter(|id| ids.contains(id))?;
+            let text = entry.get("text")?.as_str()?.trim();
+            Some((id, text.chars().take(HIT_CHARS).collect()))
+        })
+        .collect()
 }
 
 /// `line` for this person: no `person` at all for the room's, as before.
@@ -2793,6 +2855,7 @@ impl DaysClient {
                     // reviewer's P3 on #2511): only this snapshot's words.
                     context.words.clear();
                     context.carried.clear();
+                    context.texts.clear();
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(settled);
                     let why = context.stopped_by.take().map_or("unknown", Stopped::as_str);
                     context.journal_inhibited = false;
@@ -2813,6 +2876,19 @@ impl DaysClient {
                 }
                 for (id, words) in their_words {
                     context.says(person, id, words);
+                }
+                // The note's kept things with their words, so a correction
+                // of one shown only there is held against them (#2510): a
+                // next day's "it's green now" is the commonest.
+                if self.replaces.load(Ordering::Acquire) {
+                    for (id, text) in note_texts(&snapshot) {
+                        context.shown_as(None, id, &text);
+                    }
+                    if let Some((theirs, _)) = &theirs {
+                        for (id, text) in note_texts(theirs) {
+                            context.shown_as(person, id, &text);
+                        }
+                    }
                 }
                 true
             }
@@ -3218,6 +3294,25 @@ impl DaysClient {
         // What this turn's call gave, with what each says, for the link to
         // its exchange (#2176 finding 14). Only with the switch.
         let linking = self.link_used.load(Ordering::Acquire);
+        // Kept things told with their words, so a correction of one can be
+        // held against them (#2510).
+        if self.replaces.load(Ordering::Acquire) {
+            if call.name == REMEMBER
+                && let (Some((whose, id)), Some(text)) =
+                    (ids.first(), call.args["text"].as_str().map(str::trim))
+            {
+                context.shown_as(whose.as_deref(), *id, text);
+            }
+            for item in told["found"].as_array().into_iter().flatten() {
+                if let (Some(id), Some(text)) = (
+                    item["source_id"].as_u64(),
+                    item["asked_to_remember"].as_str(),
+                ) {
+                    let whose = person.filter(|_| item["theirs"] == true);
+                    context.shown_as(whose, id, text);
+                }
+            }
+        }
         for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
             if linking {
@@ -4161,6 +4256,28 @@ fn note_words(snapshot: &Value) -> Vec<(u64, Vec<String>)> {
         .into_iter()
         .flatten()
         .filter_map(|fact| Some((fact["id"].as_u64()?, content_words(fact["text"].as_str()?))))
+        .collect()
+}
+
+/// The texts of a validated session note's facts, by id ([`snapshot_ids`]
+/// checked them), as the note told them (#2510).
+fn note_texts(snapshot: &Value) -> Vec<(u64, String)> {
+    let Some(quoted) = snapshot["note"]
+        .as_str()
+        .and_then(|note| serde_json::from_str::<Value>(note).ok())
+    else {
+        return vec![];
+    };
+    quoted["facts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|fact| {
+            Some((
+                fact["id"].as_u64()?,
+                fact["text"].as_str()?.trim().to_owned(),
+            ))
+        })
         .collect()
 }
 
@@ -9664,7 +9781,8 @@ mod tests {
             REMEMBER,
             json!({"text":"Her favourite colour is green.","replaces":8}),
         );
-        let (as_heard, kept) = heard::call_with(&green, Some("it's green now")).unwrap();
+        // Held against no old fact, the heard line is kept.
+        let (as_heard, kept) = heard::call_with(&green, Some("it's green now"), || None).unwrap();
         assert_eq!(kept, "They said: it's green now");
         assert_eq!(as_heard.args, json!({"text": kept}));
         // Id 8 is not replaced: still found by a recall for "colour".
@@ -9673,7 +9791,15 @@ mod tests {
         assert_eq!(found["found"][0]["source_id"], 8, "{found}");
         // The model's text, heard in full, keeps its `replaces`.
         assert_eq!(
-            heard::call_with(&green, Some("her favourite colour is green now")),
+            heard::call_with(&green, Some("her favourite colour is green now"), || None),
+            None
+        );
+        // And so does one whose other words are id 8's as recall told it
+        // (#2602): the session has its words, no store call.
+        let shown = || client.context.lock().unwrap().text(None, 8);
+        assert_eq!(shown().as_deref(), Some("Her favourite colour is violet."));
+        assert_eq!(
+            heard::call_with(&green, Some("it's green now"), shown),
             None
         );
         assert_eq!(run(&green), (json!({"remembered":true,"replaced":8}), true));
@@ -9686,6 +9812,89 @@ mod tests {
         assert!(sent[1].get("replaces").is_none() && sent[1].get("shown").is_none());
         assert_eq!(sent[1]["text"], kept);
         assert_eq!(sent[3]["replaces"], 8);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510 (reviewer-lead P3 on #2704): a fact shown only in the session
+    /// note, corrected the next turn ("it's green now"), is held against the
+    /// note's words: the model's text is kept with `replaces`, and the
+    /// journal counts against the old fact, `old=y`. Each scope's note text
+    /// is its own.
+    #[test]
+    fn a_fact_shown_only_in_the_note_is_corrected_with_replaces() {
+        const MINH: &str = "p-be9688998f085098";
+        fn answer(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("session_open") => {
+                    let session = request["session"].as_str().unwrap();
+                    let (id, scope, text) = if request["person"].is_string() {
+                        (9, PERSON_SCOPE, "Their tea is jasmine.")
+                    } else {
+                        (8, ROOM_SCOPE, "Her favourite colour is violet.")
+                    };
+                    json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
+                        "generation":2,"invalidated":false,"source_ids":[id],
+                        "note":json!({"scope":scope,"untrusted":true,
+                            "facts":[{"id":id,"kind":"preference","text":text}]}).to_string()}})
+                }
+                Some("remember") if request["replaces"] == 8 => {
+                    json!({"ok":true,"id":10,"replaced":8})
+                }
+                _ => json!({"ok":false}),
+            }
+        }
+        let (socket, served) = memory_lines("replaces-note", 3, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        assert!(
+            client
+                .open_session_within(1, Duration::from_secs(2), Some(MINH))
+                .is_some_and(|(_, theirs)| theirs.is_some())
+        );
+        {
+            let context = client.context.lock().unwrap();
+            assert_eq!(
+                context.text(None, 8).as_deref(),
+                Some("Her favourite colour is violet.")
+            );
+            assert_eq!(
+                context.text(Some(MINH), 9).as_deref(),
+                Some("Their tea is jasmine.")
+            );
+            assert_eq!(context.text(Some(MINH), 8), None);
+            assert_eq!(context.text(None, 9), None);
+        }
+        // The next turn: not all heard, but every word violet's or heard.
+        let green = call(
+            REMEMBER,
+            json!({"text":"Her favourite colour is green.","replaces":8}),
+        );
+        let shown = || client.context.lock().unwrap().text(None, 8);
+        assert_eq!(
+            heard::call_with(&green, Some("it's green now"), shown),
+            None
+        );
+        let (told, line) = client.noted(None, &green, Some("it's green now"), Some(false), || {
+            client.run_at(&green, FIRST_READ, NOW, Some(&EAST), None)
+        });
+        assert_eq!(
+            told,
+            (json!({"remembered":true,"replaced":8,"id":10}), true)
+        );
+        assert_eq!(
+            line.unwrap(),
+            "lamp-voice provider: remember: replaces=y shown=y new_words=0 old=y keep_heard=model answer=replaced"
+        );
+        let sent: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(sent[2]["replaces"], 8, "{}", sent[2]);
+        assert_eq!(sent[2]["shown"], json!([8]));
+        assert_eq!(sent[2]["text"], "Her favourite colour is green.");
         drop(client);
         std::fs::remove_file(&socket).unwrap();
     }
@@ -9719,7 +9928,9 @@ mod tests {
             client.noted(None, model, heard, kept, || run(sent))
         };
         // Replaced: the model's text kept, with its shown id; the model is
-        // told the new one's id (#2713), the line says none.
+        // told the new one's id (#2713), the line says none. Recall showed
+        // id 8's words (#2704): counted against them, `old=y`, and every
+        // word of the model's is violet's or heard.
         let green = call(
             REMEMBER,
             json!({"text":"Her favourite colour is green.","replaces":8}),
@@ -9729,7 +9940,7 @@ mod tests {
         let replaced = replaced.unwrap();
         assert_eq!(
             replaced,
-            "lamp-voice provider: remember: replaces=y shown=y new_words=2 old=n keep_heard=model answer=replaced"
+            "lamp-voice provider: remember: replaces=y shown=y new_words=0 old=y keep_heard=model answer=replaced"
         );
         // Refused: an id this session was not shown.
         let red = call(
@@ -9746,7 +9957,7 @@ mod tests {
         // No `replaces`, the heard line kept in place of the model's text.
         let tea = call(REMEMBER, json!({"text":"My favorite food is jasmine."}));
         let heard = "please remember that my favourite tea is jasmine";
-        let (as_heard, _) = heard::call_with(&tea, Some(heard)).unwrap();
+        let (as_heard, _) = heard::call_with(&tea, Some(heard), || None).unwrap();
         let (told, plain) = noted(&tea, &as_heard, Some(heard), Some(true));
         assert_eq!(told, (json!({"remembered":true,"id":10}), true));
         let plain = plain.unwrap();

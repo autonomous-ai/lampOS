@@ -12,9 +12,10 @@
 //! whose words were sent (the model's or the heard line); and the store's
 //! answer kind ([`answer_kind`]).
 //!
-//! The old fact's text is counted only when the session holds it: until it
-//! keeps the texts it was shown by id (#2704), it holds none, the line says
-//! `old=n`, and the count is of the words not heard.
+//! The old fact's text is counted only when the session holds it, as it
+//! was shown it by id (the note, recall, a hit, a follow-up, or one it kept,
+//! #2704): then `old=y`; else `old=n`, and the count is of the words not
+//! heard.
 use super::{DaysClient, REMEMBER, content_words, days_client, person_now};
 use lamp_gemini::ToolCall;
 use serde_json::Value;
@@ -192,14 +193,20 @@ impl DaysClient {
             })
         });
         let text = model.args["text"].as_str().unwrap_or_default();
-        // The old fact's text, when the session holds it (#2704): none yet.
-        let old: Option<&str> = None;
+        // The old fact's text, when the session was shown it (#2704):
+        // read before the call, as the correction's check reads it.
+        let old = replaces.and_then(Value::as_u64).and_then(|id| {
+            self.context
+                .lock()
+                .ok()
+                .and_then(|context| context.text(person, id))
+        });
         take_answered();
         let told = run();
         let line = Remembered {
             replaces: replaces.is_some(),
             shown,
-            new_words: new_words(text, old, heard),
+            new_words: new_words(text, old.as_deref(), heard),
             old: old.is_some(),
             heard_kept,
             answer: take_answered().unwrap_or_else(|| "none".to_owned()),

@@ -698,7 +698,19 @@ the unchanged legacy client, used unless the new Days client is selected.
     without the call's `replaces`, so the old fact stays active and the
     heard line is kept beside it: "They said: it's green now" may lack the
     fact's subject, and a recall for "colour" would no longer find it. The
-    model's own text, kept, keeps its `replaces`.
+    model's own text, kept, keeps its `replaces`. A correction whose
+    sentence was not all heard keeps the model's text and its `replaces`
+    when each of its key words is the old fact's or was heard, compared
+    without accents on both sides: "Her favourite colour is green." for
+    "it's green now" against 8 "Her favourite colour is violet" replaces 8;
+    "... dark green" keeps the heard line beside violet. The old fact's
+    words are those this session was shown (the session note as it
+    opened, a hit, recall, a follow-up, or one it kept), each in its own
+    scope, never asked of the store; one it was not shown checks nothing.
+    The note matters most: a fact kept on an earlier day is shown only
+    there, and corrected the next turn. Tests: `remember::heard::tests::a_correction_keeps_the_models_words_when_each_is_the_old_facts_or_heard`
+    (lamp-06c1, 21 Oct, #2602: "it's green now" kept beside violet) and
+    `remember::tests::a_fact_shown_only_in_the_note_is_corrected_with_replaces`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** a correction is never `once`; it
     always writes its new version.
   - **The journal**, counts and yes/no only, never a word of the call,
@@ -711,8 +723,9 @@ the unchanged legacy client, used unless the new Days client is selected.
       text are neither the old fact's nor heard in the call's line, folded
       as the hits fold them (`remember::content_words`: lower case, three
       letters or more, small words out, a plural's `s` off); `old`, whether
-      the old fact's text was there to count against (the session keeps no
-      texts yet, so `n` and the count is of the words not heard);
+      the old fact's text was there to count against, as this session was
+      shown it (the same words the correction is held against; `n`, and the
+      count is of the words not heard, for an id it was not shown);
       `keep_heard` only with `LAMP_MEMORY_KEEP_HEARD`, whose words were
       sent; `answer` the store's kind: `kept`, `existing`, `replaced`,
       `refused:<reason code>`, `error:<code>`, or `none` (no answer). A
