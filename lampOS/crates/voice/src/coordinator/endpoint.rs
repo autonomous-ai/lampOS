@@ -51,10 +51,13 @@ fn short_verdict_blocks(value: Option<&str>, least: u16) -> u16 {
 /// that is only the name.
 pub const LEAST_SPEECH_SWITCH: &str = "LAMP_ENDPOINT_LEAST_SPEECH_MS";
 
-/// The lowest floor the switch takes: 0.2 s, the short lines' own
-/// ([`SHORT_VERDICT_BLOCKS`]), under which a click or a cough's scrap would
-/// be committed.
-pub const LEAST_SPEECH_LEAST_MS: u16 = 200;
+/// The lowest floor the switch takes: 0.5 s. At 400 ms the replay committed
+/// "Hey Lamp," said alone (about 0.6 s of speech, the start counted), the
+/// very line the 0.8 s floor was set for on 14 Oct (the first builder's P2
+/// on #2751, 22 Oct 06:10). At 500 a 0.6 s line is still over it: that
+/// name alone is held by the call's wait (`--call-wait-ms`, #782), not by
+/// the floor.
+pub const LEAST_SPEECH_LEAST_MS: u16 = 500;
 
 /// The floor, in ms of speech, the switch's `value` asks for under the
 /// profile's own `least` blocks: none unless an integer of milliseconds
@@ -365,12 +368,13 @@ mod tests {
         assert!(policy.validate().is_ok());
     }
 
-    /// #2602: the floor is lowered only by a whole number of ms from 200 to
+    /// #2602: the floor is lowered only by a whole number of ms from 500 to
     /// the profile's own (800 with the responsive profile's 80 blocks); unset,
-    /// not a number, under 200 or over the profile's, it stays. The short
+    /// not a number, under 500 (the first builder's P2 on #2751) or over the
+    /// profile's, it stays. The short
     /// lines' floor taken under it still passes the policy's check.
     #[test]
-    fn the_floor_is_lowered_only_by_ms_from_200_to_the_profiles() {
+    fn the_floor_is_lowered_only_by_ms_from_500_to_the_profiles() {
         for (value, taken) in [
             (None, None),
             (Some(""), None),
@@ -378,11 +382,12 @@ mod tests {
             (Some("500ms"), None),
             (Some("0.5"), None),
             (Some("-500"), None),
-            (Some("199"), None),
+            (Some("200"), None),
+            (Some("499"), None),
             (Some("810"), None),
-            (Some("200"), Some(200)),
             (Some("600"), Some(600)),
-            (Some(" 500 "), Some(500)),
+            (Some("500"), Some(500)),
+            (Some(" 550 "), Some(550)),
             (Some("800"), Some(800)),
         ] {
             assert_eq!(least_speech_ms(value, 80), taken, "{value:?}");
@@ -391,7 +396,7 @@ mod tests {
         assert_eq!(least_speech_ms(Some("600"), 0), None);
         // What it sets: the floor, the start counted, and the short lines'
         // floor under it, before and after `LAMP_ENDPOINT_SHORT_VERDICT`.
-        for ms in [200, 500, 800] {
+        for ms in [500, 650, 800] {
             let mut policy = ConfirmPolicy {
                 short_verdict_blocks: SHORT_VERDICT_BLOCKS,
                 ..ConfirmPolicy::responsive()
