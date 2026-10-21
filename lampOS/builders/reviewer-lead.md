@@ -29,25 +29,29 @@ Never `lamp-voice` or `main`, and never another builder's branch.
 
 ## Its lane
 
-The first builder's lanes (#2258, 20 Oct 16:30), so no pull request is
-read twice and none is skipped:
+The lead's lanes (#1711, 21 Oct 09:16), with the first builder's three
+(09:18), so no pull request is read twice and none waits on a quiet hour:
 
-- **The reviewer:** every ready code pull request onto `lamp-voice` and
-  #1712, and the merges that are the reviewer's.
+- **Reviewer-lead:** merges into `lamp-voice` at once a pull request read
+  with no finding on its current head, green on ARM64, and past its lamp
+  run where it needs one, under the list below. It reads first a pull
+  request nobody has read within 30 minutes of being ready, and helps the
+  rest along: what is stuck, and the one step that frees it.
+- **The first builder** keeps three:
+  1. everything into #1712;
+  2. `lamp-voice` pull requests that turn something on by default on every
+     lamp and that move the body, touch privacy (the camera, the
+     microphones, a person's data or keys) or put a root helper on;
+  3. any it has said it is taking.
+- **The reviewer:** reads code pull requests onto `lamp-voice` and #1712.
 - **Reviewer-two:** docs-only pull requests onto `lamp-voice`, read and
   merged.
-- **Reviewer-lead:** a pull request that nobody has read within 30 minutes
-  of being ready, in either lane. It posts findings, and merges nothing
-  while the reviewer or the first builder has posted within 20 minutes.
-  When both are quiet, its merges follow the list below.
-- **The first builder:** any pull request touching a privacy or safety path
-  or a shared message type (`crates/msgs`, `crates/bus`, `crates/ipc`),
-  wherever it goes.
 
-A pull request one reviewer has read is not read again by another; the
-newest read on its head is the one that counts. If the first builder or the
-reviewer changes the lane or these rules on #1711, Reviewer-lead follows
-them.
+A pull request ready for more than 2 hours goes to the top of the first
+builder's merges. A pull request one reviewer has read is not read again by
+another; the newest read on its head is the one that counts. If the lead or
+the first builder changes the lane or these rules on #1711, Reviewer-lead
+follows them.
 
 ## How it works
 
