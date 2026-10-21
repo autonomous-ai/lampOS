@@ -2037,7 +2037,10 @@ mod tests {
             .map(str::to_owned)
             .collect();
         assert_eq!(given, ["--controls-root", "/run/lampos-bus", "--no-slide"]);
-        assert_eq!(worker_route(&given).unwrap(), (root.into(), Route::NoSlide));
+        assert_eq!(
+            worker_route(&given).unwrap(),
+            (root.into(), Route::NoSlide, false)
+        );
         let environment = std::fs::read_to_string(home.path.join("env.txt")).unwrap();
         assert!(!environment.contains(crate::privacy_bus::ENVIRONMENT));
     }

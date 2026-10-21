@@ -382,12 +382,12 @@ fn no_slide_selects_the_route_and_reaches_the_worker_only_as_an_argument() {
     assert_eq!(arguments, [ROOT_FLAG, "/tmp/test", NO_SLIDE_FLAG]);
     assert_eq!(
         worker_route(&arguments).unwrap(),
-        (root.into(), Route::NoSlide)
+        (root.into(), Route::NoSlide, false)
     );
     let arguments = worker_arguments(Some((root, Route::Slide))).unwrap();
     assert_eq!(
         worker_route(&arguments).unwrap(),
-        (root.into(), Route::Slide)
+        (root.into(), Route::Slide, false)
     );
     for wrong in [
         vec![ROOT_FLAG, "relative"],
@@ -399,6 +399,24 @@ fn no_slide_selects_the_route_and_reaches_the_worker_only_as_an_argument() {
         let wrong: Vec<String> = wrong.into_iter().map(String::from).collect();
         assert!(worker_route(&wrong).is_err(), "{wrong:?}");
     }
+}
+
+#[test]
+fn only_an_enabled_controls_conversation_passes_the_worker_its_gap_ride() {
+    use lamp_voice::privacy_bus::{GAP_RIDE_FLAG, conversation_arguments};
+    let root = std::path::Path::new("/tmp/test");
+    for route in [Route::Slide, Route::NoSlide] {
+        let selected = Some((root, route));
+        let off = worker_arguments(selected).unwrap();
+        assert_eq!(conversation_arguments(selected, false).unwrap(), off);
+        let on = conversation_arguments(selected, true).unwrap();
+        assert_eq!(on.last().unwrap(), GAP_RIDE_FLAG);
+        assert_eq!(worker_route(&on).unwrap(), (root.into(), route, true));
+        let mut duplicated = on;
+        duplicated.push(GAP_RIDE_FLAG.into());
+        assert!(worker_route(&duplicated).is_err());
+    }
+    assert!(conversation_arguments(None, true).unwrap().is_empty());
 }
 
 /// With no slide the software mute alone closes the microphones: without

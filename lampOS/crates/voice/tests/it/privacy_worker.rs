@@ -20,7 +20,8 @@ use lamp_msgs::{
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use lamp_voice::{
     privacy::REOPEN_STABLE_US,
-    privacy_bus::{NO_SLIDE_FLAG, ROOT_FLAG, wall_ms},
+    privacy_bus::{GAP_RIDE_FLAG, NO_SLIDE_FLAG, ROOT_FLAG, wall_ms},
+    privacy_gap::RIDE_US,
     process::{Worker, boot_text, new_boot},
     wire::{Control, WorkerEvent},
 };
@@ -111,6 +112,9 @@ fn a_producer_kept_up_only_if_its_samples_span_the_scenario() {
 struct Producer {
     muted: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
+    publishing: Arc<AtomicBool>,
+    publication_paused: Arc<AtomicBool>,
+    publish_one: Arc<AtomicBool>,
     published: Arc<AtomicU64>,
     last_us: Arc<AtomicU64>,
     first_low_us: Arc<AtomicU64>,
@@ -261,6 +265,9 @@ impl Producer {
         let mut source = Self {
             muted: Arc::new(AtomicBool::new(false)),
             stop: Arc::new(AtomicBool::new(false)),
+            publishing: Arc::new(AtomicBool::new(true)),
+            publication_paused: Arc::new(AtomicBool::new(false)),
+            publish_one: Arc::new(AtomicBool::new(false)),
             published: Arc::new(AtomicU64::new(0)),
             last_us: Arc::new(AtomicU64::new(0)),
             first_low_us: Arc::new(AtomicU64::new(0)),
@@ -274,6 +281,11 @@ impl Producer {
             source.last_us.clone(),
             source.first_low_us.clone(),
             source.held_up.clone(),
+        );
+        let (publishing, publication_paused, publish_one) = (
+            source.publishing.clone(),
+            source.publication_paused.clone(),
+            source.publish_one.clone(),
         );
         source.thread = Some(thread::spawn(move || {
             let deadline = Instant::now() + Duration::from_secs(10);
@@ -336,9 +348,16 @@ impl Producer {
                 state.check().map_err(io::Error::other)?;
                 // A cached path can disappear during verified worker stop.
                 // Active delivery gaps are checked by the real Voice fence.
-                result.dropped += publisher.publish_json(at_us, &state)?.dropped as u64;
-                last_us.store(at_us, Ordering::Release);
-                published.store(result.samples, Ordering::Release);
+                let sending = publishing.load(Ordering::Acquire);
+                if sending || publish_one.swap(false, Ordering::AcqRel) {
+                    result.dropped += publisher.publish_json(at_us, &state)?.dropped as u64;
+                    last_us.store(at_us, Ordering::Release);
+                    published.store(result.samples, Ordering::Release);
+                }
+                // Acquisition continues while publication is held. The next
+                // publication is fresh, from the same reader and publisher;
+                // only the worker's delivery stream has been interrupted.
+                publication_paused.store(!sending, Ordering::Release);
                 if !paired || result.samples % 2 == 0 {
                     thread::sleep(SAMPLE.saturating_sub(began.elapsed()));
                 }
@@ -356,6 +375,42 @@ impl Producer {
             thread::sleep(Duration::from_millis(1));
         }
         source
+    }
+
+    /// Stop publication after any in-flight publish, keeping acquisition and
+    /// publisher ownership alive. Return the last published acquisition.
+    fn pause_publication(&self) -> u64 {
+        self.publishing.store(false, Ordering::Release);
+        let deadline = Instant::now() + WAIT;
+        while !self.publication_paused.load(Ordering::Acquire) {
+            assert!(
+                Instant::now() < deadline,
+                "producer did not pause publication"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
+        self.last_us.load(Ordering::Acquire)
+    }
+
+    fn resume_publication(&self) {
+        self.publishing.store(true, Ordering::Release);
+    }
+
+    /// Supply one new acquisition during a pause, then remain paused. This
+    /// cannot provide the full 60 ms of continuous HIGH required to reopen.
+    fn publish_once(&self) -> u64 {
+        assert!(self.publication_paused.load(Ordering::Acquire));
+        let previous = self.published.load(Ordering::Acquire);
+        self.publish_one.store(true, Ordering::Release);
+        let deadline = Instant::now() + WAIT;
+        while self.published.load(Ordering::Acquire) == previous {
+            assert!(
+                Instant::now() < deadline,
+                "producer did not publish its single sample"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
+        self.last_us.load(Ordering::Acquire)
     }
 
     fn finish(&mut self) -> Production {
@@ -382,10 +437,13 @@ struct Rig {
     last_authority: Option<Instant>,
     authority_until: u64,
     first_high: Option<u64>,
+    first_high_after_gap: Option<u64>,
+    unavailable_since: Vec<u64>,
     last_low_event: Option<u64>,
     last_lease: Option<MicrophonePrivacy>,
     retired_session: Option<String>,
     no_slide: bool,
+    gap_ride: bool,
     root: Root,
 }
 /// The Controls a rig's worker reads.
@@ -414,6 +472,19 @@ impl Rig {
 
     /// Starts the worker beside the Controls `controls` says ([`Controls`]).
     fn start_from(permission: Permission, no_slide: bool, controls: Controls) -> Self {
+        Self::start_options(permission, no_slide, controls, false)
+    }
+
+    fn start_riding(permission: Permission, no_slide: bool) -> Self {
+        Self::start_options(permission, no_slide, Controls::Steady, true)
+    }
+
+    fn start_options(
+        permission: Permission,
+        no_slide: bool,
+        controls: Controls,
+        gap_ride: bool,
+    ) -> Self {
         let root = Root::new();
         let bus = selected_bus(Bus::new(root.0.join("bus")).unwrap());
         let clock = lamp_controls::runtime::clock_id(None).unwrap();
@@ -434,7 +505,7 @@ impl Rig {
         controller
             .set_microphone_permission(now(), permission)
             .unwrap();
-        let worker = Self::spawn(&root, boot, no_slide);
+        let worker = Self::spawn(&root, boot, no_slide, gap_ride);
         Self {
             worker: Some(worker),
             subscriber: Some(subscriber),
@@ -445,10 +516,13 @@ impl Rig {
             last_authority: None,
             authority_until: 0,
             first_high: None,
+            first_high_after_gap: None,
+            unavailable_since: Vec::new(),
             last_low_event: None,
             last_lease: None,
             retired_session: None,
             no_slide,
+            gap_ride,
             root,
         }
     }
@@ -458,11 +532,14 @@ impl Rig {
             .unwrap()
     }
 
-    fn spawn(root: &Root, boot: BootId, no_slide: bool) -> Worker {
+    fn spawn(root: &Root, boot: BootId, no_slide: bool, gap_ride: bool) -> Worker {
         let bus = root.0.join("bus");
         let mut arguments = vec![ROOT_FLAG, bus.to_str().unwrap()];
         if no_slide {
             arguments.push(NO_SLIDE_FLAG);
+        }
+        if gap_ride {
+            arguments.push(GAP_RIDE_FLAG);
         }
         Worker::spawn(
             Path::new(env!("CARGO_BIN_EXE_lamp-voice")),
@@ -481,6 +558,54 @@ impl Rig {
         self.last_authority = None;
     }
 
+    fn note_feedback(&mut self, event: WorkerEvent) -> io::Result<()> {
+        match event {
+            WorkerEvent::Privacy {
+                acquired_at_us,
+                muted,
+                ..
+            } => {
+                if muted {
+                    self.last_low_event = Some(acquired_at_us);
+                } else {
+                    self.first_high.get_or_insert(acquired_at_us);
+                    if !self.unavailable_since.is_empty() {
+                        self.first_high_after_gap.get_or_insert(acquired_at_us);
+                    }
+                }
+            }
+            WorkerEvent::PrivacyUnavailable { since_us } => {
+                assert!(self.gap_ride, "default worker unexpectedly rode an expiry");
+                self.unavailable_since.push(since_us);
+                self.first_high_after_gap = None;
+            }
+            other => {
+                return Err(io::Error::other(format!("unexpected feedback: {other:?}")));
+            }
+        }
+        Ok(())
+    }
+
+    fn feedback(&mut self) -> io::Result<()> {
+        for count in 0..32 {
+            let Some(event) = self
+                .worker
+                .as_mut()
+                .unwrap()
+                .channels
+                .control
+                .receive::<WorkerEvent>()?
+            else {
+                break;
+            };
+            self.note_feedback(event)?;
+            if count == 31 {
+                return Err(io::Error::other("fixture feedback drain overflow"));
+            }
+        }
+        Ok(())
+    }
+
     fn tick(&mut self) -> io::Result<Vec<MicrophonePrivacy>> {
         let worker = self.worker.as_mut().unwrap();
         worker.check_running()?;
@@ -496,28 +621,23 @@ impl Rig {
             self.authority_until = snapshot.expires_at().as_micros();
             self.last_authority = Some(Instant::now());
         }
-        for count in 0..32 {
-            match worker.channels.control.receive::<WorkerEvent>()? {
-                Some(WorkerEvent::Privacy {
-                    acquired_at_us,
-                    muted,
-                    ..
-                }) => {
-                    if muted {
-                        self.last_low_event = Some(acquired_at_us);
-                    } else {
-                        self.first_high.get_or_insert(acquired_at_us);
-                    }
-                }
-                Some(other) => {
-                    return Err(io::Error::other(format!("unexpected feedback: {other:?}")));
-                }
-                None => break,
-            }
-            if count == 31 {
-                return Err(io::Error::other("fixture feedback drain overflow"));
-            }
-        }
+        self.feedback()?;
+        let values = self.leases()?;
+        // Feedback is sent before its corresponding lease. It may have
+        // arrived between the first drain and the lease read, so take it
+        // again before callers inspect the lease and its source event.
+        let feedback = self.feedback();
+        self.audit_grants(&values);
+        feedback?;
+        Ok(values
+            .into_iter()
+            .filter_map(|(value, fresh)| fresh.then_some(value))
+            .collect())
+    }
+
+    /// Keep every valid lease for the grant audit, even one no longer fresh
+    /// enough to satisfy a wait. An observer stall cannot hide an early grant.
+    fn leases(&mut self) -> io::Result<Vec<(MicrophonePrivacy, bool)>> {
         if let Some(retired) = &self.retired_session {
             // The new observer is already bound, but must not consume the
             // old retained file before the replacement publishes. Publication
@@ -542,8 +662,8 @@ impl Rig {
                     Ok(value) => (value, true),
                     // Sound as of when it was published, and only too old by
                     // now: this reader was held up past the lease's 50 ms on a
-                    // loaded machine. It is no lease any more and is passed
-                    // over, but its place in the order still counts (#1544).
+                    // loaded machine. It cannot satisfy a wait, but its order
+                    // and the permission it granted are still audited (#1544).
                     Err(error) => match MicrophonePrivacy::from_message(
                         &message,
                         &self.clock,
@@ -564,14 +684,35 @@ impl Rig {
                 return Err(io::Error::other("privacy lease identity/order changed"));
             }
             self.last_lease = Some(value.clone());
-            if fresh {
-                values.push(value);
-            }
+            values.push((value, fresh));
             if count == 31 {
                 return Err(io::Error::other("fixture lease drain overflow"));
             }
         }
         Ok(values)
+    }
+
+    fn audit_grants(&self, values: &[(MicrophonePrivacy, bool)]) {
+        let Some(&since) = self.unavailable_since.last() else {
+            return;
+        };
+        for (value, _) in values {
+            // A queued grant published before expiry belongs to the preceding
+            // valid interval, even when it is read after the unavailable event.
+            if value.permitted && value.stamp.at_us >= since {
+                let first = self
+                    .first_high_after_gap
+                    .expect("recovery granted without fresh HIGH");
+                assert!(
+                    value
+                        .stamp
+                        .at_us
+                        .checked_sub(first)
+                        .is_some_and(|age| age >= REOPEN_STABLE_US),
+                    "recovery granted before a full stable HIGH interval"
+                );
+            }
+        }
     }
 
     fn until(&mut self, predicate: impl Fn(&MicrophonePrivacy) -> bool) -> MicrophonePrivacy {
@@ -603,6 +744,91 @@ impl Rig {
         assert!(seen > 0, "observation interval had no renewed leases");
     }
 
+    fn observe_through(&mut self, at_us: u64, check: impl Fn(&MicrophonePrivacy)) {
+        while monotonic_us() < at_us {
+            for value in self.tick().unwrap() {
+                check(&value);
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    /// Continue supplying controller authority until the child's own clean
+    /// unreadable exit. The deadline belongs to the scenario, not the child;
+    /// a Stop is sent only after its exit has already been observed.
+    fn unreadable_exit(&mut self, deadline_us: u64, check: impl Fn(&MicrophonePrivacy)) -> u64 {
+        let mut faults = Vec::new();
+        let exited_us = loop {
+            if let Err(error) = self.worker.as_mut().unwrap().check_running() {
+                assert!(Worker::ended_cleanly(&error), "{error}");
+                break monotonic_us();
+            }
+            match self.tick() {
+                Ok(values) => {
+                    for value in values {
+                        check(&value);
+                    }
+                }
+                Err(error)
+                    if error
+                        .to_string()
+                        .contains(lamp_voice::privacy_bus::UNREADABLE) =>
+                {
+                    faults.push(error.to_string());
+                }
+                Err(error) => {
+                    assert!(
+                        Worker::ended_cleanly(&error)
+                            || matches!(
+                                error.kind(),
+                                io::ErrorKind::BrokenPipe
+                                    | io::ErrorKind::ConnectionReset
+                                    | io::ErrorKind::ConnectionRefused
+                                    | io::ErrorKind::NotConnected
+                            ),
+                        "{error}"
+                    );
+                }
+            }
+            assert!(
+                monotonic_us() < deadline_us,
+                "worker survived the expiry deadline"
+            );
+            thread::sleep(Duration::from_millis(1));
+        };
+        assert!(
+            exited_us < deadline_us,
+            "worker exited after the expiry deadline"
+        );
+        let mut worker = self.worker.take().unwrap();
+        while let Ok(Some(event)) = worker.channels.control.receive::<WorkerEvent>() {
+            match event {
+                WorkerEvent::Fault { code } => faults.push(code),
+                other => self.note_feedback(other).unwrap(),
+            }
+        }
+        // The child can publish between the last live drain and try_wait.
+        // Once exit is confirmed, both channels are complete and all final
+        // leases are checked, including leases aged while the host was busy.
+        let values = self.leases().unwrap();
+        self.audit_grants(&values);
+        for (value, _) in values {
+            check(&value);
+        }
+        // A final fault can age out before a loaded host reads it. Any fault
+        // still readable must be UNREADABLE, and exit status must be zero.
+        assert!(
+            faults
+                .iter()
+                .all(|fault| fault.contains(lamp_voice::privacy_bus::UNREADABLE)),
+            "{faults:?}"
+        );
+        worker
+            .shutdown()
+            .expect("an unreadable switch ends cleanly");
+        exited_us
+    }
+
     fn stop_worker(&mut self) {
         let mut worker = self.worker.take().unwrap();
         worker
@@ -627,7 +853,12 @@ impl Rig {
         self.last_lease = None;
         self.first_high = None;
         self.last_authority = None;
-        self.worker = Some(Self::spawn(&self.root, self.boot, self.no_slide));
+        self.worker = Some(Self::spawn(
+            &self.root,
+            self.boot,
+            self.no_slide,
+            self.gap_ride,
+        ));
     }
 }
 impl Drop for Rig {
@@ -933,6 +1164,330 @@ fn the_real_worker_with_no_slide_grants_from_its_controller_alone() {
                 produced.kept_up(from_us, to_us),
                 "{produced:?} over {from_us}..{to_us}"
             );
+        },
+    );
+}
+
+/// The opt-in worker keeps its own publisher and subscriber through a short
+/// delivery gap. Both slide and no-slide routes close their lease, say the
+/// actual expiry once, and require a new full stable interval before granting.
+#[test]
+fn a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker() {
+    for no_slide in [false, true] {
+        on_time(
+            "a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker",
+            || {
+                let mut rig = Rig::start_riding(Permission::Allowed, no_slide);
+                let allowed = rig.until(|value| value.permitted);
+                for attempt in 0..2 {
+                    let last_acquired = rig.producer.pause_publication();
+                    let closed = rig.until(|value| !value.permitted && value.observed_us == 0);
+                    assert_eq!(closed.physical_muted, None);
+                    assert_eq!(closed.session_id, allowed.session_id);
+                    assert_eq!(closed.microphone_generation, allowed.microphone_generation);
+                    assert_eq!(rig.unavailable_since.len(), attempt + 1);
+                    assert_eq!(
+                        rig.unavailable_since[attempt],
+                        last_acquired + MICROPHONE_PRIVACY_FRESH_US
+                    );
+                    rig.observe_through(last_acquired + 60_000, |value| {
+                        assert!(!value.permitted);
+                        assert_eq!(value.observed_us, 0);
+                    });
+                    rig.producer.resume_publication();
+                    let recovered = rig.until(|value| value.permitted);
+                    assert_eq!(recovered.session_id, allowed.session_id);
+                    assert_eq!(recovered.controller_boot, allowed.controller_boot);
+                    assert_eq!(
+                        recovered.microphone_generation,
+                        allowed.microphone_generation
+                    );
+                    assert!(recovered.stamp.sequence > closed.stamp.sequence);
+                    let first_recovered = rig.first_high_after_gap.unwrap();
+                    assert!(first_recovered >= last_acquired + 60_000);
+                    assert!(
+                        recovered.stamp.at_us - first_recovered >= REOPEN_STABLE_US,
+                        "recovery granted before a full stable HIGH interval"
+                    );
+                    assert_eq!(rig.unavailable_since.len(), attempt + 1);
+                }
+                rig.stop_worker();
+            },
+        );
+    }
+}
+
+/// Controls is Late after 200 ms without a publication. That advisory,
+/// including one delivered beside recovery, must not end an active ride.
+#[test]
+fn a_gap_ride_survives_controls_late_and_restabilizes_before_reopening() {
+    on_time(
+        "a_gap_ride_survives_controls_late_and_restabilizes_before_reopening",
+        || {
+            let mut rig = Rig::start_riding(Permission::Allowed, false);
+            let allowed = rig.until(|value| value.permitted);
+            let last_acquired = rig.producer.pause_publication();
+            let closed = rig.until(|value| !value.permitted && value.observed_us == 0);
+            rig.observe_through(last_acquired + 250_000, |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.physical_muted, None);
+                assert_eq!(value.session_id, allowed.session_id);
+            });
+            assert_eq!(
+                rig.unavailable_since,
+                [last_acquired + MICROPHONE_PRIVACY_FRESH_US]
+            );
+            rig.producer.resume_publication();
+            let recovered = rig.until(|value| value.permitted);
+            assert_eq!(recovered.session_id, allowed.session_id);
+            assert!(recovered.stamp.sequence > closed.stamp.sequence);
+            assert!(recovered.stamp.at_us - rig.first_high_after_gap.unwrap() >= REOPEN_STABLE_US);
+            assert_eq!(rig.unavailable_since.len(), 1);
+            rig.stop_worker();
+        },
+    );
+}
+
+/// One fresh HIGH during the ride cannot restart its one-second bound. The
+/// worker remains closed and ends at the original acquisition-expiry deadline.
+#[test]
+fn an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride() {
+    on_time(
+        "an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride",
+        || {
+            let mut rig = Rig::start_riding(Permission::Allowed, false);
+            let allowed = rig.until(|value| value.permitted);
+            let last_acquired = rig.producer.pause_publication();
+            rig.until(|value| !value.permitted && value.observed_us == 0);
+            let since = last_acquired + MICROPHONE_PRIVACY_FRESH_US;
+            assert_eq!(rig.unavailable_since, [since]);
+            rig.observe_through(since + RIDE_US * 3 / 4, |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.session_id, allowed.session_id);
+            });
+            let isolated = rig.producer.publish_once();
+            let reading = rig.until(|value| value.observed_us == isolated);
+            assert!(!reading.permitted);
+            assert_eq!(reading.physical_muted, Some(false));
+            let exited = rig.unreadable_exit(since + RIDE_US + 200_000, |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.session_id, allowed.session_id);
+            });
+            // The 200 ms allowance is for observing/reaping the exit on the
+            // host. It is shorter than a timer reset at the isolated sample.
+            assert!(exited >= since + RIDE_US);
+            assert!(exited < isolated + RIDE_US);
+            assert_eq!(rig.unavailable_since, [since]);
+        },
+    );
+}
+
+/// The default worker still ends at expiry. Enabling the flag cannot ride a
+/// gap when the controller has never allowed this conversation to capture.
+#[test]
+fn expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker() {
+    for (ride, permission) in [(false, Permission::Allowed), (true, Permission::Denied)] {
+        on_time(
+            "expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker",
+            || {
+                let mut rig = if ride {
+                    Rig::start_riding(permission, false)
+                } else {
+                    Rig::start(permission)
+                };
+                if permission == Permission::Allowed {
+                    rig.until(|value| value.permitted);
+                } else {
+                    rig.until(|value| value.observed_us > 0);
+                }
+                let last_acquired = rig.producer.pause_publication();
+                let expires = last_acquired + MICROPHONE_PRIVACY_FRESH_US;
+                rig.unreadable_exit(expires + 200_000, |value| {
+                    assert!(
+                        !value.permitted || value.expires_at_us <= expires,
+                        "a stale acquisition renewed capture permission"
+                    );
+                });
+                assert!(rig.unavailable_since.is_empty());
+            },
+        );
+    }
+}
+
+/// Allowed authority alone does not establish a conversation to preserve.
+/// With a live but silent publisher, the flagged worker must still end at
+/// startup's ordinary source-expiry deadline, before granting any lease.
+#[test]
+fn allowed_authority_without_a_first_observation_cannot_start_a_gap_ride() {
+    fn established_attempt() -> bool {
+        let root = Root::new();
+        let bus = selected_bus(Bus::new(root.0.join("bus")).unwrap());
+        let _source = bus
+            .publisher_declared(
+                ControlsState::TOPIC,
+                &ControlsState::declaration(),
+                "controls",
+            )
+            .unwrap();
+        let mut leases = Rig::subscribe(&bus);
+        let boot = new_boot().unwrap();
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let check_feedback = |event| match event {
+            WorkerEvent::Fault { code } => assert!(
+                code.starts_with(lamp_voice::privacy_bus::UNREADABLE),
+                "{code}"
+            ),
+            other => panic!("worker without source evidence sent {other:?}"),
+        };
+        let drain_feedback = |worker: &mut Worker| {
+            for count in 0..32 {
+                let Some(event) = worker.channels.control.receive::<WorkerEvent>().unwrap() else {
+                    break;
+                };
+                check_feedback(event);
+                assert!(count < 31, "fixture feedback drain overflow");
+            }
+        };
+        let check_lease = |value: &MicrophonePrivacy| {
+            value.check().unwrap();
+            assert!(
+                !value.permitted,
+                "worker granted without any source observation"
+            );
+            assert_eq!(value.observed_us, 0);
+            assert_eq!(value.physical_muted, None);
+            assert_eq!(value.controller_boot, boot_text(boot));
+        };
+        let drain_leases = |leases: &mut Subscriber| {
+            let mut seen = false;
+            for count in 0..32 {
+                let Some(message) = leases.recv(Duration::ZERO).unwrap() else {
+                    break;
+                };
+                let value: MicrophonePrivacy = message.parse().unwrap();
+                check_lease(&value);
+                seen = true;
+                assert!(count < 31, "fixture lease drain overflow");
+            }
+            seen
+        };
+        let renew = |worker: &mut Worker, controller: &mut Controller| {
+            let snapshot = controller.snapshot(now()).unwrap();
+            assert_eq!(snapshot.microphone_permission(), Permission::Allowed);
+            if let Err(error) = worker
+                .channels
+                .control
+                .send(Control::Authority { snapshot })
+            {
+                // The expected expiry can close the peer between try_wait and
+                // this renewal; the next iteration still verifies clean exit.
+                assert!(
+                    matches!(
+                        error.kind(),
+                        io::ErrorKind::BrokenPipe
+                            | io::ErrorKind::ConnectionReset
+                            | io::ErrorKind::ConnectionRefused
+                            | io::ErrorKind::NotConnected
+                    ),
+                    "{error}"
+                );
+            }
+        };
+        let mut worker = Rig::spawn(&root, boot, false, true);
+        // Install Allowed before any feedback or Bus reads. A host stall can
+        // still let the correct worker expire before receiving that first lease.
+        let ready_us = monotonic_us();
+        renew(&mut worker, &mut controller);
+        let mut last_authority = Instant::now();
+        // Allow 200 ms only to observe the 50 ms startup exit on the host. A
+        // mistaken one-second ride cannot fit within this observation window.
+        let deadline_us = ready_us + MICROPHONE_PRIVACY_FRESH_US + 200_000;
+        let mut seen_closed = false;
+        let exited_us = loop {
+            drain_feedback(&mut worker);
+            seen_closed |= drain_leases(&mut leases);
+            if let Err(error) = worker.check_running() {
+                assert!(Worker::ended_cleanly(&error), "{error}");
+                break monotonic_us();
+            }
+            assert!(
+                monotonic_us() < deadline_us,
+                "worker rode startup without a first grant"
+            );
+            if last_authority.elapsed() >= Duration::from_millis(10) {
+                renew(&mut worker, &mut controller);
+                last_authority = Instant::now();
+            }
+            thread::sleep(Duration::from_millis(1));
+        };
+        // Exit can race the preceding reads. Inspect both queues and the kept
+        // lease before deciding whether this attempt established its precondition.
+        drain_feedback(&mut worker);
+        seen_closed |= drain_leases(&mut leases);
+        if let Some(message) = bus.latest(MicrophonePrivacy::TOPIC).unwrap() {
+            let value: MicrophonePrivacy = message.parse().unwrap();
+            check_lease(&value);
+            seen_closed = true;
+        }
+        worker
+            .shutdown()
+            .expect("missing startup evidence ends cleanly");
+        if seen_closed {
+            assert!(
+                exited_us < deadline_us,
+                "startup exit was observed too late"
+            );
+        }
+        seen_closed
+    }
+
+    for attempt in 1..=3 {
+        if established_attempt() {
+            return;
+        }
+        // Only a clean exit with no Allowed-authority publication reaches
+        // here. Wrong feedback, any grant, an abnormal exit, and an established
+        // attempt's missed deadline all fail immediately inside the attempt.
+        assert!(
+            attempt < 3,
+            "worker never established the Allowed-authority startup precondition"
+        );
+        eprintln!(
+            "startup privacy attempt {attempt}: clean exit before Allowed authority was established; retrying"
+        );
+    }
+}
+
+/// A real LOW during recovery revokes immediately and retires this child.
+/// Later stable HIGH cannot turn the bounded ride into a bypass of that latch.
+#[test]
+fn fresh_low_during_a_gap_ride_never_grants_the_same_worker_again() {
+    on_time(
+        "fresh_low_during_a_gap_ride_never_grants_the_same_worker_again",
+        || {
+            let mut rig = Rig::start_riding(Permission::Allowed, false);
+            let allowed = rig.until(|value| value.permitted);
+            rig.producer.pause_publication();
+            rig.until(|value| !value.permitted && value.observed_us == 0);
+            rig.producer.muted.store(true, Ordering::Release);
+            rig.producer.resume_publication();
+            let low = rig.until(|value| value.physical_muted == Some(true));
+            assert!(!low.permitted);
+            assert_eq!(low.session_id, allowed.session_id);
+            assert_eq!(low.microphone_generation, allowed.microphone_generation);
+            assert!(rig.last_low_event.is_some());
+            rig.producer.muted.store(false, Ordering::Release);
+            rig.until(|value| value.physical_muted == Some(false));
+            rig.observe(Duration::from_millis(100), |value| {
+                assert!(!value.permitted);
+                assert_eq!(value.session_id, allowed.session_id);
+                assert_eq!(value.physical_muted, Some(false));
+            });
+            assert_eq!(rig.unavailable_since.len(), 1);
+            rig.stop_worker();
         },
     );
 }

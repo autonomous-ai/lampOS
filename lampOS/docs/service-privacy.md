@@ -99,6 +99,14 @@ and does not expose a restartable physical- or software-mute token.
 off unless set, Controls route only; #2602, the first builder's (B), lamp-75c9
 on 21 Oct 16:33:06). A lapse of the switch's freshness after the microphone was
 allowed no longer ends the conversation at once (`privacy_gap.rs`):
+- **The worker's own expiry:** the conversation passes `--gap-ride` to its
+  Controls worker because that child's environment is cleared. After the
+  worker has published an allowed capture lease, a missing fresh acquisition
+  sends `PrivacyUnavailable { since_us }`, closes the worker's `voice/privacy`
+  lease, and keeps reading in the same worker. `since_us` is the last accepted
+  acquisition plus the unchanged 50 ms freshness. The coordinator treats it
+  as unavailable even if recovery is queued in the same batch, so the cut and
+  hold below still happen. The muted wait and direct GPIO route are unchanged.
 - **From the lapse:** no capture frame is taken, including those capture still
   reads inside its lease (`GapRide::takes_frame`). The turn in flight is cut
   (`privacy_gap`) and the speaker is told at once; nothing new begins (it holds
@@ -121,8 +129,14 @@ allowed no longer ends the conversation at once (`privacy_gap.rs`):
   heartbeat (1.5 s) counts from the reopen, and the conversation goes on with
   its history.
 - **A fresh reading that says closed** is the physical mute, as before.
-- **No fresh reading within 1 s:** the conversation ends as before, and the
-  wait reads again. That's before capture's own 1.5 s (`REOPEN_US`).
+- **No stable recovery within 1 s:** the conversation ends as before, and the
+  wait reads again. The worker and coordinator both enforce the absolute
+  deadline; delayed delivery, isolated fresh readings, another lapse during
+  stabilization, or recovery at the deadline never renew it. That's before
+  capture's own 1.5 s (`REOPEN_US`). During this bounded episode only, the bus's
+  late-publication notice (after 200 ms) is tolerated, including one queued
+  with recovery. A gone/replaced publisher, lost sequence, malformed evidence
+  or fresh physical LOW keeps its existing fail-closed behavior.
 - **What it says:** the trace's `privacy_gap` (`began`, `reopened`, or `ended`
   on every privacy exit while one is ridden, with `why`: `no fresh reading`,
   `read closed` or `privacy worker failed`; each with `lasted_us`) and one
@@ -130,6 +144,17 @@ allowed no longer ends the conversation at once (`privacy_gap.rs`):
 - **No recording of the lease's tail:** the ride runs only in serve, which
   refuses raw audio diagnostics, so no local recording holds what capture read
   after the lapse.
+
+The worker-expiry regression comes from Eighth's lamp-75c9 hour (21 Oct,
+22:00:29): `physical privacy source expired` ended the conversation before the
+ride saw unavailable. The stepped coordinator test now uses the production
+worker expiry rule: a 60 ms publication silence emits `began`/`reopened` in one
+conversation, with no renewed capture authority or speaker chunk in the gap;
+a later silence outlasting the bound ends it. Linux tests exercise the actual
+worker, local bus, closed lease, recovery and timeout. These use synthetic
+switch evidence and no audio hardware; a short gap does not itself prove
+capture's descriptor closed before its authority lease expired. Device
+latency and the live conversation check remain with the lamp's owner.
 
 With the independent `--controls-mute ABS_PRIVATE_RECORD` experiment, the
 software latch is restored before any worker, including the metadata writer.

@@ -80,6 +80,17 @@ its start included, is still an abnormal exit that ends the service.
 Source acquisition sequence can advance several times between publications;
 it must advance, but need not be consecutive at the consumer.
 
+With `LAMP_PRIVACY_GAP_RIDE=on`, the conversation's worker has one bounded
+exception after it published an allowed capture lease: its own missing-acquisition
+expiry becomes `PrivacyUnavailable`, and it keeps reading while publishing
+only denied/unknown privacy leases. The deadline is one second from the last
+accepted acquisition's 50 ms expiry, including the fresh-open gate's 60 ms
+stabilization. A late-publication notice may be ridden inside that deadline;
+publisher loss/replacement, invalid evidence and sequence discontinuity still
+end the worker. The muted wait and switch-off behavior are unchanged. See
+[service-privacy.md](service-privacy.md) for the conversation's cut, held input,
+recovery and the capture authority's existing lease tail.
+
 The existing physical gate still requires observations younger than 50 ms and
 60 ms of continuously fresh open-switch evidence before reopening. Voice's
 durable software mute remains a separate inhibit. A closed switch cancels the

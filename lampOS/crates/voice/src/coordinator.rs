@@ -3857,10 +3857,11 @@ fn spawn_rig(
         None
     };
     let privacy_route = crate::privacy_bus::from_environment()?;
-    let privacy_arguments = crate::privacy_bus::worker_arguments(
+    let privacy_arguments = crate::privacy_bus::conversation_arguments(
         privacy_route
             .as_ref()
             .map(|(root, route)| (root.as_path(), *route)),
+        lifetime.continuous() && crate::privacy_gap::enabled_from_environment(),
     )?;
     let privacy_arguments: Vec<&str> = privacy_arguments.iter().map(String::as_str).collect();
     let mut later_tick = |second: Option<&mut second::Route>| -> io::Result<()> {
@@ -5928,6 +5929,7 @@ fn conversation_with_gate(
                 "service privacy freshness lost before next observation".into(),
             ));
         }
+        let mut worker_gap_since = None;
         for _ in 0..16 {
             let received = rig.privacy.channels.control.receive::<WorkerEvent>();
             let received = match received {
@@ -5941,6 +5943,17 @@ fn conversation_with_gate(
                 break;
             };
             match event {
+                WorkerEvent::PrivacyUnavailable { since_us } => {
+                    let at_us = monotonic_us();
+                    if !privacy_controls || since_us > at_us || !gap_ride.rides(permitted, at_us) {
+                        gap_ended(&gap_ride, trace, "no fresh reading")?;
+                        return Err(lost("physical privacy source expired".into()));
+                    }
+                    gate.close();
+                    gap_ride.noticed_since(since_us);
+                    worker_gap_since =
+                        Some(worker_gap_since.map_or(since_us, |old: u64| old.min(since_us)));
+                }
                 WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
@@ -6029,7 +6042,13 @@ fn conversation_with_gate(
         }
         // Provider loss closes cloud submissions, never the microphone authority
         // needed to retain interruptions or finish already-owned playback.
-        let privacy_state = gate.state(now());
+        // A recovered reading may be in the same batch as the worker's
+        // expiry. Still perform the cut/hold once before considering reopen.
+        let privacy_state = if worker_gap_since.is_some() {
+            PrivacyState::Unavailable
+        } else {
+            gate.state(now())
+        };
         if lifetime.continuous() {
             match privacy_state {
                 PrivacyState::Muted => {
@@ -6370,6 +6389,13 @@ fn conversation_with_gate(
             last_publish = monotonic_us();
         }
         let can_open = privacy_state == PrivacyState::Allowed;
+        // A fresh Allowed arriving at the deadline cannot bypass the bound.
+        if gap_ride.lasted(monotonic_us()).is_some() && !gap_ride.rides(permitted, monotonic_us()) {
+            gap_ended(&gap_ride, trace, "no fresh reading")?;
+            return Err(lost(
+                "service privacy freshness lost before next observation".into(),
+            ));
+        }
         if let Some(reminders) = reminders.as_mut() {
             reminders.poll(monotonic_us());
             if reply.as_ref().is_some_and(|current| {
@@ -6404,7 +6430,11 @@ fn conversation_with_gate(
                 gap_ended(&gap_ride, trace, "no fresh reading")?;
                 return Err(lost("physical privacy closed or lost freshness".into()));
             }
-            if gap_ride.begin(permitted, monotonic_us()) {
+            if gap_ride.begin(permitted, worker_gap_since.unwrap_or_else(monotonic_us)) {
+                if !gap_ride.rides(permitted, monotonic_us()) {
+                    gap_ended(&gap_ride, trace, "no fresh reading")?;
+                    return Err(lost("physical privacy source expired".into()));
+                }
                 rig.capture_held = true;
                 paused = true;
                 tell_eyes_no(eyes_link.as_mut(), "privacy gap");
@@ -6433,10 +6463,12 @@ fn conversation_with_gate(
         // The gap ridden is over: a fresh reading said open (#2602). The
         // capture's authority is renewed again; capture reopens in the same
         // generation with a new epoch, and no frame read before now is taken.
-        if permitted
-            && can_open
-            && let Some(lasted_us) = gap_ride.reopened(monotonic_us())
-        {
+        let reopen_at_us = monotonic_us();
+        if permitted && can_open && gap_ride.lasted(reopen_at_us).is_some() {
+            let Some(lasted_us) = gap_ride.reopened(reopen_at_us) else {
+                gap_ended(&gap_ride, trace, "no fresh reading")?;
+                return Err(lost("physical privacy source expired".into()));
+            };
             rig.capture_held = false;
             frames_from_us = monotonic_us();
             snapshot = owner.snapshot(now())?;

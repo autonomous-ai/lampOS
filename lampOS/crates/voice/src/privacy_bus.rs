@@ -5,6 +5,7 @@
 //! Bus/disk work stays in this process, outside the interaction owner's loop.
 use crate::{
     privacy::{PRIVACY_FRESH_US, PrivacyGate},
+    privacy_gap::RIDE_US,
     process::boot_text,
     transport::WorkerChannels,
     wire::{Control, WorkerEvent},
@@ -28,6 +29,9 @@ pub const ROOT_FLAG: &str = "--controls-root";
 /// The privacy worker's argument for a lamp with no slide. Its environment
 /// is cleared (`worker_command`), so the route reaches it only this way.
 pub const NO_SLIDE_FLAG: &str = "--no-slide";
+/// Only the conversation worker rides expiry; the muted wait keeps its
+/// existing restart behavior. The child's environment is cleared.
+pub const GAP_RIDE_FLAG: &str = "--gap-ride";
 const DRAIN_LIMIT: usize = 32;
 #[cfg(any(target_os = "linux", test))]
 pub(crate) const INDICATOR_SUBSCRIBER: &str = "privacy_ring";
@@ -122,16 +126,34 @@ pub fn worker_arguments(selected: Option<(&Path, Route)>) -> io::Result<Vec<Stri
     }
 }
 
+/// The conversation's selected worker, with its explicitly passed ride setting.
+/// The direct GPIO route and the muted wait never receive this flag.
+pub fn conversation_arguments(
+    selected: Option<(&Path, Route)>,
+    ride: bool,
+) -> io::Result<Vec<String>> {
+    let mut arguments = worker_arguments(selected)?;
+    if ride && !arguments.is_empty() {
+        arguments.push(GAP_RIDE_FLAG.into());
+    }
+    Ok(arguments)
+}
+
 /// What the privacy worker reads back from [`worker_arguments`]: exactly
-/// `--controls-root ROOT`, then `--no-slide` on a lamp with no slide.
-pub fn worker_route(arguments: &[String]) -> io::Result<(PathBuf, Route)> {
+/// `--controls-root ROOT`, then `--no-slide` on a lamp with no slide, then
+/// the conversation's optional `--gap-ride`.
+pub fn worker_route(arguments: &[String]) -> io::Result<(PathBuf, Route, bool)> {
+    let (arguments, ride) = match arguments.split_last() {
+        Some((flag, arguments)) if flag == GAP_RIDE_FLAG => (arguments, true),
+        _ => (arguments, false),
+    };
     let (root, route) = match arguments {
         [flag, root] if flag == ROOT_FLAG => (root, Route::Slide),
         [flag, root, mode] if flag == ROOT_FLAG && mode == NO_SLIDE_FLAG => (root, Route::NoSlide),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "privacy worker takes --controls-root ROOT [--no-slide]",
+                "privacy worker takes --controls-root ROOT [--no-slide] [--gap-ride]",
             ));
         }
     };
@@ -139,7 +161,7 @@ pub fn worker_route(arguments: &[String]) -> io::Result<(PathBuf, Route)> {
     if !root.is_absolute() {
         return Err(io::Error::other("privacy root must be absolute"));
     }
-    Ok((root, route))
+    Ok((root, route, ride))
 }
 
 pub fn wall_ms() -> u64 {
@@ -642,17 +664,92 @@ fn unreadable(why: impl std::fmt::Display) -> Box<dyn std::error::Error + Send +
     Box::new(Unreadable(why.to_string()))
 }
 
+/// The worker's bounded expiry episode. A delayed observation never extends
+/// it: the bound begins when the last acquisition actually expired, and only
+/// a stable open gate (or a physical mute) finishes it. Used by the real bus
+/// loop and by the coordinator's stepped worker fixture.
+pub(crate) struct SourceGap {
+    on: bool,
+    since: Option<u64>,
+}
+
+impl SourceGap {
+    pub(crate) fn new(on: bool) -> Self {
+        Self { on, since: None }
+    }
+
+    pub(crate) fn active(&self) -> bool {
+        self.since.is_some()
+    }
+
+    pub(crate) fn check(
+        &self,
+        now_us: u64,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if self
+            .since
+            .is_some_and(|since| now_us.saturating_sub(since) >= RIDE_US)
+        {
+            return Err(unreadable("physical privacy source expired"));
+        }
+        Ok(())
+    }
+
+    /// Recovery may already be queued when the worker next runs. Report
+    /// the old acquisition's expiry before replacing it with that reading.
+    pub(crate) fn before_observation(
+        &mut self,
+        last_us: Option<u64>,
+        permitted: bool,
+        now_us: u64,
+    ) -> Result<Option<WorkerEvent>, Box<dyn std::error::Error + Send + Sync>> {
+        self.check(now_us)?;
+        if self.on
+            && permitted
+            && let Some(last_us) = last_us
+            && now_us.saturating_sub(last_us) >= PRIVACY_FRESH_US
+        {
+            return self.missing(last_us.saturating_add(PRIVACY_FRESH_US), permitted, now_us);
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn missing(
+        &mut self,
+        since_us: u64,
+        permitted: bool,
+        now_us: u64,
+    ) -> Result<Option<WorkerEvent>, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.active() {
+            if !self.on || !permitted {
+                return Err(unreadable("physical privacy source expired"));
+            }
+            self.since = Some(since_us);
+            self.check(now_us)?;
+            return Ok(Some(WorkerEvent::PrivacyUnavailable { since_us }));
+        }
+        self.check(now_us)?;
+        Ok(None)
+    }
+
+    pub(crate) fn recovered(&mut self) {
+        self.since = None;
+    }
+}
+
 /// The only publisher of `voice/privacy`. A bus stall cannot renew its lease;
 /// Voice and Ears independently expire their final-boundary permissions.
-/// Evidence that cannot be had ends it cleanly, said as [`UNREADABLE`];
+/// Source expiry can ride one bounded episode after a grant. Otherwise,
+/// evidence that cannot be had ends it cleanly, said as [`UNREADABLE`];
 /// anything else ends it as an error.
 pub fn run(
     mut channels: WorkerChannels,
     controller: BootId,
     root: &Path,
     route: Route,
+    ride: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    match serve(&mut channels, controller, root, route) {
+    match serve(&mut channels, controller, root, route, ride) {
         Err(error) if error.is::<Unreadable>() => {
             channels.control.send(WorkerEvent::Fault {
                 code: format!("{UNREADABLE}{error}"),
@@ -743,7 +840,8 @@ fn receipt(
 /// order: its first second (the first builder on #2244). Controls'
 /// publisher finds a new subscriber within 5 ms (`selected_bus`), and with
 /// no datagram for twice `controls/state`'s declared 100 ms the bus says
-/// its publisher is late and the worker ends anyway.
+/// its publisher is late and the worker ends, except during an enabled
+/// source-expiry ride bounded independently by [`RIDE_US`].
 const RESYNC_FOR_US: u64 = 1_000_000;
 
 /// Whether the next message read resyncs the fence's order
@@ -759,6 +857,7 @@ fn serve(
     controller: BootId,
     root: &Path,
     route: Route,
+    ride: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let clock = lamp_controls::runtime::clock_id(None)?;
     let bus = lamp_controls::privacy::selected_bus(Bus::new(root)?);
@@ -771,9 +870,11 @@ fn serve(
     let mut fence = SwitchFence::for_route(clock.clone(), route);
     let mut guard = BoundaryGuard::new(controller, MonoTime::from_micros(lamp_ipc::monotonic_us()));
     let mut gate = CaptureLeaseGate::default();
+    let mut gap = SourceGap::new(ride);
     let mut last: Option<Observation> = None;
     let mut published_at = None;
     let mut previous_permission = None;
+    let mut granted = false;
     let mut sequence = 0u64;
     let began = lamp_ipc::monotonic_us();
     channels.control.send(WorkerEvent::Ready)?;
@@ -782,6 +883,8 @@ fn serve(
             return Ok(());
         }
         let now = lamp_ipc::monotonic_us();
+        // Expiry wins even if a fresh reading is queued after the deadline.
+        gap.check(now)?;
         if guard
             .state()
             .is_some_and(|state| state.expires_at().as_micros() <= now)
@@ -820,6 +923,18 @@ fn serve(
             {
                 let muted = value.muted().map_err(unreadable)?;
                 let acquired = value.stamp();
+                let permitted = granted
+                    && guard
+                        .state()
+                        .is_some_and(|state| state.microphone_permission() == Permission::Allowed);
+                if let Some(event) = gap.before_observation(
+                    last.as_ref().map(|value| value.stamp().at_us),
+                    permitted,
+                    now,
+                )? {
+                    gate.physical.close();
+                    channels.control.send(event)?;
+                }
                 gate.observe(acquired.sequence, acquired.at_us, now, muted);
                 // Revoke the main owner before any Bus publication/disk work.
                 channels.control.send(WorkerEvent::Privacy {
@@ -833,15 +948,49 @@ fn serve(
         if !empty {
             return Err(unreadable("Controls privacy drain overflow"));
         }
-        notices(&mut subscriber).map_err(unreadable)?;
+        if !ride {
+            notices(&mut subscriber).map_err(unreadable)?;
+        }
         // Revocation arriving during Bus I/O wins before another lease.
         if !authority(channels, &mut guard)? {
             return Ok(());
         }
         let now = lamp_ipc::monotonic_us();
+        gap.check(now)?;
         let physical = fresh(last.as_ref(), now);
         if physical.is_none() && now.saturating_sub(began) >= PRIVACY_FRESH_US {
-            return Err(unreadable("physical privacy source expired"));
+            let since = last
+                .as_ref()
+                .map_or(began, |value| value.stamp().at_us)
+                .saturating_add(PRIVACY_FRESH_US);
+            let permitted = granted
+                && guard
+                    .state()
+                    .is_some_and(|state| state.microphone_permission() == Permission::Allowed);
+            if let Some(event) = gap.missing(since, permitted, now)? {
+                gate.physical.close();
+                // Say unavailable before publication/disk work. This survives
+                // a delayed coordinator reading recovery in the same batch.
+                channels.control.send(event)?;
+            }
+        }
+        // Late can also accompany the first recovered datagram. Evaluate it
+        // before clearing the episode; a changed publisher remains fatal.
+        if ride
+            && subscriber.notices().iter().any(|notice| {
+                matches!(notice, Notice::SourceGone)
+                    || matches!(notice, Notice::Late) && !gap.active()
+            })
+        {
+            return Err(unreadable("privacy publisher unavailable"));
+        }
+        if physical.is_some()
+            && matches!(
+                gate.physical.state(MonoTime::from_micros(now)),
+                crate::privacy::PrivacyState::Allowed | crate::privacy::PrivacyState::Muted
+            )
+        {
+            gap.recovered();
         }
         if let Some(state) = guard.state() {
             let permitted = grants(&gate, state, physical, empty, now);
@@ -867,6 +1016,7 @@ fn serve(
                 );
                 value.check()?;
                 publisher.publish_json(now, &value)?;
+                granted |= permitted;
                 previous_permission = Some(identity);
                 published_at = Some(now);
             }
@@ -879,6 +1029,84 @@ fn serve(
 pub(crate) mod tests {
     use super::*;
     use std::sync::atomic::AtomicU64;
+
+    #[test]
+    fn source_expiry_is_ridden_only_when_enabled_after_permission() {
+        for (on, permitted) in [(false, true), (true, false), (false, false)] {
+            let error = SourceGap::new(on)
+                .missing(100_000, permitted, 100_000)
+                .unwrap_err();
+            assert!(error.is::<Unreadable>());
+        }
+        let mut gap = SourceGap::new(true);
+        assert!(matches!(
+            gap.missing(100_000, true, 102_000).unwrap(),
+            Some(WorkerEvent::PrivacyUnavailable { since_us: 100_000 })
+        ));
+        assert!(gap.missing(120_000, true, 122_000).unwrap().is_none());
+        assert!(gap.check(100_000 + RIDE_US - 1).is_ok());
+        assert!(gap.check(100_000 + RIDE_US).is_err());
+        assert!(gap.check(100_000 + RIDE_US + 1).is_err());
+        // A reader first scheduled after the entire budget cannot restart it.
+        assert!(
+            SourceGap::new(true)
+                .missing(100_000, true, 100_000 + RIDE_US)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn only_recovery_finishes_the_source_episode_and_allows_a_new_one() {
+        let mut gap = SourceGap::new(true);
+        gap.missing(100_000, true, 100_000).unwrap();
+        // A fresh but not yet stable reading leaves the original deadline.
+        gap.check(900_000).unwrap();
+        assert!(gap.missing(950_000, true, 950_000).unwrap().is_none());
+        assert!(gap.check(1_100_000).is_err());
+        gap.recovered();
+        assert!(!gap.active());
+        assert!(matches!(
+            gap.missing(2_000_000, true, 2_000_000).unwrap(),
+            Some(WorkerEvent::PrivacyUnavailable {
+                since_us: 2_000_000
+            })
+        ));
+    }
+
+    #[test]
+    fn recovery_queued_after_a_source_stall_reports_the_old_expiry_first() {
+        let mut gap = SourceGap::new(true);
+        assert!(
+            gap.before_observation(Some(100_000), true, 149_999)
+                .unwrap()
+                .is_none()
+        );
+        assert!(matches!(
+            gap.before_observation(Some(100_000), true, 160_000)
+                .unwrap(),
+            Some(WorkerEvent::PrivacyUnavailable { since_us: 150_000 })
+        ));
+        assert!(gap.active());
+        assert!(
+            gap.before_observation(Some(160_000), true, 170_000)
+                .unwrap()
+                .is_none()
+        );
+        assert!(gap.check(150_000 + RIDE_US).is_err());
+        // Off and a worker that has not granted capture keep their old path.
+        assert!(
+            SourceGap::new(false)
+                .before_observation(Some(100_000), true, 160_000)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            SourceGap::new(true)
+                .before_observation(Some(100_000), false, 160_000)
+                .unwrap()
+                .is_none()
+        );
+    }
 
     struct Root(PathBuf);
     impl Drop for Root {
