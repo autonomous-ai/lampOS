@@ -7,7 +7,7 @@ use lamp_skills::{SkillKind, load};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Child, Command},
     time::{Duration, Instant},
 };
 
@@ -283,15 +283,26 @@ fn the_program(on: bool) -> (Vec<AddonProposal>, Vec<SkillEvent>, bool) {
     command
         .env_remove("LAMP_SKILLS_ASK")
         .env_remove(lamp_skills::ADDONS_ENVIRONMENT)
-        .stderr(Stdio::null());
+        .stderr(std::fs::File::create(root.join("stderr")).unwrap());
     if on {
         command.env(lamp_skills::ADDONS_ENVIRONMENT, "on");
     }
     let _running = Running(command.spawn().unwrap());
     // Loaded at its start, and subscribed to the voice once it is: with the
-    // switch, waited for; without it, given two seconds to show it is not.
-    let wait = Duration::from_secs(if on { 10 } else { 2 });
-    let deadline = Instant::now() + wait;
+    // switch, waited for. Without it, until it says what it loaded (the
+    // pass that subscribes to its skills' topics just after), then one pass
+    // of its loop (250 ms) to show it is not, not two seconds (#1806).
+    let mut deadline = Instant::now() + Duration::from_secs(10);
+    if !on {
+        while !std::fs::read_to_string(root.join("stderr"))
+            .unwrap()
+            .contains("lamp-skills: loaded ")
+        {
+            assert!(Instant::now() < deadline, "the program never loaded");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        deadline = Instant::now() + Duration::from_millis(300);
+    }
     let mut subscribed = false;
     while Instant::now() < deadline {
         if !bus.subscribers(VoiceState::TOPIC).unwrap().is_empty() {
