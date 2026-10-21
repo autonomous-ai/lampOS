@@ -307,10 +307,11 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   before, is the eyes and then memory; `false` is the eyes' forget only,
   and the answer carries `"memory": "not asked"`; any other value is
   refused before the eyes are asked. `{"entirely": true}` with no name is
-  refused by the name's check: that refusal is the app's probe for a lamp
-  with `face.remove`, where a lamp without it answers `not on this lamp`.
-  A lamp of before `entirely` takes the field as unknown and forgets
-  memory too.
+  refused by the name's check, ending `; entirely is taken`: that refusal
+  is the app's probe for its two choices (Mobile on #2563). A lamp of
+  before `entirely` refuses it plainly (and would forget memory too on a
+  face-only remove), and a lamp without `face.remove` answers `not on this
+  lamp`.
 - **`LAMP_MEMORY_FORGET_SOCKET`** is memory's narrow socket
   (`lamp-memory --forget-socket … --forget-group …`): mode 0660 for one
   group, taking `forget_person` only, so lamp-cloud can forget a person and

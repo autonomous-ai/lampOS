@@ -200,7 +200,16 @@ pub fn entirely(data: &Value) -> Result<bool, String> {
 /// `"entirely": false`, memory's of everything it keeps for them and their
 /// rules.
 pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
-    let name = asked(data)?;
+    // A lamp that takes `entirely` says so in a nameless remove's refusal:
+    // that refusal is the app's probe for its two choices (Mobile on
+    // #2563). A lamp without the field refuses it plainly.
+    let name = asked(data).map_err(|refused| {
+        if data.get("entirely").is_some() {
+            format!("{refused}; entirely is taken")
+        } else {
+            refused
+        }
+    })?;
     let entirely = entirely(data)?;
     let (mut told, id, name_id_free) =
         match crate::photos::exchange(&eyes.socket, &json!({"forget": name}), DEADLINE) {
@@ -466,8 +475,8 @@ mod tests {
 
     /// `entirely`: left out or `true` is the eyes and memory, `false` the
     /// face only; anything else is refused before the eyes are asked. With
-    /// no name, `{"entirely": true}` is refused by the name's check: the
-    /// app's probe for a lamp that has `face.remove`.
+    /// no name, `{"entirely": true}` is refused by the name's check, naming
+    /// `entirely`: the app's probe for its two choices.
     #[test]
     fn entirely_is_true_unless_said_false_and_a_flag_only() {
         assert_eq!(entirely(&json!({"name": "Lan"})), Ok(true));
@@ -490,8 +499,14 @@ mod tests {
             socket: "/nonexistent/who.sock".into(),
             memory: Some("/nonexistent/forget.sock".into()),
         };
+        // The app's probe: a nameless remove with `entirely` is refused
+        // naming it; without the field, plainly, as an older lamp does.
         assert_eq!(
             remove(&eyes, &json!({"entirely": true})),
+            Err("name must be a name of at most 40 characters; entirely is taken".to_owned())
+        );
+        assert_eq!(
+            remove(&eyes, &json!({})),
             Err("name must be a name of at most 40 characters".to_owned())
         );
         // A bad flag is refused before the eyes would be asked: no "did not
