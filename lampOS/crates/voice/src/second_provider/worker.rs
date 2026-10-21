@@ -2262,6 +2262,15 @@ pub fn serve(
         );
         engine = engine.preparing(true);
     }
+    // Each turn's tools in the journal, names and counts only (#2510).
+    if crate::remember::days_from_environment()
+        && std::env::var(crate::remember::REPLACES_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on")
+    {
+        engine = engine.noting_turn_tools(true);
+    }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
             crate::agent_tasks::named_ask(&place, words)
