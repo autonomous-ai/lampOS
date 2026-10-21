@@ -1,0 +1,8 @@
+{
+  "lampOS/crates/cloud/src/online.rs": {
+    "before": "203b51689a604db16f82bc5a12392a043e71b9001adaf96aaebd4ab135a6d2c6",
+    "after": "eb541bf5c0da2edc205212fa568a00dc27497a21c285ca7a86ecc21e73f45625"
+  },
+  "unchanged_product_prefix_sha256": "f44cafe914c21903d452ddf882c44fbcc6f5638afc3ae50b2f06f19dd6db1c47",
+  "unchanged_scenarios_suffix_sha256": "8f0457155cc40363f1b004f9648548c0c38dde08403b510598f7d0e1f2c6b774"
+}

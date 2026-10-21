@@ -1,0 +1,25 @@
+{
+  "run": 39639887119,
+  "head": "b87b3e91ad04b5811fe441efa118773d33416630",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T17:11:05.0600200Z      Summary [ 162.767s] 9752 tests run: 9752 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 4.368,
+      "binary": "lamp-cloud",
+      "test": "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will"
+    },
+    {
+      "status": "PASS",
+      "seconds": 4.362,
+      "binary": "lamp-cloud",
+      "test": "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack"
+    },
+    {
+      "status": "PASS",
+      "seconds": 6.168,
+      "binary": "lamp-cloud",
+      "test": "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset"
+    }
+  ]
+}

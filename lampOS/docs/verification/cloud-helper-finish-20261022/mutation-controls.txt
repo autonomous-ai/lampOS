@@ -1,0 +1,81 @@
+=== mutant-window-before-ack-compile | exit 0 | 6.089648 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud#lamp-cloud@0.1.0","manifest_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_cloud","src_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized] target(s) in 6.00s
+=== end mutant-window-before-ack-compile ===
+=== mutant-window-before-ack | exit 101 | 2.274446 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... FAILED
+
+failures:
+
+failures:
+    online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 142 filtered out; finished in 1.37s
+
+--- stderr ---
+
+thread 'online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack' (686251307) panicked at crates/cloud/src/online.rs:1501:9:
+35.758988ms
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-window-before-ack ===
+=== mutant-reconnect-without-will-compile | exit 0 | 6.176935 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud#lamp-cloud@0.1.0","manifest_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_cloud","src_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized] target(s) in 6.09s
+=== end mutant-reconnect-without-will-compile ===
+=== mutant-reconnect-without-will | exit 101 | 2.282795 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... FAILED
+
+failures:
+
+failures:
+    online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 142 filtered out; finished in 1.38s
+
+--- stderr ---
+
+thread 'online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will' (686253119) panicked at crates/cloud/src/online.rs:1577:30:
+a will on each connection
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-reconnect-without-will ===
+=== mutant-backoff-not-reset-compile | exit 0 | 6.309754 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud#lamp-cloud@0.1.0","manifest_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_cloud","src_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized] target(s) in 6.22s
+=== end mutant-backoff-not-reset-compile ===
+=== mutant-backoff-not-reset | exit 101 | 4.739696 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... FAILED
+
+failures:
+
+failures:
+    online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 142 filtered out; finished in 3.83s
+
+--- stderr ---
+
+thread 'online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset' (686254075) panicked at crates/cloud/src/online.rs:1627:9:
+reset: [340.59µs, 701.634944ms, 2.102890522s, 2.161436225s]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-backoff-not-reset ===

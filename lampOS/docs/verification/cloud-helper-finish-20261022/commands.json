@@ -1,0 +1,456 @@
+[
+  {
+    "label": "before-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 49.584496,
+    "stdout": "before-compile.stdout",
+    "stderr": "before-compile.stderr"
+  },
+  {
+    "label": "before-stale-ack-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 5.242295,
+    "stdout": "before-stale-ack-1.stdout",
+    "stderr": "before-stale-ack-1.stderr"
+  },
+  {
+    "label": "before-will-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.387485,
+    "stdout": "before-will-1.stdout",
+    "stderr": "before-will-1.stderr"
+  },
+  {
+    "label": "before-backoff-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.200784,
+    "stdout": "before-backoff-1.stdout",
+    "stderr": "before-backoff-1.stderr"
+  },
+  {
+    "label": "before-stale-ack-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.387866,
+    "stdout": "before-stale-ack-2.stdout",
+    "stderr": "before-stale-ack-2.stderr"
+  },
+  {
+    "label": "before-will-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.387293,
+    "stdout": "before-will-2.stdout",
+    "stderr": "before-will-2.stderr"
+  },
+  {
+    "label": "before-backoff-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.199942,
+    "stdout": "before-backoff-2.stdout",
+    "stderr": "before-backoff-2.stderr"
+  },
+  {
+    "label": "before-stale-ack-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.385936,
+    "stdout": "before-stale-ack-3.stdout",
+    "stderr": "before-stale-ack-3.stderr"
+  },
+  {
+    "label": "before-will-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.385401,
+    "stdout": "before-will-3.stdout",
+    "stderr": "before-will-3.stderr"
+  },
+  {
+    "label": "before-backoff-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.197675,
+    "stdout": "before-backoff-3.stdout",
+    "stderr": "before-backoff-3.stderr"
+  },
+  {
+    "label": "after-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 5.720172,
+    "stdout": "after-compile.stdout",
+    "stderr": "after-compile.stderr"
+  },
+  {
+    "label": "after-stale-ack-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.329786,
+    "stdout": "after-stale-ack-1.stdout",
+    "stderr": "after-stale-ack-1.stderr"
+  },
+  {
+    "label": "after-will-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.389747,
+    "stdout": "after-will-1.stdout",
+    "stderr": "after-will-1.stderr"
+  },
+  {
+    "label": "after-backoff-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 3.248511,
+    "stdout": "after-backoff-1.stdout",
+    "stderr": "after-backoff-1.stderr"
+  },
+  {
+    "label": "after-stale-ack-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.385341,
+    "stdout": "after-stale-ack-2.stdout",
+    "stderr": "after-stale-ack-2.stderr"
+  },
+  {
+    "label": "after-will-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.389748,
+    "stdout": "after-will-2.stdout",
+    "stderr": "after-will-2.stderr"
+  },
+  {
+    "label": "after-backoff-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 3.253453,
+    "stdout": "after-backoff-2.stdout",
+    "stderr": "after-backoff-2.stderr"
+  },
+  {
+    "label": "after-stale-ack-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.381842,
+    "stdout": "after-stale-ack-3.stdout",
+    "stderr": "after-stale-ack-3.stderr"
+  },
+  {
+    "label": "after-will-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.386408,
+    "stdout": "after-will-3.stdout",
+    "stderr": "after-will-3.stderr"
+  },
+  {
+    "label": "after-backoff-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 3.256162,
+    "stdout": "after-backoff-3.stdout",
+    "stderr": "after-backoff-3.stderr"
+  },
+  {
+    "label": "mutant-window-before-ack-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.089648,
+    "stdout": "mutant-window-before-ack-compile.stdout",
+    "stderr": "mutant-window-before-ack-compile.stderr"
+  },
+  {
+    "label": "mutant-window-before-ack",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 2.274446,
+    "stdout": "mutant-window-before-ack.stdout",
+    "stderr": "mutant-window-before-ack.stderr"
+  },
+  {
+    "label": "mutant-reconnect-without-will-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.176935,
+    "stdout": "mutant-reconnect-without-will-compile.stdout",
+    "stderr": "mutant-reconnect-without-will-compile.stderr"
+  },
+  {
+    "label": "mutant-reconnect-without-will",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 2.282795,
+    "stdout": "mutant-reconnect-without-will.stdout",
+    "stderr": "mutant-reconnect-without-will.stderr"
+  },
+  {
+    "label": "mutant-backoff-not-reset-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-cloud",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.309754,
+    "stdout": "mutant-backoff-not-reset-compile.stdout",
+    "stderr": "mutant-backoff-not-reset-compile.stderr"
+  },
+  {
+    "label": "mutant-backoff-not-reset",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec",
+      "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 4.739696,
+    "stdout": "mutant-backoff-not-reset.stdout",
+    "stderr": "mutant-backoff-not-reset.stderr"
+  },
+  {
+    "label": "gate-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 10.023568,
+    "stdout": "gate-fmt.stdout",
+    "stderr": "gate-fmt.stderr"
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-cloud",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 37.628411,
+    "stdout": "gate-clippy.stdout",
+    "stderr": "gate-clippy.stderr"
+  },
+  {
+    "label": "gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-cloud"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 19.84665,
+    "stdout": "gate-tests.stdout",
+    "stderr": "gate-tests.stderr"
+  },
+  {
+    "label": "gate-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 55.807988,
+    "stdout": "gate-build.stdout",
+    "stderr": "gate-build.stderr"
+  },
+  {
+    "label": "gate-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.038423,
+    "stdout": "gate-diff.stdout",
+    "stderr": "gate-diff.stderr"
+  }
+]

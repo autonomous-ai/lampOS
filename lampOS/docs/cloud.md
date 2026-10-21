@@ -1128,6 +1128,16 @@ connection made and subscribed again. A backend in the test checks the ping's
 bearer and body, a failure said once, and a rotated broker kept. Not yet run
 against the company's broker or on a lamp.
 
+The three Wi-Fi reconnect fixtures keep their setup-helper socket open
+until the scenario has stopped and awaited `lamp-cloud`, then signal the
+helper to finish and join it. A fifteen-second bound diagnoses a missing
+finish signal; it is not a successful test's duration. The helper's former
+three-second hold is gone. The real 300/1,600 ms join delays, one-second
+broker acknowledgement delay, 2,400 ms backoff gate and every original
+assertion remain: reconnect promptly, start the confirmation window only
+at the acknowledgement, reset backoff, report rollback, and retain the
+offline will on the replacement connection.
+
 The reports (#1683): each kind's fields as sent; the canary; each of the
 three gates closed sends nothing (no setup file, a no, one unreadable,
 `"true"`, `1`, a newer wording; a later no of the lamp's own); the bus only
