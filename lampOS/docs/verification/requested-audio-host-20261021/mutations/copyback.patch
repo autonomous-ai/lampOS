@@ -1,0 +1,16 @@
+--- original/crates/skills/src/requested_audio.rs
++++ copyback/crates/skills/src/requested_audio.rs
+@@ -476,13 +476,6 @@
+         // A later stale result must never restore that revoked inventory.
+         let unchanged = unchanged && self.definitions.keys().eq(scan.assets.keys());
+         if unchanged {
+-            for (name, asset) in &scan.assets {
+-                self.definitions
+-                    .get_mut(name)
+-                    .unwrap()
+-                    .verified
+-                    .clone_from(&asset.verified);
+-            }
+             self.scanned_us = Some(now_us);
+         } else {
+             self.scanned_us = None;

@@ -1,0 +1,259 @@
+{
+  "runtime_original_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+  "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+  "environment": {
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_PROFILE_DEV_INCREMENTAL": "false",
+    "CARGO_PROFILE_TEST_INCREMENTAL": "false"
+  },
+  "soft_stop_bytes": 1342177280,
+  "hard_budget_bytes": 1610612736,
+  "runs": [
+    {
+      "name": "baseline_ctime",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio restored_size_and_modified_time_cannot_hide_audio_or_permission_edits -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 0,
+      "seconds": 67.572,
+      "target_peak_bytes": 603426816,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test restored_size_and_modified_time_cannot_hide_audio_or_permission_edits ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.05s"
+      ],
+      "assertion_excerpt": [],
+      "log_sha256": "b17db6f64fbac4c236bef511c69fcfd6dbb39412998d6e20d1bf3bb256ee8c6f",
+      "private_log_basename": "baseline_ctime.log"
+    },
+    {
+      "name": "baseline_public_digest",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio unchanged_file_metadata_cannot_validate_a_different_public_asset_digest -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 0,
+      "seconds": 0.762,
+      "target_peak_bytes": 603426816,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test unchanged_file_metadata_cannot_validate_a_different_public_asset_digest ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.02s"
+      ],
+      "assertion_excerpt": [],
+      "log_sha256": "4be1fcdb05409aa87a685445d47880a7639a810f397b07368a343819eaf2f235",
+      "private_log_basename": "baseline_public_digest.log"
+    },
+    {
+      "name": "baseline_copyback",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio byte_identical_file_edits_refresh_once_then_scan_without_payload_reads -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 0,
+      "seconds": 0.444,
+      "target_peak_bytes": 603426816,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test byte_identical_file_edits_refresh_once_then_scan_without_payload_reads ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.06s"
+      ],
+      "assertion_excerpt": [],
+      "log_sha256": "a97c96fef1cbf1215ebf7d2b49e0fc9d2e6f821dc83fbd5602e5b1a30648502e",
+      "private_log_basename": "baseline_copyback.log"
+    },
+    {
+      "name": "baseline_stale_success",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 0,
+      "seconds": 0.377,
+      "target_peak_bytes": 603426816,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s"
+      ],
+      "assertion_excerpt": [],
+      "log_sha256": "710b394e09195bef66972e33dc9f41202f1b45aa4c3278f0d8ee35716fc4bd29",
+      "private_log_basename": "baseline_stale_success.log"
+    },
+    {
+      "name": "baseline_parent_identity",
+      "command": "cargo test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 0,
+      "seconds": 3.695,
+      "target_peak_bytes": 613371904,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 98 filtered out; finished in 0.03s"
+      ],
+      "assertion_excerpt": [],
+      "log_sha256": "e4d27291ec9014ecd91eed5ea183d942485f2f5fd8b51f23375e83a0e1839686",
+      "private_log_basename": "baseline_parent_identity.log"
+    },
+    {
+      "name": "mutant_ctime",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio restored_size_and_modified_time_cannot_hide_audio_or_permission_edits -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "430226c07ca72ea7e64428466e9ed4166b8654a68ab8787b3837668a41b8b776",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 101,
+      "seconds": 4.75,
+      "target_peak_bytes": 631885824,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test restored_size_and_modified_time_cannot_hide_audio_or_permission_edits ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.02s"
+      ],
+      "assertion_excerpt": [
+        "thread 'restored_size_and_modified_time_cannot_hide_audio_or_permission_edits' (49108696) panicked at crates/skills/tests/requested_audio.rs:920:9:\nsounds/fixture.wav\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest restored_size_and_modified_time_cannot_hide_audio_or_permission_edits ... FAILED"
+      ],
+      "mutation_diff": "mutations/ctime.patch",
+      "intended_test_failure": true,
+      "log_sha256": "2caaf7ddfbfb8a2db0873458f88ab4570eeba176c261d99553e061902a9e0274",
+      "mutation_diff_sha256": "75203aa26f84873c5a320153812ae13dcfe08ce1272d9885ff85f768b0720070",
+      "private_log_basename": "mutant_ctime.log"
+    },
+    {
+      "name": "mutant_public_digest",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio unchanged_file_metadata_cannot_validate_a_different_public_asset_digest -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "385976ee03454f1ced4c26553a183fd86092765157f00319fda30dadaf2e4367",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 101,
+      "seconds": 6.368,
+      "target_peak_bytes": 613371904,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test unchanged_file_metadata_cannot_validate_a_different_public_asset_digest ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s"
+      ],
+      "assertion_excerpt": [
+        "thread 'unchanged_file_metadata_cannot_validate_a_different_public_asset_digest' (49120890) panicked at crates/skills/tests/requested_audio.rs:811:5:\nassertion failed: !changed.unchanged()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest unchanged_file_metadata_cannot_validate_a_different_public_asset_digest ... FAILED"
+      ],
+      "mutation_diff": "mutations/public_digest.patch",
+      "intended_test_failure": true,
+      "log_sha256": "efcbe7285194d4ef4a19c7fb7cd48749069610676338e2effaa5ae41fe1e9c86",
+      "mutation_diff_sha256": "d5dbf425dec683c20e67f4cf368eefbe52ae3d10813b7f3f661dae57a89e7ac2",
+      "private_log_basename": "mutant_public_digest.log"
+    },
+    {
+      "name": "mutant_copyback",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio byte_identical_file_edits_refresh_once_then_scan_without_payload_reads -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "91c6845b47d9f3d93947251abfe20b1e797bfef5cedfc60b74520497132bfd9b",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 101,
+      "seconds": 4.111,
+      "target_peak_bytes": 613367808,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test byte_identical_file_edits_refresh_once_then_scan_without_payload_reads ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s"
+      ],
+      "assertion_excerpt": [
+        "thread 'byte_identical_file_edits_refresh_once_then_scan_without_payload_reads' (49121568) panicked at crates/skills/tests/requested_audio.rs:854:13:\nassertion `left == right` failed: SKILL.md at 3\n  left: 291\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest byte_identical_file_edits_refresh_once_then_scan_without_payload_reads ... FAILED"
+      ],
+      "mutation_diff": "mutations/copyback.patch",
+      "intended_test_failure": true,
+      "log_sha256": "184193f9865f1d6f165e5880ddf9f5a6406ee679b977aa60c0a84bfd66513004",
+      "mutation_diff_sha256": "acac7da6f9284819c4345db18e29fdd2e169cc14ad8dba3c0be65bb11d24505e",
+      "private_log_basename": "mutant_copyback.log"
+    },
+    {
+      "name": "mutant_stale_success",
+      "command": "cargo test --offline --locked -p lamp-skills --test requested_audio a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "49f03b7e14d915dd4b61fba04c9ed73c6e1aac71a35768dfab6754e169b54144",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 101,
+      "seconds": 4.121,
+      "target_peak_bytes": 613355520,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.01s"
+      ],
+      "assertion_excerpt": [
+        "thread 'a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation' (49122334) panicked at crates/skills/tests/requested_audio.rs:954:5:\nassertion failed: !current.scanned(&earlier, true, 3)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... FAILED"
+      ],
+      "mutation_diff": "mutations/stale_success.patch",
+      "intended_test_failure": true,
+      "log_sha256": "fc22d4c90c60392391b9757958b5660d530db9cb49d720c6154d3f5c34d7fac7",
+      "mutation_diff_sha256": "eec31e1bb5e8f8cc0db7117f95fce4313aa7e0b4761cbf89836508d6c57e3228",
+      "private_log_basename": "mutant_stale_success.log"
+    },
+    {
+      "name": "mutant_parent_identity",
+      "command": "cargo test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same -- --exact --nocapture",
+      "cwd": "lampOS",
+      "runtime_sha256": "244e8254e81be680cf52273a6be070ed2ba8f45525f71b490a730d2ec3450073",
+      "tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "exit": 101,
+      "seconds": 3.698,
+      "target_peak_bytes": 615981056,
+      "stopped_reason": null,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 98 filtered out; finished in 0.00s"
+      ],
+      "assertion_excerpt": [
+        "thread 'requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same' (49122804) panicked at crates/skills/src/requested_audio.rs:668:9:\nassertion failed: opened.bytes(&mut 0).is_err()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... FAILED"
+      ],
+      "mutation_diff": "mutations/parent_identity.patch",
+      "intended_test_failure": true,
+      "log_sha256": "07ffbd4fe6d91daa80dc65139528db0084e7d13a9c171a5426809e6c117f0927",
+      "mutation_diff_sha256": "40163fb2cf8ce2fddbc02d02c4721b469a57eb84b64ab3a12ffe358e9ed4df8a",
+      "private_log_basename": "mutant_parent_identity.log",
+      "raw_mutation_diff_sha256": "321fc3f6cdfb9eecc21087abe3d0905fa2ff67da4cb0eb7855448ad83c70c9a6",
+      "diff_normalization": "One unchanged blank context line omitted from the public patch; hunk positions/counts adjusted. The applied runtime bytes are unchanged."
+    }
+  ],
+  "stale_success_scope": "Restores pre-P3 Authority::scanned behavior: a same-generation successful result refreshes scanned_us even after inventory was cleared. This variant does not claim to reinsert definitions or reauthorize a cleared offer.",
+  "restored_runtime_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+  "unchanged_tests_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+  "final_target_bytes": 613257216,
+  "runner_note": "The first ctime mutant reached the intended assert at test line 920. The initial log classifier required the literal word assertion, absent from that assert custom message. Classification was corrected against the original log; no baseline or ctime mutant was rerun.",
+  "complete": true,
+  "final_source_checks": {
+    "crates/skills/src/requested_audio.rs": {
+      "frozen_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+      "restored_copy_sha256": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8"
+    },
+    "crates/skills/tests/requested_audio.rs": {
+      "frozen_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b",
+      "restored_copy_sha256": "4101c9f5c87eb5d823e38bfd5d251ce1baf176cf4347d426098e825cf832809b"
+    },
+    "Cargo.lock": {
+      "frozen_sha256": "5650a4f77a6413ee9cdc1fcf7a8b9fbb89f85b54a765e37ec223b308fdfde49e",
+      "restored_copy_sha256": "5650a4f77a6413ee9cdc1fcf7a8b9fbb89f85b54a765e37ec223b308fdfde49e"
+    }
+  },
+  "peak_target_bytes": 631885824,
+  "private_receipt_sha256": "a5585a49be1feb590158e2825f8f2cd472a86e2666409cacf4157692de2e8545",
+  "source_tree_sha256": "bbd21f1d16e601b9ea3ef3591f79b4f55ce6cc1d3afc70bd6a469222c686f021",
+  "path_normalization": "Cargo executable and working directory are shown relative to a source-only copy. Raw private logs are retained by hash; only paths are omitted.",
+  "target_policy": "Separate diagnostic target, reused across the baseline and intentional variants; never used by the complete gate."
+}

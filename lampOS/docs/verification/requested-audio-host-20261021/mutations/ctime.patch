@@ -1,0 +1,11 @@
+--- original/crates/skills/src/requested_audio.rs
++++ ctime/crates/skills/src/requested_audio.rs
+@@ -95,7 +95,7 @@
+             inode: metadata.ino(),
+             size: metadata.len(),
+             modified: (metadata.mtime(), metadata.mtime_nsec()),
+-            changed: (metadata.ctime(), metadata.ctime_nsec()),
++            changed: (0, 0),
+             mode: metadata.mode(),
+             uid: metadata.uid(),
+             gid: metadata.gid(),

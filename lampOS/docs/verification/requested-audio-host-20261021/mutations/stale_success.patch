@@ -1,0 +1,20 @@
+--- original/crates/skills/src/requested_audio.rs
++++ stale_success/crates/skills/src/requested_audio.rs
+@@ -472,17 +472,7 @@
+         if scan.generation != self.generation {
+             return false;
+         }
+-        // A failed scan clears the inventory without changing generation.
+-        // A later stale result must never restore that revoked inventory.
+-        let unchanged = unchanged && self.definitions.keys().eq(scan.assets.keys());
+         if unchanged {
+-            for (name, asset) in &scan.assets {
+-                self.definitions
+-                    .get_mut(name)
+-                    .unwrap()
+-                    .verified
+-                    .clone_from(&asset.verified);
+-            }
+             self.scanned_us = Some(now_us);
+         } else {
+             self.scanned_us = None;
