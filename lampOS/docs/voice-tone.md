@@ -116,9 +116,20 @@ isn't taken here: it sends a person's voice to a server for every line.
 
 ## What reads it
 
-`voice/tone` is the voice's. What the inner state ([mood.md](mood.md)) and
-the skills make of it, beside the face's reading, is the face half's to
-settle with this one (#1722).
+`voice/tone` is the voice's. **Mood reads it**, with `LAMP_MOOD_TONE=on`,
+beside how the near face seems (`humans/seems`, #2353): two topics, one per
+sense, and Mood reads both (Ten's 10:47 on #1722).
+- **A glad line** is a smile: a little energy and warmth, sharing the smile's
+  cooldown.
+- **A down line** is someone low: two minutes' quiet while a face is near.
+  So someone low who says so is kept company even when the face reads
+  `unsure`, as FER+ did for a held long face on lamp-75c9 (Ten, 11:20).
+- **A surely lively voice** with neither adds half a smile's energy.
+- **Each sense makes its own:** a line's tone neither adds to the face's run
+  of reads nor breaks it.
+
+The bars and the rest are in [mood.md](mood.md). The skills don't read it
+yet.
 
 ## Tests
 
@@ -162,3 +173,14 @@ With `LAMP_VOICE_TONE=on` and the person at the desk:
    arousal's sign each time (`voice_tone` records);
 3. a glad line and a down one: the valence's sign;
 4. the voice part's CPU over the run, beside the same run off.
+
+**With nobody at the lamp,** steps 1 to 3 are played from a Mac beside it
+(`tools/tone-lines.sh`, #2504):
+- `say` speaks the same sentence calm and lively by its own rate, volume,
+  pitch and pitch-movement controls, after ten plain lines;
+- `tone-lines.sh play > played.tsv` plays the lines;
+- `tone-lines.sh read EVENTS played.tsv` puts each End beside its kind and
+  checks the signs.
+
+It's a first check only. A person's own voice is the real one, and the known
+face and the app's forget (`memory/forgot`) still need a person.

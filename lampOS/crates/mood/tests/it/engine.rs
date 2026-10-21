@@ -1167,3 +1167,218 @@ fn a_sleeping_lamp_takes_nothing_from_how_a_face_seems() {
         assert!(value.asleep);
     }
 }
+
+/// #1722, the voice half of "Reads your mood": a line's tone counts against
+/// its bars. Down words are low whatever the voice; glad words are glad
+/// unless the voice was surely flat; with no such words, only a surely
+/// lively voice counts. Calm alone is nothing, and a value that isn't a
+/// number counts for nothing.
+#[test]
+fn a_lines_tone_counts_only_past_its_bars() {
+    use lamp_mood::engine::{ToneKind::*, tone_kind};
+    assert_eq!(tone_kind(0.0, 0.9, Some(0.8)), Some(Glad));
+    assert_eq!(tone_kind(-0.5, 0.9, Some(0.8)), None);
+    assert_eq!(tone_kind(-0.5, 0.3, Some(0.8)), Some(Glad));
+    assert_eq!(tone_kind(0.9, 0.9, Some(-0.6)), Some(Low));
+    assert_eq!(tone_kind(-0.9, 0.0, Some(-1.0)), Some(Low));
+    assert_eq!(tone_kind(0.7, 0.8, None), Some(Lively));
+    assert_eq!(tone_kind(0.7, 0.4, None), None);
+    assert_eq!(tone_kind(0.7, 0.8, Some(0.2)), None);
+    assert_eq!(tone_kind(-0.8, 0.9, None), None);
+    assert_eq!(tone_kind(0.0, 0.9, Some(0.4)), None);
+    assert_eq!(tone_kind(0.0, 0.9, Some(-0.4)), None);
+    assert_eq!(tone_kind(f32::NAN, 0.9, None), None);
+    assert_eq!(tone_kind(0.9, f32::NAN, None), None);
+    assert_eq!(tone_kind(0.0, 0.9, Some(f32::NAN)), None);
+}
+
+/// A glad line brightens the lamp as a smile does, and shares its cooldown:
+/// a smile just after adds nothing. A lively line adds half a smile's energy
+/// and no warmth, inside the same cooldown.
+#[test]
+fn a_glad_or_lively_line_brightens_the_lamp_once_in_the_smiles_cooldown() {
+    use lamp_mood::engine::{SMILE_COOLDOWN_US, ToneKind};
+    use lamp_msgs::SeemsKind::Positive;
+    let mut mood = engine(DAY);
+    send(
+        &mut mood,
+        SECOND_US,
+        EventKind::Faces(Some(face(BOOT, "a"))),
+    );
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Glad));
+    close(state(&mood).energy, 0.40);
+    close(state(&mood).warmth, 0.63);
+    // A smile right after, and a lively line: nothing more.
+    send(&mut mood, 3 * SECOND_US, EventKind::Seems(Some(Positive)));
+    send(&mut mood, 4 * SECOND_US, EventKind::Seems(Some(Positive)));
+    send(&mut mood, 5 * SECOND_US, EventKind::Tone(ToneKind::Lively));
+    close(state(&mood).energy, 0.30 + 0.10 * 0.5f32.powf(3.0 / 15.0));
+    // Warmth only fading from the glad line's, over its 20 min half-life.
+    let warmth = state(&mood).warmth;
+    assert!(warmth <= 0.63 && warmth > 0.629, "{warmth}");
+    // After the cooldown, a lively line: half the energy, no warmth.
+    let later = 2 * SECOND_US + SMILE_COOLDOWN_US;
+    send(&mut mood, later, EventKind::Faces(Some(face(BOOT, "a"))));
+    let base = state(&mood).energy;
+    let warmth = state(&mood).warmth;
+    send(
+        &mut mood,
+        later + SECOND_US,
+        EventKind::Tone(ToneKind::Lively),
+    );
+    let added = state(&mood).energy - base;
+    assert!((added - 0.05).abs() < 0.002, "{added}");
+    assert!(state(&mood).warmth <= warmth, "no warmth added");
+    // And a smile inside its cooldown adds nothing.
+    send(
+        &mut mood,
+        later + 2 * SECOND_US,
+        EventKind::Seems(Some(Positive)),
+    );
+    send(
+        &mut mood,
+        later + 3 * SECOND_US,
+        EventKind::Seems(Some(Positive)),
+    );
+    let after = state(&mood).energy - base;
+    assert!(after < 0.05, "{after}");
+}
+
+/// A down line keeps someone near company quietly for two minutes, as a low
+/// face does; a glad line ends it. With no face near, it changes nothing.
+#[test]
+fn a_down_line_quiets_the_lamp_while_a_face_is_near_until_a_glad_one() {
+    use lamp_mood::engine::{QUIET_US, ToneKind};
+    let near = |mood: &mut Engine, at: u64| {
+        mood.apply(
+            at,
+            leased(
+                at,
+                MAX_EVENT_LEASE_US,
+                EventKind::Faces(Some(face(BOOT, "a"))),
+            ),
+        )
+        .unwrap();
+    };
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::SuddenSound);
+    assert!(state(&mood).energy > 0.50);
+    send(&mut mood, 3 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    close(state(&mood).energy, 0.20);
+    let mut at = 10 * SECOND_US;
+    while at < 3 * SECOND_US + QUIET_US {
+        near(&mut mood, at);
+        at += 10 * SECOND_US;
+    }
+    mood.advance(3 * SECOND_US + QUIET_US - 1, DAY).unwrap();
+    close(state(&mood).energy, 0.20);
+    mood.advance(3 * SECOND_US + QUIET_US, DAY).unwrap();
+    close(state(&mood).energy, 0.30);
+
+    // A glad line ends it.
+    let mut mood = engine(DAY);
+    near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    close(state(&mood).energy, 0.20);
+    send(&mut mood, 4 * SECOND_US, EventKind::Tone(ToneKind::Glad));
+    close(state(&mood).energy, 0.40);
+
+    // No face near: nothing, and nothing kept for a face that sits down
+    // after (the reviewer-lead's P3 on #2570).
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::Tone(ToneKind::Low));
+    close(state(&mood).energy, 0.30);
+    near(&mut mood, 31 * SECOND_US);
+    close(state(&mood).energy, 0.30);
+    mood.advance(60 * SECOND_US, DAY).unwrap();
+    close(state(&mood).energy, 0.30);
+}
+
+/// Asleep, how a line sounded changes nothing.
+#[test]
+fn a_sleeping_lamp_takes_nothing_from_how_a_line_sounded() {
+    use lamp_mood::engine::ToneKind::*;
+    let mut mood = engine(NIGHT);
+    assert!(state(&mood).asleep);
+    for (at, kind) in [(1, Glad), (3, Lively), (5, Low)] {
+        send(&mut mood, at * SECOND_US, EventKind::Tone(kind));
+        let value = state(&mood);
+        close(value.energy, 0.30);
+        close(value.warmth, 0.60);
+        assert!(value.asleep);
+    }
+}
+
+/// Each sense makes its own (Ten's 10:47 on #1722): a line's tone neither
+/// counts toward the face's run of reads nor breaks it. Two low face reads
+/// and a line that isn't low are no quiet, and the face's third low read
+/// after that line still is one.
+#[test]
+fn a_lines_tone_neither_adds_to_nor_breaks_the_faces_run() {
+    use lamp_mood::engine::ToneKind;
+    use lamp_msgs::SeemsKind::Negative;
+    let mut mood = engine(DAY);
+    mood.apply(
+        SECOND_US,
+        leased(
+            SECOND_US,
+            MAX_EVENT_LEASE_US,
+            EventKind::Faces(Some(face(BOOT, "a"))),
+        ),
+    )
+    .unwrap();
+    send(&mut mood, 2 * SECOND_US, EventKind::Seems(Some(Negative)));
+    send(&mut mood, 4 * SECOND_US, EventKind::Seems(Some(Negative)));
+    // A lively line between: half a smile's energy, and no quiet.
+    send(&mut mood, 5 * SECOND_US, EventKind::Tone(ToneKind::Lively));
+    close(state(&mood).energy, 0.35);
+    // The face's third low read still makes its quiet.
+    send(&mut mood, 6 * SECOND_US, EventKind::Seems(Some(Negative)));
+    close(state(&mood).energy, 0.20);
+}
+
+/// Ten's clamp (#1722, 16:1x): glad and lively lines, with bangs and a laugh
+/// between them, over an hour of smile cooldowns with someone near, never
+/// take energy past its cap or warmth past its own. Warmth presses its cap;
+/// energy peaks a bang's 0.25 and a line's 0.10 over its 0.30, below it.
+#[test]
+fn glad_and_lively_lines_with_bangs_never_pass_the_caps() {
+    use lamp_mood::engine::{SMILE_COOLDOWN_US, ToneKind};
+    let mut mood = engine(DAY);
+    let (mut energy, mut warmth) = (0.0f32, 0.0f32);
+    let mut at = SECOND_US;
+    for round in 0..30u64 {
+        let line = if round % 2 == 0 {
+            ToneKind::Glad
+        } else {
+            ToneKind::Lively
+        };
+        mood.apply(
+            at,
+            leased(
+                at,
+                MAX_EVENT_LEASE_US,
+                EventKind::Faces(Some(face(BOOT, "a"))),
+            ),
+        )
+        .unwrap();
+        for (offset, kind) in [
+            (SECOND_US, EventKind::Tone(line)),
+            (2 * SECOND_US, EventKind::SuddenSound),
+            (3 * SECOND_US, EventKind::Tone(ToneKind::Glad)),
+            (15 * SECOND_US, EventKind::Laughter),
+            (16 * SECOND_US, EventKind::SuddenSound),
+        ] {
+            send(&mut mood, at + offset, kind);
+            let value = state(&mood);
+            assert!(value.energy <= 0.70, "round {round}: {}", value.energy);
+            assert!(value.warmth <= 0.85, "round {round}: {}", value.warmth);
+            energy = energy.max(value.energy);
+            warmth = warmth.max(value.warmth);
+        }
+        at += SMILE_COOLDOWN_US + SECOND_US;
+    }
+    close(warmth, 0.85);
+    assert!(energy > 0.64, "{energy}");
+}
