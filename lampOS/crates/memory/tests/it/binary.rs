@@ -580,6 +580,38 @@ fn opted_in_memory_migrates_and_forgets_linked_facts_across_sigkill_restarts() {
     );
 }
 
+/// The reviewer-lead's P3 on #2563: a narrow socket that can't be made
+/// (here a group /etc/group doesn't have) is said and left out, and memory
+/// itself goes on serving its own socket.
+#[test]
+fn a_forget_socket_that_cant_be_made_leaves_memory_serving() {
+    let scratch = Scratch::new("forget-socket-unmade");
+    let narrow = scratch.path("forget.sock");
+    let process = Process::start_with(
+        &scratch,
+        "memory",
+        "memory.sock",
+        "memory.log",
+        &[
+            "--forget-socket",
+            &narrow,
+            "--forget-group",
+            "no-such-group-for-a-test",
+        ],
+    );
+    let status = ask(
+        Path::new(&scratch.path("memory.sock")),
+        json!({"op": "status", "person": null}),
+    );
+    assert_eq!(status["ok"], true, "{status}");
+    assert!(!Path::new(&narrow).exists());
+    let log = fs::read_to_string(&process.log).unwrap();
+    assert!(
+        log.contains("lamp-memory: the forget socket is not open:"),
+        "{log}"
+    );
+}
+
 #[test]
 fn log_completion_waits_for_the_newline_after_a_private_suffix() {
     let terminal = "lamp-memory: search person=everyone ok ";

@@ -176,9 +176,16 @@ fn run(
     // The socket first, so that a second process started by mistake stops
     // here, before it has touched the store; the store before `ready`.
     let mut server = Server::bind(&arguments.socket)?;
-    // The app's narrow socket, for one group: `forget_person` only.
-    if let Some((socket, group)) = &arguments.forget {
-        server = server.forget_socket(socket, lamp_memory::server::group_named(group)?)?;
+    // The app's narrow socket, for one group: `forget_person` only. One
+    // that can't be made (no such group, or a group memory's user can't
+    // give, EPERM) is said and left out: memory itself still serves, and
+    // the app's removal answers that memory was kept (the reviewer-lead's
+    // P3 on #2563).
+    if let Some((socket, group)) = &arguments.forget
+        && let Err(error) = lamp_memory::server::group_named(group)
+            .and_then(|gid| server.open_forget_socket(socket, gid))
+    {
+        eprintln!("lamp-memory: the forget socket is not open: {error}");
     }
     // Each forget of everything kept under a person is told on the bus
     // (`memory/forgot`), for the lamp's other parts to let theirs go too.

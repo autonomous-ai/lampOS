@@ -315,6 +315,9 @@ fn the_faces_page_reads_names_and_removes_one() {
     let probe = reply(&mut real, "face.remove", json!({"entirely": true}));
     assert_ne!(probe["status"], "success", "{probe}");
     assert!(!probe.to_string().contains("not on this lamp"), "{probe}");
+    // It names `entirely`, which a lamp of before the field never does: the
+    // app offers its two choices only on that (Mobile on #2563).
+    assert!(probe.to_string().contains("entirely is taken"), "{probe}");
     assert_eq!(
         eyes.join().unwrap(),
         [
