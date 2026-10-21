@@ -1157,8 +1157,11 @@ kept **unconfirmed**, until its person says yes at the lamp:
   theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
 - **When it's at the lamp:** recognition finds nobody who asked, but an
   unconfirmed face matches. The eyes then note that face as here, and say
-  only that when asked: `{"photo_here":true}` gives `{"photo_here":NAME}` or
-  `null`, so the voice can ask the person once (`{"photo_asked":NAME}`).
+  only that when asked: `{"photo_here":true}` gives `{"photo_here":NAME,
+  "asked":BOOL}` or `null`, so the voice can ask the person once
+  (`{"photo_asked":NAME}`). `asked` is that face's own: a face let go and
+  added again under the same name is a new face, not asked yet, and the voice
+  asks it once more (Mobile on #1968, lamp-0c89).
 - **Their answer, taken only for the face at the lamp now** (seen within
   `KNOWN_FOR`, `photo::is_here`), so nothing elsewhere can say yes for
   someone (the reviewer on #1968, 22:28): `photo_asked` for a face not here
@@ -1191,6 +1194,9 @@ socket; `crates/voice/src/photo_faces.rs`):
   ready, a session open), the thread tells the eyes `photo_asked`, once:
   a name the loop wants again while the eyes are still answering is not
   told twice (on lamp-0c89 it was asked twice, 16 s apart, #1968). The
+  voice follows the eyes' own mark, which they save: a name the eyes say was
+  not asked is a new face under it and is asked again, and a face they say
+  was asked isn't asked again, even after the voice restarts. The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
   use the name as theirs unless they agree.

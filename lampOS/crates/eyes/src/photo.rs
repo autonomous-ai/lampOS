@@ -370,6 +370,22 @@ pub fn is_here(
     here.is_some_and(|(here, ago)| ago < fresh && crate::who::same_name(here, name))
 }
 
+/// The eyes' answer to `{"photo_here":true}`: the face from a photo seen at
+/// the lamp within `fresh` (`here`: its name and how long ago), and whether
+/// that face was asked about, its own mark. A face let go and added again
+/// under the same name is a new face, not asked yet (Mobile on #1968).
+pub fn here_answer(
+    unconfirmed: &Unconfirmeds,
+    here: Option<(&str, std::time::Duration)>,
+    fresh: std::time::Duration,
+) -> serde_json::Value {
+    let name = here.filter(|(_, ago)| *ago < fresh).map(|(name, _)| name);
+    serde_json::json!({
+        "photo_here": name,
+        "asked": name.map(|name| unconfirmed.was_asked(name)),
+    })
+}
+
 /// The asked names whose meeting is over: not seen for [`MEETING_GAP_US`]
 /// (`seen` gives each asked name's last sighting), so their person gave no
 /// answer and the face is let go.
@@ -567,6 +583,25 @@ mod tests {
         assert!(faces.was_asked("hoa"));
         assert!(!faces.asked("Nobody").unwrap());
         assert_eq!(faces.asked_names(), ["Hoa"]);
+        // What the voice is told: the face here, and whether it was asked.
+        let fresh = std::time::Duration::from_secs(5);
+        let near = Some(("Hoa", std::time::Duration::from_secs(1)));
+        assert_eq!(
+            here_answer(&faces, near, fresh),
+            serde_json::json!({"photo_here": "Hoa", "asked": true})
+        );
+        assert_eq!(
+            here_answer(&faces, Some(("Hoa", fresh)), fresh),
+            serde_json::json!({"photo_here": null, "asked": null})
+        );
+        // Let go and added again under the name: a new face, not asked.
+        assert!(faces.let_go("Hoa").unwrap());
+        faces.add("Hoa", unit(3), 1_000).unwrap();
+        assert_eq!(
+            here_answer(&faces, near, fresh),
+            serde_json::json!({"photo_here": "Hoa", "asked": false})
+        );
+        assert!(faces.asked("Hoa").unwrap());
         let seen = [("Hoa".to_owned(), 5_000_000u64)];
         assert!(unanswered(&faces.asked_names(), &seen, 5_000_000 + MEETING_GAP_US - 1).is_empty());
         assert_eq!(

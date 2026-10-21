@@ -1145,13 +1145,18 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                     }
+                    // With whether that face was asked about: one added again
+                    // under the same name is a new face, not asked yet, so the
+                    // voice asks it once more (Mobile on #1968, lamp-0c89).
                     Some(Ask::PhotoHere) => match &who.unconfirmed {
                         None => serde_json::json!({"error": "photos_off"}),
-                        Some(_) => serde_json::json!({"photo_here": who
-                            .photo_here
-                            .as_ref()
-                            .filter(|(_, at)| at.elapsed() < KNOWN_FOR)
-                            .map(|(name, _)| name.clone())}),
+                        Some(unconfirmed) => lamp_eyes::photo::here_answer(
+                            unconfirmed,
+                            who.photo_here
+                                .as_ref()
+                                .map(|(name, at)| (name.as_str(), at.elapsed())),
+                            KNOWN_FOR,
+                        ),
                     },
                     // Taken only for the face at the lamp now (the reviewer on
                     // #1968, 22:28): never for a face elsewhere.
