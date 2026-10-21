@@ -4057,6 +4057,13 @@ impl Heeding {
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
         }
+        // Where the newest hearing began against the line's sound, for the
+        // journal: what `attention::NAME_AT_THE_START_US` is set from.
+        let name_into_ms = signs
+            .names
+            .iter()
+            .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
+            .max();
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -4110,7 +4117,8 @@ impl Heeding {
         // rule's form.
         if self.attention.weigh_the_name(signs.turned) {
             eprintln!(
-                "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it; the model is not told it was heard (LAMP_NAME_SECOND_SIGN)"
+                "lamp-voice second: request {request}: its name, heard only in the room's sound, counts for nothing alone: nobody turned to the lamp, not said close to it, its words not calling it, its hearing not at the line's start (began {} ms into the line); the model is not told it was heard (LAMP_NAME_SECOND_SIGN)",
+                name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
             );
             // The name note goes with the name (`heed_signs`).
             self.noted = Some((request, None));
@@ -8445,7 +8453,7 @@ mod tests {
     /// past [`crate::attention::NAME_AT_THE_START_US`]: a word heard as the
     /// lamp's name in passing.
     fn mid_line(score: f32) -> Vec<(u64, f32)> {
-        vec![(11_000_000, score)]
+        vec![(11_400_000, score)]
     }
 
     /// b0333 and b0413 on lamp-4ace on 2026-10-21 (the first builder at
@@ -8454,9 +8462,11 @@ mod tests {
     /// nobody turned to the lamp and nothing close, was dropped by
     /// `LAMP_NAME_SECOND_SIGN=on` and the day lines after it lost. A
     /// hearing that began within [`crate::attention::NAME_AT_THE_START_US`]
-    /// of the line's sound (the voice's pre-roll, about 0.25 s, and "Hey",
-    /// about 0.25 s) is a call, so it is played; one a moment later is
-    /// dropped as before. Quiet room and busy room.
+    /// of the line's sound is a call, so it is played: b0802's, about
+    /// 1.06 s in, as `lamp-name` dates a hearing from when its score
+    /// reached the bar, as the name ends (the first builder at 09:12 on
+    /// #1722). One a moment later is dropped as before. Quiet room and
+    /// busy room.
     #[test]
     fn with_a_second_sign_asked_the_name_at_a_lines_start_counts() {
         use crate::attention::NAME_AT_THE_START_US;
@@ -8471,7 +8481,7 @@ mod tests {
                     room_name_signs(room, false, None, false, vec![(at, 1.0)]),
                 )
             };
-            assert_eq!(judged(line.0 + 500_000), None, "{room:?}: b0333");
+            assert_eq!(judged(line.0 + 1_060_000), None, "{room:?}: b0802");
             assert_eq!(judged(line.0 + NAME_AT_THE_START_US), None, "{room:?}");
             assert!(
                 judged(line.0 + NAME_AT_THE_START_US + 1).is_some(),
@@ -8489,7 +8499,9 @@ mod tests {
     /// `LAMP_NAME_SECOND_SIGN=on`, is dropped: none of the three is
     /// answered. Their words were played, not measured: at the office's
     /// rate, about 0.3 s a word after a 0.25 s pre-roll, "Yes," with its
-    /// comma 0.45 s. Without the switch, a hearing lets each out.
+    /// comma 0.45 s; `lamp-name`'s hearing begins as "lamp" ends and about
+    /// 0.26 s after, as b0802's "Hey Lamp" did. Without the switch, a
+    /// hearing lets each out.
     #[test]
     fn with_a_second_sign_asked_the_lamp_named_in_passing_stays_dropped() {
         use crate::room_told::Room;
@@ -8497,15 +8509,15 @@ mod tests {
         for (line, into) in [
             (
                 "Did you see the lamp turn its head this morning?",
-                250_000 + 4 * 300_000,
+                250_000 + 5 * 300_000 + 260_000,
             ),
             (
                 "Yes, the lamp looked at me when I came in.",
-                250_000 + 450_000 + 300_000,
+                250_000 + 450_000 + 2 * 300_000 + 260_000,
             ),
             (
                 "I left the lamp on in the kitchen yesterday.",
-                250_000 + 3 * 300_000,
+                250_000 + 4 * 300_000 + 260_000,
             ),
         ] {
             assert!(into > crate::attention::NAME_AT_THE_START_US, "{line}");
@@ -8519,6 +8531,47 @@ mod tests {
                 assert_eq!(held.is_some(), on, "{on}: {line}");
             }
         }
+    }
+
+    /// The first builder at 09:12 on #1722 (b0802): `lamp-name` says a
+    /// hearing once its score falls, up to `LONGEST` (0.8 s) after it began,
+    /// and the rule dates it from when it began (`signs`: the message's
+    /// time less its `ago_ms`), never from when it was said. A name whose
+    /// hearing began as the line's sound did, said 0.8 s later, is the name
+    /// at the line's start and played; one whose hearing began 1.5 s in is
+    /// held. Busy room. On the real clock, about a tenth of a second.
+    #[test]
+    fn with_a_second_sign_asked_a_name_said_late_is_dated_from_when_it_began() {
+        use lamp_msgs::NameHeard;
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lnb-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut name = bus
+            .publisher_declared(NameHeard::TOPIC, &NameHeard::declaration(), "name")
+            .unwrap();
+        for (into, held) in [(0, false), (1_500_000, true)] {
+            let mut heeding = super::Heeding::new(true, true, Some(&root), None);
+            heeding.attention.speak_when_spoken_to(true);
+            heeding.attention.ask_a_second_sign_of_the_name(true);
+            let said = monotonic_us();
+            let ago_ms = 800;
+            name.publish_json(said, &NameHeard { score: 1.0, ago_ms })
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(50));
+            let line = (said - u64::from(ago_ms) * 1_000 - into, monotonic_us());
+            let names = heeding.signs(896, line).names;
+            assert_eq!(names.len(), 1, "{into}");
+            let verdict = heeding.judge(
+                896,
+                line,
+                "Mainland. Good morning.",
+                room_name_signs(crate::room_told::Room::Busy, false, None, false, names),
+            );
+            assert_eq!(verdict.is_some(), held, "{into}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The rule with `--spoken-to`, strict, and the eyes and the voice's
