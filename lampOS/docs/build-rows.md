@@ -48,7 +48,7 @@ Written by the first builder from the team's review page at 2026-10-20 18:28 (+0
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen, fifth, third | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
 | Never tips itself over | 1.00 | #1072 #704 | eighth | Built with V1’s limits; |
 | One inner state (mood) every behaviour reads, and familiarity | 0.60 | #713 #1670 #1728 #1749 #1772 | fourth, ten | Built and merged, off until switched on (Ten): the mood part as a product unit, whose one breath the ring and the head take (#1728); |
-| Joys: sways to music, glances at a laugh, watches you leave, core skills | 0.65 | #1669 #1707 #1748 | sixth | 20 Oct 16:0x, up from 0.50: watches you leave passed on lamp-52e6 with the lead (row 14, #2250: stood_up published on a real stand-up); |
+| Joys: sways to music, watches you leave, core skills | 0.7 | #1669 #1707 #1748 | sixth | 21 Oct 14:3x, up from 0.65: the glance at a laugh taken out of the row (the lead on #1711: never asked for), and the sway's bar kept from lamp-52e6 (#2475). 20 Oct 16:0x, up from 0.50: watches you leave passed on lamp-52e6 with the lead (row 14, #2250: stood_up published on a real stand-up); |
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
 | Bedtime and Morning as a skill, with night caps on light and volume | 0.50 | #1672 #1732 | jarvis, second | Built 19 Oct 11:1x as a core skill, off until tried (#1732, in review): dimmer, warmer, quieter and slower at night. |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
