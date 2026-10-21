@@ -26,7 +26,9 @@ in)
   case "$exec_line" in *"--harness "*) ;; *) fail "lamp-tasks' ExecStart has no --harness";; esac
   tasks=${PLAYED_TASKS:-${exec_line%% *}}
   [ -x "$tasks" ] || fail "no lamp-tasks at $tasks"
-  "$tasks" --help 2>&1 | grep -q -- --sign-in-by-code \
+  # lamp-tasks has no --help (anything but serve or request is "expected serve or request"), so the flag is
+  # looked for in the binary itself (the first builder's 03:41).
+  grep -aq -- '--sign-in-by-code' "$tasks" \
     || fail "lamp-tasks is older than #2702 ($tasks has no --sign-in-by-code): give TASKS= a lamp-tasks from the fixture's build"
   exec_line="$tasks ${exec_line#* }"
   # lamp-tasks' own user and group: the stand-in's HOME is theirs (lampos on most lamps, orangepi on lamp-4ace).

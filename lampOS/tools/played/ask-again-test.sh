@@ -5,7 +5,8 @@
 #      swapped and --sign-in-by-code added, the voice's switch on, both restarted; `out` takes it all out.
 #   2. lamp-tasks naming a user that doesn't exist: setup fails at the chown, says so, writes no drop-in.
 #   3. lamp-tasks with no --harness: setup fails, says so, writes no drop-in.
-#   4. a lamp-tasks without --sign-in-by-code (older than #2702, as lamp-4ace's): setup fails, says so, no drop-in.
+#   4. a lamp-tasks without --sign-in-by-code in it (older than #2702, as lamp-4ace's): setup fails, says so, no
+#      drop-in. Neither stand-in has a --help, as lamp-tasks has none.
 #   5. the same, with a newer lamp-tasks given for the run (TASKS=): it runs in the drop-in's ExecStart.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
@@ -24,9 +25,9 @@ is-active) echo active ;;
 esac
 EOF
 chmod 0755 "$root/systemctl"
-# Two lamp-tasks: one that knows --sign-in-by-code, one older that doesn't.
-printf '#!/bin/sh\necho "  --harness PATH"\necho "  --sign-in-by-code"\n' > "$root/new-tasks"
-printf '#!/bin/sh\necho "  --harness PATH"\n' > "$root/old-tasks"
+# Two lamp-tasks, with no --help as the real one: one has --sign-in-by-code in it, one older doesn't.
+printf '#!/bin/sh\n# flags: --harness --sign-in-by-code\necho "expected serve or request" >&2; exit 1\n' > "$root/new-tasks"
+printf '#!/bin/sh\n# flags: --harness\necho "expected serve or request" >&2; exit 1\n' > "$root/old-tasks"
 chmod 0755 "$root/new-tasks" "$root/old-tasks"
 run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its output in $root/out
   rm -rf "$root/remote" "$root/units" "$root/calls"
