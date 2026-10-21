@@ -576,9 +576,11 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b", // #2948 carried onto lamp-voice 23 Oct: head touch on (#711)
     "ad3fd11185bdf206f8622fef2c6d9bafac4efb7742e65b1c7df11de383cc83e6", // combined people temporaries and face expressions, 23 Oct
     "52645fae3f61d823ae08b920f5af8efa179cc47a8dd3ba96af29910e42ab16d1", // #3072 (people temporaries), 22 Oct
     "a681f484a5e1cd404f5117fb0efb90eca93ae9bbd1862e6f447bed05e0986a24", // #2947 (face-expressions.json), 22 Oct
+    "52045bc1c42014eab6454a0fd21ee3be7f75d2ece76af35e455f0a4ebe6c6890", // #1362 carried onto #2754's, 22 Oct: the voice's mute record emptied
     "7c24a8315ceb8fa6ff9d119370989f30cdad6d9390610ab67a607a99729cc5d8", // #2754 (glance.log), 22 Oct
     "881c5fd156474fcd8484e41f77e34f952f69aa85c6d71f3e33ceb0d7bfb9bd9d", // 64cefadfc, 21 Oct
     "60be2ab39e759a6161d249710e5babfec042c944baa62450779ed7a4478eea22", // d06e9d53e, 21 Oct
@@ -1598,7 +1600,11 @@ const GUESSED_HEAD_PADS: &str = r#"[
 ///   touch at all. A lamp's own Controls settings naming the old two pads
 ///   name the build's then too, so a Controls from before #1798, which
 ///   wants both files to name the same pads, still starts if it is put
-///   back.
+///   back;
+/// - its `legacy_head` goes when the build's pins have none: the product's
+///   voice and Expression read the head from `controls/touch` (#711), and a
+///   pat must not also be the old engine's `Pet` beside them (the reviewer
+///   on #1176).
 ///
 /// Only those keys change; everything else is kept, each file's mode too.
 /// A file already like the build, a build without them, a file that isn't
@@ -1636,6 +1642,14 @@ fn own_pins_follow_build(
     {
         pins.insert("head_pads".into(), pads.clone());
         done.push("put the build's head pads, every line a pad is wired to, in");
+    }
+    if default
+        .get("legacy_head")
+        .is_none_or(|legacy| *legacy == false)
+        && pins.get("legacy_head") == Some(&serde_json::Value::Bool(true))
+    {
+        pins.remove("legacy_head");
+        done.push("took the old engine's head (legacy_head) out of");
     }
     // The pins name the build's pads now, whether install wrote them just
     // before or this did.

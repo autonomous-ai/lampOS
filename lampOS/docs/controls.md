@@ -134,8 +134,8 @@ apply both representations of one release. Base and reset never enter that
 legacy engine, and a malformed complete GPIO observation cannot retain a
 primary action from just the valid-looking portion. The head pads enter it
 only with `"legacy_head": true` in the pins, for a lamp whose voice and
-Expression do not read `controls/touch` yet (the product's, the reviewer on
-#1167): a pat is then still the old engine's `Pet` on `controls/gesture`,
+Expression do not read `controls/touch` (the product's until head touch went
+on there, #711; the reviewer on #1167): a pat is then still the old engine's `Pet` on `controls/gesture`,
 which wakes a lamp asleep at night, and `head_active` on `controls/state`.
 A `Pet` never touches the mute, nothing reads `head_active`, and the voice
 counts pets only for its trace. `legacy_head` goes only with neither
