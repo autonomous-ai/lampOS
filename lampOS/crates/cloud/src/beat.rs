@@ -18,7 +18,7 @@ const MOST_REPLY: usize = 64 * 1024;
 
 /// TLS 1.2 and 1.3 with the `ring` provider and the webpki roots, as the
 /// other lampOS clients have it.
-fn tls() -> Result<rustls::ClientConfig, String> {
+pub(crate) fn tls() -> Result<rustls::ClientConfig, String> {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
