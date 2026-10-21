@@ -2,12 +2,17 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.autonomous.ai/os/system/bootstrap/config"
+	"go.autonomous.ai/os/system/bootstrap/state"
+	"go.autonomous.ai/os/system/domain"
 )
 
 func TestUpdaterURLFrom(t *testing.T) {
@@ -226,5 +231,84 @@ func TestRefreshUpdaterPreservesMigrationCapabilitiesBeforeActivation(t *testing
 				t.Fatalf("stale feed removed %s before migration: %v", protocol, err)
 			}
 		})
+	}
+}
+
+// recoveryRefreshFixture fails `software-update recover` with the on-device
+// updater and serves `published` as the feed copy; empty serves the device's own.
+func recoveryRefreshFixture(t *testing.T, published string) (*Bootstrap, string, *int) {
+	t.Helper()
+	dir, calls := setupUpdateAudit(t)
+	t.Setenv("UPDATE_TEST_FAIL", "recover")
+	orig, originalLock := updaterPath, updaterLockPath
+	updaterPath = filepath.Join(dir, "bin", "software-update")
+	updaterLockPath = filepath.Join(t.TempDir(), "software-update.lock")
+	t.Cleanup(func() { updaterPath, updaterLockPath = orig, originalLock })
+	pending := filepath.Join(dir, "pending-update.json")
+	if err := os.WriteFile(pending, legacyJournalBytes(t, "restore_hal_service_state", "/opt/hal", filepath.Join(dir, "hal.previous")), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if published == "" {
+		current, err := os.ReadFile(updaterPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		published = string(current)
+	}
+	fetches := new(int)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/software-update") {
+			*fetches++
+			_, _ = w.Write([]byte(published))
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+	b := &Bootstrap{serviceStateDir: t.TempDir(), cfg: &config.Config{MetadataURL: server.URL + "/os/ota/metadata.json"}, client: server.Client(), state: &state.State{Components: map[string]string{domain.OTAKeyHal: "9.0.0"}}, pendingUpdatePath: pending}
+	return b, calls, fetches
+}
+
+func TestFailedRecoveryRetriesWithRefreshedUpdater(t *testing.T) {
+	fixed := "#!/bin/sh\nprintf 'fixed-%s\\n' \"$1\" >> \"$UPDATE_TEST_CALLS\"\n"
+	b, calls, _ := recoveryRefreshFixture(t, fixed)
+	if err := b.checkOnce(context.Background()); err != nil {
+		t.Fatalf("recovery with the refreshed updater should let the cycle continue: %v", err)
+	}
+	data, err := os.ReadFile(calls)
+	if err != nil || string(data) != "recover\nfixed-recover\n" {
+		t.Fatalf("calls = %q, %v", data, err)
+	}
+	if installed, err := os.ReadFile(updaterPath); err != nil || string(installed) != fixed {
+		t.Fatalf("feed updater not installed: %q %v", installed, err)
+	}
+}
+
+func TestFailedRecoveryIsNotRetriedWithUnchangedUpdater(t *testing.T) {
+	b, calls, fetches := recoveryRefreshFixture(t, "")
+	if err := b.checkOnce(context.Background()); err == nil {
+		t.Fatal("failed recovery must still stop the cycle")
+	}
+	if *fetches != 1 {
+		t.Fatalf("updater fetched %d times, want 1", *fetches)
+	}
+	data, err := os.ReadFile(calls)
+	if err != nil || string(data) != "recover\n" {
+		t.Fatalf("calls = %q, %v", data, err)
+	}
+}
+
+func TestRecoveryHeldByInstallerDoesNotRefreshUpdater(t *testing.T) {
+	b, calls, fetches := recoveryRefreshFixture(t, "#!/bin/sh\necho new\n")
+	release := holdRecoveryLock(t)
+	defer release()
+	if err := b.recoverWithFreshUpdater(context.Background()); !errors.Is(err, ErrUpdateInProgress) {
+		t.Fatalf("expected the installer lock to win: %v", err)
+	}
+	if *fetches != 0 {
+		t.Fatalf("updater fetched %d times while the installer held the lock", *fetches)
+	}
+	if _, err := os.Stat(calls); !os.IsNotExist(err) {
+		t.Fatal("recover invoked while lock held")
 	}
 }

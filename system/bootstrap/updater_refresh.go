@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -56,29 +57,46 @@ func updateInFlight() bool {
 	return busy
 }
 
+// recoverWithFreshUpdater runs pending recovery. Recovery executes the updater
+// already on the device, and a failure stops the cycle before refreshUpdater, so a
+// bug in that updater could never be fixed from the feed. On failure, refresh once
+// and retry only if the updater actually changed; otherwise return the error.
+func (b *Bootstrap) recoverWithFreshUpdater(ctx context.Context) error {
+	err := b.recoverPendingUpdate(ctx)
+	if err == nil || errors.Is(err, ErrUpdateInProgress) {
+		return err
+	}
+	if !b.refreshUpdater(ctx) {
+		return err
+	}
+	slog.Warn("OTA recovery failed; retrying with the refreshed updater", "component", "bootstrap", "error", err)
+	return b.recoverPendingUpdate(ctx)
+}
+
 // refreshUpdater brings software-update up to the published copy; no-op when unchanged.
-func (b *Bootstrap) refreshUpdater(ctx context.Context) {
+// It reports whether the on-device updater was replaced.
+func (b *Bootstrap) refreshUpdater(ctx context.Context) bool {
 	// The script is executing during an update; replacing it now hits the lazy-read hazard.
 	if updateInFlight() {
-		return
+		return false
 	}
 
 	current, err := os.ReadFile(updaterPath)
 	if err != nil {
 		// No updater installed is a provisioning problem; never drop one in.
-		return
+		return false
 	}
 
 	src, err := updaterURLFrom(b.cfg.MetadataURL)
 	if err != nil {
 		slog.Debug("updater refresh: no source url", "component", "bootstrap", "error", err)
-		return
+		return false
 	}
 
 	published, err := b.fetchUpdater(ctx, src)
 	if err != nil {
 		slog.Debug("updater refresh: fetch failed", "component", "bootstrap", "url", src, "error", err)
-		return
+		return false
 	}
 
 	// Download outside the shared lock. Recheck disk state while holding it so
@@ -86,42 +104,43 @@ func (b *Bootstrap) refreshUpdater(ctx context.Context) {
 	unlock, err := lockUpdaterRefresh()
 	if err != nil {
 		slog.Debug("updater refresh: installation lock unavailable", "error", err)
-		return
+		return false
 	}
 	defer unlock()
 	if updateInFlight() {
-		return
+		return false
 	}
 	current, err = os.ReadFile(updaterPath)
 	if err != nil {
-		return
+		return false
 	}
 
 	if b.serviceUpdaterProtected() && !updaterSupportsServiceProtocol(published) {
 		slog.Warn("updater refresh: service OTA protocol unsupported")
-		return
+		return false
 	}
 	if updaterSupportsActivationProtocol(current) && !updaterSupportsActivationProtocol(published) {
 		slog.Warn("updater refresh: promoted activation protocol unsupported")
-		return
+		return false
 	}
 	// A stale CDN copy must not remove migration or rollback capabilities after
 	// customers have received the foundation update, even while still on V1.
 	for _, protocol := range []string{"preflight", "cleanup"} {
 		if updaterSupportsProtocol(current, protocol) && !updaterSupportsProtocol(published, protocol) {
 			slog.Warn("updater refresh: refusing capability downgrade", "protocol", protocol)
-			return
+			return false
 		}
 	}
 	if sha256.Sum256(published) == sha256.Sum256(current) {
-		return
+		return false
 	}
 
 	if err := installUpdater(ctx, published); err != nil {
 		slog.Warn("updater refresh: keeping the existing updater", "component", "bootstrap", "error", err)
-		return
+		return false
 	}
 	slog.Info("updater refreshed", "component", "bootstrap", "url", src, "bytes", len(published))
+	return true
 }
 
 // fetchUpdater downloads the published script, size-capped against captive portals.

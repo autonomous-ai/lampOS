@@ -930,6 +930,16 @@ SIGKILL hoặc mất điện được phục hồi ở lần chạy updater ho�
 theo; cơ chế này không bảo đảm khôi phục mọi lỗi dữ liệu thẻ SD hoặc máy không
 boot được tới bước chạy các service đó.
 
+Recovery chạy updater đang có trên máy, trước khi vòng kiểm tra tới bước làm mới
+ở trên. Nếu updater đó recovery thất bại, bootstrap làm mới nó từ feed một lần và
+chỉ khi file thực sự thay đổi mới chạy lại recovery bằng bản mới
+(`recoverWithFreshUpdater`). Điều này áp dụng lúc khởi động, ở poll tự động,
+component check và force update. Nếu không có bước này, một lỗi recovery trong
+updater trên máy sẽ chặn mọi vòng kiểm tra trước khi bản sửa kịp tới. Updater
+không đổi, làm mới thất bại hoặc installer đang giữ lock thì trả lỗi ban đầu và
+không chạy lại recovery. Bootstrap chưa có bước này thì máy kẹt như vậy vẫn phải
+sửa updater thủ công.
+
 Nếu cài HAL lần đầu mà không có runtime hay backup trước đó, recovery đưa
 candidate lỗi ra khỏi đường dẫn live và giữ HAL dừng. Nó không báo đã phục hồi
 một bản cũ vốn không tồn tại.

@@ -154,7 +154,7 @@ func (b *Bootstrap) Serve() error {
 func (b *Bootstrap) serve(ctx context.Context) error {
 	// Interrupted local transitions must be recovered even if provisioning,
 	// the feed URL or poll settings are unavailable after a power loss.
-	if err := b.recoverPendingUpdate(ctx); err != nil {
+	if err := b.recoverWithFreshUpdater(ctx); err != nil {
 		if !bootstrapSelfUpdateInProgress(err) {
 			return fmt.Errorf("startup OTA recovery: %w", err)
 		}
@@ -263,7 +263,7 @@ func (b *Bootstrap) checkLoop(ctx context.Context, pollInterval time.Duration) {
 
 // checkComponent fetches metadata and reconciles a single named component.
 func (b *Bootstrap) checkComponent(ctx context.Context, key string) error {
-	if err := b.recoverPendingUpdate(ctx); err != nil {
+	if err := b.recoverWithFreshUpdater(ctx); err != nil {
 		return err
 	}
 	meta, err := b.fetchMetadata(ctx)
@@ -288,7 +288,7 @@ func (b *Bootstrap) checkComponent(ctx context.Context, key string) error {
 
 // checkOnce fetches metadata and reconciles all components.
 func (b *Bootstrap) checkOnce(ctx context.Context) error {
-	if err := b.recoverPendingUpdate(ctx); err != nil {
+	if err := b.recoverWithFreshUpdater(ctx); err != nil {
 		return err
 	}
 	meta, err := b.fetchMetadata(ctx)

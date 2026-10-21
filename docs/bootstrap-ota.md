@@ -962,6 +962,16 @@ recovered on the next updater invocation or running bootstrap poll; this does
 not guarantee recovery from arbitrary SD-card corruption or a machine that
 cannot boot far enough to run those services.
 
+Recovery runs the updater already on the device, before the cycle reaches the
+refresh above. If that updater fails recovery, bootstrap refreshes it from the
+feed once and, only when the file actually changed, retries recovery with the
+new copy (`recoverWithFreshUpdater`). This applies at startup, in automatic
+polls, component checks and force updates. Without it, a recovery bug in the
+on-device updater would stop every cycle before the fix could arrive. An
+unchanged updater, a failed refresh or a held installer lock returns the
+original error and does not rerun recovery. Bootstraps without this step still
+need a manual updater fix on such a device.
+
 If a first HAL installation had no prior runtime or backup, recovery removes the
 failed candidate from the live path and leaves HAL stopped. It does not claim to
 restore a nonexistent prior installation.
