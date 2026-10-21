@@ -143,11 +143,15 @@ seen 06:00–11:00, if the lamp rested that night, even when a sound ended
 the rest early. Before, a morning after a night stir was refused (`this
 skill owns no rest to wake`) and the hum was skipped too.
 
-- **The night it rested.** Skills' rest manager keeps, in memory, the local
-  day the last night this skill's rest began (its rest window's start day:
-  02:00 belongs to the night that began the evening before), set when
-  Expression first said `resting` for it. A restart or a change to the
-  skill forgets it.
+- **The night it rested.** Skills' rest manager keeps the local day the
+  last night this skill's rest began (its rest window's start day: 02:00
+  belongs to the night that began the evening before), set when Expression
+  first said `resting` for it. With `--state-dir` (the product's) it is
+  kept in `DIR/rested`, one line a skill (`bedtime-morning 20453`), and read
+  back at the start, so a restart between the night and the morning still
+  greets (#2757). It is kept through the morning's wake, for Welcome back's
+  `yields_to`, and cleared when the skill's next night's rest begins or the
+  skill changes. Without `--state-dir` a restart forgets it.
 - **Already up.** A morning wake with no rest left to own, on the day after
   that night, is answered `Woke::Already`, once, and nothing is sent to
   Expression. The run then sends the body its `stretching` clip (6.5 s) and
@@ -177,6 +181,58 @@ skill owns no rest to wake`) and the hum was skipped too.
   ends before the hum. A failed,
 interrupted or refused chance is consumed; there is no later catch-up that
 day. Missing, malformed or stale faces never count as an empty desk.
+
+### One greeting after a rested night
+
+On lamp-06c1 on 22 Oct, after a night it rested, Welcome back said its
+hello at 06:01:14 (`it appeared on humans/faces/tracked after 7451 s
+without`) and the morning chance was dropped at 06:01:34: with both
+greeting, the first face of a morning could be greeted twice. The first
+builder's ruling (06:08 on #1672): after a rested night, the morning
+greeting is the welcome back.
+
+- **It waits.** Welcome back's trigger has `yields_to = { skill =
+  "bedtime-morning", trigger = "morning" }` ([skills.md](skills.md)). Its
+  chance for the first face is kept, not spent, until the morning trigger
+  is judged, and the journal says once `welcome-back waits: the morning
+  greeting comes first`. It waits only while the morning trigger holds or
+  is in its minute's `wait`, unbroken since Welcome back began waiting (the
+  reviewer's P2 on #2757): a face the morning never holds for, such as one
+  looking down at the keyboard every other second (Welcome back's 3 s
+  `gap` keeps it, the morning has none), is greeted by Welcome back at once,
+  not at 11:00. Both share `near = 0.14`, so a face too far for one is too
+  far for the other.
+- **The morning fires.** Its run is the face's greeting, and Welcome back's
+  chance for that face is done: `welcome-back done: bedtime-morning's
+  morning greeting was this face's hello`. With the Policy asked, a no to
+  the hum is still the morning's chance taken.
+- **The morning is dropped or let go.** Its conditions did not hold within
+  its minute's `wait`, or someone spoke to the lamp since 06:00: Welcome
+  back greets as before, at its trigger's next message while the face is
+  there, after its own conditions.
+- **One morning moment a day** (the first builder on #2757). Welcome back's
+  hello in that window, after a rested night and before the morning was
+  claimed, claims the morning's day in `daily.json`, as the morning's own
+  greeting would, and the journal says once `bedtime-morning: morning
+  chance let go: welcome-back already greeted this morning`. A face later
+  that morning gets Welcome back's ordinary hello, if its five minutes away
+  and its cooldown allow, never the morning's ritual.
+- **A restart.** The morning's day is claimed on disk and the night rested
+  is read back from `rested`. After the hum, a face there at the restart is
+  no news to Welcome back's `appears`, and the morning does not fire again:
+  nobody is greeted twice. Before the hum, the morning still greets the
+  first face and Welcome back yields.
+- **When it applies.** Only the morning after a night a routine rested
+  (the rest manager's `rested_day`, kept in `rested` across a restart), 06:00
+  to 11:00, on a day the morning has not yet been claimed in the daily
+  journal, with this skill enabled and `LAMP_SKILL_ROUTINES` on, and able
+  to act (an ask mode, a journal). Otherwise Welcome back behaves exactly as
+  before. A later face that morning, after Welcome back's five minutes
+  away, is greeted by it as always.
+
+The ruling covers every face of the morning: once Welcome back has greeted
+someone, the morning's day is claimed, and a face back later is welcomed,
+never hummed at.
 
 ### The evening glow, relative to the person's light
 

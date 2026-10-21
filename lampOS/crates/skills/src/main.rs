@@ -838,10 +838,21 @@ fn serve(
             None
         };
     let (mut routines, rest_client) = if options.routines {
-        let (manager, client) = lamp_skills::routine::Manager::new(
+        let (mut manager, client) = lamp_skills::routine::Manager::new(
             bus.clone(),
             boot_clock(options.boot_id.as_deref())?,
         )?;
+        // The night rested, kept across a restart for the morning's wake and
+        // a `yields_to` (#1672).
+        if let Some(state) = &options.state {
+            match manager.keep_rested_in(state) {
+                Ok(nights) => eprintln!(
+                    "lamp-skills: the nights rested kept in {}: {nights:?}",
+                    state.display()
+                ),
+                Err(error) => eprintln!("lamp-skills: the nights rested not read: {error}"),
+            }
+        }
         (Some(manager), Some(client))
     } else {
         (None, None)
@@ -1068,7 +1079,7 @@ fn serve(
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
                 let (unplug, said) = lamp_skills::unplug_words(&skills);
-                for line in said {
+                for line in said.into_iter().chain(lamp_skills::yield_notes(&skills)) {
                     eprintln!("lamp-skills: {line}");
                 }
                 *runner.unplug.borrow_mut() = unplug;
@@ -1169,6 +1180,8 @@ fn serve(
                 runner.local_time.as_deref(),
                 trusted_wall.unwrap_or(0),
             );
+            // Whether the lamp rested last night, for a `yields_to` (#1672).
+            engine.rested(manager.rested_day());
         }
         dispatch(
             engine.clock_tick(now_us),

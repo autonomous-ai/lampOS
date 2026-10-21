@@ -14,13 +14,18 @@ use lamp_msgs::{
 };
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
-    io,
+    collections::{BTreeMap, HashMap},
+    fs, io,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, mpsc},
     time::Duration,
 };
 
 pub const ENVIRONMENT: &str = "LAMP_SKILL_ROUTINES";
+/// Where, in `--state-dir`, the night each routine rested is kept across a
+/// restart (#1672): one line a skill, its name and the local day the night
+/// began (`bedtime-morning 20453`), nothing about a person.
+pub const RESTED_FILE: &str = "rested";
 const MAX_SKILLS: usize = 8;
 const RENEW_US: u64 = 1_000_000;
 const ADMISSION_US: u64 = 1_000_000;
@@ -341,8 +346,14 @@ struct Source {
     /// The local day the last night this skill rested began (its rest
     /// window's start day), set when Expression first took a rest. The
     /// next day's wake with no rest left to own answers `Woke::Already`
-    /// once. Kept in memory: a restart forgets it.
+    /// once. With [`Manager::keep_rested_in`] it is read back at a
+    /// start from [`RESTED_FILE`], as `night` is.
     rested_day: Option<i64>,
+    /// The same night, kept through that wake: what a `yields_to` asks of
+    /// the morning after ([`Manager::rested_day`]), and what is kept in
+    /// [`RESTED_FILE`]. It ends when the next night's rest begins, or with
+    /// a change to the skill.
+    night: Option<i64>,
 }
 
 pub struct Manager {
@@ -358,6 +369,8 @@ pub struct Manager {
     enabled: Vec<String>,
     definitions: HashMap<String, Skill>,
     generation: Arc<Mutex<Arc<()>>>,
+    /// Where the nights are kept ([`RESTED_FILE`]), and what it last held.
+    rested_file: Option<(PathBuf, BTreeMap<String, i64>)>,
 }
 
 impl Manager {
@@ -381,6 +394,7 @@ impl Manager {
                 enabled: Vec::new(),
                 definitions: HashMap::new(),
                 generation,
+                rested_file: None,
             },
             client,
         ))
@@ -394,9 +408,11 @@ impl Manager {
             cancel(&mut self.publisher, source, now);
             source.stirred = None;
             source.rested_day = None;
+            source.night = None;
         }
         self.definitions.clear();
         self.enabled = names;
+        self.keep_rested();
     }
 
     /// An unrelated edit does not end an admitted rest. Pending runs and
@@ -409,9 +425,11 @@ impl Manager {
             .map(|skill| (skill.name.clone(), skill.clone()))
             .collect();
         for (name, source) in &mut self.sources {
+            // A night read back at the start has no definition before the
+            // first load: still loaded, it is the same skill's.
             let unchanged = definitions
                 .get(name)
-                .is_some_and(|new| self.definitions.get(name) == Some(new));
+                .is_some_and(|new| self.definitions.get(name).is_none_or(|old| old == new));
             let resting = source.active.as_ref().is_some_and(|active| {
                 active.waiting.is_none()
                     && active.request.op == Op::Rest
@@ -423,10 +441,108 @@ impl Manager {
             if !unchanged {
                 source.stirred = None;
                 source.rested_day = None;
+                source.night = None;
             }
         }
         self.enabled = definitions.keys().cloned().collect();
         self.definitions = definitions;
+        self.keep_rested();
+    }
+
+    /// The local day the last night a routine rested began (its rest
+    /// window's start day), the newest of its skills': what a `yields_to`
+    /// trigger asks of the night (#1672). Kept through the morning's wake,
+    /// until the next night's rest begins, and across a restart with
+    /// [`Manager::keep_rested_in`].
+    pub fn rested_day(&self) -> Option<i64> {
+        self.sources
+            .values()
+            .filter_map(|source| source.night)
+            .max()
+    }
+
+    /// The nights rested are kept in `dir` (`--state-dir`), in
+    /// [`RESTED_FILE`], and read from it now, before the first load: a
+    /// restart between a rested night and its morning still knows the lamp
+    /// rested, for the morning's wake and for a `yields_to` (#1672). A line
+    /// that is not a skill's name and a day is passed over. Without it, a
+    /// restart forgets the night.
+    pub fn keep_rested_in(&mut self, dir: &Path) -> Result<Vec<(String, i64)>, String> {
+        let file = dir.join(RESTED_FILE);
+        let text = match fs::read_to_string(&file) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
+            Err(error) => return Err(format!("{}: {error}", file.display())),
+        };
+        let mut kept = BTreeMap::new();
+        for line in text.lines() {
+            let mut words = line.split_whitespace();
+            let (Some(name), Some(day), None) = (words.next(), words.next(), words.next()) else {
+                continue;
+            };
+            let (Ok(day), true) = (day.parse::<i64>(), crate::plain_name(name)) else {
+                continue;
+            };
+            if kept.len() < MAX_SKILLS {
+                kept.insert(name.to_owned(), day);
+            }
+        }
+        for (name, day) in &kept {
+            let source = self.sources.entry(name.clone()).or_insert(Source {
+                last_episode: 0,
+                active: None,
+                stirred: None,
+                rested_day: None,
+                night: None,
+            });
+            source.rested_day = Some(*day);
+            source.night = Some(*day);
+        }
+        let read = kept
+            .iter()
+            .map(|(name, day)| (name.clone(), *day))
+            .collect();
+        self.rested_file = Some((file, kept));
+        Ok(read)
+    }
+
+    /// The nights, written whole where they are kept when they changed: a
+    /// file beside it, synced, then moved over it, and the folder synced,
+    /// as `off` is. A failure is said, and tried again at the next change.
+    fn keep_rested(&mut self) {
+        let Some((file, kept)) = &mut self.rested_file else {
+            return;
+        };
+        let nights: BTreeMap<String, i64> = self
+            .sources
+            .iter()
+            .filter_map(|(name, source)| Some((name.clone(), source.night?)))
+            .collect();
+        if nights == *kept {
+            return;
+        }
+        let lines: String = nights
+            .iter()
+            .map(|(name, day)| format!("{name} {day}\n"))
+            .collect();
+        let new = file.with_extension("new");
+        let written = (|| -> io::Result<()> {
+            let mut out = fs::File::create(&new)?;
+            io::Write::write_all(&mut out, lines.as_bytes())?;
+            out.sync_all()?;
+            fs::rename(&new, &*file)?;
+            if let Some(folder) = file.parent() {
+                fs::File::open(folder)?.sync_all()?;
+            }
+            Ok(())
+        })();
+        match written {
+            Ok(()) => *kept = nights,
+            Err(error) => eprintln!(
+                "lamp-skills: the night rested not kept in {}: {error}",
+                file.display()
+            ),
+        }
     }
 
     fn invalidate_runs(&mut self) {
@@ -591,6 +707,7 @@ impl Manager {
                     .and_then(|moment| active.during.occurrence_day(moment.day, moment.minute))
                 {
                     source.rested_day = Some(day);
+                    source.night = Some(day);
                 }
             }
             if accepted {
@@ -793,6 +910,7 @@ impl Manager {
                         active: None,
                         stirred: None,
                         rested_day: None,
+                        night: None,
                     },
                 );
             }
@@ -814,6 +932,13 @@ impl Manager {
                     continue;
                 };
                 let during = ask.rest.during.expect("checked rest");
+                // The next night's rest begins: last night's is over.
+                let tonight = moment
+                    .as_ref()
+                    .and_then(|moment| during.occurrence_day(moment.day, moment.minute));
+                if source.night.is_some() && source.night != tonight {
+                    source.night = None;
+                }
                 let Some(window_until_us) = moment
                     .and_then(|moment| during.remaining_ms(moment.minute, unix_ms % 60_000))
                     .and_then(|remaining| sampled_at_us.checked_add(remaining * 1000))
@@ -881,6 +1006,7 @@ impl Manager {
             }
             active.waiting = Some(ask);
         }
+        self.keep_rested();
     }
 }
 
@@ -1086,6 +1212,17 @@ mod tests {
             self.heartbeat();
             self.manager
                 .tick(self.now, sampled_at_us, Some(&LocalTime::Offset(0)), wall);
+        }
+        /// lamp-skills restarted: a fresh manager on the same bus, the
+        /// nights read back from `dir` before the first load.
+        fn restart(&mut self, dir: &Path) {
+            let (mut manager, client) =
+                Manager::new(self.manager.bus.clone(), CLOCK.into()).unwrap();
+            manager.keep_rested_in(dir).unwrap();
+            let routine = crate::load(&self._root.path().join("routine")).unwrap();
+            manager.reload_skills(&[routine], self.now);
+            self.manager = manager;
+            self.client = client;
         }
         fn ask(&self, op: Op) -> mpsc::Receiver<Result<Woke, String>> {
             let (answer, result) = mpsc::sync_channel(1);
@@ -2490,7 +2627,12 @@ mod tests {
     #[test]
     fn a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch() {
         let mut f = Fixture::new();
+        assert_eq!(f.manager.rested_day(), None);
         rested_then_stirred(&mut f);
+        // The night it rested, for a `yields_to` (#1672): the day it began.
+        let rested = f.manager.sources["routine"].rested_day;
+        assert!(rested.is_some());
+        assert_eq!(f.manager.rested_day(), rested);
         let mut requests = f.manager.bus.subscribe(Request::TOPIC, "morning").unwrap();
         f.now += 3_600_000_000 + 40 * 60_000_000;
         assert_eq!(wake_at(&mut f, MORNING), Ok(Woke::Already));
@@ -2502,6 +2644,42 @@ mod tests {
         f.now += 60_000_000;
         let again = wake_at(&mut f, MORNING + 60_000);
         assert!(again.unwrap_err().contains("owns no rest"));
+    }
+
+    /// #2757: the night rested is kept in `--state-dir`'s `rested`, so a
+    /// restart before the morning still has its wake answered, one after it
+    /// still tells a `yields_to` the lamp rested, and the next night's rest
+    /// clears it.
+    #[test]
+    fn the_night_rested_is_kept_across_a_restart_until_the_next_night() {
+        let mut f = Fixture::new();
+        let dir = f._root.path().to_path_buf();
+        assert_eq!(f.manager.keep_rested_in(&dir), Ok(vec![]));
+        rested_then_stirred(&mut f);
+        let rested = f.manager.rested_day().expect("rested");
+        let kept = || std::fs::read_to_string(dir.join(RESTED_FILE)).unwrap();
+        assert_eq!(kept(), format!("routine {rested}\n"));
+        // Restarted before the morning: its wake is the lamp's, as before.
+        f.restart(&dir);
+        assert_eq!(f.manager.rested_day(), Some(rested));
+        f.now += 3_600_000_000 + 40 * 60_000_000;
+        assert_eq!(wake_at(&mut f, MORNING), Ok(Woke::Already));
+        // After the morning's wake, and after another restart: still the
+        // night it rested, for welcome-back's `yields_to`.
+        assert_eq!(f.manager.rested_day(), Some(rested));
+        f.restart(&dir);
+        assert_eq!(f.manager.rested_day(), Some(rested));
+        assert_eq!(kept(), format!("routine {rested}\n"));
+        // The next night's rest begins: last night's is over.
+        f.now += 60_000_000;
+        let _rest = f.ask(Op::Rest);
+        f.tick(NIGHT + 86_400_000);
+        assert_eq!(f.manager.rested_day(), None);
+        assert_eq!(kept(), "");
+        // A line that is not a skill and a day is passed over.
+        std::fs::write(dir.join(RESTED_FILE), "Routine 1\nroutine x\nroutine 5 6\n").unwrap();
+        f.restart(&dir);
+        assert_eq!(f.manager.rested_day(), None);
     }
 
     #[test]

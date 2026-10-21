@@ -438,6 +438,17 @@ struct TriggerFile {
     wait: Option<String>,
     /// The field rose at least this much within this while (#1684).
     rise: Option<RiseFile>,
+    /// After a night the lamp rested, a chance waits for another skill's
+    /// daily trigger to be judged first (#1672): its greeting comes first.
+    yields_to: Option<YieldFile>,
+}
+
+/// `yields_to = { skill = "bedtime-morning", trigger = "morning" }`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct YieldFile {
+    skill: String,
+    trigger: String,
 }
 
 /// `rise = { by = 100, within = "3m" }`.
@@ -674,6 +685,36 @@ pub fn unplug_words(skills: &[Skill]) -> (HashMap<String, UnplugLines>, Vec<Stri
         })
         .collect();
     (words, said)
+}
+
+/// What the journal says of each `yields_to` among `skills`, the loaded and
+/// enabled ones (#1672): one naming a skill or daily trigger that is not
+/// among them is ignored, and says so. Disabled, or a routine with
+/// `LAMP_SKILL_ROUTINES` off, its skill is not loaded.
+pub fn yield_notes(skills: &[Skill]) -> Vec<String> {
+    let mut notes = Vec::new();
+    for skill in skills {
+        for trigger in &skill.triggers {
+            let Some((other, name)) = &trigger.yields_to else {
+                continue;
+            };
+            let found = skills.iter().any(|loaded| {
+                &loaded.name == other
+                    && loaded.triggers.iter().any(|daily| {
+                        daily.name.as_ref() == Some(name)
+                            && daily.once_per_day
+                            && daily.during.is_some()
+                    })
+            });
+            if !found {
+                notes.push(format!(
+                    "{}: yields_to {other}'s {name}, which is not a loaded daily trigger: ignored, it does not wait",
+                    skill.name
+                ));
+            }
+        }
+    }
+    notes
 }
 
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
@@ -1779,6 +1820,9 @@ pub struct Trigger {
     pub unless_heard: bool,
     /// It holds only while its field rose this much within a while (#1684).
     pub rise: Option<Rise>,
+    /// The skill and its daily trigger this one's chance waits for, after a
+    /// night the lamp rested (#1672): `yields_to`.
+    pub yields_to: Option<(String, String)>,
 }
 
 /// A trigger's `rise` (#1684): the field's newest reading is at least `by`
@@ -2313,6 +2357,29 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
     if file.unless_heard && file.each.is_some() {
         return Err("unless_heard goes with a trigger on the whole topic, not each".into());
     }
+    // A face that came is what waits for the other skill's greeting: the
+    // chance is kept while it stays, as `wait` keeps one.
+    let yields_to = match file.yields_to {
+        None => None,
+        Some(_) if when != When::Appears || file.each.is_some() => {
+            return Err("yields_to goes with when = \"appears\" on the whole topic".into());
+        }
+        Some(to) => {
+            if !plain_name(&to.skill) {
+                return Err(format!(
+                    "yields_to.skill {:?} is not a skill's name",
+                    to.skill
+                ));
+            }
+            if !plain_name(&to.trigger) || to.trigger.contains('-') {
+                return Err(format!(
+                    "yields_to.trigger {:?} is not a trigger's name",
+                    to.trigger
+                ));
+            }
+            Some((to.skill, to.trigger))
+        }
+    };
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -2424,6 +2491,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         during,
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
+        yields_to,
     })
 }
 
@@ -3899,6 +3967,25 @@ struct Watch {
     /// With `rise`: the readings it compares with, since the start or the
     /// last reload.
     readings: Readings,
+    /// With `yields_to`: when this time it holds first waited, and said so.
+    yielded_us: Option<u64>,
+}
+
+/// Where a `yields_to` trigger's chance stands against the daily trigger it
+/// yields to (#1672).
+enum Yield {
+    /// Nothing to wait for: no rested night, the skill or its trigger not
+    /// loaded, outside its window, no journal, or its day already claimed.
+    No,
+    /// Its day, not yet claimed, and nothing to wait for: its trigger does
+    /// not hold, or its chance was dropped, or it cannot act. This chance
+    /// is taken, and claims that day for it: one morning moment a day.
+    Open(i64),
+    /// Its trigger holds since `since_us`, its chance still to come on
+    /// `day`: this chance waits while that hold lasts unbroken.
+    Pending { since_us: u64, day: i64 },
+    /// It took its chance today, at this time.
+    Fired(u64),
 }
 
 /// A trigger that held: what was said of it, and the calls to make.
@@ -3979,6 +4066,14 @@ pub struct Engine {
     daily: Option<daily::Journal>,
     /// The first storage failure is reported once; reloads do not retry it.
     daily_faulted: bool,
+    /// The local day the last night the lamp rested began, from the routine
+    /// manager ([`Engine::rested`]): a `yields_to` waits only the morning
+    /// after.
+    rested_day: Option<i64>,
+    /// Each daily trigger judged today, by skill and trigger name: its
+    /// occurrence day, and when it took its chance (none: dropped or let
+    /// go). In memory: the journal says a day was claimed, not when.
+    judged: HashMap<(String, String), (i64, Option<u64>)>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -4165,6 +4260,82 @@ impl Engine {
             daily_clock_trusted: false,
             daily: None,
             daily_faulted: false,
+            rested_day: None,
+            judged: HashMap::new(),
+        }
+    }
+
+    /// The local day the last night the lamp rested began (the routine
+    /// manager's [`routine::Manager::rested_day`]), or none.
+    pub fn rested(&mut self, day: Option<i64>) {
+        self.rested_day = day;
+    }
+
+    /// Where a `yields_to` chance stands now ([`Yield`]).
+    fn yield_state(&self, (name, trigger): &(String, String), now_us: u64) -> Yield {
+        let Some(moment) = self.local_moment(now_us) else {
+            return Yield::No;
+        };
+        if self.rested_day.and_then(|day| day.checked_add(1)) != Some(moment.day) {
+            return Yield::No;
+        }
+        let Some(skill) = self.skills.iter().find(|skill| &skill.name == name) else {
+            return Yield::No;
+        };
+        let Some((index, window)) = skill
+            .triggers
+            .iter()
+            .enumerate()
+            .find(|(_, other)| other.name.as_ref() == Some(trigger) && other.once_per_day)
+            .and_then(|(index, other)| Some((index, other.during.as_ref()?)))
+        else {
+            return Yield::No;
+        };
+        let Some(day) = window
+            .contains(moment.minute)
+            .then(|| window.occurrence_day(moment.day, moment.minute))
+            .flatten()
+        else {
+            return Yield::No;
+        };
+        let judged = self.judged.get(&(name.clone(), trigger.clone()));
+        if let Some((on, Some(at_us))) = judged
+            && *on == day
+        {
+            return Yield::Fired(*at_us);
+        }
+        // Claimed on disk and not in this run's memory: taken before a
+        // restart. A face here since is no news to an `appears` trigger,
+        // and one that comes later is greeted as on any day.
+        if self.daily_faulted
+            || self
+                .daily
+                .as_ref()
+                .is_none_or(|journal| journal.claimed(name, trigger, day))
+        {
+            return Yield::No;
+        }
+        let dropped = judged.is_some_and(|(on, _)| *on == day);
+        // What cannot take its chance is not waited for: off, snoozed, or a
+        // run that would not act.
+        let acts = self.skip_ask
+            || self.ask_policy
+            || skill.kind == SkillKind::Addon
+            || skill.permissions.grants("sleep");
+        let able = acts
+            && !self.off.contains(name)
+            && self.snoozed.get(name).is_none_or(|until| now_us >= *until);
+        // Waited for only while its trigger holds with its chance still to
+        // come, in its `for` or its `wait` (the reviewer's P2 on #2757): a
+        // face it never holds for is not waited for until 11:00.
+        let holding = self
+            .watches
+            .get(&(name.clone(), index))
+            .filter(|watch| !watch.spent && !watch.disarmed)
+            .and_then(|watch| watch.since_us);
+        match holding {
+            Some(since_us) if able && !dropped => Yield::Pending { since_us, day },
+            _ => Yield::Open(day),
         }
     }
 
@@ -5002,6 +5173,10 @@ impl Engine {
                 if trigger.topic != topic {
                     continue;
                 }
+                let yielding = trigger
+                    .yields_to
+                    .as_ref()
+                    .map_or(Yield::No, |to| self.yield_state(to, now_us));
                 let watch = self.watches.entry((skill.name.clone(), index)).or_default();
                 if let Some(why) = out_of_window(trigger, moment.as_ref()) {
                     if trigger.once_per_day
@@ -5164,6 +5339,7 @@ impl Engine {
                     watch.away_us = now_us - watch.last_held_us.unwrap_or(started);
                     watch.spent = false;
                     watch.waiting_us = None;
+                    watch.yielded_us = None;
                 }
                 watch.last_held_us = Some(now_us);
                 let held_us = now_us - watch.since_us.unwrap_or(now_us);
@@ -5234,6 +5410,59 @@ impl Engine {
                 {
                     continue;
                 }
+                // After a night the lamp rested, the other skill's daily
+                // greeting comes first (the first builder's ruling on
+                // #1672): the chance is kept, as the quiet hours keep one,
+                // while that trigger holds unbroken since this one first
+                // waited, until it is judged. Its greeting given to this
+                // face is this run's, done. Otherwise this chance is taken
+                // as before, and claims that trigger's day (`claims`).
+                let mut claims = None;
+                if let Some((other, name)) = &trigger.yields_to {
+                    let greeted = matches!(yielding, Yield::Fired(at_us)
+                        if watch.since_us.is_some_and(|since| since <= at_us));
+                    let waits = match yielding {
+                        Yield::Pending { since_us, .. } => {
+                            watch.yielded_us.is_none_or(|first| since_us <= first)
+                        }
+                        _ => false,
+                    };
+                    claims = match yielding {
+                        Yield::Open(day) => Some((other, name, day)),
+                        Yield::Pending { day, .. } if !waits => Some((other, name, day)),
+                        _ => None,
+                    };
+                    let why = if waits {
+                        watch.spent = false;
+                        watch.waiting_us = None;
+                        let first = watch.yielded_us.is_none();
+                        watch.yielded_us.get_or_insert(now_us);
+                        first.then(|| format!("waits: the {name} greeting comes first"))
+                    } else {
+                        greeted.then(|| {
+                            format!("done: {other}'s {name} greeting was this face's hello")
+                        })
+                    };
+                    if let Some(why) = why {
+                        runs.push(Run {
+                            generation: None,
+                            skill: skill.name.clone(),
+                            events: vec![event(
+                                &skill.name,
+                                SkillStage::Answered,
+                                why,
+                                Some(false),
+                            )],
+                            calls: Vec::new(),
+                            ask: None,
+                            queue: false,
+                            from: None,
+                        });
+                    }
+                    if greeted || waits {
+                        continue;
+                    }
+                }
                 let outside = skill
                     .active
                     .is_some_and(|active| minute.is_none_or(|minute| !within(minute, active)));
@@ -5298,6 +5527,18 @@ impl Engine {
                         watch.spent = false;
                         watch.disarmed = false;
                     } else if once && trigger.once_per_day {
+                        if let (Some(name), Some(day)) = (
+                            &trigger.name,
+                            moment.as_ref().and_then(|moment| {
+                                trigger
+                                    .during
+                                    .as_ref()?
+                                    .occurrence_day(moment.day, moment.minute)
+                            }),
+                        ) {
+                            self.judged
+                                .insert((skill.name.clone(), name.clone()), (day, None));
+                        }
                         // A daily chance let go says so, once: on lamp-06c1
                         // bedtime matured 2 s before the voice had rested
                         // its 30 s, and nothing said why it never came
@@ -5364,6 +5605,14 @@ impl Engine {
                             "daily trigger needs a writable journal and a known local clock",
                         )),
                     };
+                    // What a `yields_to` reads: judged today, and when it
+                    // took its chance.
+                    if let (Ok(true), Some(day), Some(name)) = (&claim, day, &trigger.name) {
+                        self.judged.insert(
+                            (skill.name.clone(), name.clone()),
+                            (day, (!spoken).then_some(now_us)),
+                        );
+                    }
                     match claim {
                         Ok(true) if spoken => {
                             runs.push(Run {
@@ -5409,6 +5658,41 @@ impl Engine {
                             });
                             continue;
                         }
+                    }
+                }
+                // This hello is the morning's moment (the first builder on
+                // #2757): the trigger it yields to has that day claimed, as
+                // its own greeting would, so a later face is not given it.
+                if acts && let Some((other, name, day)) = claims {
+                    let claimed = match &mut self.daily {
+                        Some(journal) => journal.claim(other, name, day),
+                        None => Err(std::io::Error::other("no daily journal")),
+                    };
+                    let why = match claimed {
+                        Ok(true) => {
+                            self.judged
+                                .insert((other.clone(), name.clone()), (day, None));
+                            Some(format!(
+                                "{name} chance let go: {} already greeted this morning",
+                                skill.name
+                            ))
+                        }
+                        Ok(false) => None,
+                        Err(error) => {
+                            self.daily_faulted = true;
+                            Some(format!("daily chance withheld: {error}"))
+                        }
+                    };
+                    if let Some(why) = why {
+                        runs.push(Run {
+                            generation: None,
+                            skill: other.clone(),
+                            events: vec![event(other, SkillStage::Answered, why, Some(false))],
+                            calls: Vec::new(),
+                            ask: None,
+                            queue: false,
+                            from: None,
+                        });
                     }
                 }
                 let held = match trigger.when {
