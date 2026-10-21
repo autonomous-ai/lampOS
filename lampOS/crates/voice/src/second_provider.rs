@@ -304,6 +304,15 @@ pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
 /// (`crate::attention::Attention::narrow_the_call`).
 pub const BUSY_CALLED_STRICT_ENVIRONMENT: &str = "LAMP_BUSY_CALLED_STRICT";
 
+/// Where the worker reads whether a face turned to the lamp is a sign only
+/// when it is not seen silent: `on`, and nothing else. The eyes' speaking
+/// faces are read for it (`LAMP_EYES_SPEAKING` on lamp-eyes): when the only
+/// faces turned to the lamp through a line read still, nobody is turned to
+/// it (the first builder on Queue #1722, 21 Oct 14:31: on lamp-4ace someone
+/// at the desk, turned to it and quiet, let 33 lines of two other people's
+/// talk out; `Heeding::counting_only_turned_speakers`).
+pub const TURNED_SPEAKING_ENVIRONMENT: &str = "LAMP_TURNED_SPEAKING";
+
 /// Where the worker reads whether a busy room ends sooner (the first
 /// builder on Queue #1722, 04:00): `on`, and nothing else. A minute after
 /// the last talk when the lamp has not answered since, and a minute after

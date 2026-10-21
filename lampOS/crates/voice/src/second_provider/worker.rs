@@ -2385,6 +2385,22 @@ pub fn serve(
             std::env::var(crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT)
                 .is_ok_and(|value| value == "on"),
         );
+        // A face turned to the lamp but seen silent is nobody turned to it
+        // (`LAMP_TURNED_SPEAKING=on`).
+        if std::env::var(crate::second_provider::TURNED_SPEAKING_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a face turned to the lamp is a sign only when the eyes don't see the only ones turned to it silent through the line (LAMP_TURNED_SPEAKING)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.counting_only_turned_speakers();
+                // The eyes' speaking faces (`LAMP_EYES_SPEAKING` on
+                // lamp-eyes); without them nothing reads silent, and the
+                // sign is as before.
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+        }
         // The lamp's own answers to lines let out only as the conversation
         // going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`).
         if not_own {
@@ -3255,6 +3271,8 @@ pub(crate) struct Heeding {
     said_until_free_us: Option<u64>,
     /// `LAMP_BUSY_CALLED_STRICT=on` ([`crate::attention::Attention::narrow_the_call`]).
     busy_called_strict: bool,
+    /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
+    turned_speaking: bool,
 }
 
 /// The same-voice check (#829) on `heeding`, its child made by `start` with
@@ -3420,6 +3438,33 @@ fn speakers_between(
             eyes.turned_speakers_with_boot(from, to),
         ),
         _ => Default::default(),
+    }
+}
+
+/// Whether `eyes` saw only silent faces turned to the lamp from `began_us`
+/// to `ended_us`, by this process's clock; never without them.
+fn turned_only_silent(
+    eyes: Option<&(
+        Arc<crate::speaking_faces::SpeakingFaces>,
+        Option<crate::speaking_faces::Reader>,
+    )>,
+    began_us: u64,
+    ended_us: u64,
+) -> bool {
+    let Some((eyes, _)) = eyes else {
+        return false;
+    };
+    let (now, now_us) = (Instant::now(), monotonic_us());
+    let at = |us: u64| {
+        if us >= now_us {
+            now.checked_add(Duration::from_micros(us - now_us))
+        } else {
+            now.checked_sub(Duration::from_micros(now_us - us))
+        }
+    };
+    match (at(began_us), at(ended_us)) {
+        (Some(from), Some(to)) => eyes.turned_only_silent(from, to),
+        _ => false,
     }
 }
 
@@ -3717,6 +3762,7 @@ impl Heeding {
             chain: Vec::new(),
             said_until_free_us: None,
             busy_called_strict: false,
+            turned_speaking: false,
         }
     }
 
@@ -3754,6 +3800,14 @@ impl Heeding {
     /// (`LAMP_BUSY_CALLED_STRICT=on`).
     pub(crate) fn narrowing_busy_calls(&mut self) {
         self.busy_called_strict = true;
+    }
+
+    /// A face turned to the lamp counts as nobody turned to it when the eyes
+    /// saw the only faces turned to it silent through the line
+    /// (`LAMP_TURNED_SPEAKING=on`,
+    /// [`crate::speaking_faces::SpeakingFaces::turned_only_silent`]).
+    pub(crate) fn counting_only_turned_speakers(&mut self) {
+        self.turned_speaking = true;
     }
 
     /// Whether `request` was judged as begun with the lamp's name said to
@@ -4184,13 +4238,31 @@ impl Heeding {
         request: u64,
         said: (u64, u64),
         heard: &str,
-        signs: Signs,
+        mut signs: Signs,
     ) -> Option<&'static str> {
+        self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
         verdict
+    }
+
+    /// `LAMP_TURNED_SPEAKING`: a face turned to the lamp but seen silent
+    /// through the line, with no face turned to it speaking, is someone at
+    /// the lamp not talking to it. The sign goes before the rule and the
+    /// name's note read it (the reviewer-lead's P2 on #2546), and nothing
+    /// fresh from the eyes (`None`) stays as it is.
+    fn silence_turned(&self, request: u64, (began_us, ended_us): (u64, u64), signs: &mut Signs) {
+        if self.turned_speaking
+            && signs.turned == Some(true)
+            && turned_only_silent(self.eyes.as_ref(), began_us, ended_us)
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: the only faces turned to the lamp were seen silent through the line: nobody is turned to it (LAMP_TURNED_SPEAKING)"
+            );
+            signs.turned = Some(false);
+        }
     }
 
     /// What the Policy's gate is told of `request`, as the Live worker
@@ -9585,6 +9657,88 @@ mod tests {
             continues_from: None,
         };
         heeding.judge(9, (1_000_000_000, 1_003_000_000), heard, signs)
+    }
+
+    /// `LAMP_TURNED_SPEAKING` (lamp-4ace, 21 Oct 14:00): in a busy room, a
+    /// question let out by a face turned to the lamp is held when that face
+    /// read silent through the line, and let out as before when it spoke,
+    /// when its mouth was not read, or without the switch.
+    #[test]
+    fn with_turned_speaking_a_silent_face_turned_to_the_lamp_is_nobody_turned_to_it() {
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        let judged = |on: bool, state: Option<SpeakingState>, turned: Option<bool>| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            for look in 0..5u64 {
+                let faces = Faces {
+                    faces: vec![Face {
+                        id: "f1".into(),
+                        xmin: 0.4,
+                        ymin: 0.3,
+                        xmax: 0.5,
+                        ymax: 0.45,
+                        confidence: 1.0,
+                        yaw: Some(0.1),
+                        facing: Some(true),
+                        speaking: state.map(|state| Speaking {
+                            state,
+                            score: 0.0,
+                            from: None,
+                        }),
+                    }],
+                };
+                eyes.look(
+                    now + Duration::from_millis(200 + look * 400),
+                    Some((("b", look), &faces)),
+                );
+            }
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.seeing_speaking_faces(eyes, None);
+            if on {
+                heeding.counting_only_turned_speakers();
+            }
+            let signs = super::Signs {
+                room: crate::room_told::Room::Busy,
+                going_on: false,
+                lamp_asked: false,
+                turned,
+                names: vec![],
+                near: false,
+                continues_from: None,
+            };
+            heeding.heed_signs(
+                9,
+                (now_us, now_us + 2_200_000),
+                "So are we still doing lunch at noon?",
+                signs,
+            )
+        };
+        use SpeakingState::{No, Unknown, Yes};
+        let turned = Some(true);
+        assert_eq!(judged(false, Some(No), turned), None, "without the switch");
+        assert_eq!(
+            judged(true, Some(No), turned),
+            Some(crate::attention::BUSY_UNCALLED),
+            "someone at the desk, still"
+        );
+        assert_eq!(
+            judged(true, Some(Yes), turned),
+            None,
+            "the face turned to it speaks"
+        );
+        assert_eq!(
+            judged(true, Some(Unknown), turned),
+            None,
+            "its mouth not read"
+        );
+        assert_eq!(judged(true, None, turned), None, "no speaking read at all");
+        // Nothing fresh from the eyes stays nothing: the busy rule's own
+        // reading of an unknown sign, never a face taken away.
+        assert_eq!(
+            judged(true, Some(No), None),
+            judged(false, Some(No), None),
+            "the eyes said nothing fresh"
+        );
     }
 
     #[test]
