@@ -5,11 +5,26 @@
 | id | proposal | where |
 |---|---|---|
 | devops007-P1 | Link the ARM64 run's test binaries with lld. Closed: the trial's 34% was runner variance; Tests measured 8 s on a lamp-voice edit (#2495 closed) | #1806 |
-| devops007-P2 | No lamp-voice ARM64 push run is cancelled while it waits. Taken: #2513 | #1806 |
+| devops007-P2 | No lamp-voice ARM64 push run is cancelled while it waits. Done: #2513, merged 21 Oct as `f09b7633c` | #1806 |
 
 ## Found, not mine
 
 - **The clippy cache crowds out ARM64's** (21 Oct 12:4x +07). Since #2465 each lamp-voice clippy run saves about 2.2 GB, three in four minutes (12:43–12:47), against ARM64's 1.1 GB and the repository's 10 GB, which GitHub evicts least recently used first. `gh api repos/autonomous-ai/lampOS/actions/caches` shows it. Posted on #1806.
+
+## 2026-10-21 15:15 +0700 — #2513 merged, its first round
+
+Ready for lamp-voice: yes (#2513, merged by the first builder at 14:40 as `f09b7633c`)
+
+- **Reads:** the first builder and the reviewer-lead, no P1 or P2. Two P3s taken as follow-ups: PRs queueing behind parallel lamp-voice runs, and clippy's cache going stale until the lockfile changes.
+- **After merge, to 08:11Z:**
+  - **lamp-voice runs:** 9, none cancelled; before, 13 of 25 were. Successful runs took 14–19 min, against a 10 min median before: an overlapping run restores the newest finished save, a few commits behind.
+  - **PR queue:** 6 s at the median, 11 s at most, beside up to 8 lamp-voice runs at once.
+  - **Cache:** 10.0 GB, with clippy at one lockfile entry; it was 14.7 GB.
+  - **Clippy:** 2.4 min at the median, against about 2.0 before.
+- **Posted on #1806.**
+- **Next, only if the numbers ask:**
+  - lamp-voice runs past ~20 min: a cap of 2 at a time without cancelling;
+  - clippy creeping up: a week in its key.
 
 ## 2026-10-21 14:30 +0700 — the clippy cache and P2 as #2513, and the lld trial corrected
 
