@@ -10076,33 +10076,54 @@ fn conversation_with_gate(
             )
             && playback_mask.available(say_now_us)
             && let Some(provider_session) = unasked_session(&cloud, paused)
-            && let Some((turn, priority, ticket)) = says.take(say_now_us)
+            && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
         {
-            eprintln!(
-                "lamp-voice: saying what the skill {} asked (priority {priority})",
-                ticket.skill()
-            );
-            record(
-                trace,
-                json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session}),
-            )?;
-            snapshot = commit_written_turn(
-                owner,
-                reply,
-                &mut provider_queue,
-                &turn,
-                false,
-                "skill_says",
-                provider_session,
-                rig.playout_start_now(),
-                trace,
-                |state| rig.publish(state),
-            )?;
-            last_publish = monotonic_us();
-            // Begun: the asker may move the body and the light with it.
-            ticket.begun(monotonic_us());
-            if let Some(current) = reply.as_mut() {
-                current.say = Some(ticket);
+            // An add-on's quoted line is the second route's alone: there its
+            // turn is asked with no functions (#2530 part 2). The Live
+            // session's functions are declared once, so it never takes one.
+            if let Some(why) = quoted_refused(quoted, &rig.provider.role) {
+                eprintln!(
+                    "lamp-voice: the add-on {}'s say is refused: {why}",
+                    ticket.skill()
+                );
+                ticket.answer(crate::say::Outcome::Refused(why.into()));
+            } else {
+                eprintln!(
+                    "lamp-voice: saying what the skill {} asked (priority {priority})",
+                    ticket.skill()
+                );
+                record(
+                    trace,
+                    json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session}),
+                )?;
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &turn,
+                    false,
+                    "skill_says",
+                    provider_session,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                last_publish = monotonic_us();
+                // Marked on its turn: the second route asks it with no
+                // functions and keeps it out of memory.
+                if quoted
+                    && let Some(ProviderInput::Written {
+                        quoted: written_quoted,
+                        ..
+                    }) = provider_queue.back_mut()
+                {
+                    *written_quoted = true;
+                }
+                // Begun: the asker may move the body and the light with it.
+                ticket.begun(monotonic_us());
+                if let Some(current) = reply.as_mut() {
+                    current.say = Some(ticket);
+                }
             }
         }
         // A skill's own sound (#938): played now, as a turn of the lamp's
@@ -12132,6 +12153,13 @@ fn start_timed_fixture(
     .map(Some)
 }
 
+/// Why an add-on's quoted say may not be taken by the provider in `role`,
+/// if so (#2530 part 2): only the second route asks a turn with no
+/// functions declared, so only it takes one. Any other say is taken.
+fn quoted_refused(quoted: bool, role: &str) -> Option<&'static str> {
+    (quoted && role != "second").then_some("add-on says need the second route")
+}
+
 #[allow(clippy::too_many_arguments)]
 fn commit_written_turn(
     owner: &mut Controller,
@@ -12167,6 +12195,7 @@ fn commit_written_turn(
         text: note.to_owned(),
         look,
         search: false,
+        quoted: false,
     });
     let current = Reply {
         owner: turn,

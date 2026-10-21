@@ -1008,3 +1008,17 @@ fn the_ring_prepares_no_frame_for_a_skill_sound() {
     assert!(ring.prepare(&mut owner, now()).unwrap().is_none());
     assert!(ring.prepare(&mut owner, now()).unwrap().is_none());
 }
+
+/// #2530 part 2, the first builder's 22:25: an add-on's quoted say is the
+/// second route's alone. The Live provider refuses it with why, and every
+/// other say is taken on either route as before.
+#[test]
+fn an_add_ons_quoted_say_is_taken_by_the_second_route_alone() {
+    assert_eq!(
+        quoted_refused(true, "provider"),
+        Some("add-on says need the second route")
+    );
+    assert_eq!(quoted_refused(true, "second"), None);
+    assert_eq!(quoted_refused(false, "provider"), None);
+    assert_eq!(quoted_refused(false, "second"), None);
+}

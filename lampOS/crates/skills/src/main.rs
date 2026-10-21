@@ -938,11 +938,17 @@ fn serve(
                     "skills",
                 )?,
                 limits: lamp_skills::addon::Limits::default(),
+                saying: VecDeque::new(),
             })))
         } else {
             None
         },
     };
+    // An add-on's say, kept by the policy, is asked of the voice quoted
+    // (#2530 part 2): only with the switch, its words never off this part.
+    if let Some(proposals) = &runner.proposals {
+        addon_says(&runner.bus, proposals.clone(), sockets.say.clone())?;
+    }
     let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
         listen(tools, ask.clone())?;
@@ -1428,6 +1434,76 @@ struct Runner {
 struct Proposals {
     out: Publisher,
     limits: lamp_skills::addon::Limits,
+    /// The says proposed and not yet decided, at most [`SAYS_WAITING`]: the
+    /// proposal's number, its add-on, its note and when it was proposed.
+    /// The note stays here; only the judge's `kept` by `jev` sends it.
+    saying: VecDeque<(u64, String, String, u64)>,
+}
+
+/// Says waiting for the judge, at most (`docs/addons.md`, "Rate and lease").
+const SAYS_WAITING: usize = 2;
+/// How long a say waits for its decision before it is let go.
+const SAY_DECIDED_WITHIN_US: u64 = 10_000_000;
+
+/// Reads the judge's decisions and asks the voice to say a kept say, quoted
+/// (`{skill, quoted}`, `LAMP_ADDON_SAY` in the voice): only one decided
+/// `kept` `by` `jev` for a say this part proposed and still holds, within
+/// [`SAY_DECIDED_WITHIN_US`]. Any other decision about it lets it go. The
+/// journal names the add-on and the proposal, never the words.
+fn addon_says(bus: &Bus, proposals: Arc<Mutex<Proposals>>, say_socket: PathBuf) -> io::Result<()> {
+    let mut decisions = bus.subscribe(lamp_msgs::AddonDecision::TOPIC, "skills")?;
+    std::thread::Builder::new()
+        .name("addon-says".into())
+        .spawn(move || {
+            loop {
+                let message = match decisions.recv(Duration::from_secs(1)) {
+                    Ok(message) => message,
+                    Err(error) => {
+                        eprintln!("lamp-skills: add-ons' decisions not read: {error}");
+                        return;
+                    }
+                };
+                let now_us = lamp_ipc::monotonic_us();
+                let mut held = proposals
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                held.saying
+                    .retain(|(_, _, _, at)| now_us.saturating_sub(*at) < SAY_DECIDED_WITHIN_US);
+                // Only the add-ons' judge writes decisions.
+                let Some(decision) = message
+                    .filter(|message| message.header.source == "addons")
+                    .and_then(|message| message.parse::<lamp_msgs::AddonDecision>().ok())
+                else {
+                    continue;
+                };
+                let Some(at) = held
+                    .saying
+                    .iter()
+                    .position(|(number, ..)| *number == decision.proposal)
+                else {
+                    continue;
+                };
+                let (number, addon, note, _) = held.saying.remove(at).expect("found above");
+                drop(held);
+                if decision.act != "say" || decision.choice != "kept" || decision.by != "jev" {
+                    continue;
+                }
+                let what = format!("{addon} say #{number}, quoted");
+                let said = say(
+                    &say_socket,
+                    &what,
+                    &addon,
+                    json!({ "quoted": note }),
+                    &[],
+                    || {},
+                );
+                // The model may leave a quoted line unsaid: "or not at all"
+                // (the first builder on #2530, 22:07).
+                let said = said.replace("dropped (no_audio_answer)", "said nothing");
+                eprintln!("lamp-skills: {said}");
+            }
+        })?;
+    Ok(())
 }
 
 /// An add-on's run: each proposal numbered, held to the limits and written
@@ -1461,6 +1537,22 @@ fn propose(calls: &[Call], proposals: Option<&Arc<Mutex<Proposals>>>, may: &May)
         let sent = proposals
             .out
             .publish_json(lamp_ipc::monotonic_us(), &numbered);
+        // A say's note is kept here for its decision (#2530 part 2).
+        if sent.is_ok()
+            && numbered.act == "say"
+            && let Some(note) = &numbered.note
+        {
+            if proposals.saying.len() == SAYS_WAITING {
+                proposals.saying.pop_front();
+            }
+            let entry = (
+                numbered.proposal,
+                numbered.addon.clone(),
+                note.clone(),
+                lamp_ipc::monotonic_us(),
+            );
+            proposals.saying.push_back(entry);
+        }
         said.push(match sent {
             Ok(_) => format!(
                 "proposed {} as {} on {}",

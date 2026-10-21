@@ -2859,8 +2859,15 @@ mod tests {
             about: "attention".into(),
             ..decided("say_now", false, &key)
         };
+        // An add-on's say decision (#2530 part 2) naming this very work.
+        let addon = Decision {
+            about: "addon".into(),
+            proposal: Some(7),
+            ..decided("say_now", false, &key)
+        };
         for (decision, age, status, why) in [
             (attention, 0, Some(&now), "not_progress"),
+            (addon, 0, Some(&now), "not_progress"),
             (decided("wait", false, &key), 0, Some(&now), "wait"),
             (decided("say_now", true, &key), 0, Some(&now), "shadow"),
             (decided("say_now", false, "3:4"), 0, Some(&now), "no_task"),

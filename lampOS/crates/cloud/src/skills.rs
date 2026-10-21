@@ -724,18 +724,18 @@ pub mod tests {
         let mut places = places("addon");
         // Written whole: [`skill`] gives every folder a tool, which an
         // add-on may not have.
-        let dir = places.folder.join("quiet-note");
+        let dir = places.folder.join("quiet-mood");
         fs::create_dir_all(&dir).unwrap();
         fs::write(
             dir.join("SKILL.md"),
-            "---\nname: quiet-note\ndescription: A partner's add-on.\n---\n\n# Quiet note\n",
+            "---\nname: quiet-mood\ndescription: A partner's add-on.\n---\n\n# Quiet mood\n",
         )
         .unwrap();
         fs::write(
             dir.join("skill.toml"),
-            "kind = \"addon\"\nversion = \"1.0.0\"\n\n[permissions]\ntopics = [\"voice/state\"]\npropose = [\"note\"]\n\n\
+            "kind = \"addon\"\nversion = \"1.0.0\"\n\n[permissions]\ntopics = [\"voice/state\"]\npropose = [\"mood\"]\n\n\
              [trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\n\
-             [[do]]\npropose = { act = \"note\", why = \"quiet\", sure = 0.5, holds = \"10s\", note = \"The room is quiet.\" }\n",
+             [[do]]\npropose = { act = \"mood\", why = \"quiet\", sure = 0.5, holds = \"10s\", mood = { energy = 0.1, for = \"10m\" } }\n",
         )
         .unwrap();
         let rows = listed(&places);

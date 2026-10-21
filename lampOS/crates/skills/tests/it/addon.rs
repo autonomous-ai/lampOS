@@ -184,6 +184,29 @@ fn the_loader_refuses_an_add_on_anything_but_proposing() {
             "why is one of",
         ),
         ("energy = 0.1", "energy = 0.5", "at most 0.1"),
+        // The say grant (#2530 part 2): declared with propose naming say,
+        // "quoted" only.
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\", \"say\"]",
+            "declares say = \"quoted\"",
+        ),
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\"]\nsay = \"quoted\"",
+            "goes with propose naming \"say\"",
+        ),
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\", \"say\"]\nsay = \"spoken\"",
+            "say is \"quoted\" only",
+        ),
+        // A note is refused at load until notes are typed (#2530).
+        (
+            "propose = [\"mood\"]",
+            "propose = [\"mood\", \"note\"]",
+            "\"note\" is refused for now",
+        ),
         (
             "mood = { energy = 0.1, for = \"10m\" }",
             "mood = { energy = 0.1, for = \"10m\" }, note = \"Hi.\"",
@@ -210,6 +233,23 @@ fn the_loader_refuses_an_add_on_anything_but_proposing() {
         .replace("act = \"light\"", "act = \"move\"");
     let error = load(&addon_with(dir.path(), "flips", &gesture)).unwrap_err();
     assert!(error.contains("is not one of the body's"), "{error}");
+}
+
+/// #2530 part 2: an add-on that proposes `say` loads with its say grant,
+/// which no other kind may declare.
+#[test]
+fn a_say_needs_the_quoted_grant_and_only_an_add_on_has_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let saying = MUSIC.replace(
+        "propose = [\"mood\"]",
+        "propose = [\"mood\", \"say\"]\nsay = \"quoted\"",
+    );
+    load(&addon_with(dir.path(), "says", &saying)).unwrap();
+    let installable = MUSIC
+        .replace("kind = \"addon\"", "kind = \"installable\"")
+        .replace("propose = [\"mood\"]", "say = \"quoted\"");
+    let error = load(&addon_with(dir.path(), "not-addon", &installable)).unwrap_err();
+    assert!(error.contains("an add-on's say grant"), "{error}");
 }
 
 /// A skill that is not an add-on proposes nothing.
@@ -245,7 +285,8 @@ version = "1.2.0"
 
 [permissions]
 topics = ["voice/state"]
-propose = ["note"]
+propose = ["say"]
+say = "quoted"
 
 [trigger]
 topic = "voice/state"
@@ -253,7 +294,7 @@ field = "state"
 equals = "resting"
 
 [[do]]
-propose = { act = "note", why = "quiet", sure = 0.5, holds = "10s", note = "The room is quiet." }
+propose = { act = "say", why = "quiet", sure = 0.5, holds = "10s", note = "The room is quiet." }
 "#;
 
 /// The program with one add-on, the switch `on` or not: what it wrote on
@@ -265,7 +306,7 @@ fn the_program(on: bool) -> (Vec<AddonProposal>, Vec<SkillEvent>, bool) {
         .tempdir_in("/tmp")
         .unwrap();
     let root = dir.path();
-    addon_with(&root.join("skills"), "quiet-note", RESTING);
+    addon_with(&root.join("skills"), "quiet-say", RESTING);
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
@@ -341,14 +382,14 @@ fn with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on() {
     assert_eq!(written.len(), 1, "{written:?}");
     let proposal = &written[0];
     assert!(proposal.proposal > 0);
-    assert_eq!(proposal.addon, "quiet-note");
+    assert_eq!(proposal.addon, "quiet-say");
     assert_eq!(proposal.version, "1.2.0");
-    assert_eq!(proposal.act, "note");
+    assert_eq!(proposal.act, "say");
     assert_eq!(proposal.note.as_deref(), Some("The room is quiet."));
     assert_eq!(proposal.check(), Ok(()));
     let said: Vec<&str> = events.iter().map(|event| event.why.as_str()).collect();
     assert!(
-        said.iter().any(|why| why.starts_with("proposed note as")),
+        said.iter().any(|why| why.starts_with("proposed say as")),
         "{said:?}"
     );
     assert!(
@@ -365,4 +406,150 @@ fn without_the_switch_no_add_on_is_loaded_and_nothing_is_written() {
     assert!(!subscribed, "an add-on was loaded without the switch");
     assert!(written.is_empty(), "{written:?}");
     assert!(events.is_empty(), "{events:?}");
+}
+
+/// An add-on that proposes a say whenever the voice rests (#2530 part 2).
+const SAYS: &str = r#"
+kind = "addon"
+version = "1.0.0"
+
+[permissions]
+topics = ["voice/state"]
+propose = ["say"]
+say = "quoted"
+
+[trigger]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[do]]
+propose = { act = "say", why = "music", sure = 0.7, holds = "10s", note = "Music is playing." }
+"#;
+
+/// The program with [`SAYS`] and a stand-in say service: the judge's
+/// decision on its say is `choice` by `by`; what the voice was asked, if
+/// anything, within 2 s.
+fn a_say_decided(choice: &str, by: &str) -> Option<serde_json::Value> {
+    a_say_decided_told(choice, by, "{\"outcome\":\"spoken\"}").0
+}
+
+/// [`a_say_decided`], the say service answering `outcome`: also the
+/// program's journal.
+fn a_say_decided_told(
+    choice: &str,
+    by: &str,
+    outcome: &'static str,
+) -> (Option<serde_json::Value>, String) {
+    use std::io::{BufRead, BufReader, Write};
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    addon_with(&root.join("skills"), "music-says", SAYS);
+    let say = std::os::unix::net::UnixListener::bind(root.join("say.sock")).unwrap();
+    let (asked, heard) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        if let Ok((stream, _)) = say.accept() {
+            let mut line = String::new();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            reader.read_line(&mut line).unwrap();
+            let _ = asked.send(serde_json::from_str::<serde_json::Value>(&line).unwrap());
+            let _ = (&stream).write_all(format!("{outcome}\n").as_bytes());
+        }
+    });
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    for (flag, path) in [
+        ("--dir", root.join("skills")),
+        ("--bus-root", root.join("bus")),
+        ("--gaze-socket", root.join("gaze.sock")),
+        ("--mood-socket", root.join("mood.sock")),
+        ("--actions-socket", root.join("actions.sock")),
+        ("--say-socket", root.join("say.sock")),
+    ] {
+        command.arg(flag).arg(path);
+    }
+    command
+        .env_remove("LAMP_SKILLS_ASK")
+        .env(lamp_skills::ADDONS_ENVIRONMENT, "on")
+        .stderr(std::fs::File::create(root.join("stderr")).unwrap());
+    let _running = Running(command.spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline && bus.subscribers(VoiceState::TOPIC).unwrap().is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let mut voice = bus
+        .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+        .unwrap();
+    voice
+        .publish_json(1, &serde_json::json!({ "state": "resting" }))
+        .unwrap();
+    let proposal: AddonProposal = proposals
+        .recv(Duration::from_secs(5))
+        .unwrap()
+        .expect("proposed")
+        .parse()
+        .unwrap();
+    bus.publisher_declared(
+        lamp_msgs::AddonDecision::TOPIC,
+        &lamp_msgs::AddonDecision::declaration(),
+        "addons",
+    )
+    .unwrap()
+    .publish_json(
+        1,
+        &lamp_msgs::AddonDecision {
+            proposal: proposal.proposal,
+            addon: proposal.addon.clone(),
+            act: "say".into(),
+            choice: choice.into(),
+            by: by.into(),
+            why: "test".into(),
+        },
+    )
+    .unwrap();
+    let asked = heard.recv_timeout(Duration::from_secs(2)).ok();
+    // The outcome's journal line comes just after.
+    std::thread::sleep(Duration::from_millis(200));
+    let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
+    assert!(
+        !journal.contains("Music is playing."),
+        "no words journaled: {journal}"
+    );
+    (asked, journal)
+}
+
+/// #2530 part 2: only a say the policy kept (`by` `jev`) is asked of the
+/// voice, and only quoted: `{skill, quoted}`, never a note it would follow.
+#[test]
+fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {
+    let asked = a_say_decided("kept", "jev").expect("asked of the voice");
+    assert_eq!(asked["skill"], "music-says");
+    assert_eq!(asked["quoted"], "Music is playing.");
+    assert!(
+        asked.get("note").is_none() && asked.get("text").is_none(),
+        "{asked}"
+    );
+    assert_eq!(a_say_decided("dropped", "jev"), None);
+    assert_eq!(a_say_decided("kept", "rule"), None);
+}
+
+/// The model may leave a quoted line unsaid: the journal says `said
+/// nothing`, with the add-on and the proposal, never the words.
+#[test]
+fn a_quoted_line_left_unsaid_is_journaled_as_said_nothing() {
+    let (asked, journal) = a_say_decided_told(
+        "kept",
+        "jev",
+        "{\"outcome\":\"dropped\",\"why\":\"no_audio_answer\"}",
+    );
+    assert!(asked.is_some());
+    let line = journal
+        .lines()
+        .find(|line| line.contains("music-says say #"))
+        .unwrap_or_else(|| panic!("{journal}"));
+    assert!(line.ends_with(", quoted: said nothing"), "{line}");
 }

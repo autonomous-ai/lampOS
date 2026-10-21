@@ -5689,6 +5689,27 @@ fn probe_targets(config: &crate::second_config::SecondConfig) -> Vec<String> {
     targets
 }
 
+/// A written request kept for the thread as the note it is, with the
+/// answer to it (`Thread::written`). An add-on's quoted line is not: neither
+/// it nor what the lamp says of it is kept, so a person's later turn, with
+/// its functions, never carries the partner's words (the reviewer-lead on
+/// #2675).
+fn keep_written(thread: &mut crate::thread::Thread, command: &ProviderInput, scopes_context: bool) {
+    match command {
+        ProviderInput::Written {
+            request,
+            quoted: true,
+            ..
+        } => thread.quoted(*request),
+        // A written request is admitted as the room's.
+        ProviderInput::Written { request, text, .. } if scopes_context => {
+            thread.written_for(*request, text, None);
+        }
+        ProviderInput::Written { request, text, .. } => thread.written(*request, text),
+        _ => {}
+    }
+}
+
 /// A sign-in's news marks its request, before anything of it is kept
 /// (#1676, `crate::sign_in::written`).
 fn sign_in_written(command: &ProviderInput) {
@@ -5789,15 +5810,8 @@ pub async fn run(
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).
                 sign_in_written(&command);
-                if let ProviderInput::Written { request, text, .. } = &command
-                    && let Ok(mut thread) = crate::thread::THREAD.lock()
-                {
-                    // A written request is admitted as the room's.
-                    if engine.scopes_context() {
-                        thread.written_for(*request, text, None);
-                    } else {
-                        thread.written(*request, text);
-                    }
+                if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                    keep_written(&mut thread, &command, engine.scopes_context());
                 }
                 // What was played of an answer this line, or the Stop
                 // before it, cut is the lamp's words of it, before the
@@ -8376,6 +8390,7 @@ mod tests {
             text,
             look: false,
             search: false,
+            quoted: false,
         };
         sign_in_written(&written(3, "Claude Code just finished.".into()));
         sign_in_written(&written(
@@ -8429,6 +8444,51 @@ mod tests {
             lamp: "Hello.".into(),
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
+    }
+
+    /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's
+    /// words of it, are never kept for the thread, so the person's next
+    /// turn (with its functions) carries no note of it; the lamp's own
+    /// written request still is.
+    #[test]
+    fn a_quoted_line_is_never_kept_for_a_later_turn() {
+        let now = std::time::Instant::now();
+        let written = |request: u64, quoted: bool| ProviderInput::Written {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: format!("note {request}"),
+            look: false,
+            search: false,
+            quoted,
+        };
+        for scopes_context in [false, true] {
+            let mut thread = crate::thread::Thread::new();
+            // An onboarding sentence in hand stays marked.
+            thread.count_only(Some(9));
+            keep_written(&mut thread, &written(1, true), scopes_context);
+            thread.lamp(1, "Music is playing.", now);
+            thread.lamp(9, "Welcome.", now);
+            // The person's words after it are kept (a Start clears the
+            // sentence, as the engine's does).
+            thread.count_only(None);
+            thread.person("And the light?", true, now);
+            thread.lamp(2, "It's on.", now);
+            keep_written(&mut thread, &written(3, false), scopes_context);
+            thread.lamp(3, "Done.", now);
+            let recent = thread.recent_for(None, now, std::time::Duration::from_secs(300), 6);
+            let said = format!("{recent:?}");
+            assert!(!said.contains("note 1"), "{said}");
+            assert!(!said.contains("Music is playing"), "{said}");
+            assert!(!said.contains("Welcome"), "{said}");
+            assert!(said.contains("And the light?"), "{said}");
+            assert!(said.contains("It's on."), "{said}");
+            assert_eq!(
+                recent.last().and_then(|last| last.written.as_deref()),
+                Some("note 3"),
+                "{said}"
+            );
+        }
     }
 
     /// #1722: this route reads who work can go to as the Live route does,

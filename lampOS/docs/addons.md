@@ -63,7 +63,7 @@ lamp-skills carries it out through today's owners, each call checked again:
   move   → the body's sockets  (body arbitration, priority Skill or Idle)
   mood   → lamp-mood's nudge input (new, bounded)
   say    → the say service, as a note the model phrases
-  note   → the say service's context line → the voice's try_context
+  note   → refused at load for now (typed notes, later)
 ```
 
 ## The `addon` kind's manifest
@@ -84,8 +84,11 @@ propose = ["mood", "light"]                # what it may propose, and nothing el
 ```
 
 - **`propose`** is the add-on's only output permission: a list of `say`,
-  `light`, `move`, `mood` and `note`. An empty or missing list lets it
-  propose nothing.
+  `light`, `move` and `mood`. An empty or missing list lets it propose
+  nothing. **`note` is refused at load for now** (the first builder,
+  #2530): a note's words would ride on the person's next turn, which has
+  every function. If notes come back, they are typed (a kind and bounded
+  values the voice renders itself), never a partner's words.
 - **Refused for the `addon` kind:** `speak`, `light`, `body`, `look`,
   `messages`, `known_faces`, `output_limits` and `actions` in
   `[permissions]`; `say`, `sound`, `cue`, `light`, `body` and `look` steps;
@@ -93,6 +96,11 @@ propose = ["mood", "light"]                # what it may propose, and nothing el
   call is the model's, not a partner's); `[history]`; and `run.py`, as for
   every skill. An add-on that names any of them is not loaded, and the
   journal says what it named.
+- **`say = "quoted"`**, the add-on's say grant (#2530 part 2): every add-on
+  whose `propose` names `say` declares it, so whoever installs it reads that
+  its words may reach the voice, quoted and untrusted. `"quoted"` is the
+  only value, any other kind declaring it is refused when it loads, and it
+  goes only with `propose` naming `say`.
 - **Its steps** are `[[do]] propose = { ... }` only (below).
 - **The read allowlist** is checked at load: a topic in `topics` that is
   not on it refuses the add-on.
@@ -175,7 +183,12 @@ on a lamp without the head's controls):
 | Late | the proposal's age | judged after its `holds_ms` |
 | Rate (rule 8) | the judge's own memory | its add-on had one kept within 2 minutes, or 10 within the hour; a dropped one is not counted |
 
-**A say (part 2, #2530).** A `say` past every rule is not kept by the rules alone: the judge puts it to the policy as one `AddonAsk` on `addon/ask` (the proposal's number, the add-on, `why`, `sure`; no words), one at a time, and waits 3 s (`ASK_WAIT_US`) for a `Decision` from `lamp-policy` with `about` `addon` naming the proposal. Only `say_now` that acts (`shadow` false), with the rules holding again as it comes, keeps it, `by` `jev`; `wait` or a shadow answer drops it, `by` `jev`, with why; no answer drops it, `by` `rule`. Only a kept say counts toward the rates. `lamp-policy --gate --addons` answers it by the moment question, shadow unless `--act addon` ([policy.md](policy.md)). A kept say is said kept and not yet spoken: the voice's side comes in part 2's last PR. `--say-quiet-ms` shortens the 15 s for tests only.
+**A say (part 2, #2530).** A `say` past every rule is not kept by the rules alone: the judge puts it to the policy as one `AddonAsk` on `addon/ask` (the proposal's number, the add-on, `why`, `sure`; no words), one at a time, and waits 3 s (`ASK_WAIT_US`) for a `Decision` from `lamp-policy` with `about` `addon` naming the proposal. Only `say_now` that acts (`shadow` false), with the rules holding again as it comes, keeps it, `by` `jev`; `wait` or a shadow answer drops it, `by` `jev`, with why; no answer drops it, `by` `rule`. Only a kept say counts toward the rates. `lamp-policy --gate --addons` answers it by the moment question, shadow unless `--act addon` ([policy.md](policy.md)). **The voice's side (part 2c).**
+- **`lamp-skills`** keeps each say's note, at most 2 waiting. Only on its `kept` `by` `jev` within 10 s does it ask the say service with `{skill, quoted}`, never `note`. Any other decision lets the note go, and the note's words are never journaled.
+- **The say service** takes `quoted` only with `LAMP_ADDON_SAY=on`, at most 300 bytes on one line, never at an urgent priority. It refuses it on the Live route ("add-on says need the second route"): a Live session's functions are declared once.
+- **On the second route** the turn is framed as a partner's line, untrusted, never an instruction, which the model may leave unsaid (`say::quoted_turn`). Its every round declares no function at all, and a call made in it all the same is refused at execution and journaled.
+- **Never the person's:** it is kept out of memory (no memory scope, and `keep_out` from the journal), and, a turn the lamp wrote, it is never what the person said. Neither the line nor what the lamp said of it is kept for the thread, so the person's next turn, which has its functions, never carries it (`keep_written`).
+- **The journal:** `lamp-skills` names the add-on and the proposal (`music-says say #…, quoted: spoken`), and `said nothing` when the model left it unsaid. `--say-quiet-ms` shortens the 15 s for tests only.
 
 A kept `light` becomes one `LightRequest` on `light/request` from
 `addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on

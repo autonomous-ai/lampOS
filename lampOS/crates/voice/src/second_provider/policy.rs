@@ -294,6 +294,26 @@ mod tests {
         );
     }
 
+    /// An add-on's say decision (#2530 part 2, `about` `addon`) is never
+    /// this route's: one that names a turn's number and says `stay_quiet`
+    /// holds nothing, and the action runs after the wait as with none (the
+    /// first builder on #2530, 17:1x).
+    #[tokio::test(start_paused = true)]
+    async fn an_add_ons_decision_never_holds_a_turns_action() {
+        let mut bench = Bench::new("addon");
+        let desk = bench.desk(false, TALKING);
+        let decision = json!({"about": "addon", "choice": "stay_quiet", "probability": 0.1,
+                              "answers": {}, "by": "typesafe/jev-1.13-20260917",
+                              "took_ms": 540, "shadow": false, "request": 1, "proposal": 7});
+        bench.decisions.publish_json(0, &decision).unwrap();
+        let called = tokio::time::Instant::now();
+        assert_eq!(desk.wait(1, "light_on".into()).await, Policed::Run);
+        assert!(
+            called.elapsed() >= crate::policy_holds::WAIT,
+            "it waited as with no decision"
+        );
+    }
+
     /// The lamp's name heard in the turn runs its action whatever the
     /// Policy said, at once.
     #[tokio::test(start_paused = true)]

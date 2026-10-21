@@ -935,6 +935,12 @@ pub struct Permissions {
     /// output, and an add-on's alone.
     #[serde(default)]
     pub propose: Vec<String>,
+    /// An add-on's say grant (#2530 part 2): `"quoted"`, the only value. An
+    /// add-on that proposes `say` declares it as well, so the person reads
+    /// at install that its words may reach the voice, quoted and untrusted;
+    /// any other kind declaring it is refused when it loads.
+    #[serde(default)]
+    pub say: Option<String>,
     /// Core-only grants ([`CORE_GRANTS`]): what a skill that comes with the
     /// lamp may do that no other may, declared here rather than known by its
     /// name. Any other kind declaring one is refused when it loads, and a
@@ -949,6 +955,10 @@ pub struct Permissions {
 /// `prepare_unplug`, the composite unplug operation (`body = {
 /// prepare_unplug = true }`), its reads and the reserved never-mind tool.
 pub const CORE_GRANTS: [&str; 2] = ["onboarding", "prepare_unplug"];
+
+/// An add-on's say grant, the one value of `[permissions] say`: its words
+/// reach the voice quoted and untrusted, never as an instruction.
+pub const ADDON_SAY_GRANT: &str = "quoted";
 
 impl Permissions {
     /// Why a skill with these permissions may not make `call`, if not.
@@ -1036,6 +1046,28 @@ impl Permissions {
                  is the lamp's own skills' alone, never an {} skill's",
                 kind.name()
             )),
+            _ => Ok(()),
+        }
+    }
+
+    /// The add-on's say grant ([`Permissions::say`]): `"quoted"` only, an
+    /// add-on's alone, and declared by every add-on that proposes `say`.
+    fn check_say(&self, kind: SkillKind) -> Result<(), String> {
+        let proposes_say = self.propose.iter().any(|act| act == "say");
+        match self.say.as_deref() {
+            Some(given) if given != ADDON_SAY_GRANT => Err(format!(
+                "[permissions] say is {ADDON_SAY_GRANT:?} only, not {given:?}"
+            )),
+            Some(_) if kind != SkillKind::Addon => Err(
+                "[permissions] say = \"quoted\" is an add-on's say grant, never another kind's"
+                    .into(),
+            ),
+            Some(_) if !proposes_say => {
+                Err("[permissions] say = \"quoted\" goes with propose naming \"say\"".into())
+            }
+            None if proposes_say => {
+                Err("an add-on that proposes say declares say = \"quoted\" in [permissions]".into())
+            }
             _ => Ok(()),
         }
     }
@@ -1141,6 +1173,15 @@ impl Permissions {
         }
         if (1..self.propose.len()).any(|at| self.propose[..at].contains(&self.propose[at])) {
             return Err("[permissions] propose lists one twice".into());
+        }
+        // A note's words would ride on the person's next turn, which has
+        // every function: refused until notes are typed, never words
+        // (the first builder, 21 Oct, #2530).
+        if self.propose.iter().any(|act| act == "note") {
+            return Err(
+                "[permissions] propose: \"note\" is refused for now: its words would reach the person's next turn, which has every function"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -2397,6 +2438,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         toml::from_str(&read("skill.toml")?).map_err(|error| format!("skill.toml: {error}"))?;
     let kind = SkillKind::read(file.kind.as_deref())?;
     file.permissions.check_core(kind)?;
+    file.permissions.check_say(kind)?;
     if kind == SkillKind::Addon {
         addon_file(&file, file.trigger.is_none())?;
     } else if !file.permissions.propose.is_empty() {

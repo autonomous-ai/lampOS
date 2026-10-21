@@ -1611,6 +1611,7 @@ mod tests {
             text: crate::holding_answer::NOTE.into(),
             look: false,
             search: false,
+            quoted: false,
         }
     }
 

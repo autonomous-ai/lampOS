@@ -1063,6 +1063,7 @@ mod timed_tests {
                     text: String::new(),
                     look: false,
                     search: false,
+                    quoted: false,
                 },
             )
             .unwrap();
@@ -1103,6 +1104,7 @@ mod timed_tests {
                         text: String::new(),
                         look: false,
                         search: false,
+                        quoted: false,
                     },
                 )
                 .is_err()

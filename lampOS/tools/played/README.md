@@ -24,7 +24,7 @@ voice is a smoke test: the lamp hears replayed speech worse than a person.
 The day and the follow-ups first wait until the lamp has heard and said
 nothing for 45 seconds (`quiet_gate.sh`).
 
-Two more you can run on their own:
+Four more you can run on their own:
 
 - `open-name.sh LABEL`, about 3 minutes (#2355): "Hey Lamp, my name is",
   a pause, then a made-up name; does the lamp keep it? It then asks the
@@ -46,6 +46,12 @@ Two more you can run on their own:
   lamp-tasks' own user. If a setup step fails, it says which, and nothing
   is played. `ask-again-test.sh` runs that setup against a stand-in
   `systemctl`, with no lamp and no root: run it after changing the setup.
+- `addon-say.sh LABEL ["the kept text"]`, about 2 minutes (#2675): an
+  add-on's quoted say on the second route. A `/run` drop-in turns
+  `LAMP_ADDON_SAY` on for the run and is removed on exit; the lamp says one
+  quoted line, and the script counts the kept words it said in order, those
+  it changed or added, and any refusal (`$PLAYED_OUT/scenarios/addon-say-LABEL.txt`).
+  Its stand-in test is `addon-say-test.sh`.
 
 ## What it needs
 

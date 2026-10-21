@@ -140,6 +140,16 @@ impl Desk {
                               "took_ms": 540, "shadow": false, "request": request});
         self.decisions.publish_json(0, &decision).unwrap();
     }
+
+    /// An add-on's say decision (#2530 part 2, `about` `addon`), carrying a
+    /// turn's number as an attention decision would.
+    pub(super) fn decide_as_addon(&mut self, request: u64, choice: &str) {
+        let decision = json!({"about": "addon", "choice": choice, "probability": 0.1,
+                              "answers": {}, "by": "typesafe/jev-1.13-20260917",
+                              "took_ms": 540, "shadow": false, "request": request,
+                              "proposal": 7});
+        self.decisions.publish_json(0, &decision).unwrap();
+    }
 }
 
 impl Drop for Desk {
@@ -417,6 +427,29 @@ async fn another_turns_stay_quiet_holds_nothing() {
         );
         rig.stop().await;
     }
+}
+
+/// An add-on's say decision is never the Live route's either (#2530 part
+/// 2, the first builder's 17:1x): one naming this turn's number with
+/// `stay_quiet` holds nothing, and the action runs after the wait.
+#[tokio::test(start_paused = true)]
+async fn an_add_ons_decision_never_holds_a_turns_action() {
+    let _clock = logical_clock();
+    let mut desk = Desk::new("addon");
+    let mut rig = LiveRig::start_with(quick_policy(), desk.options(true));
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, true).await;
+    desk.decide_as_addon(request, "stay_quiet");
+    let called = crate::scenario_clock::instant();
+    dial.service.send(volume_up("v1")).await;
+    let told = rig.service_message(&mut dial).await;
+    let took = crate::scenario_clock::instant() - called;
+    assert_eq!(response(&told), json!({"volume": 60}));
+    assert!(
+        took >= crate::policy_holds::WAIT - Duration::from_millis(100),
+        "{took:?}"
+    );
+    rig.stop().await;
 }
 
 /// The worker reads `--policy-holds-actions` where the coordinator puts it,

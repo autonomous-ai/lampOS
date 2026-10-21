@@ -2335,6 +2335,7 @@ impl Engine {
                 text,
                 look,
                 search,
+                quoted,
                 ..
             } => {
                 // A skill's note for the picture of the look it asked, kept
@@ -2413,7 +2414,18 @@ impl Engine {
                     }
                     None => text,
                 };
-                let memory_scope = self.memory_scope(request, session, false);
+                // An add-on's quoted line is never the person's: no one's
+                // memory is read or written with it (#2530 part 2).
+                let memory_scope = if quoted {
+                    eprintln!(
+                        "lamp-voice second: request {request} is an add-on's quoted line: asked with no functions, kept out of memory"
+                    );
+                    // Its exchange never reaches the memory's journal either.
+                    crate::remember::keep_out(request);
+                    None
+                } else {
+                    self.memory_scope(request, session, false)
+                };
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
                 let shared = self.shared.clone();
                 let begun = Instant::now();
@@ -2422,7 +2434,11 @@ impl Engine {
                         &shared,
                         (request, lease),
                         text,
-                        Asker::Written { looking, search },
+                        Asker::Written {
+                            looking,
+                            search,
+                            quoted,
+                        },
                         picture,
                         Vec::new(),
                         Times::new(begun),
@@ -3853,8 +3869,13 @@ enum Asker {
     Spoken,
     /// The lamp wrote it (a hello, a "Sorry?", a skill's say), or a look
     /// with `looking`; with `search`, a skill's search's own turn
-    /// (`ProviderInput::Written`'s `search`).
-    Written { looking: bool, search: bool },
+    /// (`ProviderInput::Written`'s `search`); with `quoted`, an add-on's
+    /// line, asked with no functions and running none (#2530 part 2).
+    Written {
+        looking: bool,
+        search: bool,
+        quoted: bool,
+    },
     /// A due reminder, said as the Live route says it: a note to say it, and
     /// no tool runs (`provider_worker::reminder_note`).
     Reminder,
@@ -4640,6 +4661,7 @@ async fn answer(
     let heard = asked == Asker::Spoken;
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
+    let quoted = matches!(asked, Asker::Written { quoted: true, .. });
     let heard_at = Instant::now();
     // Its speech socket opened now, while the chat thinks, with the switch
     // (`LAMP_SECOND_SPEECH_SOCKET`).
@@ -4830,6 +4852,8 @@ async fn answer(
             round += 1;
             let mut refused = false;
             let mut stream = match prepared.take() {
+                // A quoted line's every round declares no function at all.
+                _ if quoted => shared.services.chat_only(messages.clone(), &[]),
                 Some(prepared) if round == 1 => prepared.into_events(),
                 _ => chat_for(shared, scope.as_ref(), messages.clone()),
             };
@@ -5058,6 +5082,15 @@ async fn answer(
                 queue.push(rest).await?;
             }
             if calls.is_empty() {
+                return Ok(());
+            }
+            // An add-on's quoted line calls nothing, though none was
+            // declared: what it said is said, and the turn ends.
+            if quoted {
+                eprintln!(
+                    "lamp-voice second: request {request} is an add-on's quoted line: its {} call(s) are refused, a quoted add-on turn calls nothing",
+                    calls.len()
+                );
                 return Ok(());
             }
             // A reminder is only said: its words are data, never an ask
