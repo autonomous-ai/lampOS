@@ -95,6 +95,12 @@ impl Grid {
         )
     }
 
+    /// A grid of these cell greys, for tests.
+    #[cfg(test)]
+    pub(crate) fn from_greys(greys: Vec<f32>) -> Self {
+        Self(greys)
+    }
+
     /// How many cells are [`GREYS`] or more brighter or darker.
     fn cells_changed_from(&self, before: &Self) -> usize {
         self.0
@@ -307,6 +313,73 @@ pub struct Change {
     /// ([`Change::set_lit`]).
     lit: bool,
     why: Why,
+    /// With `--glance-log`, each compared glance's numbers are kept for
+    /// [`Change::take_glance`].
+    keep_glances: bool,
+    glance: Option<Glance>,
+}
+
+/// One compared glance's numbers for `--glance-log` (`glance_log`): counts
+/// and per-cell sizes of change, never a cell's grey or a pixel.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Glance {
+    pub at_us: u64,
+    /// The current rule's verdict: [`CELLS`] or more cells past the bar,
+    /// and not while the lamp's own light changed.
+    pub changed: bool,
+    /// The lamp's own light was changing ([`OwnLight`]).
+    pub lit: bool,
+    /// Cells past the bar.
+    pub cells: usize,
+    /// Each cell past the bar, one bit a cell in row order, the first cell
+    /// the lowest bit of the first byte.
+    pub mask: Vec<u8>,
+    /// Each cell's |residual| over its learned noise (before this glance
+    /// teaches it), times 8, floored, at most 255; 255 while the noise is 0.
+    pub ratio: Vec<u8>,
+    /// Each cell's |residual| in greys, floored, at most 255: its change
+    /// less its row's median change, not its grey.
+    pub resid_greys_q: Vec<u8>,
+    /// The size of the frame's median change, in greys.
+    pub frame_shift: f32,
+    /// Whether the detector ran, and why (or `skipped`, `lit`).
+    pub detect: bool,
+    pub why: &'static str,
+}
+
+/// [`Glance::ratio`]'s steps per one time the noise.
+pub const RATIO_STEPS: f32 = 8.0;
+
+impl Glance {
+    fn of(residuals: &[f32], noise: &[f32], cells: usize, shift: f32, at_us: u64) -> Self {
+        let mut mask = vec![0u8; residuals.len().div_ceil(8)];
+        let mut ratio = Vec::with_capacity(residuals.len());
+        let mut resid_greys_q = Vec::with_capacity(residuals.len());
+        for (cell, (residual, noise)) in residuals.iter().zip(noise).enumerate() {
+            let size = residual.abs();
+            if size >= GREYS.max(NOISE_TIMES * noise) {
+                mask[cell / 8] |= 1 << (cell % 8);
+            }
+            ratio.push(if *noise > 0.0 {
+                (size / noise * RATIO_STEPS).floor().min(255.0) as u8
+            } else {
+                255
+            });
+            resid_greys_q.push(size.floor().min(255.0) as u8);
+        }
+        Self {
+            at_us,
+            changed: false,
+            lit: false,
+            cells,
+            mask,
+            ratio,
+            resid_greys_q,
+            frame_shift: shift,
+            detect: false,
+            why: "",
+        }
+    }
 }
 
 impl Change {
@@ -314,6 +387,17 @@ impl Change {
     /// ([`OwnLight::lit`]): a change then is the lamp's, not the room's.
     pub fn set_lit(&mut self, lit: bool) {
         self.lit = lit;
+    }
+
+    /// Keep each compared glance's numbers for [`Change::take_glance`]
+    /// (`--glance-log`).
+    pub fn keep_glances(&mut self) {
+        self.keep_glances = true;
+    }
+
+    /// The last compared glance's numbers, once, if kept.
+    pub fn take_glance(&mut self) -> Option<Glance> {
+        self.glance.take()
     }
 
     /// Whether the detector runs on this frame. `busy`: why the room is not
@@ -365,6 +449,11 @@ impl Change {
             .last
             .as_ref()
             .is_none_or(|(_, at)| now_us.saturating_sub(*at) >= LOOK_AT_LEAST_US);
+        let mut glance = compared.as_ref().filter(|_| self.keep_glances).map(
+            |(cells, _, _, shift, residuals)| {
+                Glance::of(residuals, &self.noise, *cells, *shift, now_us)
+            },
+        );
         let why = &mut self.why;
         if busy.is_none()
             && let Some((cells, row_cells, plain_cells, shift, residuals)) = compared
@@ -391,19 +480,26 @@ impl Change {
                     };
             }
         }
-        let counted = match busy {
-            Some(Busy::Asked) => &mut why.asked,
-            Some(Busy::Remembering) => &mut why.remembering,
-            Some(Busy::Face) => &mut why.face,
-            None if cells.is_none() => &mut why.first,
-            None if changed => &mut why.changed,
-            None if lit && !moving && !due => &mut why.lit,
-            None if moving => &mut why.settling,
-            None if due => &mut why.every,
-            None => &mut why.skipped,
+        let (counted, said) = match busy {
+            Some(Busy::Asked) => (&mut why.asked, "asked"),
+            Some(Busy::Remembering) => (&mut why.remembering, "remembering"),
+            Some(Busy::Face) => (&mut why.face, "face"),
+            None if cells.is_none() => (&mut why.first, "first"),
+            None if changed => (&mut why.changed, "changed"),
+            None if lit && !moving && !due => (&mut why.lit, "lit"),
+            None if moving => (&mut why.settling, "settling"),
+            None if due => (&mut why.every, "every"),
+            None => (&mut why.skipped, "skipped"),
         };
         *counted += 1;
         let detect = busy.is_some() || moving || due;
+        if let Some(glance) = glance.as_mut() {
+            glance.changed = changed;
+            glance.lit = self.lit;
+            glance.detect = detect;
+            glance.why = said;
+        }
+        self.glance = glance;
         if detect {
             self.last = Some((grid, now_us));
         }

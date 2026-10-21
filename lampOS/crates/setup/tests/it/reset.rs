@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 33] = [
+const PERSON_STORES: [&str; 34] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -299,6 +299,10 @@ const PERSON_STORES: [&str; 33] = [
     // The face reads of a labelled session (`lamp-eyes --seems-log`, #1671),
     // the one path the eyes take for it (`seems_log::PATH`).
     "/var/lib/lampos-eyes/seems.log",
+    // When a face was at the lamp, glance by glance, for the change bar's
+    // replay (`lamp-eyes --glance-log`), the one path the eyes take for it
+    // (`glance_log::PATH`).
+    "/var/lib/lampos-eyes/glance.log",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
     // The person's parts of Harness under the tasks part's HOME (the fifth
