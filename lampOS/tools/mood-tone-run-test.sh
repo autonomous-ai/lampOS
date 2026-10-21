@@ -70,13 +70,16 @@ check "calm said with say's calm controls, glad and down plainly" \
 
 # read: each judged line 150 s apart from 07:00:00 UTC; Mood at rest at 0.30
 # energy and 0.60 warmth, sampled every second; `voice/tone` 3 s after each.
-taps() { # $1: what Mood does after glad, calm and down: "right", "calm-up", or "down-quiet"
-  python3 -I - "$1" "$T/played-run.tsv" "$T/tone" "$T/mood" <<'PY'
+taps() { # $1: what Mood does: "right", "calm-up", "down-quiet", "raised-quiet", "aside-quiet" or "dip-then-up"; $2: "person" for prompt's kinds
+  python3 -I - "$1" "$T/played-run.tsv" "$T/tone" "$T/mood" "${2:-}" <<'PY'
 import json, sys
 from datetime import datetime, timezone
-shape, played, tone, mood = sys.argv[1:5]
+shape, played, tone, mood, who = sys.argv[1:6]
 start = datetime(2026, 10, 21, 7, 0, 0, tzinfo=timezone.utc).timestamp()
 kinds = ["glad", "calm", "down"] * 3
+# The person's session is with a face near, so a down line quiets the lamp.
+if who == "person":
+    kinds = ["glad", "calm", "down", "lively", "raised"] * 3 + ["quoted", "aside"] * 3
 with open(played, "w") as out:
     for n in range(10):
         at = datetime.fromtimestamp(start - 200 + n * 15, timezone.utc)
@@ -95,7 +98,7 @@ with open(tone, "w") as out:
         out.write(header("voice/tone", t) + " " + json.dumps(body) + "\n")
 with open(mood, "w") as out:
     out.write("not a message\n")
-    for second in range(-210, 9 * 150):
+    for second in range(-210, len(kinds) * 150):
         t = start + second
         n, since = divmod(second, 150) if second >= 0 else (None, None)
         energy, warmth = 0.30, 0.60
@@ -105,7 +108,16 @@ with open(mood, "w") as out:
                 energy, warmth = 0.30 + 0.10 * 0.5 ** ((since - 4) / 15), 0.63
             elif kind == "calm" and shape == "calm-up":
                 energy = 0.35
-            elif kind == "down" and shape == "down-quiet":
+            elif kind == "down" and (shape == "down-quiet" or who == "person"):
+                energy = 0.20
+            elif kind in ("lively", "raised") and not (kind == "raised" and shape == "raised-quiet"):
+                energy = 0.30 + 0.05 * 0.5 ** ((since - 4) / 15)
+            elif kind in ("raised", "aside") and shape == kind + "-quiet":
+                energy = 0.20
+            elif kind == "quoted":
+                energy = 0.20
+            # A quiet first, then the brightening, inside the window.
+            if kind in ("lively", "glad") and shape == "dip-then-up" and since < 10:
                 energy = 0.20
         out.write(header("mood/state", t) + " " + json.dumps({"energy": energy, "warmth": warmth}) + "\n")
 PY
@@ -155,6 +167,64 @@ PY
 "$SCRIPT" read "$T/tone" "$T/mood-quiet" "$T/played-run.tsv" >"$T/read-quiet-mood" 2>&1
 check "no Mood message after a line is Mood unchanged" \
   'grep -q "^calm	right=3	of=3$" "$T/read-quiet-mood" && grep -q "^down	right=3	of=3$" "$T/read-quiet-mood" && [ "$(grep -c "	glad	.*not moved$" "$T/read-quiet-mood")" = 3 ] && ! grep -q "not judged" "$T/read-quiet-mood"'
+
+# The person's own session (the first builder on #2602, 22 Oct 06:43): prompt
+# shows each line, Enter as it begins prints its row, q stops.
+mkdir -p "$T/nosleep"
+printf '#!/usr/bin/env bash\n' >"$T/nosleep/sleep"
+chmod +x "$T/nosleep/sleep"
+yes "" | head -60 | PATH="$T/nosleep:$PATH" "$SCRIPT" prompt >"$T/said.tsv" 2>"$T/said.err"
+check "prompt: ten plain, three rounds of five kinds, then three of quoted and aside" \
+  '[ "$(cut -f2 "$T/said.tsv" | tr "\n" " ")" = "$(printf "plain %.0s" $(seq 10))$(printf "glad calm down lively raised %.0s" 1 2 3)$(printf "quoted aside %.0s" 1 2 3)" ]'
+check "prompt: each row numbered and timed" \
+  'awk -F"\t" "\$1 != NR || \$3 !~ /^20[0-9-]*T[0-9:]*Z\$/ { bad = 1 } END { exit bad }" "$T/said.tsv"'
+check "prompt: each line said first, to the lamp with its name, the aside without" \
+  '[ "$(grep -c "^mood-tone-run: [0-9]* (" "$T/said.err")" = 31 ] && grep "(aside)" "$T/said.err" | grep -q ": \"I.m so tired today.\"" && grep "(raised)" "$T/said.err" | grep -q "\"Hey Lamp, "'
+check "prompt: lively is the calm sentence; no glad or down word in a raised line" \
+  '[ "$(awk -F"\t" "\$2==\"lively\"||\$2==\"calm\"{print \$4}" "$T/said.tsv" | sort -u | wc -l | tr -d " ")" = 1 ] && ! awk -F"\t" "\$2==\"raised\"{print tolower(\$4)}" "$T/said.tsv" | tr -c "a-z'"'"'\n" " " | xargs -n1 | grep -qxF -f <(printf "%s\n" $words)'
+cat >"$T/nosleep/sleep" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >>"$SLEPT"
+SH
+yes "" | head -60 | SLEPT="$T/slept-prompt" PATH="$T/nosleep:$PATH" GAP=1 KIND_GAP=7 STILL_GAP=3 "$SCRIPT" prompt >/dev/null 2>&1
+check "prompt: GAP after plain, STILL_GAP after calm and aside, KIND_GAP after the rest" \
+  '[ "$(sort "$T/slept-prompt" | uniq -c | tr -s " " | tr "\n" "|")" = " 10 1| 6 3| 15 7|" ]'
+printf 'q' | PATH="$T/nosleep:$PATH" "$SCRIPT" prompt >"$T/said-q.tsv" 2>/dev/null
+check "prompt: q stops before the line" '[ ! -s "$T/said-q.tsv" ]'
+
+taps right person
+FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-person" 2>&1
+code=$?
+check "the person's kinds right: the bar passes" '[ $code = 0 ] && grep -q "^bar	pass$" "$T/read-person"'
+check "lively, raised and aside counted, quoted noted" \
+  'grep -q "^lively	right=3	of=3$" "$T/read-person" && grep -q "^raised	right=3	of=3$" "$T/read-person" && grep -q "^aside	right=3	of=3$" "$T/read-person" && grep -q "^quoted	noted=3$" "$T/read-person" && [ "$(grep -c "	quoted	.*noted$" "$T/read-person")" = 3 ]'
+taps raised-quiet person
+FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-raised" 2>&1
+code=$?
+check "a raised line that quiets the lamp is the wrong way, and fails" \
+  '[ $code = 1 ] && grep -q "^wrong_way	3$" "$T/read-raised" && grep -q "^raised	right=0	of=3$" "$T/read-raised"'
+taps aside-quiet person
+FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-aside" 2>&1
+code=$?
+check "an aside that moves Mood is the wrong way, and fails" \
+  '[ $code = 1 ] && grep -q "^aside	right=0	of=3$" "$T/read-aside" && grep -q "^bar	FAIL$" "$T/read-aside"'
+# A glad or lively line that quiets Mood before it brightens is the wrong
+# way, not right (reviewer-two's P2 on #2758).
+taps dip-then-up person
+FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-dip" 2>&1
+code=$?
+check "a quiet before a brightening is the wrong way, glad and lively both" \
+  '[ $code = 1 ] && grep -q "^glad	right=0	of=3$" "$T/read-dip" && grep -q "^lively	right=0	of=3$" "$T/read-dip" && grep -q "^wrong_way	6$" "$T/read-dip"'
+# A session stopped before the room isn't judged (reviewer-two's P2 on #2758).
+taps right person
+head -25 "$T/played-run.tsv" >"$T/played-stopped.tsv"
+FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-stopped.tsv" >"$T/read-stopped" 2>&1
+code=$?
+check "prompt's session stopped before the room is not judged" \
+  '[ $code = 1 ] && grep -q "^bar	not judged: too few quoted, aside lines$" "$T/read-stopped" && grep -q "^aside	right=0	of=0$" "$T/read-stopped"'
+ROOM=4 FACE=near "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-room" 2>&1
+check "fewer room lines than ROOM are not judged" 'grep -q "^bar	not judged: too few quoted, aside lines$" "$T/read-room"'
+taps right
 
 ROUNDS=4 "$SCRIPT" read "$T/tone" "$T/mood" "$T/played-run.tsv" >"$T/read-few" 2>&1
 code=$?
