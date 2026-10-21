@@ -195,7 +195,18 @@ sees" with what has and has not been shown of it.
   the file's size a frame and what its check, write and rename each took.
   With `--full-look`, the "sight file" stage also holds the working
   frame's decode and re-encode at 320 across (`full_look::working`), which
-  those three do not time.
+  those three do not time. That was about 41 ms of every look on lamp-4ace
+  (#1441), while the write itself is about 0.01 ms. **With
+  `--sight-from-look on`** (with `--full-look` and `--sight-file`, off unless
+  given), the working frame is encoded from the look's own picture, decoded
+  and shrunk to 320 across for the detector already
+  (`full_look::working_from_picture`). That's an encode alone: on an x86
+  laptop, 0.72 ms against the shrink's 5.9 ms for a 1280 by 960 frame (Ten
+  on #2602, 22 Oct 05:4x). It's the same file and size, and no reader
+  changes. It's kept just after the decode, so a frame that doesn't decode
+  leaves the one before it, and the stage still counts it as "sight file".
+  The product passes no `--full-look`, so its sight file is the camera's own
+  frame, as before.
   It goes on to say why each
   glance was detected, or not because the lamp's own light changed
   (the picture changed, it was settling within two glances of
