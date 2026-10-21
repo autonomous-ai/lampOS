@@ -168,6 +168,9 @@ struct SkillFile {
     /// What the model is told of a call while the tool's run, which holds
     /// no pose, is under way.
     still: Option<String>,
+    /// What a skill granted `prepare_unplug` says at each outcome
+    /// ([`UnplugLines`]).
+    unplug: Option<UnplugLines>,
     /// What the room's presence was over the last hours, for the model
     /// (#1685, "was anyone here while I was out?").
     history: Option<HistoryFile>,
@@ -578,6 +581,92 @@ const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
 /// The most bytes of a skill's own words the voice takes
 /// (`lamp_voice::say::MOST_WORDS_BYTES`).
 pub const MOST_WORDS_BYTES: usize = 900;
+
+/// What a skill granted `prepare_unplug` says at each of the operation's
+/// outcomes, in its own `skill.toml`'s `[unplug]` (#940: the first move of
+/// "Everything is a skill"). The fold, its readiness check and the voice's
+/// guard are the core grant's; the words are the skill's.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct UnplugLines {
+    /// Said as written, once the fold and the asleep look are confirmed.
+    pub ready: String,
+    /// A note for the voice when the fold isn't confirmed.
+    pub failed: String,
+    /// A note for the voice when the person says to stay plugged in.
+    pub stay: String,
+    /// A note for the voice when it gets back up after the wait.
+    pub timeout: String,
+    /// A note for the voice, said once when a preparation that was Ready
+    /// fails before any cancel, or when the body fails one after the cancel
+    /// (no stand within 60 s): it can't get up by itself.
+    pub check: String,
+}
+
+impl UnplugLines {
+    /// The words lamp-skills said before they were the skill's, said for
+    /// one release by a skill granted `prepare_unplug` whose file has no
+    /// `[unplug]` (the first builder's P2 on #2632): a lamp can keep an
+    /// older `skill.toml` past a newer lamp-skills, by an updater from
+    /// before the skills bundle, a lamp's own `--dir` (lamp-4ace's), or a
+    /// file changed on the lamp, which a round keeps (#1913). The next
+    /// release removes them, and such a file is then refused.
+    pub fn built_in() -> Self {
+        Self {
+            ready: "My arm is folded. You can unplug me now.".into(),
+            failed:
+                "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
+                    .into(),
+            stay: "Say exactly: Okay, I'll stay.".into(),
+            timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
+            check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+        }
+    }
+
+    /// Each line is words, as a say's own are: 1 to [`MOST_WORDS_BYTES`]
+    /// bytes, with no control characters.
+    fn checked(self) -> Result<Self, String> {
+        for (name, line) in [
+            ("ready", &self.ready),
+            ("failed", &self.failed),
+            ("stay", &self.stay),
+            ("timeout", &self.timeout),
+            ("check", &self.check),
+        ] {
+            if line.trim().is_empty()
+                || line.len() > MOST_WORDS_BYTES
+                || line.chars().any(char::is_control)
+            {
+                return Err(format!(
+                    "[unplug] {name} is words, 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ));
+            }
+        }
+        Ok(self)
+    }
+}
+
+/// Each skill granted `prepare_unplug`, by name, with its words: its own
+/// `[unplug]`, or, for this release only, the built-in ones, with a line
+/// for the journal saying so ([`UnplugLines::built_in`]).
+pub fn unplug_words(skills: &[Skill]) -> (HashMap<String, UnplugLines>, Vec<String>) {
+    let mut said = Vec::new();
+    let words = skills
+        .iter()
+        .filter(|skill| skill.prepares_unplug())
+        .map(|skill| {
+            let lines = skill.unplug.clone().unwrap_or_else(|| {
+                said.push(format!(
+                    "{} is granted prepare_unplug and says no [unplug] words: the built-in ones are said, for this release only (#940)",
+                    skill.name
+                ));
+                UnplugLines::built_in()
+            });
+            (skill.name.clone(), lines)
+        })
+        .collect();
+    (words, said)
+}
 
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
 /// what it keeps.
@@ -1278,6 +1367,8 @@ pub struct Skill {
     steps: Vec<(Option<Only>, Step)>,
     /// A watch, on only while a person asked for it ([`watch`]).
     pub watch: Option<watch::Spec>,
+    /// With the `prepare_unplug` grant, what it says ([`UnplugLines`]).
+    pub unplug: Option<UnplugLines>,
 }
 
 impl Skill {
@@ -3103,6 +3194,20 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             Some(within_us)
         }
     };
+    // The words are the grant's: a skill granted it says them all, and no
+    // other skill has them (#940).
+    let unplug = match (file.unplug, file.permissions.grants("prepare_unplug")) {
+        (Some(lines), true) => Some(lines.checked()?),
+        (Some(_), false) => {
+            return Err(
+                "[unplug] is what a skill granted core = [\"prepare_unplug\"] says: only with that grant"
+                    .into(),
+            );
+        }
+        // A file from before `[unplug]` says the built-in words, for this
+        // release only ([`UnplugLines::built_in`], [`unplug_words`]).
+        (None, _) => None,
+    };
     let skill = Skill {
         name,
         description,
@@ -3130,6 +3235,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         stop,
         steps,
         watch,
+        unplug,
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
