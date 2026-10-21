@@ -28,3 +28,33 @@ within = "12h"
 
 [[do]]
 say = "Answer from the lamp's record below whether anyone was at the lamp while they were away, in a few words: when, and about how long, as \"someone was here for a few minutes around two\". It cannot tell who: never guess who it was. Where the record names someone, they said yes to being named: say that name as it is. Where it says someone the lamp knows, say just that, never a name. The time going on now is theirs. If it could not see the room for a while, say so. If there is no record, say you can't tell."
+
+# What it says (#940): the record told to the model after its note, in its
+# own words. {within}, {who}, {long}, {when}, {names}, {last}, {ago},
+# {time}, {hours} and {minutes} are filled in; each line has only its own
+# slots, each once.
+[history.words]
+record = "The lamp's record of the room over the last {within}, times only, from its eyes and ears: it never knows who anyone was, and keeps no picture."
+record_known = "The lamp's record of the room over the last {within}, times only, from its eyes and ears: it never knows who anyone was, only whether its eyes knew a face, someone who asked it to remember them, and keeps no picture."
+record_named = "The lamp's record of the room over the last {within}, from its eyes and ears: times, and a name only for someone who said yes to being named to others; anyone else its eyes knew is someone the lamp knows, anyone else someone, and it keeps no picture."
+no_record = "The lamp has no record of who was at it: its eyes have said nothing about the room since it started (presence is off, or they could not see). Say you can't tell."
+someone = "someone"
+known = "someone the lamp knows"
+and = "{names} and {last}"
+was = "- {who} was at the lamp for {long}, {when}"
+were = "- {who} were at the lamp for {long}, {when}"
+heard = "- {who} was heard near the lamp, not seen, for {long}, {when}"
+heard_many = "- {who} were heard near the lamp, not seen, for {long}, {when}"
+still = "- {who} has been at the lamp for {long}, since {when}, and still is"
+still_many = "- {who} have been at the lamp for {long}, since {when}, and still is"
+still_heard = "- {who} has been heard near the lamp, not seen, for {long}, since {when}, and still is"
+still_heard_many = "- {who} have been heard near the lamp, not seen, for {long}, since {when}, and still is"
+unseen = "- it could not see or hear the room for {long}, {when}"
+not_seeing = "- it has not been able to see the room since {when}"
+nobody_else = "- nobody else was at the lamp in that time"
+ago = "{long} ago"
+at = "at {time}, {ago}"
+under_a_minute = "under a minute"
+minutes = "{minutes} min"
+hours = "{hours} h"
+hours_minutes = "{hours} h {minutes} min"

@@ -1054,6 +1054,16 @@ fn serve(
                             skill.name
                         );
                     }
+                    if skill
+                        .history
+                        .as_ref()
+                        .is_some_and(|history| history.built_in_words)
+                    {
+                        eprintln!(
+                            "lamp-skills: {} has a [history] with no [history.words]: the built-in ones are said, for this release only (#940)",
+                            skill.name
+                        );
+                    }
                 }
                 // A watch whose skill is gone, or changed, is off.
                 {

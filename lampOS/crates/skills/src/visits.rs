@@ -5,7 +5,167 @@
 //! none (`docs/presence.md`). What showed someone is kept as one yes or no
 //! a spell: whether a face did, or only a voice (`by`, #1771).
 use lamp_msgs::{RoomPresence, SeenBy};
+use serde::Deserialize;
 use std::collections::VecDeque;
+
+/// A `[history]` as loaded: how far back a call is told who was at the
+/// lamp, and in what words.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct History {
+    pub within_us: u64,
+    /// What the record says ([`Words`]).
+    pub words: Words,
+    /// Whether its file has no `[history.words]`, so [`Words::built_in`]
+    /// is said, for this release only: the journal says so at each load.
+    pub built_in_words: bool,
+}
+
+/// What the record of the room says, in its skill's own words
+/// (`[history.words]`, #940): its head, each line, who, and each length and
+/// time. Each is words, as a say's are, and only the slots named here.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Words {
+    /// The head, with `{within}`: told "someone" only...
+    pub record: String,
+    /// ...with someone the lamp knows marked...
+    pub record_known: String,
+    /// ...or with names too.
+    pub record_named: String,
+    /// No value ever.
+    pub no_record: String,
+    /// `{who}`: anyone...
+    pub someone: String,
+    /// ...a face the eyes knew...
+    pub known: String,
+    /// ...or names: `{names}` (all but the last, joined by ", ") and
+    /// `{last}`.
+    pub and: String,
+    /// A spell that ended, with `{who}`, `{long}` and `{when}`: one, seen...
+    pub was: String,
+    /// ...two or more, seen...
+    pub were: String,
+    /// ...one, only heard...
+    pub heard: String,
+    /// ...two or more, only heard.
+    pub heard_many: String,
+    /// The spell going on, the same four ways.
+    pub still: String,
+    pub still_many: String,
+    pub still_heard: String,
+    pub still_heard_many: String,
+    /// A stretch it could not tell, with `{long}` and `{when}`.
+    pub unseen: String,
+    /// Not seeing now, since `{when}`.
+    pub not_seeing: String,
+    /// No spell ended in the window.
+    pub nobody_else: String,
+    /// `{when}` without the local time: `{long}` ago...
+    pub ago: String,
+    /// ...and with it: `{time}` (`11:50`) and `{ago}`.
+    pub at: String,
+    /// `{long}` and `{within}`: under a minute...
+    pub under_a_minute: String,
+    /// ...`{minutes}`...
+    pub minutes: String,
+    /// ...whole `{hours}`...
+    pub hours: String,
+    /// ...or `{hours}` and `{minutes}`.
+    pub hours_minutes: String,
+}
+
+impl Words {
+    /// The words lamp-skills said before they were the skill's, said for
+    /// one release by a `[history]` whose file has no `[history.words]`:
+    /// who was here is installable, so a lamp keeps the copy it has past a
+    /// newer lamp-skills (as the first builder's P2 on #2632 found for
+    /// prepare-unplug). The next release removes them, and such a file is
+    /// then refused.
+    pub fn built_in() -> Self {
+        Self {
+            record: "The lamp's record of the room over the last {within}, times only, from its eyes and ears: it never knows who anyone was, and keeps no picture.".into(),
+            record_known: "The lamp's record of the room over the last {within}, times only, from its eyes and ears: it never knows who anyone was, only whether its eyes knew a face, someone who asked it to remember them, and keeps no picture.".into(),
+            record_named: "The lamp's record of the room over the last {within}, from its eyes and ears: times, and a name only for someone who said yes to being named to others; anyone else its eyes knew is someone the lamp knows, anyone else someone, and it keeps no picture.".into(),
+            no_record: "The lamp has no record of who was at it: its eyes have said nothing about the room since it started (presence is off, or they could not see). Say you can't tell.".into(),
+            someone: "someone".into(),
+            known: "someone the lamp knows".into(),
+            and: "{names} and {last}".into(),
+            was: "- {who} was at the lamp for {long}, {when}".into(),
+            were: "- {who} were at the lamp for {long}, {when}".into(),
+            heard: "- {who} was heard near the lamp, not seen, for {long}, {when}".into(),
+            heard_many: "- {who} were heard near the lamp, not seen, for {long}, {when}".into(),
+            still: "- {who} has been at the lamp for {long}, since {when}, and still is".into(),
+            still_many: "- {who} have been at the lamp for {long}, since {when}, and still is".into(),
+            still_heard: "- {who} has been heard near the lamp, not seen, for {long}, since {when}, and still is".into(),
+            still_heard_many: "- {who} have been heard near the lamp, not seen, for {long}, since {when}, and still is".into(),
+            unseen: "- it could not see or hear the room for {long}, {when}".into(),
+            not_seeing: "- it has not been able to see the room since {when}".into(),
+            nobody_else: "- nobody else was at the lamp in that time".into(),
+            ago: "{long} ago".into(),
+            at: "at {time}, {ago}".into(),
+            under_a_minute: "under a minute".into(),
+            minutes: "{minutes} min".into(),
+            hours: "{hours} h".into(),
+            hours_minutes: "{hours} h {minutes} min".into(),
+        }
+    }
+
+    /// Each is words with exactly its own slots, each once.
+    pub(crate) fn checked(self) -> Result<Self, String> {
+        let spell = &["long", "when", "who"][..];
+        crate::watch::checked_words(
+            "[history.words]",
+            &[
+                ("record", &self.record, &["within"]),
+                ("record_known", &self.record_known, &["within"]),
+                ("record_named", &self.record_named, &["within"]),
+                ("no_record", &self.no_record, &[]),
+                ("someone", &self.someone, &[]),
+                ("known", &self.known, &[]),
+                ("and", &self.and, &["last", "names"]),
+                ("was", &self.was, spell),
+                ("were", &self.were, spell),
+                ("heard", &self.heard, spell),
+                ("heard_many", &self.heard_many, spell),
+                ("still", &self.still, spell),
+                ("still_many", &self.still_many, spell),
+                ("still_heard", &self.still_heard, spell),
+                ("still_heard_many", &self.still_heard_many, spell),
+                ("unseen", &self.unseen, &["long", "when"]),
+                ("not_seeing", &self.not_seeing, &["when"]),
+                ("nobody_else", &self.nobody_else, &[]),
+                ("ago", &self.ago, &["long"]),
+                ("at", &self.at, &["ago", "time"]),
+                ("under_a_minute", &self.under_a_minute, &[]),
+                ("minutes", &self.minutes, &["minutes"]),
+                ("hours", &self.hours, &["hours"]),
+                ("hours_minutes", &self.hours_minutes, &["hours", "minutes"]),
+            ],
+        )?;
+        Ok(self)
+    }
+}
+
+/// `text` with each `{slot}` filled, in one pass, so a filled value (a
+/// name) is never read as a slot.
+fn fill(text: &str, slots: &[(&str, &str)]) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        let Some(close) = rest[open..].find('}').map(|close| open + close) else {
+            break;
+        };
+        out.push_str(&rest[..open]);
+        let name = &rest[open + 1..close];
+        match slots.iter().find(|(slot, _)| *slot == name) {
+            Some((_, value)) => out.push_str(value),
+            None => out.push_str(&rest[open..=close]),
+        }
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    out
+}
 
 /// A value of `room/presence` means nothing past this: a later one after a
 /// longer gap means the lamp could not tell meanwhile.
@@ -137,10 +297,16 @@ impl Visits {
     }
 
     /// What the record says of the last `within_us` before `now_us`, in
-    /// words for the model, with each time as `when` says it (a local time
-    /// of day, or how long ago).
-    pub fn told(&self, now_us: u64, within_us: u64, when: impl Fn(u64) -> String) -> String {
-        self.told_as(now_us, within_us, when, Telling::Someone)
+    /// `words` for the model, with each time as `when` says it (a local
+    /// time of day, or how long ago).
+    pub fn told(
+        &self,
+        now_us: u64,
+        within_us: u64,
+        when: impl Fn(u64) -> String,
+        words: &Words,
+    ) -> String {
+        self.told_as(now_us, within_us, when, Telling::Someone, words)
     }
 
     /// [`Visits::told`], with `Known` each spell the eyes knew the face in
@@ -152,13 +318,11 @@ impl Visits {
         within_us: u64,
         when: impl Fn(u64) -> String,
         telling: Telling,
+        words: &Words,
     ) -> String {
         let marked = telling != Telling::Someone;
         let Some((last_us, someone)) = self.last else {
-            return "The lamp has no record of who was at it: its eyes have said nothing about \
-                    the room since it started (presence is off, or they could not see). Say you \
-                    can't tell."
-                .into();
+            return words.no_record.clone();
         };
         let since = now_us.saturating_sub(within_us);
         let seeing = now_us <= last_us + LASTS_US;
@@ -175,42 +339,36 @@ impl Visits {
                 Vec::new()
             };
             let who = match names.as_slice() {
-                [] if marked && self.known.contains(from) => "someone the lamp knows".to_owned(),
-                [] => "someone".to_owned(),
+                [] if marked && self.known.contains(from) => words.known.clone(),
+                [] => words.someone.clone(),
                 [one] => (*one).to_owned(),
-                [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+                [rest @ .., last] => {
+                    fill(&words.and, &[("names", &rest.join(", ")), ("last", last)])
+                }
             };
             let many = names.len() > 1;
             let (was, has_been) = match (*face, many) {
-                (true, false) => ("was at the lamp", "has been at the lamp"),
-                (true, true) => ("were at the lamp", "have been at the lamp"),
-                (false, false) => (
-                    "was heard near the lamp, not seen,",
-                    "has been heard near the lamp, not seen,",
-                ),
-                (false, true) => (
-                    "were heard near the lamp, not seen,",
-                    "have been heard near the lamp, not seen,",
-                ),
+                (true, false) => (&words.was, &words.still),
+                (true, true) => (&words.were, &words.still_many),
+                (false, false) => (&words.heard, &words.still_heard),
+                (false, true) => (&words.heard_many, &words.still_heard_many),
+            };
+            let line = |text: &str, long_us: u64| {
+                fill(
+                    text,
+                    &[
+                        ("who", &who),
+                        ("long", &length(long_us, words)),
+                        ("when", &when(*from)),
+                    ],
+                )
             };
             match until {
-                Some(until) if *until >= since => lines.push((
-                    *from,
-                    format!(
-                        "- {who} {was} for {}, {}",
-                        length(until - from),
-                        when(*from)
-                    ),
-                )),
+                Some(until) if *until >= since => lines.push((*from, line(was, until - from))),
                 Some(_) => {}
-                None if seeing && someone => lines.push((
-                    *from,
-                    format!(
-                        "- {who} {has_been} for {}, since {}, and still is",
-                        length(now_us.saturating_sub(*from)),
-                        when(*from)
-                    ),
-                )),
+                None if seeing && someone => {
+                    lines.push((*from, line(has_been, now_us.saturating_sub(*from))));
+                }
                 None => {}
             }
         }
@@ -218,10 +376,12 @@ impl Visits {
             if *until >= since {
                 lines.push((
                     *from,
-                    format!(
-                        "- it could not see or hear the room for {}, {}",
-                        length(until - from),
-                        when(*from)
+                    fill(
+                        &words.unseen,
+                        &[
+                            ("long", &length(until - from, words)),
+                            ("when", &when(*from)),
+                        ],
                     ),
                 ));
             }
@@ -229,10 +389,7 @@ impl Visits {
         if !seeing {
             lines.push((
                 last_us,
-                format!(
-                    "- it has not been able to see the room since {}",
-                    when(last_us)
-                ),
+                fill(&words.not_seeing, &[("when", &when(last_us))]),
             ));
         }
         lines.sort_by_key(|(from, _)| *from);
@@ -241,34 +398,21 @@ impl Visits {
             .iter()
             .filter(|(_, until, _)| until.is_some_and(|until| until >= since))
             .count();
-        let mut told = if telling == Telling::Named {
-            format!(
-                "The lamp's record of the room over the last {}, from its eyes and ears: times, \
-                 and a name only for someone who said yes to being named to others; anyone \
-                 else its eyes knew is someone the lamp knows, anyone else someone, and it keeps \
-                 no picture.",
-                length(within_us)
-            )
+        let head = if telling == Telling::Named {
+            &words.record_named
         } else if marked {
-            format!(
-                "The lamp's record of the room over the last {}, times only, from its eyes and \
-                 ears: it never knows who anyone was, only whether its eyes knew a face, someone \
-                 who asked it to remember them, and keeps no picture.",
-                length(within_us)
-            )
+            &words.record_known
         } else {
-            format!(
-                "The lamp's record of the room over the last {}, times only, from its eyes and \
-                 ears: it never knows who anyone was, and keeps no picture.",
-                length(within_us)
-            )
+            &words.record
         };
+        let mut told = fill(head, &[("within", &length(within_us, words))]);
         for (_, line) in lines {
             told.push('\n');
             told.push_str(&line);
         }
         if visits == 0 {
-            told.push_str("\n- nobody else was at the lamp in that time");
+            told.push('\n');
+            told.push_str(&words.nobody_else);
         }
         told
     }
@@ -276,20 +420,48 @@ impl Visits {
 
 /// A length of time as a person says it: under a minute, minutes, or hours
 /// and minutes.
-fn length(us: u64) -> String {
+fn length(us: u64, words: &Words) -> String {
     let minutes = us / 60_000_000;
-    match minutes {
-        0 => "under a minute".into(),
-        1..=59 => format!("{minutes} min"),
-        _ if minutes.is_multiple_of(60) => format!("{} h", minutes / 60),
-        _ => format!("{} h {} min", minutes / 60, minutes % 60),
+    let (hours, minutes) = (minutes / 60, minutes % 60);
+    let (hours, minutes) = (hours.to_string(), minutes.to_string());
+    let slots = [("hours", hours.as_str()), ("minutes", minutes.as_str())];
+    match us / 60_000_000 {
+        0 => words.under_a_minute.clone(),
+        1..=59 => fill(&words.minutes, &slots),
+        all if all.is_multiple_of(60) => fill(&words.hours, &slots),
+        _ => fill(&words.hours_minutes, &slots),
     }
 }
 
 /// How long before `now_us` it was: the `when` of a record whose local time
 /// is not known.
-pub fn ago(now_us: u64) -> impl Fn(u64) -> String {
-    move |at_us| format!("{} ago", length(now_us.saturating_sub(at_us)))
+pub fn ago(now_us: u64, words: &Words) -> impl Fn(u64) -> String + '_ {
+    move |at_us| {
+        fill(
+            &words.ago,
+            &[("long", &length(now_us.saturating_sub(at_us), words))],
+        )
+    }
+}
+
+/// The `when` of a record: its local time of day, `minute` since midnight,
+/// where known, and how long ago.
+pub fn when<'a>(
+    now_us: u64,
+    minute: impl Fn(u64) -> Option<u16> + 'a,
+    words: &'a Words,
+) -> impl Fn(u64) -> String + 'a {
+    let ago = ago(now_us, words);
+    move |at_us| match minute(at_us) {
+        Some(minute) => fill(
+            &words.at,
+            &[
+                ("time", &format!("{:02}:{:02}", minute / 60, minute % 60)),
+                ("ago", &ago(at_us)),
+            ],
+        ),
+        None => ago(at_us),
+    }
 }
 
 #[cfg(test)]
@@ -298,6 +470,338 @@ mod tests {
 
     const S: u64 = 1_000_000;
     const M: u64 = 60 * S;
+
+    /// Who was here's own words, as a lamp loads them.
+    fn own_words() -> Words {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/who-was-here");
+        let history = crate::load(&dir)
+            .expect("who was here loads")
+            .history
+            .expect("it has a [history]");
+        assert!(!history.built_in_words, "it says its own words");
+        history.words
+    }
+
+    /// [`super::ago`] in who was here's own words.
+    fn ago(now_us: u64) -> impl Fn(u64) -> String {
+        let words = own_words();
+        move |at_us| super::ago(now_us, &words)(at_us)
+    }
+
+    /// [`super::length`] in who was here's own words.
+    fn length(us: u64) -> String {
+        super::length(us, &own_words())
+    }
+
+    /// What lamp-skills said before its words were the skill's (#940), kept
+    /// here as it was, only `self` made `visits`: the byte-for-byte test
+    /// below holds the skill's words to it.
+    mod before {
+        use super::super::*;
+
+        pub fn told_as(
+            visits: &Visits,
+            now_us: u64,
+            within_us: u64,
+            when: impl Fn(u64) -> String,
+            telling: Telling,
+        ) -> String {
+            let marked = telling != Telling::Someone;
+            let Some((last_us, someone)) = visits.last else {
+                return "The lamp has no record of who was at it: its eyes have said nothing about \
+                        the room since it started (presence is off, or they could not see). Say you \
+                        can't tell."
+                    .into();
+            };
+            let since = now_us.saturating_sub(within_us);
+            let seeing = now_us <= last_us + LASTS_US;
+            let mut lines: Vec<(u64, String)> = Vec::new();
+            for (from, until, face) in &visits.spells {
+                let names: Vec<&str> = if telling == Telling::Named {
+                    visits
+                        .names
+                        .iter()
+                        .filter(|(of, _)| of == from)
+                        .map(|(_, name)| name.as_str())
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let who = match names.as_slice() {
+                    [] if marked && visits.known.contains(from) => {
+                        "someone the lamp knows".to_owned()
+                    }
+                    [] => "someone".to_owned(),
+                    [one] => (*one).to_owned(),
+                    [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+                };
+                let many = names.len() > 1;
+                let (was, has_been) = match (*face, many) {
+                    (true, false) => ("was at the lamp", "has been at the lamp"),
+                    (true, true) => ("were at the lamp", "have been at the lamp"),
+                    (false, false) => (
+                        "was heard near the lamp, not seen,",
+                        "has been heard near the lamp, not seen,",
+                    ),
+                    (false, true) => (
+                        "were heard near the lamp, not seen,",
+                        "have been heard near the lamp, not seen,",
+                    ),
+                };
+                match until {
+                    Some(until) if *until >= since => lines.push((
+                        *from,
+                        format!(
+                            "- {who} {was} for {}, {}",
+                            length(until - from),
+                            when(*from)
+                        ),
+                    )),
+                    Some(_) => {}
+                    None if seeing && someone => lines.push((
+                        *from,
+                        format!(
+                            "- {who} {has_been} for {}, since {}, and still is",
+                            length(now_us.saturating_sub(*from)),
+                            when(*from)
+                        ),
+                    )),
+                    None => {}
+                }
+            }
+            for (from, until) in &visits.unseen {
+                if *until >= since {
+                    lines.push((
+                        *from,
+                        format!(
+                            "- it could not see or hear the room for {}, {}",
+                            length(until - from),
+                            when(*from)
+                        ),
+                    ));
+                }
+            }
+            if !seeing {
+                lines.push((
+                    last_us,
+                    format!(
+                        "- it has not been able to see the room since {}",
+                        when(last_us)
+                    ),
+                ));
+            }
+            lines.sort_by_key(|(from, _)| *from);
+            let count = visits
+                .spells
+                .iter()
+                .filter(|(_, until, _)| until.is_some_and(|until| until >= since))
+                .count();
+            let mut told = if telling == Telling::Named {
+                format!(
+                    "The lamp's record of the room over the last {}, from its eyes and ears: times, \
+                     and a name only for someone who said yes to being named to others; anyone \
+                     else its eyes knew is someone the lamp knows, anyone else someone, and it keeps \
+                     no picture.",
+                    length(within_us)
+                )
+            } else if marked {
+                format!(
+                    "The lamp's record of the room over the last {}, times only, from its eyes and \
+                     ears: it never knows who anyone was, only whether its eyes knew a face, someone \
+                     who asked it to remember them, and keeps no picture.",
+                    length(within_us)
+                )
+            } else {
+                format!(
+                    "The lamp's record of the room over the last {}, times only, from its eyes and \
+                     ears: it never knows who anyone was, and keeps no picture.",
+                    length(within_us)
+                )
+            };
+            for (_, line) in lines {
+                told.push('\n');
+                told.push_str(&line);
+            }
+            if count == 0 {
+                told.push_str("\n- nobody else was at the lamp in that time");
+            }
+            told
+        }
+
+        pub fn length(us: u64) -> String {
+            let minutes = us / 60_000_000;
+            match minutes {
+                0 => "under a minute".into(),
+                1..=59 => format!("{minutes} min"),
+                _ if minutes.is_multiple_of(60) => format!("{} h", minutes / 60),
+                _ => format!("{} h {} min", minutes / 60, minutes % 60),
+            }
+        }
+
+        pub fn ago(now_us: u64) -> impl Fn(u64) -> String {
+            move |at_us| format!("{} ago", length(now_us.saturating_sub(at_us)))
+        }
+
+        /// lamp-skills' `told_history`'s `when`, as it was.
+        pub fn when(now_us: u64, minute: impl Fn(u64) -> Option<u16>) -> impl Fn(u64) -> String {
+            let ago = ago(now_us);
+            move |at_us| match minute(at_us) {
+                Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
+                None => ago(at_us),
+            }
+        }
+    }
+
+    /// Values every 2 s from `from` to `to` (seconds), all saying `someone`
+    /// by `by`, and with `then` done at the first.
+    fn hold(
+        visits: &mut Visits,
+        (from, to): (u64, u64),
+        someone: bool,
+        by: Option<SeenBy>,
+        then: &[&str],
+    ) {
+        for second in (from..to).step_by(2) {
+            visits.seen(someone, 0, by, second * S);
+            if second == from {
+                for name in then {
+                    match *name {
+                        "known" => visits.known_here(),
+                        name => visits.named(name),
+                    }
+                }
+            }
+        }
+    }
+
+    /// The third move of "Everything is a skill" (#940) is a move, not a
+    /// change: who was here's words, filled from their slots, are what
+    /// lamp-skills said before, byte for byte, for every line: each head,
+    /// each spell seen or heard, one or many, ended or going on, a name,
+    /// names, someone the lamp knows, a stretch unseen, not seeing now,
+    /// nobody else, no record, each length, and each time with and without
+    /// the local time of day.
+    #[test]
+    fn who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte() {
+        let words = own_words();
+        assert_eq!(words, Words::built_in());
+        let face = Some(SeenBy::Face);
+        let voice = Some(SeenBy::Voice);
+        let mut away = Visits::default();
+        hold(
+            &mut away,
+            (0, 600),
+            true,
+            face,
+            &["known", "Alpha", "Beta", "Gamma"],
+        );
+        hold(&mut away, (600, 1_200), false, None, &[]);
+        hold(&mut away, (1_200, 1_260), true, voice, &["Alpha", "Beta"]);
+        hold(&mut away, (1_260, 1_300), false, None, &[]);
+        hold(&mut away, (1_300, 1_320), true, voice, &["Delta"]);
+        hold(&mut away, (1_320, 1_400), false, None, &[]);
+        hold(&mut away, (1_400, 1_500), true, face, &["known"]);
+        hold(&mut away, (1_500, 1_600), false, None, &[]);
+        // Nothing from 1 600 s to 2 000 s: a stretch unseen.
+        hold(&mut away, (2_000, 2_010), false, None, &[]);
+        hold(&mut away, (2_010, 9_212), true, voice, &["Alpha", "Beta"]);
+        let mut many = Visits::default();
+        hold(&mut many, (0, 100), true, face, &["Alpha", "Beta"]);
+        let mut one_heard = Visits::default();
+        hold(&mut one_heard, (0, 100), true, voice, &["Delta"]);
+        let mut heard = Visits::default();
+        hold(&mut heard, (0, 100), true, voice, &[]);
+        let mut here = Visits::default();
+        hold(&mut here, (0, 30), true, face, &[]);
+        let mut stopped = Visits::default();
+        hold(&mut stopped, (0, 100), true, face, &[]);
+        let cases = [
+            (&away, 9_210 * S),
+            (&many, 100 * S),
+            (&one_heard, 100 * S),
+            (&heard, 100 * S),
+            (&here, 30 * S),
+            (&stopped, 500 * S),
+            (&Visits::default(), 10 * S),
+        ];
+        let local = |at_us: u64| {
+            (!(at_us / (7 * M)).is_multiple_of(3)).then_some((at_us / M % 1_440) as u16)
+        };
+        let mut all = String::new();
+        for (visits, now_us) in cases {
+            for within_us in [M, 135 * M, 12 * 60 * M] {
+                for telling in [Telling::Someone, Telling::Known, Telling::Named] {
+                    let said = visits.told_as(now_us, within_us, ago(now_us), telling, &words);
+                    let before =
+                        before::told_as(visits, now_us, within_us, before::ago(now_us), telling);
+                    assert_eq!(said, before);
+                    let when = super::when(now_us, local, &words);
+                    let said = visits.told_as(now_us, within_us, when, telling, &words);
+                    let before = before::told_as(
+                        visits,
+                        now_us,
+                        within_us,
+                        before::when(now_us, local),
+                        telling,
+                    );
+                    assert_eq!(said, before);
+                    all.push_str(&said);
+                    all.push('\n');
+                }
+            }
+        }
+        // Every line was said at least once.
+        for line in [
+            "times only, from its eyes and ears: it never knows who anyone was, and keeps",
+            "only whether its eyes knew a face",
+            "a name only for someone who said yes",
+            "has no record",
+            "- someone was at the lamp for",
+            "- someone the lamp knows was at the lamp for",
+            "- Alpha, Beta and Gamma were at the lamp for",
+            "- Delta was heard near the lamp, not seen, for",
+            "- Alpha and Beta were heard near the lamp, not seen, for",
+            "- someone has been at the lamp for",
+            "- Alpha and Beta have been at the lamp for",
+            "- someone has been heard near the lamp, not seen, for",
+            "- Delta has been heard near the lamp, not seen, for",
+            "- Alpha and Beta have been heard near the lamp, not seen, for 2 h, since",
+            "- it could not see or hear the room for 6 min, ",
+            "- it has not been able to see the room since",
+            "- nobody else was at the lamp in that time",
+            "over the last 2 h 15 min",
+            "over the last 12 h",
+            "under a minute ago",
+            ", at ",
+            " min ago",
+        ] {
+            assert!(all.contains(line), "{line}");
+        }
+    }
+
+    /// Each word is words, with only its own slots, each once; and a name
+    /// filled in is never read as a slot.
+    #[test]
+    fn who_was_heres_words_have_only_their_own_slots() {
+        assert!(Words::built_in().checked().is_ok());
+        let broken = |change: fn(&mut Words)| {
+            let mut words = Words::built_in();
+            change(&mut words);
+            words.checked().unwrap_err()
+        };
+        assert!(broken(|w| w.was = "- {who} was here for {long}".into()).contains("was"));
+        assert!(broken(|w| w.record = "{within} {within}".into()).contains("record"));
+        assert!(broken(|w| w.someone = "someone {who}".into()).contains("someone"));
+        assert!(broken(|w| w.at = "at {time, {ago}".into()).contains("brace"));
+        assert!(broken(|w| w.hours = "{Hours} h".into()).contains("brace"));
+        assert!(broken(|w| w.nobody_else = "a\u{7}b".into()).contains("control"));
+        assert!(broken(|w| w.no_record = " ".into()).contains("no_record"));
+        assert_eq!(
+            fill("{who} was {long}", &[("who", "{long}"), ("long", "here")]),
+            "{long} was here"
+        );
+    }
 
     /// The eyes' values once a second, `someone` from each spell's start
     /// until 20 s after its end, `nobody_s` counting otherwise, from `from`
@@ -352,7 +856,7 @@ mod tests {
                 (1_800 * S, None, true)
             ]
         );
-        let told = visits.told(1_900 * S, 12 * 60 * M, ago(1_900 * S));
+        let told = visits.told(1_900 * S, 12 * 60 * M, ago(1_900 * S), &own_words());
         assert!(
             told.ends_with(
                 "\n- someone was at the lamp for under a minute, 31 min ago\
@@ -377,14 +881,14 @@ mod tests {
             visits.spells,
             [(0, Some(299 * S), true), (900 * S, None, true)]
         );
-        let told = visits.told(1_000 * S, 60 * M, ago(1_000 * S));
+        let told = visits.told(1_000 * S, 60 * M, ago(1_000 * S), &own_words());
         assert!(
             told.contains("\n- it could not see or hear the room for 10 min, 11 min ago"),
             "{told}"
         );
         let mut alone = Visits::default();
         said(&mut alone, &[(0, 100)], &[], 100);
-        let told = alone.told(100 * S, 60 * M, ago(100 * S));
+        let told = alone.told(100 * S, 60 * M, ago(100 * S), &own_words());
         assert!(
             told.ends_with("and still is\n- nobody else was at the lamp in that time"),
             "{told}"
@@ -396,10 +900,13 @@ mod tests {
     #[test]
     fn with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when() {
         let none = Visits::default();
-        assert!(none.told(10 * S, M, ago(10 * S)).contains("no record"));
+        assert!(
+            none.told(10 * S, M, ago(10 * S), &own_words())
+                .contains("no record")
+        );
         let mut stopped = Visits::default();
         said(&mut stopped, &[(0, 50)], &[], 60);
-        let told = stopped.told(10 * M, 60 * M, ago(10 * M));
+        let told = stopped.told(10 * M, 60 * M, ago(10 * M), &own_words());
         assert!(
             told.contains("\n- it has not been able to see the room since 9 min ago"),
             "{told}"
@@ -421,7 +928,7 @@ mod tests {
         window.seen(true, 0, None, 0);
         window.seen(false, 20, None, 100 * S);
         window.seen(false, 0, None, 3 * 3_600 * S);
-        let told = window.told(3 * 3_600 * S, 60 * M, ago(3 * 3_600 * S));
+        let told = window.told(3 * 3_600 * S, 60 * M, ago(3 * 3_600 * S), &own_words());
         assert!(!told.contains("someone was"), "{told}");
         assert!(told.contains("nobody else"), "{told}");
     }
@@ -452,7 +959,7 @@ mod tests {
             visits.spells,
             [(0, Some(20 * S), false), (62 * S, None, true)]
         );
-        let told = visits.told(120 * S, 60 * M, ago(120 * S));
+        let told = visits.told(120 * S, 60 * M, ago(120 * S), &own_words());
         assert!(
             told.contains("\n- someone was heard near the lamp, not seen, for under a minute, 2 min ago")
                 && told.contains("\n- someone has been at the lamp for under a minute, since under a minute ago, and still is"),
@@ -476,7 +983,7 @@ mod tests {
         visits.seen(true, 0, Some(SeenBy::Face), 30 * M);
         visits.seen(false, 20, None, 40 * M);
         let when = ago(41 * M);
-        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Known);
+        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Known, &own_words());
         assert!(
             told.contains("- someone the lamp knows was at the lamp for "),
             "{told}"
@@ -488,8 +995,8 @@ mod tests {
         );
         assert!(told.contains("only whether its eyes knew a face"), "{told}");
         // Unmarked (no switch, or a skill without known_faces): as before.
-        let plain = visits.told_as(41 * M, 60 * M, &when, Telling::Someone);
-        assert_eq!(plain, visits.told(41 * M, 60 * M, &when));
+        let plain = visits.told_as(41 * M, 60 * M, &when, Telling::Someone, &own_words());
+        assert_eq!(plain, visits.told(41 * M, 60 * M, &when, &own_words()));
         assert!(
             !plain.contains("the lamp knows") && plain.contains("never knows who"),
             "{plain}"
@@ -523,7 +1030,7 @@ mod tests {
         visits.seen(false, 20, None, 40 * M);
         let when = ago(41 * M);
         visits.keep_names(&["Alpha".to_owned(), "Beta".to_owned()]);
-        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Named);
+        let told = visits.told_as(41 * M, 60 * M, &when, Telling::Named, &own_words());
         assert!(
             told.contains("- Alpha and Beta were at the lamp for "),
             "{told}"
@@ -537,11 +1044,11 @@ mod tests {
             "{told}"
         );
         // Not named: the names aren't said.
-        let known = visits.told_as(41 * M, 60 * M, &when, Telling::Known);
+        let known = visits.told_as(41 * M, 60 * M, &when, Telling::Known, &own_words());
         assert!(!known.contains("Alpha"), "{known}");
         // A no: Beta's name goes.
         visits.keep_names(&["Alpha".to_owned()]);
-        let after = visits.told_as(41 * M, 60 * M, &when, Telling::Named);
+        let after = visits.told_as(41 * M, 60 * M, &when, Telling::Named, &own_words());
         assert!(after.contains("- Alpha was at the lamp for "), "{after}");
         assert!(!after.contains("Beta"), "{after}");
     }
