@@ -405,6 +405,27 @@ mod tests {
         parse(text.split_whitespace().map(str::to_owned))
     }
 
+    /// The product unit pins mic1's capture level before ears starts, at
+    /// the level its rise and quiet were measured at (#694), and a lamp
+    /// without the card still starts it (`-`).
+    #[test]
+    fn the_product_unit_pins_the_room_microphones_level() {
+        let unit = include_str!("../../../deploy/product/lamp-ears.service");
+        let pre = unit
+            .lines()
+            .position(|line| {
+                line == "ExecStartPre=-/usr/bin/amixer -c device_cmedia sset Mic capture 4"
+            })
+            .expect("the capture level's line");
+        let start = unit
+            .lines()
+            .position(|line| line.starts_with("ExecStart=/opt/lampOS/ears/current/lamp-ears "))
+            .expect("ExecStart");
+        assert!(pre < start);
+        assert!(unit.contains("--rise-db 30 "));
+        assert!(unit.contains("SupplementaryGroups=audio"));
+    }
+
     #[test]
     fn the_options_are_read_and_the_rest_have_their_defaults() {
         assert_eq!(

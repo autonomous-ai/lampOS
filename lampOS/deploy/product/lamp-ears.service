@@ -20,6 +20,10 @@ Nice=5
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
 # Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
 Environment=LAMP_PRIVACY_CONTROLS=on
+# mic1's capture level, pinned (#694, 21 Oct): --rise-db 30 and the quiet in docs/ears.md were measured at the C-Media
+# card's `Mic` capture 4 (-8 dB), lamp-4ace's. lamp-75c9 was left at 20 (+8 dB) and its quiet read 16 dB louder,
+# -37.6 against -53.6 at 4. Said once in the journal at each start; a lamp without the card starts ears all the same.
+ExecStartPre=-/usr/bin/amixer -c device_cmedia sset Mic capture 4
 ExecStart=/opt/lampOS/ears/current/lamp-ears --device plug:device_micro1 --rise-db 30 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
