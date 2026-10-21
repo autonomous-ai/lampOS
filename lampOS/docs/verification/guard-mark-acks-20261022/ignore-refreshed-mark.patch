@@ -1,0 +1,12 @@
+--- a/lampOS/crates/skills/src/watch.rs
++++ b/lampOS/crates/skills/src/watch.rs
+@@ -915,6 +915,9 @@
+         if on.paused {
+             return Vec::new();
+         }
++        if shown && on.reached_us.is_some() {
++            return Vec::new();
++        }
+         if shown {
+             on.reached_us = Some(now_us);
+         }

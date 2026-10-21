@@ -1,0 +1,87 @@
+{
+  "hashes": {
+    "lampOS/crates/skills/tests/it/skills.rs": "c388908356a16ab8046d1fe712bbd195669065961cb5e91ab151810a7285eee8",
+    "lampOS/docs/skills.md": "5ef7b0291937a7dda431950d29800e4ab04f6d054585d7367f8639fcf06e9710",
+    "lampOS/crates/skills/src/watch.rs": "e7e83c71875b7297d8b99691e339393116b7275506a9c6ba8d2e9ef6fa174274",
+    "lampOS/crates/skills/src/main.rs": "8a851c583cae9eec4b5573c65e8143da142d99a5f7af9a2922096c9353710122",
+    "lampOS/crates/skills/src/glow.rs": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+    "lampOS/crates/skills/src/clock.rs": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+    "lampOS/crates/skills/src/routine.rs": "dd8779e14d7a2fa3ee97fc046d5399994a664e81a032236d0e72ee849c4aa05a"
+  },
+  "all_production_code_unchanged_from_actual_base": true,
+  "timing_before_test_sha256": "20a63eb188f3ca181eefa91cdccccb93839e49ddbc01b0782c2f5aef6fb2f455",
+  "timing_before_source": "HEAD e441494c: old PR three-zero-skip fixture, on the same 0566796 base as the repaired candidate",
+  "changed_paths_before_evidence": [
+    "lampOS/crates/skills/tests/it/skills.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "aggregate_algorithm": "sorted path + NUL + u64 big-endian content length + exact bytes",
+  "freshness": {
+    "guard": {
+      "count": 1323,
+      "before": "b92cbfbc3e5b07a5d28d86d30d1b9f377dfb90ec4d10a3f3fbca9a39760f7948",
+      "after": "b92cbfbc3e5b07a5d28d86d30d1b9f377dfb90ec4d10a3f3fbca9a39760f7948",
+      "freshened_count": 1323
+    },
+    "actual_base": {
+      "count": 1323,
+      "before": "5c8cadc83529ff21659ed364835f15225d4765e0aeebc3a1f589b63f04b228d0",
+      "after": "5c8cadc83529ff21659ed364835f15225d4765e0aeebc3a1f589b63f04b228d0",
+      "freshened_count": 1323
+    }
+  },
+  "restoration": {
+    "guard_six_restorations_exact": true,
+    "comparison_two_all_source_restorations_exact": true,
+    "frozen_source_file_count": 30,
+    "candidate_aggregate": "b92cbfbc3e5b07a5d28d86d30d1b9f377dfb90ec4d10a3f3fbca9a39760f7948"
+  },
+  "library_binary": {
+    "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-f2989a883499a717",
+    "sha256_before_base_after_base_after_final": "ebbe6595332e5421fe1a2a665299aeef6ba1aba42752116bc30f9264b8a31cc0",
+    "bytes": 11404256,
+    "note": "Identical across the bounded passing comparison; no executable hash was recorded at the earlier failing full gate."
+  },
+  "original_assertions": [
+    {
+      "test": "T1",
+      "assertions": 18,
+      "same_assertion_multiset_as_actual_base": true
+    },
+    {
+      "test": "T2",
+      "assertions": 8,
+      "same_assertion_multiset_as_actual_base": true
+    },
+    {
+      "test": "T3",
+      "assertions": 11,
+      "same_assertion_multiset_as_actual_base": true
+    },
+    {
+      "test": "T4",
+      "assertions": 8,
+      "same_assertion_multiset_as_actual_base": true
+    }
+  ],
+  "upstream_app_switch": {
+    "test": "skills::guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it",
+    "function_sha256": "67458a0121be943da262abfec4603982a6d1477c46630e18ca13b35114a225c1",
+    "body_byte_identical_to_actual_base": true,
+    "assertions": 27
+  },
+  "external_manifest_sha256": {
+    "verify.py": "56dc9ed8071095a019a41cdebb649837ae154e61159ec33aa2f1ed5332e68149",
+    "compare_actual_base.py": "41846c14383e05460cbc7f5737ca857e3a18ca3d97df7f8cd596ac23cc01d551",
+    "prepared.json": "fe19f6206e8c704de7b2e7570723e24ebab11f0bf3fb72626b1a4096348ef146",
+    "run-20261022T003809.369932Z/commands.json": "1c5f03c79ed8dd4b882bbafe2e5b51899ddbf409b85fbb5e4eb4b448fdd8b899",
+    "run-20261022T003809.369932Z/timings.json": "7588c689c9927fe053e375b487d456165321afc76688850bc3cbcd1221aece34",
+    "run-20261022T003809.369932Z/source-freshness.json": "4f1cd11cb9161bfec51cbd97dea33c15697896e14facb47f2afa21303100bdf3",
+    "run-20261022T003809.369932Z/restorations.json": "5d54f8dc36665d820ee8f990cfd11504114e1483107091dae04a2364f311c2e9",
+    "actual-base-20261022T005333.699975Z/commands.json": "6214e09c2b847271647ad3f8374579bfe5d6b173cda14247bedc36d57549285a",
+    "actual-base-20261022T005333.699975Z/summary.json": "ec754d00c0e4c6f5b67c62d8a92e66b7d838563f8780a3034478b59c02b70bad",
+    "actual-base-20261022T005333.699975Z/source-freshness.json": "255f4fb5b995875e4d23d75c4bca828ae773087d5744e216e2d79f686a0421c6",
+    "actual-base-20261022T005333.699975Z/restorations.json": "2b4a8bd5df2fb02ce7d95686533aa522c7ca718edf7428a43c94c0f6e7b44465",
+    "actual-base-20261022T005333.699975Z/library-binaries.json": "606d8b5ed7f0b05cba440c08c0b9e087e80a43c42fa7e4bbe80b5402e955bc9e"
+  }
+}
