@@ -10451,11 +10451,43 @@ fn spoken_to_run(
     by: Priority,
     spoken_at: Option<Duration>,
 ) -> (BodyReport, Vec<(&'static str, &'static str)>, Vec<Step>) {
+    let moods: Vec<(Duration, Mood)> = spoken_at
+        .map(|at| (at, Mood::Listening))
+        .into_iter()
+        .collect();
+    moods_run(arbitration, false, clip, by, moods)
+}
+
+/// The same under `LAMP_GESTURE_PAUSE=on` (#2602).
+fn paused_run(
+    arbitration: bool,
+    clip: &'static Clip,
+    by: Priority,
+    spoken_at: Option<Duration>,
+) -> (BodyReport, Vec<(&'static str, &'static str)>, Vec<Step>) {
+    let moods: Vec<(Duration, Mood)> = spoken_at
+        .map(|at| (at, Mood::Listening))
+        .into_iter()
+        .collect();
+    moods_run(arbitration, true, clip, by, moods)
+}
+
+/// The same, the voice's mood each from its time on (resting before the
+/// first), with the pause on or off: `listening` then `thinking` is a line
+/// the lamp answers, `listening` then `resting` one it left alone (#2602).
+fn moods_run(
+    arbitration: bool,
+    pause: bool,
+    clip: &'static Clip,
+    by: Priority,
+    moods: Vec<(Duration, Mood)>,
+) -> (BodyReport, Vec<(&'static str, &'static str)>, Vec<Step>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(16));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
     let limits = Limits {
         arbitration,
+        gesture_pause: pause,
         ..gesture_limits()
     };
     let (time, mood_time, seen_at) = (clock.time.clone(), clock.time.clone(), clock.time.clone());
@@ -10468,9 +10500,12 @@ fn spoken_to_run(
         Some(HOME),
         Some(standing(100, 60)),
         None,
-        move || match spoken_at {
-            Some(at) if mood_time.get() >= at => Some((Mood::Listening, 60)),
-            _ => Some((Mood::Resting, 0)),
+        move || {
+            let now = mood_time.get();
+            match moods.iter().rev().find(|(at, _)| now >= *at) {
+                Some((_, Mood::Resting)) | None => Some((Mood::Resting, 0)),
+                Some((_, mood)) => Some((*mood, 60)),
+            }
         },
         move || {
             let due = !asked && time.get() >= Duration::from_secs(1);
@@ -10567,6 +10602,190 @@ fn a_skill_gesture_eases_out_on_the_very_step_the_listening_mood_is_read() {
     // The arm, which only the stretch moves, already leaves the stretch's
     // path on that step.
     assert_ne!(seen[read].3, played[read].3);
+}
+
+/// Under `LAMP_GESTURE_PAUSE=on` (#2602), the same stretch pauses as the
+/// lamp listens and ends the moment it answers (`thinking`), with the
+/// arbitration switch on or off, eased out as above; the conversation's
+/// own gesture plays on.
+#[test]
+fn a_paused_skill_or_idle_gesture_ends_when_the_lamp_answers_and_eases_out() {
+    let (heard, answers) = (Duration::from_secs(8), Duration::from_millis(9_200));
+    let spoken = answers;
+    for arbitration in [true, false] {
+        for by in [Priority::Skill, Priority::Idle] {
+            let stretch = &crate::clips::STRETCHING;
+            let moods = vec![(heard, Mood::Listening), (answers, Mood::Thinking)];
+            let (report, fates, seen) = moods_run(arbitration, true, stretch, by, moods);
+            assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+            assert_eq!(
+                fates,
+                [
+                    ("stretching", "taken: it was folded and stood up for it"),
+                    ("stretching", "ended: by conversation"),
+                ],
+                "{arbitration} {by:?}"
+            );
+            // It held, paused, until the answer, and not a step after.
+            let ended = seen.iter().position(|step| step.0 >= spoken).unwrap();
+            assert_eq!(seen[ended - 1].1, Some("stretching"));
+            assert!(seen[ended..].iter().all(|step| step.1.is_none()));
+            // Eased out, not snapped back: the arm's change a step grows and
+            // shrinks by a few counts and never jumps.
+            for joint in 0..2 {
+                let change: Vec<f32> = seen[ended - 2..ended + 20]
+                    .windows(2)
+                    .map(|pair| f32::from(pair[1].3[joint]) - f32::from(pair[0].3[joint]))
+                    .collect();
+                for pair in change.windows(2) {
+                    assert!((pair[1] - pair[0]).abs() <= 4.0, "{joint}: {change:?}");
+                }
+            }
+            // Never spoken to, it plays out.
+            let (_, fates, _) = paused_run(arbitration, stretch, by, None);
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it was folded and stood up for it")],
+                "{arbitration} {by:?}"
+            );
+        }
+        // The conversation's own nod, a person's or safety's, plays on.
+        for by in [Priority::Conversation, Priority::Safety, Priority::Person] {
+            let stretch = &crate::clips::STRETCHING;
+            let (_, fates, seen) = paused_run(arbitration, stretch, by, Some(spoken));
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it was folded and stood up for it")],
+                "{arbitration} {by:?}"
+            );
+            assert!(seen.iter().any(|step| step.0 > spoken && step.1.is_some()));
+        }
+    }
+}
+
+/// No wait between the word and the pause: the step that reads `listening`
+/// is the stretch's first eased one, so the lamp stops within a motor step
+/// of the mood (the owner's 300 ms from "Lamp," to the stretch giving way),
+/// as before the pause (#2602). It is still the stretch's, paused.
+#[test]
+fn a_skill_gesture_pauses_on_the_very_step_the_listening_mood_is_read() {
+    let spoken = Duration::from_secs(8);
+    let stretch = &crate::clips::STRETCHING;
+    let (_, _, played) = paused_run(false, stretch, Priority::Skill, None);
+    let (_, _, seen) = paused_run(false, stretch, Priority::Skill, Some(spoken));
+    let read = seen.iter().position(|step| step.0 >= spoken).unwrap();
+    assert_eq!(seen[..read], played[..read], "the same until the word");
+    assert_eq!(
+        (seen[read - 1].1, seen[read].1),
+        (Some("stretching"), Some("stretching"))
+    );
+    // The arm, which only the stretch moves, already leaves the stretch's
+    // path on that step.
+    assert_ne!(seen[read].3, played[read].3);
+}
+
+/// #2602: a line the lamp leaves alone (music, a cough, not said to it)
+/// pauses the stretch, and it goes on from where it was once the voice is
+/// resting again: never ended, played out later by the pause. While
+/// paused the arm comes to a hold and stays there, never snapping.
+#[test]
+fn a_skill_gesture_paused_for_a_line_left_alone_goes_on_where_it_was() {
+    let ms = Duration::from_millis;
+    let stretch = &crate::clips::STRETCHING;
+    for arbitration in [true, false] {
+        let (_, played_fates, played) = paused_run(arbitration, stretch, Priority::Skill, None);
+        let moods = vec![(ms(8_000), Mood::Listening), (ms(9_500), Mood::Resting)];
+        let (report, fates, seen) = moods_run(arbitration, true, stretch, Priority::Skill, moods);
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(fates, played_fates, "{arbitration}: not ended");
+        // It played out the hold later than unpaused, less the third of the
+        // ease the hold carried it on (`EASE_OUT` / 3), give or take a
+        // step: it goes on from where it was held.
+        let over = |steps: &[Step]| {
+            steps
+                .iter()
+                .rposition(|step| step.1 == Some("stretching"))
+                .map(|at| steps[at].0)
+                .unwrap()
+        };
+        let late = over(&seen).saturating_sub(over(&played));
+        assert!(
+            late >= ms(1_167) && late <= ms(1_367),
+            "{arbitration}: {late:?}"
+        );
+        // Held: from 0.7 s into the pause to its end the arm is still.
+        let held: Vec<_> = seen
+            .iter()
+            .filter(|step| step.0 >= ms(8_750) && step.0 < ms(9_500))
+            .map(|step| step.3)
+            .collect();
+        assert!(
+            held.windows(2).all(|pair| pair[0] == pair[1]),
+            "{arbitration}: {held:?}"
+        );
+        // Into the hold and out of it again, the arm's change a step never
+        // jumps (the hold begins at 8 s and goes on at 9.5 s).
+        let at = seen.iter().position(|step| step.0 >= ms(8_000)).unwrap();
+        let on = seen.iter().position(|step| step.0 >= ms(9_500)).unwrap();
+        for joint in 0..2 {
+            // Going on, it never swings back: the arm moves on the way it
+            // was moving as it paused, not back toward where it paused.
+            let way = f32::from(seen[at].3[joint]) - f32::from(seen[at - 1].3[joint]);
+            for pair in seen[on..on + 18].windows(2) {
+                let step = f32::from(pair[1].3[joint]) - f32::from(pair[0].3[joint]);
+                assert!(
+                    step * way >= 0.0,
+                    "{arbitration} {joint}: back {step} against {way}"
+                );
+            }
+            let change: Vec<f32> = seen[at - 2..on + 60]
+                .windows(2)
+                .map(|pair| f32::from(pair[1].3[joint]) - f32::from(pair[0].3[joint]))
+                .collect();
+            for pair in change.windows(2) {
+                assert!(
+                    (pair[1] - pair[0]).abs() <= 4.0,
+                    "{arbitration} {joint}: {change:?}"
+                );
+            }
+        }
+    }
+}
+
+/// #2602: listening that goes on 3 s or more ends the paused stretch, eased
+/// out, so it never picks a move back up long after the moment.
+#[test]
+fn a_skill_gesture_paused_three_seconds_or_more_ends() {
+    let ms = Duration::from_millis;
+    let stretch = &crate::clips::STRETCHING;
+    let (_, fates, seen) = paused_run(false, stretch, Priority::Skill, Some(ms(8_000)));
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it was folded and stood up for it"),
+            ("stretching", "ended: by conversation"),
+        ]
+    );
+    let ended = seen
+        .iter()
+        .position(|step| step.1.is_none() && step.0 > ms(8_000))
+        .unwrap();
+    assert!(
+        seen[ended].0 >= ms(11_000) && seen[ended].0 < ms(11_100),
+        "{:?}",
+        seen[ended].0
+    );
+    // Back to resting after that, nothing resumes.
+    let moods = vec![(ms(8_000), Mood::Listening), (ms(11_500), Mood::Resting)];
+    let (_, fates, seen) = moods_run(false, true, stretch, Priority::Skill, moods);
+    assert_eq!(
+        fates.last(),
+        Some(&("stretching", "ended: by conversation"))
+    );
+    assert!(
+        seen.iter()
+            .all(|step| step.0 < ms(11_100) || step.1.is_none())
+    );
 }
 
 /// A conversation's nod playing when the person speaks is not ended.
@@ -12061,5 +12280,21 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
         } else {
             assert!(between(16, 40).any(|stand| stand > 0.9), "stood again");
         }
+    }
+}
+
+/// `LAMP_GESTURE_PAUSE` (#2602) is on for the exact value `on` only.
+#[test]
+fn the_gesture_pause_is_on_for_on_only() {
+    assert!(super::gesture_pause_from(Some("on")));
+    for value in [
+        None,
+        Some(""),
+        Some("On"),
+        Some("1"),
+        Some("off"),
+        Some("on "),
+    ] {
+        assert!(!super::gesture_pause_from(value), "{value:?}");
     }
 }
