@@ -5552,6 +5552,64 @@ gates; #2684 is draft again while its three P3s are folded and checked.
   The original two heads, the held-piece readiness, and the new timing
   evidence head are posted on Queue #2602.
 
+## 2026-10-22, 00:47 ICT: report review fixes pushed; six yield slices native-green
+
+Ready for lamp-voice: yes (#2691, #2697). #2684 is draft pending its
+new head's native gates. #2665 and #2638 are merged.
+
+- **#2684**, `3f40260c7ba1ab7c5fb02f477b4b10efb30a4312`, is pushed
+  as one commit on `4efcf4eb0cda0ef730d30658572f49da7592a0b8`, with
+  an exact lease against the previous published head. The three review
+  P3s are folded: all-origin/listening receipt semantics, shared runtime
+  and report receipt validation, and explicit exclusion of even
+  byte-identical repeated starts or terminals. The runtime's validation
+  and counting behavior are unchanged.
+- Full local checks on the preceding `b87b3e91a` base passed **3292
+  Voice, zero failed, 14 ignored**, and **623 evaluator, zero failed
+  or ignored**. After the clean rebase, all three changed Rust file
+  hashes were preserved; formatting, **21 focused checks**, workspace
+  Clippy with warnings denied and workspace build passed. These focused
+  checks do not turn the earlier full-suite counts into final-base counts.
+  The initial socket-denied attempt remains recorded in the prior entry.
+- Both final full-export reports match the committed counts byte for
+  byte: **21 resumed and 25 cancelled** gaps over 300 ms, with no pairing
+  defects. All six #2697 slices pass too: **201 rows, twelve receipts,
+  six complete resumed pairs over 300 ms and zero cancelled**, in
+  **17.218 ms**. Full logs and commands are retained in
+  `/private/tmp/fourth-answer-gaps-checks/` and its committed README.
+- **The one-second first-launch target was missed.** Before the final
+  rebase: **1339.043 ms first / 322.414 ms repeat**. Final integrated
+  debug binary: **1303.071 ms first / 316.480 ms repeat**, from process
+  launch through captured JSON and exit over both full exports. First
+  child user/system CPU was **300.775/5.711 ms**; remaining wall time
+  is unassigned. Caches were not flushed. Each binary was measured
+  once then immediately repeated once; no warmed pass replaces either
+  miss. This is offline reporting latency, not lamp speech latency.
+- Exact-head workspace Clippy **39645965628** passed in **2m34s**;
+  ARM64 **39645965557** is running for #2684. Previous-head green runs
+  do not qualify this amended head. The PR body, review response and Queue #2602 carry the
+  new head, counts and missed latency target.
+- **#2697**, `ea27e09e1632d45634b32d3dffc1f86a322cc63e`, is ready.
+  Native ARM64 **39643593845** passed **9759, zero failed, 63 skipped**
+  across 156 test binaries, plus four doc tests, the relay harness and
+  twelve process tests. Workspace Clippy **39643593687** passed.
+  Artifact **12367840305** has ZIP SHA-256
+  `1426695061e8eccbe36c417d648ae8e51ccb1f4d701701783850b16a567ea815`.
+  The existing passing journal test again had a leak diagnostic; no
+  failing gate is hidden. Source and output byte hashes, all 201 source
+  lines, owner/cursor pairs, window selection and privacy checks passed
+  independently. No source changed during qualification.
+- Backend lifted the lamp-4ace allowance at **00:28 ICT**, after the
+  preceding entry's restriction. First now plans the cue 3000/default
+  pair after the check line, under the six-played-run limit with provider
+  totals. Fourth still has no lamp and made no device/provider request.
+  Third owns the six yield cases; their missing original hearing history
+  and build/flag identity remain requested from First.
+- The remaining labelled issues have merged code or lamp/app acceptance
+  assigned to their owners. Fourth requested the next code slice once
+  on Queue #2602 and continues the current review and native gates;
+  another builder's open memory/lean work was not duplicated.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
