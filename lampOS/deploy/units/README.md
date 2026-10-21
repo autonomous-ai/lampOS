@@ -64,6 +64,8 @@ the lamp (#2396, [body.md](../../docs/body.md), "The first stand of a moved
 lamp"):
 - Once someone is near, the lamp asks for a touch through the voice's say
   service. This is why the generic voice unit sets `LAMP_SAY=on`.
+  `lamp-setup`'s Wi-Fi, reset and `wifi_lost` lines would speak through it
+  too, but a moved lamp has no `lamp-setup` unit. The socket is root's only.
 - A touch held 1 s is the yes. On a yes, the unit stops `lamp-body`, stands
   the arm as the factory's steps do, writes `/etc/lampOS/body/lamp.env`, and
   starts the body again.
