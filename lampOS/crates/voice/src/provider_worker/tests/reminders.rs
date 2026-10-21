@@ -883,6 +883,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         }),
         schedule_tools: true,
         schedule_speak: true,

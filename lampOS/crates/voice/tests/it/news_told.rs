@@ -267,7 +267,7 @@ fn news_heard_whole_closes_the_harness_it_was_of() {
     });
     place.nothing_closed(&id);
 
-    news.heard(vec![key]);
+    news.heard(5, vec![key]);
     place.until(|| !place.closed().is_empty());
     assert!(place.task(&id)["observations"][0]["told"].is_object());
     place.until(|| place.task(&id)["task"]["close"]["state"] == "closed");
@@ -292,11 +292,11 @@ fn news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back() {
     .unwrap();
     let key = place.told(&mut news, &id);
     place.halt();
-    news.heard(vec![key]);
+    news.heard(5, vec![key]);
     thread::sleep(NOTHING_FOR);
     place.serve();
     place.nothing_closed(&id);
-    news.heard(vec!["s1:9:hand-over".into()]);
+    news.heard(5, vec!["s1:9:hand-over".into()]);
     place.until(|| !place.closed().is_empty());
     assert!(place.task(&id)["observations"][0]["told"].is_object());
     assert_eq!(place.closed(), [AGENT]);

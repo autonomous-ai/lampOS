@@ -76,6 +76,7 @@ pub mod motion_voice;
 pub mod person;
 pub mod photo_faces;
 pub mod scoped_session;
+pub mod sign_in;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;
 pub mod not_speech;

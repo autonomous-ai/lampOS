@@ -659,6 +659,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         machine_names: false,
         make_skill: false,
         named_only: false,
+        sign_in: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place.clone()),
@@ -3977,6 +3978,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         machine_names: false,
         make_skill: false,
         named_only: false,
+        sign_in: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place),
