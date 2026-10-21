@@ -321,7 +321,7 @@ where
                     }
                     // Its answer is read as any other turn's words; the
                     // stream goes on.
-                    Some(Outgoing::Flush) => {
+                    Some(Outgoing::Flush { .. }) => {
                         if !chunk.is_empty() {
                             write.send(Message::binary(std::mem::take(&mut chunk))).await.map_err(failed)?;
                         }
