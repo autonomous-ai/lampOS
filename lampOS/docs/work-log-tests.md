@@ -1,5 +1,61 @@
 # Tests work log
 
+## 2026-10-21 23:47:21 +0700 — reminder ready on ARM64; judge startup wait pushed
+
+Ready for lamp-voice: [#2679](https://github.com/autonomous-ai/lampOS/pull/2679)
+yes, pending review; [#2647](https://github.com/autonomous-ai/lampOS/pull/2647)
+no, its new exact-head Linux checks are running.
+
+The reminder PR at `0af798d348ba06f7163f7aac90b79a381263888c` passed
+native [ARM64 #5191](https://github.com/autonomous-ai/lampOS/actions/runs/39633785316)
+in 15m54s: 9,723 passed (one leaky), 63 skipped, plus doc/own-harness
+checks. Its reminder case took 0.008 s and all 16 named motor cases passed.
+Linux all-target [Clippy #1200](https://github.com/autonomous-ai/lampOS/actions/runs/39633785317)
+passed in 2m29s. The original motor failures remain unexplained; no regression
+was reproduced in the unchanged/changed comparison. The PR retains that limit.
+
+Also marked the exact-head-green Tests drafts #2637, #2645, #2646 and #2653
+ready, with their Linux CI links and existing limitations in their bodies.
+These are review requests, not merge clearances or new device claims.
+
+Pushed #2647 at `0f961123bae4ef804acd04ac53db6e074d2dd161` on
+`tests/1806-addons-judge-decision-2`, Part of #1806, `builder:tests`.
+The previous patch rebased unchanged (`range-diff =`) onto `8029dbd30`;
+the new work is folded into its one-line commit. The explicitly leased
+push replaced only this owned branch's prior head `4e16dbed9`.
+
+- Kind: off unless explicitly set. The approved test `--mute-grace-ms`
+  shortens only the wait for a never-said mute. Product default and actual
+  mute freshness stay 3 s, including the voice-restart reset.
+- Retained fixture state precedes process startup. Tests wait for the
+  proposal subscription and decision, or the disabled child's exit.
+  The product fixture's 3.2 s and startup's 300 ms sleeps are removed.
+- The ring is read at the first decision, before the preserved 100 ms
+  duplicate observation. A later ring request fails the fixture.
+- Comparable Mac product-lamp runs: 3.6924 / 3.6991 / 3.7015 s before,
+  0.1378 / 0.1373 / 0.1348 s after. The eight original tests summed
+  7.3655 / 6.8171 / 6.8117 s before and 1.4313 / 0.8212 / 0.8152 s after.
+  These are separate-process wall times, not device latency or concurrent
+  binary elapsed time. First-use effects remain in the record.
+- Eight original tests passed 3/3 before; nine passed 3/3 after. Six
+  temporary mutants caused 8/8 intended assertion failures, including
+  early-decision and delayed-duplicate controls twice each. Source hashes
+  matched after restoration.
+- Passed sequentially from `lampOS/`: `cargo fmt --all --check`;
+  `cargo clippy -q -p lamp-addons --all-targets --message-format=short -- -Dwarnings`;
+  `cargo test -q -p lamp-addons` (29 library + 9 integration, none ignored);
+  `cargo build -q --workspace`; `git diff --check`.
+- [Verification record](https://github.com/autonomous-ai/lampOS/tree/0f961123bae4ef804acd04ac53db6e074d2dd161/lampOS/docs/verification/addons-judge-grace-20261021)
+  contains exact commands, raw results, timings and replayable Rust
+  mutation patches. The measuring Python script remains outside lampOS.
+
+Native [ARM64 #5208](https://github.com/autonomous-ai/lampOS/actions/runs/39637726292)
+and Linux [Clippy #1217](https://github.com/autonomous-ai/lampOS/actions/runs/39637726326)
+are running on the new head. ARM64 #5191's eight judge cases totaled
+19.064 s; that is before-only context from a different machine/base.
+No ARM64 build ran on the Mac and no lamp was contacted.
+Posted on [Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6321426373).
+
 ## 2026-10-21 23:22:51 +0700 — reminder clock published; motor comparison recorded; addons grace next
 
 Ready for lamp-voice: no — [#2679](https://github.com/autonomous-ai/lampOS/pull/2679) is a draft until its exact-head Linux checks finish.
