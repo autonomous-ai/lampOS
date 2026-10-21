@@ -128,6 +128,93 @@ fn source_for(value: Option<&str>) -> Source {
     }
 }
 
+/// `on` exactly: the stop stream's speech-to-text is asked with the stop
+/// words as key terms (Deepgram's `keyterm`, as the main stream's are sent),
+/// first among the unit's own ([`with_key_terms`]). On lamp-4ace's replay
+/// on 21 Oct (#2661) the stop path wrote the lamp's own story nearly word
+/// for word on `pre_aec` and `aec_linear` and never a played "Stop."
+/// (the first builder on #2602, 23:44). Off unless set.
+pub const KEYTERM_ENVIRONMENT: &str = "LAMP_STOP_WORDS_KEYTERM";
+
+/// The stop words as the stop stream asks for them ([`KEYTERM_ENVIRONMENT`]):
+/// a subset of [`STOP_WORDS`] and [`STOP_PAIRS`] on purpose, the ones people
+/// say to a lamp; "quiet", "hush" and "shush" are left out (the reviewer's P3
+/// on #2690).
+pub const KEY_TERMS: &[&str] = &["Stop", "Wait", "Hold on", "Hang on", "Enough", "Pause"];
+
+/// Whether the switch is on, as the environment says.
+pub fn key_terms_from_environment() -> bool {
+    std::env::var(KEYTERM_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// `config` as the stop stream connects with it: with `on`, the stop words
+/// first among its key terms, then the unit's own not already among them,
+/// at most [`crate::second_config::MOST_KEY_TERMS`]. Without, as it is.
+pub fn with_key_terms(mut config: SecondConfig, on: bool) -> SecondConfig {
+    config.stt_key_terms = stop_key_terms(std::mem::take(&mut config.stt_key_terms), on);
+    config
+}
+
+/// The key terms the stop stream asks with, from the unit's `own`
+/// ([`with_key_terms`]).
+fn stop_key_terms(own: Vec<String>, on: bool) -> Vec<String> {
+    if !on {
+        return own;
+    }
+    KEY_TERMS
+        .iter()
+        .map(|term| (*term).to_owned())
+        .chain(
+            own.into_iter()
+                .filter(|term| !KEY_TERMS.iter().any(|stop| stop.eq_ignore_ascii_case(term))),
+        )
+        .take(crate::second_config::MOST_KEY_TERMS)
+        .collect()
+}
+
+/// A makeup gain in dB for the canceller's output ([`Source::Processed`],
+/// `aec_only`) before the stop stream hears it, to the level `aec_linear`
+/// has: on the replay (#2661) `aec_only` gave 2 results in 81 pauses. A
+/// number over 0 and at most [`MOST_GAIN_DB`]; anything else, none. Only
+/// that source is gained ([`StopWords::with_gain`]).
+pub const GAIN_ENVIRONMENT: &str = "LAMP_STOP_WORDS_GAIN_DB";
+/// The most gain taken: past it the suppressor's floor is noise.
+pub const MOST_GAIN_DB: f32 = 24.0;
+
+/// The gain the environment asks for, bounded ([`GAIN_ENVIRONMENT`]).
+pub fn gain_from_environment() -> Option<f32> {
+    gain_for(std::env::var(GAIN_ENVIRONMENT).ok().as_deref())
+}
+
+/// `value` as a gain: a number over 0 and at most [`MOST_GAIN_DB`].
+pub fn gain_for(value: Option<&str>) -> Option<f32> {
+    value?
+        .trim()
+        .parse::<f32>()
+        .ok()
+        .filter(|gain| gain.is_finite() && *gain > 0.0 && *gain <= MOST_GAIN_DB)
+}
+
+/// The gain for stop words heard in a yield, whose [`StopWords`] keeps the
+/// default source while capture hands on `source`'s blocks: none unless they
+/// are the canceller's output (El's P2 on #2690).
+pub fn yield_gain(gain_db: Option<f32>, source: Source) -> Option<f32> {
+    gain_db.filter(|_| source == Source::Processed)
+}
+
+/// `samples` raised by `gain_db`, clipped at full scale.
+pub fn raised(samples: &[i16], gain_db: f32) -> Vec<i16> {
+    let factor = 10f32.powf(gain_db / 20.0);
+    samples
+        .iter()
+        .map(|&sample| {
+            (f32::from(sample) * factor)
+                .round()
+                .clamp(f32::from(i16::MIN), f32::from(i16::MAX)) as i16
+        })
+        .collect()
+}
+
 /// Where the coordinator reads whether a stop heard over the lamp is held
 /// for the lamp's own words (`own-words`, #828 section 2): at a reply's
 /// start, with nothing queued, the lamp's text for a block can come after
@@ -329,6 +416,8 @@ pub struct StopWords {
     /// What the coordinator hands on ([`Self::with_source`]), for the
     /// counts file.
     source: Source,
+    /// A makeup gain for the canceller's output ([`Self::with_gain`]).
+    gain: Option<f32>,
     /// With `always`: a stop heard is held for the lamp's own words
     /// ([`Self::with_hold`]), and the one held.
     hold: bool,
@@ -375,6 +464,7 @@ impl StopWords {
             cadence: false,
             since_asked: 0,
             source: Source::Processed,
+            gain: None,
             hold: false,
             held: None,
             ahead_at: 0,
@@ -405,6 +495,22 @@ impl StopWords {
     pub fn with_source(mut self, source: Source) -> Self {
         self.source = source;
         self.with_cadence(source != Source::Processed)
+    }
+
+    /// The canceller's output raised by `gain_db` before it is heard
+    /// ([`GAIN_ENVIRONMENT`]); the raw and linear blocks never are.
+    pub fn with_gain(mut self, gain_db: Option<f32>) -> Self {
+        self.gain = gain_db;
+        self
+    }
+
+    /// `samples` as the ears hear them: raised with a gain, on the
+    /// canceller's output only.
+    fn heard<'a>(&self, samples: &'a [i16]) -> std::borrow::Cow<'a, [i16]> {
+        match self.gain.filter(|_| self.source == Source::Processed) {
+            Some(gain) => std::borrow::Cow::Owned(raised(samples, gain)),
+            None => std::borrow::Cow::Borrowed(samples),
+        }
     }
 
     /// Everything heard while the lamp speaks ([`Listen::Always`]). A yield
@@ -483,7 +589,8 @@ impl StopWords {
         }
         self.replying = replying;
         if replying && (sounding || yielded) {
-            self.ears.hear(captured_at_us, samples);
+            let heard = self.heard(samples);
+            self.ears.hear(captured_at_us, &heard);
             self.sent += 1;
             // Through the relay a short "Stop." gets no interim result, and
             // its words come only once `Finalize` asks for them (the first
@@ -698,15 +805,22 @@ impl StopWords {
             self.asked = false;
             self.told = false;
             match held {
-                Some(held) => held
-                    .iter()
-                    .for_each(|block| self.ears.hear(block.captured_at_us, &block.samples)),
-                None => self.ears.hear(captured_at_us, samples),
+                Some(held) => {
+                    for block in held {
+                        let heard = self.heard(&block.samples);
+                        self.ears.hear(block.captured_at_us, &heard);
+                    }
+                }
+                None => {
+                    let heard = self.heard(samples);
+                    self.ears.hear(captured_at_us, &heard);
+                }
             }
             tell = Tell::Await;
         } else if yielded {
             if !self.asked {
-                self.ears.hear(captured_at_us, samples);
+                let heard = self.heard(samples);
+                self.ears.hear(captured_at_us, &heard);
             }
             if !self.asked && still.is_some_and(|still| still >= FINALIZE_AFTER_STILL_BLOCKS) {
                 self.ears.finalize();
@@ -1543,6 +1657,73 @@ mod tests {
         }
         // A stop word after one that is turned round still counts.
         assert!(stop_phrase("Don't worry, stop."));
+    }
+
+    /// The first builder on #2602 (21 Oct 23:44): the stop stream's key
+    /// terms are the stop words, first, only with `LAMP_STOP_WORDS_KEYTERM`;
+    /// the unit's own follow, each once, within the bound.
+    #[test]
+    fn the_stop_stream_asks_for_the_stop_words_only_with_the_switch() {
+        let own = vec!["Hanoi".to_owned(), "stop".to_owned()];
+        assert_eq!(stop_key_terms(own.clone(), false), own);
+        let asked = stop_key_terms(own, true);
+        assert_eq!(&asked[..KEY_TERMS.len()], KEY_TERMS);
+        assert_eq!(&asked[KEY_TERMS.len()..], ["Hanoi"], "\"stop\" once");
+        let many = (0..40).map(|n| format!("w{n}")).collect();
+        assert_eq!(
+            stop_key_terms(many, true).len(),
+            crate::second_config::MOST_KEY_TERMS
+        );
+    }
+
+    /// A makeup gain is a number of dB over 0 and at most 24, clips at full
+    /// scale, and raises only the canceller's output, never the raw or the
+    /// linear blocks.
+    #[test]
+    fn the_gain_is_bounded_and_raises_only_the_cancellers_output() {
+        assert_eq!(gain_for(Some("12")), Some(12.0));
+        assert_eq!(gain_for(Some(" 6.5 ")), Some(6.5));
+        for bad in [
+            None,
+            Some("0"),
+            Some("-6"),
+            Some("24.5"),
+            Some("inf"),
+            Some("NaN"),
+            Some("x"),
+        ] {
+            assert_eq!(gain_for(bad), None, "{bad:?}");
+        }
+        assert_eq!(
+            raised(&[100, -100, 20_000, -20_000], 20.0),
+            [1_000, -1_000, i16::MAX, i16::MIN]
+        );
+        // Heard in a yield, the blocks are the capture's chosen source: raw or
+        // linear blocks are never raised (El's P2 on #2690).
+        assert_eq!(yield_gain(Some(12.0), Source::Processed), Some(12.0));
+        assert_eq!(yield_gain(Some(12.0), Source::Raw), None);
+        assert_eq!(yield_gain(Some(12.0), Source::Linear), None);
+        assert_eq!(yield_gain(None, Source::Processed), None);
+        for (source, raised_to) in [
+            (Source::Processed, 1_000),
+            (Source::Linear, 100),
+            (Source::Raw, 100),
+        ] {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words = StopWords::new(Box::new(Scripted(script.clone())))
+                .with_source(source)
+                .with_gain(Some(20.0));
+            words.block(true, true, true, None, None, 0, &block(100));
+            assert!(
+                script
+                    .lock()
+                    .unwrap()
+                    .told
+                    .contains(&format!("hear {raised_to}")),
+                "{source:?}: {:?}",
+                script.lock().unwrap().told
+            );
+        }
     }
 
     /// What the scripted ears were told, and the words they give.

@@ -682,7 +682,18 @@ cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
   it, with the voice unit's environment over the file. The default file
   is the product's `/etc/lampOS/voice/second.json`. Nothing prints a key:
   only the host the words go to. It refuses to run with
-  `LAMP_STOP_WORDS_AUDIO` or `LAMP_STOP_WORDS_COUNTS` set.
+  `LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS`, `LAMP_STOP_WORDS_KEYTERM`
+  or `LAMP_STOP_WORDS_GAIN_DB` set: those are its options.
+- **`--keyterm`** asks every stream with the stop words as key terms, as
+  the voice does with `LAMP_STOP_WORDS_KEYTERM=on`: "Stop", "Wait",
+  "Hold on", "Hang on", "Enough" and "Pause", first among the unit's own
+  (`stop_words::with_key_terms`). **`--gain-db N`** raises the `aec_only`
+  (`processed`) source by N dB, over 0 and at most 24, clipped at full
+  scale, as `LAMP_STOP_WORDS_GAIN_DB` does (`StopWords::with_gain`); the
+  other sources are never raised. Both are the first builder's on #2602
+  (21 Oct 23:44), after #2661's replay: the stop path wrote the lamp's own
+  story on `pre_aec` and `aec_linear` and no played "Stop.", and on
+  `aec_only` gave 2 results in 81 pauses.
 - **Real time.** Each source is heard as the lamp read it, 10 ms block by
   block, the sources side by side, each on a stream of its own: a 2.7 min
   bundle takes about 2.8 min.
