@@ -1,0 +1,553 @@
+#!/usr/bin/env python3
+"""Offline publisher tests: every git, gh and updater command is simulated."""
+
+import base64
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+SPEC = importlib.util.spec_from_file_location("publisher", Path(__file__).with_name("lampos-publish.py"))
+P = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(P)
+SHA = "a" * 40
+RETAINED = {"lamp-update", "lamp-voice", "lamp-body-measure", "lamp-body-mood"}
+EXCLUDED = {"lamp-station", "schedule_check", "replay_cost"}
+
+
+def fixture_classification():
+    return {"_comment": "Only the four lists classify binaries.",
+            "core": ["lamp-voice"], "optional": ["lamp-update", "lamp-absent-optional"],
+            "provisioning": ["lamp-body-measure", "lamp-body-mood"],
+            "development": ["lamp-station"]}
+
+
+def assert_release_subset(test, artifact, assets):
+    for name in RETAINED:
+        test.assertEqual(assets[name]["data"], (artifact / name).read_bytes())
+    test.assertTrue(EXCLUDED.isdisjoint(assets))
+    sums = "".join(f"{P.digest(artifact / name)}  {name}\n" for name in sorted(RETAINED))
+    test.assertEqual(assets["SHA256SUMS"]["data"], sums.encode())
+    manifest = json.loads(assets["manifest.json"]["data"])
+    test.assertEqual({entry["name"] for entry in manifest["files"]}, RETAINED | {"lamp-product-skills"})
+    expected = RETAINED | {"lamp-product-skills", "SHA256SUMS", "manifest.json", P.ENVELOPE}
+    expected.update(f"{entry['lamp']}.{entry['unit']}" for entry in manifest["units"])
+    test.assertEqual(set(assets), expected)
+
+
+def encoded(manifest):
+    return json.dumps({"format": "lampos-update/1", "key": "0" * 16, "manifest": base64.b64encode(json.dumps(manifest).encode()).decode(), "signature": "fixture-signature"}).encode()
+
+
+def old_envelope(sequence):
+    return encoded({"schema": 1, "channel": "lamp-voice", "sequence": sequence, "commit": "b" * 40, "files_url": f"https://github.com/{P.REPO}/releases/download/{P.HEAD}-{sequence}/", "files": [{"name": "lamp-update", "size": 1, "sha256": hashlib.sha256(b"x").hexdigest()}], "units": []})
+
+
+class FakeCommands:
+    """A stateful GitHub release API, with failures before and after mutations."""
+    def __init__(self, sequence=9):
+        self.calls = []
+        self.release_map = {}
+        self.refs = set()
+        self.next_id = 1
+        self.next_asset = 100
+        self.fail = None
+        self.key_paths = []
+        self.key_modes = []
+        self.head_mutations = []
+        self.updater_calls = []
+        self.api_fail = False
+        if sequence is not None:
+            release = self.release(P.HEAD, "b" * 40)
+            self.add(release, P.ENVELOPE, old_envelope(sequence))
+        self.before = self.canonical()
+
+    def release(self, tag, sha):
+        release = {"id": self.next_id, "tag_name": tag, "target_commitish": sha, "draft": False, "prerelease": True, "assets": {}}
+        self.next_id += 1
+        self.release_map[tag] = release
+        self.refs.add(f"refs/tags/{tag}")
+        return release
+
+    def add(self, release, name, data):
+        if name in release["assets"]:
+            raise P.Refused("fake duplicate asset")
+        asset = {"id": self.next_asset, "name": name, "size": len(data), "state": "uploaded", "data": data}
+        self.next_asset += 1
+        release["assets"][name] = asset
+        return asset
+
+    def canonical(self):
+        asset = self.release_map.get(P.HEAD, {}).get("assets", {}).get(P.ENVELOPE)
+        return asset["data"] if asset else None
+
+    def asset(self, identifier):
+        for release in self.release_map.values():
+            for asset in release["assets"].values():
+                if asset["id"] == identifier:
+                    return release, asset
+        raise P.Refused("fake asset absent")
+
+    @staticmethod
+    def json_result(value):
+        def public(item):
+            return {key: val for key, val in item.items() if key not in ("data", "assets")}
+        if isinstance(value, list):
+            value = [[public(item) for item in page] for page in value]
+        return json.dumps(value).encode()
+
+    def run(self, words, output=None):
+        words = [str(word) for word in words]
+        self.calls.append(words)
+        if words[0] == "git":
+            return (SHA + "\n").encode()
+        if Path(words[0]).name == "lamp-update":
+            return self.updater(words)
+        if words[:2] == ["gh", "release"]:
+            return self.release_command(words)
+        if words[:2] == ["gh", "api"]:
+            require = P.require
+            if self.api_fail:
+                raise P.Refused("fake API auth/network error")
+            if "application/octet-stream" in " ".join(words):
+                endpoint = words[2]
+                _, asset = self.asset(int(endpoint.rsplit("/", 1)[1]))
+                output.write(asset["data"])
+                return b""
+            endpoint = words[-1]
+            prefix = f"repos/{P.REPO}"
+            if endpoint == prefix:
+                return self.json_result({"full_name": P.REPO, "private": False})
+            endpoint = endpoint.removeprefix(prefix + "/")
+            if endpoint.startswith("releases?"):
+                if self.fail == "release-lookup":
+                    raise P.Refused("fake release lookup HTTP 503")
+                if self.fail == "malformed-lookup":
+                    return b'{"message":"unexpected API object"}'
+                return self.json_result([list(self.release_map.values())])
+            if endpoint.startswith("git/matching-refs/tags/"):
+                tag = endpoint.removeprefix("git/matching-refs/tags/")
+                return json.dumps([{"ref": ref} for ref in sorted(self.refs) if ref.startswith("refs/tags/" + tag)]).encode()
+            if endpoint.endswith("/assets?per_page=100"):
+                identifier = int(endpoint.split("/")[1])
+                release = next(release for release in self.release_map.values() if release["id"] == identifier)
+                return self.json_result([list(release["assets"].values())])
+            if "PATCH" in words:
+                identifier = int(endpoint.rsplit("/", 1)[1])
+                release, asset = self.asset(identifier)
+                name = words[words.index("-f") + 1].removeprefix("name=")
+                old_name = asset["name"]
+                promoting = old_name.startswith("lampos-manifest-staged-") and name == P.ENVELOPE
+                restoring = old_name.startswith("lampos-manifest-previous-") and name == P.ENVELOPE
+                if old_name == P.ENVELOPE and self.fail == "rename-old":
+                    raise P.Refused("fake old rename failed")
+                if promoting and self.fail in ("rename-candidate", "restore"):
+                    raise P.Refused("fake promotion rename failed")
+                if restoring and self.fail == "restore":
+                    raise P.Refused("fake restore failed")
+                require(name not in release["assets"], "fake duplicate name")
+                del release["assets"][old_name]
+                asset["name"] = name
+                release["assets"][name] = asset
+                self.head_mutations.append((identifier, old_name, name))
+                if self.fail == "rename-old-response" and old_name == P.ENVELOPE:
+                    self.fail = None
+                    raise P.Refused("fake lost response after old rename")
+                if self.fail == "rename-new-response" and promoting:
+                    self.fail = None
+                    raise P.Refused("fake lost response after candidate rename")
+                return self.json_result({"id": identifier, "name": name})
+        raise AssertionError(f"unexpected simulated command: {words}")
+
+    def updater(self, words):
+        self.updater_calls.append(words)
+        action = words[1]
+        options = dict(zip(words[2::2], words[3::2]))
+        if action == "manifest":
+            stage = Path(options["--binaries"])
+            (stage / "lamp-product-skills").write_bytes(b"skill fixture")
+            unit = "lamp-4ace.lamp-voice.service"
+            (stage / unit).write_bytes(b"unit fixture")
+            if self.fail == "manifest-extra-binary":
+                (stage / "lamp-station").write_bytes(b"unexpected development binary")
+            entries = [{"name": file.name, **P.file_info(file)} for file in sorted(stage.glob("lamp-*")) if P.BINARY.fullmatch(file.name)]
+            manifest = {"schema": 1, "channel": options["--channel"], "sequence": int(options["--sequence"]), "commit": options["--commit"], "files_url": options["--files-url"], "files": entries, "units": [{"lamp": "lamp-4ace", "unit": "lamp-voice.service", **P.file_info(stage / unit)}]}
+            if self.fail == "wrong-manifest-sha":
+                manifest["commit"] = "c" * 40
+            if self.fail == "bad-manifest-hash":
+                manifest["files"][0]["sha256"] = "0" * 64
+            (stage / "manifest.json").write_text(json.dumps(manifest))
+            return b"made\n"
+        if action in ("sign", "public-key"):
+            key = Path(options["--key-file"])
+            self.key_paths.append(key)
+            self.key_modes.append(key.stat().st_mode & 0o777)
+            if action == "public-key":
+                if self.fail == "public-key":
+                    raise P.Refused("fake public-key failure")
+                return base64.b64encode(bytes(32)) + b"\n"
+            if self.fail == "sign":
+                raise P.Refused("fake signing failure")
+            payload = Path(options["--manifest"]).read_bytes()
+            envelope = {"format": "lampos-update/1", "key": "0" * 16, "manifest": base64.b64encode(payload).decode(), "signature": "fixture-signature"}
+            Path(options["--out"]).write_text(json.dumps(envelope))
+            return b"signed with fixture fingerprint\n"
+        if action == "check":
+            self.assert_check(options)
+            channel = Path(options["--channel-url"].removeprefix("file://"))
+            envelope = json.loads((channel / P.ENVELOPE).read_bytes())
+            P.require(envelope["signature"] == "fixture-signature", "fake bad signature")
+            manifest = json.loads(base64.b64decode(envelope["manifest"]))
+            P.require(manifest["channel"] == options["--channel"], "fake wrong channel")
+            if self.fail == "check":
+                raise P.Refused("fake verifier refusal")
+            if self.fail == "check-empty-success":
+                return b"nothing published\n"
+            if self.fail == "check-wrote":
+                (Path(options["--root"]) / "changed").write_text("not read-only")
+            if self.fail == "check-mkdir":
+                (Path(options["--root"]) / "empty").mkdir()
+            if self.fail == "check-symlink":
+                (Path(options["--root"]) / "dangling").symlink_to("absent")
+            return f"up to date: build {manifest['sequence']}\n".encode()
+        raise AssertionError(action)
+
+    @staticmethod
+    def assert_check(options):
+        assert options["--apply"] == "off"
+        assert options["--channel-url"].startswith("file:///")
+        assert options["--lamp"] == "publish-check"
+        assert Path(options["--root"]).is_dir()
+
+    def release_command(self, words):
+        action, tag = words[2:4]
+        flags = {"--repo", "--target", "--title", "--notes-file"}
+        args = {}
+        files = []
+        cursor = 4
+        while cursor < len(words):
+            value = words[cursor]
+            if value in flags:
+                args[value] = words[cursor + 1]
+                cursor += 2
+            elif value.startswith("--"):
+                assert value in ("--prerelease", "--latest=false")
+                cursor += 1
+            else:
+                files.append(Path(value))
+                cursor += 1
+        if action == "create":
+            assert tag not in self.release_map
+            release = self.release(tag, args["--target"])
+            for index, file in enumerate(files):
+                if self.fail == "create-upload" and tag != P.HEAD and index == 1:
+                    raise P.Refused("fake partial immutable upload")
+                if self.fail == "missing-upload" and tag != P.HEAD and index == 1:
+                    continue
+                data = file.read_bytes()
+                if self.fail == "corrupt-upload" and tag != P.HEAD and index == 1:
+                    data = bytes([data[0] ^ 1]) + data[1:]
+                self.add(release, file.name, data)
+            if self.fail == "changed-head" and tag != P.HEAD:
+                asset = self.release_map[P.HEAD]["assets"][P.ENVELOPE]
+                asset["data"] = old_envelope(11)
+                asset["size"] = len(asset["data"])
+            return b"created\n"
+        assert action == "upload" and tag == P.HEAD and "--clobber" not in words
+        if self.fail == "stage-upload":
+            raise P.Refused("fake stage upload failed")
+        release = self.release_map[tag]
+        for file in files:
+            data = file.read_bytes()
+            if self.fail == "corrupt-stage":
+                data = data[:-1] + bytes([data[-1] ^ 1])
+            self.add(release, file.name, data)
+        return b"uploaded\n"
+
+
+class PublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lampos-publish-test-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.artifact = self.root / "artifact"
+        self.artifact.mkdir()
+        for name in sorted(RETAINED | EXCLUDED):
+            (self.artifact / name).write_bytes((name + " fixture").encode())
+        (self.artifact / "lamp-update").chmod(0o600)
+        self.checksums()
+        self.classification = self.root / "lampOS/deploy/package-binaries.json"
+        self.classification.parent.mkdir(parents=True)
+        self.classification.write_text(json.dumps(fixture_classification()))
+        self.env = {P.ENABLE: "on", P.BOOTSTRAP: "off", P.SECRET: "not-a-real-key", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
+        self.fake = FakeCommands()
+
+    def checksums(self):
+        sums = "".join(f"{P.digest(path)}  {path.name}\n" for path in sorted(self.artifact.iterdir()) if path.name != "SHA256SUMS")
+        (self.artifact / "SHA256SUMS").write_text(sums)
+
+    def publish(self):
+        return P.Publisher(self.artifact, self.root, self.env, self.fake).run()
+
+    def refused_unchanged(self, pattern=None, canonical=True):
+        original = P.tree_info(self.artifact)
+        with self.assertRaisesRegex(P.Refused, pattern or ".+"):
+            self.publish()
+        self.assertEqual(P.tree_info(self.artifact), original)
+        if canonical:
+            self.assertEqual(self.fake.before, self.fake.canonical())
+        self.assertTrue(all(not path.exists() for path in self.fake.key_paths))
+
+    def test_existing_channel_advances_only_after_verified_build_and_stage(self):
+        original = P.tree_info(self.artifact)
+        result = self.publish()
+        self.assertEqual(P.tree_info(self.artifact), original)
+        self.assertEqual(result["published"], "lampos-lamp-voice-10")
+        assets = self.fake.release_map[P.HEAD]["assets"]
+        self.assertNotEqual(self.fake.before, self.fake.canonical())
+        self.assertIn(self.fake.before, [asset["data"] for name, asset in assets.items() if "previous" in name])
+        self.assertEqual(self.fake.key_modes, [0o600, 0o600])
+        self.assertTrue(all(not path.exists() for path in self.fake.key_paths))
+        self.assertFalse(any("--clobber" in call for call in self.fake.calls))
+        released = self.fake.release_map[result["published"]]["assets"]
+        assert_release_subset(self, self.artifact, released)
+
+    def test_excluded_bytes_are_verified_before_any_updater_execution(self):
+        for name in sorted(EXCLUDED):
+            with self.subTest(name=name):
+                original = (self.artifact / name).read_bytes()
+                try:
+                    (self.artifact / name).write_bytes(b"tampered excluded bytes")
+                    self.refused_unchanged("checksum mismatch")
+                    self.assertEqual(self.fake.updater_calls, [])
+                finally:
+                    (self.artifact / name).write_bytes(original)
+
+    def test_invalid_classification_never_executes_artifact(self):
+        original = fixture_classification()
+        cases = [b"not json", b"[]", b'{"core":[],"core":[]}',
+                 json.dumps({key: value for key, value in original.items() if key != "optional"}).encode(),
+                 json.dumps({**original, "future": []}).encode(),
+                 json.dumps({**original, "_comment": []}).encode(),
+                 json.dumps({**original, "core": "lamp-voice"}).encode(),
+                 json.dumps({**original, "core": ["lamp-voice", "lamp-voice"]}).encode(),
+                 json.dumps({**original, "development": ["lamp-update"]}).encode()]
+        for name in (None, 1, "../lamp-escape", "lamp-../../escape", "lamp-Bad", "lamp_bad", "", "lamp-" + "x" * 40):
+            cases.append(json.dumps({**original, "core": [name]}).encode())
+        for raw in cases:
+            with self.subTest(raw=raw):
+                self.classification.write_bytes(raw)
+                self.refused_unchanged()
+                self.assertEqual(self.fake.updater_calls, [])
+                self.assertFalse(any(call[0] == "gh" for call in self.fake.calls))
+
+    def test_missing_or_linked_classification_never_executes_artifact(self):
+        self.classification.unlink()
+        self.refused_unchanged("package classification")
+        self.assertEqual(self.fake.updater_calls, [])
+        other = self.root / "classification.json"
+        other.write_text(json.dumps(fixture_classification()))
+        self.classification.symlink_to(other)
+        self.refused_unchanged("package classification")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_comment_cannot_classify_an_unclassified_artifact_binary(self):
+        (self.artifact / "lamp-new-part").write_bytes(b"unclassified")
+        self.checksums()
+        classification = fixture_classification()
+        classification["_comment"] = 'A quoted "lamp-new-part" is not membership.'
+        self.classification.write_text(json.dumps(classification))
+        self.refused_unchanged("unclassified")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_classification_cannot_exclude_the_updater(self):
+        classification = fixture_classification()
+        classification["optional"].remove("lamp-update")
+        classification["development"].append("lamp-update")
+        self.classification.write_text(json.dumps(classification))
+        self.refused_unchanged("excludes the updater")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_manifest_cannot_reintroduce_an_excluded_binary(self):
+        self.fake.fail = "manifest-extra-binary"
+        self.refused_unchanged("manifest binary inventory differs")
+        self.assertFalse(any(call[0] == "gh" for call in self.fake.calls))
+
+    def test_initial_channel_requires_explicit_bootstrap(self):
+        self.fake = FakeCommands(None)
+        self.refused_unchanged("requires")
+        self.assertFalse(self.fake.release_map)
+
+    def test_explicit_bootstrap_creates_a_verified_head(self):
+        self.fake = FakeCommands(None)
+        self.env[P.BOOTSTRAP] = "on"
+        self.publish()
+        self.assertIsNotNone(self.fake.canonical())
+
+    def test_bad_activation_and_non_push_contexts_run_no_updater(self):
+        for field, value in ((P.ENABLE, "ON"), (P.ENABLE, ""), ("GITHUB_ACTIONS", "false"), ("GITHUB_REPOSITORY", "other/repo"), ("GITHUB_EVENT_NAME", "pull_request"), ("GITHUB_EVENT_NAME", "workflow_dispatch"), ("GITHUB_REF", "refs/heads/other"), ("GITHUB_SHA", "c" * 40), ("GITHUB_RUN_NUMBER", "0"), (P.SECRET, "")):
+            with self.subTest(field=field, value=value):
+                original = self.env[field]
+                self.env[field] = value
+                self.refused_unchanged()
+                self.assertEqual(self.fake.updater_calls, [])
+                self.env[field] = original
+
+    def test_missing_checksums_never_executes_artifact(self):
+        (self.artifact / "SHA256SUMS").unlink()
+        self.refused_unchanged("lacks")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_changed_checksum_never_executes_artifact(self):
+        (self.artifact / "lamp-update").write_bytes(b"changed")
+        self.refused_unchanged("checksum mismatch")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_unlisted_file_never_executes_artifact(self):
+        (self.artifact / "extra").write_text("extra")
+        self.refused_unchanged("inventory")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_symlink_never_executes_artifact(self):
+        (self.artifact / "link").symlink_to(self.artifact / "lamp-update")
+        self.refused_unchanged("regular")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_duplicate_checksum_never_executes_artifact(self):
+        path = self.artifact / "SHA256SUMS"
+        path.write_text(path.read_text() * 2)
+        self.refused_unchanged("duplicate")
+        self.assertEqual(self.fake.updater_calls, [])
+
+    def test_wrong_manifest_identity_refuses_before_github(self):
+        self.fake.fail = "wrong-manifest-sha"
+        self.refused_unchanged("identity")
+        self.assertFalse(any(call[0] == "gh" for call in self.fake.calls))
+
+    def test_manifest_hash_mismatch_refuses_before_github(self):
+        self.fake.fail = "bad-manifest-hash"
+        self.refused_unchanged("hash")
+        self.assertFalse(any(call[0] == "gh" for call in self.fake.calls))
+
+    def test_public_key_failure_removes_private_key(self):
+        self.fake.fail = "public-key"
+        self.refused_unchanged()
+
+    def test_sign_failure_removes_private_key(self):
+        self.fake.fail = "sign"
+        self.refused_unchanged()
+
+    def test_verifier_failure_and_success_without_proof_refuse(self):
+        for failure in ("check", "check-empty-success", "check-wrote", "check-mkdir", "check-symlink"):
+            with self.subTest(failure=failure):
+                self.fake = FakeCommands()
+                self.fake.fail = failure
+                self.refused_unchanged()
+                self.assertFalse(any(call[0] == "gh" for call in self.fake.calls))
+
+    def test_api_auth_or_network_error_is_not_absence(self):
+        self.env[P.BOOTSTRAP] = "on"
+        self.fake.api_fail = True
+        self.refused_unchanged("API")
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_bad_existing_signature_is_not_bootstrap(self):
+        self.env[P.BOOTSTRAP] = "on"
+        asset = self.fake.release_map[P.HEAD]["assets"][P.ENVELOPE]
+        value = json.loads(asset["data"])
+        value["signature"] = "wrong-signature"
+        asset["data"] = json.dumps(value).encode()
+        asset["size"] = len(asset["data"])
+        self.fake.before = self.fake.canonical()
+        self.refused_unchanged("signature")
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_failed_or_malformed_channel_lookup_is_not_bootstrap(self):
+        for failure in ("release-lookup", "malformed-lookup"):
+            with self.subTest(failure=failure):
+                self.fake = FakeCommands()
+                self.fake.fail = failure
+                self.env[P.BOOTSTRAP] = "on"
+                self.refused_unchanged()
+                self.assertEqual(self.fake.head_mutations, [])
+                self.assertNotIn("lampos-lamp-voice-10", self.fake.release_map)
+
+    def test_existing_channel_without_envelope_is_not_bootstrap(self):
+        self.env[P.BOOTSTRAP] = "on"
+        del self.fake.release_map[P.HEAD]["assets"][P.ENVELOPE]
+        self.fake.before = None
+        self.refused_unchanged("owner repair")
+
+    def test_existing_immutable_tag_without_release_refuses(self):
+        self.fake.refs.add("refs/tags/lampos-lamp-voice-10")
+        self.refused_unchanged("tag already")
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_existing_immutable_release_refuses(self):
+        self.fake.release("lampos-lamp-voice-10", SHA)
+        self.refused_unchanged("release already")
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_stale_or_repeated_sequence_never_mutates_head(self):
+        for sequence in (10, 11):
+            with self.subTest(sequence=sequence):
+                self.fake = FakeCommands(sequence)
+                self.refused_unchanged("stale or repeated")
+                self.assertEqual(self.fake.head_mutations, [])
+                self.assertNotIn("lampos-lamp-voice-10", self.fake.release_map)
+
+    def test_failed_incomplete_or_corrupt_build_upload_never_mutates_head(self):
+        for failure in ("create-upload", "missing-upload", "corrupt-upload"):
+            with self.subTest(failure=failure):
+                self.fake = FakeCommands()
+                self.fake.fail = failure
+                self.refused_unchanged()
+                self.assertEqual(self.fake.head_mutations, [])
+
+    def test_failed_or_corrupt_staging_never_mutates_head(self):
+        for failure in ("stage-upload", "corrupt-stage"):
+            with self.subTest(failure=failure):
+                self.fake = FakeCommands()
+                self.fake.fail = failure
+                self.refused_unchanged()
+                self.assertEqual(self.fake.head_mutations, [])
+
+    def test_channel_changed_during_upload_is_left_untouched(self):
+        self.fake.fail = "changed-head"
+        self.refused_unchanged("channel changed", canonical=False)
+        self.assertEqual(self.fake.canonical(), old_envelope(11))
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_candidate_rename_failure_restores_previous_head(self):
+        self.fake.fail = "rename-candidate"
+        self.refused_unchanged("previous canonical envelope restored")
+        self.assertTrue(self.fake.head_mutations)
+
+    def test_old_rename_failure_preserves_previous_head(self):
+        self.fake.fail = "rename-old"
+        self.refused_unchanged("previous canonical envelope restored")
+        self.assertEqual(self.fake.head_mutations, [])
+
+    def test_lost_response_after_either_rename_restores_previous_head(self):
+        for failure in ("rename-old-response", "rename-new-response"):
+            with self.subTest(failure=failure):
+                self.fake = FakeCommands()
+                self.fake.fail = failure
+                self.refused_unchanged("previous canonical envelope restored")
+
+    def test_failed_restoration_reports_retained_asset_ids(self):
+        self.fake.fail = "restore"
+        self.refused_unchanged("restoration also failed; owner must inspect", canonical=False)
+        self.assertIsNone(self.fake.canonical())
+        self.assertIn(self.fake.before, [asset["data"] for asset in self.fake.release_map[P.HEAD]["assets"].values()])
+
+    def test_commands_never_pass_private_key_environment_to_children(self):
+        commands = P.Commands(self.env)
+        self.assertNotIn(P.SECRET, commands.environ)
+        self.assertEqual(commands.environ["GITHUB_REPOSITORY"], P.REPO)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -43,6 +43,10 @@ name: lampOS on ARM64
 # the crates built from them, not all of lampOS on every checkout (#1806; the
 # first builder's ask of 21 Oct 2026 for runs of about ten minutes, against 11
 # to 28 and 19 at the median: 3.9 to 4.4 minutes in the probe runs there).
+# Publication-eligible pushes are the exception: they restore neither target
+# nor source times, and record fresh checkout times in an empty target before
+# building. Their signed binaries do not depend on cache freshness. PRs and
+# publication-disabled runs keep the ordinary cached path below.
 #
 # The cache is lamp-voice's newest build: each of lamp-voice's own runs saves
 # it under a key with its commit, even when a test failed, and pull requests
@@ -68,7 +72,7 @@ name: lampOS on ARM64
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py']
+    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-publish*.py']
   # A pull request that changes only docs a build never reads skips this run (the
   # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
   # docs that code or tests read are named again below, so a change to one still
@@ -96,6 +100,7 @@ on:
       - '.github/workflows/lampos-arm64.yml'
       - '.github/scripts/lampos-pr-crates.py'
       - '.github/scripts/lampos-source-times.py'
+      - '.github/scripts/lampos-publish*.py'
   workflow_dispatch:
     inputs:
       full:
@@ -135,12 +140,21 @@ jobs:
         with:
           # A pull request's merge commit and its first parent (lamp-voice), for the crates it changes.
           fetch-depth: 2
+      - name: publication failure tests (offline, no signing secret)
+        run: python3 -I .github/scripts/lampos-publish-test.py
       - name: Rust 1.96.0
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: artifact provenance regression (offline, disposable Cargo workspace)
+        if: matrix.shard == 1
+        run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
       - name: restore the cache
         id: cache
+        # Match publish's eligibility exactly, so signing candidates build cold.
+        if: >-
+          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -152,16 +166,46 @@ jobs:
             lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
             lampos-arm64-u2204-
       - name: unchanged source files get the cached build's times back
+        if: >-
+          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
         run: python3 -I .github/scripts/lampos-source-times.py
+      - name: record fresh source times for a cold publication build
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+        # With no target/record, this only records checkout times for the cache
+        # saved after the run. Any unexpected pre-existing target fails closed.
+        run: |
+          if [ -e lampOS/target ] || [ -L lampOS/target ]; then
+            echo 'cold publication build requires an absent lampOS/target' >&2
+            exit 1
+          fi
+          python3 -I .github/scripts/lampos-source-times.py
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
-        run: cargo build --locked --release --workspace --bins --examples
+        # Keep Cargo's current-target records outside the restored target cache.
+        run: cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl
       - name: every built lamp-* binary is classified for the lamp-os package
         working-directory: lampOS
         run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
+      - name: build the two selected artifact examples without filename collisions
+        if: matrix.shard == 1
+        working-directory: lampOS
+        # Both controls and expression have replay_cost. Export expression's
+        # planner tool from a separate target directory; the workspace gate
+        # above still builds every example from both packages.
+        run: |
+          cargo build --locked --release -p lamp-schedule --example schedule_check \
+            --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-schedule-example.jsonl
+          cargo build --locked --release -p lamp-expression --example replay_cost \
+            --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-expression-example.jsonl
+      - name: publication CLI rehearsal (local test key and simulated GitHub only)
+        if: matrix.shard == 1
+        run: python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update
       - name: which crates a pull request tests
         id: scope
         if: github.event_name == 'pull_request'
@@ -189,15 +233,14 @@ jobs:
           cargo test --locked --release --workspace --doc -- --test-threads=1
           cargo test --locked --release -p lamp-ipc --test relay_signals
           cargo test --locked --release -p lamp-turn-end-wire --test process
-      - name: SHA-256 of each binary
+      - name: export only current Cargo targets and their SHA-256
         if: matrix.shard == 1
-        working-directory: lampOS/target/release
-        run: |
-          mkdir -p ../../arm64-out
-          for f in lamp-* examples/schedule_check examples/replay_cost; do
-            [ -f "$f" ] && [ -x "$f" ] && case "$f" in *.d) ;; *) cp "$f" ../../arm64-out/ ;; esac
-          done
-          cd ../../arm64-out && sha256sum * | tee SHA256SUMS
+        run: >-
+          python3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS
+          --build-log lampOS/arm64-build.jsonl
+          --build-log lampOS/arm64-schedule-example.jsonl
+          --build-log lampOS/arm64-expression-example.jsonl
+          --out lampOS/arm64-out
       - uses: actions/upload-artifact@v4
         if: matrix.shard == 1
         with:
@@ -208,6 +251,12 @@ jobs:
       # lamp-voice's own, and one onto #1712's that found none (see the top). Not
       # a run by hand on another branch: no pull request reads its cache (the
       # reviewer on #2465).
+      - name: discard the isolated example target before saving the cache
+        if: >-
+          ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
+          || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
+        # The CI artifact has independent, checksummed copies of both examples.
+        run: rm -rf -- lampOS/target/lampos-artifact-examples
       - name: save the cache
         if: >-
           ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
@@ -218,7 +267,45 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          key: ${{ steps.cache.outputs.cache-primary-key }}
+          # A cold publication build skipped restore, so it has no cache outputs.
+          key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
+
+  publish:
+    name: lampOS — sign and publish the tested lamp-voice artifact
+    needs: arm64
+    # Off until the owner explicitly activates publication. Manual runs and PRs
+    # never enter this job; download-artifact defaults to this successful run.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+    # The owner must configure branch-only lamp-voice protection before storing
+    # the signing key here; naming an environment does not create its rules.
+    environment: lampos-update-publish
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: lampos-publish-lamp-voice
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: lampos-arm64-${{ github.sha }}
+          path: build
+      - name: verify, sign, upload, then promote the channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAMPOS_UPDATE_PUBLISH: ${{ vars.LAMPOS_UPDATE_PUBLISH }}
+          LAMPOS_UPDATE_BOOTSTRAP: ${{ vars.LAMPOS_UPDATE_BOOTSTRAP }}
+          # Use the branch-restricted environment secret, with no repository or
+          # organization copy. Only this step references it in this workflow.
+          # Cleanup removes its 0600 file on normal failure;
+          # forced runner termination still relies on ephemeral-runner disposal.
+          LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
+        run: python3 -I .github/scripts/lampos-publish.py --artifact build --source .
 
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.
