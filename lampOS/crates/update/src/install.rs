@@ -253,9 +253,8 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "laugh-glance",
-        "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
-         until its scores are measured in an empty room and a busy one: a glance at every loud \
-         voice would read as a machine",
+        "PARKED (#1669): dropped, the owner never asked to listen for other people laughing \
+         (the lead, #1711, 21 Oct); kept, and off by being listed here",
     ),
     (
         "music-sway",
