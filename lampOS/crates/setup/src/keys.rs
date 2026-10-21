@@ -619,30 +619,48 @@ mod tests {
     use std::io::{Read, Write};
 
     /// A local server that answers `status` once; what it was asked.
-    fn answering(status: u16) -> (String, std::thread::JoinHandle<String>) {
+    fn answering(status: u16) -> (String, Served) {
         answering_with(&format!(
             "HTTP/1.1 {status} X\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
         ))
     }
 
     /// A local server that answers `reply` to the one request it takes, and
-    /// fails the test if a second comes within the check's bound.
-    fn answering_with(reply: &str) -> (String, std::thread::JoinHandle<String>) {
+    /// fails the test if a second comes before [`Served::join`]: a check
+    /// has returned by then, so a second request of its own has connected,
+    /// and one more look finds it.
+    fn answering_with(reply: &str) -> (String, Served) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let reply = reply.to_owned();
-        let served = std::thread::spawn(move || {
+        let (stop, stopped) = std::sync::mpsc::channel::<()>();
+        let thread = std::thread::spawn(move || {
             let (mut socket, _) = listener.accept().unwrap();
             let mut request = vec![0; 8_192];
             let n = socket.read(&mut request).unwrap();
             socket.write_all(reply.as_bytes()).unwrap();
             drop(socket);
+            // Up to the check's bound, as before, unless stopped sooner.
+            let _ = stopped.recv_timeout(Duration::from_millis(300));
             listener.set_nonblocking(true).unwrap();
-            std::thread::sleep(Duration::from_millis(300));
             assert!(listener.accept().is_err(), "a second request with the key");
             String::from_utf8_lossy(&request[..n]).to_lowercase()
         });
-        (format!("http://{address}"), served)
+        (format!("http://{address}"), Served { stop, thread })
+    }
+
+    /// The server [`answering_with`] runs.
+    struct Served {
+        stop: std::sync::mpsc::Sender<()>,
+        thread: std::thread::JoinHandle<String>,
+    }
+
+    impl Served {
+        /// What it was asked, once it is stopped and has looked once more.
+        fn join(self) -> std::thread::Result<String> {
+            let _ = self.stop.send(());
+            self.thread.join()
+        }
     }
 
     /// The service's error body is never read or passed on: a 401 whose
