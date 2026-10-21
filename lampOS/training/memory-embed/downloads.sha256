@@ -1,0 +1,7 @@
+# Hugging Face files the bench reads, by repository and revision (#2510).
+# google/embeddinggemma-300m is gated (a login and the Gemma licence), so it is not here.
+# intfloat/multilingual-e5-small @ 614241f622f53c4eeff9890bdc4f31cfecc418b3 (MIT)
+ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665  e5-fp32/onnx/model.onnx
+0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39  e5-fp32/onnx/tokenizer.json
+# Xenova/multilingual-e5-small @ 761b726dd34fb83930e26aab4e9ac3899aa1fa78 (its int8 export)
+f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193  e5-int8/onnx/model_quantized.onnx
