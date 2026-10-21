@@ -483,6 +483,29 @@ does half a minute without a turn. Nothing comes back, and a body that is absent
 slow or stopped changes nothing in the voice service. A mood older than 1.5 s
 is rest. Anything that is not exactly that object is ignored.
 
+With `LAMP_BODY_ONSET_LISTENING=on` (off unless set, #2669) `listening` is
+sent at the onset of a person's speech instead of only once an input is
+admitted (about 0.9 s after a line begins, measured): at 300 ms of what the
+voice's own speech detector calls speech (score 0.5 or more, dips of up to
+80 ms between syllables allowed), heard on a resting lamp. Resting means no
+turn of the lamp's own in progress, nothing of the lamp's own playing (the
+echo evidence says the render has been quiet for 300 ms) or ended under
+300 ms ago, the speech over the room's floor, and the head not settled as
+above. The detector opens a person's turn 60 ms into their speech (six
+blocks at 0.8), long before 300 ms: that turn, still hearing them with
+nothing of the lamp's in it, is the same speech and does not end the count
+(#2701: on lamp-c0a4's duplex route the count was reset there, and thirty
+played lines gave no cue). A clap is over
+long before 300 ms, and music or a steady loud TV the detector does not call
+speech never begins the count. It is a cue to the body only: no turn is
+opened, and nothing about what is admitted or answered changes. An input
+admitted takes the mood from its turn; with none, `listening` holds 1.5 s
+after the last speech (past an utterance's 0.6 s end and the admission's
+200 ms) and the body is told `resting` again. Each cue is recorded as
+`{"kind":"body_onset_listening","speech_ms":300,"at_us":...,"told_us":...}`
+in the voice trace, for a lamp run to time against the body's first step
+(target: under 400 ms).
+
 | Mood | Wanted pose, as offsets from where the head was found |
 | --- | --- |
 | resting | none |

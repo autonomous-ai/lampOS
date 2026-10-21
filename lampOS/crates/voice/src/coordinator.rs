@@ -4545,6 +4545,14 @@ thread_local! {
     static TEST_EYES: std::cell::RefCell<Option<crate::body_link::EyesLink>> =
         const { std::cell::RefCell::new(None) };
     static TEST_CAMERA_FOLLOWS_EYES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's body link, as `TEST_EYES`: taken by the loop as it
+    /// starts, whatever its lifetime.
+    pub(super) static TEST_BODY: std::cell::RefCell<Option<crate::body_link::BodyLink>> =
+        const { std::cell::RefCell::new(None) };
+    /// A loop test's `LAMP_BODY_ONSET_LISTENING` (#2669), in place of the
+    /// environment: `Some(true)` on, `Some(false)` off.
+    pub(super) static TEST_ONSET: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
     /// A loop test's `LAMP_WAIT_KEEPS_ANSWER=on` (#1123), as
     /// `TEST_CAMERA_FOLLOWS_EYES`.
     static TEST_WAIT_KEEPS_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -4999,6 +5007,22 @@ fn conversation_with_gate(
     #[cfg(test)]
     let follows_eyes = camera_follows_eyes() || TEST_CAMERA_FOLLOWS_EYES.with(std::cell::Cell::get);
     let mut attention = crate::body_link::Attention::default();
+    #[cfg(test)]
+    if let Some(given) = TEST_BODY.with(|body| body.borrow_mut().take()) {
+        body_link = Some(given);
+    }
+    // `listening` told the body at a person's first 300 ms of speech, a
+    // cue only (`LAMP_BODY_ONSET_LISTENING=on`, #2669).
+    #[cfg(not(test))]
+    let onset_on = crate::body_link::Onset::from_environment().is_some();
+    #[cfg(test)]
+    let onset_on = TEST_ONSET
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(|| crate::body_link::Onset::from_environment().is_some());
+    let mut onset = body_link
+        .as_ref()
+        .filter(|_| onset_on)
+        .map(|_| crate::body_link::Onset::default());
     // The same count kept whether or not there is a body to tell: whether
     // the talk in the room has been for the lamp lately.
     let mut room = crate::body_link::Attention::default();
@@ -7387,6 +7411,34 @@ fn conversation_with_gate(
                 trace,
             )?;
             rise.sample(frame.read_completed_at_us);
+            // The body hears `listening` at the onset of speech on a resting
+            // lamp: no turn of the lamp's own, nothing of its own playing or
+            // just played, and the talk around it not settled as others'. A
+            // cue only. The detector opens the person's turn at 60 ms of
+            // speech (`START_BLOCKS` at 0.8), long before 300 ms: that turn,
+            // still hearing them with nothing of the lamp's in it, is this
+            // same speech and does not end the count (#2701, lamp-c0a4).
+            if let Some(onset) = onset.as_mut() {
+                let resting = reply.as_ref().is_none_or(|current| {
+                    !current.local_input_ended && current.playback.is_none() && !current.had_audio
+                }) && !attention.settled()
+                    && last_spoke_us.is_none_or(|spoke| {
+                        frame.read_completed_at_us
+                            > spoke.saturating_add(crate::asker_first::ECHO_TAIL_US)
+                    });
+                if let Some(speech_ms) = onset.block(
+                    frame.read_completed_at_us,
+                    probability,
+                    frame.echo.as_ref(),
+                    resting,
+                ) {
+                    record(
+                        trace,
+                        json!({"kind":"body_onset_listening","speech_ms":speech_ms,
+                            "at_us":frame.read_completed_at_us,"told_us":monotonic_us()}),
+                    )?;
+                }
+            }
             // How loud what the detector calls speech has been lately, for
             // the record of each utterance: its last eight seconds.
             // Once the lamp answers, nothing after goes on from the line
@@ -9337,6 +9389,12 @@ fn conversation_with_gate(
                     // The talk around it has not been for it: the head
                     // stays where it is until the lamp has something to say.
                     Some(RingPhase::Listening | RingPhase::Waiting) if attention.settled() => None,
+                    // Speech begun on a resting lamp, before any decision.
+                    None if reply.is_none()
+                        && onset.as_mut().is_some_and(|onset| onset.listening(clock)) =>
+                    {
+                        Some(RingPhase::Listening)
+                    }
                     phase => phase,
                 },
                 voice_level,

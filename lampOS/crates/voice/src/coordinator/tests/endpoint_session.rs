@@ -179,6 +179,9 @@ fn drain_control(channels: &mut WorkerChannels, generation: &mut u64) -> io::Res
 /// is the lamp's own voice (`Some(false)`), or cannot be told yet, the lamp's
 /// sound not yet matched in this reply (`None`).
 type Over = fn(u64, i16) -> Option<bool>;
+/// How long after an answer's last chunk the speaker's silence has filled
+/// the canceller's view of the render: its 640 ms ceiling.
+const RENDER_RESTS_AFTER: Duration = Duration::from_millis(640);
 
 /// Speech at ±1,000 or more is plainly over the lamp; quieter talk is under
 /// its voice, which explains the microphone.
@@ -189,12 +192,15 @@ fn over_at_1000(_block: u64, level: i16) -> Option<bool> {
 /// With `echo`, each block carries the canceller's evidence as lamp-4ace's
 /// capture worker gives it: no render before the first answer is written,
 /// and from then on the lamp's own voice, or a person over it as `echo`
-/// says.
+/// says. With `render_rests`, the speaker is given silence again once the
+/// last answer's chunk is [`RENDER_RESTS_AFTER`] old, and the render is quiet
+/// as the capture-clocked reference then reports it (#2701).
 fn capture_peer(
     mut channels: WorkerChannels,
     script: Script,
     levels: Option<Levels>,
     echo: Option<Over>,
+    render_rests: bool,
     seen: Arc<Mutex<Seen>>,
     starts_after: Duration,
 ) -> PeerStep {
@@ -270,7 +276,14 @@ fn capture_peer(
                 probability,
                 echo: echo.map(|over| {
                     use super::duplex::{OVER, OWN, evidence};
-                    if seen.lock().unwrap().chunks.is_empty() {
+                    let rested = |chunks: &Vec<(u64, Instant)>| {
+                        chunks.last().is_none_or(|(_, last)| {
+                            render_rests
+                                && scenario_clock::instant().saturating_duration_since(*last)
+                                    >= RENDER_RESTS_AFTER
+                        })
+                    };
+                    if rested(&seen.lock().unwrap().chunks) {
                         evidence(lamp_audio::evidence::QUIET_BLOCKS_CEILING, None)
                     } else if probability < 0.5 {
                         evidence(0, OWN)
@@ -358,7 +371,15 @@ mod capture_timeline {
                 .unwrap();
             channels.control.send(Control::StartCapture).unwrap();
             let seen = Arc::new(Mutex::new(Seen::default()));
-            let mut step = capture_peer(peer, |_| QUIET, None, None, seen.clone(), Duration::ZERO);
+            let mut step = capture_peer(
+                peer,
+                |_| QUIET,
+                None,
+                None,
+                false,
+                seen.clone(),
+                Duration::ZERO,
+            );
             assert!(step().unwrap());
             assert!(matches!(
                 channels.control.receive::<WorkerEvent>().unwrap(),
@@ -1042,6 +1063,9 @@ struct Lamp {
     retires: bool,
     /// The microphone's blocks carry echo evidence ([`capture_peer`]).
     echo: Option<Over>,
+    /// With `echo`, the render is quiet again once an answer has played
+    /// ([`capture_peer`]).
+    render_rests: bool,
     /// The speaker's authority lapses after this many chunks, as the
     /// speaker worker reports it (#1178): its reset, then the discard of
     /// that answer's queued speech as `ExpiredState`. It refuses the rest of
@@ -1154,6 +1178,7 @@ fn run_policy_with_peers_held(
             script,
             lamp.levels,
             lamp.echo,
+            lamp.render_rests,
             seen.clone(),
             lamp.capture_after.unwrap_or_default(),
         ),
@@ -3370,5 +3395,121 @@ fn a_timed_fixture_starts_3000_ms_after_listening_ready_and_never_muted() {
         muted.events("fixture_timed_start").is_empty(),
         "{:?}",
         muted.result
+    );
+}
+
+/// Three 1.6 s lines, each answered, with the lamp at rest between them:
+/// blocks 50-210, 400-560 and 750-910.
+fn three_lines(block: u64) -> f32 {
+    if (50..210).contains(&block) || (400..560).contains(&block) || (750..910).contains(&block) {
+        SPEECH
+    } else {
+        QUIET
+    }
+}
+
+/// The duplex route as lamp-c0a4 runs it, with a body to tell and
+/// `LAMP_BODY_ONSET_LISTENING` `on` or not, through the session loop:
+/// [`three_lines`], each answered, the render quiet between them. The
+/// session, and the moods the body was told, each once in a row.
+fn onset_session(on: bool) -> (Session, Vec<String>) {
+    use std::sync::atomic::AtomicU32;
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "lamp-onset-{}-{}.sock",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_file(&path);
+    let socket = std::os::unix::net::UnixDatagram::bind(&path).unwrap();
+    socket.set_nonblocking(true).unwrap();
+    super::TEST_BODY.with(|body| {
+        *body.borrow_mut() = Some(crate::body_link::BodyLink::to(path.clone()).unwrap())
+    });
+    super::TEST_ONSET.with(|onset| onset.set(Some(on)));
+    let session = run_policy_with_peers(
+        TurnTaking::Duplex,
+        11,
+        three_lines,
+        EndpointRig::double(delayed(0.95, Duration::from_millis(60))),
+        Some(ProviderReply {
+            after_end: Duration::from_millis(200),
+            packets: 3,
+            only_first: false,
+        }),
+        None,
+        PeerMode::Stepped,
+        Lamp {
+            echo: Some(|_, _| Some(true)),
+            render_rests: true,
+            retires: true,
+            ..Lamp::default()
+        },
+    );
+    super::TEST_BODY.with(|body| body.borrow_mut().take());
+    super::TEST_ONSET.with(|onset| onset.set(None));
+    let mut moods: Vec<String> = Vec::new();
+    let mut bytes = [0u8; 128];
+    while let Ok(length) = socket.recv(&mut bytes) {
+        let said = String::from_utf8(bytes[..length].to_vec()).unwrap();
+        let mood = serde_json::from_str::<Value>(&said).unwrap()["mood"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        if moods.last() != Some(&mood) {
+            moods.push(mood);
+        }
+    }
+    drop(socket);
+    let _ = std::fs::remove_file(&path);
+    session.result.as_ref().unwrap();
+    (session, moods)
+}
+
+/// #2701, lamp-c0a4: on the duplex route the detector opens the person's
+/// turn 60 ms into their speech, and the onset, which counted only with no
+/// turn at all, was reset there every line: no `body_onset_listening` in
+/// thirty played lines. Through the session loop, each of three answered
+/// lines now cues once at 300 ms of its speech, the render quiet each time,
+/// and what is admitted and answered is the same as with the switch off.
+#[test]
+fn the_onset_cues_every_line_on_the_duplex_route_through_the_loop() {
+    let _one = one_session();
+    let (on, moods_on) = onset_session(true);
+    let cues = on.events("body_onset_listening");
+    assert_eq!(cues.len(), 3, "{cues:?}");
+    // The turn opens at each line's sixth block of speech (`START_BLOCKS`,
+    // the candidate's trigger); the 300 ms end 24 blocks later, at its
+    // 30th, with the turn already open.
+    let candidates = on.events("input_candidate");
+    assert_eq!(candidates.len(), 3, "{candidates:?}");
+    for (cue, candidate) in cues.iter().zip(&candidates) {
+        assert_eq!(cue["speech_ms"], 300, "{cue:?}");
+        let trigger = candidate["candidate"]["trigger_read_at_us"]
+            .as_u64()
+            .unwrap();
+        assert_eq!(cue["at_us"].as_u64(), Some(trigger + 240_000), "{cue:?}");
+    }
+    let admitted = on.events("input_admitted");
+    assert_eq!(admitted.len(), 3, "{admitted:?}");
+    // Each cue during its own line's turn, before that line ends.
+    let ends = on.events("local_endpoint");
+    assert_eq!(ends.len(), 3, "{ends:?}");
+    for ((cue, admitted), end) in cues.iter().zip(&admitted).zip(&ends) {
+        assert!(admitted["at_us"].as_u64() < cue["at_us"].as_u64());
+        assert!(cue["at_us"].as_u64() < end["at_us"].as_u64());
+    }
+    // Off, through the same loop: no cue, and the same lines admitted,
+    // asked and answered, the body told the same moods in the same order.
+    let (off, moods_off) = onset_session(false);
+    assert!(off.events("body_onset_listening").is_empty());
+    assert_eq!(off.events("input_admitted").len(), 3);
+    assert_eq!(off.seen.requests.len(), on.seen.requests.len());
+    assert_eq!(off.seen.chunks.len(), on.seen.chunks.len());
+    assert_eq!(moods_off, moods_on);
+    assert_eq!(moods_on.first().map(String::as_str), Some("resting"));
+    assert!(
+        moods_on.iter().any(|mood| mood == "listening"),
+        "{moods_on:?}"
     );
 }

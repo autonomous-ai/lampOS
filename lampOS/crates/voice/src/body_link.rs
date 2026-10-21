@@ -342,6 +342,101 @@ impl Cue {
     }
 }
 
+/// The switch for the onset cue (#2669): `on` exactly. Off, the body hears
+/// `listening` only once an input is admitted, as before.
+pub const ONSET_ENVIRONMENT: &str = "LAMP_BODY_ONSET_LISTENING";
+/// Speech heard this long, on a resting lamp, tells the body `listening`
+/// (the first builder on #2669): a clap is over long before it.
+pub const ONSET_SPEECH_US: u64 = 300_000;
+/// A capture block (`lamp_audio::BLOCK_MS`).
+const ONSET_BLOCK_US: u64 = lamp_audio::BLOCK_MS as u64 * 1_000;
+/// A dip in the detector's score no longer than this, between syllables,
+/// does not break the speech: shorter than the gap between two hand claps.
+const ONSET_GAP_US: u64 = 80_000;
+/// After the last speech, the cue holds this long for the decision to
+/// admit it; an input admitted takes the mood from the turn instead. Past
+/// the 0.6 s an utterance's end waits for its silence, and the admission's
+/// 200 ms after it, so an admitted line does not drop to `resting` first.
+pub const ONSET_HOLDS_US: u64 = 1_500_000;
+
+/// The body told `listening` at a person's first words rather than at the
+/// decision to take them (#2669). A cue to the body only: it opens no turn
+/// and changes nothing of what is admitted or answered.
+#[derive(Default)]
+pub struct Onset {
+    /// The speech run in progress: its first and latest speech blocks.
+    run: Option<(u64, u64)>,
+    /// Once cued: the latest speech block since.
+    cued: Option<u64>,
+}
+
+impl Onset {
+    pub fn from_environment() -> Option<Self> {
+        (std::env::var(ONSET_ENVIRONMENT).ok().as_deref() == Some("on")).then(Self::default)
+    }
+
+    /// One capture block, ending at `at_us`. `resting`: the lamp is in no
+    /// turn of its own (none, or only the one this speech opened, still
+    /// hearing it with nothing of the lamp's in it), not speaking or just
+    /// done speaking, and the talk around it has not been for others. Speech is the detector's own (score 0.5 or more,
+    /// as `last_speech_us` takes it) and, with echo evidence, heard with the
+    /// lamp's render quiet ([`lamp_audio::duplex::Heard::Clear`]): never the
+    /// lamp's own voice. Returns how long the speech has lasted, in
+    /// milliseconds, the once a run reaches [`ONSET_SPEECH_US`].
+    pub fn block(
+        &mut self,
+        at_us: u64,
+        probability: f32,
+        echo: Option<&lamp_audio::evidence::EchoEvidence>,
+        resting: bool,
+    ) -> Option<u64> {
+        if !resting {
+            *self = Self::default();
+            return None;
+        }
+        let speech = match echo {
+            Some(evidence) => {
+                lamp_audio::duplex::Hearing::EVALUATED.heard(probability, evidence)
+                    == lamp_audio::duplex::Heard::Clear
+            }
+            None => probability.is_finite() && probability >= 0.5,
+        };
+        if !speech {
+            if self
+                .run
+                .is_some_and(|(_, last)| at_us.saturating_sub(last) > ONSET_GAP_US)
+            {
+                self.run = None;
+            }
+            return None;
+        }
+        let first = match self.run {
+            Some((first, last)) if at_us.saturating_sub(last) <= ONSET_GAP_US + ONSET_BLOCK_US => {
+                first
+            }
+            _ => at_us,
+        };
+        self.run = Some((first, at_us));
+        let lasted = at_us.saturating_sub(first) + ONSET_BLOCK_US;
+        let first_cue = self.cued.is_none() && lasted >= ONSET_SPEECH_US;
+        if first_cue || self.cued.is_some() {
+            self.cued = Some(at_us);
+        }
+        first_cue.then_some(lasted / 1_000)
+    }
+
+    /// Whether the body is to hear `listening` now for the onset.
+    pub fn listening(&mut self, now_us: u64) -> bool {
+        if self
+            .cued
+            .is_some_and(|last| now_us.saturating_sub(last) >= ONSET_HOLDS_US)
+        {
+            self.cued = None;
+        }
+        self.cued.is_some()
+    }
+}
+
 /// The eyes' socket, when the service is to let a camera look. Unset:
 /// nothing is sent and the eyes stay shut.
 pub const EYES_ENVIRONMENT: &str = "LAMP_EYES_PERMIT_SOCKET";
@@ -828,6 +923,202 @@ mod tests {
                 r#"{"mood":"speaking","level":255}"#,
             ]
         );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    /// One capture block's echo evidence: the lamp's render quiet for half
+    /// a second, or playing and explaining `explained` percent of the block.
+    fn echo(playing: Option<u8>) -> lamp_audio::evidence::EchoEvidence {
+        use lamp_audio::evidence::{EchoEvidence, EchoMatch, Level};
+        EchoEvidence {
+            blocks: 1_000,
+            render_active_blocks: if playing.is_some() { 50 } else { 0 },
+            render_quiet_blocks: if playing.is_some() { 0 } else { 50 },
+            capture_level: Level::from_tenths_of_db(-130),
+            residual_level: Level::from_tenths_of_db(-570),
+            echo: playing.map(|capture_explained| EchoMatch {
+                render_level: Level::from_tenths_of_db(-180),
+                capture_explained,
+                residual_explained: 10,
+                residual_playback_floor: 0,
+                alignment_age_blocks: 0,
+            }),
+            silent_at_echo: None,
+        }
+    }
+
+    /// Plays 10 ms blocks from `from_us` through the onset and tells the
+    /// body as the service does between turns (no phase): the score of each
+    /// block by its time, and whether the lamp rests. The cue's times, and
+    /// when the body first heard `listening`.
+    fn play(
+        onset: &mut Onset,
+        link: &mut BodyLink,
+        from_us: u64,
+        until_us: u64,
+        echo_of: impl Fn(u64) -> Option<lamp_audio::evidence::EchoEvidence>,
+        score: impl Fn(u64) -> f32,
+        resting: impl Fn(u64) -> bool,
+    ) -> Vec<(u64, u64)> {
+        let mut cues = Vec::new();
+        let mut at = from_us;
+        while at <= until_us {
+            let evidence = echo_of(at);
+            if let Some(speech_ms) = onset.block(at, score(at), evidence.as_ref(), resting(at)) {
+                cues.push((at, speech_ms));
+            }
+            let phase = onset.listening(at).then_some(RingPhase::Listening);
+            link.tell(phase, 0, at);
+            at += 10_000;
+        }
+        cues
+    }
+
+    const RESTING: &str = r#"{"mood":"resting","level":0}"#;
+    const LISTENING: &str = r#"{"mood":"listening","level":0}"#;
+
+    #[test]
+    fn the_body_hears_listening_at_300_ms_of_speech_and_rests_again_if_nothing_is_admitted() {
+        let (socket, path) = listener();
+        let mut link = BodyLink::to(path.clone()).unwrap();
+        let mut onset = Onset::default();
+        let quiet = |_| Some(echo(None));
+        // Silence for 200 ms, then speech from the block ending at 210 ms.
+        let speech = |at: u64| if at > 200_000 { 0.9 } else { 0.1 };
+        let cues = play(&mut onset, &mut link, 0, 500_000, quiet, speech, |_| true);
+        // 30 blocks of speech, 200-500 ms: told at the 300 ms mark, once.
+        assert_eq!(cues, [(500_000, 300)]);
+        let told = received(&socket);
+        let first = told.iter().position(|said| said == LISTENING).unwrap();
+        // Resting every 40 ms until then: 0, 40, ... 480 ms is 13 messages.
+        assert_eq!(first, 13);
+        assert!(told[..first].iter().all(|said| said == RESTING));
+        // The person stops at 500 ms and no input is admitted: the cue
+        // holds for ONSET_HOLDS_US after the last speech, then rests.
+        let mut at = 510_000;
+        while at < 500_000 + ONSET_HOLDS_US {
+            assert_eq!(onset.block(at, 0.1, Some(&echo(None)), true), None);
+            assert!(onset.listening(at), "{at}");
+            at += 10_000;
+        }
+        assert!(!onset.listening(500_000 + ONSET_HOLDS_US));
+        link.tell(None, 0, 500_000 + ONSET_HOLDS_US);
+        assert_eq!(received(&socket), [RESTING]);
+        // An admitted input takes the lamp: the onset lets go of the mood
+        // at once and the turn's own phase is told from then.
+        let mut onset = Onset::default();
+        play(&mut onset, &mut link, 0, 400_000, quiet, |_| 0.9, |_| true);
+        assert!(onset.listening(400_000));
+        assert_eq!(onset.block(410_000, 0.9, None, false), None);
+        assert!(!onset.listening(410_000));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn claps_never_tell_the_body_listening() {
+        let (socket, path) = listener();
+        let mut link = BodyLink::to(path.clone()).unwrap();
+        let mut onset = Onset::default();
+        // Even scored as speech: 50 ms claps, four a second, for 3 s.
+        let clap = |at: u64| if at % 250_000 < 50_000 { 0.95 } else { 0.05 };
+        let cues = play(
+            &mut onset,
+            &mut link,
+            0,
+            3_000_000,
+            |_| Some(echo(None)),
+            clap,
+            |_| true,
+        );
+        assert!(cues.is_empty());
+        // One 290 ms burst falls short too.
+        let burst = |at: u64| {
+            if (4_000_000..4_290_000).contains(&at) {
+                0.95
+            } else {
+                0.05
+            }
+        };
+        let cues = play(
+            &mut onset,
+            &mut link,
+            3_990_000,
+            5_000_000,
+            |_| None,
+            burst,
+            |_| true,
+        );
+        assert!(cues.is_empty());
+        assert!(received(&socket).iter().all(|said| said == RESTING));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn music_or_a_loud_tv_the_detector_does_not_call_speech_never_does() {
+        let (socket, path) = listener();
+        let mut link = BodyLink::to(path.clone()).unwrap();
+        let mut onset = Onset::default();
+        // Ten seconds of steady sound scored under the detector's 0.5, with
+        // a block or two over it now and then.
+        let music = |at: u64| if at % 700_000 < 20_000 { 0.6 } else { 0.3 };
+        let cues = play(
+            &mut onset,
+            &mut link,
+            0,
+            10_000_000,
+            |_| Some(echo(None)),
+            music,
+            |_| true,
+        );
+        assert!(cues.is_empty());
+        assert!(received(&socket).iter().all(|said| said == RESTING));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn the_lamps_own_voice_never_tells_the_body_listening() {
+        let (socket, path) = listener();
+        let mut link = BodyLink::to(path.clone()).unwrap();
+        let mut onset = Onset::default();
+        // While it speaks (in a turn, or just done): not resting.
+        let cues = play(
+            &mut onset,
+            &mut link,
+            0,
+            2_000_000,
+            |_| Some(echo(Some(90))),
+            |_| 0.9,
+            |_| false,
+        );
+        assert!(cues.is_empty());
+        // Between turns with its render still playing (a sound of its own):
+        // the render explains the block, or a person is heard over it; or
+        // nothing yet says whose it is. Only a quiet render counts.
+        for playing in [Some(echo(Some(90))), Some(echo(Some(0)))] {
+            let cues = play(
+                &mut onset,
+                &mut link,
+                2_010_000,
+                4_000_000,
+                |_| playing,
+                |_| 0.9,
+                |_| true,
+            );
+            assert!(cues.is_empty());
+        }
+        let mut alignment_unknown = echo(Some(0));
+        alignment_unknown.echo = None;
+        let cues = play(
+            &mut onset,
+            &mut link,
+            4_010_000,
+            6_000_000,
+            |_| Some(alignment_unknown),
+            |_| 0.9,
+            |_| true,
+        );
+        assert!(cues.is_empty());
+        assert!(received(&socket).iter().all(|said| said == RESTING));
         std::fs::remove_file(path).unwrap();
     }
 
