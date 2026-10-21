@@ -1119,10 +1119,12 @@ it.
 
 **And one version back** (the build row "Updates cover the whole lamp, V3 to
 V5", 21 Oct): each store as its day's build wrote it is kept as a
-fixture, and every later build's tests read it. A shape change adds the
-new day's file and keeps the old ones. lamp-tasks is first
-(`crates/tasks/tests/fixtures/stores/`: the state and the database around
-it, as SQL); the other parts follow, by harm.
+fixture, and every later build's tests read it, as a restart in the same
+boot and after a reboot. A shape change adds the new day's file and keeps
+the old ones. Kept so far, each in its crate's `tests/fixtures/stores/`:
+lamp-tasks (the state and the database around it, as SQL) and
+lamp-schedule (its reminders and timers, the same two); the other parts
+follow, by harm.
 
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows

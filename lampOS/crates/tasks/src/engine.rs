@@ -4412,43 +4412,46 @@ mod tests {
     /// Every later build reads each with its tasks as they were, so an
     /// update never leaves a lamp's tasks behind (the build row "Updates
     /// cover the whole lamp, V3 to V5"). Opened as an update's restart opens
-    /// it: the same boot, later.
+    /// it, the same boot later, and after a reboot (the reviewer-lead's P3 on
+    /// #2420).
     #[test]
     fn each_kept_state_reads_with_its_tasks() {
         let kept: [(&str, &[u8]); 1] = [(
             "2026-10-21",
             include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
         )];
+        let rebooted = Clock {
+            boot_id: "later-boot".into(),
+            monotonic_ms: 50,
+        };
         for (day, bytes) in kept {
-            let memory = Memory::default();
-            memory.0.borrow_mut().bytes = Some(bytes.to_vec());
-            let engine = Engine::open(
-                memory,
-                targets(),
-                "f".repeat(32).as_str(),
-                RESTART,
-                &clock(1_000),
-            )
-            .unwrap_or_else(|error| panic!("{day}: {error}"));
-            assert_eq!(engine.store_id(), STORE, "{day}: the same store");
-            assert_eq!(engine.set_aside(), None, "{day}: nothing set aside");
-            // The one still queued when its session ended is invalidated,
-            // as at any restart; the others are as they were written.
-            assert_eq!(
-                [1, 2, 3].map(|id| dispatch(&engine, id)),
-                [
-                    DispatchState::Accepted,
-                    DispatchState::Uncertain,
-                    DispatchState::Invalidated
-                ],
-                "{day}"
-            );
-            let speech = engine.state.tasks[0].observations[0].speech.as_ref();
-            assert_eq!(
-                speech.map(|speech| speech.text.as_str()),
-                Some("The agent reports that its review is available."),
-                "{day}"
-            );
+            for (how, opened) in [("later", clock(1_000)), ("rebooted", rebooted.clone())] {
+                let day = format!("{day}, {how}");
+                let memory = Memory::default();
+                memory.0.borrow_mut().bytes = Some(bytes.to_vec());
+                let engine =
+                    Engine::open(memory, targets(), "f".repeat(32).as_str(), RESTART, &opened)
+                        .unwrap_or_else(|error| panic!("{day}: {error}"));
+                assert_eq!(engine.store_id(), STORE, "{day}: the same store");
+                assert_eq!(engine.set_aside(), None, "{day}: nothing set aside");
+                // The one still queued when its session ended is invalidated,
+                // as at any restart; the others are as they were written.
+                assert_eq!(
+                    [1, 2, 3].map(|id| dispatch(&engine, id)),
+                    [
+                        DispatchState::Accepted,
+                        DispatchState::Uncertain,
+                        DispatchState::Invalidated
+                    ],
+                    "{day}"
+                );
+                let speech = engine.state.tasks[0].observations[0].speech.as_ref();
+                assert_eq!(
+                    speech.map(|speech| speech.text.as_str()),
+                    Some("The agent reports that its review is available."),
+                    "{day}"
+                );
+            }
         }
     }
 
