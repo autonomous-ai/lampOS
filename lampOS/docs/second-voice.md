@@ -819,6 +819,20 @@ order is kept. A written turn is the same from the chat on.
   last named 30 s ago or more), and that person's kept things are asked
   for. With
   Days memory, the note is asked once per run of turns for one person.
+  A run ends when the person changes or the worker restarts, and, with
+  `LAMP_MEMORY_REOPEN_QUIET=on` (off unless set, #1693 (1)), when no turn
+  was told for ten minutes (`thread::REMEMBERED_FOR`, after which the
+  thread's exchanges aren't told either). The next turn then asks the note
+  again as a new session, so the same person back the next morning can be
+  asked about an open thread (`LAMP_MEMORY_THREADS`). Quiet is counted from
+  the last time a turn was told, so a long conversation, or one turn's
+  several asks (its prepared chat, then its rounds), never reopens it. The
+  ask is the one a person change already makes: synchronous as the turn's
+  chat is built, within the note's 300 ms; the old session is closed by
+  the memory's own queue, off the turn. Tests:
+  `worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again`,
+  and the thread told after a quiet in
+  `worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules`.
 - **Each turn is logged** as "lamp-voice second: request N ...": the words
   heard and how long after the line, the state of the words at the line's
   end (above), each chat round's first event (the first text or tool
