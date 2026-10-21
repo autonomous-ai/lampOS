@@ -4,8 +4,8 @@ use crate::engine::{Event, EventKind, FaceTarget, ToneKind, tone_kind};
 use lamp_bus::{Declaration, Kind, Message};
 use lamp_msgs::{
     AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, HumanFamiliar,
-    HumanSeems, MoodNudge, NameHeard, ScheduleDue, SeemsKind, Speech, SuddenSound, Voice,
-    VoiceState, VoiceTone,
+    HumanSeems, MoodNudge, NameHeard, ScheduleDue, SeemsKind, SeemsReader, Speech, SuddenSound,
+    Voice, VoiceState, VoiceTone,
 };
 use std::{collections::BTreeSet, fmt};
 
@@ -157,6 +157,11 @@ pub const INPUTS: [InputSpec; 13] = [
     },
 ];
 
+/// How long after Blendshape V2's last read FER+'s aren't taken: a read
+/// comes at most every 2 s, and with both readers taking turns, one every
+/// 4 s, so this covers a look or two missed.
+pub const BLENDSHAPES_HOLD_US: u64 = 10_000_000;
+
 /// The switch for how the near face seems as an input (#1671): `on` only.
 pub const SEEMS_ENVIRONMENT: &str = "LAMP_MOOD_SEEMS";
 /// The switch for how a line sounded as an input (#1722): `on` only.
@@ -269,7 +274,7 @@ enum Payload {
     Name(NameHeard),
     Schedule(ScheduleDue),
     Familiar(HumanFamiliar),
-    Seems(SeemsKind),
+    Seems(SeemsKind, SeemsReader),
     Nudge(MoodNudge),
     /// What a line's tone counts as, if anything: only the kind is kept.
     Tone(Option<ToneKind>),
@@ -305,6 +310,9 @@ pub struct InputAdapter {
     seems: bool,
     /// How a line sounded is taken (`LAMP_MOOD_TONE=on`).
     tone: bool,
+    /// Until when FER+'s reads are not taken: [`BLENDSHAPES_HOLD_US`] after
+    /// Blendshape V2's last.
+    blendshapes_until_us: u64,
 }
 
 impl InputAdapter {
@@ -326,6 +334,7 @@ impl InputAdapter {
             counts: InputCounts::default(),
             seems: false,
             tone: false,
+            blendshapes_until_us: 0,
         })
     }
 
@@ -565,9 +574,26 @@ impl InputAdapter {
             Payload::Air(value) => Some(EventKind::Air(value.co2_ppm)),
             Payload::Familiar(value) => Some(EventKind::Familiar(value.level)),
             // The kind only: the confidence was the reader's to judge.
-            Payload::Seems(kind) => Some(EventKind::Seems(
-                (kind != SeemsKind::Unsure).then_some(kind),
-            )),
+            // Blendshape V2's verdict is the one Mood takes when it is
+            // read: while it has been read lately, FER+'s reads (the
+            // measure's, taking turns with it on the same topic) are not
+            // taken, so they never break its run (Ten's 75c9 run on #2602,
+            // 22 Oct 02:05: each FER+ smile was followed by Blendshape's
+            // `unsure`, and Mood never smiled).
+            Payload::Seems(kind, reader) => {
+                if reader == SeemsReader::Blendshapes {
+                    self.blendshapes_until_us = observed_us.saturating_add(BLENDSHAPES_HOLD_US);
+                    Some(EventKind::Seems(
+                        (kind != SeemsKind::Unsure).then_some(kind),
+                    ))
+                } else if now_us < self.blendshapes_until_us {
+                    None
+                } else {
+                    Some(EventKind::Seems(
+                        (kind != SeemsKind::Unsure).then_some(kind),
+                    ))
+                }
+            }
             Payload::Tone(kind) => kind.map(EventKind::Tone),
             Payload::Name(value) => (value.score >= 0.9).then_some(EventKind::Name),
             Payload::Nudge(value) => Some(EventKind::Nudge {
@@ -756,7 +782,7 @@ fn parse(message: &Message, index: usize) -> Result<Payload, InputError> {
         10 => {
             let value: HumanSeems = message.parse().map_err(malformed)?;
             value.check().map_err(|_| InputError::InvalidPayload)?;
-            Payload::Seems(value.kind)
+            Payload::Seems(value.kind, value.from)
         }
         11 => {
             let value: MoodNudge = message.parse().map_err(malformed)?;

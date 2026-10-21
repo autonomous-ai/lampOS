@@ -1295,7 +1295,9 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   MIT), 35,040,571 bytes, pinned by SHA-256 in `seems.rs`, run under
   tract. No build or release carries it yet. It is placed by hand on a test lamp.
 - **The read:** at most every 2 s, the nearest face at or over
-  `NEAR_ENOUGH` of the picture's height is cut out upright as for
+  `NEAR_ENOUGH` of the picture's height, with its eyes at least 10 px
+  apart (`seems::READ_EYES_PX`, `seems::near_face`, for both readers), is
+  cut out upright as for
   recognition (`who::align`, 112 by 112), made grey and 64 by 64
   (`seems::grey`), and scored on eight expressions. These are reduced, as V1
   did: `positive` when happiness holds 0.6 or more of the eight, `negative`
@@ -1367,7 +1369,8 @@ Off unless `lamp-eyes --seems-blendshapes
 /opt/lampOS/eyes/models/face_blendshapes.onnx` is given, with
 `--mouth-model` (the mesh it reads from). Everything said, journaled and
 kept is as for `--seems` above: a kind and a confidence, at most every 2 s,
-for the nearest face at or over `NEAR_ENOUGH`; no name, picture, point or
+for the nearest face at or over `NEAR_ENOUGH` with its eyes at least 10 px
+apart; no name, picture, point or
 score. Each read names its reader (`from`: `fer_plus` or `blendshapes`;
 a message without it is FER+'s), so with both flags the two run side by
 side on the same face for the measure (the first builder, 20 Oct 09:51),
@@ -1391,6 +1394,12 @@ newest, whichever reader that was.
   tract. It comes from the same MediaPipe download as the mouth's mesh
   (`models/blendshapes/SOURCE.md`, made by `training/mouth/make.sh`). No
   build or release carries it yet.
+- **A far face gets no read** (Ten on #2602, 22 Oct 02:4x). One smile frame
+  of a screen face, shrunk, reads smile 0.97 with the eyes 14.2 px apart,
+  0.87 at 9.9 px and 0.18 at 7.0 px (`unsure`). On lamp-75c9 a screen
+  face at 0.07–0.10 of the picture, 7–9 px between the eyes, read
+  `unsure` 105 times in 106. An `unsure` from a face too small to read
+  would break Mood's run of reads, so under 10 px there is no read at all.
 - **The read:** the mesh's 478 landmarks for that face, from the mouth's
   pass if it read the same face on that look, else one mesh pass
   (`Mesh::landmarks`). The 146 points MediaPipe's own graph takes

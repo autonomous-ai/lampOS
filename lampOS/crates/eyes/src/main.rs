@@ -1912,12 +1912,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         // #2132): the other's turn comes on the next.
                         let mut read_this_look = false;
                         for seems in seems.iter_mut() {
-                            let tall = picture.filled.1.max(1) as f32;
-                            let near = faces
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, face)| face.height / tall >= NEAR_ENOUGH)
-                                .max_by(|a, b| a.1.height.total_cmp(&b.1.height));
+                            // A far face, its eyes too close together to
+                            // read, gets no read rather than `unsure`.
+                            let near = lamp_eyes::seems::near_face(
+                                &faces,
+                                picture.filled.1.max(1) as f32,
+                            );
                             // FER+ reads the face cut out upright, once its
                             // read is due; a face that can't be is not read,
                             // and the next look tries again, as before
