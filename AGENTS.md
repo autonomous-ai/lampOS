@@ -118,7 +118,10 @@ See `docs/DEV-MULTI-IDE.md` for full conventions.
 - Do not "clean up" inherited drift such as unrelated gofmt churn, duplicate
   dependency metadata, or upstream-preserved style unless it is required for the
   task.
-- Respond to the user in Vietnamese unless they request otherwise.
+- Use English by default for all user-facing communication, including progress
+  updates, questions, and final responses. Switch to Vietnamese or another
+  language only when the user explicitly requests it; do not infer a language
+  switch solely from the language of their message.
 - Do not auto-deploy to devices. Default to repo changes plus local verification;
   any on-device SSH/SCP/restart step is opt-in and must be confirmed first.
 

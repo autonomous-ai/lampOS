@@ -57,6 +57,10 @@ The owner does not relay routine agent reports.
 - Owner instruction: all code comments, documentation, and notes are English
   only. Keep documentation in this directory, normally `docs/`. This explicit
   instruction overrides any inherited translation requirements.
+- Use English by default for all user-facing communication, including progress
+  updates, questions, and final responses. Switch to Vietnamese or another
+  language only when the user explicitly requests it; do not infer a language
+  switch solely from the language of their message.
 - Keep the build, tests, configuration, startup, deployment tooling and runtime
   self-contained. No required source files, path dependencies, configuration
   files or running services from sibling directories. Ordinary external Rust
