@@ -1037,7 +1037,9 @@ mod tests {
         // after a fixed 200 ms (#1806).
         wifi.program = answering.clone();
         wifi.within = roomy;
-        let until = Instant::now() + Duration::from_secs(5);
+        // Well short of the stand-in's own `sleep 5`, so one never killed
+        // fails here.
+        let until = Instant::now() + Duration::from_secs(2);
         while wifi.ssid("wlan1", now + SSID_KEPT).is_empty() {
             assert!(Instant::now() < until, "the killed stand-in never went");
             std::thread::sleep(Duration::from_millis(5));

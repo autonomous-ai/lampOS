@@ -1929,11 +1929,12 @@ fn unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service() {
     assert!(restarted.is_err());
     assert_eq!(waits.get(), 1);
     // What was checked is done: the worker ended now, not at its 1.5 s
-    // grace (#1806). The supervisor, which alone reaps it, finds it gone at
-    // its next 10 ms look, so the PID is still the worker's here.
+    // grace (#1806). The supervisor alone reaps it, so the PID is the
+    // worker's until then; on a host slow enough to reach the grace first,
+    // it is gone already and the kill finds nothing.
     let pid = cleanup.monitor.report().pid.expect("the worker's PID");
     let pid = rustix::process::Pid::from_raw(pid as i32).unwrap();
-    rustix::process::kill_process(pid, rustix::process::Signal::KILL).unwrap();
+    let _ = rustix::process::kill_process(pid, rustix::process::Signal::KILL);
     drop(cleanup);
 }
 
