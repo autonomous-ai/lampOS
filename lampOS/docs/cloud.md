@@ -101,6 +101,18 @@ lamp says so.
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
+### News for the phone, unasked (`messages/out`)
+
+With `LAMP_MESSAGES=on`, a skill's short line for the person's phone, as
+guard mode's "Someone was at your desk at 14:31, for about 2 minutes.", goes
+up on `fd_channel` with nothing asked first: V1's `chat.event` with no run,
+its `data.event` a `task_news` event with its own `id` and `time` and the
+skill's text whole, as the voice's unasked task news (`crate::unasked`,
+[messages.md](messages.md), "Unasked texts"). At most 6 in any hour, in
+order, one heard again dropped; at most 4 wait while the broker is away and
+go on reconnect, each kept until the broker's ack. The journal says one line
+a piece, the skill and the count, never the text.
+
 ### The light: V1's colours on this lamp's
 
 V1's resting light is any `[r, g, b]`. This lamp's light is the person's

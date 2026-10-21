@@ -32,7 +32,7 @@ use std::{
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
-                     [--known-file PATH] [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
+                     [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -43,6 +43,9 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
+/// The eyes' known file, as the product unit passes it; `--known-file` wins
+/// when both are given.
+const KNOWN_ENVIRONMENT: &str = "LAMP_SKILLS_KNOWN_FILE";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -255,11 +258,10 @@ fn main() -> ExitCode {
     // The product unit gives the daily journal as an `Environment=` line, which
     // a lamp-skills built before it ignores, where an unknown `--daily-state`
     // would end that older binary at its start (#2157). The flag wins.
-    let daily_state = daily_state.or_else(|| {
-        std::env::var_os(DAILY_ENVIRONMENT)
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-    });
+    let daily_state = flag_or_environment(daily_state, DAILY_ENVIRONMENT);
+    // The eyes' known file comes so too, for a watch to tell the face of the
+    // person who asked (#1685): `--known-file` is as new as guard mode.
+    let known_file = flag_or_environment(known_file, KNOWN_ENVIRONMENT);
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -835,7 +837,7 @@ fn serve(
                 }
             }
             None => eprintln!(
-                "lamp-skills: {} is on without --known-file, so Who was here marks nobody",
+                "lamp-skills: {} is on without --known-file or LAMP_SKILLS_KNOWN_FILE, so Who was here marks nobody",
                 lamp_skills::known::ENVIRONMENT
             ),
         }
@@ -1324,6 +1326,16 @@ struct Runner {
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
     watching: RefCell<Watching>,
+}
+
+/// A path given by its flag, or else by the environment's `name`, unless
+/// that is empty.
+fn flag_or_environment(flag: Option<PathBuf>, name: &str) -> Option<PathBuf> {
+    flag.or_else(|| {
+        std::env::var_os(name)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    })
 }
 
 /// The watch skills' watches ([`watch`]), the mark each shows while on,
@@ -3391,6 +3403,25 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The known file and the daily journal come by their flag, or else by
+    /// the unit's `Environment=` line, which an older binary ignores where
+    /// it would end on an unknown flag (#2157); the flag wins.
+    #[test]
+    fn a_path_comes_by_its_flag_or_else_the_environment() {
+        let flag = Some(PathBuf::from("/run/lampos-eyes/known"));
+        assert_eq!(flag_or_environment(flag.clone(), "HOME"), flag);
+        assert_eq!(
+            flag_or_environment(None, "HOME"),
+            std::env::var_os("HOME")
+                .filter(|home| !home.is_empty())
+                .map(PathBuf::from)
+        );
+        assert_eq!(
+            flag_or_environment(None, "LAMP_SKILLS_NOT_A_SWITCH_ANYWHERE"),
+            None
+        );
+    }
 
     /// Fourth on #2304: a descriptor that says a hang-up with nothing to
     /// read makes the wait wait on the wake alone, so a call still wakes it

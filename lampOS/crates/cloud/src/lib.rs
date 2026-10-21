@@ -17,5 +17,6 @@ pub mod reports;
 pub mod schedule;
 pub mod settings;
 pub mod skills;
+pub mod unasked;
 pub mod update;
 pub mod wire;

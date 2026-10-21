@@ -5,7 +5,7 @@
 use lamp_bus::Bus;
 use lamp_cloud::answer::{Lamp, answer};
 use lamp_cloud::lamp::{Places, Real, Ring, Texts, Wifi};
-use lamp_msgs::{ChatIn, ChatOut, ChatPart};
+use lamp_msgs::{ChatIn, ChatOut, ChatPart, MessageOut};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -158,4 +158,110 @@ fn task_news_comes_out_with_no_text_asked_first() {
     assert_eq!(events.len(), 1, "{events:?}");
     assert_eq!(events[0]["event"]["type"], "task_news");
     assert!(events[0].get("run_id").is_none());
+}
+
+/// The skills' lines heard on `messages/out` within a second, given.
+fn lines_until(lamp: &mut Real, enough: usize) -> Vec<lamp_cloud::unasked::Piece> {
+    let until = Instant::now() + Duration::from_secs(1);
+    let mut due = Vec::new();
+    while due.len() < enough && Instant::now() < until {
+        due.extend(lamp.unasked(lamp_cloud::chat::now_ms(), true).due);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    due
+}
+
+/// A skill's line on `messages/out`, as `lamp-skills` publishes it, comes
+/// off the bus as a `task_news` event with no run and the text whole;
+/// without texts taken, none is.
+#[test]
+fn a_skills_line_on_messages_out_comes_off_the_bus_as_task_news() {
+    for texting in [true, false] {
+        let name = if texting { "unasked" } else { "unasked-off" };
+        let (mut lamp, bus_root) = lamp(name, texting);
+        // Listening first, as from the start.
+        assert!(
+            lamp.unasked(lamp_cloud::chat::now_ms(), true)
+                .due
+                .is_empty()
+        );
+        let skills = Bus::new(&bus_root).unwrap();
+        let mut texts = skills
+            .publisher_declared(MessageOut::TOPIC, &MessageOut::declaration(), "skills")
+            .unwrap();
+        let text = "Someone was at your desk at 14:31, for about 2 minutes.";
+        texts
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &MessageOut {
+                    from: "skill:guard-mode".into(),
+                    text: text.into(),
+                },
+            )
+            .unwrap();
+        let due = lines_until(&mut lamp, 1);
+        if !texting {
+            assert!(due.is_empty(), "{due:?}");
+            continue;
+        }
+        assert_eq!(due.len(), 1, "{due:?}");
+        assert_eq!(due[0].skill, "guard-mode");
+        let data = &due[0].data;
+        assert!(data.get("run_id").is_none());
+        assert_eq!(data["event"]["type"], "task_news");
+        assert_eq!(data["event"]["summary"], text);
+        assert_eq!(data["event"]["detail"]["message"], text);
+        assert!(data["event"]["id"].as_str().unwrap().starts_with("evt-"));
+        assert!(data["event"]["time"].is_string());
+    }
+}
+
+/// A line another publisher puts on `messages/out` (a `lamp-bus` publish
+/// from a shell, a test tool) is not sent, and the journal names the
+/// publisher once, never the text; `lamp-skills`' line after it is.
+#[test]
+fn a_line_from_another_publisher_on_messages_out_is_not_sent() {
+    let (mut lamp, bus_root) = lamp("unasked-elsewhere", true);
+    assert!(
+        lamp.unasked(lamp_cloud::chat::now_ms(), true)
+            .due
+            .is_empty()
+    );
+    let bus = Bus::new(&bus_root).unwrap();
+    let line = |text: &str| MessageOut {
+        from: "skill:guard-mode".into(),
+        text: text.into(),
+    };
+    let mut shell = bus
+        .publisher_declared(
+            MessageOut::TOPIC,
+            &MessageOut::declaration(),
+            "lamp_bus_cli",
+        )
+        .unwrap();
+    for _ in 0..2 {
+        shell
+            .publish_json(lamp_ipc::monotonic_us(), &line("Someone was at your desk."))
+            .unwrap();
+    }
+    let until = Instant::now() + Duration::from_secs(1);
+    let mut journal = Vec::new();
+    while Instant::now() < until {
+        let heard = lamp.unasked(lamp_cloud::chat::now_ms(), true);
+        assert!(heard.due.is_empty(), "{:?}", heard.due);
+        journal.extend(heard.lines);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(journal.len(), 1, "{journal:?}");
+    assert!(journal[0].contains("lamp_bus_cli"), "{journal:?}");
+    assert!(!journal[0].contains("desk"), "{journal:?}");
+    let mut skills = bus
+        .publisher_declared(MessageOut::TOPIC, &MessageOut::declaration(), "skills")
+        .unwrap();
+    skills
+        .publish_json(lamp_ipc::monotonic_us(), &line("From the skill."))
+        .unwrap();
+    let due = lines_until(&mut lamp, 1);
+    assert_eq!(due.len(), 1, "{due:?}");
+    assert_eq!(due[0].data["event"]["detail"]["message"], "From the skill.");
 }

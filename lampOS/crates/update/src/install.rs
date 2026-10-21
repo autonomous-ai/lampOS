@@ -224,8 +224,8 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     (
         "guard-mode",
         "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach no phone until `lamp-cloud` and the app's push \
-         relay take `messages/out`",
+         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
+         `lamp-cloud`, which carries `messages/out` up as unasked news",
     ),
     (
         "light-out",

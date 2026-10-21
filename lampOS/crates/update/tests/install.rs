@@ -1144,6 +1144,14 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     // Dance's tool reaches the model from lamp-skills' own folder, which the
     // voice reads at each session (#1656), not the actions part's.
     assert!(skills.contains("--tools-dir /run/lampos-skills"));
+    // The eyes' known file for a watch (#1685), as an `Environment=` line:
+    // an older lamp-skills would end at its start on `--known-file` (#2157).
+    assert!(skills.contains("\nEnvironment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known\n"));
+    let start = skills
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(!start.contains("--known-file"), "{start}");
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
 }
 

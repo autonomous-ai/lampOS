@@ -33,6 +33,11 @@ Environment=LAMP_LIGHT_REQUESTS=on
 # build and the binary from the channel's newest, and an older lamp-skills ignores the line where it
 # would exit 2 on the flag (#2157).
 Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
+# The eyes' known file (lamp-eyes --known-file, 0600 to lampos), so a watch's own asker ends it by
+# their face (#1685, docs/guard-mode.md); read only while a watch is on, or by Who was here with
+# LAMP_WHO_WAS_HERE_KNOWN=on. An Environment= line too, as --known-file is as new as guard mode
+# (19 Oct) and would end an older lamp-skills at its start (#2157).
+Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s
