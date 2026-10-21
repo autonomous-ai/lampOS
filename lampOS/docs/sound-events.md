@@ -140,9 +140,10 @@ The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
 `scores.music` and does nothing without this topic.
 
-Only after this evidence do the three `kind = "core"` skills use the topic:
-a small rare music sway, a glance at laughter, and following a departing person
-with Nine's presence contract (#1677). None acts over the lamp's speech or a
+Only after this evidence do the `kind = "core"` skills use the topic: a small
+rare music sway, and following a departing person with Nine's presence
+contract (#1677). A glance at laughter was dropped (the lead on #1711, 21 Oct:
+never asked for); `skills/laugh-glance` stays parked and off. None acts over the lamp's speech or a
 person addressing it. Departure is not inferred from sound classification.
 
 The offline voice-eval exporter recognizes `ears/classes` in its omitted-topic
