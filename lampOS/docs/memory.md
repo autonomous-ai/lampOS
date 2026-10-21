@@ -357,6 +357,11 @@ active, not newer and among `shown`; it is answered
 with a `reason` and nothing written
 ([the rule](memory-days.md#request-contract)). The legacy store ignores
 both.
+With `"on":"2026-10-24"` (#1693, the voice's `LAMP_MEMORY_EVENTS`), the
+kept thing has that day (`event_days`) when it is a real day from the
+local day of `at_unix_ms` to 60 days after it; any other `on` is dropped
+and the thing kept undated. A dated kept thing is given by `follow_up` with
+`events`, once, after its day. The legacy store ignores it.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
@@ -927,6 +932,40 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::a_past_event_day_keeps_the_observation_and_its_batch`,
   `days::an_event_far_off_is_kept_to_its_follow_up_window`,
   `days::without_events_an_event_is_not_asked_about_before_its_day`.
+  **A kept fact with its day** ("remember my sister's wedding is
+  Saturday"): with the switch, `remember` is declared with an optional
+  `on`, `YYYY-MM-DD`, which the model gives only when they named the day,
+  worked out from today's date (`remember::on::DESCRIBED`). The voice keeps
+  it only when the words heard in that line name a day it can come from
+  (`remember::on::names_a_day`, lower-cased whole words): a weekday;
+  today, tonight, tomorrow (so "the day after tomorrow"); next or this
+  week; weekend; a month name or short form (never "may", "mar", "jun",
+  "jul") with a day number 1 to 31, bare or "24th"; a numeric date of two
+  or three digit groups joined by `/` or `-`; and in Vietnamese hôm nay,
+  tối nay, ngày mai, ngày kia, tuần sau/tới/này, cuối tuần, chủ nhật,
+  thứ hai to thứ bảy (or thứ 2 to 7), and tháng with a day number.
+  Otherwise `on` is dropped before the memory is asked, never guessed
+  (`tools.rs`, `remember::on::call_as_heard`): so too for a text from the
+  app or a line the lamp wrote, which nobody said at the lamp. What is
+  left is sent only when it is a real day from the lamp's local today to
+  60 days on (`remember::on::day_within`), as `remember {…, "on"}`; the
+  memory checks it again. A kept fact with a day is then given by
+  `follow_up` once, the same as a dated observation, with category
+  `"kept"` and its `on`, in the scope that kept it, never the room's; one
+  without a day is never given. A correction that replaces it, and every
+  forget, takes its day too. Off, `remember`'s declaration and request are
+  byte for byte as before. With `LAMP_MEMORY_KEEP_HEARD`, a heard line
+  kept in place of the model's sentence is kept without `on`. Tests:
+  `remember::on::tests::a_day_is_kept_only_from_words_that_name_one`,
+  `remember::on::tests::on_is_dropped_unless_the_heard_line_names_a_day`,
+  `remember::on::tests::a_day_is_sent_only_from_today_to_sixty_days_on`,
+  `remember::tests::with_the_events_switch_remember_sends_its_day`,
+  `remember::tests::without_the_events_switch_remember_is_declared_as_before`,
+  `days::a_kept_thing_with_a_day_is_given_once_the_day_after_it`,
+  `days::a_kept_thing_without_a_good_day_is_never_given`,
+  `days::a_replaced_kept_thing_loses_its_day`,
+  `days::forgetting_a_kept_thing_removes_its_day`,
+  `days::a_kept_day_is_given_only_to_the_person_who_kept_it`.
 - **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
   the second route only; off unless set). A Live session asks for the note
   each time it connects. The second route asked only when the person

@@ -1051,7 +1051,9 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
     match route {
         Route::Memory(socket) => {
             let began = std::time::Instant::now();
-            let (told, answered) = crate::remember::run_for(&socket, call, ASK_DEADLINE, None);
+            // A text names no day the lamp heard: a `remember`'s `on` goes (#1693).
+            let call = crate::remember::on::call_as_heard(call, None);
+            let (told, answered) = crate::remember::run_for(&socket, &call, ASK_DEADLINE, None);
             eprintln!(
                 "lamp-voice second: text request {request} asked for {}; the room's memory {} in {} ms; the answer was sent",
                 call.name,
@@ -1171,6 +1173,19 @@ fn run_call_with_scope(
         Route::Memory(socket) => {
             // With `LAMP_MEMORY_KEEP_HEARD`, a `remember` whose sentence has
             // words the line did not keeps that line instead (#2176).
+            // With `LAMP_MEMORY_EVENTS`, a `remember`'s `on` is kept only
+            // when the words heard in its line name a day (#1693).
+            let words =
+                (heard && call.name == crate::remember::REMEMBER && call.args.get("on").is_some())
+                    .then(|| {
+                        crate::thread::THREAD
+                            .lock()
+                            .ok()?
+                            .heard_for(request, std::time::Instant::now())
+                    })
+                    .flatten();
+            let dated = crate::remember::on::call_as_heard(call, words.as_deref());
+            let call = dated.as_ref();
             let as_heard = crate::remember::heard::call_as_heard(call, request, heard);
             let call = as_heard.as_ref().map_or(call, |(call, _)| call);
             let (told, answered) = match lease {

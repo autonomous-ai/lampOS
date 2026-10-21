@@ -113,6 +113,14 @@ pub enum Request {
         /// hit), for `replaces`.
         #[serde(default)]
         shown: Vec<u64>,
+        /// The Days store's (#1693, the voice's `LAMP_MEMORY_EVENTS`): the
+        /// day the kept thing is about, `YYYY-MM-DD`, kept in `event_days`
+        /// when it is from the local day of `at_unix_ms` to 60 days after
+        /// it, else dropped and the thing kept undated. It is followed up
+        /// once after that day (`follow_up` with `events`). The legacy store
+        /// ignores it.
+        #[serde(default)]
+        on: Option<String>,
     },
     /// What it was asked to keep, for telling a new session.
     Kept {
@@ -990,6 +998,7 @@ mod tests {
                 once: false,
                 replaces: None,
                 shown: vec![],
+                on: None,
             }
         );
         // The Days store's: where it came from (#1693).
@@ -1003,6 +1012,7 @@ mod tests {
                 once: false,
                 replaces: None,
                 shown: vec![],
+                on: None,
             }
         );
         assert_eq!(
