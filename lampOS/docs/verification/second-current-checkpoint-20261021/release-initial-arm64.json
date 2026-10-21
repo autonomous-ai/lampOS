@@ -1,0 +1,116 @@
+{
+  "head": "5b15091dac6c2905704276073dabd3896b88700c",
+  "event": "pull_request",
+  "tested_checkout": "a7adb75ac49bfb163502adba31fef89033839573",
+  "tested_base": "dcfe9181ba3bbb05d116c9acaf961924854e85d4",
+  "checkout_note": "Pull-request run tests the GitHub merge commit; the artifact is named for the PR head.",
+  "run": 39540037529,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39540037529",
+  "conclusion": "success",
+  "nextest_passed": 9054,
+  "nextest_leaky": 1,
+  "nextest_skipped": 59,
+  "doc_tests": 4,
+  "own_harness_tests": 12,
+  "relay_signals_ok": true,
+  "log_sha256": "3065331616b99abd9219ddb77144c0c05ec958429a3b3aa8c4ee3e207ff416c2",
+  "warnings": [
+    "warning: output filename collision at target/release/examples/progress_cost",
+    "warning: output filename collision at target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at target/release/examples/replay_cost",
+    "warning: output filename collision at target/release/examples/replay_cost.dwp"
+  ],
+  "steps": [
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "publication failure tests (offline, no signing secret)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "which crates a pull request tests",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "SHA-256 of each binary",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "warning_path_note": "Runner checkout prefix removed; raw log SHA-256 retained.",
+  "publication_failure_tests_passed": 29,
+  "publication_real_cli_tests_passed": 6,
+  "publish_job_skipped": true,
+  "leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+  "qualification_note": "Initial release PR revision only; the later artifact export change needs its own native run."
+}
