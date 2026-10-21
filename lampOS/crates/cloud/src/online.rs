@@ -32,8 +32,24 @@ pub const SESSION_EXPIRY_S: u32 = 60;
 /// rather than `photos::asked`'s refusal: the app sends at most 1 MiB.
 pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + (1 << 20)) as u32;
 
-/// The client's options for `account`: V1's, with this lamp's keepalive.
-pub fn options(account: &Account) -> MqttOptions {
+/// Where lamp-cloud reads whether the broker is reached over TLS: `on`, and
+/// nothing else (`docs/cloud.md`, "Stays on the broker"). The account's
+/// port is then the broker's TLS port.
+pub const TLS_ENVIRONMENT: &str = "LAMP_CLOUD_TLS";
+
+/// The client's options for `account`, with TLS as the unit says; none
+/// when TLS is asked and cannot be set up, so it never connects in the
+/// clear in its place.
+pub fn options(account: &Account) -> Option<MqttOptions> {
+    options_with(
+        account,
+        std::env::var(TLS_ENVIRONMENT).is_ok_and(|value| value == "on"),
+    )
+}
+
+/// The client's options for `account`: V1's, with this lamp's keepalive,
+/// over TLS (1.2 and 1.3, the webpki roots, as the ping has it) when `tls`.
+pub fn options_with(account: &Account, tls: bool) -> Option<MqttOptions> {
     let mut options = MqttOptions::new(
         account.client_id(),
         account.mqtt_endpoint.trim(),
@@ -54,7 +70,13 @@ pub fn options(account: &Account) -> MqttOptions {
             authentication_method: None,
             authentication_data: None,
         });
-    options
+    if tls {
+        let config = crate::beat::tls().ok()?;
+        options.set_transport(rumqttc::Transport::tls_with_config(
+            rumqttc::TlsConfiguration::Rustls(Arc::new(config)),
+        ));
+    }
+    Some(options)
 }
 
 /// Whether a message on `topic` is a command for this lamp: only its own
@@ -319,7 +341,11 @@ async fn session(
     say: &mut impl Say,
     first: Duration,
 ) {
-    let (client, mut events) = AsyncClient::new(options(account), 64);
+    let Some(options) = options(account) else {
+        say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
+        return std::future::pending().await;
+    };
+    let (client, mut events) = AsyncClient::new(options, 64);
     let mut wait = first;
     // Health and crash reports, with their switch (#1683): handed over only
     // while connected, and kept until the broker acknowledges them.
@@ -941,9 +967,21 @@ mod tests {
             "{lines:?}"
         );
         assert_eq!(
-            options(&account(port)).max_packet_size(),
+            options_with(&account(port), false)
+                .unwrap()
+                .max_packet_size(),
             Some(MOST_PACKET_BYTES)
         );
+    }
+
+    /// `LAMP_CLOUD_TLS`: on, the broker is reached over TLS; off, as V1's.
+    #[test]
+    fn with_its_switch_the_broker_is_reached_over_tls() {
+        let plain = options_with(&account(1883), false).unwrap();
+        assert!(matches!(plain.transport(), rumqttc::Transport::Tcp));
+        let tls = options_with(&account(8883), true).unwrap();
+        assert!(matches!(tls.transport(), rumqttc::Transport::Tls(_)));
+        assert_eq!(tls.max_packet_size(), Some(MOST_PACKET_BYTES));
     }
 
     /// #2094: a person's own key from the app is acked `starting` at once
