@@ -365,6 +365,26 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // (`package::STORE_SWITCH`): off, an install is refused as
         // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
         ("asked", []) => {
+            // Only lamp-cloud and the voice, by their cgroup, before the
+            // line is read (the reviewer's P3 on #2429).
+            let any = std::env::var(package::ANY_ASKER).as_deref() == Ok("on");
+            if any {
+                // Said each time, so a drop-in that sets it by mistake shows
+                // in the journal (the reviewer's P3 2 on #2429).
+                eprintln!(
+                    "lamp-skills: asked: {}=on: any peer may ask, as in the tests",
+                    package::ANY_ASKER
+                );
+            } else if !package::peer_is_an_asker() {
+                eprintln!(
+                    "lamp-skills: asked: refused a peer that is neither lamp-cloud nor the voice"
+                );
+                println!(
+                    "{}",
+                    serde_json::json!({ "refused": package::NOT_AN_ASKER })
+                );
+                return ExitCode::FAILURE;
+            }
             let store_on =
                 package::store_switched_on(std::env::var(package::STORE_SWITCH).ok().as_deref());
             let mut web = match store_on

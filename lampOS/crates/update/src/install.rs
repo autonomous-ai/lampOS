@@ -122,6 +122,18 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
     ),
+    // The skills' manage helper (#1722, #2414): root's, started by its
+    // socket for each connection, so the socket is enabled and the template
+    // never is. lamp-cloud's skills.remove and a made skill's spoken yes
+    // (#1685) ask it.
+    (
+        "lamp-skills-manage.socket",
+        include_str!("../../../deploy/product/lamp-skills-manage.socket"),
+    ),
+    (
+        "lamp-skills-manage@.service",
+        include_str!("../../../deploy/product/lamp-skills-manage@.service"),
+    ),
     (
         "lamp-records.service",
         include_str!("../../../deploy/product/lamp-records.service"),
@@ -602,6 +614,7 @@ const BESIDE_IF_CARRIED: &[(&str, &[&str])] =
     &[("lamp-body", &["lamp-body-measure", "lamp-body-mood"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
+/// A template (`NAME@.service`) is started by its socket, never enabled.
 const TIMED: &[&str] = &[
     "lamp-records.service",
     "lamp-selftest.service",
@@ -618,6 +631,7 @@ fn enabled() -> Vec<String> {
         .map(|(name, _)| *name)
         .filter(|name| {
             name.ends_with(".service")
+                && !name.contains('@')
                 && !TIMED.contains(name)
                 && !STARTED_BY_A_ROUND.contains(name)
         })
@@ -627,6 +641,7 @@ fn enabled() -> Vec<String> {
             "lamp-selftest.timer",
             "lamp-update-back.timer",
             "lampos-setup-done.path",
+            "lamp-skills-manage.socket",
         ])
         .map(str::to_owned)
         .collect()
@@ -2354,13 +2369,36 @@ mod tests {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset and the waking face share one binary, and so do
-        // the air and its bus clock; every other service is a part.
+        // the air and its bus clock, and the skills and their manage helper;
+        // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 3, "every product service is a part");
+        assert_eq!(parts.len(), services - 4, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
         }
+    }
+
+    /// #1722, #2414: the skills' manage helper is installed, its socket
+    /// enabled and its template never (systemd starts one for each
+    /// connection), so the app's remove and a made skill's yes reach it.
+    #[test]
+    fn the_skills_manage_socket_is_enabled_and_its_template_is_not() {
+        assert!(
+            PRODUCT
+                .iter()
+                .any(|(name, _)| *name == "lamp-skills-manage@.service")
+        );
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lamp-skills-manage.socket")
+        );
+        assert!(
+            !enabled().iter().any(|name| name.contains('@')),
+            "{:?}",
+            enabled()
+        );
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
