@@ -1,0 +1,22 @@
+# On, the desk empty; the switch closed from 300 s for 30 s and again from
+# 600 s: the first closing ends it (#2562), its mark given back with one
+# text, and the second texts nothing: it is off until asked again.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "300250ms"
+call = "ends"
+
+[[expect]]
+at = "300250ms"
+call = "text"
+args = { text = "Guard is off: the privacy switch is closed." }

@@ -1,5 +1,6 @@
 # The person asks at 14:20:02 and leaves; someone comes at 14:31 and stays two
-# minutes, a face the lamp does not know; one text when they go.
+# minutes, a face the lamp does not know: the head turns to them once
+# (#2562), and one text when they go.
 clock = "14:20"
 
 [[call_tool]]
@@ -11,6 +12,11 @@ args = { turn = "on" }
 at = "4s"
 call = "light"
 args = { colour = "blue", level = 1 }
+
+[[expect]]
+at = "661500ms"
+call = "body.gaze"
+args = { look_at = "face" }
 
 [[expect]]
 at = "799s"

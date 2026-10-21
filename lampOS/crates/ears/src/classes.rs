@@ -1,5 +1,5 @@
 //! Room sound classes on `ears/classes` (#1669): speech, music and laughter
-//! scores from YAMNet over mic1. Off unless `LAMP_EARS_CLASSES=on`, and only
+//! scores from YAMNet over mic1, and a door and footsteps (#2562). Off unless `LAMP_EARS_CLASSES=on`, and only
 //! with `LAMP_PRIVACY_CONTROLS=on` (docs/sound-events.md).
 //!
 //! Capture hands each admitted 20 ms block to a bounded queue and never waits:
@@ -113,10 +113,13 @@ const GRAPH_SHA256: &str = "970ea63f4dc1aa33c86ef7d61d854319fdfe6bdd078f5b3d674e
 pub const DATA_NAME: &str = "yamnet.data";
 const DATA_BYTES: u64 = 14_915_108;
 const DATA_SHA256: &str = "1d6dff488da4712190e10f1c841252aa58011381132d0126dcd5ee56a4e7ed31";
-/// AudioSet indices in the bundled label map: Speech, Music, Laughter.
+/// AudioSet indices in the bundled label map: Speech, Music, Laughter, and
+/// Door and "Walk, footsteps" (`yamnet_class_map.csv`, #2562).
 const SPEECH: usize = 0;
 const MUSIC: usize = 132;
 const LAUGHTER: usize = 13;
+const DOOR: usize = 348;
+const FOOTSTEPS: usize = 48;
 const CLASSES: usize = 521;
 
 pub const FFT: usize = 512;
@@ -433,6 +436,10 @@ impl Model {
             // PARKED (#1669): no skill reads it since the laugh glance was
             // dropped (the owner, 21 Oct); kept, it is one more sigmoid.
             laughter: sigmoid(logits[LAUGHTER]),
+            // Guard mode's arrivals by sound (#2562), read only with
+            // LAMP_GUARD_SOUNDS=on in lamp-skills.
+            door: sigmoid(logits[DOOR]),
+            footsteps: sigmoid(logits[FOOTSTEPS]),
         })
     }
 }

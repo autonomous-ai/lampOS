@@ -192,3 +192,20 @@ fn the_photo_folder_the_unit_may_write_is_the_one_made_at_boot() {
     );
     assert!(!UNIT.contains("RuntimeDirectory=lampos-photos"));
 }
+
+/// #2562: lamp-cloud's unit may reach lamp-skills' call socket, for guard
+/// mode from the app, where lamp-skills' unit makes it (its runtime folder,
+/// given as its `--tools-dir`); a lamp without it still starts (`-`).
+#[test]
+fn the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it() {
+    const SKILLS: &str = include_str!("../../../../deploy/product/lamp-skills.service");
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(writable.contains(&"-/run/lampos-skills"), "{writable:?}");
+    assert!(SKILLS.contains("RuntimeDirectory=lampos-skills\n"));
+    assert!(SKILLS.contains("--tools-dir /run/lampos-skills "));
+    assert_eq!(lamp_cloud::guard::SOCKET, "/run/lampos-skills/call.sock");
+}

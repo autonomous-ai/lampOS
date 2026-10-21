@@ -8,6 +8,7 @@ pub mod answer;
 pub mod beat;
 pub mod chat;
 pub mod faces;
+pub mod guard;
 pub mod lamp;
 pub mod light;
 pub mod online;

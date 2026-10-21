@@ -37,6 +37,13 @@ pub struct SoundScores {
     pub speech: f32,
     pub music: f32,
     pub laughter: f32,
+    /// A door, and someone walking (#2562, guard mode's arrivals by
+    /// sound). Added to version 1: an older lamp-ears says neither, read
+    /// as 0, which is no door and no footsteps.
+    #[serde(default)]
+    pub door: f32,
+    #[serde(default)]
+    pub footsteps: f32,
 }
 
 /// The original source window and completion time, all on the capture clock.
@@ -97,6 +104,8 @@ impl SoundClasses {
             ("speech", scores.speech),
             ("music", scores.music),
             ("laughter", scores.laughter),
+            ("door", scores.door),
+            ("footsteps", scores.footsteps),
         ] {
             if !score.is_finite() || !(0.0..=1.0).contains(&score) {
                 return Err(Invalid(format!(
@@ -148,6 +157,8 @@ mod tests {
                 speech: 0.9,
                 music: 0.9,
                 laughter: 0.2,
+                door: 0.1,
+                footsteps: 0.0,
             },
             own_voice: OwnVoiceEvidence::Unknown,
         }
@@ -165,6 +176,14 @@ mod tests {
         );
         json.as_object_mut().unwrap().remove("own_voice");
         assert!(serde_json::from_value::<SoundClasses>(json).is_err());
+    }
+
+    /// #2562: an older lamp-ears says no door or footsteps; read as none.
+    #[test]
+    fn scores_without_a_door_or_footsteps_read_as_none() {
+        let json = serde_json::json!({"speech": 0.1, "music": 0.2, "laughter": 0.0});
+        let scores: SoundScores = serde_json::from_value(json).unwrap();
+        assert_eq!((scores.door, scores.footsteps), (0.0, 0.0));
     }
 
     #[test]
@@ -207,6 +226,11 @@ mod tests {
             let mut value = scored();
             if let SoundClasses::Scored { scores, .. } = &mut value {
                 scores.music = score;
+            }
+            assert!(value.check().is_err());
+            let mut value = scored();
+            if let SoundClasses::Scored { scores, .. } = &mut value {
+                scores.door = score;
             }
             assert!(value.check().is_err());
         }

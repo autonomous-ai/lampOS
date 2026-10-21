@@ -38,23 +38,34 @@
 //!   at your desk at 14:31, for about 2 minutes.", at most once each
 //!   `[watch] every`. Who it was is said only as "someone you've introduced
 //!   me to" or "someone I don't know", never a name.
-//! - **Ends.** On its tool's `off`, or when the eyes know the face of the
-//!   person who asked again, after they had left.
-//! - **The privacy switch wins.** With the switch closed it can't see: it
-//!   says so by text, once each closing (at most one a minute), and is quiet
-//!   after. While it is closed the watch
-//!   itself takes nothing it is told about the desk, whoever says it: no
-//!   visit begins or ends, nothing is texted, and the asker's face ends
-//!   nothing (reviewer-two's P3 on #1807): the eyes closing with the switch
-//!   is not what keeps it.
+//! - **Arrivals by sound** (#2562, with [`SOUNDS_ENVIRONMENT`] on and
+//!   [`SOUNDS`] in the skill's permissions). A door or footsteps on the
+//!   ears' room sound classes is someone come in only when a face or speech
+//!   follows within [`FOLLOWED_WITHIN_US`]: the visit then begins at the
+//!   sound, and its text says they came in. A sound alone texts nothing.
+//! - **The head turns once** to an arrival (#2562), as a creature would:
+//!   one gaze to the largest face in view as a visit's first face is seen,
+//!   then rest. No patrol, and none again within [`TURN_EVERY_US`]. The
+//!   sound has no direction, so an arrival with no face turns nothing.
+//! - **Ends.** On its tool's `off`; when the eyes know the face of the
+//!   person who asked again, after they had left, with "I'm off guard" said
+//!   aloud (its words' `off_guard`); or at its `most`, with that texted.
+//! - **From the owner's app** (#2562, [`Watches::from_app`]): turned on and
+//!   off by `guard.on` and `guard.off`, which only the owner's app sends,
+//!   through lamp-cloud to the program's call socket. No voice is needed,
+//!   but the mark is: it counts only while the ring confirms it.
+//! - **The privacy switch ends it** (#2562). Closed, the watch is off at
+//!   once, its mark given back, with one text (its words' `blind`); and it is never
+//!   turned on while the switch is closed.
 //!
-//! No picture is read or kept: only `room/presence` (counts and times), the
-//! faces' sizes on `humans/faces/tracked`, and whether the face at the lamp
-//! is known, from the eyes' known file, which the program reads. A name read
-//! there is kept in the program only to tell the person who asked from
-//! anyone else: it is never in a text, an event or the journal.
-use crate::{Call, LightFile, Skill, duration_us, light_call, words};
-use lamp_msgs::Faces;
+//! No picture or sound is read or kept: only `room/presence` (counts and
+//! times), the faces' sizes and places on `humans/faces/tracked`, the ears'
+//! scores for a door, footsteps and speech, and whether the face at the
+//! lamp is known, from the eyes' known file, which the program reads. A
+//! name read there is kept in the program only to tell the person who asked
+//! from anyone else: it is never in a text, an event or the journal.
+use crate::{Call, LightFile, Skill, Words as SayWords, duration_us, light_call, words};
+use lamp_msgs::{Faces, OwnVoiceEvidence, SoundClasses};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -73,15 +84,87 @@ pub const NEAR: f32 = 0.10;
 pub const ON: &str = "on";
 pub const OFF: &str = "off";
 
-/// Each closing of the switch is told, but at most one line in this long:
-/// a switch flicked to and fro is not a stream of texts.
-pub const BLIND_EVERY_US: u64 = 60_000_000;
+/// The ears' room sound classes (#2562): a door, footsteps and speech, read
+/// by a watch whose `[permissions]` topics name it, and only with
+/// [`SOUNDS_ENVIRONMENT`] on.
+pub const SOUNDS: &str = "ears/classes";
+/// `on` takes arrivals by sound; off unless set (#2562).
+pub const SOUNDS_ENVIRONMENT: &str = "LAMP_GUARD_SOUNDS";
+/// `on` takes `guard.on` and `guard.off` from the owner's app on the call
+/// socket; off unless set (#2562). lamp-cloud checks the same switch in its
+/// own unit, so this is not the only gate.
+pub const FROM_APP_ENVIRONMENT: &str = "LAMP_GUARD_FROM_APP";
+/// How long lamp-cloud waits for lamp-skills' answer to the app's
+/// `guard.on` or `guard.off` (#2562, the reviewer's P2 on #2688): it puts
+/// the moment that wait ends on the op, as [`DEADLINE`], so an op that
+/// waited behind another call past it is let go here, never turned while
+/// the app is told nothing was.
+pub const FROM_APP_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+/// The op's field: when lamp-cloud stops waiting, in µs on the host's
+/// shared monotonic clock (`lamp_ipc::monotonic_us`, `CLOCK_MONOTONIC`, the
+/// same in both programs on the one host): the moment it sent the op and
+/// [`FROM_APP_WAIT`].
+pub const DEADLINE: &str = "deadline_us";
+/// Why the app's `name` (`guard.on` or `guard.off`), whose op said
+/// `deadline_us`, is let go at `now_us`, before anything is turned: its
+/// deadline reached, or none on it. An op with none comes from a lamp-cloud
+/// older than this one, which did not say how long it waits; it is let go
+/// too, which costs nothing, since taking the app's ops at all is behind
+/// [`FROM_APP_ENVIRONMENT`], off by default.
+pub fn let_go(name: &str, deadline_us: Option<u64>, now_us: u64) -> Option<String> {
+    let wait_ms = FROM_APP_WAIT.as_millis();
+    let Some(deadline_us) = deadline_us else {
+        return Some(format!(
+            "{name} let go: it says no {DEADLINE}, so it can't be told from one the app gave up on"
+        ));
+    };
+    (now_us >= deadline_us).then(|| {
+        let sent_us = deadline_us
+            .saturating_sub(u64::try_from(FROM_APP_WAIT.as_micros()).unwrap_or(u64::MAX));
+        let waited_ms = now_us.saturating_sub(sent_us) / 1_000;
+        format!(
+            "{name} let go: it waited {waited_ms} ms behind another call, past the app's {} s",
+            wait_ms / 1_000
+        )
+    })
+}
+/// Whether a switch's value is `on`, exactly.
+pub fn switched_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+/// Whether `/proc/<pid>/cgroup`'s text puts a peer of the call socket in
+/// lamp-cloud's unit, the owner's app's link (#2562): the only one whose
+/// `guard.on` and `guard.off` are taken, as the manage helper tells its
+/// askers.
+pub fn from_the_app(cgroup: &str) -> bool {
+    crate::package::from_one_of(cgroup, &[crate::package::APP_LINK])
+}
+/// The skill the app's `guard.on` and `guard.off` turn.
+pub const GUARD: &str = "guard-mode";
+/// The app's two kinds, as the call socket's `guard` op names them to the
+/// main loop: never a tool's name, which has no `.`.
+pub const APP_ON: &str = "guard.on";
+pub const APP_OFF: &str = "guard.off";
+/// A door or footsteps scored at least this is a sound someone may have
+/// come in by, and speech at least this, with the lamp's own voice clear,
+/// is someone speaking. Not yet measured on a lamp.
+pub const SOUND_AT_LEAST: f32 = 0.5;
+/// A door or footsteps is someone come in only when a face or speech
+/// follows within this.
+pub const FOLLOWED_WITHIN_US: u64 = 30_000_000;
+/// The head turns to an arrival at most once in this long (rule 8).
+pub const TURN_EVERY_US: u64 = 120_000_000;
 /// A shown mark is said reached again after each renewal, every 10 s
 /// (`glow::GLOW_EVERY`): with no such word this long, about three
 /// renewals, it is taken as hidden, and nothing is counted until the next.
 pub const CONFIRMED_WITHIN_US: u64 = 30_000_000;
 /// What the journal says when the ring has gone that long without a word.
 pub const UNCONFIRMED: &str = "its mark has not been confirmed for 30 s: no visit counted";
+
+/// The app's refusals that are not the skill's to say (#2562): guard mode
+/// not there to say them, and a peer that is not the owner's app.
+pub const NOT_INSTALLED: &str = "guard mode isn't installed on this lamp";
+pub const NOT_THE_APP: &str = "guard mode is turned on and off from afar only by the owner's app";
 
 /// `[watch]` as `skill.toml` says it.
 #[derive(Deserialize)]
@@ -125,14 +208,26 @@ pub struct Words {
     pub not_asked: String,
     /// Refused: its mark can't be shown.
     pub no_mark: String,
-    /// Texted when the privacy switch closes.
+    /// Refused: the privacy switch is closed (#2562).
+    pub closed: String,
+    /// The owner's app refused: the person's own light paused it (#2562).
+    pub paused_from_app: String,
+    /// Texted when the privacy switch closes, which ends it (#2562).
     pub blind: String,
     /// Texted when the person's own light pauses it.
     pub paused: String,
-    /// Texted when it ends by itself.
+    /// Said aloud when the face of the person who asked ends it (#2562).
+    pub off_guard: String,
+    /// Texted when it ends by itself, with `{hours}` once (#2562)...
     pub stopped: String,
+    /// ...`an_hour` for its `most` of one...
+    pub an_hour: String,
+    /// ...or `{hours}`, once.
+    pub hours: String,
     /// A visit's text: `{who}`, `{at}` and `{long}`, each once.
     pub visit: String,
+    /// A visit that came in by a door or footsteps (#2562): the same slots.
+    pub came_in: String,
     /// `{who}`: a face the eyes know...
     pub known: String,
     /// ...a face they don't...
@@ -167,10 +262,16 @@ impl Words {
             was_off: "You weren't keeping an eye on things. Say so in one short line.".into(),
             not_asked: "I keep an eye on things only when someone asks me out loud, at the lamp.".into(),
             no_mark: "I can't show that I'm keeping an eye on things just now, so I won't do it.".into(),
-            blind: "I can't see right now, the privacy switch is closed.".into(),
+            closed: "The privacy switch is closed, so I can't see: I won't keep an eye on things.".into(),
+            paused_from_app: "Guard is paused while your light is off: ask at the lamp for it to go on.".into(),
+            blind: "Guard is off: the privacy switch is closed.".into(),
             paused: "I've paused watching while your light is off.".into(),
-            stopped: "I've stopped keeping an eye on things.".into(),
+            off_guard: "I'm off guard.".into(),
+            stopped: "I'm off guard: it's been {hours}.".into(),
+            an_hour: "an hour".into(),
+            hours: "{hours} hours".into(),
             visit: "{who} was at your desk{at}, {long}.".into(),
+            came_in: "{who} came in{at} and was here {long}.".into(),
             known: "Someone you've introduced me to".into(),
             unknown: "Someone I don't know".into(),
             someone: "Someone".into(),
@@ -179,6 +280,16 @@ impl Words {
             a_minute: "for about a minute".into(),
             minutes: "for about {minutes} minutes".into(),
         }
+    }
+
+    /// The text when it ends by itself at its `most` (#2562): "I'm off
+    /// guard: it's been 12 hours."
+    pub fn ended(&self, most_us: u64) -> String {
+        let hours = match most_us / 3_600_000_000 {
+            1 => self.an_hour.clone(),
+            hours => self.hours.replace("{hours}", &hours.to_string()),
+        };
+        self.stopped.replace("{hours}", &hours)
     }
 
     /// Each is words of 1 to [`crate::MOST_WORDS_BYTES`] bytes with no
@@ -195,10 +306,16 @@ impl Words {
                 ("was_off", &self.was_off, &[]),
                 ("not_asked", &self.not_asked, &[]),
                 ("no_mark", &self.no_mark, &[]),
+                ("closed", &self.closed, &[]),
+                ("paused_from_app", &self.paused_from_app, &[]),
                 ("blind", &self.blind, &[]),
                 ("paused", &self.paused, &[]),
-                ("stopped", &self.stopped, &[]),
+                ("off_guard", &self.off_guard, &[]),
+                ("stopped", &self.stopped, &["hours"]),
+                ("an_hour", &self.an_hour, &[]),
+                ("hours", &self.hours, &["hours"]),
                 ("visit", &self.visit, &["at", "long", "who"]),
+                ("came_in", &self.came_in, &["at", "long", "who"]),
                 ("known", &self.known, &[]),
                 ("unknown", &self.unknown, &[]),
                 ("someone", &self.someone, &[]),
@@ -345,6 +462,10 @@ pub enum Out {
     Unmark,
     /// One short line for the person's phone, on `messages/out`.
     Text(String),
+    /// One look, this gaze, to an arrival (#2562): then the body rests.
+    Gaze(Call),
+    /// Words said aloud as written, "I'm off guard" alone (#2562).
+    Say(SayWords),
     /// What happened, for `skills/events` and the journal: never a name.
     Said(String),
 }
@@ -361,6 +482,10 @@ struct Visit {
     face: bool,
     /// A face the eyes know, not the person who asked, was seen.
     known: bool,
+    /// It began with a door or footsteps, a face or speech after (#2562).
+    came_in: bool,
+    /// The head turned to it, or was let be: once a visit.
+    turned: bool,
 }
 
 impl Visit {
@@ -386,9 +511,12 @@ impl Visit {
             minutes => words.minutes.replace("{minutes}", &minutes.to_string()),
         };
         // The parts have no slots of their own, so none is filled twice.
-        words
-            .visit
-            .replace("{who}", who)
+        let text = if self.came_in {
+            &words.came_in
+        } else {
+            &words.visit
+        };
+        text.replace("{who}", who)
             .replace("{at}", &at)
             .replace("{long}", &long)
     }
@@ -409,8 +537,6 @@ struct On {
     /// The person's own light is over its mark: paused until they ask for
     /// it again in words, never asked for over them.
     paused: bool,
-    /// When the switch's line last went: one a minute at most.
-    blind_at_us: Option<u64>,
     /// The known person who asked, if the eyes knew them: their face back
     /// ends the watch. Kept in the program only.
     asker: Option<String>,
@@ -419,14 +545,35 @@ struct On {
     visit: Option<Visit>,
     /// When the last text about a visit went.
     texted_us: Option<u64>,
-    /// This closing of the switch was told (or held back within a minute
-    /// of the last line): its next closing is told again.
-    blind_told: bool,
-    /// The privacy switch is closed: nothing about the desk is taken.
-    closed: bool,
+    /// A door or footsteps heard with nobody at the desk, and the local
+    /// minute: someone came in if a face or speech follows (#2562).
+    sound: Option<(u64, Option<u16>)>,
+    /// When the head last turned to an arrival.
+    turned_us: Option<u64>,
 }
 
 impl On {
+    fn new(since_us: u64, asker: Option<&str>) -> Self {
+        Self {
+            since_us,
+            hidden: true,
+            reached_us: None,
+            paused: false,
+            asker: asker.map(str::to_owned),
+            away: false,
+            visit: None,
+            texted_us: None,
+            sound: None,
+            turned_us: None,
+        }
+    }
+
+    /// Whether what it is told about the desk is taken: the desk empty
+    /// since it was asked, and its mark shown.
+    fn counting(&self) -> bool {
+        self.away && !self.hidden
+    }
+
     fn visit(&mut self, now_us: u64, minute: Option<u16>) -> &mut Visit {
         let visit = self.visit.get_or_insert(Visit {
             began_us: now_us,
@@ -434,9 +581,53 @@ impl On {
             seen_us: now_us,
             face: false,
             known: false,
+            came_in: false,
+            turned: false,
         });
         visit.seen_us = now_us;
         visit
+    }
+
+    /// A face or speech now: a door or footsteps within
+    /// [`FOLLOWED_WITHIN_US`] before was someone coming in, and the visit
+    /// begins at the sound (#2562).
+    fn followed(&mut self, now_us: u64, minute: Option<u16>, by: &str) -> Vec<Out> {
+        let Some((at_us, at_minute)) = self.sound.take() else {
+            return Vec::new();
+        };
+        if now_us.saturating_sub(at_us) > FOLLOWED_WITHIN_US {
+            return Vec::new();
+        }
+        let visit = self.visit(now_us, minute);
+        if !visit.came_in {
+            visit.came_in = true;
+            visit.began_us = visit.began_us.min(at_us);
+            visit.began_minute = at_minute.or(visit.began_minute);
+        }
+        vec![Out::Said(format!(
+            "someone came in: a door or footsteps, then {by} {} s after",
+            now_us.saturating_sub(at_us) / 1_000_000
+        ))]
+    }
+
+    /// The visit's first face, at `face`: the head turns to it once, unless
+    /// it turned to an arrival within [`TURN_EVERY_US`] (#2562).
+    fn turn_to(&mut self, face: (f32, f32, f32), now_us: u64) -> Vec<Out> {
+        let last = self.turned_us;
+        let Some(visit) = self.visit.as_mut().filter(|visit| !visit.turned) else {
+            return Vec::new();
+        };
+        visit.turned = true;
+        if last.is_some_and(|at| now_us.saturating_sub(at) < TURN_EVERY_US) {
+            return vec![Out::Said(
+                "an arrival: the head turned to one under 2 min ago, so not again".into(),
+            )];
+        }
+        self.turned_us = Some(now_us);
+        vec![
+            Out::Gaze(Call::Gaze { face: Some(face) }),
+            Out::Said("an arrival: the head turns to it once".into()),
+        ]
     }
 
     /// A visit over: its text, unless one went within `every`.
@@ -522,19 +713,7 @@ impl Watch {
         if !can_mark {
             return Err(spec.words.no_mark.clone());
         }
-        self.on = Some(On {
-            since_us: now_us,
-            hidden: true,
-            reached_us: None,
-            paused: false,
-            blind_at_us: None,
-            asker: asker.map(str::to_owned),
-            away: false,
-            visit: None,
-            texted_us: None,
-            blind_told: false,
-            closed: false,
-        });
+        self.on = Some(On::new(now_us, asker));
         let (note, by) = match asker {
             Some(_) => (&spec.words.on, ", by someone whose face it knows"),
             None => (
@@ -551,6 +730,45 @@ impl Watch {
         ))
     }
 
+    /// `guard.on` or `guard.off` from the owner's app (#2562): no voice is
+    /// asked for, since the owner's account sent it; the mark is, and it
+    /// counts only once the ring confirms it. Its asker is nobody's face, so
+    /// no face ends it. A watch paused by the person's own light goes on
+    /// only when asked at the lamp. The app's answer, or why not.
+    pub fn from_app(
+        &mut self,
+        on: bool,
+        spec: &Spec,
+        now_us: u64,
+        can_mark: bool,
+    ) -> Result<(Value, Vec<Out>), String> {
+        if !on {
+            return Ok(match self.on.take() {
+                Some(_) => (
+                    json!({ "guard": OFF }),
+                    vec![Out::Unmark, Out::Said("off, from the owner's app".into())],
+                ),
+                None => (json!({ "guard": OFF }), Vec::new()),
+            });
+        }
+        match &self.on {
+            Some(on) if on.paused => return Err(spec.words.paused_from_app.clone()),
+            Some(_) => return Ok((json!({ "guard": ON }), Vec::new())),
+            None => {}
+        }
+        if !can_mark {
+            return Err(spec.words.no_mark.clone());
+        }
+        self.on = Some(On::new(now_us, None));
+        Ok((
+            json!({ "guard": ON }),
+            vec![
+                Out::Mark(spec.mark.clone()),
+                Out::Said("on, from the owner's app".into()),
+            ],
+        ))
+    }
+
     /// `room/presence`: someone at the lamp or not.
     pub fn presence(
         &mut self,
@@ -562,7 +780,7 @@ impl Watch {
         let Some(on) = &mut self.on else {
             return Vec::new();
         };
-        if on.closed || on.hidden {
+        if on.hidden {
             return Vec::new();
         }
         if !on.away {
@@ -582,66 +800,108 @@ impl Watch {
         }
     }
 
-    /// A face near the lamp was seen, or not.
-    pub fn face(&mut self, near: bool, now_us: u64, minute: Option<u16>) {
-        if let Some(on) = &mut self.on
-            && on.away
-            && !on.closed
-            && !on.hidden
-            && near
-        {
+    /// The largest face in view, if any: its centre across and down from
+    /// the middle of the picture (-1 to 1) and its height as a share of it,
+    /// as the body's gaze takes it. Near the lamp, it is someone at the
+    /// desk; anywhere in view, it follows a door or footsteps (#2562). A
+    /// visit's first face turns the head to it, once.
+    pub fn face(
+        &mut self,
+        seen: Option<(f32, f32, f32)>,
+        now_us: u64,
+        minute: Option<u16>,
+    ) -> Vec<Out> {
+        let (Some(on), Some(face)) = (&mut self.on, seen) else {
+            return Vec::new();
+        };
+        if !on.counting() {
+            return Vec::new();
+        }
+        let mut outs = on.followed(now_us, minute, "a face");
+        if face.2 >= NEAR {
             on.visit(now_us, minute).face = true;
         }
+        outs.extend(on.turn_to(face, now_us));
+        outs
+    }
+
+    /// A door or footsteps (`door`), or speech (`speech`), on the ears'
+    /// room sound classes (#2562). A door or footsteps with nobody at the
+    /// desk waits [`FOLLOWED_WITHIN_US`] for a face or speech; alone, it is
+    /// nothing. Speech follows one.
+    pub fn sound(
+        &mut self,
+        door: bool,
+        speech: bool,
+        now_us: u64,
+        minute: Option<u16>,
+    ) -> Vec<Out> {
+        let Some(on) = &mut self.on else {
+            return Vec::new();
+        };
+        if !on.counting() {
+            return Vec::new();
+        }
+        if speech {
+            return on.followed(now_us, minute, "speech");
+        }
+        if !door || on.visit.is_some() || on.sound.is_some() {
+            return Vec::new();
+        }
+        on.sound = Some((now_us, minute));
+        vec![Out::Said(
+            "a door or footsteps: someone came in only if a face or speech follows within 30 s"
+                .into(),
+        )]
     }
 
     /// The eyes know the face at the lamp as `name`, or no face there is
     /// known. The person who asked, back after they left, ends the watch.
-    pub fn known(&mut self, name: Option<&str>, now_us: u64, minute: Option<u16>) -> Vec<Out> {
+    pub fn known(
+        &mut self,
+        name: Option<&str>,
+        now_us: u64,
+        minute: Option<u16>,
+        spec: &Spec,
+    ) -> Vec<Out> {
         let (Some(on), Some(name)) = (&mut self.on, name) else {
             return Vec::new();
         };
-        if !on.away || on.closed || on.hidden {
+        if !on.counting() {
             return Vec::new();
         }
         if on.asker.as_deref() == Some(name) {
             self.on = None;
             return vec![
                 Out::Unmark,
+                Out::Say(SayWords {
+                    words: spec.words.off_guard.clone(),
+                    exact: true,
+                    priority: crate::SAY_PRIORITY,
+                    expires_ms: crate::SAY_EXPIRES_MS,
+                }),
                 Out::Said("off: the person who asked is back".into()),
             ];
         }
+        let outs = on.followed(now_us, minute, "a known face");
         let visit = on.visit(now_us, minute);
         visit.face = true;
         visit.known = true;
-        Vec::new()
+        outs
     }
 
-    /// The privacy switch, closed or not: each closing, its line, at most
-    /// one a minute (`BLIND_EVERY_US`); and while it is closed nothing about
-    /// the desk is taken.
-    pub fn privacy(&mut self, closed: bool, now_us: u64, spec: &Spec) -> Vec<Out> {
-        let Some(on) = &mut self.on else {
-            return Vec::new();
-        };
-        on.closed = closed;
-        if !closed {
-            on.blind_told = false;
+    /// The privacy switch, closed or not: closed, the watch is off at once,
+    /// its mark given back, with one text, its words' `blind` (#2562). It stays off when the
+    /// switch opens again, until it is asked for again.
+    pub fn privacy(&mut self, closed: bool, spec: &Spec) -> Vec<Out> {
+        if !closed || self.on.take().is_none() {
             return Vec::new();
         }
-        if on.blind_told {
-            return Vec::new();
-        }
-        on.blind_told = true;
-        if on
-            .blind_at_us
-            .is_some_and(|at| now_us.saturating_sub(at) < BLIND_EVERY_US)
-        {
-            return vec![Out::Said(
-                "the switch closed again within a minute of its last line: not texted".into(),
-            )];
-        }
-        on.blind_at_us = Some(now_us);
-        vec![Out::Text(spec.words.blind.clone())]
+        vec![
+            Out::Unmark,
+            Out::Text(spec.words.blind.clone()),
+            Out::Said("off: the privacy switch closed".into()),
+        ]
     }
 
     /// The ring says at `now_us` its mark is shown (`light/reached`) or not
@@ -694,29 +954,40 @@ impl Watch {
     }
 
     /// Time passes: at its `most` after it was asked, it ends, with one
-    /// text that it has stopped. A shown mark the ring has not said shows
+    /// text that it is off guard. A shown mark the ring has not said shows
     /// for [`CONFIRMED_WITHIN_US`] is taken as hidden, said once (Third's
     /// privacy read on #1963): the ring's next word that it shows counts
-    /// again.
+    /// again. A door or footsteps that nothing followed within
+    /// [`FOLLOWED_WITHIN_US`] is let go: nobody came in (#2562).
     pub fn tick(&mut self, now_us: u64, spec: &Spec) -> Vec<Out> {
         let Some(on) = &mut self.on else {
             return Vec::new();
         };
         if now_us.saturating_sub(on.since_us) < spec.most_us {
+            let mut outs = Vec::new();
+            if on
+                .sound
+                .is_some_and(|(at, _)| now_us.saturating_sub(at) > FOLLOWED_WITHIN_US)
+            {
+                on.sound = None;
+                outs.push(Out::Said(
+                    "a door or footsteps with no face or speech within 30 s: nobody came in".into(),
+                ));
+            }
             let unconfirmed = !on.hidden
                 && on
                     .reached_us
                     .is_none_or(|at| now_us.saturating_sub(at) > CONFIRMED_WITHIN_US);
-            if !unconfirmed {
-                return Vec::new();
+            if unconfirmed {
+                on.hidden = true;
+                outs.push(Out::Said(UNCONFIRMED.into()));
             }
-            on.hidden = true;
-            return vec![Out::Said(UNCONFIRMED.into())];
+            return outs;
         }
         self.on = None;
         vec![
             Out::Unmark,
-            Out::Text(spec.words.stopped.clone()),
+            Out::Text(spec.words.ended(spec.most_us)),
             Out::Said(format!(
                 "off: {} h since it was asked, its most",
                 spec.most_us / 3_600_000_000
@@ -733,15 +1004,23 @@ struct Entry {
     tool: String,
     choice: String,
     watch: Watch,
+    /// Its `[permissions]` topics name [`SOUNDS`]: it may hear a door,
+    /// footsteps and speech (#2562).
+    sounds: bool,
 }
 
-/// Every watch skill's watch, by skill, and when the lamp last heard
-/// someone speak.
+/// Every watch skill's watch, by skill, when the lamp last heard someone
+/// speak, and whether the privacy switch is closed.
 #[derive(Debug, Default)]
 pub struct Watches {
     each: BTreeMap<String, Entry>,
     /// When the newest thing was heard at the lamp, and what.
     heard: Option<(u64, String)>,
+    /// Arrivals by sound are taken ([`SOUNDS_ENVIRONMENT`], #2562): off
+    /// unless the program says so.
+    pub sounds: bool,
+    /// The privacy switch was last seen closed: no watch goes on.
+    closed: bool,
 }
 
 /// What a watch skill does, by skill.
@@ -750,6 +1029,14 @@ pub type Outs = Vec<(String, Out)>;
 pub type Turned = (String, Value, Vec<Out>);
 
 impl Watches {
+    /// No watch yet, taking arrivals by sound if `sounds`.
+    pub fn hearing(sounds: bool) -> Self {
+        Self {
+            sounds,
+            ..Self::default()
+        }
+    }
+
     /// The skills loaded again. A watch kept as it was stays as it was; one
     /// whose skill is gone, or whose `[watch]` changed, is off, its mark
     /// given back. A watch is never turned on here.
@@ -782,6 +1069,7 @@ impl Watches {
                     tool: tool.clone(),
                     choice: choice.name.clone(),
                     watch,
+                    sounds: skill.permissions.refuses_reading(SOUNDS).is_none(),
                 },
             );
         }
@@ -840,6 +1128,9 @@ impl Watches {
         }) else {
             return Some(Err(format!("{} is \"on\" or \"off\"", entry.choice)));
         };
+        if on && self.closed && !entry.watch.is_on() {
+            return Some(Err(entry.spec.words.closed.clone()));
+        }
         Some(
             entry
                 .watch
@@ -855,8 +1146,26 @@ impl Watches {
         )
     }
 
+    /// `guard.on` (`on`) or `guard.off` from the owner's app, for guard
+    /// mode's watch ([`GUARD`], #2562): its answer and what to do, or why
+    /// not. Never on while the privacy switch is closed.
+    pub fn from_app(
+        &mut self,
+        on: bool,
+        now_us: u64,
+        can_mark: bool,
+    ) -> Result<(Value, Vec<Out>), String> {
+        let entry = self.each.get_mut(GUARD).ok_or(NOT_INSTALLED)?;
+        if on && self.closed && !entry.watch.is_on() {
+            return Err(entry.spec.words.closed.clone());
+        }
+        entry.watch.from_app(on, &entry.spec, now_us, can_mark)
+    }
+
     /// A message on a topic a watch reads, at `now_us`, at local `minute`.
-    /// `voice/privacy` is taken too, as a replay has it.
+    /// `voice/privacy` is taken too, as a replay has it. The ears' room
+    /// sound classes only with [`Self::sounds`], by a watch that may hear
+    /// them.
     pub fn observe(
         &mut self,
         topic: &str,
@@ -875,6 +1184,22 @@ impl Watches {
                     .filter(|text| !text.trim().is_empty())
                 {
                     self.heard = Some((now_us, text.to_owned()));
+                    // Speech after a door or footsteps (#2562).
+                    made = self.sounded(false, true, now_us, minute);
+                }
+            }
+            SOUNDS => {
+                // Scored with the lamp's own voice clear only: its own
+                // words are no one coming in.
+                if let Ok(SoundClasses::Scored {
+                    scores,
+                    own_voice: OwnVoiceEvidence::Clear,
+                    ..
+                }) = serde_json::from_value::<SoundClasses>(value)
+                {
+                    let door = scores.door.max(scores.footsteps) >= SOUND_AT_LEAST;
+                    let speech = scores.speech >= SOUND_AT_LEAST;
+                    made = self.sounded(door, speech, now_us, minute);
                 }
             }
             "room/presence" => {
@@ -888,14 +1213,42 @@ impl Watches {
             }
             "humans/faces/tracked" => {
                 if let Ok(faces) = serde_json::from_value::<Faces>(value) {
-                    let near = faces.faces.iter().any(|face| face.ymax - face.ymin >= NEAR);
-                    for entry in self.each.values_mut() {
-                        entry.watch.face(near, now_us, minute);
+                    // The largest, as a skill's look at a face takes it.
+                    let largest = faces
+                        .faces
+                        .iter()
+                        .max_by(|a, b| (a.ymax - a.ymin).total_cmp(&(b.ymax - b.ymin)))
+                        .map(|face| {
+                            (
+                                face.xmin + face.xmax - 1.0,
+                                face.ymin + face.ymax - 1.0,
+                                face.ymax - face.ymin,
+                            )
+                        });
+                    for (name, entry) in &mut self.each {
+                        for out in entry.watch.face(largest, now_us, minute) {
+                            made.push((name.clone(), out));
+                        }
                     }
                 }
             }
-            PRIVACY => made = self.privacy(value["physical_muted"] == Value::Bool(true), now_us),
+            PRIVACY => made = self.privacy(value["physical_muted"] == Value::Bool(true)),
             _ => {}
+        }
+        made
+    }
+
+    /// A door or footsteps, or speech, for each watch that may hear them,
+    /// with [`Self::sounds`] on (#2562).
+    fn sounded(&mut self, door: bool, speech: bool, now_us: u64, minute: Option<u16>) -> Outs {
+        let mut made = Vec::new();
+        if !self.sounds {
+            return made;
+        }
+        for (skill, entry) in self.each.iter_mut().filter(|(_, entry)| entry.sounds) {
+            for out in entry.watch.sound(door, speech, now_us, minute) {
+                made.push((skill.clone(), out));
+            }
         }
         made
     }
@@ -904,18 +1257,19 @@ impl Watches {
     pub fn known(&mut self, name: Option<&str>, now_us: u64, minute: Option<u16>) -> Outs {
         let mut made = Vec::new();
         for (skill, entry) in &mut self.each {
-            for out in entry.watch.known(name, now_us, minute) {
+            for out in entry.watch.known(name, now_us, minute, &entry.spec) {
                 made.push((skill.clone(), out));
             }
         }
         made
     }
 
-    /// The privacy switch, closed or not.
-    pub fn privacy(&mut self, closed: bool, now_us: u64) -> Outs {
+    /// The privacy switch, closed or not: closed, every watch is off.
+    pub fn privacy(&mut self, closed: bool) -> Outs {
+        self.closed = closed;
         let mut made = Vec::new();
         for (skill, entry) in &mut self.each {
-            for out in entry.watch.privacy(closed, now_us, &entry.spec) {
+            for out in entry.watch.privacy(closed, &entry.spec) {
                 made.push((skill.clone(), out));
             }
         }
@@ -995,6 +1349,31 @@ mod tests {
 
     /// What the person said as they asked.
     const ASKED: &str = "Lamp, keep an eye on things while I'm out";
+    /// The largest face in view, near the desk and far off, as the body's
+    /// gaze takes it.
+    const NEAR_FACE: Option<(f32, f32, f32)> = Some((0.1, -0.2, 0.2));
+    const FAR_FACE: Option<(f32, f32, f32)> = Some((-0.5, 0.0, 0.05));
+
+    /// The reviewer's P2 on #2688: the app's op is let go once its
+    /// deadline is reached, saying how long it waited, and when it says no
+    /// deadline; inside it, it is taken.
+    #[test]
+    fn the_apps_op_past_its_deadline_or_with_none_is_let_go() {
+        let sent = 100 * SECOND;
+        let deadline = sent + 2 * SECOND;
+        assert_eq!(let_go(APP_ON, Some(deadline), sent + SECOND), None);
+        assert_eq!(let_go(APP_ON, Some(deadline), deadline - 1), None);
+        assert_eq!(
+            let_go(APP_ON, Some(deadline), sent + 2_400_000).as_deref(),
+            Some("guard.on let go: it waited 2400 ms behind another call, past the app's 2 s")
+        );
+        assert!(let_go(APP_OFF, Some(deadline), deadline).is_some());
+        assert!(
+            let_go(APP_ON, None, sent)
+                .unwrap()
+                .contains("says no deadline_us")
+        );
+    }
 
     /// Heard at `at`, asking for it.
     fn heard(at: u64) -> Option<(u64, &'static str)> {
@@ -1096,8 +1475,12 @@ mod tests {
                 .presence(true, 2 * MINUTE, Some(600), &spec)
                 .is_empty()
         );
-        watch.face(true, 2 * MINUTE, None);
-        assert!(watch.known(Some("known-a"), 3 * MINUTE, None).is_empty());
+        watch.face(NEAR_FACE, 2 * MINUTE, None);
+        assert!(
+            watch
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
         assert!(watch.is_on(), "the asker's face ends nothing unseen");
         let shown = watch.mark_shown(true, None, 4 * MINUTE);
@@ -1148,9 +1531,13 @@ mod tests {
         // Nothing it sees turns it on.
         assert!(watch.presence(false, MINUTE, None, &spec).is_empty());
         assert!(watch.presence(true, 2 * MINUTE, None, &spec).is_empty());
-        watch.face(true, 2 * MINUTE, None);
-        assert!(watch.known(Some("known-a"), 2 * MINUTE, None).is_empty());
-        assert!(watch.privacy(true, MINUTE, &the_spec()).is_empty());
+        watch.face(NEAR_FACE, 2 * MINUTE, None);
+        assert!(
+            watch
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
+        assert!(watch.privacy(true, &the_spec()).is_empty());
         assert!(!watch.is_on());
         // Asked with nothing heard at the lamp (a text), or heard too long
         // before, or after talk of something else: refused.
@@ -1257,26 +1644,42 @@ mod tests {
         let spec = spec();
         let mut watch = on(Some("known-a"));
         // Still at the desk, being recognised as they leave.
-        assert!(watch.known(Some("known-a"), 2 * SECOND, None).is_empty());
+        assert!(
+            watch
+                .known(Some("known-a"), 2 * SECOND, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.is_on());
         watch.presence(false, MINUTE, None, &spec);
         watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec);
-        let back = watch.known(Some("known-a"), 30 * MINUTE + 2 * SECOND, None);
+        let back = watch.known(Some("known-a"), 30 * MINUTE + 2 * SECOND, None, &the_spec());
         assert_eq!(back[0], Out::Unmark);
         assert!(!watch.is_on());
         assert!(texts(&back).is_empty());
+        // #2562: "I'm off guard", said aloud as written.
+        assert!(
+            matches!(&back[1], Out::Say(words) if words.words == guard_words().off_guard && words.exact)
+        );
         // Nothing after: they are back.
         assert!(watch.presence(false, 32 * MINUTE, None, &spec).is_empty());
         // Someone else known does not end it.
         let mut watch = on(Some("known-a"));
         watch.presence(false, MINUTE, None, &spec);
         watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec);
-        assert!(watch.known(Some("known-b"), 30 * MINUTE, None).is_empty());
+        assert!(
+            watch
+                .known(Some("known-b"), 30 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.is_on());
         // An asker the eyes did not know is never ended by a face.
         let mut watch = on(None);
         watch.presence(false, MINUTE, None, &spec);
-        assert!(watch.known(Some("known-a"), 2 * MINUTE, None).is_empty());
+        assert!(
+            watch
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.is_on());
     }
 
@@ -1287,7 +1690,7 @@ mod tests {
         let mut watch = on(Some("known-a"));
         watch.presence(false, MINUTE, None, &spec);
         watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.known(Some("known-b"), 10 * MINUTE + SECOND, None);
+        watch.known(Some("known-b"), 10 * MINUTE + SECOND, None, &the_spec());
         watch.presence(true, 12 * MINUTE, None, &spec);
         let outs = watch.presence(false, 12 * MINUTE + SECOND, None, &spec);
         assert_eq!(
@@ -1298,7 +1701,7 @@ mod tests {
         let mut watch = on(None);
         watch.presence(false, MINUTE, None, &spec);
         watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec);
-        watch.face(true, 10 * MINUTE, None);
+        watch.face(NEAR_FACE, 10 * MINUTE, None);
         watch.presence(true, 13 * MINUTE, None, &spec);
         assert_eq!(
             texts(&watch.presence(false, 13 * MINUTE + SECOND, None, &spec)),
@@ -1308,42 +1711,29 @@ mod tests {
         let mut watch = on(None);
         watch.presence(false, MINUTE, None, &spec);
         watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec);
-        watch.face(false, 10 * MINUTE, None);
+        watch.face(FAR_FACE, 10 * MINUTE, None);
         assert!(
             texts(&watch.presence(false, 13 * MINUTE, None, &spec))[0].starts_with("Someone was")
         );
     }
 
-    /// #1685's test, and the peer read's P3 on #1807: with the switch
-    /// closed, one line, and quiet while it stays closed; each closing after
-    /// it opens is told again, but at most one line a minute.
+    /// #2562: the privacy switch closed ends it at once, its mark given
+    /// back, with one text; the switch staying closed, or opening and
+    /// closing again, texts nothing more: it is off until asked again.
     #[test]
-    fn the_privacy_switch_closed_gives_one_line_each_closing() {
+    fn the_privacy_switch_closed_ends_it_with_one_text() {
         let mut watch = on(None);
-        assert!(watch.privacy(false, MINUTE, &the_spec()).is_empty());
-        assert_eq!(
-            watch.privacy(true, MINUTE, &the_spec()),
-            [Out::Text(guard_words().blind)]
-        );
-        assert!(watch.privacy(true, MINUTE + SECOND, &the_spec()).is_empty());
-        assert!(watch.privacy(false, 2 * MINUTE, &the_spec()).is_empty());
-        // Closed again two minutes after the first: told.
-        assert_eq!(
-            watch.privacy(true, 3 * MINUTE, &the_spec()),
-            [Out::Text(guard_words().blind)]
-        );
-        // Opened and closed within the minute: not texted, said.
-        assert!(
-            watch
-                .privacy(false, 3 * MINUTE + 10 * SECOND, &the_spec())
-                .is_empty()
-        );
-        let flicked = watch.privacy(true, 3 * MINUTE + 20 * SECOND, &the_spec());
-        assert!(matches!(&flicked[..], [Out::Said(why)] if why.contains("within a minute")));
-        assert!(watch.privacy(true, 5 * MINUTE, &the_spec()).is_empty());
+        assert!(watch.privacy(false, &the_spec()).is_empty());
+        let muted = watch.privacy(true, &the_spec());
+        assert_eq!(muted[0], Out::Unmark);
+        assert_eq!(texts(&muted), [guard_words().blind.as_str()]);
+        assert!(!watch.is_on());
+        assert!(watch.privacy(true, &the_spec()).is_empty());
+        assert!(watch.privacy(false, &the_spec()).is_empty());
+        assert!(watch.privacy(true, &the_spec()).is_empty());
         // Off, nothing.
         let mut off = Watch::default();
-        assert!(off.privacy(true, MINUTE, &the_spec()).is_empty());
+        assert!(off.privacy(true, &the_spec()).is_empty());
     }
 
     /// The peer read's P2 on #1807: while the ring says its mark is not
@@ -1362,8 +1752,12 @@ mod tests {
                 .presence(true, 2 * MINUTE, Some(600), &spec)
                 .is_empty()
         );
-        watch.face(true, 2 * MINUTE, None);
-        assert!(watch.known(Some("known-a"), 3 * MINUTE, None).is_empty());
+        watch.face(NEAR_FACE, 2 * MINUTE, None);
+        assert!(
+            watch
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
         assert!(watch.is_on());
         let shown = watch.mark_shown(true, None, 5 * MINUTE);
@@ -1403,7 +1797,7 @@ mod tests {
                 .presence(true, MINUTE, Some(14 * 60 + 21), &spec)
                 .is_empty()
         );
-        watch.face(true, MINUTE, None);
+        watch.face(NEAR_FACE, MINUTE, None);
         assert!(watch.presence(false, 3 * MINUTE, None, &spec).is_empty());
         assert!(watch.is_on());
         // The ring's word again: the next visit counts.
@@ -1492,7 +1886,10 @@ mod tests {
         assert!(watch.tick(11 * 60 * MINUTE, &spec).is_empty());
         assert!(watch.is_on());
         let ended = watch.tick(12 * 60 * MINUTE + SECOND, &spec);
-        assert_eq!(texts(&ended), [guard_words().stopped.as_str()]);
+        assert_eq!(
+            texts(&ended),
+            [guard_words().ended(12 * 60 * MINUTE).as_str()]
+        );
         assert!(!watch.is_on());
     }
 
@@ -1507,40 +1904,58 @@ mod tests {
         assert!(watch.tick(12 * 60 * MINUTE, &spec).is_empty());
         let ended = watch.tick(12 * 60 * MINUTE + SECOND, &spec);
         assert_eq!(ended[0], Out::Unmark);
-        assert_eq!(texts(&ended), [guard_words().stopped.as_str()]);
+        assert_eq!(
+            texts(&ended),
+            [guard_words().ended(12 * 60 * MINUTE).as_str()]
+        );
         assert!(!watch.is_on());
         assert!(watch.tick(13 * 60 * MINUTE, &spec).is_empty());
     }
 
-    /// reviewer-two's P3 on #1807: with the switch closed, whoever says
-    /// someone is at the desk, no visit begins, none ends, none is texted,
-    /// and the asker's face ends nothing; open again, visits count again.
+    /// reviewer-two's P3 on #1807, and #2562: once the switch has ended
+    /// it, whoever says someone is at the desk, no visit begins, none ends
+    /// and none is texted; and while the switch is closed it is not turned
+    /// on, by voice or from the app.
     #[test]
-    fn with_the_switch_closed_nothing_about_the_desk_is_taken() {
+    fn once_the_switch_has_ended_it_nothing_about_the_desk_is_taken() {
         let spec = spec();
         let mut watch = on(Some("known-a"));
         watch.presence(false, MINUTE, None, &spec);
         assert_eq!(
-            watch.privacy(true, MINUTE, &the_spec()),
-            [Out::Text(guard_words().blind)]
+            texts(&watch.privacy(true, &the_spec())),
+            [guard_words().blind.as_str()]
         );
         assert!(
             watch
                 .presence(true, 2 * MINUTE, Some(600), &spec)
                 .is_empty()
         );
-        watch.face(true, 2 * MINUTE, None);
-        assert!(watch.known(Some("known-b"), 2 * MINUTE, None).is_empty());
-        assert!(watch.known(Some("known-a"), 3 * MINUTE, None).is_empty());
-        assert!(watch.is_on());
+        assert!(watch.face(NEAR_FACE, 2 * MINUTE, None).is_empty());
+        assert!(
+            watch
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
         assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
-        // Open: the next visit is the first.
-        assert!(watch.privacy(false, 5 * MINUTE, &the_spec()).is_empty());
-        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.presence(true, 12 * MINUTE, None, &spec);
+        assert!(!watch.is_on());
+        // Closed, it is not turned on.
+        let mut watches = guard();
+        watches.privacy(true);
+        watches.observe("voice/heard", HEARD, SECOND, None);
+        let refused = watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
+        assert_eq!(refused.unwrap().unwrap_err(), guard_words().closed);
         assert_eq!(
-            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
-            ["Someone was at your desk at 14:31, for about 2 minutes."]
+            watches.from_app(true, 2 * SECOND, true).unwrap_err(),
+            guard_words().closed
+        );
+        assert!(!watches.any_on());
+        // Open, asked again: on.
+        watches.privacy(false);
+        assert!(
+            watches
+                .tool("keep_watch", &json!({"turn": "on"}), 3 * SECOND, None, true)
+                .unwrap()
+                .is_ok()
         );
     }
 
@@ -1624,6 +2039,274 @@ mod tests {
         assert!(watches.owner("keep_watch").is_none());
     }
 
+    /// What was heard as the person asked.
+    const HEARD: &[u8] = br#"{"text":"keep an eye on things while I'm out","finished":true}"#;
+
+    /// The repository's guard mode, loaded, taking arrivals by sound.
+    fn guard() -> Watches {
+        let skill = crate::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/guard-mode"),
+        )
+        .unwrap();
+        let mut watches = Watches::hearing(true);
+        watches.replace(std::slice::from_ref(&skill));
+        watches
+    }
+
+    /// The ears' room sound classes: a door scored `door`, speech `speech`,
+    /// the lamp's own voice `own`.
+    fn classes(door: f32, speech: f32, own: &str) -> Vec<u8> {
+        json!({
+            "status": "scored",
+            "model_id": "yamnet-qai-v0.59.0",
+            "window": {"start_us": 0, "end_us": 960_000, "completed_us": 1_000_000, "capture_epoch": 1},
+            "scores": {"speech": speech, "music": 0.0, "laughter": 0.0, "door": door, "footsteps": 0.0},
+            "own_voice": own,
+        })
+        .to_string()
+        .into_bytes()
+    }
+
+    /// The watch on, the desk empty and its mark confirmed at `now`.
+    fn away(watch: &mut Watch, now: u64) {
+        watch.presence(false, now, None, &spec());
+        watch.mark_shown(true, None, now);
+    }
+
+    /// #2562: a door or footsteps with no face or speech within 30 s is
+    /// nobody coming in: nothing is texted, and a face after that is no
+    /// arrival of the sound's.
+    #[test]
+    fn a_door_with_no_face_within_thirty_seconds_texts_nothing() {
+        let spec = spec();
+        let mut watch = on(None);
+        away(&mut watch, 10 * MINUTE);
+        let heard = watch.sound(true, false, 10 * MINUTE, Some(14 * 60 + 31));
+        assert!(matches!(&heard[..], [Out::Said(why)] if why.contains("only if a face or speech")));
+        // A second door while one waits says nothing new.
+        assert!(
+            watch
+                .sound(true, false, 10 * MINUTE + SECOND, None)
+                .is_empty()
+        );
+        watch.mark_shown(true, None, 10 * MINUTE + 20 * SECOND);
+        let gone = watch.tick(10 * MINUTE + 31 * SECOND, &spec);
+        assert!(matches!(&gone[..], [Out::Said(why)] if why.contains("nobody came in")));
+        assert!(texts(&gone).is_empty());
+        // A face far off after: no visit, no arrival, no turn.
+        let late = watch.face(FAR_FACE, 10 * MINUTE + 40 * SECOND, None);
+        assert!(late.is_empty(), "{late:?}");
+        assert!(watch.presence(false, 11 * MINUTE, None, &spec).is_empty());
+        assert!(watch.is_on());
+    }
+
+    /// #2562: a door, then a face within 30 s, is one arrival: the visit
+    /// begins at the door, the head turns to the face once, and one text
+    /// says they came in, when they go.
+    #[test]
+    fn a_door_then_a_face_gives_one_arrival() {
+        let spec = spec();
+        let mut watch = on(None);
+        away(&mut watch, 10 * MINUTE);
+        watch.sound(true, false, 10 * MINUTE, Some(14 * 60 + 31));
+        let seen = watch.face(NEAR_FACE, 10 * MINUTE + 12 * SECOND, Some(14 * 60 + 31));
+        assert!(matches!(&seen[0], Out::Said(why) if why.contains("someone came in")));
+        assert_eq!(
+            seen[1],
+            Out::Gaze(Call::Gaze {
+                face: Some((0.1, -0.2, 0.2))
+            })
+        );
+        let mut outs = Vec::new();
+        let mut now = 10 * MINUTE + 12 * SECOND;
+        while now < 12 * MINUTE {
+            now += SECOND;
+            outs.extend(watch.presence(true, now, None, &spec));
+            outs.extend(watch.face(NEAR_FACE, now, None));
+        }
+        outs.extend(watch.presence(false, now + 20 * SECOND, None, &spec));
+        assert!(
+            !outs.iter().any(|out| matches!(out, Out::Gaze(_))),
+            "{outs:?}"
+        );
+        assert_eq!(
+            texts(&outs),
+            ["Someone I don't know came in at 14:31 and was here for about 2 minutes."]
+        );
+        // Speech after footsteps is one too, with no face to turn to.
+        let mut watch = on(None);
+        away(&mut watch, 10 * MINUTE);
+        watch.sound(true, false, 10 * MINUTE, Some(9 * 60 + 5));
+        let spoke = watch.sound(false, true, 10 * MINUTE + 5 * SECOND, None);
+        assert!(matches!(&spoke[..], [Out::Said(why)] if why.contains("then speech")));
+        watch.presence(true, 10 * MINUTE + 6 * SECOND, None, &spec);
+        assert_eq!(
+            texts(&watch.presence(false, 10 * MINUTE + 50 * SECOND, None, &spec)),
+            ["Someone came in at 9:05 and was here for under a minute."]
+        );
+    }
+
+    /// #2562 and rule 8: one turn of the head a visit, and none again
+    /// within 2 min of the last, whoever comes; after, one again.
+    #[test]
+    fn a_second_arrival_within_two_minutes_does_not_turn_the_head() {
+        let spec = spec();
+        let mut watch = on(None);
+        away(&mut watch, MINUTE);
+        let turns = |outs: &[Out]| {
+            outs.iter()
+                .filter(|out| matches!(out, Out::Gaze(_)))
+                .count()
+        };
+        let arrive = |watch: &mut Watch, at: u64| {
+            let mut outs = watch.presence(true, at, None, &spec);
+            outs.extend(watch.face(NEAR_FACE, at, None));
+            outs.extend(watch.face(NEAR_FACE, at + SECOND, None));
+            outs.extend(watch.presence(false, at + 30 * SECOND, None, &spec));
+            outs
+        };
+        assert_eq!(turns(&arrive(&mut watch, 10 * MINUTE)), 1);
+        let again = arrive(&mut watch, 11 * MINUTE);
+        assert_eq!(turns(&again), 0);
+        assert!(
+            again
+                .iter()
+                .any(|out| matches!(out, Out::Said(why) if why.contains("under 2 min")))
+        );
+        assert_eq!(turns(&arrive(&mut watch, 13 * MINUTE)), 1);
+        // The asker still at the desk turns nothing: it is not counting yet.
+        let mut watch = on(None);
+        assert!(watch.face(NEAR_FACE, 2 * SECOND, None).is_empty());
+    }
+
+    /// #2562: the owner's app turns it on with no voice, and off; its mark
+    /// is asked for and nothing is counted until the ring confirms it. A
+    /// watch paused by the person's light, no mark to show, or no guard
+    /// mode installed: refused.
+    #[test]
+    fn guard_from_the_app_is_on_without_a_voice_and_counts_only_once_its_mark_shows() {
+        let mut watches = guard();
+        let (answer, outs) = watches.from_app(true, SECOND, true).unwrap();
+        assert_eq!(answer, json!({"guard": "on"}));
+        assert!(matches!(outs[0], Out::Mark(_)));
+        assert!(watches.is_on(GUARD));
+        // Before the ring's word: nothing taken.
+        let empty = br#"{"someone":false}"#;
+        let someone = br#"{"someone":true}"#;
+        watches.observe("room/presence", empty, 2 * SECOND, None);
+        watches.observe("room/presence", someone, 3 * SECOND, None);
+        assert!(
+            watches
+                .observe("room/presence", empty, 4 * SECOND, None)
+                .is_empty()
+        );
+        watches.ring_said(GUARD, true, None, 5 * SECOND);
+        watches.observe("room/presence", empty, 6 * SECOND, None);
+        watches.observe("room/presence", someone, 7 * SECOND, Some(600));
+        let visit = watches.observe("room/presence", empty, 20 * SECOND, None);
+        assert!(visit.iter().any(|(_, out)| matches!(out, Out::Text(_))));
+        // On again: on. Off: its mark given back.
+        assert!(
+            watches
+                .from_app(true, 21 * SECOND, true)
+                .unwrap()
+                .1
+                .is_empty()
+        );
+        let (answer, outs) = watches.from_app(false, 22 * SECOND, false).unwrap();
+        assert_eq!(answer, json!({"guard": "off"}));
+        assert_eq!(outs[0], Out::Unmark);
+        assert!(!watches.any_on());
+        // No mark to show: refused.
+        assert_eq!(
+            watches.from_app(true, MINUTE, false).unwrap_err(),
+            guard_words().no_mark
+        );
+        // Paused by the person's own light: only asked at the lamp.
+        watches.from_app(true, MINUTE, true).unwrap();
+        watches.paused_by_person(GUARD);
+        assert_eq!(
+            watches.from_app(true, 2 * MINUTE, true).unwrap_err(),
+            guard_words().paused_from_app
+        );
+        // Asked from the app, no face is the asker's: a known face ends
+        // nothing.
+        let mut watch = Watch::default();
+        watch.from_app(true, &spec(), SECOND, true).unwrap();
+        away(&mut watch, MINUTE);
+        assert!(
+            watch
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .is_empty()
+        );
+        assert!(watch.is_on());
+        // No guard mode: refused.
+        assert_eq!(
+            Watches::default().from_app(true, SECOND, true).unwrap_err(),
+            NOT_INSTALLED
+        );
+    }
+
+    /// #2562: only lamp-cloud's unit is the owner's app's link: not the
+    /// voice, another part, or a unit whose name only begins the same.
+    #[test]
+    fn only_lamp_clouds_unit_is_the_app() {
+        assert!(from_the_app(
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n"
+        ));
+        for other in [
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service-x\n",
+            "",
+        ] {
+            assert!(!from_the_app(other), "{other}");
+        }
+        assert!(switched_on(Some("on")));
+        for off in [None, Some("1"), Some("ON"), Some("")] {
+            assert!(!switched_on(off));
+        }
+    }
+
+    /// #2562: a door on the ears' classes is taken only with the switch on
+    /// and with the lamp's own voice clear; speech on `voice/heard` or the
+    /// classes follows it.
+    #[test]
+    fn sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear() {
+        let empty = br#"{"someone":false}"#;
+        for (sounds, own, came) in [
+            (true, "clear", true),
+            (false, "clear", false),
+            (true, "present", false),
+            (true, "unknown", false),
+        ] {
+            let mut watches = guard();
+            watches.sounds = sounds;
+            watches.observe("voice/heard", HEARD, SECOND, None);
+            watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
+            watches.ring_said(GUARD, true, None, 3 * SECOND);
+            watches.observe("room/presence", empty, 4 * SECOND, None);
+            let door = watches.observe(SOUNDS, &classes(0.9, 0.0, own), 10 * SECOND, None);
+            let heard = br#"{"text":"hello?","finished":true}"#;
+            let spoke = watches.observe("voice/heard", heard, 15 * SECOND, None);
+            let said = format!("{door:?}{spoke:?}");
+            assert_eq!(
+                said.contains("someone came in"),
+                came,
+                "{sounds} {own}: {said}"
+            );
+        }
+        // Speech on the classes follows a door too.
+        let mut watches = guard();
+        watches.observe("voice/heard", HEARD, SECOND, None);
+        watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
+        watches.ring_said(GUARD, true, None, 3 * SECOND);
+        watches.observe("room/presence", empty, 4 * SECOND, None);
+        watches.observe(SOUNDS, &classes(0.9, 0.0, "clear"), 10 * SECOND, None);
+        let spoke = watches.observe(SOUNDS, &classes(0.0, 0.8, "clear"), 12 * SECOND, None);
+        assert!(format!("{spoke:?}").contains("then speech"));
+    }
+
     #[test]
     fn the_local_minute_is_the_wall_clock_east_of_utc() {
         // 2026-10-19 07:31 UTC is 14:31 in Ho Chi Minh City (+07:00).
@@ -1639,5 +2322,6 @@ mod tests {
         assert_eq!(LISTENS[1], Faces::TOPIC);
         assert_eq!(LISTENS[2], lamp_msgs::Speech::TOPICS[0]);
         assert_eq!(PRIVACY, lamp_msgs::MicrophonePrivacy::TOPIC);
+        assert_eq!(SOUNDS, SoundClasses::TOPIC);
     }
 }

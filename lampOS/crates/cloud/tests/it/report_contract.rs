@@ -127,6 +127,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         schedule: None,
         update_page: false,
         restart: None,
+        guard: None,
     };
     for kind in ["reports.get", "reports.set"] {
         let result = answer(&mut real, kind, &json!({"share": true}));

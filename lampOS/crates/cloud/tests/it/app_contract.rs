@@ -168,6 +168,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         schedule: None,
         update_page: false,
         restart: None,
+        guard: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -271,6 +272,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         schedule: None,
         update_page: false,
         restart: None,
+        guard: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -420,6 +422,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
         update_page: false,
         restart: None,
+        guard: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -508,6 +511,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         schedule: None,
         update_page: true,
         restart: None,
+        guard: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -633,6 +637,7 @@ fn a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_upd
         schedule: None,
         update_page: false,
         restart: Some(socket),
+        guard: None,
     };
     let me = Identity {
         device: "lamp".into(),

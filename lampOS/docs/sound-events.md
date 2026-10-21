@@ -44,7 +44,8 @@ The proposed message carries:
   publish time must not make old audio look recent. Reject reversed/future times,
   windows over two seconds and results older than two seconds after input end.
 - A pinned model/label-map identifier and separate finite scores in [0,1] for
-  speech, music and laughter. They are multi-label: music and speech may coexist.
+  speech, music and laughter, and a door and footsteps (#2562, guard mode's
+  arrivals by sound). They are multi-label: music and speech may coexist.
   Never choose a single winning label and discard evidence of speech.
 - Whether the lamp's voice or its 500 ms tail touched the window, and whether
   that evidence was fresh. Unknown own-voice state is not evidence of silence.
@@ -67,7 +68,9 @@ voice; it is not permission for a skill to act. `check()` validates shape/ranges
 and the raw-age bound. `check_at(now_us)` additionally rejects future or stale
 results. Neither checks privacy authority, clock identity or current capture
 epoch: those remain required at the publisher/consumer boundary. Unknown JSON
-fields are refused, so an unavailable message cannot hide stale scores. The
+fields are refused, so an unavailable message cannot hide stale scores.
+`door` and `footsteps` were added to version 1 (#2562): a message without
+them, from an older `lamp-ears`, reads both as 0, no door and no footsteps. The
 only publisher is Ears behind its switch, below.
 
 There is no `safe_to_act` field. Consumer gates also require fresh voice state,
@@ -205,7 +208,8 @@ after the check is never loaded. A missing, relative or mismatched model
 publishes `invalid_model` every 500 ms and retains no audio. Loading and
 inference run on their own thread (`ears-classes`), never on capture or the
 Bus pump. Scores are independent sigmoids of the logits for Speech (0),
-Music (132) and Laughter (13).
+Music (132) and Laughter (13), and Door (348) and Walk, footsteps (48) for
+guard mode (#2562; read by `lamp-skills` only with `LAMP_GUARD_SOUNDS=on`).
 
 **Frontend and windows.** As the offline probe: 16 kHz, FFT 512, periodic
 Hann 400 centered in it, hop 160, magnitude, 64 HTK mel bands 125–7500 Hz,

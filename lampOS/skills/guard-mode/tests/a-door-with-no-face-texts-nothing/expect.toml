@@ -1,0 +1,13 @@
+# #2562: asked at 14:20 and the desk empty from 49 s; a door at 14:31
+# (660 s) on the ears' room sound classes, and no face, voice or anyone at
+# the desk after: a sound alone is nobody coming in, and nothing is texted.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"

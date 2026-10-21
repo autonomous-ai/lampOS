@@ -8738,7 +8738,7 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
     // What it may do, in words.
     assert_eq!(
         loaded.permissions.said(),
-        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy; light, messages, known faces"
+        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy, ears/classes; speak, light, body, messages, known faces"
     );
     // Its tool, with its choice, for the model.
     let file = tools_file(std::slice::from_ref(&loaded));
@@ -8786,7 +8786,8 @@ fn still_shows(reached: &mut lamp_bus::Publisher, mark: &LightRequest) {
 /// with nothing heard at the lamp is refused; asked out loud, its faint mark
 /// is asked of the ring, a visit gives one text on `messages/out`, and the
 /// face of the person who asked, back in the eyes' known file, ends it and
-/// gives the mark back, with no text.
+/// gives the mark back, with no text, and "I'm off guard" said aloud
+/// through the voice's say service (#2562).
 #[test]
 fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
     use lamp_msgs::{LightReached, MessageOut, RoomPresence};
@@ -8814,6 +8815,17 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         .unwrap();
     let known = root.join("known");
     let tools = root.join("tools");
+    // The voice's say service: each ask, said at once.
+    let voice = UnixListener::bind(root.join("say.sock")).unwrap();
+    let (heard_said, said_aloud) = mpsc::channel();
+    std::thread::spawn(move || {
+        for stream in voice.incoming().flatten() {
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let _ = heard_said.send(line);
+            let _ = (&stream).write_all(b"{\"event\":\"begun\"}\n{\"outcome\":\"said\"}\n");
+        }
+    });
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
@@ -8826,6 +8838,8 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
                 tools.as_os_str(),
                 "--known-file".as_ref(),
                 known.as_os_str(),
+                "--say-socket".as_ref(),
+                root.join("say.sock").as_os_str(),
                 "--boot-id".as_ref(),
                 OsStr::new("boot-test"),
             ])
@@ -8968,6 +8982,11 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         }
     }
     assert!(back.is_some(), "the mark was not given back");
+    // "I'm off guard", aloud, as written (#2562).
+    let aloud: serde_json::Value =
+        serde_json::from_str(&said_aloud.recv_timeout(Duration::from_secs(5)).unwrap()).unwrap();
+    assert_eq!(aloud["text"], "I'm off guard.", "{aloud}");
+    assert_eq!(aloud["skill"], "guard-mode", "{aloud}");
     // No text for the person who asked coming back.
     say(&mut presence, false);
     assert!(next(&mut texts, Duration::from_millis(500)).is_none());
@@ -8978,6 +8997,222 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         off["result"]["next"].as_str().unwrap().contains("weren't"),
         "{off}"
     );
+}
+
+/// #2562, the program: the owner's app's `{"op":"guard"}` on the call
+/// socket. Without `LAMP_GUARD_FROM_APP=on` it is refused, and from a peer
+/// that is not lamp-cloud's unit (the owner's app's link) it is refused as
+/// not the owner's; a tool's call can't name the app's kinds. From the
+/// app's link (here any peer, `LAMP_SKILLS_ANY_ASKER=on`), it goes on with
+/// no voice, its mark asked of the ring; and the privacy switch closed
+/// turns it off, the mark given back, with one text and no more.
+#[test]
+fn guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it() {
+    use lamp_msgs::{LightReached, MessageOut, MicrophonePrivacy, RoomPresence};
+    for (switch, any_peer) in [(false, true), (true, false), (true, true)] {
+        let dir = tempfile::Builder::new()
+            .prefix("ga")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = dir.path();
+        copy(
+            &skills_root().join("guard-mode"),
+            &root.join("skills/guard-mode"),
+        );
+        let bus = Bus::new(root.join("bus")).unwrap();
+        let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+        let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+        let mut reached = bus
+            .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+            .unwrap();
+        let mut privacy = bus
+            .publisher_declared(
+                MicrophonePrivacy::TOPIC,
+                &MicrophonePrivacy::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let tools = root.join("tools");
+        let clock = Clock::at(root);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+        command
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .env_remove("LAMP_GUARD_FROM_APP")
+            .env_remove("LAMP_SKILLS_ANY_ASKER");
+        if switch {
+            command.env("LAMP_GUARD_FROM_APP", "on");
+        }
+        if any_peer {
+            command.env("LAMP_SKILLS_ANY_ASKER", "on");
+        }
+        let _running = Running(command.spawn().unwrap());
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !tools.join("call.sock").exists()
+            || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        {
+            assert!(Instant::now() < deadline, "guard mode was never loaded");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let ask = |line: &str| {
+            let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+            writeln!(&stream, "{line}").unwrap();
+            let mut answer = String::new();
+            BufReader::new(&stream).read_line(&mut answer).unwrap();
+            serde_json::from_str::<serde_json::Value>(&answer).unwrap()
+        };
+        let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+            let until = Instant::now() + within;
+            loop {
+                if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                    break Some(message);
+                }
+                if Instant::now() >= until {
+                    break None;
+                }
+            }
+        };
+        // The app's op as lamp-cloud writes it: when it stops waiting, on
+        // the host's shared clock, `within` from now.
+        let guard = |turn: &str, within: Duration| {
+            serde_json::json!({
+                "op": "guard",
+                "turn": turn,
+                "deadline_us": lamp_ipc::monotonic_us() + within.as_micros() as u64,
+            })
+            .to_string()
+        };
+        let wait = lamp_skills::watch::FROM_APP_WAIT;
+        // A tool's call never names the app's kinds.
+        let named = ask(r#"{"op":"call","name":"guard.on","args":{}}"#);
+        assert_eq!(named["ok"], false, "{named}");
+        if switch && any_peer {
+            // The reviewer's P2 on #2688. An op from a lamp-cloud that says
+            // no deadline, and one past its deadline, are let go: guard
+            // stays off, no mark asked of the ring.
+            let unstamped = ask(r#"{"op":"guard","turn":"on"}"#);
+            assert_eq!(unstamped["ok"], false, "{unstamped}");
+            assert!(
+                unstamped["error"].as_str().unwrap().contains("deadline_us"),
+                "{unstamped}"
+            );
+            let late = serde_json::json!({
+                "op": "guard",
+                "turn": "on",
+                "deadline_us": lamp_ipc::monotonic_us() - 1,
+            });
+            let late = ask(&late.to_string());
+            assert_eq!(late["ok"], false, "{late}");
+            assert!(
+                late["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("behind another call, past the app's 2 s"),
+                "{late}"
+            );
+            // A slow voice call holds the socket, which answers one
+            // connection at a time, past the app's op's deadline: the op,
+            // read after it, is let go, and lamp-cloud tells the app
+            // nothing was turned (its answer is not `ok`).
+            let slow = UnixStream::connect(tools.join("call.sock")).unwrap();
+            write!(&slow, r#"{{"op":"call","name":"#).unwrap();
+            std::thread::sleep(Duration::from_millis(100));
+            let behind = ask(&guard("on", Duration::from_millis(400)));
+            assert_eq!(behind["ok"], false, "{behind}");
+            assert!(
+                behind["error"].as_str().unwrap().contains("let go"),
+                "{behind}"
+            );
+            drop(slow);
+            assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+            // Not on: off says it was off.
+            let off = ask(&guard("off", wait));
+            assert_eq!(off["result"]["guard"], "off", "{off}");
+            assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+        }
+        let on = ask(&guard("on", wait));
+        if !switch {
+            assert_eq!(on["ok"], false, "{on}");
+            assert!(
+                on["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("LAMP_GUARD_FROM_APP"),
+                "{on}"
+            );
+            assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+            continue;
+        }
+        if !any_peer {
+            // Not lamp-cloud's unit: not the owner's app.
+            assert_eq!(on["ok"], false, "{on}");
+            assert_eq!(on["error"], lamp_skills::watch::NOT_THE_APP, "{on}");
+            assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+            continue;
+        }
+        assert_eq!(on["ok"], true, "{on}");
+        assert_eq!(on["result"]["guard"], "on", "{on}");
+        let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+            .expect("the mark")
+            .parse()
+            .unwrap();
+        assert_eq!(mark.light, Light::new(true, "blue", 1).unwrap());
+        reached
+            .publish_json(
+                1,
+                &LightReached {
+                    source: mark.claim.source.clone(),
+                    light: mark.light.clone(),
+                },
+            )
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        let bad = ask(&guard("maybe", wait));
+        assert_eq!(bad["ok"], false, "{bad}");
+        // The switch closed: off, the mark given back, one text.
+        privacy
+            .publish_json(1, &serde_json::json!({"physical_muted": true}))
+            .unwrap();
+        let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+            .expect("a text")
+            .parse()
+            .unwrap();
+        assert_eq!(text.text, lamp_skills::watch::Words::built_in().blind);
+        let mut back = false;
+        let until = Instant::now() + Duration::from_secs(5);
+        while !back && Instant::now() < until {
+            if let Some(message) = next(&mut requests, Duration::from_millis(500)) {
+                let asked: LightRequest = message.parse().unwrap();
+                back = !asked.claim.holds_at("boot-test", lamp_ipc::monotonic_us());
+            }
+        }
+        assert!(back, "the mark was not given back");
+        // Still closed, a second later: no second text, and not on again.
+        privacy
+            .publish_json(1, &serde_json::json!({"physical_muted": true}))
+            .unwrap();
+        assert!(next(&mut texts, Duration::from_millis(1_500)).is_none());
+        let closed = ask(&guard("on", wait));
+        assert_eq!(closed["ok"], false, "{closed}");
+        assert_eq!(
+            closed["error"],
+            lamp_skills::watch::Words::built_in().closed,
+            "{closed}"
+        );
+        let off = ask(&guard("off", wait));
+        assert_eq!(off["result"]["guard"], "off", "{off}");
+    }
 }
 
 /// The eyes' `room/activity`, as they say it while someone sits at the desk.

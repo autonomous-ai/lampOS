@@ -1473,6 +1473,14 @@ impl Skill {
                     .flat_map(|_| watch::LISTENS)
                     .map(|topic| (topic.to_owned(), "a watch")),
             )
+            // A watch's arrivals by sound, only where its permissions name
+            // the ears' room sound classes (#2562).
+            .chain(
+                self.watch
+                    .iter()
+                    .filter(|_| self.permissions.refuses_reading(watch::SOUNDS).is_none())
+                    .map(|_| (watch::SOUNDS.to_owned(), "a watch's arrivals by sound")),
+            )
             .chain(
                 self.is_routine()
                     .then(|| (VoiceState::TOPIC.to_owned(), "a routine's quiet gate")),
@@ -6021,7 +6029,9 @@ pub struct KnownAt {
 /// time (at one time, the messages first, then what the eyes know, then the
 /// call), the eyes' known file looked at after each, as the program looks at
 /// it as it goes. Its mark is `light`, the mark given back `ends`, a text
-/// `text`. With `clock`, the case's first message is at that local time.
+/// `text`, a turn of the head `body.gaze` and its words aloud `say`. With
+/// `clock`, the case's first message is at that local time. Arrivals by
+/// sound are taken, as the program takes them with `LAMP_GUARD_SOUNDS=on`.
 pub fn replay_watch(
     dir: &Path,
     recording: &Path,
@@ -6034,6 +6044,7 @@ pub fn replay_watch(
         return Err("[[known]] is a watch's: this skill has no [watch]".into());
     }
     let mut watches = watch::Watches::default();
+    watches.sounds = true;
     watches.replace(std::slice::from_ref(&skill));
     let messages = read_recordings(recording)?;
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
@@ -6075,6 +6086,8 @@ pub fn replay_watch(
                 watch::Out::Mark(call) => call,
                 watch::Out::Unmark => Call::Ends,
                 watch::Out::Text(text) => Call::Text(text),
+                watch::Out::Gaze(call) => call,
+                watch::Out::Say(words) => Call::Words(words),
                 watch::Out::Said(_) => continue,
             };
             made.push(Made { at_us, call });
