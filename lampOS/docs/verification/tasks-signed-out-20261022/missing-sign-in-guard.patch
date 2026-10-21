@@ -1,0 +1,11 @@
+--- a/lampOS/crates/tasks/src/runtime.rs
++++ b/lampOS/crates/tasks/src/runtime.rs
+@@ -977,7 +977,7 @@
+                             later.from_machines?;
+                             let signed_in = set_up
+                                 .as_ref()
+-                                .is_some_and(|found| found.sign_in == Some(SignIn::In));
++                                .is_some_and(|found| found.sign_in.is_some());
+                             if !signed_in || Instant::now() < machines_due {
+                                 return None;
+                             }

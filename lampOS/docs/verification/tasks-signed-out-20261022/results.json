@@ -1,0 +1,161 @@
+{
+  "initial_head": "2e84acbe7755267a60b7abfb50ae3ee7adc915a8",
+  "comparison_base_without_original_pr": "7a6c5d678047e016a8b79d5e4bb88391c7d2b24f",
+  "latency_target": "Preserve the full 600 ms signed-out observation plus completed owner pass; aim for repeated full-case wall time <2 s; report every miss.",
+  "timings": {
+    "before": {
+      "all_three_s": [
+        1.686588,
+        1.002755,
+        1.023472
+      ],
+      "first_use_s": 1.686588,
+      "median_three_s": 1.023472,
+      "median_repeated_s": 1.0131135,
+      "over_2s_runs": [],
+      "repeated_over_2s_runs": []
+    },
+    "after": {
+      "all_three_s": [
+        2.152739,
+        1.751555,
+        1.55959
+      ],
+      "first_use_s": 2.152739,
+      "median_three_s": 1.751555,
+      "median_repeated_s": 1.6555725,
+      "over_2s_runs": [
+        1
+      ],
+      "repeated_over_2s_runs": []
+    }
+  },
+  "controls": [
+    {
+      "patch": "missing-sign-in-guard.patch",
+      "patch_sha256": "1cde658aab47c2965cbe2c4967ba1b86ef89e4994b531d820c13f434d14b908c",
+      "failure": "assertion `left == right` failed: asked while signed out",
+      "wall_s": 1.297559
+    },
+    {
+      "patch": "missing-sign-in-guard-delayed-worker.patch",
+      "patch_sha256": "4d2b6fe391a237825ae57472c955c7d9bb1d0602ad2812321b27a17a59061cdf",
+      "failure": "assertion `left == right` failed: asked while signed out",
+      "wall_s": 2.922107
+    }
+  ],
+  "skills_base_comparisons": [
+    {
+      "sample": 1,
+      "first_use": true,
+      "exit_code": 0,
+      "process_wall_s": 1.441766,
+      "compile_excluded": true,
+      "test_counts": {
+        "passed": 119,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      "original_signature_reproduced": false,
+      "stdout": "baseline-skills-parallel-1.stdout",
+      "stderr": "baseline-skills-parallel-1.stderr",
+      "all_panic_owners": []
+    },
+    {
+      "sample": 2,
+      "first_use": false,
+      "exit_code": 0,
+      "process_wall_s": 1.466027,
+      "compile_excluded": true,
+      "test_counts": {
+        "passed": 119,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      "original_signature_reproduced": false,
+      "stdout": "baseline-skills-parallel-2.stdout",
+      "stderr": "baseline-skills-parallel-2.stderr",
+      "all_panic_owners": []
+    },
+    {
+      "sample": 3,
+      "first_use": false,
+      "exit_code": 0,
+      "process_wall_s": 1.39123,
+      "compile_excluded": true,
+      "test_counts": {
+        "passed": 119,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      "original_signature_reproduced": false,
+      "stdout": "baseline-skills-parallel-3.stdout",
+      "stderr": "baseline-skills-parallel-3.stderr",
+      "all_panic_owners": []
+    }
+  ],
+  "gates": {
+    "initial/gate-fmt": null,
+    "initial/gate-clippy": null,
+    "initial/gate-tasks-tests": {
+      "passed": 209,
+      "failed": 0,
+      "ignored": 2
+    },
+    "initial/gate-voice-tests": {
+      "passed": 3238,
+      "failed": 0,
+      "ignored": 14
+    },
+    "initial/gate-dependent-tests": {
+      "passed": 1673,
+      "failed": 1,
+      "ignored": 10
+    },
+    "continuation/gate-dependent-tests": {
+      "passed": 2806,
+      "failed": 0,
+      "ignored": 12
+    },
+    "continuation/gate-workspace-build": null,
+    "continuation/gate-diff": null
+  },
+  "source_sha256": {
+    "lampOS/crates/tasks/tests/runtime.rs": "4e261cd36b1082f4369926b95dbf116891418d2e3896060568f60c7e6811d073",
+    "lampOS/crates/tasks/src/runtime.rs": "044980f8a60973edaab507567e27b176c9cf21508101910d2d0c5f8d567d9b6e",
+    "lampOS/docs/tasks.md": "0c30f50f547c7287db553b08d70eeaa75350078b158d9b437b4f5d10a4f73263"
+  },
+  "restored": {
+    "lampOS/crates/tasks/tests/runtime.rs": true,
+    "lampOS/crates/tasks/src/runtime.rs": true,
+    "lampOS/docs/tasks.md": true
+  },
+  "continuation_restored": true,
+  "environment": {
+    "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+    "environment": {
+      "PATH": "/Users/autonomous/.cargo/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/usr/local/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/Users/autonomous/.codex/tmp/arg0/codex-arg0S5r2ZG:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin:/Users/autonomous/.harness/runtime/grid-0.3.55-darwin-x64/bin",
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TERM_COLOR": "never",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "removed_environment": {},
+    "candidate_sha256": {
+      "lampOS/crates/tasks/tests/runtime.rs": "4e261cd36b1082f4369926b95dbf116891418d2e3896060568f60c7e6811d073",
+      "lampOS/crates/tasks/src/runtime.rs": "044980f8a60973edaab507567e27b176c9cf21508101910d2d0c5f8d567d9b6e",
+      "lampOS/docs/tasks.md": "0c30f50f547c7287db553b08d70eeaa75350078b158d9b437b4f5d10a4f73263"
+    },
+    "baseline_test_sha256": "9f2013ccdd0c560b32bf93daf0f5e537f4c96a5b29343f221b7d669878cb6246"
+  },
+  "source_freshness_record_sha256": "301c2bba2d1c5bec46653d11b456234ebc660aaad6afd97f2320b46cf0bd6ef3",
+  "recording_policy": "All exact commands, exits, times and full raw stdout/stderr digests are listed. Full failed-gate, control, timing and baseline-comparison output is included in observations.txt. Bulk compile, metadata and passing gate output stays in the named external run directories; it is not claimed to be retained in this commit."
+}
