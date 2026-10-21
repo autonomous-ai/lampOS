@@ -24,8 +24,8 @@ It is its own process. With it gone nothing else on the lamp changes, and
 a part reports whether or not anybody listens. The skill Not feeling well
 (#1681, [skills.md](skills.md)) reads `lamp/health`'s `level`: `error` for
 30 s, and the lamp droops once and dims a shade until it ends, or until
-`lamp/health` has said nothing for its 15 s. It is not in the product's
-install yet (`install::NOT_PRODUCT_SKILLS`).
+`lamp/health` has said nothing for its 15 s. It comes with the product
+since its lamp check, row 8 on lamp-52e6 (20 Oct; `install::PRODUCT_SKILLS`).
 
 The voice can say which part is unwell, when asked (#1681). Behind
 `LAMP_HEALTH_FACTS=on` in the voice's unit (off unless set;
