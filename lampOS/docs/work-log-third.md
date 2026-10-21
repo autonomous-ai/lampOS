@@ -56,9 +56,45 @@ Ready for lamp-voice: no (diagnostic read only; no policy change).
   enqueue/readiness and any stop-word or discontinuity metadata. No words
   or audio. Missing telemetry stays missing; queued audio alone does not
   show it was dispatchable throughout the gap.
-- Next diagnostic: compare accepted-zero duration, withholding duration,
-  capture-block count, source-read elapsed time and decision delay at each
-  boundary. The privacy-worker fix remains first while its gates run.
+- Fourth then published [#2697](https://github.com/autonomous-ai/lampOS/pull/2697)
+  at `ea27e09e1632d45634b32d3dffc1f86a322cc63e`. Matched all six slice
+  SHA-256 values to its manifest, parsed the 201 rows, and checked complete
+  owner identities, matched gap cursors, zero-frame arithmetic and all six
+  75-block yield/resume differences. The original exports remain absent,
+  so their whole-source hashes cannot be independently checked here.
+
+| Arm / turn | Yield to resume decision (ms) | Accepted zero PCM (ms) | Resume decision to accepted reply PCM (ms) |
+|---|---:|---:|---:|
+| ab1840base / 28 | 751.240 | 740 | 0.934 |
+| ab1840base / 44 | 747.111 | 740 | 3.551 |
+| ab1840base / 49 | 748.287 | 740 | 5.921 |
+| ab1840base / 59 | 752.458 | 750 | 9.381 |
+| ab1913po350 / 34 | 750.184 | 740 | 7.303 |
+| ab1913po350 / 51 | 749.858 | 750 | 8.282 |
+
+- Derived from `duplex_resume.at_us - duplex_yield.at_us`,
+  `gap.zero_frames / 24`, and the matching resumed
+  `playback_gap.at_us - duplex_resume.at_us`. That last boundary is accepted
+  reply PCM at the speaker, not its later coordinator receipt or room sound.
+  The coordinator notices that receipt 0.455–2.064 ms later. The last
+  accepted zero write precedes the resume decision in every case.
+- The two endpoint `last_block_host_read_us` values span 748.623–750.929 ms.
+  Read-to-decision time is 2.423–3.822 ms at yield and 1.462–4.873 ms at
+  resume. Queue depth is unchanged across those decisions and nonzero
+  (9,840–720,000 frames); no selected enqueue is inside that interval.
+  These endpoints do not prove continuous timely capture or dispatchability.
+- The observed long interval is before the resume decision; the accepted
+  reply follows within 9.381 ms in all six cases. Why the yield took 75
+  blocks remains unknown. If the current policy ran, 75 is before its
+  110-block fallback, but the source's 71-block acknowledgment fixture is
+  not the missing session history. No policy shortening is justified yet.
+- Posted the table and boundaries on
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322292742).
+  Asked First for exact session
+  build/policy/flags and complete hearing, yield-end, stop-word and
+  discontinuity history, or an explicit statement that it was not retained.
+  Endpoint classifier IDs are not provider IDs. No lamp or new build run;
+  scratch arithmetic is in `/private/tmp/third-yield-gap-audit/derived.json`.
 
 ## 2026-10-21–22 — privacy worker expiry ride — PR #2695
 
