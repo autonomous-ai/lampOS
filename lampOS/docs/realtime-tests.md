@@ -482,8 +482,11 @@ runtime stdout and runner controls. Only successful room sends count as
 expected runtime input. The relay acknowledges complete output after flushing;
 the backend reader must actually enqueue that output before the parent moves
 on. `next_event` drains queued frames before advancing. A scheduled injection
-preserves its existing wait and final-drain ordering. Reads never move time,
-and the original 2 ms runtime/relay and 10 ms model tick intervals remain.
+preserves its existing wait and final-drain ordering. Reads never move time.
+The runtime and relay are polled 2 ms after a round that moved anything and,
+after one that moved nothing, at the fake model's 10 ms tick, which is
+unchanged (#1806): an output that lands just after an idle poll is seen up to
+about 8 ms later.
 
 The private socket uses bounded newline-delimited frames, role/round/counter
 checks and absolute host watchdogs. Nonblocking reads/writes use bounded
