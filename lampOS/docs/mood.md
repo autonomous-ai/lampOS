@@ -60,6 +60,7 @@ no history of anyone.
 | Future explicit feedback | While awake, typed thanks adds 0.04 and laughter 0.03, within the same warmth bound and cooldown. These are not inferred from words or available as live semantic observations. |
 | Smiled at (#1671, `LAMP_MOOD_SEEMS=on`) | Two `positive` reads in a row of the near face (about 4 s) add 0.10 energy, half an accepted bang's, with the same 15-second half-life, and 0.03 warmth, as laughter, within its bound and cooldown. At most once in 120 seconds; a smile held on doesn't add again. Seen only as the resting ring's breath a touch quicker and the idle head a touch livelier for some seconds: nothing turns to the person and nothing is said. |
 | Someone low (#1671, `LAMP_MOOD_SEEMS=on`) | Three `negative` reads in a row (about 6 s) let go energy's transient and lower energy 0.10 for two minutes while a face is near: a slower breath and fewer idle moves, keeping them company quietly. A smile, or nobody near (said, or the face's lease lapsing), ends it, and it doesn't come back with the face. It doesn't renew while they stay low: after two minutes the lamp is its usual self beside them. A change of near face doesn't end it or a run of reads, since one person's passing id changes often; a second person who sits down beside someone low finds the lamp quiet for the rest of those two minutes. |
+| How a line sounded (#1722, `LAMP_MOOD_TONE=on`) | From the voice's `voice/tone`, once a line, counted against bars (`tone_kind`). **Glad words** (valence 0.5 or over), unless the voice was surely flat (arousal under -0.3 with sure 0.6 or over), are a smile: 0.10 energy and 0.03 warmth, and they end a quiet. **Down words** (valence -0.5 or under) are someone low: energy's transient let go and 0.10 lower for two minutes while a face is near. With no face near, a down line does nothing, and isn't kept for a face that comes after. **A surely lively voice** (arousal 0.6 or over, sure 0.6 or over) with no glad or down words adds 0.05 energy and no warmth. Every brightening, a smile's included, shares the smile's 120-second cooldown, so a smile and a glad line together add once. A calm line alone is nothing: calm isn't sad. Asleep, a line changes nothing. Only the kind is kept, never the numbers, the request or the words. |
 | Air | Fresh CO2 at or above 1,200 ppm must remain uninterrupted for ten minutes before an energy offset can grow toward -0.08, with a five-minute half-life. Freshness loss or clear air ends the sustained qualification. |
 
 These values are authored starting values, not thresholds fitted to this
@@ -215,16 +216,26 @@ shape, age and ordering checks before the pure engine accepts an event.
 | `humans/familiar` / `HumanFamiliar` | `eyes` | 5 s | The level of the remembered person recognised at the lamp, or none; no name (#1670, `lamp-eyes --visits on`). Held for its lease, never kept. |
 | `humans/seems` / `HumanSeems` | `eyes` | 5 s | How the near face seems, as its kind only (`unsure` is none, the confidence stays the reader's), with `LAMP_MOOD_SEEMS=on`; without it Mood doesn't subscribe to it, and the adapter drops any before it is read (#1671, `lamp-eyes --seems` or `--seems-blendshapes`). Only the count of reads in a row of one kind is kept, never a read or whose face. Every read counts, whichever reader said it (`from`), so with both of the eyes' readers on a run would mix them at twice the rate: a lamp trying it runs one reader. |
 | `mood/nudge` / `MoodNudge` | `addons` | 3 s | A kept add-on's nudge (#2530, [addons.md](addons.md)), written only by the add-ons' judge with `LAMP_ADDONS=on`. Energy moves both ways and warmth up only, each 0.1 at most, added before Mood's own clamps, so neither passes them. Held until its `until_us` (10 minutes at most), fading over its last minute; the newest replaces the last; none is taken asleep, and sleep ends one. |
+| `voice/tone` / `VoiceTone` | `voice` | 5 s | How a line sounded against the person's own way (voice-tone.md), as what it counts as only (glad, low, lively or nothing), with `LAMP_MOOD_TONE=on`; without it Mood doesn't subscribe to it, and the adapter drops any before it is read (#1722). Numbers outside their ranges are refused. |
+
+Tone and add-on nudges have independent publisher and event ordering. Both
+can be taken at the same observation time, in either order. A line changes
+the transient mood without replacing a nudge or extending its deadline;
+their combined result stays inside Mood's energy and warmth clamps. Turning
+tone off leaves nudges unchanged.
 
 **On the second voice route** (`LAMP_VOICE_ROUTE=second`, the owner's rule
-of 19 Oct that a voice feature works there too). Only the first two inputs
-come from the voice, and neither depends on its route. `voice/state` is made
+of 19 Oct that a voice feature works there too). The three voice inputs
+work on either route. `voice/state` is made
 from the coordinator's ring phase each tick, and `voice/heard` from a
 transcript with no request, which the second route's recogniser gives
 (`second_provider/worker.rs`). Both are said by the same coordinator code
 whichever route answers (`coordinator/second.rs`: every path written for
-`rig.provider` runs unchanged). The other eight come from the eyes, Controls,
-the ears, air, name and Schedule, which the voice's route doesn't touch. The
+`rig.provider` runs unchanged). The optional `voice/tone` input comes from
+the completed line's tone reading with `LAMP_VOICE_TONE=on` and `LAMP_BUS=on`
+(see [voice-tone.md](voice-tone.md)). The remaining inputs come from the
+eyes, Controls, the ears, air, name, Schedule and the add-ons' judge, which
+the voice's route doesn't touch. The
 voice's own readers of Mood work the same way: the ring's breath, and the
 hello's warmer sentence for someone who comes by often (a written turn,
 which the second route answers too). Tests: the second route alone gives

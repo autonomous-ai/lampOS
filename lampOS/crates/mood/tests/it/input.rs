@@ -9,7 +9,7 @@ use lamp_mood::{
 use lamp_msgs::{
     AirFeel, AirState, ClockStamp, ControlGesture, ControlIntent, ControlSource, ControlsState,
     Face, Faces, Gesture, HoldTier, MoodNudge, NameHeard, ScheduleDue, ScheduleNotice, Speech,
-    SuddenSound, Voice, VoiceState,
+    SuddenSound, Voice, VoiceState, VoiceTone,
 };
 
 const NOW: u64 = 10_000_000;
@@ -1157,4 +1157,99 @@ fn a_nudge_is_taken_only_from_the_add_ons_judge_and_in_bounds() {
         adapter().ingest(&message(index, &other_boot), NOW, WALL),
         Err(InputError::WrongClock)
     );
+}
+
+/// #1722: how a line sounded is taken only with `LAMP_MOOD_TONE=on`
+/// (`with_tone`), from the voice only, good for five seconds, as what it
+/// counts as: glad, low, lively, or nothing. Numbers out of their ranges are
+/// refused.
+#[test]
+fn how_a_line_sounded_is_taken_only_when_switched_on_and_as_its_kind() {
+    use lamp_mood::engine::ToneKind;
+    let index = INPUTS
+        .iter()
+        .position(|spec| spec.topic == VoiceTone::TOPIC)
+        .unwrap();
+    let line = |arousal: f32, sure: f32, valence: Option<f32>| {
+        message(
+            index,
+            &serde_json::json!({"request": 7, "arousal": arousal, "sure": sure, "valence": valence}),
+        )
+    };
+    let mut off = adapter();
+    assert!(
+        off.ingest(&line(0.0, 0.9, Some(1.0)), NOW, WALL)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(off.counts().accepted, 0);
+    for (arousal, sure, valence, taken) in [
+        (0.0, 0.9, Some(1.0), Some(ToneKind::Glad)),
+        (0.2, 0.9, Some(-1.0), Some(ToneKind::Low)),
+        (0.8, 0.9, None, Some(ToneKind::Lively)),
+        (-0.8, 0.9, None, None),
+        (0.0, 0.0, None, None),
+    ] {
+        let events = adapter()
+            .with_tone(true)
+            .ingest(&line(arousal, sure, valence), NOW, WALL)
+            .unwrap();
+        match taken {
+            Some(kind) => {
+                assert_eq!(events.len(), 1, "{arousal} {sure} {valence:?}");
+                assert_eq!(events[0].kind, EventKind::Tone(kind));
+                assert_eq!(events[0].valid_until_us, NOW + 5_000_000);
+            }
+            None => assert!(events.is_empty(), "{arousal} {sure} {valence:?}"),
+        }
+    }
+    let mut other = line(0.0, 0.9, Some(1.0));
+    other.header.source = "replay".into();
+    assert!(adapter().with_tone(true).ingest(&other, NOW, WALL).is_err());
+    for wrong in [
+        line(1.5, 0.9, None),
+        line(0.0, -0.1, None),
+        line(0.0, 0.9, Some(2.0)),
+    ] {
+        assert!(adapter().with_tone(true).ingest(&wrong, NOW, WALL).is_err());
+    }
+}
+
+/// A nudge and a line can arrive at the same time, in either order. Their
+/// publisher fences and engine timestamps are independent, and switching
+/// tone off leaves the nudge unchanged.
+#[test]
+fn tone_and_nudge_inputs_are_independent_at_the_same_time() {
+    let index = |topic| INPUTS.iter().position(|spec| spec.topic == topic).unwrap();
+    let nudge = message(
+        index(MoodNudge::TOPIC),
+        &MoodNudge {
+            stamp: stamp(),
+            addon: "music-mood".into(),
+            energy: 0.05,
+            warmth: 0.1,
+            until_us: NOW + 600_000_000,
+        },
+    );
+    let tone = message(
+        index(VoiceTone::TOPIC),
+        &serde_json::json!({"request": 7, "arousal": 0.0, "sure": 0.9, "valence": 1.0}),
+    );
+    for enabled in [false, true] {
+        for messages in [[&nudge, &tone], [&tone, &nudge]] {
+            let mut input = adapter().with_tone(enabled);
+            let mut mood = Engine::new(CLOCK.into(), NOW, Some(12 * 60)).unwrap();
+            for message in messages {
+                for event in input.ingest(message, NOW, WALL).unwrap() {
+                    assert_eq!(event.observed_us, NOW);
+                    mood.apply(NOW, event).unwrap();
+                }
+            }
+            let state = mood.snapshot(NOW, 1, BOOT).unwrap();
+            let (energy, warmth) = if enabled { (0.45, 0.73) } else { (0.35, 0.70) };
+            assert!((state.energy - energy).abs() < 0.000_002, "{state:?}");
+            assert!((state.warmth - warmth).abs() < 0.000_002, "{state:?}");
+            assert_eq!(input.counts().accepted, if enabled { 2 } else { 1 });
+        }
+    }
 }

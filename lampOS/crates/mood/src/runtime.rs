@@ -41,6 +41,8 @@ pub struct Config {
     pub enabled: bool,
     /// How the near face seems taken as an input (#1671, `LAMP_MOOD_SEEMS`).
     pub seems: bool,
+    /// How a line sounded taken as an input (#1722, `LAMP_MOOD_TONE`).
+    pub tone: bool,
     pub bus_root: PathBuf,
     pub zone: Option<String>,
     pub clock_id: Option<String>,
@@ -52,6 +54,7 @@ impl Default for Config {
         Self {
             enabled: false,
             seems: false,
+            tone: false,
             bus_root: PathBuf::from(lamp_bus::DEFAULT_ROOT),
             zone: None,
             clock_id: None,
@@ -179,7 +182,8 @@ pub trait Transport: Send + 'static {
 
 struct BusTransport<C> {
     clock: Arc<C>,
-    /// One for each of `INPUTS`; `humans/seems` only with `LAMP_MOOD_SEEMS`.
+    /// One for each of `INPUTS`; `humans/seems` only with `LAMP_MOOD_SEEMS`,
+    /// and `voice/tone` only with `LAMP_MOOD_TONE`.
     inputs: Vec<Option<Subscriber>>,
     adapter: InputAdapter,
     output: Publisher,
@@ -214,7 +218,7 @@ fn owner_lock(root: &Path) -> io::Result<File> {
 }
 
 impl<C: Clock> BusTransport<C> {
-    fn new(root: &Path, clock: Arc<C>, seems: bool) -> io::Result<Self> {
+    fn new(root: &Path, clock: Arc<C>, seems: bool, tone: bool) -> io::Result<Self> {
         let owner = owner_lock(root)?;
         let bus = Bus::new(root)?;
         let output = bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")?;
@@ -223,7 +227,9 @@ impl<C: Clock> BusTransport<C> {
         let inputs = INPUTS
             .iter()
             .map(|spec| {
-                if spec.topic == lamp_msgs::HumanSeems::TOPIC && !seems {
+                if (spec.topic == lamp_msgs::HumanSeems::TOPIC && !seems)
+                    || (spec.topic == lamp_msgs::VoiceTone::TOPIC && !tone)
+                {
                     return Ok(None);
                 }
                 bus.subscribe_typed(spec.topic, "mood", spec.type_name)
@@ -232,7 +238,8 @@ impl<C: Clock> BusTransport<C> {
             .collect::<io::Result<Vec<_>>>()?;
         let adapter = InputAdapter::new(clock.clock_id().to_owned())
             .map_err(io::Error::other)?
-            .with_seems(seems);
+            .with_seems(seems)
+            .with_tone(tone);
         Ok(Self {
             _owner: owner,
             clock,
@@ -507,7 +514,7 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         .as_deref()
         .ok_or_else(|| invalid("--zone is required when enabled"))?;
     let clock = Arc::new(SystemClock::new(zone, config.clock_id.as_deref())?);
-    let transport = BusTransport::new(&config.bus_root, clock.clone(), config.seems)?;
+    let transport = BusTransport::new(&config.bus_root, clock.clone(), config.seems, config.tone)?;
     run(&config, clock, transport, stop)
 }
 
@@ -522,7 +529,7 @@ mod tests {
             .tempdir_in("/tmp")
             .unwrap();
         let clock = Arc::new(SystemClock::new("UTC", Some("diagnostic-test")).unwrap());
-        let mut transport = BusTransport::new(root.path(), clock.clone(), false).unwrap();
+        let mut transport = BusTransport::new(root.path(), clock.clone(), false, false).unwrap();
         let obstruction = root.path().join(Diagnostic::TOPIC).join("subs");
         if obstruction.is_dir() {
             fs::remove_dir_all(&obstruction).unwrap();

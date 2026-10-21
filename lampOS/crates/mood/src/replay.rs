@@ -512,6 +512,7 @@ fn apply(
         EventKind::Familiar(_) => "familiar",
         EventKind::Seems(_) => "seems",
         EventKind::Nudge { .. } => "addon_nudge",
+        EventKind::Tone(_) => "tone",
     };
     let changed = engine.apply(
         now_us,
