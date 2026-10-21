@@ -29,8 +29,10 @@ pub fn on(value: Option<&str>) -> bool {
 
 /// 16 kHz: the voice's capture rate.
 const RATE: f32 = 16_000.0;
-/// The pitch frame: 30 ms, three of the voice's 10 ms blocks.
+/// The pitch frame: 30 ms, the last three of the voice's 10 ms blocks,
+/// read every third block, so the frames don't overlap.
 const FRAME: usize = 480;
+const PITCH_EVERY: usize = 3;
 /// The pitches searched: 80 to 400 Hz, a speaking voice's range, as lags.
 const LAG_LOW: usize = 40;
 const LAG_HIGH: usize = 200;
@@ -40,10 +42,19 @@ const VOICED: f32 = 0.6;
 /// The shortest lag whose correlation is within this of the best is the
 /// pitch, not the best itself: autocorrelation favours the octave below.
 const OCTAVE_GUARD: f32 = 0.9;
-/// A line too short to read: under 0.3 s of speech, or under 10 voiced
-/// frames.
+/// A line too short to read: under 0.3 s of speech, or under 0.3 s of it
+/// voiced (ten 30 ms frames). It is sure of a line with 0.6 s voiced.
 const FEWEST_BLOCKS: usize = 30;
 const FEWEST_VOICED: usize = 10;
+const SURE_VOICED: f32 = 20.0;
+/// Speech just before a line begins is the line's: its first syllable
+/// often comes before the turn does. 400 ms, as the room's floor keeps it.
+const PRE_ROLL_US: u64 = 400_000;
+/// A block more than this after the one before isn't joined to it: the
+/// pitch frame starts again.
+const JOINED_US: u64 = 15_000;
+/// A minute of speech: a line's blocks past it aren't taken.
+const MOST_BLOCKS: usize = 6_000;
 /// Syllable peaks in the speech's energy: at least 80 ms apart, and over
 /// half again the line's median energy.
 const PEAK_GAP_BLOCKS: usize = 8;
@@ -66,47 +77,91 @@ pub struct Tone {
     pub voiced: u16,
 }
 
+/// One speech block's numbers: when it was read, its level and energy, and
+/// the pitch of the frame it closed, if one was read and voiced.
+#[derive(Clone, Copy)]
+struct Block {
+    at_us: u64,
+    level_db: f32,
+    energy: f32,
+    pitch: Option<f32>,
+}
+
 /// Measures a line's prosody as its speech blocks come, keeping only the
-/// last 30 ms of sound and a number or two a block.
+/// last 30 ms of sound and a few numbers a block.
 #[derive(Default)]
 pub struct ToneMeter {
     frame: Vec<i16>,
-    levels: Vec<f32>,
-    energy: Vec<f32>,
-    pitches: Vec<f32>,
+    /// Blocks into the frame since its last pitch was read.
+    since_pitch: usize,
+    last_at_us: Option<u64>,
+    /// The line's blocks; before it begins, the last [`PRE_ROLL_US`] of
+    /// speech.
+    blocks: Vec<Block>,
+    in_line: bool,
 }
 
 impl ToneMeter {
-    /// One 10 ms block the detector called speech.
-    pub fn speech_block(&mut self, block: &[i16]) {
-        if block.is_empty() {
+    /// One 10 ms block the detector called speech, read at `at_us` with the
+    /// lamp silent: the line's own (`own`), or speech outside any line, of
+    /// which only the last [`PRE_ROLL_US`] is kept, for a line about to
+    /// begin. Once the line has begun, a block outside it isn't taken.
+    pub fn speech_block(&mut self, at_us: u64, block: &[i16], own: bool) {
+        if block.is_empty() || (self.in_line && !own) || self.blocks.len() >= MOST_BLOCKS {
             return;
         }
+        if own && !self.in_line {
+            self.in_line = true;
+            self.blocks
+                .retain(|kept| at_us.saturating_sub(kept.at_us) <= PRE_ROLL_US);
+        }
+        if self
+            .last_at_us
+            .is_none_or(|last| at_us.saturating_sub(last) > JOINED_US)
+        {
+            self.frame.clear();
+            self.since_pitch = 0;
+        }
+        self.last_at_us = Some(at_us);
         let power = block
             .iter()
             .map(|sample| (f32::from(*sample) / 32_768.0).powi(2))
             .sum::<f32>()
             / block.len() as f32;
-        self.levels.push(10.0 * power.max(1e-12).log10());
-        self.energy.push(power.sqrt());
         self.frame.extend_from_slice(block);
         let over = self.frame.len().saturating_sub(FRAME);
         self.frame.drain(..over);
-        if self.frame.len() == FRAME
-            && let Some(pitch) = pitch_of(&self.frame)
-        {
-            self.pitches.push(pitch);
+        self.since_pitch += 1;
+        let pitch = if self.frame.len() == FRAME && self.since_pitch >= PITCH_EVERY {
+            self.since_pitch = 0;
+            pitch_of(&self.frame)
+        } else {
+            None
+        };
+        self.blocks.push(Block {
+            at_us,
+            level_db: 10.0 * power.max(1e-12).log10(),
+            energy: power.sqrt(),
+            pitch,
+        });
+        if !self.in_line {
+            self.blocks
+                .retain(|kept| at_us.saturating_sub(kept.at_us) <= PRE_ROLL_US);
         }
     }
 
-    /// The line's tone, if it was long enough to read; and the meter is
-    /// ready for the next line either way.
+    /// The line's tone, if a line began and was long enough to read; and
+    /// the meter is ready for the next line either way.
     pub fn finish(&mut self) -> Option<Tone> {
-        let levels = std::mem::take(&mut self.levels);
-        let energy = std::mem::take(&mut self.energy);
-        let mut pitches = std::mem::take(&mut self.pitches);
+        let blocks = std::mem::take(&mut self.blocks);
+        let in_line = std::mem::take(&mut self.in_line);
         self.frame.clear();
-        if levels.len() < FEWEST_BLOCKS || pitches.len() < FEWEST_VOICED {
+        self.since_pitch = 0;
+        self.last_at_us = None;
+        let levels: Vec<f32> = blocks.iter().map(|block| block.level_db).collect();
+        let energy: Vec<f32> = blocks.iter().map(|block| block.energy).collect();
+        let mut pitches: Vec<f32> = blocks.iter().filter_map(|block| block.pitch).collect();
+        if !in_line || levels.len() < FEWEST_BLOCKS || pitches.len() < FEWEST_VOICED {
             return None;
         }
         let mut sorted = levels.clone();
@@ -141,9 +196,17 @@ fn median(values: &mut [f32]) -> f32 {
 /// best, so the octave below is not taken for it, and the peak's own top,
 /// not its rising edge, is the lag.
 fn pitch_of(frame: &[i16]) -> Option<f32> {
-    let x: Vec<f32> = frame.iter().map(|s| f32::from(*s)).collect();
-    let mean = x.iter().sum::<f32>() / x.len() as f32;
-    let x: Vec<f32> = x.iter().map(|v| v - mean).collect();
+    let mut samples = [0.0f32; FRAME];
+    let length = frame.len().min(FRAME);
+    for (to, from) in samples.iter_mut().zip(frame) {
+        *to = f32::from(*from);
+    }
+    let x = &mut samples[..length];
+    let mean = x.iter().sum::<f32>() / length as f32;
+    for value in x.iter_mut() {
+        *value -= mean;
+    }
+    let x = &*x;
     let correlation = |lag: usize| {
         let (mut cross, mut early, mut late) = (0.0f32, 0.0f32, 0.0f32);
         for i in 0..x.len() - lag {
@@ -157,21 +220,19 @@ fn pitch_of(frame: &[i16]) -> Option<f32> {
             cross / (early * late).sqrt()
         }
     };
-    let scores: Vec<(usize, f32)> = (LAG_LOW..=LAG_HIGH)
-        .map(|lag| (lag, correlation(lag)))
-        .collect();
-    let best = scores.iter().map(|(_, r)| *r).fold(f32::MIN, f32::max);
+    let mut scores = [0.0f32; LAG_HIGH - LAG_LOW + 1];
+    for (at, score) in scores.iter_mut().enumerate() {
+        *score = correlation(LAG_LOW + at);
+    }
+    let best = scores.iter().copied().fold(f32::MIN, f32::max);
     if best < VOICED {
         return None;
     }
-    let mut at = scores.iter().position(|(_, r)| *r >= best * OCTAVE_GUARD)?;
-    while scores
-        .get(at + 1)
-        .is_some_and(|(_, next)| *next >= scores[at].1)
-    {
+    let mut at = scores.iter().position(|r| *r >= best * OCTAVE_GUARD)?;
+    while scores.get(at + 1).is_some_and(|next| *next >= scores[at]) {
         at += 1;
     }
-    Some(RATE / scores[at].0 as f32)
+    Some(RATE / (LAG_LOW + at) as f32)
 }
 
 /// Syllable-like peaks a second: local peaks of the smoothed energy at
@@ -257,7 +318,7 @@ impl Baseline {
             Reading {
                 arousal: steps.tanh(),
                 sure: (self.lines as f32 / SURE_AFTER).min(1.0)
-                    * (f32::from(tone.voiced) / 30.0).min(1.0),
+                    * (f32::from(tone.voiced) / SURE_VOICED).min(1.0),
             }
         };
         self.lines = self.lines.saturating_add(1);
@@ -352,9 +413,11 @@ const DOWN: &[&str] = &[
     "bored",
     "nervous",
 ];
+/// Not "no": mostly an answer to the lamp ("No, I'm good"), not a word
+/// turning the one after it.
 const NOT: &[&str] = &[
-    "not", "no", "never", "don't", "dont", "isn't", "isnt", "wasn't", "wasnt", "can't", "cant",
-    "didn't", "didnt", "aren't", "arent", "won't", "wont",
+    "not", "never", "don't", "dont", "isn't", "isnt", "wasn't", "wasnt", "can't", "cant", "didn't",
+    "didnt", "aren't", "arent", "won't", "wont",
 ];
 
 /// The line's valence from its words, down (-1) to glad (+1), if any word
@@ -416,8 +479,8 @@ mod tests {
 
     fn tone_of(blocks: &[Vec<i16>]) -> Option<Tone> {
         let mut meter = ToneMeter::default();
-        for block in blocks {
-            meter.speech_block(block);
+        for (at, block) in blocks.iter().enumerate() {
+            meter.speech_block(at as u64 * 10_000, block, true);
         }
         meter.finish()
     }
@@ -464,6 +527,43 @@ mod tests {
         assert_eq!(tone_of(&hiss), None, "nothing voiced");
     }
 
+    /// A line's tone is its own speech and the 400 ms just before it began
+    /// (the reviewer's P2 on #2427): the lamp's answer or anyone's talk
+    /// before that, or outside the line once it has begun, is not the
+    /// line's, and speech outside any line is never read alone.
+    #[test]
+    fn only_the_lines_own_speech_and_what_came_just_before_it_is_read() {
+        let calm = voice(120.0, 1.0, -26.0, 4.0, 1.5);
+        let lively = voice(200.0, 4.0, -14.0, 6.0, 1.0);
+        let alone = tone_of(&calm).unwrap();
+        // Its pitch frames don't overlap: about one in three blocks.
+        assert!(alone.voiced <= 50 && alone.blocks == 150, "{alone:?}");
+        let feed = |meter: &mut ToneMeter, at: &mut u64, blocks: &[Vec<i16>], own: bool| {
+            for block in blocks {
+                meter.speech_block(*at, block, own);
+                *at += 10_000;
+            }
+        };
+        let mut meter = ToneMeter::default();
+        let mut at = 0;
+        feed(&mut meter, &mut at, &lively, false);
+        at += 600_000;
+        feed(&mut meter, &mut at, &calm, true);
+        feed(&mut meter, &mut at, &lively, false);
+        assert_eq!(meter.finish(), Some(alone));
+        // Speech that runs on into the line: its last 400 ms is the line's.
+        let mut at = 0;
+        feed(&mut meter, &mut at, &lively, false);
+        feed(&mut meter, &mut at, &calm, true);
+        let joined = meter.finish().unwrap();
+        assert_eq!(joined.blocks, 150 + 40, "{joined:?}");
+        assert!(joined.pitch_hz > alone.pitch_hz, "{joined:?}");
+        // No line began: nothing.
+        let mut at = 0;
+        feed(&mut meter, &mut at, &calm, false);
+        assert_eq!(meter.finish(), None);
+    }
+
     /// Against a person's own calm lines, a livelier line reads lively and a
     /// calmer one calm; the first line says nothing, and the baseline is
     /// sure only after a few lines.
@@ -500,6 +600,10 @@ mod tests {
         assert_eq!(valence_of("I'm really tired and stressed."), Some(-1.0));
         assert!(valence_of("I'm not happy about it").unwrap() < 0.0);
         assert!(valence_of("It's not bad at all").unwrap() > 0.0);
+        // "No" answers the lamp: it turns nothing.
+        assert_eq!(valence_of("No, I'm good."), Some(1.0));
+        assert_eq!(valence_of("No thanks."), Some(1.0));
+        assert!(valence_of("I'm not good, never happy").unwrap() < 0.0);
         assert_eq!(valence_of("What time is it?"), None);
         assert_eq!(valence_of(""), None);
         let mixed = valence_of("Great news, but I'm tired").unwrap();
