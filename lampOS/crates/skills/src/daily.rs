@@ -106,6 +106,21 @@ impl Window {
         Some(minutes * 60_000 - minute_ms)
     }
 
+    /// Time since the current occurrence opened, including the sampled
+    /// fraction of its minute. An outside-window sample has none.
+    pub(crate) fn opened_ms_ago(&self, local_minute: u16, minute_ms: u64) -> Option<u64> {
+        if !self.contains(local_minute) || minute_ms >= 60_000 {
+            return None;
+        }
+        let minutes = (u64::from(local_minute) + 1440 - u64::from(self.from)) % 1440;
+        Some(minutes * 60_000 + minute_ms)
+    }
+
+    /// When it opens, as `HH:MM`.
+    pub fn opens(&self) -> String {
+        format!("{:02}:{:02}", self.from / 60, self.from % 60)
+    }
+
     /// The date on which this occurrence began. After midnight, the early
     /// portion of an overnight window belongs to the previous local date.
     pub fn occurrence_day(&self, local_day: i64, local_minute: u16) -> Option<i64> {

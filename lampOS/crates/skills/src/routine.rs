@@ -10,7 +10,7 @@ use lamp_local_time::LocalTime;
 use lamp_msgs::{
     ClockStamp, ExpressionRestOp as Op, ExpressionRestPhase as Phase,
     ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionState, Faces,
-    Voice, VoiceState,
+    MicrophonePrivacy, Voice, VoiceMute, VoiceState,
 };
 use serde::Deserialize;
 use std::{
@@ -152,12 +152,23 @@ impl RestFile {
     }
 }
 
+/// How a request was answered. `Owner`: Expression took it (a rest, or
+/// the wake of the rest this skill owns, its stretch Expression's wake
+/// clip). `Already`: a wake with no rest left to own, the morning after a
+/// night it rested whose rest a sound ended early; the lamp is awake, so
+/// the skill makes its own stretch before its sound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Woke {
+    Owner,
+    Already,
+}
+
 struct Asked {
     skill: String,
     rest: Rest,
     issued_us: u64,
     expires_us: u64,
-    answer: mpsc::SyncSender<Result<(), String>>,
+    answer: mpsc::SyncSender<Result<Woke, String>>,
     generation: Arc<()>,
 }
 
@@ -180,9 +191,16 @@ pub struct RunClient {
 pub struct Permit {
     run: RunClient,
     expires_us: u64,
+    already: bool,
 }
 
 impl Permit {
+    /// A wake answered `Woke::Already`: nobody stretched the lamp, so the
+    /// run does before its sound.
+    pub fn already(&self) -> bool {
+        self.already
+    }
+
     /// Original same-host monotonic deadline. Receiving a confirmation
     /// never extends it; an output owner can enforce it after transport.
     pub fn expires_us(&self) -> u64 {
@@ -254,14 +272,15 @@ impl RunClient {
 
     fn received(
         &self,
-        response: Result<(), String>,
+        response: Result<Woke, String>,
         expires_us: u64,
         now_us: u64,
     ) -> Result<Permit, String> {
-        response?;
+        let woke = response?;
         let permit = Permit {
             run: self.clone(),
             expires_us,
+            already: woke == Woke::Already,
         };
         permit.check_at(now_us)?;
         Ok(permit)
@@ -319,6 +338,11 @@ struct Source {
     last_episode: u64,
     active: Option<Active>,
     stirred: Option<Stirred>,
+    /// The local day the last night this skill rested began (its rest
+    /// window's start day), set when Expression first took a rest. The
+    /// next day's wake with no rest left to own answers `Woke::Already`
+    /// once. Kept in memory: a restart forgets it.
+    rested_day: Option<i64>,
 }
 
 pub struct Manager {
@@ -369,6 +393,7 @@ impl Manager {
         for source in self.sources.values_mut() {
             cancel(&mut self.publisher, source, now);
             source.stirred = None;
+            source.rested_day = None;
         }
         self.definitions.clear();
         self.enabled = names;
@@ -397,6 +422,7 @@ impl Manager {
             }
             if !unchanged {
                 source.stirred = None;
+                source.rested_day = None;
             }
         }
         self.enabled = definitions.keys().cloned().collect();
@@ -551,12 +577,21 @@ impl Manager {
                 continue;
             }
             active.window_until_us = window_until_us.expect("checked window end");
+            if accepted && active.request.op == Op::Rest && !active.admitted {
+                // The night it rested, by the window's start day: 02:00
+                // belongs to the night that began the evening before.
+                if let Some(day) = moment
+                    .and_then(|moment| active.during.occurrence_day(moment.day, moment.minute))
+                {
+                    source.rested_day = Some(day);
+                }
+            }
             if accepted {
                 active.admitted = true;
             }
             if accepted && let Some(asked) = active.waiting.take() {
                 // A caller that already left cannot leave an active routine.
-                if now >= asked.expires_us || asked.answer.try_send(Ok(())).is_err() {
+                if now >= asked.expires_us || asked.answer.try_send(Ok(Woke::Owner)).is_err() {
                     cancel(&mut self.publisher, source, now);
                     continue;
                 }
@@ -750,6 +785,7 @@ impl Manager {
                         last_episode: 0,
                         active: None,
                         stirred: None,
+                        rested_day: None,
                     },
                 );
             }
@@ -758,7 +794,7 @@ impl Manager {
             source.stirred = None;
             if ask.rest.op == Op::Cancel {
                 cancel(&mut self.publisher, source, now);
-                let _ = ask.answer.try_send(Ok(()));
+                let _ = ask.answer.try_send(Ok(Woke::Owner));
                 continue;
             }
             if ask.rest.op == Op::Rest {
@@ -804,6 +840,22 @@ impl Manager {
                 });
             }
             let Some(active) = &mut source.active else {
+                // The morning after a night it rested, its rest ended early
+                // by a sound (or the window): the lamp is already awake.
+                // Once, and never for a lamp put to sleep by hand or kept
+                // private, which a stretch would move.
+                let morning_after = moment.is_some_and(|moment| {
+                    source.rested_day.and_then(|day| day.checked_add(1)) == Some(moment.day)
+                });
+                if ask.rest.op == Op::Wake && morning_after {
+                    if let Some(why) = kept_asleep(&self.bus) {
+                        refuse(&format!("{why}, so it is not woken"));
+                        continue;
+                    }
+                    source.rested_day = None;
+                    let _ = ask.answer.try_send(Ok(Woke::Already));
+                    continue;
+                }
                 refuse("this skill owns no rest to wake");
                 continue;
             };
@@ -823,6 +875,36 @@ impl Manager {
             active.waiting = Some(ask);
         }
     }
+}
+
+/// Why the lamp must not be moved: put to sleep by hand (the voice's mute,
+/// reason `sleep`), or kept private (the voice's own mute, or the privacy
+/// switch closed on `voice/privacy`), as Expression reads them
+/// (`crates/expression/src/alive.rs`, `runtime.rs`'s `privacy_muted_in`).
+/// The newest word on each, however old: a muted voice that went quiet is
+/// still muted, and a privacy word that is not a valid open lease counts as
+/// closed. Never said is awake: a lamp without either route.
+pub fn kept_asleep(bus: &Bus) -> Option<&'static str> {
+    let latest = |topic| bus.latest(topic).ok().flatten();
+    if let Some(mute) = latest(VoiceMute::TOPIC)
+        .and_then(|message| message.parse::<VoiceMute>().ok())
+        .filter(|mute| mute.check().is_ok() && mute.muted)
+    {
+        return Some(if mute.asleep() {
+            "the lamp was put to sleep by hand"
+        } else {
+            "the lamp's microphones are muted for privacy"
+        });
+    }
+    latest(MicrophonePrivacy::TOPIC)
+        .is_some_and(|message| {
+            message
+                .parse::<MicrophonePrivacy>()
+                .ok()
+                .filter(|lease| lease.check().is_ok())
+                .is_none_or(|lease| lease.physical_muted != Some(false) && !lease.no_slide)
+        })
+        .then_some("the privacy switch is closed")
 }
 
 /// After Expression ended an admitted rest: whether it may settle again,
@@ -978,7 +1060,7 @@ mod tests {
             self.manager
                 .tick(self.now, sampled_at_us, Some(&LocalTime::Offset(0)), wall);
         }
-        fn ask(&self, op: Op) -> mpsc::Receiver<Result<(), String>> {
+        fn ask(&self, op: Op) -> mpsc::Receiver<Result<Woke, String>> {
             let (answer, result) = mpsc::sync_channel(1);
             self.client
                 .send
@@ -1035,7 +1117,7 @@ mod tests {
             let rest = self.ask(Op::Rest);
             self.tick(NIGHT);
             self.admitted(Phase::Resting);
-            assert_eq!(rest.try_recv().unwrap(), Ok(()));
+            assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
             self.manager.sources["routine"]
                 .active
                 .as_ref()
@@ -1206,7 +1288,7 @@ mod tests {
             assert_eq!(initial.valid_until_us, until);
             f.observe(Phase::Resting);
             f.tick(wall);
-            assert_eq!(rest.try_recv().unwrap(), Ok(()));
+            assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
             let pending_wake = if wake {
                 f.now += 500_000;
                 let pending = f.ask(Op::Wake);
@@ -1379,7 +1461,7 @@ mod tests {
             if existing.is_none() {
                 f.observe(Phase::Resting);
                 f.tick_sample(sampled_at_us, wall);
-                assert_eq!(pending.take().unwrap().try_recv().unwrap(), Ok(()));
+                assert_eq!(pending.take().unwrap().try_recv().unwrap(), Ok(Woke::Owner));
             }
             // Delivering that same trusted sample later cannot rejuvenate
             // its cached deadline, including during a pending wake.
@@ -1654,7 +1736,7 @@ mod tests {
         assert_eq!(request.skill_session_id, message.header.boot);
         assert_eq!(request.expression_session_id, f.state.boot());
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         let wake = f.ask(Op::Wake);
         f.now += 1;
         f.tick(NIGHT);
@@ -1692,14 +1774,14 @@ mod tests {
         let rest = f.ask(Op::Rest);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         let wake = f.ask(Op::Wake);
         f.now += 1;
         f.tick(NIGHT);
         f.admitted(Phase::Waking);
         assert!(wake.try_recv().is_err());
         f.admitted(Phase::Completed);
-        assert_eq!(wake.try_recv().unwrap(), Ok(()));
+        assert_eq!(wake.try_recv().unwrap(), Ok(Woke::Owner));
         assert!(f.manager.sources["routine"].active.is_none());
     }
     #[test]
@@ -1760,7 +1842,7 @@ mod tests {
                 > original.stamp.sequence
         );
         f.admitted(Phase::Completed);
-        assert_eq!(wake.try_recv().unwrap(), Ok(()));
+        assert_eq!(wake.try_recv().unwrap(), Ok(Woke::Owner));
         assert!(f.manager.sources["routine"].active.is_none());
     }
     #[test]
@@ -1770,7 +1852,7 @@ mod tests {
             let rest = f.ask(Op::Rest);
             f.tick(NIGHT);
             f.admitted(Phase::Resting);
-            assert_eq!(rest.try_recv().unwrap(), Ok(()));
+            assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
             let wake = f.ask(Op::Wake);
             f.now += 1;
             f.tick(NIGHT);
@@ -1850,14 +1932,16 @@ mod tests {
             let issued_us = 10_000_000;
             let expires_us = issued_us + wait_us;
             let (answer, receive) = mpsc::sync_channel(1);
-            answer.try_send(Ok(())).unwrap();
+            answer.try_send(Ok(Woke::Owner)).unwrap();
             // The owner answered in time, but the thread did not receive
             // the queued answer until the original deadline had passed.
             assert!(
                 run.received(receive.try_recv().unwrap(), expires_us, expires_us + 1)
                     .is_err()
             );
-            let permit = run.received(Ok(()), expires_us, expires_us - 1).unwrap();
+            let permit = run
+                .received(Ok(Woke::Owner), expires_us, expires_us - 1)
+                .unwrap();
             assert_eq!(permit.expires_us(), expires_us);
             assert!(permit.check_at(expires_us - 1).is_ok());
             // A pause after receive cannot extend the presentation window.
@@ -1872,14 +1956,14 @@ mod tests {
             generation: Arc::new(Mutex::new(Arc::new(()))),
         };
         let run = client.for_run();
-        let permit = run.received(Ok(()), 200, 100).unwrap();
+        let permit = run.received(Ok(Woke::Owner), 200, 100).unwrap();
         assert!(permit.check_at(100).is_ok());
         *client.generation.lock().unwrap() = Arc::new(());
         // Reload after receive invalidates the retained permit, and a
         // completion received after reload cannot create another permit.
         assert!(permit.check_at(101).is_err());
-        assert!(run.received(Ok(()), 200, 101).is_err());
-        assert!(client.for_run().received(Ok(()), 200, 101).is_ok());
+        assert!(run.received(Ok(Woke::Owner), 200, 101).is_err());
+        assert!(client.for_run().received(Ok(Woke::Owner), 200, 101).is_ok());
     }
     #[test]
     fn a_terminal_receipt_before_the_last_renewal_still_ends_the_episode() {
@@ -1887,7 +1971,7 @@ mod tests {
         let rest = f.ask(Op::Rest);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         let request = f.manager.sources["routine"]
             .active
             .as_ref()
@@ -1958,7 +2042,7 @@ mod tests {
         assert!(f.manager.sources["routine"].active.is_none());
     }
 
-    fn resettling(f: &mut Fixture) -> mpsc::Receiver<Result<(), String>> {
+    fn resettling(f: &mut Fixture) -> mpsc::Receiver<Result<Woke, String>> {
         let (answer, result) = mpsc::sync_channel(1);
         f.client
             .send
@@ -2014,7 +2098,7 @@ mod tests {
         let rest = resettling(f);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         f.now += 100_000;
         voice
             .publish_json(
@@ -2079,7 +2163,7 @@ mod tests {
         let rest = resettling(&mut f);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         assert_eq!(episode(&f), Some(1));
         for night_sound in 1..=4_u64 {
             // A sound: the voice listens, and Expression ends the rest.
@@ -2139,7 +2223,7 @@ mod tests {
         let rest = resettling(&mut f);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         f.now += 100_000;
         voice
             .publish_json(
@@ -2188,7 +2272,7 @@ mod tests {
         let rest = resettling(&mut f);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         // A hand or the privacy switch: the voice still rests.
         f.now += 100_000;
         voice
@@ -2236,7 +2320,7 @@ mod tests {
         let rest = resettling(&mut f);
         f.tick(NIGHT);
         f.admitted(Phase::Resting);
-        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(rest.try_recv().unwrap(), Ok(Woke::Owner));
         f.now += 100_000;
         voice
             .publish_json(
@@ -2318,5 +2402,119 @@ mod tests {
         // A fresh empty look: now it settles.
         hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 1);
         assert_eq!(episode(&f), Some(2));
+    }
+
+    /// 05:30 and 07:10 of the morning after `NIGHT` (23:00).
+    const STIR: u64 = NIGHT + 6 * 3_600_000 + 30 * 60_000;
+    const MORNING: u64 = NIGHT + 8 * 3_600_000 + 10 * 60_000;
+
+    /// The rest taken at 23:00, then ended at 05:30: its lease lapses, as a
+    /// rest a sound ended past its resettle window does.
+    fn rested_then_stirred(f: &mut Fixture) {
+        f.resting();
+        f.now += 6 * 3_600_000_000 + 30 * 60_000_000;
+        f.tick(STIR);
+        assert!(f.manager.sources["routine"].active.is_none());
+    }
+
+    fn wake_at(f: &mut Fixture, wall: u64) -> Result<Woke, String> {
+        let wake = f.ask(Op::Wake);
+        f.tick(wall);
+        wake.try_recv().unwrap()
+    }
+
+    #[test]
+    fn a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch() {
+        let mut f = Fixture::new();
+        rested_then_stirred(&mut f);
+        let mut requests = f.manager.bus.subscribe(Request::TOPIC, "morning").unwrap();
+        f.now += 3_600_000_000 + 40 * 60_000_000;
+        assert_eq!(wake_at(&mut f, MORNING), Ok(Woke::Already));
+        // Nothing is asked of Expression: the lamp is already up, and the
+        // run makes its own stretch.
+        assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+        assert!(f.manager.sources["routine"].active.is_none());
+        // Once a morning: a second wake has no night left to answer for.
+        f.now += 60_000_000;
+        let again = wake_at(&mut f, MORNING + 60_000);
+        assert!(again.unwrap_err().contains("owns no rest"));
+    }
+
+    #[test]
+    fn no_rest_tonight_no_greeting() {
+        // Never rested.
+        let mut f = Fixture::new();
+        let never = wake_at(&mut f, MORNING);
+        assert!(never.unwrap_err().contains("owns no rest"));
+        // Rested the night before last: not this morning's night.
+        let mut f = Fixture::new();
+        rested_then_stirred(&mut f);
+        f.now += 25 * 3_600_000_000;
+        let late = wake_at(&mut f, MORNING + 86_400_000);
+        assert!(late.unwrap_err().contains("owns no rest"));
+    }
+
+    #[test]
+    fn a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after() {
+        let closed = serde_json::json!({ "physical_muted": true });
+        for kept in ["by hand", "muted", "switch"] {
+            let mut f = Fixture::new();
+            rested_then_stirred(&mut f);
+            let mut mute = f
+                .manager
+                .bus
+                .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
+                .unwrap();
+            let mut privacy = f
+                .manager
+                .bus
+                .publisher_declared(
+                    MicrophonePrivacy::TOPIC,
+                    &MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            f.now += 3_600_000_000 + 40 * 60_000_000;
+            match kept {
+                "by hand" => mute.publish_json(
+                    f.now,
+                    &VoiceMute {
+                        muted: true,
+                        reason: Some(lamp_msgs::MuteReason::Sleep),
+                    },
+                ),
+                "muted" => mute.publish_json(
+                    f.now,
+                    &VoiceMute {
+                        muted: true,
+                        reason: None,
+                    },
+                ),
+                _ => privacy.publish_json(f.now, &closed),
+            }
+            .unwrap();
+            let why = wake_at(&mut f, MORNING).unwrap_err();
+            assert!(
+                why.contains("sleep by hand") || why.contains("privacy"),
+                "{kept}: {why}"
+            );
+            assert!(
+                f.manager.sources["routine"].active.is_none(),
+                "{kept}: nothing is sent"
+            );
+            // Woken by hand later that morning, it may still greet.
+            if kept != "switch" {
+                mute.publish_json(
+                    f.now,
+                    &VoiceMute {
+                        muted: false,
+                        reason: None,
+                    },
+                )
+                .unwrap();
+                f.now += 60_000_000;
+                assert_eq!(wake_at(&mut f, MORNING + 60_000), Ok(Woke::Already));
+            }
+        }
     }
 }

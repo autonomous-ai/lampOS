@@ -12,9 +12,13 @@ request sustained rest from Expression. A night sound that ends that rest
 (listening that never became a turn) is followed by settling again once the
 voice has rested and no face is in view, at most three times a night, with
 no new run. A turn or a face in view means someone is up and ends the
-night's rest. At the first quiet morning arrival,
-wake only rest this skill still owns, with the existing small stretch and a
-quiet Say hum. Never wake a manual or privacy sleep. A physical interruption,
+night's rest. At the first quiet morning arrival (06:00 to 11:00) after a
+night it rested, greet once: wake rest this skill still owns, with the
+existing small stretch, or, if a sound already ended that rest, stretch the
+lamp with the body's own stretch; then a quiet Say hum after the stretch.
+One stretch and one hum, never a second greeting. No greeting if the person
+already spoke to the lamp that morning, mid-conversation, or with the skill
+off. Never wake or stretch a manual or privacy sleep. A physical interruption,
 restart, refusal or consumed daily chance is not retried later that day.
 
 The evening glow is one step warmer and one step dimmer than the person's

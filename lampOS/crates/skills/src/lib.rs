@@ -419,6 +419,10 @@ struct TriggerFile {
     /// Consume at most one chance per local window, durably before acting.
     #[serde(default)]
     once_per_day: bool,
+    /// No chance once something was heard on `voice/heard` since its
+    /// `during` window opened today: the person already spoke to the lamp.
+    #[serde(default)]
+    unless_heard: bool,
     absent_for: Option<String>,
     #[serde(rename = "for")]
     lasting: Option<String>,
@@ -1454,6 +1458,12 @@ impl Skill {
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
             )
             .chain(
+                self.triggers
+                    .iter()
+                    .any(|trigger| trigger.unless_heard)
+                    .then(|| (Speech::TOPICS[0].to_owned(), "a trigger's unless_heard")),
+            )
+            .chain(
                 self.watch
                     .iter()
                     .flat_map(|_| watch::LISTENS)
@@ -1648,6 +1658,9 @@ pub struct Trigger {
     pub wait_us: u64,
     pub during: Option<daily::Window>,
     pub once_per_day: bool,
+    /// No chance once something was heard since `during` opened today; a
+    /// daily trigger's day is spent then, said once.
+    pub unless_heard: bool,
     /// It holds only while its field rose this much within a while (#1684).
     pub rise: Option<Rise>,
 }
@@ -2175,6 +2188,15 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
     if file.once_per_day && (during.is_none() || file.name.is_none() || file.each.is_some()) {
         return Err("once_per_day needs a named trigger with during, and no each".into());
     }
+    if file.unless_heard && during.is_none() {
+        return Err("unless_heard goes with during: heard since the window opened".into());
+    }
+    // An item's run is planned apart from the topic's, and hearing is
+    // checked only for the topic's (the reviewer on #2664) (chosen, until a
+    // skill needs both).
+    if file.unless_heard && file.each.is_some() {
+        return Err("unless_heard goes with a trigger on the whole topic, not each".into());
+    }
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -2285,6 +2307,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         rise,
         during,
         once_per_day: file.once_per_day,
+        unless_heard: file.unless_heard,
     })
 }
 
@@ -3902,6 +3925,37 @@ fn day_of(clock: Option<(i32, u64, u64)>, now_us: u64) -> i64 {
     }
 }
 
+/// The local moment at `now_us` and its Unix time, with a recent,
+/// plausible local clock only: what new scheduled behaviour goes by.
+fn trusted_moment(
+    clock: Option<(i32, u64, u64)>,
+    trusted: bool,
+    now_us: u64,
+) -> Option<(daily::Moment, u64)> {
+    let (offset, at_us, unix_ms) = clock.filter(|_| trusted)?;
+    let elapsed = now_us.checked_sub(at_us)?;
+    if elapsed > 120_000_000 {
+        return None;
+    }
+    let unix_ms = unix_ms.checked_add(elapsed / 1_000)?;
+    let moment = daily::Moment::at(&lamp_local_time::LocalTime::Offset(offset), unix_ms).ok()?;
+    Some((moment, unix_ms))
+}
+
+/// How long before `now_us` the current occurrence of `window` opened, on
+/// the engine's clock, if the local time is trusted and inside it.
+fn opened_us_ago(
+    clock: Option<(i32, u64, u64)>,
+    trusted: bool,
+    window: &daily::Window,
+    now_us: u64,
+) -> Option<u64> {
+    let (moment, unix_ms) = trusted_moment(clock, trusted, now_us)?;
+    window
+        .opened_ms_ago(moment.minute, unix_ms % 60_000)
+        .map(|ms| ms * 1_000)
+}
+
 /// When the next [`MORNING`] comes after `now_us`, on the engine's clock:
 /// 12 h on with the local time not known.
 fn next_morning_us(clock: Option<(i32, u64, u64)>, now_us: u64) -> u64 {
@@ -4415,19 +4469,7 @@ impl Engine {
     /// New scheduled behavior needs a recent, plausible local clock.
     /// Existing quiet-hours semantics remain unchanged.
     fn local_moment(&self, now_us: u64) -> Option<daily::Moment> {
-        if !self.daily_clock_trusted {
-            return None;
-        }
-        let (offset, at_us, unix_ms) = self.clock?;
-        let elapsed = now_us.checked_sub(at_us)?;
-        if elapsed > 120_000_000 {
-            return None;
-        }
-        daily::Moment::at(
-            &lamp_local_time::LocalTime::Offset(offset),
-            unix_ms.checked_add(elapsed / 1_000)?,
-        )
-        .ok()
+        trusted_moment(self.clock, self.daily_clock_trusted, now_us).map(|(moment, _)| moment)
     }
 
     /// The skills loaded again. A timed condition keeps when it began to
@@ -5101,6 +5143,24 @@ impl Engine {
                 }
                 watch.waiting_us = None;
                 let acts = self.skip_ask || self.ask_policy || skill.kind == SkillKind::Addon;
+                // Spoken to since the window opened today (the first
+                // builder's ruling on bedtime-morning): no greeting, and a
+                // daily trigger's day is spent, said once.
+                let spoken = trigger.unless_heard
+                    && trigger
+                        .during
+                        .as_ref()
+                        .and_then(|window| {
+                            opened_us_ago(self.clock, self.daily_clock_trusted, window, now_us)
+                        })
+                        .is_some_and(|opened_us| {
+                            self.heard
+                                .at_us
+                                .is_some_and(|at| now_us.saturating_sub(at) < opened_us)
+                        });
+                if spoken && !(trigger.once_per_day && acts) {
+                    continue;
+                }
                 if trigger.once_per_day && acts {
                     if self.daily_faulted {
                         continue;
@@ -5120,6 +5180,30 @@ impl Engine {
                         )),
                     };
                     match claim {
+                        Ok(true) if spoken => {
+                            runs.push(Run {
+                                generation: None,
+                                skill: skill.name.clone(),
+                                events: vec![event(
+                                    &skill.name,
+                                    SkillStage::Answered,
+                                    format!(
+                                        "{} chance let go: spoken to since {}",
+                                        trigger.name.as_deref().unwrap_or("trigger"),
+                                        trigger
+                                            .during
+                                            .as_ref()
+                                            .map_or_else(String::new, daily::Window::opens)
+                                    ),
+                                    Some(false),
+                                )],
+                                calls: Vec::new(),
+                                ask: None,
+                                queue: false,
+                                from: None,
+                            });
+                            continue;
+                        }
                         Ok(true) => {}
                         Ok(false) => continue,
                         Err(error) => {

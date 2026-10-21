@@ -1216,7 +1216,11 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     assert_eq!(
         bedtime.permissions,
         lamp_skills::Permissions {
-            topics: vec!["humans/faces/tracked".into(), "voice/state".into()],
+            topics: vec![
+                "humans/faces/tracked".into(),
+                "voice/state".into(),
+                "voice/heard".into()
+            ],
             speak: true,
             light: true,
             body: true,
