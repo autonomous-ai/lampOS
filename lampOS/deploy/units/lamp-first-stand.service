@@ -27,6 +27,8 @@ Restart=on-failure
 RestartSec=60s
 StandardInput=null
 SyslogIdentifier=lamp-first-stand
+# The stand's folder is private to this unit (the reviewer-lead on #2541).
+PrivateTmp=yes
 
 [Install]
 WantedBy=lampos.target

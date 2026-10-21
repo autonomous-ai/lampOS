@@ -1822,6 +1822,12 @@ as root) is how a seated lamp gets its standing file without the factory:
   4. `lamp-body.service` is started again, on that file.
 - **A second touch while it moves stops it.** The body is sent SIGTERM,
   eases back and lets go, and nothing is written.
+  - Controls that aren't known for 1 s while it moves stop it the same way,
+    since a touch could no longer be seen.
+  - A body run by hand is eased back and waited for however its run ends, so
+    none is left holding the servo lock.
+  - Its folder is a new one in the unit's private `/tmp`.
+  - `lamp.env` is synced to disk before it is linked into place.
 - **No yes, nothing moves.** Without a touch within 2 minutes the lamp
   waits. It asks at most twice, 10 minutes apart. After that a person asks
   again by removing the record and restarting the unit.

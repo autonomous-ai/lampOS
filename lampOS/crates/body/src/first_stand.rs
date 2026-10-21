@@ -113,6 +113,27 @@ impl Touches {
     }
 }
 
+/// While the arm moves, the controls not known for this long stop it: a
+/// person's touch could no longer be seen (the reviewer-lead on #2541).
+pub const CONTROLS_LOST_US: u64 = 1_000_000;
+
+/// Whether the controls have been unknown for [`CONTROLS_LOST_US`].
+#[derive(Debug, Clone, Default)]
+pub struct ControlsLost {
+    since_us: Option<u64>,
+}
+
+impl ControlsLost {
+    pub fn observe(&mut self, touched: Option<bool>, now_us: u64) -> bool {
+        if touched.is_some() {
+            self.since_us = None;
+            return false;
+        }
+        let since = *self.since_us.get_or_insert(now_us);
+        now_us.saturating_sub(since) >= CONTROLS_LOST_US
+    }
+}
+
 /// Whether the head pads or a button are touched, from `controls/state`'s
 /// payload; None when it cannot be read or the controls are not ready.
 pub fn touched(state: &lamp_msgs::ControlsState) -> Option<bool> {
@@ -278,7 +299,11 @@ mod run {
     use super::*;
     use std::{
         io::{BufRead, BufReader, Write},
-        os::unix::{fs::PermissionsExt, net::UnixDatagram, net::UnixStream},
+        os::unix::{
+            fs::{DirBuilderExt, OpenOptionsExt},
+            net::UnixDatagram,
+            net::UnixStream,
+        },
         process::{Child, Command, Stdio},
         sync::mpsc,
         thread,
@@ -488,12 +513,22 @@ mod run {
         Stopped,
     }
 
-    fn ease_back(child: &mut Child) {
-        let _ = nix::sys::signal::kill(
-            nix::unistd::Pid::from_raw(child.id() as i32),
-            nix::sys::signal::Signal::SIGTERM,
-        );
-        let _ = child.wait();
+    /// A body run by hand: however its run ends, early return or not, it
+    /// is sent SIGTERM, which eases the arm back and lets it go, and waited
+    /// for, so no body is left holding the servo lock (the reviewer-lead on
+    /// #2541). A body that has ended already is only reaped.
+    struct Body(Child);
+
+    impl Drop for Body {
+        fn drop(&mut self) {
+            if let Ok(None) = self.0.try_wait() {
+                let _ = nix::sys::signal::kill(
+                    nix::unistd::Pid::from_raw(self.0.id() as i32),
+                    nix::sys::signal::Signal::SIGTERM,
+                );
+            }
+            let _ = self.0.wait();
+        }
     }
 
     /// `steps.sh`'s `body_once`: the body on a private mood socket; with a
@@ -555,11 +590,14 @@ mod run {
                 command.args(["--wake", "off"]);
             }
         }
-        let mut child = command
-            .stdin(Stdio::null())
-            .stdout(log.try_clone()?)
-            .stderr(log)
-            .spawn()?;
+        let mut body = Body(
+            command
+                .stdin(Stdio::null())
+                .stdout(log.try_clone()?)
+                .stderr(log)
+                .spawn()?,
+        );
+        let mut lost = ControlsLost::default();
         let began = Instant::now();
         let mut told = share.is_none();
         let until = BODY_STARTS
@@ -569,15 +607,21 @@ mod run {
                 Duration::ZERO
             };
         while began.elapsed() < until {
-            if child.try_wait()?.is_some() {
+            if body.0.try_wait()?.is_some() {
                 return Err(io::Error::other(
                     "the body ended by itself (its lines are in body.log)",
                 ));
             }
-            if share.is_some() && stop.observe(touch_now(bus), began.elapsed().as_micros() as u64) {
+            let now_us = began.elapsed().as_micros() as u64;
+            let touched = touch_now(bus);
+            if share.is_some() && stop.observe(touched, now_us) {
                 say("a touch while it moved: stopped, easing back");
-                ease_back(&mut child);
                 return Ok(Ran::Stopped);
+            }
+            if share.is_some() && lost.observe(touched, now_us) {
+                return Err(io::Error::other(
+                    "the controls were not known for a second while it moved, so a touch could not stop it: eased back",
+                ));
             }
             if !told && began.elapsed() >= BODY_STARTS {
                 UnixDatagram::unbound()?.send_to(br#"{"mood":"listening","level":128}"#, &mood)?;
@@ -585,19 +629,22 @@ mod run {
             }
             thread::sleep(LOOK_EVERY);
         }
-        ease_back(&mut child);
+        drop(body);
         Ok(Ran::Done)
     }
 
     /// The stand, from a stopped body to a written `lamp.env`.
     fn stand(options: &Options, bus: &lamp_bus::Bus, record: &mut Record) -> io::Result<Outcome> {
-        let dir = std::env::temp_dir().join(format!("first-stand.{}", std::process::id()));
-        fs::create_dir_all(&dir)?;
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
-        Command::new("chown")
-            .arg(&options.body_user)
-            .arg(&dir)
-            .status()?;
+        // A new folder, never one already there (create_dir, not _all), in
+        // the unit's private /tmp (PrivateTmp=yes), handed to the body's user
+        // by id without following a link (the reviewer-lead on #2541).
+        let dir =
+            std::env::temp_dir().join(format!("first-stand.{}.{}", std::process::id(), unix_ms()));
+        fs::DirBuilder::new().mode(0o700).create(&dir)?;
+        let user = nix::unistd::User::from_name(&options.body_user)
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::other("the body's user is not there"))?;
+        std::os::unix::fs::lchown(&dir, Some(user.uid.as_raw()), Some(user.gid.as_raw()))?;
         let read = dir.join("lamp.env");
         let (read_ok, said) = rest_read(options, &read)?;
         // A stop needs the yes let go first, then a new touch.
@@ -639,11 +686,24 @@ mod run {
             fs::create_dir_all(parent)?;
         }
         let new = options.lamp_env.with_extension("env.new");
-        fs::write(&new, confirmed)?;
-        fs::set_permissions(&new, fs::Permissions::from_mode(0o644))?;
+        let _ = fs::remove_file(&new);
+        {
+            // Whole on disk before it is linked into place: after a power
+            // cut, an empty lamp.env would never be asked for again.
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(&new)?;
+            file.write_all(confirmed.as_bytes())?;
+            file.sync_all()?;
+        }
         // Never over a lamp.env written meanwhile.
         fs::hard_link(&new, &options.lamp_env)?;
         fs::remove_file(&new)?;
+        if let Some(parent) = options.lamp_env.parent() {
+            fs::File::open(parent)?.sync_all()?;
+        }
         let _ = fs::remove_dir_all(&dir);
         (record.shoulder, record.elbow) = (Some(shoulder), Some(elbow));
         say(&format!("wrote {}", options.lamp_env.display()));
@@ -766,6 +826,33 @@ mod tests {
         assert!(!stop.observe(Some(true), 0));
         assert!(!stop.observe(Some(false), 200_000));
         assert!(stop.observe(Some(true), 300_000));
+    }
+
+    #[test]
+    fn controls_unknown_for_a_second_while_it_moves_stop_it() {
+        let mut lost = ControlsLost::default();
+        assert!(!lost.observe(None, 0));
+        assert!(!lost.observe(Some(false), 500_000));
+        assert!(!lost.observe(None, 600_000));
+        assert!(!lost.observe(None, 1_599_999));
+        assert!(lost.observe(None, 1_600_000));
+    }
+
+    #[test]
+    fn controls_not_ready_are_not_known() {
+        let state: lamp_msgs::ControlsState = serde_json::from_value(serde_json::json!({
+            "stamp": {"clock_id": "c", "at_us": 1, "sequence": 1},
+            "session_id": "s", "enabled": false, "ready": false, "buttons": [],
+            "head_active": true, "base_ready": false, "base_tier": "none",
+            "event_sequence": 0, "rejected_inputs": 0
+        }))
+        .unwrap();
+        assert_eq!(touched(&state), None);
+        let ready = lamp_msgs::ControlsState {
+            ready: true,
+            ..state
+        };
+        assert_eq!(touched(&ready), Some(true));
     }
 
     #[test]
