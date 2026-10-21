@@ -424,6 +424,8 @@ impl Model {
         Ok(SoundScores {
             speech: sigmoid(logits[SPEECH]),
             music: sigmoid(logits[MUSIC]),
+            // PARKED (#1669): no skill reads it since the laugh glance was
+            // dropped (the owner, 21 Oct); kept, it is one more sigmoid.
             laughter: sigmoid(logits[LAUGHTER]),
         })
     }

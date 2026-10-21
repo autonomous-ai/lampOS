@@ -1,5 +1,9 @@
-# Laugh glance (#1669, the owner, 19 Oct 07:2x: "a glance up at a laugh ...
-# rare and small, and never while the lamp is speaking or someone is talking
+# PARKED (#1669): dropped, the owner never asked to listen for other people
+# laughing (the lead, #1711, 21 Oct 14:3x); kept, off on every product lamp by
+# install::NOT_PRODUCT_SKILLS. Its cases still run. To bring it back, take its
+# line out of NOT_PRODUCT_SKILLS.
+# Laugh glance (#1669: the owner's 19 Oct "laughing", creature.md item 7, read
+# as "a glance up at a laugh ... rare and small, and never while the lamp is speaking or someone is talking
 # to it"; docs/creature.md: "a glance now and then at whoever laughs"). It
 # reads ears/classes (LAMP_EARS_CLASSES=on in lamp-ears) and glances at the
 # face in view, once, when someone laughs. Written to lamp-skills' schema

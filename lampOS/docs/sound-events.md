@@ -153,6 +153,11 @@ ever held two windows in a row over 0.3. In 16.8 minutes of people talking
 0.09. So Laugh glance takes **one window over 0.3**, no longer two over 0.5:
 5 of the 9 laughs, and none of the talk (the tables are on #1669).
 
+**Parked (21 Oct):** no skill reads `scores.laughter` now: the owner never
+asked to listen for other people laughing, so the laugh glance is off and
+kept (`skills/laugh-glance`, held out of the product by
+`install::NOT_PRODUCT_SKILLS`). The score is still published.
+
 **Through a lamp's microphone** (lamp-52e6, #2399, 21 Oct, `tools/joys-scores.sh`
 with `KEEP_DIR`, from a speaker beside the lamp in a talking office): laughs
 score about five times lower, 0.04 to 0.15, and nothing else (music, a line
