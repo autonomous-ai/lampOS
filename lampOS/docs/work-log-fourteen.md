@@ -957,3 +957,20 @@ been in since 20 Oct)
   real org (`gh repo view`) — they are, public and private
   respectively — since the scare briefly raised the question of
   whether any of this session's work was real.
+- Backend2 answered the catalogue question within the hour:
+  `GET /api/v1/skills-store/lamp/catalog`, bare `{"format","skills"}`,
+  on the same public `catalogDioProvider` host Agent Skills already
+  uses — so the `Location` header and per-build base were already
+  wired, nothing new to add there. Built the catalogue entity (null,
+  not guessed, for an entry missing a field `skills.install` needs)
+  and the Store page: a row on the existing Skills page shown only
+  when `list.installs`, "Added" by name against the installed list,
+  "Add" confirms then installs. Pushed as a second commit onto the
+  same PR rather than opening a new one, since it's the other half of
+  the same ask.
+- `flutter test`: 6/6 on the catalogue (Backend2's own example JSON,
+  word for word), 880/0 on the full suite.
+- Updated ecm-sds-mobile#30's title and body to cover both commits.
+  Posted on [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6317036172).
+  No lamp run yet — `LAMP_SKILLS_STORE` isn't live anywhere; offered
+  to help Mobile's run on 0c89 with the test key.
