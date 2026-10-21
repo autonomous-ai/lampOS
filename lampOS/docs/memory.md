@@ -1434,11 +1434,17 @@ a gap, only while all of these hold:
   answer's audio went). A line left unclear, judged not for the lamp
   (`not_for_me`), held or given up marks no one. So someone who gets up and
   goes isn't held for whoever speaks next from out of the picture, unless
-  they go within 8 s of the lamp's last answer to them: that window is
-  still held, and only told-only held lines (no `recall` or `search`) would
-  close it (the reviewers' P2 on #2265, the first builder's call). On the
-  first exchange there is no answer yet, so a face lost before it ends is
-  the room's.
+  they go within 8 s of the lamp's last answer to them. On the first
+  exchange there is no answer yet, so a face lost before it ends is the
+  room's.
+- **A held line is answered from the conversation as it stood** (the first
+  builder's 22:10 and 01:43 on #2265): someone who left within that window
+  may not be the one speaking. A line whose scope is kept only by the gap
+  (`ScopeSnapshot::held`) is not told `recall`, memory's read and search
+  (`Services::chat_without`), is told no memory hits
+  (`LAMP_SECOND_MEMORY_HITS`), and its scope runs no one's held forget
+  (`forget_asker`, #2340). Its words still go to the person counted at the
+  lamp's thread, as before.
 - **Within the gap:** up to 8 s (`GAP`) past the face's last fresh
   sighting, which is the known file's 3 s freshness, so up to about 11 s
   after the eyes last saw it, and up to 8 s past the lamp's last answer to

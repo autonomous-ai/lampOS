@@ -3022,6 +3022,8 @@ async fn spoken(
         .filter(|prepared| plain_words(&prepared.words) == plain_words(&text))
     {
         Some(prepared) => prepared.remembered.clone(),
+        // A line held only by a gap is told no hits ([`held_by_gap`]).
+        None if held_by_gap(scope.as_ref()) => None,
         None => match shared.remembered.clone() {
             Some(note) => {
                 let words = text.clone();
@@ -3233,7 +3235,7 @@ impl Prepared {
         let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
-        let mut chat = shared.services.chat(messages.clone());
+        let mut chat = chat_for(shared, scope, messages.clone());
         let (kept, events) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             while let Some(event) = chat.next().await {
@@ -3441,6 +3443,7 @@ fn prepared_on(
             let remembered = shared
                 .remembered
                 .as_ref()
+                .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words));
             Some(Prepared::begin(shared, scope, words, notes, remembered))
         }
@@ -3885,11 +3888,45 @@ type SightRead = (
     Option<(String, String)>,
 );
 
+/// Memory's read, never declared to a line held only by a known face's gap.
+const MEMORY_READS: &[&str] = &[crate::remember::RECALL];
+
+/// Whether this turn's scope is a known face's kept only by its held gap
+/// (`LAMP_FACE_GAP_HOLD`): someone who left within 8 s of the lamp's last
+/// answer to them may not be the one speaking, so the line is answered from
+/// the conversation as it stood: no recall or search, no memory hits, and no
+/// held forget run on it (the first builder's 22:10 and 01:43 on #2265).
+fn held_by_gap(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    scope
+        .and_then(crate::memory_scope::ScopeLease::scope)
+        .is_some_and(crate::memory_scope::ScopeSnapshot::held)
+}
+
+/// The turn's chat: every function, or without memory's read for a line
+/// held only by a gap ([`held_by_gap`]).
+fn chat_for(
+    shared: &Shared,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    messages: Vec<Message>,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    if held_by_gap(scope) {
+        shared.services.chat_without(messages, MEMORY_READS)
+    } else {
+        shared.services.chat(messages)
+    }
+}
+
 /// Whom a turn's forget is held for, or whose yes runs one: the admitted
 /// request's session and known person. None with nobody known (the room)
 /// or no admitted scope: a forget isn't undone, so it takes no anonymous
 /// yes, and such a turn is told to ask in words, as without the hold.
 fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, String)> {
+    // A scope held only by a known face's gap runs no one's forget: a yes
+    // from out of the picture may not be theirs (the first builder's 01:43
+    // on #2265).
+    if held_by_gap(scope) {
+        return None;
+    }
     let scope = scope?;
     let person = scope.scope()?.person()?.to_owned();
     Some((scope.key().session, person))
@@ -4367,7 +4404,7 @@ async fn answer(
             let mut refused = false;
             let mut stream = match prepared.take() {
                 Some(prepared) if round == 1 => prepared.into_events(),
-                _ => shared.services.chat(messages.clone()),
+                _ => chat_for(shared, scope.as_ref(), messages.clone()),
             };
             let mut first = true;
             let mut split = Sentences::default();
@@ -4465,7 +4502,7 @@ async fn answer(
                                     "lamp-voice second: request {request} lost on the network ({error}): the link is back, asked once more"
                                 );
                                 from = tokio::time::Instant::now();
-                                stream = shared.services.chat(messages.clone());
+                                stream = chat_for(shared, scope.as_ref(), messages.clone());
                                 continue;
                             }
                         }

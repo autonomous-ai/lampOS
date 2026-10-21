@@ -35,6 +35,11 @@ pub fn gap_from_environment() -> Option<Duration> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ScopeSnapshot {
     person: Option<Arc<str>>,
+    /// A known face's scope kept only by its held gap, not seen now
+    /// (`LAMP_FACE_GAP_HOLD`): its line is answered from the conversation as
+    /// it stood, never from memory's reads, and runs no held forget (the
+    /// first builder's 22:10 and 01:43 on #2265).
+    held: bool,
 }
 impl ScopeSnapshot {
     pub fn room() -> Self {
@@ -43,11 +48,16 @@ impl ScopeSnapshot {
     pub fn person(&self) -> Option<&str> {
         self.person.as_deref()
     }
+    /// Whether this scope is a known face's held only through its gap.
+    pub fn held(&self) -> bool {
+        self.held
+    }
     /// A known person's scope, for other parts' tests.
     #[cfg(test)]
     pub fn of(name: &str) -> Self {
         Self {
             person: Some(Arc::from(crate::remember::person_id(name))),
+            held: false,
         }
     }
 }
@@ -148,6 +158,7 @@ impl FaceCache {
             generation: token.generation,
             scope: ScopeSnapshot {
                 person: Some(Arc::from(observation.person())),
+                held: false,
             },
             valid_until: observation.valid_until(),
             seen_until: observation.valid_until(),
@@ -169,12 +180,12 @@ impl FaceCache {
         let held = || {
             let gap = self.gap?;
             let was = face.as_ref()?;
-            let (whom, at) = answered.filter(|(whom, _)| *whom == was.scope)?;
+            let (whom, at) = answered.filter(|(whom, _)| whom.person == was.scope.person)?;
             // Only a face cached in this generation: one from before a
             // privacy change is never carried into the new one.
             (faces_in_view == Some(0) && was.generation == token.generation).then(|| CachedFace {
                 generation: was.generation,
-                scope: whom,
+                scope: ScopeSnapshot { held: true, ..whom },
                 valid_until: (was.seen_until + gap).min(at + gap),
                 seen_until: was.seen_until,
             })
@@ -305,6 +316,7 @@ mod tests {
             generation: cache.generation.load(Ordering::Acquire),
             scope: ScopeSnapshot {
                 person: Some(Arc::from(crate::remember::person_id(name))),
+                held: false,
             },
             valid_until: until,
             seen_until: until,
@@ -403,6 +415,7 @@ mod tests {
     fn a_narrowed_lease_reads_the_room_at_every_later_boundary() {
         let person = ScopeSnapshot {
             person: Some(Arc::from("p-0123456789abcdef")),
+            held: false,
         };
         let owner = RequestScope::new(key(1), person.clone());
         let handed = owner.lease();
@@ -478,6 +491,7 @@ mod tests {
     fn talked_with(cache: &FaceCache, name: &str, at: Instant) {
         let scope = ScopeSnapshot {
             person: Some(Arc::from(crate::remember::person_id(name))),
+            held: false,
         };
         cache.answered(&scope, at);
     }
