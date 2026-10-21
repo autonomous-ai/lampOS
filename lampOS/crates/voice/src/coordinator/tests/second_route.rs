@@ -2474,6 +2474,21 @@ fn each_lines_tone_is_told_with_its_own_words() {
         "{}",
         run.summary()
     );
+    // No known face here: the room's baseline, the second line its second.
+    let whose: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| {
+            (
+                end["tone"]["whose"].clone(),
+                end["tone"]["baseline_lines"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        whose,
+        [(json!("room"), json!(1)), (json!("room"), json!(2))]
+    );
     let tones = run.events("voice_tone");
     assert_eq!(tones[0]["sure"], 0.0);
     assert!(tones[1]["sure"].as_f64().unwrap() > 0.0, "{}", tones[1]);
@@ -2481,6 +2496,59 @@ fn each_lines_tone_is_told_with_its_own_words() {
         tones[1]["arousal"].as_f64().unwrap().abs() < 0.1,
         "{}",
         tones[1]
+    );
+}
+
+/// A known person's lines are read against their own baseline, and their
+/// words asking the lamp to forget their face let it go: the line after
+/// starts their baseline again.
+#[test]
+fn a_known_persons_baseline_goes_when_they_ask_to_forget_their_face() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = Some("p-jim".into()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("Please forget my face"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let whose: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| {
+            (
+                end["tone"]["whose"].clone(),
+                end["tone"]["baseline_lines"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        whose,
+        [(json!("person"), json!(1)), (json!("person"), json!(1))],
+        "{}",
+        run.summary()
+    );
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["all"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [
+            (json!(false), json!("person")),
+            (json!(false), json!("person"))
+        ],
+        "{}",
+        run.summary()
     );
 }
 
