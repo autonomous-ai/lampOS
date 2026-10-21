@@ -255,11 +255,22 @@ Dance's (`crates/update/tests/functions.rs`, which fails if one is left out
 or the count changes). On the product's route each chat request adds the
 web search's `web_search`, the 32nd, and leaves out its `fetch_page`, so
 `dance` reaches the model
-(`a_product_chat_request_offers_dance_at_the_bound`). The built-in
+(`a_product_chat_request_offers_dance_at_the_bound`). At the bound a core
+skill's function is never the one cut (the owner's rule, on #2614): a chat
+request leaves out the search's `fetch_page`, then `the_time` (asked only
+for elsewhere), then the skills' functions that are not a core skill's,
+the last first, then `web_search`; a Live session only the skills'
+not a core skill's. Core skills say theirs in the skills' tools file's
+`core` list (`lamp_skills::tools_file`). With `LAMP_REPORTS=on` (two more
+of the voice's own) a chat request leaves out the fetch, the time and the
+search and keeps `dance`; a Live session's own and Dance's alone are 33,
+which the voice says on an error line, leaving out the actions part's
+last (`with_reports_on_dance_stays_at_the_bound`). The built-in
 instruction tells the model its head sits on an arm that moves and that a
 dance is a call (lamp-0c89, 21 Oct, answered "I've no legs to dance with"
-with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by order, without a word, what
-is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
+with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by that order what
+is past 32, so Desk tutor's two (installable) would push its marks'
+`show_verdict` out, never `dance`. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
 skills have run there; the voice's own code for them is removed after.
 

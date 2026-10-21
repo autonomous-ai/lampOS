@@ -1,9 +1,12 @@
 //! The functions a product lamp's voice tells each session of, with every
 //! product skill installed. A session takes at most `lamp_gemini::MAX_TOOLS`
-//! (32), and what is past it is left out by order, without a word: the
-//! voice's own first, then the actions part's, then the skills' (the
-//! coordinator, 19 Oct: lamp-4ace sat at exactly 32, and switching
-//! onboarding on there pushed one of the actions part's out). So the
+//! (32). Past it the bound cuts by a declared order, never a core skill's
+//! function (the owner's rule, on #2614): on the chat route the search's
+//! fetch, the time elsewhere, the skills' not a core skill's, then the
+//! search; with the lamp's own and core skills' alone over, the voice says
+//! so on an error line (the coordinator, 19 Oct: lamp-4ace sat at exactly
+//! 32, and switching onboarding on there pushed one of the actions part's
+//! out). So the
 //! product's count is pinned here, worked out by each part's own code: the
 //! voice's own from the product voice unit's environment, the actions
 //! part's whole catalog (its sound, its light and Schedule's), and the tools
@@ -96,6 +99,8 @@ struct Product {
     declared: Vec<String>,
     left_out: Vec<String>,
     chat: Vec<String>,
+    /// What the voice's side wrote on its error stream.
+    errors: String,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -174,6 +179,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         declared: found(DECLARED),
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
+        errors: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
 
@@ -246,33 +252,60 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
 
 /// The reviewer's P3 on #1906: with `LAMP_REPORTS=on` the product voice
 /// declares its two reports functions too, `reports_stop` and
-/// `reports_state`, before the actions part's and the skills'. The voice's
-/// own 15 and the actions part's 17 are the 32, so Dance's, the one
-/// product skill's function, is the one cut, and the link leaves out nothing.
+/// `reports_state`, before the actions part's and the skills'. Then the
+/// voice's own 15, the actions part's 17 and Dance's are 33, and the chat
+/// request's search makes 35. By the owner's rule (on #2614) Dance's, a
+/// core skill's function, is never the one cut, and by the first builder's
+/// on #2644 neither are the actions part's nor `reports_stop`: the chat
+/// request leaves out the search's fetch, the time elsewhere and
+/// `reports_state`, a Live session `reports_state` alone, with no error
+/// line, and `dance` stays in both.
 #[test]
-fn with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut() {
+fn with_reports_on_dance_stays_at_the_bound() {
     let Product {
         executive,
         skill_tools,
         declared,
         left_out,
-        ..
+        chat,
+        errors,
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
-    assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
-    assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");
-    assert_eq!(declared.len(), PRODUCT_FUNCTIONS + 1, "{declared:?}");
+    assert_eq!(skill_tools, ["dance"]);
+    assert_eq!(chat.len(), lamp_gemini::MAX_TOOLS, "{chat:?}");
+    assert!(chat.iter().any(|told| told == "dance"), "{chat:?}");
+    for cut in [
+        lamp_voice::second_provider::net::search::FETCH,
+        lamp_voice::tools::THE_TIME,
+        lamp_voice::reports_stop::STATE_NAME,
+    ] {
+        assert!(!chat.iter().any(|told| told == cut), "{cut}: {chat:?}");
+    }
     for name in [
         lamp_voice::reports_stop::NAME,
-        lamp_voice::reports_stop::STATE_NAME,
+        lamp_voice::second_provider::net::search::NAME,
     ]
     .into_iter()
     .chain(executive.iter().map(|function| function.name))
+    {
+        assert!(chat.iter().any(|told| told == name), "{name}: {chat:?}");
+    }
+
+    assert!(left_out.is_empty(), "left out by the link: {left_out:?}");
+    assert_eq!(declared.len(), lamp_gemini::MAX_TOOLS, "{declared:?}");
+    assert!(declared.iter().any(|told| told == "dance"), "{declared:?}");
+    assert!(
+        !declared
+            .iter()
+            .any(|told| told == lamp_voice::reports_stop::STATE_NAME),
+        "{declared:?}"
+    );
+    for name in std::iter::once(lamp_voice::reports_stop::NAME)
+        .chain(executive.iter().map(|function| function.name))
     {
         assert!(
             declared.iter().any(|told| told == name),
             "{name}: {declared:?}"
         );
     }
-    assert_eq!(skill_tools, ["dance"]);
-    assert!(!declared.iter().any(|told| told == "dance"), "{declared:?}");
+    assert!(!errors.contains("alone are past the bound"), "{errors}");
 }

@@ -5592,16 +5592,23 @@ fn calls(
 /// never runs one, since a lamp that moves for a text nobody in the room sent
 /// looks wrong (#1673, the first builder, 19 Oct). A key of the file's own,
 /// not of each tool, which the voice's function declarations refuse.
-/// Both lists include enabled skills only, even when given the inventory.
+/// `core` names the tools of core skills ([`SkillKind::Core`]), when any:
+/// at a session's bound of functions the voice never cuts one of them, and
+/// cuts others first (the owner's rule, on #2614).
+/// The lists include enabled skills only, even when given the inventory.
 pub fn tools_file(skills: &[Skill]) -> Value {
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
+    let mut core: Vec<&str> = Vec::new();
     for skill in skills.iter().filter(|skill| skill.enabled) {
         if let Some(name) = &skill.tool
             && !tools.iter().any(|tool| tool["name"] == *name)
         {
             if skill.permissions.body {
                 moving.push(name);
+            }
+            if skill.kind == SkillKind::Core {
+                core.push(name);
             }
             let mut tool = json!({"name": name, "description": skill.description});
             let mut properties = serde_json::Map::new();
@@ -5674,11 +5681,14 @@ pub fn tools_file(skills: &[Skill]) -> Value {
         tools.push(unplug::stay_tool());
         moving.push(unplug::STAY_TOOL);
     }
-    if moving.is_empty() {
-        json!({ "tools": tools })
-    } else {
-        json!({ "tools": tools, "body": moving })
+    let mut file = json!({ "tools": tools });
+    if !moving.is_empty() {
+        file["body"] = json!(moving);
     }
+    if !core.is_empty() {
+        file["core"] = json!(core);
+    }
+    file
 }
 
 /// What the model is told when its call ran these calls. With a look, to

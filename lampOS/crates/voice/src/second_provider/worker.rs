@@ -1031,38 +1031,36 @@ pub fn search_for(
 }
 
 /// The functions each chat request of this route is given, before a spoken
-/// turn's own (the look, the name signal): the lamp's ([`crate::tools::declared`]),
+/// turn's own (the look, the name signal): the lamp's ([`crate::tools::uncut`]),
 /// [`crate::tools::THE_TIME`] only for elsewhere (the time here is told in
-/// every request), then the search's ([`with_search`]).
+/// every request), then the search's, within Live's bound of
+/// [`lamp_gemini::MAX_TOOLS`] ([`crate::tools::fit`]): cut by
+/// [`chat_cut`], never a core skill's function.
 pub fn chat_tools(
     tools: &crate::tools::Settings,
     search: &[lamp_gemini::Tool],
 ) -> Vec<lamp_gemini::Tool> {
     let places = tools.clock && tools.places;
-    with_search(
-        time_elsewhere(crate::tools::declared(tools), places),
-        search,
-    )
+    let (lamp, skills, core) = crate::tools::uncut(tools);
+    let mut told = time_elsewhere(lamp, places);
+    told.extend(search.iter().cloned());
+    crate::tools::fit(told, &chat_cut(skills), &core)
 }
 
-/// The lamp's functions, then the search's, within Live's bound of
-/// [`lamp_gemini::MAX_TOOLS`]: the search is given room before a skill's
-/// function, and the fetch only when room is left.
-pub fn with_search(
-    mut tools: Vec<lamp_gemini::Tool>,
-    search: &[lamp_gemini::Tool],
-) -> Vec<lamp_gemini::Tool> {
-    let Some((first, rest)) = search.split_first() else {
-        return tools;
-    };
-    tools.truncate(lamp_gemini::MAX_TOOLS - 1);
-    tools.push(first.clone());
-    for tool in rest {
-        if tools.len() < lamp_gemini::MAX_TOOLS {
-            tools.push(tool.clone());
-        }
-    }
-    tools
+/// The order the bound cuts this route's functions in (the first builder
+/// on #2614 and #2644): the search's fetch, then the time elsewhere, then
+/// `skills` ([`crate::tools::uncut`]'s cut: `reports_state` with
+/// `LAMP_REPORTS=on`, then those not a core skill's), then the search. A
+/// core skill's function, `reports_stop` and the lamp's own actions are
+/// never in it.
+pub fn chat_cut(skills: Vec<String>) -> Vec<String> {
+    let first = [super::net::search::FETCH, crate::tools::THE_TIME];
+    first
+        .into_iter()
+        .map(str::to_owned)
+        .chain(skills)
+        .chain([super::net::search::NAME.to_owned()])
+        .collect()
 }
 
 /// What [`crate::tools::THE_TIME`] is told on this route (#1712): each
@@ -11751,11 +11749,13 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
-    /// The search's functions go beside the lamp's within Live's bound of
-    /// 32: the search before a skill's last function, the fetch only with
-    /// room left.
+    /// The owner's rule at the bound (the first builder on #2614): the cut
+    /// takes the search's fetch first, then the time elsewhere, then the
+    /// skills' functions that are not a core skill's, then the search, and
+    /// never a core skill's; the lamp's own and core skills' alone past 32
+    /// are an error, and a session still opens with the core skill's.
     #[test]
-    fn the_search_is_given_room_before_a_skill_and_the_fetch_only_with_room() {
+    fn the_bound_cuts_the_fetch_then_the_time_and_never_a_core_skill() {
         let tool = |name: String| lamp_gemini::Tool {
             name,
             description: "A function.".into(),
@@ -11765,19 +11765,53 @@ mod tests {
         let lamp = |count: usize| -> Vec<lamp_gemini::Tool> {
             (0..count).map(|i| tool(format!("tool_{i}"))).collect()
         };
-        let search = [tool("web_search".into()), tool("fetch_page".into())];
-        let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
-            tools.into_iter().map(|tool| tool.name).collect()
+        let names = |tools: &[lamp_gemini::Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
         };
-        let roomy = names(super::with_search(lamp(10), &search));
-        assert_eq!(roomy.len(), 12);
-        assert_eq!(roomy[10..], ["web_search", "fetch_page"]);
-        let full = names(super::with_search(lamp(32), &search));
-        assert_eq!(full.len(), 32);
-        assert_eq!(full[31], "web_search");
-        assert!(!full.contains(&"tool_31".to_owned()));
-        assert!(!full.contains(&"fetch_page".to_owned()));
-        assert_eq!(names(super::with_search(lamp(5), &[])).len(), 5);
+        let cut = super::chat_cut(vec!["installed".into()]);
+        let has = |kept: &[String], name: &str| kept.iter().any(|told| told == name);
+        // 28 of the lamp's, the time, a core skill's `dance`, an
+        // installable one's, the search's two: 33, so the fetch goes.
+        let mut told = lamp(28);
+        for name in [
+            crate::tools::THE_TIME,
+            "dance",
+            "installed",
+            "web_search",
+            "fetch_page",
+        ] {
+            told.push(tool(name.into()));
+        }
+        let kept = names(&crate::tools::within_bound(told.clone(), &cut).unwrap());
+        assert_eq!(kept.len(), lamp_gemini::MAX_TOOLS);
+        assert!(!has(&kept, "fetch_page"), "{kept:?}");
+        assert!(has(&kept, crate::tools::THE_TIME), "{kept:?}");
+        // Each one more of the lamp's: the time, the installable skill's,
+        // then the search, and `dance` stays.
+        for (more, gone) in [
+            (1, crate::tools::THE_TIME),
+            (2, "installed"),
+            (3, "web_search"),
+        ] {
+            let mut over = lamp(28 + more);
+            over.extend(told[28..].iter().cloned());
+            let kept = names(&crate::tools::within_bound(over, &cut).unwrap());
+            assert_eq!(kept.len(), lamp_gemini::MAX_TOOLS);
+            assert!(!has(&kept, gone), "{gone}: {kept:?}");
+            assert!(has(&kept, "dance"), "{kept:?}");
+        }
+        // One more still: nothing left to cut but `dance`, an error; the
+        // session opens with `dance` and the lamp's last left out.
+        let mut over = lamp(32);
+        over.extend(told[28..].iter().cloned());
+        assert!(crate::tools::within_bound(over.clone(), &cut).is_err());
+        let core = std::collections::BTreeSet::from(["dance".to_owned()]);
+        let kept = names(&crate::tools::fit(over, &cut, &core));
+        assert_eq!(kept.len(), lamp_gemini::MAX_TOOLS);
+        assert!(has(&kept, "dance"), "{kept:?}");
+        assert!(!has(&kept, "tool_31"), "{kept:?}");
+        // Within the bound, nothing is cut.
+        assert_eq!(crate::tools::within_bound(lamp(5), &cut).unwrap().len(), 5);
     }
 
     /// #1712, the first builder at 19:43: on lamp-4ace "what time is it?"

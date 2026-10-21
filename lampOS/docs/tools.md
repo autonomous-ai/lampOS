@@ -412,16 +412,23 @@ a skill cut for it is named on the setup line (#1706).
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. A product lamp
 declares 31 without it (the voice's own 13, the actions part's 17 and
-Dance's) and 32 with it: the voice's own 15 and the actions part's 17 fill
-the 32, and Dance's `dance`, the product's one skill function, is the one
-cut (`; skills not given: dance (past 32: …)` on the setup line). On any
-lamp it is the last skills' functions, in order, that make room for the
-two; the executive's are cut only once the skills' are gone. With
-`LAMP_USE_SKILL=on` as well, `use_skill` would be the 33rd, and the link's
-check leaves it out (`use_skill (past 32)` in the journal). Tests:
-`with_reports_on_a_product_lamp_is_at_32_and_dance_is_cut`
-(`crates/update/tests/functions.rs`) and
-`reports_add_two_functions_and_the_last_skills_are_cut_past_32`.
+Dance's) and 33 with it. At the bound a core skill's function is never the
+one cut (the owner's rule, on #2614; [install.md](install.md)), and
+neither is `reports_stop` nor any of the actions part's (the first
+builder, on #2644): the cut takes the second route's fetch, then its time
+elsewhere, then `reports_state` (reading reports' state is rare), then the
+skills' functions that are not a core skill's, the last first, then the
+search. On the product's chat route the fetch, the time elsewhere and
+`reports_state` are left out; in a Live session `reports_state` alone, and
+`dance` stays in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
+core skill, so it is a core name and never the one cut. Whatever is cut is
+said once, at start, on a plain journal line (`past the bound of 32, left
+out: …`); only the lamp's own and core skills' functions alone past 32 are
+an error line (`alone are past the bound of 32; left out: …`). Tests:
+`with_reports_on_dance_stays_at_the_bound`
+(`crates/update/tests/functions.rs`),
+`reports_add_two_functions_and_the_last_skills_are_cut_past_32` and
+`past_the_bound_use_skill_and_the_lamps_actions_stay`.
 
 The voice puts `{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
 `reports/state` within 2 s: `{"ok": true, "say": "I've stopped sending
