@@ -281,3 +281,28 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **#2662:** the `lamp-runs.md` rows. Part 1 is struck; #2640's glow row
   waits for its build.
 - **Next:** the glow row on #2640's build, then part 2 (`say`).
+
+## 2026-10-21 21:3x–22:5x — part 2 up as three stacked PRs
+
+- **#2666 (2a), the judge's ask and answer.**
+  - The Reviewer's P2: an answer kept a say past its deadlines. Fixed: the
+    ask now keeps both the proposal's own lease and the 3 s wait, and an
+    answer at or past the earlier keeps nothing (`Asking::past`), with
+    boundary tests. Rebased onto #2640 (11 conflicts resolved).
+- **#2667 (2b), `lamp-policy --gate --addons`.**
+  - The moment question, about `addon`, shadow unless `--act addon`.
+  - The Reviewer's P3 (a real two-ask coexistence test) is closed.
+- **#2675 (2c), the voice's side.**
+  - The first builder's three conditions, and (b): the Live route refuses
+    `quoted`.
+  - On the second route: no tools, calls refused at execution,
+    `keep_out`, journal `said nothing`.
+  - The grant is `say = "quoted"`, with `propose` naming `say`.
+  - Test 5: the voice ignores `addon` decisions on all four readers.
+- **#2671 (tests only):** the add-on light test keeps the judge's journal
+  for a failure to show, after Second's Mac failure. My race theory was
+  wrong (the old order slowed still passed), and I said so.
+- **Claimed next:** a kept `note` as a fresh system note on the second
+  route's next spoken turn. Its shape is posted on #2530 for a read; I build
+  it at 23:20 without an answer.
+- **lamp-75c9:** Eighth, then Ten, then blue (#2640's row), then Nine.
