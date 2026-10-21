@@ -26,8 +26,10 @@ pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_mod
 /// --speech`.
 pub(crate) use tts::{
     Request as SpeechRequest, SocketRequest, on_elevenlabs, request as speech_request,
-    socket_answer, socket_end, socket_opening, socket_piece, socket_request,
+    socket_answer, socket_piece, socket_request,
 };
+#[cfg(test)]
+pub(crate) use tts::{SocketShape, socket_end, socket_opening};
 
 /// To open a connection, TLS included.
 pub(crate) const CONNECT: Duration = Duration::from_secs(10);

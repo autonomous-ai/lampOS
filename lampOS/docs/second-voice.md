@@ -3065,13 +3065,62 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
     piece of its answer is said in the socket's model, those over HTTP
     too (`Tts::model_for`).
   - **`inactivity_timeout=60`** on the socket's URL, since it opens before
-    the answer exists and ElevenLabs closes an idle socket after 20 s.
+    the answer exists and ElevenLabs closes an idle socket after 20 s. It
+    opens within the 10 s connect bound, while the chat thinks.
   - **A close is read:** its code and reason go in the journal (`the speech
     socket was closed: 4400 "…"`). So does ElevenLabs' JSON error before
     it (`the speech socket's service said: input_timeout_exceeded: …`).
-  - **A 4400–4499 close refuses the model:** that piece goes over HTTP, and
-    no socket is opened ahead for that model again until the voice starts
-    again, said once. A refused model is refused on every try.
+  - **A 4400, 4404 or 4422 close refuses the model:** that piece goes over
+    HTTP, and no socket is opened ahead for that model again until the
+    voice starts again, said once. A refused model is refused on every try.
+  - **A 429 pauses the sockets** (the reviewer-lead's P3 on #2658): a 429
+    answering the socket's upgrade, or a 4429 close, sends the piece over
+    HTTP and opens no socket for 60 s (`SOCKET_BUSY_PAUSE`), said once, as
+    `too_many_concurrent_requests` does below, so the next answers don't
+    each try the open again. The model isn't refused.
+- **v4 Turbo takes the dialogue endpoint** (#2602, #2135, 21 Oct; the
+  backend's test through the relay). With the socket's model set to
+  `eleven_v4_turbo`, the socket is ElevenLabs'
+  `text-to-dialogue/stream-input` (`socket_shape`); every other model keeps
+  `stream-input` exactly as above.
+  - **Its shape:** `…/ws/elevenlabs/text-to-dialogue/stream-input?model_id=eleven_v4_turbo&output_format=pcm_24000`,
+    no voice in the path and no `inactivity_timeout`: ElevenLabs' dialogue
+    reference doesn't list it, and the socket never waits for text. The first message names the one voice
+    (`{"voices":[id]}`, no speed: the dialogue takes only `stability`).
+    The piece goes as `{"inputs":[{"text","voice_id"}]}`, then
+    `{"flush":true}`, then `{"close_socket":true}`. Audio is base64
+    `audio`, decoded into the same 24 kHz PCM; `is_final_audio_for_turn`
+    is read past, and `is_final` ends the socket. The backend's test had
+    audio 116 ms after the input, against Flash's 214 ms on `stream-input`.
+  - **Its cap:** each open dialogue socket holds one of the account's
+    concurrent dialogue sessions, idle too (105, then
+    `too_many_concurrent_requests`), and ElevenLabs closes it after 20 s
+    with no message from the lamp.
+  - **So it opens on the reply, never ahead:** as the answer begins
+    nothing is opened; the answer's first piece with words opens it
+    (`request N: the dialogue speech socket is open, M ms after its piece
+    was ready`) and sends its input, `flush` and `close_socket` at once,
+    so it is never held between turns and nothing waits on it. Its other
+    pieces go over HTTP in `eleven_v4_turbo`, as with `stream-input`.
+  - **Its open has 400 ms** (`DIALOGUE_OPEN_WITHIN`, the reviewer-lead's
+    P2 on #2658): it opens on the piece's own path, so the connect and
+    upgrade get 400 ms, less than a kept HTTP connection's first audio
+    (420–690 ms on lamp-4ace), not the 10 s connect bound. Past it the
+    piece goes over HTTP, journaled with no words (`request N: the dialogue
+    speech socket was slow to open: not open M ms after its piece was
+    ready`); a slow open refuses and pauses nothing.
+  - **Its failures** are `stream-input`'s: a 4400, 4404 or 4422 close
+    refuses v4 for the rest of the voice's run; a 429 at the upgrade or a
+    4429 close pauses the sockets for 60 s; a close, error or silence
+    before any audio sends the piece over HTTP.
+  - **`too_many_concurrent_requests`**, said as ElevenLabs' error or as the
+    relay's close reason, sends the piece over HTTP and opens no socket for
+    60 s (`SOCKET_BUSY_PAUSE`), said once; v4 isn't refused.
+  - **Not carried:** the whole answer on one dialogue socket. The voice
+    asks each piece's speech apart and at once, and the dialogue socket
+    marks no piece's end before `close_socket`, so it would need the
+    answer's end told to the voice, and `keep_alive` while the chat is
+    slow.
 
 ### How much the prompt cache holds (`probe-cache`)
 

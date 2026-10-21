@@ -1374,12 +1374,21 @@ pub(crate) fn socket_arm(
         ws.send(Frame::Text(message.to_string().into()))
             .map_err(socket_step("send"))
     };
-    send(&mut ws, net::socket_opening())?;
+    send(&mut ws, socket.opening())?;
     std::thread::sleep(ahead);
-    let piece = net::socket_piece(text).ok_or_else(|| io::Error::other("nothing to speak"))?;
-    send(&mut ws, piece)?;
+    // The piece, then its end: `stream-input`'s, or the dialogue's `flush`
+    // and `close_socket` for v4 Turbo (`net::socket_shape`).
+    let mut messages = socket
+        .messages(text)
+        .ok_or_else(|| io::Error::other("nothing to speak"))?
+        .into_iter();
+    if let Some(piece) = messages.next() {
+        send(&mut ws, piece)?;
+    }
     let written = Instant::now();
-    send(&mut ws, net::socket_end())?;
+    for end in messages {
+        send(&mut ws, end)?;
+    }
     loop {
         match ws.read().map_err(socket_step("answer"))? {
             Frame::Text(message) => {
@@ -2487,6 +2496,8 @@ mod tests {
             ),
             header: "authorization",
             value: key.to_owned(),
+            shape: net::SocketShape::StreamInput,
+            voice: "abc".to_owned(),
         }
     }
 
