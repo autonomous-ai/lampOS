@@ -407,6 +407,13 @@ pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 /// (`worker::staff_noting`, `crate::staff_note`): `(request, heard)` to the
 /// note, or nothing.
 pub type StaffNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
+
+/// What memory holds that may fit a spoken request's words ([`Engine::remembering`]),
+/// asked with the request's lease when this route scopes context: its
+/// admitted scope, narrowed or not, is the one searched.
+pub type Remembered = Arc<
+    dyn Fn(u64, &str, Option<&crate::memory_scope::ScopeLease>) -> Option<String> + Send + Sync,
+>;
 /// The note a spoken request earns when the lamp's name was heard as it
 /// began (`worker::Heeding::telling_the_name`, `crate::called`): asked
 /// after the request is judged, with its request.
@@ -544,7 +551,7 @@ struct Shared {
     staff: Option<StaffNote>,
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
-    remembered: Option<StaffNote>,
+    remembered: Option<Remembered>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -1512,7 +1519,7 @@ impl Engine {
     /// words (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c,
     /// `crate::remember::hits_note`), computed as its notes are, within a
     /// short bound. Before any turn only.
-    pub fn remembering(mut self, note: StaffNote) -> Self {
+    pub fn remembering(mut self, note: Remembered) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.remembered = Some(note);
         }
@@ -3044,7 +3051,8 @@ async fn spoken(
         None => match shared.remembered.clone() {
             Some(note) => {
                 let words = text.clone();
-                tokio::task::spawn_blocking(move || note(request, &words))
+                let lease = scope.clone();
+                tokio::task::spawn_blocking(move || note(request, &words, lease.as_ref()))
                     .await
                     .ok()
                     .flatten()
@@ -3464,7 +3472,7 @@ fn prepared_on(
             let remembered = shared
                 .remembered
                 .as_ref()
-                .and_then(|note| note(request, &words));
+                .and_then(|note| note(request, &words, scope));
             Some(Prepared::begin(shared, scope, words, notes, remembered))
         }
         net::Early::Resumed => {

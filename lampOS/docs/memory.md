@@ -865,7 +865,7 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
 - **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
 - **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
-- **Not with `LAMP_SECOND_SCOPED_CONTEXT`:** it doesn't read the per-line lease yet, so the worker says so and tells nothing.
+- **With `LAMP_SECOND_SCOPED_CONTEXT`:** the scope is the request's own lease, as its context is told: the person admitted with the line, or the room's once another face was seen speaking it (`speaking_faces`), never the sticky session's person. A revoked request is asked nothing. Tested in `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs` (hits asked for the room, A, the room).
 
 ### Each person's own (#764)
 
