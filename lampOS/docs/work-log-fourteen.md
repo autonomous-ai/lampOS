@@ -840,3 +840,33 @@ been in since 20 Oct)
 - Opened [ecm-sds-mobile#23](https://github.com/autonomous-ai/ecm-sds-mobile/pull/23)
   onto `v3`. Reported to Mobile on
   [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6311782638).
+
+## 21 Oct — one Wi-Fi row, and #1722 hit its comment cap
+
+- The first builder's 16:5x ask, from Mobile's 16:3x note on #1959: merge
+  the Interaction card's Lamp-2-only `_LampWifiRow` into Device info's
+  existing (every-device) "Wi-Fi" row instead of carrying two. Modeled
+  the new `_LampWifiInfoRow` on the same file's `_TimezoneInfoRow` — a
+  plain info row plus a trailing "Edit" `TextButton`, shown only once
+  `lampWifiChangeProvider` confirms the lamp takes `wifi.set`. The
+  change sheet itself (`_LampWifiChangeSheet`) isn't touched by this
+  diff at all, as asked.
+- Checked against Mobile's own open #26 (the sheet-close fix) before
+  starting: #26 only enters `_LampWifiChangeSheetState`, which my diff
+  never does, so there's no textual overlap either order merges — went
+  ahead on current `v3` rather than waiting on #26.
+- `flutter analyze`: 24, matching `v3`'s baseline (none in the 3
+  changed files). `flutter test -j 2`: 858/0 (the default-concurrency
+  run flakes on unrelated `device_chat`/`agent_skills` files under
+  load — confirmed by running them alone and under `-j 2`, not from
+  this diff).
+- Opened [ecm-sds-mobile#27](https://github.com/autonomous-ai/ecm-sds-mobile/pull/27)
+  onto `v3`.
+- **#1722 hit GitHub's 2500-comment cap** while I was posting the
+  report — commenting is now refused there. The first builder (or
+  lead) had already opened
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602)
+  ("Queue (continued from #1722)") moments earlier; posted the #27
+  report there instead. Armed a second Monitor on #2602 beside the
+  existing one, since the running Monitor's own polling script isn't
+  something I can edit to add the new issue number.
