@@ -1499,6 +1499,20 @@ Vietnamese, in every state, fits and is taken by the transport (a test).
 The same bound holds for any written turn: a note made from other text
 (progress news, #732) has to fit in it too.
 
+### The read-back names what the task names (#2602 finding 2)
+
+After `start_agent_task` prepares the work, its answer's `next`
+(`agent_tasks::prepared_next`) asks the model to say the task back in one
+short sentence, **naming each name the task has as it was written for the
+agent**: a channel, place, program, file, project or person. That way a
+word misheard shows before the person says yes. With the lead-in (below), a
+read-back already said counts only if it named them. On lamp-75c9 on 21
+October, "the lamp devin demo Slack channel" went to Devin as "the #dead
+Slack channel", and "Claude Code" to Claude Code as "the blog code", while
+the read-backs said only "the Slack channel". This isn't behind a switch:
+it changes the words of `next` only, on every route, and
+`every_read_back_names_what_the_task_names` holds all four variants.
+
 ### A lead-in before a call (#799, off unless `LAMP_TOOL_LEAD_IN=on`)
 
 A turn in which the model calls `start_agent_task` or `confirm_agent_task`

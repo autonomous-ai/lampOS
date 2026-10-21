@@ -703,17 +703,29 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     tools
 }
 
+/// The names a read-back says as the task gives them to the agent, so a
+/// word misheard shows before the person says yes. On lamp-75c9 on 21 Oct
+/// "the lamp devin demo Slack channel" went to Devin as "the #dead Slack
+/// channel", and "Claude Code" to Claude Code as "the blog code", while the
+/// read-backs said only "the Slack channel" (#2602 finding 2).
+const NAMES_BACK: &str = "naming each name it has as you wrote it for the agent (a channel, \
+                          place, program, file, project or person), so a misheard word shows";
+
 /// What the model is told after `start_agent_task` prepared the work.
 pub fn prepared_next(lead_in: bool, choosing: bool, who: &str) -> String {
     match (lead_in, choosing) {
-        (true, false) => "If you already said the task back, now only ask in a few words whether to start it (\"Shall I start it?\"). If you did not, say it back in one short sentence and ask. Start it only if the person says yes.".to_owned(),
+        (true, false) => format!(
+            "If you already said the task back, {NAMES_BACK}, now only ask in a few words whether to start it (\"Shall I start it?\"). If you did not, say it back in one short sentence, {NAMES_BACK}, and ask. Start it only if the person says yes."
+        ),
         (true, true) => format!(
-            "If you already said the task back, now only ask in a few words whether to start it (\"Shall I start it?\"). If you did not, say it back in one short sentence, saying {who} will do it, and ask. Start it only if the person says yes."
+            "If you already said the task back, {NAMES_BACK}, now only ask in a few words whether to start it (\"Shall I start it?\"). If you did not, say it back in one short sentence, saying {who} will do it, {NAMES_BACK}, and ask. Start it only if the person says yes."
         ),
         (false, true) => format!(
-            "Say the task back in one short sentence, saying {who} will do it, and ask whether to start it. Start it only if the person says yes."
+            "Say the task back in one short sentence, saying {who} will do it, {NAMES_BACK}, and ask whether to start it. Start it only if the person says yes."
         ),
-        (false, false) => "Say the task back in one short sentence and ask whether to start it. Start it only if the person says yes.".to_owned(),
+        (false, false) => format!(
+            "Say the task back in one short sentence, {NAMES_BACK}, and ask whether to start it. Start it only if the person says yes."
+        ),
     }
 }
 
@@ -4020,15 +4032,40 @@ pub(crate) mod tests {
     /// #799: off, the model hears what it always did after each call, to
     /// the byte; `on` is the only word that turns the lead-in on, and it
     /// comes after the other tasks flags.
+    /// #2602 finding 2 (lamp-75c9, 21 Oct): every read-back, with or
+    /// without the lead-in and the staff, names what the task names, as
+    /// written for the agent, so "the #dead Slack channel" is heard before
+    /// the yes.
+    #[test]
+    fn every_read_back_names_what_the_task_names() {
+        for lead_in in [false, true] {
+            for choosing in [false, true] {
+                let next = prepared_next(lead_in, choosing, "Devin");
+                assert!(
+                    next.contains("a channel, place, program, file, project or person"),
+                    "{next}"
+                );
+                assert!(
+                    next.ends_with("Start it only if the person says yes."),
+                    "{next}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn without_the_lead_in_what_the_model_is_told_after_a_call_is_as_before() {
         assert_eq!(
             prepared_next(false, false, "Claude Code"),
-            "Say the task back in one short sentence and ask whether to start it. Start it only if the person says yes."
+            format!(
+                "Say the task back in one short sentence, {NAMES_BACK}, and ask whether to start it. Start it only if the person says yes."
+            )
         );
         assert_eq!(
             prepared_next(false, true, "Codex"),
-            "Say the task back in one short sentence, saying Codex will do it, and ask whether to start it. Start it only if the person says yes."
+            format!(
+                "Say the task back in one short sentence, saying Codex will do it, {NAMES_BACK}, and ask whether to start it. Start it only if the person says yes."
+            )
         );
         assert_eq!(
             handing_over_next(false, "Claude Code"),
@@ -4149,10 +4186,13 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(with, off);
         // Afterwards: the question, and nothing said twice.
-        assert!(prepared_next(true, false, "Claude Code").starts_with(
-            "If you already said the task back, now only ask in a few words whether to start it (\"Shall I start it?\")."
-        ));
-        assert!(prepared_next(true, true, "Codex").contains("saying Codex will do it, and ask"));
+        assert!(prepared_next(true, false, "Claude Code").starts_with(&format!(
+            "If you already said the task back, {NAMES_BACK}, now only ask in a few words whether to start it (\"Shall I start it?\")."
+        )));
+        assert!(
+            prepared_next(true, true, "Codex")
+                .contains(&format!("saying Codex will do it, {NAMES_BACK}, and ask"))
+        );
         assert!(
             handing_over_next(true, "Codex")
                 .starts_with("They have heard you say you are giving it to Codex.")
@@ -4355,7 +4395,7 @@ pub(crate) mod tests {
             told,
             [
                 json!({"prepared":true,"task":"Write hello.txt","where":"Claude Code on the office computer",
-                    "next":"Say the task back in one short sentence and ask whether to start it. Start it only if the person says yes."}),
+                    "next":prepared_next(false, false, "Claude Code")}),
                 json!({"handing_over":true,"who":"Claude Code",
                     "next":"Tell them in a few natural words that you are handing it to Claude Code now and will let them know when it is done, the way a chief of staff would (\"Sure, I'm giving that to Claude Code. I'll tell you when it's done.\"). It has not been taken up yet: do not say it has."}),
             ]

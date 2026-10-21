@@ -610,7 +610,7 @@ mod tests {
             stand_in(crate::agent_tasks::START, &json!({}), true)["next"]
                 .as_str()
                 .unwrap()
-                .starts_with("If you already said the task back, now only ask")
+                .starts_with("If you already said the task back, naming each name it has")
         );
         // Every function the script expects is one the voice declares.
         let place = crate::agent_tasks::Place {
