@@ -13,15 +13,18 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-21, both revisions in native CI
+## Current checkpoint: 2026-10-21, Music cache correction and release CI
 
 Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
 `6f4e5ceea0df9f47ec211e5649dedf075507a7d6`; release workflow
 [#2462](https://github.com/autonomous-ai/lampOS/pull/2462) is pushed at
-`4c847099474a8aca5e6c09d5291a3003ec2a47fd`. Each is one commit on
-`99f2ecfcd4ebb3b9279750bee42f219c0c4895ed`. Both remain draft pending native
-ARM64 qualification. Their current x86 strict workspace/all-target Clippy
-runs passed without warnings. [Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6307873956).
+`f41a24c185df9e1b9e612ed1c7e573cd44631b48`. Music is one commit on
+`99f2ecfcd4ebb3b9279750bee42f219c0c4895ed`; the release workflow is one on
+`64cefadfca797cfd259048197a64add4dd6b8681`, preserving the newer integration
+cache policy. Both remain draft. Music failed its native cache regression and
+is being corrected; release ARM64 is pending. Their current x86 strict
+workspace/all-target Clippy runs passed without warnings.
+[Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6308117257).
 Review follow-up and the next assigned task remain in this builder loop.
 
 ### Music
@@ -49,20 +52,31 @@ record. The unchanged intermittent test is referred to First / Setup's owner
 [on the PR](https://github.com/autonomous-ai/lampOS/pull/1757#issuecomment-6307872247).
 No runtime change is inferred from that observation.
 
-Stable scans of sixteen maximum recordings measured **1.277500 / 0.707583 /
+The pre-correction scans of sixteen maximum recordings measured **1.277500 / 0.707583 /
 0.702833 ms**, with **zero payload reads**, at `Scan::unchanged` after load.
 The earlier before-fix baseline was **1,380.945167 / 1,401.177416 /
 1,407.403209 ms**, reading 46,085,516 bytes. Cloning, loading, copyback and
-logging are outside that boundary. The scan source and regression file are
-unchanged from the five compiled/detected mutation checks. The cache assumes
-trustworthy local filesystem change times; Voice still hashes playback bytes.
+logging are outside that boundary. These historical latency and five mutation
+checks do not qualify the pending correction: immediate metadata reuse missed
+a same-size rewrite in native CI. Voice still hashes playback bytes, but that
+is not a substitute for the scan's permission-manifest validation.
 Current prepared handoff measured **194 / 180 us** first/repeated, confirmation
 retirement to authored speaker IPC acceptance, against 250 ms. No acoustic
 or lamp latency is established. The 48-second generated WAV and all seven
 installed files retained their expected hashes; no binary is committed.
 
 [ARM64 39542590327](https://github.com/autonomous-ai/lampOS/actions/runs/39542590327)
-is running. [x86 39542590328](https://github.com/autonomous-ai/lampOS/actions/runs/39542590328)
+failed: **4,684 passed / 1 failed / 59 skipped**, with **4,525** remaining
+tests not run after fail-fast. The failure is
+`a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation`:
+its same-size audio rewrite was incorrectly classified as unchanged. This is
+Music's cache correctness failure, separate from unchanged Setup's intermittent
+test. The native log has no stamp values, so the precise filesystem timing is
+unmeasured. The correction must require a new content hash after timestamp
+settlement before metadata-only reuse; unsupported filesystem/clock contracts
+will keep hashing. No blind CI rerun or fixture-only sleep is being used.
+[Failed-run receipt](verification/second-current-checkpoint-20261021/music-native-failure.json).
+[x86 39542590328](https://github.com/autonomous-ai/lampOS/actions/runs/39542590328)
 passed on merge `d84cdfb50866bd867f0f92bf22a972e5e936633f`, base
 `632c0b8ede96c91d52db2df485f95590cf5c1842`; its [receipt](verification/second-current-checkpoint-20261021/music-clippy.json)
 binds that run to the current PR head. Earlier 8,620/0/36-ignored host counts
@@ -91,13 +105,19 @@ and **6 real updater CLI tests**, all passed. The artifact tests include a real
 Cargo renamed-target cache regression through the exporter CLI. Actionlint
 1.7.12, seven shell syntax checks, Python/YAML/JSON and diff checks passed.
 Optional actionlint ShellCheck/Pyflakes integrations were disabled and are
-explicitly recorded. The unchanged freshly built updater binary was reused;
-no Rust runtime source changed. [Host receipt](https://github.com/autonomous-ai/lampOS/blob/4c847099474a8aca5e6c09d5291a3003ec2a47fd/lampOS/docs/verification/update-release-host-20261021.json).
+explicitly recorded. The updater was freshly rebuilt on the rebase; no Rust runtime source changed.
+Current Cargo metadata contains **46 binaries + 2 selected examples**.
+[Host receipt](https://github.com/autonomous-ai/lampOS/blob/f41a24c185df9e1b9e612ed1c7e573cd44631b48/lampOS/docs/verification/update-release-host-20261021.json).
 
-Current [ARM64 39542671883](https://github.com/autonomous-ai/lampOS/actions/runs/39542671883)
-is running. Current [x86 39542671856](https://github.com/autonomous-ai/lampOS/actions/runs/39542671856)
-passed on merge `3ff5809553765f1f05e1e495b8d7978a51a5a2f2`, base
-`f11099bf81bb692e73cee752b3dedb4d732c55e4`; [receipt](verification/second-current-checkpoint-20261021/release-clippy.json).
+Current [ARM64 39543873384](https://github.com/autonomous-ai/lampOS/actions/runs/39543873384)
+is running. Current [x86 39543873388](https://github.com/autonomous-ai/lampOS/actions/runs/39543873388)
+passed on merge `36f4b77b5f84edbddfff53038a91d8f0b944c66f`, base
+`707e02c30cff5d9802ab7e5cfeab77621ca6992d`, with no warnings;
+[current receipt](verification/second-current-checkpoint-20261021/release-rebased-clippy.json).
+Earlier head `4c847099474a8aca5e6c09d5291a3003ec2a47fd` passed x86
+39542671856 ([earlier receipt](verification/second-current-checkpoint-20261021/release-clippy.json));
+its ARM64 39542671883 was cancelled by the rebase push. That cancellation is
+not a test failure or qualification of the current revision.
 Initial head `5b15091dac6c2905704276073dabd3896b88700c` passed ARM64
 39540037529: **9,054 nextest passes, one leaky, 59 skipped, four doctests,
 12 own-harness tests and relay signals**, plus 29+6 publication checks.
