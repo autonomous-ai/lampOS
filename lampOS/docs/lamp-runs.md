@@ -4,7 +4,7 @@ The one list of every merged row and fix that now waits only for a run on a real
 
 **How to use it:** book your lamp with its person, run the row on the build named, and post the result on the row's PR. The first builder then strikes the row here. A row that moves the body needs the person at the arm. **Build** is the branch the switch is on: `#1712` for the voice (the second route), `lamp-voice` for every other part.
 
-**As of** `lamp-voice` `04571ea1d` and #1712 `167325721` (21 Oct, 11:0x +07), with the runs and merges up to 11:0x struck or noted. A row's owner says on #1722 when a run is done, and the first builder strikes it here. The sources are every `until` row of `switches.md` on both branches, `build-rows.md` (the 20 Oct 18:28 copy), the morning list of 21 Oct and the open PRs.
+**As of** `lamp-voice` `4c733283b` and #1712 `0f92dd0ff` (21 Oct, 12:5x +07), with the runs and merges up to 12:5x struck or noted. A row's owner says on #1722 when a run is done, and the first builder strikes it here. The sources are every `until` row of `switches.md` on both branches, `build-rows.md` (the 20 Oct 18:28 copy), the morning list of 21 Oct and the open PRs.
 
 ## lamp-4ace (the first builder)
 
@@ -172,14 +172,14 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
 | `LAMP_APP_UPDATE`, the app's update page | #2360 (#2194) | Install lamp-voice `d90cc8b8e` with it on, then #2194's steps 1 to 8 from the app (on #1396). Done in part on lamp-0c89 at 10:3x (#1396). (The switch isn't in `switches.md` yet.) | the app | lamp-voice |
-| `lamp-eyes --photo-dir`, `LAMP_PHOTO_FACES` (voice and cloud), the "Faces from a photo" row | #1968 | #1968's steps 4 to 6, with Ten: a selfie added in the app, a two-face photo refused, the person asked once at the lamp; yes then recognised, no or silence then gone. | the person's face; the app | lamp-voice |
-| `LAMP_FACES_PAGE` | #2192 | From the app: the list as the eyes keep it, one face removed and no longer recognised. | the person's face; the app | lamp-voice |
+| `lamp-eyes --photo-dir`, `LAMP_PHOTO_FACES` (voice and cloud), the "Faces from a photo" row | #1968 | ~~#1968's steps 4 to 6, with Ten: a selfie added in the app, a two-face photo refused, the person asked once at the lamp; yes then recognised, no or silence then gone~~ (passed on lamp-0c89, 21 Oct 11:2x, Mobile on #1968; the double ask is fixed in #2492). | the person's face; the app | lamp-voice |
+| `LAMP_FACES_PAGE` | #2192 | ~~From the app: the list as the eyes keep it, one face removed~~ (passed on lamp-0c89, 21 Oct 11:3x, Mobile on #2192). Left: that the removed person isn't named at the lamp, when they're back; and the memories, which an app removal doesn't reach yet (my 11:3x call on #2192: it can forget them entirely). | the person's face; the app | lamp-voice |
 | `LAMP_MESSAGES`, the "Text your lamp" row | #1673 | The app's chat shows a reply on the second route's config; one hand-made `task_news` pushed through this lamp's `lamp-cloud`, then off. | the app | lamp-voice |
 | The "factory's per-lamp steps" row, #1682's body sheet | #1717, #1744 | #1682's body sheet: a measured stand. | person at the arm | lamp-voice |
 | `LAMP_APP_SCHEDULE` | #2195 | A reminder set by voice is listed on the app's Lamp 2 page, cancelled there, and gone from "what reminders do I have?". | the app; one line said or played | #1712 |
 | `LAMP_LIGHT_WHILE_MUTED` | #1816 | The app's light row works with the privacy switch closed. | the app; a hand on the slide | #1712 |
-| `LAMP_SKILLS_PAGE` | #1882, #1890 | The app's Skills reply read through the broker on this lamp, and its time. | the app | lamp-voice |
-| `LAMP_SETTINGS_CHANGE` (with `trials.sh settings`, #2038) | #1959 (#1982) | A hello with the new name, a reminder at the new zone's time, the app's name read back. The helper's two units go on by hand: they aren't in `lamp-update`'s list yet. | the app | lamp-voice |
+| `LAMP_SKILLS_PAGE` | #1882, #1890 | ~~The app's Skills reply read through the broker on this lamp, and its time~~ (passed on lamp-0c89, 21 Oct 12:4x, Mobile on #1890: the list 0.8 to 1.0 s after the tap). | the app | lamp-voice |
+| `LAMP_SETTINGS_CHANGE` (with `trials.sh settings`, #2038) | #1959 (#1982) | ~~The app's name read back~~ and the zone set and set back (passed on lamp-0c89, 21 Oct 12:3x, Mobile on #1959). Left: a hello with the new name, a reminder at the new zone's time, both with its person. The helper's two units go on by hand: they aren't in `lamp-update`'s list yet. | the app | lamp-voice |
 | `LAMP_SETTINGS_WIFI` | #1959 (#1995) | A wrong password from the app: the fall-back said, and the lamp stays on its Wi-Fi. | the app | lamp-voice |
 | `LAMP_SECOND_CHAT_WARM` | #1712 | After quiet minutes, on and off: the journal's `chat request … began in A ms; the last request S s before`. It goes on if A falls by the handshake. | nothing (any line) | #1712 |
 | `LAMP_SECOND_SPEECH_WARM` | #1712 | After quiet minutes, on and off: `ElevenLabs piece 1 … its first audio byte A ms after it went`. | nothing (any line) | #1712 |
@@ -192,6 +192,8 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
+| `LAMP_VOICE_TONE` (with `LAMP_BUS=on`), "Reads your mood", the voice half (Ten, with Fourth) | #2450, #2467, #2493 | **The person at the desk:**<br>1. ten ordinary lines;<br>2. one sentence calm, then excited, three times each;<br>3. a glad line and a down one.<br><br>Read the `voice_tone` records' arousal and valence signs.<br><br>**A known face:** its lines read `whose: person`. Then forget their face in the app, enrol them again under the same name, and say a line: `baseline_lines` 1, after a `voice_tone_forgot` with `by: memory`.<br><br>**Cost:** the voice's CPU beside the same run with it off. | a person, a known face | #1712 |
+| `LAMP_MOOD_TONE` (with `LAMP_MOOD`, `LAMP_VOICE_TONE`, `LAMP_BUS`), "Reads your mood" and "One inner state" (Ten, with Fourth) | (b), up after the landing | With `LAMP_MOOD_SEEMS` too: a glad line, a down one, a lively one and a calm one, a few minutes apart. Read each one's Mood journal line, and ask whether the breath and the head look right to the person. A down line should quiet the lamp even with the face `unsure`, as FER+ read Ten's person's long face. | a person | #1712 |
 | `LAMP_MOOD`, the "One inner state" row (Ten) | #1670, #1728 | `lamp-bus tap mood/state` for a minute (`trials.sh mood`): by day the ring and head breathe together, a clap quickens both, dozing at night slows both, neither jumps. | person at the arm | lamp-voice |
 | `lamp-eyes` `LAMP_ACTIVITY` and `--look-on-change` (Ten) | #1678, #705 | The eyes' CPU in an empty room against `presence-check.sh`'s baseline with `--look-on-change on`; a scripted sitting, each state a minute, twice, scored against its times; a sit-down looked at within 0.6 s. | the person sitting | lamp-voice |
 | `LAMP_USE_SKILL` (Ten) | #1668 | With Desk tutor installed: "dance", "a long jazzy dance" and "check my work", each answered by its skill; the same lines with it off; tool turns against 2.02–2.21 s. | person at the arm; a page | #1712 |
