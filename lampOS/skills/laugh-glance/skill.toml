@@ -1,7 +1,9 @@
 # PARKED (#1669): dropped, the owner never asked to listen for other people
 # laughing (the lead, #1711, 21 Oct 14:3x); kept, off on every product lamp by
-# install::NOT_PRODUCT_SKILLS. Its cases still run. To bring it back, take its
-# line out of NOT_PRODUCT_SKILLS.
+# install::NOT_PRODUCT_SKILLS. Its cases still run. Install never removes a
+# skill, so a copy already on a lamp (a trial, #2399) stays and still glances
+# with LAMP_EARS_CLASSES=on; remove that folder by hand. To bring it back, take
+# its line out of NOT_PRODUCT_SKILLS.
 # Laugh glance (#1669: the owner's 19 Oct "laughing", creature.md item 7, read
 # as "a glance up at a laugh ... rare and small, and never while the lamp is speaking or someone is talking
 # to it"; docs/creature.md: "a glance now and then at whoever laughs"). It
