@@ -1558,18 +1558,38 @@ fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
         );
         assert!(Path::new(path).starts_with(format!("/var/lib/{directory}")));
     }
-    // Night sleep (#940) stays inert until its switch-on PR: the product
-    // units leave routines and rest requests off, and the caps stay off.
+    // Night sleep is a skill (#940): Skills' routines and Expression's rest
+    // requests are on, each in its own unit only; the caps stay off.
     for (unit, text) in install::PRODUCT {
         for line in section(text, "Service") {
-            for switch in [
-                "LAMP_SKILL_ROUTINES",
-                "LAMP_REST_REQUESTS",
-                "LAMP_OUTPUT_CAPS",
+            for (switch, owner) in [
+                ("LAMP_SKILL_ROUTINES", "lamp-skills.service"),
+                ("LAMP_REST_REQUESTS", "lamp-expression.service"),
+                ("LAMP_OUTPUT_CAPS", ""),
             ] {
-                assert!(!line.contains(&format!("{switch}=on")), "{unit}: {line}");
+                assert_eq!(
+                    line == format!("Environment={switch}=on"),
+                    line.contains(&format!("{switch}=on")),
+                    "{unit}: {line}"
+                );
+                if line.contains(&format!("{switch}=on")) {
+                    assert_eq!(*unit, owner, "{line}");
+                }
             }
         }
+    }
+    for (owner, switch) in [
+        ("lamp-skills.service", "LAMP_SKILL_ROUTINES"),
+        ("lamp-expression.service", "LAMP_REST_REQUESTS"),
+    ] {
+        let (_, text) = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap();
+        assert!(
+            section(text, "Service").contains(&format!("Environment={switch}=on").as_str()),
+            "{owner}"
+        );
     }
     // Actions needs no caps path while off, and the product's new argument
     // alone must not open persistent storage or opt into the cap service.
