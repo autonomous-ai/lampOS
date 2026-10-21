@@ -604,6 +604,56 @@ The proposal above, as built on `sixth/stop-model`:
   `duplex::tests::a_forced_yield_begins_at_the_next_block_and_quiet_commits_it`, `coordinator::tests::duplex::a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows` (the reply ends on the forced commit: the coordinator cancels it as the hand's Stop, and the speaker is held from the commit to the cancel), `hear::tests::only_the_pinned_stop_model_is_taken`, `the_stop_bar_is_read_in_the_program_and_in_check`,
   the parse of `--stop-least`, and `lamp_msgs`' `StopHeard`.
 
+## Scoring played stops on each canceller stage: `stop_words_replay`
+
+Which stage of the echo canceller lets "Stop." through to `stop.onnx`
+best, with the fewest false stops? `crates/name/examples/stop_words_replay.rs`
+answers this offline, on this machine's files, and runs only when named.
+It is a Rust port of the scorer that was kept out of Git. It gives each of
+a replay's three sources, `pre_aec` (what `LAMP_STOP_WORDS_SOURCE=raw`
+takes), `aec_linear` (`linear`, 4 ms ahead of the others) and `aec_only`
+(`processed`, what `mic2/audio` carries), to the product's own listener,
+20 ms at a time: `Hearer` with the stop model, `Quiet` with no rest bar as
+the product unit runs it, and `Stops` with its 1 s hold-off. Then it counts
+the stops against the played lines.
+
+```sh
+# from lampOS/, with the lamp's name models and stop.onnx in MODELS
+cargo build --release -p lamp-audio
+cargo run --release -p lamp-name --example stop_words_replay -- \
+  --models MODELS --stop-least 0.5,0.7,0.9 \
+  --lamp-audio target/release/lamp-audio \
+  ~/lamp-voice-data/stop-1021/BUNDLE[:PLAYS] ...
+```
+
+- **A bundle** is a `lamp-audio replay-aec … --linear-output` output
+  (`operations.jsonl`, `segment-001-<source>.wav`), or a recording that
+  tool reads (`events.jsonl`, `capture-audio/`, `render-audio/`), as a
+  folder or a `.tar`. A recording is replayed first with `--lamp-audio`,
+  from `--workspace` (default: the current folder, which must be lampOS/),
+  into a fresh leaf under its `artifacts/`, removed afterwards. A replay
+  without `--linear-output` shows `aec_linear` as "not in the replay".
+- **The marks** are the plays file: `start_us<TAB>duration_us…` per played
+  "Stop.", on the clock of each capture block's `first_read_started_at_us`,
+  as the played recordings' `plays.tsv` has it. With no `:PLAYS`, the
+  scorer looks for `plays.tsv` in the bundle, then `plays-<name>.tsv`
+  beside it. A line with a fourth column counts as a stop line only when
+  that column is `cut`: the recorder's own `plays.tsv` lists the requests
+  it played too. A line without one counts. The audio has no marks of its
+  own.
+- **A catch** is the first stop from a line's start to its end plus
+  `--after-ms` (default 1000). Its latency is measured from the line's start.
+  **Other** is a second stop in that window, or one in the second
+  before a line. **A false stop** is any stop outside those. It prints a
+  table per bundle, `source | bar | catches | false stops | other |
+  first-catch latency`, then one for all the bundles together.
+- **The tests** (`cargo test -p lamp-name --example stop_words_replay`)
+  build a synthetic replay: silence with loud bursts, scored by a stand-in
+  for the models behind `quiet::Models`. They cover reading the bundle, the
+  lamp's clock, `Quiet` and `Stops` as the product runs them, and the
+  counting. They don't cover what `stop.onnx` hears: the front-end models
+  aren't in the repository.
+
 ## Where it is most likely to be wrong on the lamp, and how to see it quickly
 
 In the order I would look:

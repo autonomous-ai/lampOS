@@ -24,5 +24,15 @@ tract-onnx = { version = "=0.23.8", default-features = false }
 # The stop model's pinned SHA-256, checked as it loads (`hear::STOP_SHA256`).
 sha2.workspace = true
 
+[dev-dependencies]
+# `stop_words_replay` reads a replay's `operations.jsonl`.
+serde_json.workspace = true
+
+# Offline, run only when named: played stops scored on each canceller
+# stage (#828, docs/stop-word.md). Its tests run with the crate's.
+[[example]]
+name = "stop_words_replay"
+test = true
+
 [lints]
 workspace = true
