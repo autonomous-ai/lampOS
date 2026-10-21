@@ -69,8 +69,8 @@ mod services;
 pub mod worker;
 
 pub use services::{
-    CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_SOCKET_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT,
-    Services,
+    CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_SOCKET_ENVIRONMENT,
+    SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
 };
 
 #[cfg(test)]

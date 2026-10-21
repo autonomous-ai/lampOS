@@ -3051,6 +3051,27 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
     270 ms, p90 393 ms.
   - So the switch stays off. It's tried again only once the relay's `/ws/`
     carries ElevenLabs' `stream-input`.
+- **Why it never spoke (lamp-4ace, 21 Oct 17:00–17:19, 53 sockets; the
+  backend on #2135):** the socket asked for the route's model,
+  `eleven_v4_turbo`, which `stream-input` doesn't serve. ElevenLabs refused
+  all 53, and the relay passed each refusal on as close 4400 ("4000 plus
+  the status") with ElevenLabs' message, after it had accepted the socket.
+  So the lamp counted it open, and the close arrived before any audio.
+- **Since then** (`LAMP_SECOND_SPEECH_SOCKET_MODEL`, the backend's ask):
+  - **The socket has its own model,** default `eleven_flash_v2_5`, which
+    `stream-input` serves (audio 214–309 ms after the piece in the
+    backend's test). `LAMP_SECOND_SPEECH_MODEL` stays the HTTP pieces'.
+  - **One answer keeps one voice:** once a request's socket opened, every
+    piece of its answer is said in the socket's model, those over HTTP
+    too (`Tts::model_for`).
+  - **`inactivity_timeout=60`** on the socket's URL, since it opens before
+    the answer exists and ElevenLabs closes an idle socket after 20 s.
+  - **A close is read:** its code and reason go in the journal (`the speech
+    socket was closed: 4400 "…"`). So does ElevenLabs' JSON error before
+    it (`the speech socket's service said: input_timeout_exceeded: …`).
+  - **A 4400–4499 close refuses the model:** that piece goes over HTTP, and
+    no socket is opened ahead for that model again until the voice starts
+    again, said once. A refused model is refused on every try.
 
 ### How much the prompt cache holds (`probe-cache`)
 
