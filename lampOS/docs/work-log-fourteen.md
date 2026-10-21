@@ -870,3 +870,35 @@ been in since 20 Oct)
   report there instead. Armed a second Monitor on #2602 beside the
   existing one, since the running Monitor's own polling script isn't
   something I can edit to add the new issue number.
+
+## 21 Oct — a live `system.info` reply decides V1 vs Lamp 2
+
+- The first builder's 17:34 ask on #2602, after Backend3/Mobile's
+  exchange about a lamp moved back to V1: today's page-level gate
+  (`_isLampV2` in `autonomous_os_detail_page.dart`) was a sticky OR of
+  the backend record's `os_generation` and `deviceGenerationProvider`'s
+  own "ever heard" memory — neither ever clears once a lamp has said
+  `lamp-v2`, so a rollback kept showing the Lamp 2 page forever.
+- Fixed by letting this cycle's live `system.info` probe decide
+  outright whenever it has an answer: V1 sends no `generation` at all,
+  so its absence is itself the signal, not an unknown to fall back
+  past. Only without a live answer yet (loading, or the device silent
+  this poll) does it fall back to the old record/sticky OR, so the
+  page doesn't flicker to V1 for one missed probe.
+- Extracted the decision into a pure `isLampV2Page()` in
+  `device_presence_provider.dart`, next to the existing `osPresenceOf`
+  — same reasoning: testable without a widget or a container. 6 new
+  tests on it, covering both reply shapes plus a record that says V2
+  while the reply has none.
+- `flutter analyze`: 24, matching `v3`'s baseline. `flutter test -j 2`:
+  864/0.
+- Opened [ecm-sds-mobile#28](https://github.com/autonomous-ai/ecm-sds-mobile/pull/28)
+  onto `v3`. Reported on
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6314038092).
+- Caught and fixed a posting mistake of my own: two of today's #2602
+  comments (this one and #27's) went out with a literal backslash
+  before every backtick — a single-quoted heredoc doesn't need (or
+  honor) `\`` as an escape, so it posted the backslash verbatim.
+  Edited both via the API once I noticed GitHub hadn't rendered the
+  code spans. PR bodies in the same session were unaffected — checked
+  all three.
