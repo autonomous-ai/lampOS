@@ -589,6 +589,16 @@ struct Shared {
     held_forget: Mutex<HeldForgets>,
 }
 
+/// How long after its end a line whose words end before a name waits for
+/// the name (`LAMP_SECOND_OPEN_NAME`, [`Engine::waiting_for_a_name`]), and
+/// how soon a sound must begin after it to go on from it
+/// (`coordinator::open_name`). Its own, longer than [`CARRY_AFTER_END`]: a
+/// person who says "my name is" and stops is about to say it, and may think
+/// a moment. On lamp-4ace at 05:53 the name came about 2.05 s after the
+/// line's end, past 1.5 s, and the body's move let it go (the first
+/// builder on #1722 at 06:00). The cost falls only on lines that end so.
+pub const OPEN_NAME_WITHIN: Duration = Duration::from_millis(2_500);
+
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
 /// goes on from it in the same session: one the coordinator says continues
 /// it, or one begun within [`CARRY_AFTER_END`] of its end when it was not
@@ -1262,7 +1272,7 @@ impl Engine {
 
     /// A spoken line whose words end before a name ("Hey Lamp, my name
     /// is", [`crate::known_faces::opens_a_name`]) is answered no sooner
-    /// than [`CARRY_AFTER_END`] after its end (`LAMP_SECOND_OPEN_NAME=on`,
+    /// than [`OPEN_NAME_WITHIN`] after its end (`LAMP_SECOND_OPEN_NAME=on`,
     /// #2135): the name said next then goes on from it, and the two are
     /// answered as one line. On lamp-4ace "my name is" and 400 ms of quiet
     /// ended a line, the name came 9 ms after, and the lamp answered "my
@@ -2605,11 +2615,11 @@ async fn spoken(
         text
     };
     // Its words end before a name: answered no sooner than
-    // [`CARRY_AFTER_END`] after the line's end, so the name said next goes
+    // [`OPEN_NAME_WITHIN`] after the line's end, so the name said next goes
     // on from it (`LAMP_SECOND_OPEN_NAME`). A newer line drops this request,
     // and this wait with it.
     if shared.open_name && crate::known_faces::opens_a_name(&text) {
-        let left = CARRY_AFTER_END.saturating_sub(finishing.elapsed());
+        let left = OPEN_NAME_WITHIN.saturating_sub(finishing.elapsed());
         eprintln!(
             "lamp-voice second: request {request}: its words end before a name: its answer waits {} ms for it (LAMP_SECOND_OPEN_NAME)",
             left.as_millis()

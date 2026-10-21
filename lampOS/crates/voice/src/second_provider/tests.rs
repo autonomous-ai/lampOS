@@ -6325,7 +6325,7 @@ fn no_listener_is_opened_before_a_line_outside_a_runtime() {
 
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16): a
 /// line whose words end before a name is not answered until
-/// [`CARRY_AFTER_END`] after its end. The name said as the next line in
+/// [`OPEN_NAME_WITHIN`] (2.5 s) after its end. The name said as the next line in
 /// that time goes on from it, and the two are asked as one; with none, it is
 /// asked as it is. A line that gives its name, or the switch off, is asked
 /// at once.
@@ -6364,14 +6364,15 @@ async fn a_line_ending_before_its_name_waits_for_it() {
             .map(|asked| asked.last().cloned())
             .collect()
     };
-    // The name goes on from it, 1 s after its end: asked once, as one line.
+    // The name goes on from it, 2 s after its end (past the 1.5 s of
+    // `CARRY_AFTER_END`, as at 05:53): asked once, as one line.
     let played = script(&["Hey Lamp, my name is", "Jim. Please remember it."]);
     let (engine, _, _) = scripted(played.clone());
     let mut engine = engine.waiting_for_a_name(true);
     engine.submit(begin(1, false));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
-    tokio::time::sleep(Duration::from_millis(1_000)).await;
+    tokio::time::sleep(Duration::from_millis(2_000)).await;
     assert!(asked(&played).is_empty(), "nothing asked before the name");
     engine.submit(begin(2, true));
     engine.submit(audio(2, 1));
@@ -6384,15 +6385,15 @@ async fn a_line_ending_before_its_name_waits_for_it() {
             "Hey Lamp, my name is Jim. Please remember it."
         ))]
     );
-    // No name comes: asked as it is, 1.5 s after its end, not before.
+    // No name comes: asked as it is, 2.5 s after its end, not before.
     let alone = script(&["Hey Lamp, my name is"]);
     let (engine, _, _) = scripted(alone.clone());
     let mut engine = engine.waiting_for_a_name(true);
     engine.submit(begin(1, false));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
-    tokio::time::sleep(Duration::from_millis(1_400)).await;
-    assert!(asked(&alone).is_empty(), "still waiting at 1.4 s");
+    tokio::time::sleep(Duration::from_millis(2_400)).await;
+    assert!(asked(&alone).is_empty(), "still waiting at 2.4 s");
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     assert_eq!(asked(&alone), [Some(Message::user("Hey Lamp, my name is"))]);
     // A line that gives its name, or the switch off: asked at once.

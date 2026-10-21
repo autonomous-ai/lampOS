@@ -5850,7 +5850,7 @@ fn conversation_with_gate(
                     {
                         open_name_turn = Some((turn, ended_us));
                         eprintln!(
-                            "lamp-voice: request {turn}: its words end before a name: a sound begun within 1.5 s of its end goes on from it (LAMP_SECOND_OPEN_NAME)"
+                            "lamp-voice: request {turn}: its words end before a name: a sound begun within 2.5 s of its end goes on from it (LAMP_SECOND_OPEN_NAME)"
                         );
                         record(
                             trace,

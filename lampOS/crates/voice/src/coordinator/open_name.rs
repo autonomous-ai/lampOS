@@ -8,18 +8,18 @@
 //!
 //! With the switch, once the second route's final words for the turn in
 //! hand end before a name (`known_faces::opens_a_name`), a sound that began
-//! within `second_provider::CARRY_AFTER_END` of the turn's end, before any of
+//! within `second_provider::OPEN_NAME_WITHIN` (2.5 s) of the turn's end, before any of
 //! its answer was heard, goes on from it. The answer wait (#1123, with its
 //! words) and the body's motors don't let it go, and its Start says it goes
 //! on from the turn given up, so the second route asks the two as one line.
 //! That route holds the answer meanwhile (`Engine::waiting_for_a_name`). The
 //! keeper's pause, the busy-room hold and asker-first still judge it: they
-//! keep the room's next voice, a colleague's line begun in those 1.5 s, from
+//! keep the room's next voice, a colleague's line begun in those 2.5 s, from
 //! being taken as the name (the reviewer's P3 on #2355). A sound let go
 //! before the words came is not brought back.
 
 /// How long after a turn's end a sound may begin and still go on from it.
-const GOES_ON_WITHIN_US: u64 = crate::second_provider::CARRY_AFTER_END.as_micros() as u64;
+const GOES_ON_WITHIN_US: u64 = crate::second_provider::OPEN_NAME_WITHIN.as_micros() as u64;
 
 pub(super) fn from_environment() -> bool {
     enabled(
@@ -75,7 +75,7 @@ mod tests {
     }
 
     /// #2135: the turn in hand whose words end before its name, its answer
-    /// unheard, is opened; and a sound begun within 1.5 s of its end goes on
+    /// unheard, is opened; and a sound begun within 2.5 s of its end goes on
     /// from it, while one later, for another turn, or once the answer is
     /// heard does not. Nothing with the switch off, words that give the
     /// name, or an end not this turn's.
@@ -101,8 +101,12 @@ mod tests {
             goes_on(open, waiting, 990_000),
             "its pre-roll before the end"
         );
-        assert!(goes_on(open, waiting, 2_500_000), "at 1.5 s");
-        assert!(!goes_on(open, waiting, 2_500_001), "past 1.5 s");
+        assert!(
+            goes_on(open, waiting, 3_050_000),
+            "2.05 s after, as at 05:53"
+        );
+        assert!(goes_on(open, waiting, 3_500_000), "at 2.5 s");
+        assert!(!goes_on(open, waiting, 3_500_001), "past 2.5 s");
         assert!(!goes_on(None, waiting, 1_009_000));
         assert!(!goes_on(open, None, 1_009_000));
         assert!(!goes_on(open, Some((8, true)), 1_009_000), "another turn");
