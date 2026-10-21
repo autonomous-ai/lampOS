@@ -1,0 +1,296 @@
+{
+  "archive": {
+    "basename": "second-release-cache-native-20261021-logs.zip",
+    "sha256": "2c76af3d0ac8a034ee6cae8c8d69b82fc5689aec36c52d0cc71fb72603651b7e"
+  },
+  "archive_bytes": 742453,
+  "binding": "Owner-confirmed completed official log ZIP, pinned SHA-256, exact API step numbers and observed archive filenames. No timestamp-window attribution.",
+  "body_comparison_transform": "splitlines, remove a leading BOM and the full timestamp prefix where present; preserve literal continuation lines and every message byte, ordering and multiplicity. Subsecond timestamp representations differ between GitHub combined and numbered logs.",
+  "line_reference_rule": "Result log_line fields identify this ordered record stream; member ranges map each line to its exact numbered archive file and line. The original gh payload stream has the same message count and order.",
+  "no_log_files_modified_or_extracted": true,
+  "normalized_message_stream_encoding": "UTF-8 of ordered timestamp-free message lines joined by newline, with one final newline.",
+  "normalized_message_stream_sha256": "3b3e3f03787004cd1cd1cdb55ccbb896ac228a1a0c2f06a4b03271fbdd246920",
+  "numbered_and_combined_message_bodies_identical_in_order": true,
+  "origin": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/39622328714/logs",
+  "original_gh_log": {
+    "basename": "second-release-cache-native-20261021-final.log",
+    "sha256": "70eef8a11185c55d2241fb8fbab451b01026dda7ef2db0db23a25ce213f5a7e4"
+  },
+  "original_payload_binding": "The original UNKNOWN STEP payloads exactly equal the combined archive member, after splitlines only.",
+  "original_unknown_step_labels": true,
+  "other_members": [
+    {
+      "archive_member": "2_lampOS \u2014 build and test on Linux ARM64 (1_1).txt",
+      "bytes": 1637524,
+      "sha256": "bb59c898dfd2100313df5baaa1344aa671faaa0cb3125b129faa699e809fcb70"
+    },
+    {
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/system.txt",
+      "bytes": 587,
+      "sha256": "1f46cda3403dc4aa873ac34e8f7a2e8f2c1bce28f479cbb9214a65e4aa344d9e"
+    }
+  ],
+  "record_line_count": 11065,
+  "skipped_api_steps_without_members": [
+    {
+      "name": "record fresh source times for a cold publication build",
+      "number": 9
+    },
+    {
+      "name": "discard the isolated example target before saving the cache",
+      "number": 20
+    },
+    {
+      "name": "save the cache",
+      "number": 21
+    }
+  ],
+  "source_api": {
+    "basename": "second-release-cache-native-20261021-raw.json",
+    "sha256": "bae3ea97689032cbdc435fb0aa46c53fecca7df1c9f309503fec0d0af4181867"
+  },
+  "step_member_count": 20,
+  "step_members": [
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Set up job",
+      "api_step_number": 1,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/1_Set up job.txt",
+      "bytes": 2384,
+      "line_count": 36,
+      "record_first_line": 1,
+      "record_last_line": 36,
+      "sha256": "0bf1d35114a9088601c815f86258ce635e44f21a9105049b09e8540bb7b3401b"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "system packages",
+      "api_step_number": 2,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/2_system packages.txt",
+      "bytes": 10713,
+      "line_count": 136,
+      "record_first_line": 37,
+      "record_last_line": 172,
+      "sha256": "c7cdb731fa9886a0a3799b8ce9032ba95a474963a8aba24d5370138d53512a6e"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Run actions/checkout@v4",
+      "api_step_number": 3,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/3_Run actions_checkout@v4.txt",
+      "bytes": 8061,
+      "line_count": 109,
+      "record_first_line": 173,
+      "record_last_line": 281,
+      "sha256": "cf3effa815e6becc375ddb565cd8a5784906f15010a1813b585e3969f75a3549"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "publication failure tests (offline, no signing secret)",
+      "api_step_number": 4,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/4_publication failure tests (offline, no signing secret).txt",
+      "bytes": 4575,
+      "line_count": 44,
+      "record_first_line": 282,
+      "record_last_line": 325,
+      "sha256": "727a013db5c97b72987a56fdd91de29c2912dff086e32b8c00663cc99c76f87d"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Rust 1.96.0",
+      "api_step_number": 5,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/5_Rust 1.96.0.txt",
+      "bytes": 3523,
+      "line_count": 49,
+      "record_first_line": 326,
+      "record_last_line": 374,
+      "sha256": "b9eba61afb558c95df41bfaf553fb376beb053b48091b7f0af646858a0b0f24e"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "api_step_number": 6,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/6_artifact provenance regression (offline, disposable Cargo workspace).txt",
+      "bytes": 1951,
+      "line_count": 21,
+      "record_first_line": 375,
+      "record_last_line": 395,
+      "sha256": "06b68442a77794dace836f1ce545b9b2a69006b26e1bd094e41b7817a0b2ecdb"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "restore the cache",
+      "api_step_number": 7,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/7_restore the cache.txt",
+      "bytes": 3743,
+      "line_count": 44,
+      "record_first_line": 396,
+      "record_last_line": 439,
+      "sha256": "c08e038e1952d712792ae017c8035f2d9499f925b299ba412554f4df17cca01e"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "unchanged source files get the cached build's times back",
+      "api_step_number": 8,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/8_unchanged source files get the cached build's times back.txt",
+      "bytes": 439,
+      "line_count": 5,
+      "record_first_line": 440,
+      "record_last_line": 444,
+      "sha256": "e6d6f0a9d9e5f3feafd729a37bbfad3ecdb57ade173d7b096859058e0bf0eab4"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Run taiki-e/install-action@v2",
+      "api_step_number": 10,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/10_Run taiki-e_install-action@v2.txt",
+      "bytes": 4332,
+      "line_count": 59,
+      "record_first_line": 445,
+      "record_last_line": 503,
+      "sha256": "dbfdf5bb2aba0d92ee61df367fc1f3e13002991fb3c1aea00402e1a2dd1086d9"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "build (release, the lamps' binaries)",
+      "api_step_number": 11,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/11_build (release, the lamps' binaries).txt",
+      "bytes": 3720,
+      "line_count": 27,
+      "record_first_line": 504,
+      "record_last_line": 530,
+      "sha256": "9c7f5a8144225179c151dfb13328fb34907028c8c3d608564b31aba7720017e5"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "every built lamp-* binary is classified for the lamp-os package",
+      "api_step_number": 12,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/12_every built lamp- binary is classified for the lamp-os package.txt",
+      "bytes": 548,
+      "line_count": 6,
+      "record_first_line": 531,
+      "record_last_line": 536,
+      "sha256": "5af839d721428fa40c7940439de87ac5ae138399f82f7d3e686b67ac0ba96809"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "build the two selected artifact examples without filename collisions",
+      "api_step_number": 13,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/13_build the two selected artifact examples without filename collisions.txt",
+      "bytes": 5959,
+      "line_count": 80,
+      "record_first_line": 537,
+      "record_last_line": 616,
+      "sha256": "72b1c9b8e2380b004ac491dea3d4fc6a99d7caf17b1147e5dd7b839d9e6f73a2"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "api_step_number": 14,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/14_publication CLI rehearsal (local test key and simulated GitHub only).txt",
+      "bytes": 1458,
+      "line_count": 16,
+      "record_first_line": 617,
+      "record_last_line": 632,
+      "sha256": "235a39d3cd8f6aafc9305830dabf13fd862d0bcb0121043423a828bc6016b1d1"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "which crates a pull request tests",
+      "api_step_number": 15,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/15_which crates a pull request tests.txt",
+      "bytes": 438,
+      "line_count": 6,
+      "record_first_line": 633,
+      "record_last_line": 638,
+      "sha256": "e64c916b2c72062ed242b42e229ecf7382d90482ef757db6deb84c0b85c2a358"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "api_step_number": 16,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/16_test (full run, every test one at a time; otherwise without the realtime group, in parallel).txt",
+      "bytes": 1562648,
+      "line_count": 10059,
+      "record_first_line": 639,
+      "record_last_line": 10697,
+      "sha256": "871b6571de50809ab9dea056e0d0ba7364253bc3d959b27c6bf1b6165fd0c996"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "doc tests and the own-harness tests (nextest runs neither)",
+      "api_step_number": 17,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/17_doc tests and the own-harness tests (nextest runs neither).txt",
+      "bytes": 17379,
+      "line_count": 310,
+      "record_first_line": 10698,
+      "record_last_line": 11007,
+      "sha256": "9b9cd2523598cc143c636e227c578b118d0a1310e2e376e3e23f2ccd789083b2"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "export only current Cargo targets and their SHA-256",
+      "api_step_number": 18,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/18_export only current Cargo targets and their SHA-256.txt",
+      "bytes": 769,
+      "line_count": 5,
+      "record_first_line": 11008,
+      "record_last_line": 11012,
+      "sha256": "3addb24b920b947b3ca350aba2a3b46686a95404a7d0e537483ab208c46b533d"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Run actions/upload-artifact@v4",
+      "api_step_number": 19,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/19_Run actions_upload-artifact@v4.txt",
+      "bytes": 2832,
+      "line_count": 37,
+      "record_first_line": 11013,
+      "record_last_line": 11049,
+      "sha256": "48458b8f7f4862935dc8c2b3d2b29afeb7f65d204308c1d156d05c263caba160"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Post Run actions/checkout@v4",
+      "api_step_number": 42,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/42_Post Run actions_checkout@v4.txt",
+      "bytes": 1707,
+      "line_count": 14,
+      "record_first_line": 11050,
+      "record_last_line": 11063,
+      "sha256": "d2b9b694088ab9eac43a1162df504fdd1f0c52659cd24fdf0c6d3c525dd42f75"
+    },
+    {
+      "api_job_id": 119298777511,
+      "api_job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "api_step_name": "Complete job",
+      "api_step_number": 43,
+      "archive_member": "lampOS \u2014 build and test on Linux ARM64 (1_1)/43_Complete job.txt",
+      "bytes": 402,
+      "line_count": 2,
+      "record_first_line": 11064,
+      "record_last_line": 11065,
+      "sha256": "3920dad4925c032ae7eee5aa358903b0c7e465d30920bff000e0de3d53a92c7d"
+    }
+  ],
+  "system_member_not_counted_as_test_output": true
+}
