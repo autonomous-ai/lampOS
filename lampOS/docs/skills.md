@@ -336,8 +336,9 @@ skills".)
   250 ms shared among them, and a tool call waited out a topic's turn:
   about 49 ms each with three topics on the Intel Mac, against under 1 ms
   after (#1806, `tests/call_wait.rs`). A socket that says an error or a
-  hang-up with nothing to read makes that pass wait on the wake alone, so
-  the loop doesn't spin and a call still wakes it at once.
+  hang-up with nothing to read is left out for the rest of that pass, so
+  the loop doesn't spin on it, and a call or another topic's message still
+  ends the pass at once.
 - **The ask.** `LAMP_SKILLS_ASK` says how a run that a trigger starts is
   allowed (a tool's run is asked for by a person and never is):
   - `policy`: the Policy's gate (#958, `lamp-policy --gate`). The run's

@@ -612,35 +612,56 @@ fn wait_any(
 }
 
 /// Until one of `sockets` is readable, `woken` is, or `wait` passes. A
-/// socket that says an error or hang-up with nothing to read makes it wait
-/// out `wait` on the wake alone instead, so the loop cannot spin and a
-/// call, a skip or a run's end still wakes it (Fourth on #2304).
+/// socket that says an error or hang-up with nothing to read is left out
+/// for the rest of `wait`: the other sockets and the wake are waited on
+/// without it, so the loop cannot spin on it, and a call, a skip, a run's
+/// end or another topic's message still ends the wait at once (Fourth on
+/// #2304, the reviewer on #2389).
 fn wait_on(sockets: &[std::os::fd::BorrowedFd<'_>], woken: &std::os::fd::OwnedFd, wait: Duration) {
     use rustix::event::{PollFd, PollFlags, Timespec, poll};
-    let mut fds: Vec<PollFd<'_>> = sockets
-        .iter()
-        .map(|socket| PollFd::new(socket, PollFlags::IN))
-        .collect();
-    fds.push(PollFd::new(woken, PollFlags::IN));
-    let timeout = Timespec::try_from(wait).unwrap_or(Timespec {
-        tv_sec: 0,
-        tv_nsec: 250_000_000,
-    });
-    let broken = match poll(&mut fds, Some(&timeout)) {
-        Ok(_) => fds.iter().any(|fd| {
-            let flags = fd.revents();
-            !flags.contains(PollFlags::IN)
-                && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
-        }),
-        Err(rustix::io::Errno::INTR) => false,
-        Err(_) => true,
+    let until = Instant::now() + wait;
+    let broken = |flags: PollFlags| {
+        !flags.contains(PollFlags::IN)
+            && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
     };
-    if broken {
-        let mut wake = [PollFd::new(woken, PollFlags::IN)];
-        if matches!(poll(&mut wake, Some(&timeout)), Err(error) if error != rustix::io::Errno::INTR)
-        {
-            std::thread::sleep(wait);
+    let mut waiting = sockets.to_vec();
+    loop {
+        let left = until.saturating_duration_since(Instant::now());
+        let timeout = Timespec::try_from(left).unwrap_or(Timespec {
+            tv_sec: 0,
+            tv_nsec: 250_000_000,
+        });
+        let mut fds: Vec<PollFd<'_>> = waiting
+            .iter()
+            .map(|socket| PollFd::new(socket, PollFlags::IN))
+            .collect();
+        fds.push(PollFd::new(woken, PollFlags::IN));
+        match poll(&mut fds, Some(&timeout)) {
+            Ok(_) => {}
+            Err(rustix::io::Errno::INTR) => return,
+            // A poll that fails waits on the wake alone, and one of the
+            // wake alone that fails sleeps out the rest.
+            Err(_) if !waiting.is_empty() => {
+                waiting.clear();
+                continue;
+            }
+            Err(_) => return std::thread::sleep(left),
         }
+        let (wake, socket_flags) = fds.split_last().expect("the wake is polled");
+        if broken(wake.revents()) {
+            return std::thread::sleep(until.saturating_duration_since(Instant::now()));
+        }
+        let kept: Vec<_> = waiting
+            .iter()
+            .zip(socket_flags)
+            .filter(|(_, fd)| !broken(fd.revents()))
+            .map(|(socket, _)| *socket)
+            .collect();
+        // Something readable, the wait over, or nothing new broken.
+        if kept.len() == waiting.len() {
+            return;
+        }
+        waiting = kept;
     }
 }
 
@@ -3273,6 +3294,54 @@ mod tests {
         let took = began.elapsed();
         drop(waking.join().unwrap());
         assert!(took < Duration::from_secs(1), "{took:?}");
+    }
+
+    /// The reviewer on #2389: while one socket is broken, a message on
+    /// another topic still ends the wait at once, where the wake was waited
+    /// on alone (2 s here). Linux only, as above.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_broken_socket_still_lets_another_topics_message_end_the_wait() {
+        use std::os::fd::AsFd;
+        let (broken, writer) = rustix::pipe::pipe().unwrap();
+        drop(writer);
+        let (topic, sender) = std::os::unix::net::UnixDatagram::pair().unwrap();
+        let (woken, _waker) = wake_pipe().unwrap();
+        let sending = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            sender.send(b"x").unwrap();
+            sender
+        });
+        let began = std::time::Instant::now();
+        wait_on(
+            &[broken.as_fd(), topic.as_fd()],
+            &woken,
+            Duration::from_secs(2),
+        );
+        let took = began.elapsed();
+        drop(sending.join().unwrap());
+        assert!(took < Duration::from_secs(1), "{took:?}");
+    }
+
+    /// The reviewer on #2389: a hang-up late in the wait leaves only the
+    /// rest of it to wait, not a whole wait more (600 ms, where it was
+    /// 900 ms). Linux only, as above.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_late_hang_up_waits_out_only_the_rest_of_the_wait() {
+        use std::os::fd::AsFd;
+        let (socket, writer) = rustix::pipe::pipe().unwrap();
+        let (woken, _waker) = wake_pipe().unwrap();
+        let hanging_up = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            drop(writer);
+        });
+        let began = std::time::Instant::now();
+        wait_on(&[socket.as_fd()], &woken, Duration::from_millis(600));
+        let took = began.elapsed();
+        hanging_up.join().unwrap();
+        assert!(took >= Duration::from_millis(550), "{took:?}");
+        assert!(took < Duration::from_millis(800), "{took:?}");
     }
 
     fn clock_fixture(windowed: bool, enabled: bool) -> lamp_skills::Skill {
