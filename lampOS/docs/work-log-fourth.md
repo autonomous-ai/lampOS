@@ -5160,6 +5160,14 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2375 closed for #2382:** the same patch on `a4757644a` (the sixth landing). Gate green: 3571 passed, 0 failed. The reviewer's read stands.
 - **#2340 re-read:** my P2 and P3 are taken. One new P3: the question check accepts any forget word, so "Did you forget your keys?" keeps a held face forget. The reviewer found a P2 there too.
 
+## 2026-10-21, 07:06 ICT: #2380 and #2388 merged; #2382 is #2392; #2394 up (the 2.5 s window)
+
+- **Merged into #1712:** #2380 (`LAMP_ENDPOINT_SHORT_VERDICT`, 05:50) and #2388, its follow-up (each short submission counted; the heat check in a talkative room), by hand at 06:54.
+- **#2382 closed for #2392:** the same patch on `eba3864b9`. The reviewer's read stands.
+  - Its gate had three failures, none this change's: #2365's order-dependent probe test, which El is fixing, and two `physical_loopback` tests from a 599 s stall under load. Those passed alone, and the binary passed 12 of 12 in 29 s right after.
+- **The open name on lamp-4ace** (the first builder, 05:57): 2 of 3 names joined, 1 kept, no "Dylan". Round 2's name came about 2.05 s after the End and missed the 1.5 s window.
+- **#2394** (`006e0492d`, stacked on #2392): `OPEN_NAME_WITHIN` = 2.5 s for both halves. Two mutations each fail a test. Gate: 3596 passed, plus the known probe failure.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
