@@ -1061,7 +1061,12 @@ When Expression ends an active rest itself, its journal says why once:
 `lamp-expression: ended a skill's rest: <why>`, the first shut gate (the
 voice listening or in a turn, privacy, a pause, a held body, a stale voice),
 a changed Voice turn, a stronger reflex, rest no longer allowed, or the
-lease running out. A `cancel` the skill then sends for that already ended
+lease running out. The night's sleep (#940) is the exception to a lease
+running out: it is held down for 10 s past it (`SLEEP_HOLD_US`), and a
+newer episode or a new session's first rest of the claimed skill takes it
+over with no release; with no taker, the built-in sleep keeps it in place
+while its own conditions hold ([alive.md](alive.md#night-sleep-is-a-skill)).
+A `cancel` the skill then sends for that already ended
 episode is a no-op: it is accepted with a `cancelled` receipt (unless
 another skill's rest is active, whose receipt is kept) and resumes nothing.
 Before #1672 it was refused as "rest episode was already spent". A cancel

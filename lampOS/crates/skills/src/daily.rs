@@ -106,6 +106,25 @@ impl Window {
         Some(minutes * 60_000 - minute_ms)
     }
 
+    /// A rest's time left, and whether it carries over: as `remaining_ms`,
+    /// except that the longest window, which closes one minute before it
+    /// opens again (`23:00` to `22:59`), carries a rest still held in its
+    /// last minute through that gap to the next occurrence's end (#940). A
+    /// lamp nobody saw all day keeps its head down at the boundary.
+    pub fn rest_remaining_ms(&self, local_minute: u16, minute_ms: u64) -> Option<(u64, bool)> {
+        let remaining = self.remaining_ms(local_minute, minute_ms);
+        let longest = (self.from + 1440 - self.to) % 1440 == 1;
+        if !longest || remaining.is_some_and(|ms| ms > 60_000) {
+            return remaining.map(|ms| (ms, false));
+        }
+        if local_minute >= 1440 || minute_ms >= 60_000 {
+            return None;
+        }
+        // Outside the window is its one gap minute, `to`, here.
+        let opens_ms = remaining.map_or(60_000 - minute_ms, |ms| ms + 60_000);
+        Some((opens_ms + 1439 * 60_000, true))
+    }
+
     /// Time since the current occurrence opened, including the sampled
     /// fraction of its minute. An outside-window sample has none.
     pub(crate) fn opened_ms_ago(&self, local_minute: u16, minute_ms: u64) -> Option<u64> {
