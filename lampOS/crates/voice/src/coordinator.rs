@@ -1816,14 +1816,14 @@ pub fn run_directed_session(
 
 /// Continuous conversation, with bounded best-effort metadata. It does not
 /// relax privacy, worker, provider or per-turn permission/watchdog checks.
-/// The provider refuses for now: its quota or its rate limit. The run ended
-/// in order like any other terminal end.
+/// The provider refuses for now: its quota or its rate limit, or the lamp's
+/// key (#2231). The run ended in order like any other terminal end.
 #[derive(Debug)]
-pub struct ProviderRefusesForNow;
+pub struct ProviderRefusesForNow(pub crate::provider_worker::Fault);
 impl std::fmt::Display for ProviderRefusesForNow {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(
-            "terminal provider output settled; the provider refuses for now (quota or rate limit); service stopped without retry",
+            "terminal provider output settled; the provider refuses for now (quota, rate limit or key); service stopped without retry",
         )
     }
 }
@@ -1834,6 +1834,11 @@ impl std::error::Error for ProviderRefusesForNow {}
 /// 2026-10-13 systemd did, every five seconds, about 380 times in half an
 /// hour of a spent quota.
 const REFUSAL_WAIT: Duration = Duration::from_secs(120);
+/// Beside the sessions: the last run ended on a refused key (#2231). A
+/// second such end within [`KEY_REFUSED_AGAIN_WITHIN`] waits; any other end
+/// removes it.
+const KEY_REFUSED_STAMP: &str = ".key-refused";
+const KEY_REFUSED_AGAIN_WITHIN: Duration = Duration::from_secs(600);
 
 pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Result<()> {
     options.validate_serve()?;
@@ -1887,20 +1892,75 @@ pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Resul
     );
     // Everything is shut down and recorded by now. What is left is not to
     // come straight back; a request to stop ends the wait at once.
-    if result
+    let refused = result
         .as_ref()
-        .is_err_and(|error| error.is::<ProviderRefusesForNow>())
-    {
+        .err()
+        .and_then(|error| error.downcast_ref::<ProviderRefusesForNow>())
+        .map(|refused| refused.0);
+    let stamp = output.parent().map(|folder| folder.join(KEY_REFUSED_STAMP));
+    let wait = refusal_waits(refused, stamp.as_deref());
+    if wait {
         eprintln!(
-            "lamp-voice: the provider refuses for now (quota or rate limit); staying {} s before leaving",
+            "lamp-voice: the provider refuses for now (quota, rate limit or key); staying {} s before leaving, less if the voice's settings change",
             REFUSAL_WAIT.as_secs()
         );
+        // A key put right meanwhile (setup, the app's own keys) ends the
+        // wait: the settings folder changes when a file in it is replaced.
+        let settings = config.parent().map(Path::to_owned);
+        let changed_at = |folder: &Option<PathBuf>| {
+            folder.as_deref().and_then(|folder| {
+                std::fs::metadata(folder)
+                    .and_then(|found| found.modified())
+                    .ok()
+            })
+        };
+        let before = changed_at(&settings);
         let until = Instant::now() + REFUSAL_WAIT;
-        while Instant::now() < until && termination.signal_name().is_none() {
+        while Instant::now() < until
+            && termination.signal_name().is_none()
+            && changed_at(&settings) == before
+        {
             std::thread::sleep(Duration::from_millis(200));
         }
+    } else if refused.is_some() {
+        eprintln!(
+            "lamp-voice: the provider refused this lamp's key; leaving now to ask once more, and waiting {} s if it refuses again",
+            REFUSAL_WAIT.as_secs()
+        );
     }
     result
+}
+
+/// Whether a run that ended so stays [`REFUSAL_WAIT`] before it leaves, with
+/// the refused-key stamp kept beside the sessions. A spent quota or a rate
+/// limit waits at once. A refused key waits only the second time in a row
+/// within [`KEY_REFUSED_AGAIN_WITHIN`] (the reviewer-lead on #2459): one
+/// 401/403 from a proxy, or a key being changed, is asked again after the
+/// usual restart. Any other end removes the stamp.
+fn refusal_waits(refused: Option<crate::provider_worker::Fault>, stamp: Option<&Path>) -> bool {
+    use crate::provider_worker::Fault;
+    match refused {
+        Some(Fault::Authentication) => {
+            let again = stamp.is_some_and(|stamp| {
+                std::fs::metadata(stamp)
+                    .and_then(|found| found.modified())
+                    .ok()
+                    .and_then(|at| at.elapsed().ok())
+                    .is_some_and(|age| age < KEY_REFUSED_AGAIN_WITHIN)
+            });
+            if !again && let Some(stamp) = stamp {
+                let _ = std::fs::write(stamp, b"");
+            }
+            again
+        }
+        Some(_) => true,
+        None => {
+            if let Some(stamp) = stamp {
+                let _ = std::fs::remove_file(stamp);
+            }
+            false
+        }
+    }
 }
 
 /// The first record of a run: what it was asked to do.
@@ -7553,8 +7613,17 @@ fn conversation_with_gate(
                     "automatic_retry":false}),
             )?;
             flush_cues(trace, cues);
-            if cloud.refused_for_now() {
-                return Err(ProviderRefusesForNow.into());
+            if let Some(fault) = cloud.refused_for_now() {
+                // Said before the run leaves, whenever it last reported.
+                if let Some(bus) = bus_out.as_mut() {
+                    bus.report_now(
+                        cloud.available(),
+                        cloud.refusal(),
+                        monotonic_us(),
+                        trace.mic_at_start,
+                    );
+                }
+                return Err(ProviderRefusesForNow(fault).into());
             }
             return Err(io::Error::other(
                 "terminal provider output settled; service stopped without retry",
@@ -7639,7 +7708,12 @@ fn conversation_with_gate(
             );
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
             bus.set_ring_off(rig.ring.off_for_good());
-            bus.report(cloud.available(), clock, trace.mic_at_start);
+            bus.report(
+                cloud.available(),
+                cloud.refusal(),
+                clock,
+                trace.mic_at_start,
+            );
         }
         if let Some(mic) = mic_out.as_mut() {
             mic.tick(clock);
@@ -11429,6 +11503,28 @@ fn handle_playback_gap(
 
 #[cfg(test)]
 mod tests {
+    /// #2231 (the reviewer-lead on #2459): a refused key waits only the
+    /// second time in a row; a quota or a rate limit at once; any other end
+    /// clears the stamp.
+    #[test]
+    fn a_refused_key_waits_only_the_second_time_in_a_row() {
+        use crate::provider_worker::Fault;
+        let folder = std::env::temp_dir().join(format!("lamp-voice-stamp-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let stamp = folder.join(KEY_REFUSED_STAMP);
+        let _ = std::fs::remove_file(&stamp);
+        assert!(!refusal_waits(Some(Fault::Authentication), Some(&stamp)));
+        assert!(stamp.exists(), "the first refusal is stamped");
+        assert!(refusal_waits(Some(Fault::Authentication), Some(&stamp)));
+        assert!(!refusal_waits(None, Some(&stamp)));
+        assert!(!stamp.exists(), "another end clears it");
+        assert!(!refusal_waits(Some(Fault::Authentication), Some(&stamp)));
+        assert!(refusal_waits(Some(Fault::QuotaExceeded), Some(&stamp)));
+        assert!(refusal_waits(Some(Fault::RateLimited), None));
+        assert!(!refusal_waits(Some(Fault::Authentication), None));
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
     mod call_wait;
     mod duplex;
     mod early_end;
