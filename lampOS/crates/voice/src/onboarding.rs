@@ -402,7 +402,7 @@ const EYES_SOURCE: &str = "eyes";
 /// can act before the lamp is done talking (the lead's 52e6 run, 21 October).
 fn privacy_invitation(location: &str) -> String {
     format!(
-        "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: turn it off, then on again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
+        "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
     )
 }
 const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
@@ -936,7 +936,14 @@ impl Onboarding {
         if !self.storage_idle() {
             return None;
         }
-        self.privacy_open_receipt(now_us)?;
+        let baseline = self.privacy_open_receipt(now_us)?;
+        if !privacy::armable(
+            &self.privacy_flow.context.as_ref()?.epoch,
+            &baseline,
+            now_us,
+        ) {
+            return None;
+        }
         if self
             .seen_us
             .is_none_or(|seen| now_us.saturating_sub(seen) > FRESH_MS * 1_000)
@@ -985,7 +992,16 @@ impl Onboarding {
             })
         });
         let Some(Ok(attempt)) = armed else {
-            self.retry_privacy(began_us);
+            // The words are being said already: spending a try here would
+            // leave a close during them with nothing to answer. The same try
+            // is offered again once the switch reads open and it is quiet;
+            // the offer's give-up still bounds a failure that keeps coming.
+            if let Some(offer) = self.privacy_flow.offer.as_mut() {
+                offer.claimed = false;
+                offer.ready = false;
+            }
+            self.records
+                .push(json!({"kind":"onboarding_privacy_arm_failed","turn":turn,"at_us":began_us}));
             return false;
         };
         self.privacy_flow.attempt = Some(attempt);

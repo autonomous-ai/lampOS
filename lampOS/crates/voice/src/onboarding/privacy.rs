@@ -222,6 +222,14 @@ fn same_source(left: &Acquisition, right: &Acquisition) -> bool {
         && left.physical.stamp.clock_id == right.physical.stamp.clock_id
 }
 
+/// Whether [`Attempt::arm`] would take this baseline: checked before the
+/// invitation's words are given, so arming can then fail only transiently.
+pub(crate) fn armable(epoch: &Epoch, baseline: &Acquisition, now_us: u64) -> bool {
+    identity(epoch, baseline)
+        && baseline.physical.fresh_at(&epoch.clock_id, now_us)
+        && baseline.physical.muted == Some(false)
+}
+
 impl Attempt {
     pub(crate) fn arm(
         epoch: Epoch,
@@ -229,9 +237,7 @@ impl Attempt {
         baseline: Acquisition,
         now_us: u64,
     ) -> io::Result<Self> {
-        if !identity(&epoch, &baseline)
-            || !baseline.physical.fresh_at(&epoch.clock_id, now_us)
-            || baseline.physical.muted != Some(false)
+        if !armable(&epoch, &baseline, now_us)
             || invitation.turn == 0
             || invitation.delivered_at_us > now_us
             || invitation.delivered_at_us.checked_add(ATTEMPT_US).is_none()

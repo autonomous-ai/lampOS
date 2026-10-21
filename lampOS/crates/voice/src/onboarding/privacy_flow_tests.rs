@@ -117,7 +117,7 @@ fn deliver(walk: &mut Onboarding, token: u64, now: u64) {
     assert!(
         walk.take_privacy_invitation(token, now)
             .unwrap()
-            .contains("turn it off, then on again")
+            .contains("close it, then open it again")
     );
     assert!(walk.bind_privacy_invitation(token, boot, 4));
     walk.privacy_invitation_finished(boot, 4, true, now);
@@ -880,6 +880,39 @@ fn a_close_while_the_invitation_is_said_counts_without_another_offer() {
     assert_eq!(second.kept().privacy_invitation_tries, 1);
 }
 
+// The reviewer-lead's P3 on #2448: an arm that fails while the words are
+// already being said does not spend a try; the same try is offered again,
+// so a close during its words has an attempt to answer.
+#[test]
+fn an_arm_that_fails_while_the_invitation_is_said_spends_no_try() {
+    let (store, mut first) = walk();
+    let token = offer(&mut first, T, 1);
+    let boot = BootId::new([7; 16]).unwrap();
+    first.take_privacy_invitation(token, T).unwrap();
+    // The open receipt is gone by the bind: the arm fails.
+    context(&mut first, T, 2, true);
+    assert!(!first.bind_privacy_invitation(token, boot, 4));
+    assert!(first.privacy_flow.attempt.is_none());
+    assert_eq!(first.privacy_flow.failures, 0);
+    assert_eq!(first.privacy_pending().invitations[0].invitation, token);
+    // The switch reads open again: the same try is offered and armed.
+    let now = 2 * T;
+    context(&mut first, now, 3, false);
+    first.drain_storage_for_test(now);
+    first.tick(now, START_QUIET_US, true, false, face(), true);
+    assert!(first.privacy_pending().invitations[0].ready);
+    first.take_privacy_invitation(token, now).unwrap();
+    assert!(first.bind_privacy_invitation(token, boot, 5));
+    close(&store, &mut first, 4, now + 10_000);
+    drop(first);
+    let mut second = store.cycle(now + 20_000, 5);
+    pump(&mut second, now + 20_000);
+    second.tick(now + 20_000, START_QUIET_US, false, false, face(), true);
+    second.drain_storage_for_test(now + 20_000);
+    assert_eq!(second.kept().steps["privacy"].outcome, Outcome::Done);
+    assert_eq!(second.kept().privacy_invitation_tries, 1);
+}
+
 #[test]
 fn the_invitation_is_one_short_sentence_with_the_location() {
     let (_store, mut walk) = walk();
@@ -888,7 +921,7 @@ fn the_invitation_is_one_short_sentence_with_the_location() {
     let said = note.split('"').nth(1).unwrap();
     assert_eq!(
         said,
-        "Try my privacy switch at its verified profile location: turn it off, then on again."
+        "Try my privacy switch at its verified profile location: close it, then open it again."
     );
     // About 3-5 s spoken; one sentence.
     assert!(said.split_whitespace().count() <= 16);
