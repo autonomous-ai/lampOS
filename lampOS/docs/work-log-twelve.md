@@ -499,3 +499,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   twelve/forget-person (PR after the landing); #1608 answered (Fourth took it).
   #2449 on c0a4 with the person: never held; journal line + replay test
   pushed as c07632f17, retest when ARM64 is in.
+- 21 Oct evening: #2616 (gap hold, 12 s from the answer end, told only) merged after c0a4 Mac passes with a screen face; #2563 (forget_person) merged; #2588 (journal by scope) and #2619 (by name only) open; c0a4 gaze measured 750,543 into lamp.env; #1693 first piece claimed.
