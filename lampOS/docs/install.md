@@ -199,16 +199,28 @@ voice's own hello is off, as lamp-4ace now has it too.
 
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
-`/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
-ten folders are installed, nine enabled, one of them hidden unless
-`LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+`/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
+and every core skill is a product skill (the owner: core skills are always
+installed, installable ones as apps; `tests/install.rs` holds the two
+equal, Laugh glance parked out of both): eighteen folders are installed,
+nine enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
 enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
 Bedtime and Morning is included with `enabled = false`, awaiting its lamp
-comparison (#1672); it adds no active trigger or advertised tool. Each
+comparison (#1672); it adds no active trigger or advertised tool. Eight
+core skills not yet tried on a lamp are installed disabled
+(`install::PRODUCT_SKILLS_OFF`, each with why): Light out when you leave
+(#1677, [presence.md](presence.md), which must never take the light of
+someone reading face down), Watches you leave and Music sway (#1669), Light
+scenes, Point the light and Light show (#1679), and Smoky air and Dusty air
+(#1684), until they are measured for false alarms on real traces. Install
+and a round's bundle write `enabled = false` (`install::OFF_LINE`) above
+each one's own `skill.toml`, so the folder in `lampOS/skills/`, and a lamp
+run from it, keeps its own default and its cases; each adds no trigger and
+no function, and a trial turns one on on the lamp itself. Each
 folder is installed whole but for its `tests/`. The voice's own paths still
 give way in the product's `lamp-voice.service`: its hello stays off
 (`LAMP_SPEAK_FIRST` unset), and `LAMP_SCHEDULE_SPEAK=skill` and
@@ -233,12 +245,9 @@ stopped or asks something too (#1722), with a look, and a curious tilt for a
 question; the voice only words it, as it does done and failed. Left out, with
 why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
 from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
-the product doesn't run, and its marks, called only after its look; and
-Light out when you leave (#1677, [presence.md](presence.md)), which reads
-the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
-lamp check; and Smoky air and Dusty air
-(#1684), the air's sudden smoke and an hour of dust, until they are
-measured for false alarms on real traces. A test
+the product doesn't run, and its marks, called only after its look; the
+other installable skills, which their owner puts on; and Laugh glance,
+parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
@@ -253,9 +262,6 @@ with `dance` given; `crates/voice/src/config.rs`). The voice leaves out by order
 is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
 skills have run there; the voice's own code for them is removed after.
-
-Light scenes, Point the light and Light show (#1679) also stay out pending
-lamp qualification and room for their tools in the product session.
 
 Install only writes skills, never removes one: a skill later moved out of
 `PRODUCT_SKILLS`, or a file dropped from a skill's folder, stays on every

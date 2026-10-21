@@ -137,13 +137,11 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 `skills/light-out/skill.toml`, in `lamp-skills`' schema
 ([skills.md](skills.md)): a core skill (`kind = "core"`, version 1.0.0,
 #1698) that may read `room/presence` and `voice/state` and use the light,
-and nothing more (`[permissions]`). A core skill comes with the lamp, but
-this one is held out of the product's install until its lamp check
-(`install::NOT_PRODUCT_SKILLS`): presence will be switched on for Messages
+and nothing more (`[permissions]`). A core skill comes with the lamp, so
+this one is installed, but disabled until its lamp check
+(`install::PRODUCT_SKILLS_OFF`): presence will be switched on for Messages
 too, and that must not put the light out on lamps where nobody has watched
-it. A test that the install's skills are exactly the core ones (#1698's "not
-built yet") would need it moved in first, or to allow a core skill waiting
-for its check.
+it. A test holds the install's skills to exactly the core ones.
 
 | | Default | Why |
 |---|---|---|
@@ -211,9 +209,10 @@ heard, so `someone` comes back and the skill's ask ends with it.
 2. `LAMP_LIGHT_REQUESTS=on` in the voice's and `lamp-skills`' units (the
    product's have both), and `LAMP_LIGHT_KEEP=on` for the person's light
    across a restart.
-3. `skills/light-out/` in `/var/lib/lampOS/skills`. It is not in
-   `install::PRODUCT_SKILLS` until its lamp check; it is listed in
-   `NOT_PRODUCT_SKILLS` with why.
+3. `skills/light-out/` in `/var/lib/lampOS/skills`, enabled. Install puts
+   it there disabled until its lamp check (`install::PRODUCT_SKILLS_OFF`,
+   with why); its own `skill.toml` copied over the installed one turns it
+   on.
 4. `lamp-skills` with `--zone system` (the product's) for the quiet hours;
    without a zone a skill with quiet hours never starts itself, which
    lamp-4ace's unit is today.

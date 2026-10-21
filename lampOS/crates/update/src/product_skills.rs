@@ -92,6 +92,8 @@ fn is_skill_path(path: &str) -> bool {
 
 /// The bundle of these skills of `skills` (`lampOS/skills`): every file of
 /// each folder but its `tests/` and hidden files, sorted. Each must be text.
+/// A skill of `install::PRODUCT_SKILLS_OFF` gets `install::OFF_LINE` above
+/// its `skill.toml`, as install writes it.
 pub fn make(skills: &Path, names: &[&str]) -> io::Result<Bundle> {
     fn walk(folder: &Path, under: &str, files: &mut Vec<SkillFile>) -> io::Result<()> {
         for entry in fs::read_dir(folder)? {
@@ -130,6 +132,16 @@ pub fn make(skills: &Path, names: &[&str]) -> io::Result<Bundle> {
             return Err(invalid(format!("{} has no skill.toml", folder.display())));
         }
         walk(&folder, name, &mut files)?;
+        // Installed disabled, as install writes it (install::OFF_LINE).
+        if crate::install::PRODUCT_SKILLS_OFF
+            .iter()
+            .any(|(off, _)| off == name)
+        {
+            let toml = format!("{name}/skill.toml");
+            for file in files.iter_mut().filter(|file| file.path == toml) {
+                file.text.insert_str(0, crate::install::OFF_LINE);
+            }
+        }
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let mut skills: Vec<String> = names.iter().map(|name| (*name).to_owned()).collect();

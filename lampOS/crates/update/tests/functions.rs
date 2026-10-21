@@ -7,12 +7,10 @@
 //! product's count is pinned here, worked out by each part's own code: the
 //! voice's own from the product voice unit's environment, the actions
 //! part's whole catalog (its sound, its light and Schedule's), and the tools
-//! of `install::PRODUCT_SKILLS` as `lamp-skills` writes them.
+//! of `install::PRODUCT_SKILLS` as install writes them and `lamp-skills`
+//! writes their tools (those of `install::PRODUCT_SKILLS_OFF` are off).
 use lamp_update::install;
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::process::Command;
 
 const VOICE: &str = include_str!("../../../deploy/product/lamp-voice.service");
 /// Set only for the run in a process of its own: the folder of the
@@ -33,10 +31,6 @@ const CHAT: &str = "chat: ";
 /// change to what every session is told: say in its pull request what is
 /// left out past the bound, if anything.
 const PRODUCT_FUNCTIONS: usize = 31;
-
-fn skills_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
-}
 
 /// Every `Environment=` of the product voice unit's `[Service]`.
 fn voice_environment() -> Vec<(String, String)> {
@@ -116,9 +110,18 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
     )
     .unwrap();
     // The skills' tools beside it, as `lamp-skills --tools-dir` writes them.
+    // The skills as install writes them, so those it installs off are off.
+    let installed = tempfile::tempdir().unwrap();
+    for (path, text) in install::SETTINGS {
+        if let Some(file) = path.strip_prefix("/var/lib/lampOS/skills/") {
+            let at = installed.path().join(file);
+            std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+            std::fs::write(at, text).unwrap();
+        }
+    }
     let skills: Vec<lamp_skills::Skill> = install::PRODUCT_SKILLS
         .iter()
-        .map(|name| lamp_skills::load(&skills_root().join(name)).unwrap())
+        .map(|name| lamp_skills::load(&installed.path().join(name)).unwrap())
         // The product leaves LAMP_UNPLUG unset: mirror the runtime catalog
         // filter even though this fixture loads the installed files directly.
         .filter(|skill| !skill.prepares_unplug())
@@ -162,8 +165,10 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
     };
     Product {
         executive,
+        // A disabled skill's tool is never written (lamp_skills::tools_file).
         skill_tools: skills
             .iter()
+            .filter(|skill| skill.enabled)
             .filter_map(|skill| skill.tool.clone())
             .collect(),
         declared: found(DECLARED),
