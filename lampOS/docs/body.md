@@ -1828,7 +1828,8 @@ as root) is how a seated lamp gets its standing file without the factory:
   - The yes hand must be off the head and buttons before anything moves
     (up to 10 s, or nothing moves), so any touch while it moves is a stop.
   - The body and its read run as the body's user through `setpriv`, which
-    execs them: the SIGTERM reaches the body itself, never a `runuser` that
+    execs them (`setpriv` is util-linux's, on the lamps' Debian base): the SIGTERM
+    reaches the body itself, never a `runuser` that
     passes it on and kills the body 2 s later, mid-fold (Jarvis on #2541).
     However its run ends, a body still running is sent SIGTERM and given
     20 s to ease back, fold (about 6 s) and let go; only past that is it
