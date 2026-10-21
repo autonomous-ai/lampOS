@@ -1786,4 +1786,102 @@ mod tests {
         assert_eq!(take_keep(&flags), (Some(Path::new(KEEP_PATH)), &rest[..]));
         assert_eq!(take_keep(&rest), (None, &rest[..]));
     }
+
+    /// The summed channels of a frame.
+    fn brightness(frame: &[lamp_ring::Rgb; lamp_ring::PIXEL_COUNT]) -> u32 {
+        frame
+            .iter()
+            .map(|pixel| u32::from(pixel.red) + u32::from(pixel.green) + u32::from(pixel.blue))
+            .sum()
+    }
+
+    /// The mean of a face resting steady in warm at `level`, at the
+    /// product's ceiling (24), after it has eased in.
+    fn steady_warm(level: u8) -> u32 {
+        let mut face = crate::ring_face::Face::new();
+        face.light(Lit::of(true, "warm", level).unwrap());
+        let frames: Vec<u32> = (0..800u64)
+            .map(|frame| {
+                brightness(&face.render(crate::ring_face::Mood::Resting, 0, frame * 25_000, 24))
+            })
+            .collect();
+        frames[200..].iter().sum::<u32>() / 600
+    }
+
+    /// Row 7 on lamp-06c1 (#1672): the person's light was warm 3, and the
+    /// evening glow it resolved to is warm 3 breathing down to 2 every 10 s
+    /// for 20 s. Through the ring's own loop at its 25 ms resting pace and
+    /// the product's ceiling, the face swings from about level 2's glow to
+    /// about level 3's: the breath is drawn, a level deep.
+    #[test]
+    fn the_evening_glow_over_a_warm_three_breathes_down_to_level_two_and_back() {
+        let root = Root::new("light-evening");
+        let (mut ring, _) = RingLight::on(&root.0).unwrap();
+        ring.take_requests(&root.0, "boot-test").unwrap();
+        let bus = Bus::new(&root.0).unwrap();
+        let mut asks = bus
+            .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+            .unwrap();
+        let mut glows = bus
+            .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "skills")
+            .unwrap();
+        let mut face = crate::ring_face::Face::new();
+        let mut at = 0u64;
+        ring.tick(at);
+        asks.publish_json(1, &light(true, "warm", 3)).unwrap();
+        face.light(taken(&mut ring, &mut at).unwrap());
+        let mut evening = request(
+            "skill:bedtime-morning",
+            lamp_msgs::Priority::Skill,
+            at + 30_000_000,
+            "warm",
+        );
+        evening.light.level = 3;
+        evening.pattern = Some(LightPattern {
+            kind: PatternKind::Breathe,
+            period_ms: 10_000,
+            low: 2,
+        });
+        glows.publish_json(2, &evening).unwrap();
+        // Until the ring has taken the request off the bus, on the clock it
+        // was asked at, so the frames below are the breath's and none wait.
+        // A pattern begins on its first resting frame, so each wait draws
+        // one.
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while ring.pattern().is_none() && std::time::Instant::now() < deadline {
+            at += STEP_US;
+            if let Some(lit) = ring.tick(at) {
+                face.light(lit);
+            }
+            ring.drew(at, true);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            ring.pattern().is_some(),
+            "the ring took the evening's request"
+        );
+        let mut drawn = Vec::new();
+        let until = at + 20_000_000;
+        while at < until {
+            if let Some(lit) = ring.tick(at) {
+                face.light(lit);
+            }
+            face.pattern(ring.pattern());
+            let frame = face.render(crate::ring_face::Mood::Resting, 0, at, 24);
+            ring.drew(at, face.rests_on_its_light(at));
+            drawn.push(brightness(&frame));
+            at += 25_000;
+        }
+        assert!(ring.pattern().is_some(), "the breath is the face's");
+        let (two, three) = (steady_warm(2), steady_warm(3));
+        // After the first second, while the ring has taken it.
+        let breathing = &drawn[40..];
+        let (least, most) = (
+            *breathing.iter().min().unwrap(),
+            *breathing.iter().max().unwrap(),
+        );
+        assert!(two < three, "{two} under {three}");
+        assert!(least * 10 <= two * 12, "{least} against level 2's {two}");
+        assert!(most * 10 >= three * 9, "{most} against level 3's {three}");
+    }
 }

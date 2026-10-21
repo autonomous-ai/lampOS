@@ -79,7 +79,7 @@ excluding its end.
 | Part | Eligibility | Authored result |
 |---|---|---|
 | Night ceilings | 21:00–06:00, independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
-| Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Already as warm and as low as that goes, nothing is shown and the journal says `already evening`. |
+| Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Always a level under their light, never over, in their colour when it is already warm. At level 1, off or not known, nothing is shown and the journal says why. |
 | Bedtime | 23:00–06:00; a fresh empty face list continuously for 15 minutes, kept for up to 15 minutes more while the voice has not yet rested its 30 seconds | Ask Expression to sustain this skill's rest, renewable until 10:00. A sound that ends it is followed by settling again (below), at most three times a night. |
 | Morning | 06:00–10:00; a nearby person for three seconds | Wake only this skill's still-owned rest; after its planned stretch completes, ask Say for a hum. |
 
@@ -117,10 +117,19 @@ run begins against `light/state`:
   person chose, kept as it is.
 - **A step dimmer** is one of the ring's five levels. With the breath, the
   light stays at the person's level at the top and breathes down one step
-  and back; at level 1 there is no step under it, and the light is steady.
-- Already warm (or orange, or another colour) at level 1, or a light that is
-  off or not known: nothing is asked of the ring, and the journal says why
-  (`already evening`, `the light is off`).
+  and back. At level 1 there is no step under it, and nothing is shown
+  (the first builder, 21:18 on #2655: "down, never up"; someone at their
+  dimmest light is already resting, and a lamp brightening on them at
+  22:00 reads as a timer). The journal says `the person's light is at its
+  dimmest: no evening glow`.
+- **Always one visible level** (the first builder: "one visible level,
+  never the colour"). On lamp-06c1 at 17:41 the person's light was warm 3:
+  warmer goes no further than warm, so the glow is warm 3 breathing to 2.
+  A warmth that is clamped is never made up for with another colour, and a
+  `dimmer` of 0 still moves one level. Without a breath it is steady a
+  level down.
+- A light that is off or not known: nothing is asked of the ring, and the
+  journal says why (`the light is off`, `the light shown is not known`).
 
 The glow is asked of the ring as any skill's light is, at skill priority,
 and given back after its 20 seconds.

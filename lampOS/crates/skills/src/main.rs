@@ -1905,8 +1905,8 @@ fn start(
     });
     std::thread::spawn(move || {
         // A light relative to the person's is made from the light shown as
-        // the run began (#1672): already as warm and low as its steps go,
-        // nothing is shown, and the journal says `already evening`.
+        // the run began (#1672), at least a level from it; with that light
+        // off or not known, nothing is shown, and the journal says why.
         let calls: Vec<Call> = calls
             .into_iter()
             .filter_map(

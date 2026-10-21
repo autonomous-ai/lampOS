@@ -1754,7 +1754,8 @@ pub enum Call {
     /// run begins (#1672), made into a [`Call::Light`] by
     /// [`glow::relative`] then: with a breath, the light breathes from the
     /// person's level down `dimmer` steps and back; without, it is steady
-    /// `dimmer` steps down. Given back as any skill's light.
+    /// `dimmer` steps down. Always at least a level down, never up: at
+    /// level 1 nothing is asked. Given back as any skill's light.
     Relative {
         warmer: u8,
         dimmer: u8,
