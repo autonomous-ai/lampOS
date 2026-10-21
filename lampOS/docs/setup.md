@@ -117,6 +117,8 @@ skills made by voice and kept unconfirmed `/var/lib/lampOS/voice/made-skills`
 (`LAMP_MAKE_SKILL`, #2011), the
 person's light kept across a restart `/var/lib/lampOS/light` (emptied)
 (`LAMP_LIGHT_KEEP`), the
+voice's software mute and sleep from the head (`/var/lib/lampOS/voice/mute`,
+`--controls-mute`, #711), the
 policy's log `/var/lib/lampos-policy`, the person's parts of Harness under
 the tasks part's home (`/var/lib/lampos-tasks/.harness/` `auth`,
 `connections`, `computer-id`, `cli/data`, `agent-messages`, `hook-routes`
