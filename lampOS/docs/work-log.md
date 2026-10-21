@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-22 00:49 +07, full-journal native gate passed
+
+**Ready for lamp-voice: yes (#1757, #2692, #2694).** Skills journal head
+`624c98887c3f613a95c5315cf60007226e1df698` passed
+[ARM64 39644702150](https://github.com/autonomous-ai/lampOS/actions/runs/39644702150):
+**9,762 passed (one leaky), 0 failed, 63 skipped**, plus four doc tests,
+relay and twelve own-harness tests. x86 Clippy 39644702241 passed. All
+three journal regressions pass natively. The Mac gate is **389/0/0/0**.
+[Native evidence](verification/skills-journal-backpressure-native-20261022/README.md)
+records the tested merge and exact output. The prior failures remain below.
+Music and the unplug fixture retain their published heads and green native
+runs. Review and First's lamp integration remain with their owners.
+
+**Next: updater handover audit, assigned by First at 00:41 +07.** The
+[shape posted before code](https://github.com/autonomous-ai/lampOS/issues/1369#issuecomment-6322682547)
+shows that #1788/#1801 already provide self-handover and rollback. Preserve
+that implementation and its updater-first `min_updater` exception. The
+proposed remaining slice checks independent recovery before switching and
+covers the durable handover cut boundaries. #1369 and #1680 are closed;
+an open Second issue and the intended boundary are requested from First.
+No updater code changed, build or test run. Source/fixture review continues.
+
+No full local workspace, local ARM64 gate or device action was run.
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 00:40 +07, Music metadata refusal audit complete
 
 **Ready for lamp-voice: yes (#1757, #2694); no (#2692, new-head ARM64 pending).**
