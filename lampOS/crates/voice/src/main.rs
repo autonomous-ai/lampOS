@@ -3,6 +3,27 @@ use std::{io, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 fn main() {
+    // A worker's scheduling, on its first thread before any other starts
+    // (#1608, `LAMP_WORKER_SCHEDULING=on`): the audio keeps the voice's RR
+    // 20, the ring a lower real-time priority, and the rest the ordinary
+    // policy, so none takes the CPU from the lamp's ordinary parts. An
+    // unlisted role is refused below as before.
+    if std::env::args().nth(1).as_deref() == Some("worker")
+        && lamp_voice::worker_scheduling::on(
+            std::env::var(lamp_voice::worker_scheduling::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        )
+        && let Some(role) = std::env::args()
+            .nth(2)
+            .and_then(|role| lamp_voice_processes::WorkerRole::parse(&role))
+        && let Err(error) = lamp_voice::worker_scheduling::take(role.scheduling())
+    {
+        eprintln!(
+            "lamp-voice worker {}: its scheduling was not set, so it runs as the voice does: {error}",
+            role.as_str()
+        );
+    }
     // The service and its workers: a log line never blocks them or ends
     // them (`lamp_voice::log_relay`), and their last lines are passed on.
     let relayed = matches!(std::env::args().nth(1).as_deref(), Some("serve" | "worker"))
