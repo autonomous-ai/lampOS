@@ -327,3 +327,9 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **First builder (23:46):** #2666 was ready but had drifted. Rebased as `01bc12064` (range-diff `=`, workspace clippy clean, ARM64 and x86 CI green). #2667 (`743ece8df`) and #2675 (`83e46d7d8`) were restacked, each range-diff `=`.
 - The Reviewer-lead set #2666 for 17:10Z, but it was still open at 01:0x. #2682 (the #2640 row struck) merged.
 - **First builder (00:42):** the next step is part 2's 75c9 row script, so it runs as soon as #2675 is in. It is written: `blue-lamp2.sh` and the probe add-on `probe-say` (a quoted say after 20 s of the voice resting). The plan is posted on #2530. It runs on the CI build that holds all three PRs.
+
+## 22 Oct, 01:2x: part 2a merged
+
+- **#2666 (2a)** merged as `849c0829f`.
+- **#2667 (2b):** retargeted onto lamp-voice through the REST API and rebased as `6d035c151` (`=`), then pushed so CI runs. #2675 is restacked as `caac7abcc` (`=`).
+- **#2671:** read with no finding by the Reviewer-lead. It drifted on `tests/judge.rs` from 2a, so it is rebased as `b5d36beb4` (`=`). lamp-addons' tests and clippy pass.
