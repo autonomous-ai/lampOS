@@ -5234,6 +5234,19 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **El's short-verdict run:** a 16-line recipe with no names, and the record field names checked against `EndpointDecision`. The played test's own scripts are the first builder's to publish.
 - **(b)** is gated on `first/landing7` (717/0) and pushed. It goes onto lamp-voice after #1712 lands there, with `voice-tone.md`'s pointer to the played run.
 
+## 2026-10-21, 16:44 ICT: the forgotten name, #2539 up as #2573, (b) up as #2582, #1608 up as #2554; the duplex route's tone words
+
+- **The forgotten name** (#1722, 15:28): a replay table of where a name told to the lamp goes (#2551, `memory/tests/it/voice_name.rs`, the made-up name Pippa).
+  - The second route never told the model the known face's name, as Live does, so a name kept with `remember_my_face` was never said back. That's #2539.
+  - A name kept mid-run never reached that run's memory note. That's #2540.
+  - The first builder gave both to me.
+- **#2539, `LAMP_SECOND_FACE_NAME`:** the second route tells the known person's name on their own turns (`known_faces::note`). The PR went #2559 → #2567 → #2573, folding the reviewer-lead's three P3s; force-push is refused here. The re-read of #2573 found nothing, and it merges on a green ARM64 run.
+- **(b), `LAMP_MOOD_TONE`:** Mood takes how each line sounded. It was opened as #2570, with Ten's clamp test (energy and warmth never pass their caps over 30 cooldowns). The reviewer-lead's P3 was folded in as #2582: a down line with nobody in view no longer starts a quiet a later face finds.
+- **#1608, `LAMP_WORKER_SCHEDULING`** (#2554): each worker the voice starts takes its role's scheduling, so the camera and the second route drop the voice's RR 20 and the ring keeps RR 10. The RR path was run as root in the VM, 4/4. The reviewer-lead found nothing, and it merges on a green ARM64 run.
+- **#2582:** the reviewer-lead found nothing; it merges on a green ARM64 run. Ten's peer read had one P3: a lively voice during someone low's quiet still lifts the lamp. My call is that it shouldn't, since it may be agitation. That's a small follow-up once #2582 lands.
+- **Thirteen's finding (c0a4, 16:0x):** on the duplex route, "forget my face" left the tone baseline. Gemini marks no piece of the person's line finished, so the words check (forget, and the words' valence) never ran there. The fix joins the pieces and reads the line once they stop (300 ms, as Policy's) after its End. Built on `fourth/tone-duplex-words` (`45cd35ef3`): both new tests fail on the code before it, and the before-End one fails without the End wait. It's in its gate.
+- **#2540** is claimed: a successful `remember` marks the frozen note stale, so the next turn asks it again.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5258,7 +5271,8 @@ takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
-`LAMP_VOICE_TONE` (#2427) is off unless set and was not run on a lamp.
+`LAMP_VOICE_TONE` (#2427) is off unless set. It was played on lamp-75c9 with nobody there (Ten, 21 Oct: the words' valence passed, the arousal wasn't shown by the tools there), and run with a known face on lamp-c0a4 (Thirteen, 21 Oct: a pass on the second route; on the duplex route no forget, now in its fix).
+`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
