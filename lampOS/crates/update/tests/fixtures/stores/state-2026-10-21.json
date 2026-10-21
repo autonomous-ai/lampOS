@@ -1,0 +1,34 @@
+{
+  "installed": {
+    "sequence": 4576,
+    "commit": "4f5e62507"
+  },
+  "previous": {
+    "sequence": 4570,
+    "commit": "d90cc8b8e"
+  },
+  "refused": [
+    {
+      "sequence": 4573,
+      "commit": "c902a95cf",
+      "why": "lamp-voice.service was not well within a minute",
+      "at_unix_ms": 1760000000000
+    }
+  ],
+  "made": [
+    "/opt/lampOS/voice/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "settings": {
+    "/etc/lampOS/voice/second.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "settings_writing": {
+    "/etc/lampOS/records.json": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "systemd_owed": true,
+  "models": {
+    "/opt/lampOS/eyes/models/face.onnx": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "models_before": {
+    "/opt/lampOS/eyes/models/face.onnx": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
