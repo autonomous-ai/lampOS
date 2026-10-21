@@ -1,10 +1,11 @@
 //! Duplex hearing through the production hearing, observation, decision,
 //! commit and speaker-dispatch functions, one capture block at a time.
 //!
-//! Time here is the host's own and the blocks follow one another at once, so
-//! every assertion is about order and counts of blocks; a paced test runs on
-//! the scenario clock instead, 40 ms a block
-//! ([`Harness::keeping_first_words_paced`]). The bounds that are measured in
+//! Time here is the test's own scenario clock, and the blocks follow one
+//! another a step (2 ms) apart, so every assertion is about order and counts
+//! of blocks; a paced test runs 40 ms a block
+//! ([`Harness::keeping_first_words_paced`]), and one that waits on the host's
+//! clock runs on it ([`Harness::on_the_host`]). The bounds that are measured in
 //! time are tested where they live: the decision budget in `admission`, the
 //! tail and the staleness of hearing in `turn_taking`.
 use super::*;
@@ -89,6 +90,8 @@ pub(super) struct Harness {
     stop_words: Option<crate::stop_words::StopWords>,
     /// `LAMP_REPLY_END_REACH=on` (#1722), as the session loop reads it.
     pub(super) reach_past_reply: bool,
+    /// The test's own scenario clock, unless it waits on the host's.
+    _clock: Option<crate::scenario_clock::Scope>,
 }
 
 impl Harness {
@@ -121,7 +124,23 @@ impl Harness {
     }
     /// A reply of `blocks` speaker blocks whose samples count up from zero,
     /// so that what reaches the speaker can be checked for order and loss.
+    /// On the test's own scenario clock, unless one is entered already (a
+    /// paced test's): blocks read at once on the host's could be more than
+    /// 50 ms apart when the host wakes late (a loaded runner), which the
+    /// detector refuses as a capture discontinuity (#1569 row 70).
     pub(super) fn new(policy: TurnTaking, blocks: usize) -> Self {
+        let clock = (!crate::scenario_clock::is_active()).then(|| {
+            let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(30)).unwrap();
+            clock.set_pump(|_| Ok(())).unwrap();
+            clock
+        });
+        Self {
+            _clock: clock,
+            ..Self::on_the_host(policy, blocks)
+        }
+    }
+    /// [`Self::new`] on the host's clock, for a test that waits on it.
+    pub(super) fn on_the_host(policy: TurnTaking, blocks: usize) -> Self {
         let (mut owner, mut reply, _) = active_reply();
         reply.pcm = (0..blocks * 240).map(|n| (n % 30_000) as i16).collect();
         let directory = SessionDirectory::create().unwrap();
@@ -168,6 +187,7 @@ impl Harness {
             reads: vec![0],
             stop_words: None,
             reach_past_reply: false,
+            _clock: None,
         }
     }
     pub(super) fn old(&self) -> TurnOwner {
@@ -216,10 +236,11 @@ impl Harness {
     pub(super) fn block(&mut self, score: f32, echo: Option<EchoEvidence>) -> Tick {
         self.sequence += 1;
         let at = self.at();
-        if self.gap_us > 0 {
-            // A paced run outlasts the half second the reply's capture and
-            // admission were opened for: renewed each block, as the session
-            // loop renews them each tick.
+        if self.gap_us > 0 || self._clock.is_some() {
+            // A paced run, or one on the scenario clock (2 ms a block),
+            // outlasts the half second the reply's capture and admission
+            // were opened for: renewed each block, as the session loop
+            // renews them each tick.
             let now = MonoTime::from_micros(at);
             let until = MonoTime::from_micros(at + 500_000);
             self.owner
@@ -358,9 +379,10 @@ impl Harness {
             )
             .unwrap();
         }
-        if self.gap_us > 0 {
-            // A paced run lasts longer than the snapshot taken at the start
-            // stays fresh: the speaker is offered the one of this block.
+        if self.gap_us > 0 || self._clock.is_some() {
+            // A paced run, or one on the scenario clock, lasts longer than
+            // the snapshot taken at the start stays fresh: the speaker is
+            // offered the one of this block.
             self.snapshot = self.owner.snapshot(MonoTime::from_micros(at)).unwrap();
         }
         tick.dispatched = self.offer_speaker();
@@ -1205,7 +1227,8 @@ fn without_echo_evidence_duplex_decides_as_the_conservative_baseline_does() {
 
 #[test]
 fn a_microphone_that_stops_arriving_does_not_hold_the_reply_back() {
-    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    // Stale on the host's clock: the wait below is the host's.
+    let mut h = Harness::on_the_host(TurnTaking::Duplex, 400);
     h.blocks(ONSET, 0.9, Some(evidence(0, OVER)));
     assert!(h.offer_speaker().is_none(), "yielded");
     // Muted or stalled: no further block is heard.
