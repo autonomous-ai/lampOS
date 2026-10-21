@@ -81,5 +81,13 @@ The owner does not relay routine agent reports.
 - With Rust implementation changes, run formatting, clippy and applicable tests.
   Replays and unit tests do not establish acoustic latency or motor safety.
   Report real-device measurements separately, with exact boundaries.
+- Keep command output small: long build and test logs use up an agent's
+  usage limit. Build and lint quietly (`cargo build -q`,
+  `cargo clippy -q --message-format=short`), and test with
+  `cargo nextest run --status-level fail --final-status-level fail` or
+  `cargo test -q … | tail -40`, with `set -o pipefail` so the pipe keeps the
+  test's failure. Send a whole log to a file and read only its result lines
+  (`grep -E '^test result|FAILED|panicked'`). On a lamp, read `journalctl`
+  through `grep` or `tail`, never a whole log.
 - Do not commit, push or deploy without the authorization required by the
   repository and current conversation.
