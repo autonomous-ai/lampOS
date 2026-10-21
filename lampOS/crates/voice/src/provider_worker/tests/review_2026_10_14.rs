@@ -430,13 +430,44 @@ async fn review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_lik
     );
 }
 
-/// Listens on the test's bus for each turn's verdict (`voice/turn`,
-/// #1155), from before the worker starts, as the Policy does.
-fn turns(root: &Root) -> lamp_bus::Subscriber {
-    lamp_bus::Bus::new(&root.0)
+/// Each turn's verdict on the test's bus (`voice/turn`, #1155), listened
+/// for from before the worker starts, as the Policy does, and read off the
+/// bus as it comes by a thread of its own until this is dropped. Every
+/// worker in this binary says its verdicts on that bus, so a subscriber
+/// left unread while the test starts its rig fills (4 KB on macOS, 17
+/// verdicts) and the test's own is dropped (#1569 row 68).
+struct Turns {
+    taken: std::sync::mpsc::Receiver<std::io::Result<VoiceTurn>>,
+    done: std::sync::Arc<AtomicBool>,
+}
+
+impl Drop for Turns {
+    fn drop(&mut self) {
+        self.done.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+fn turns(root: &Root) -> Turns {
+    let mut subscriber = lamp_bus::Bus::new(&root.0)
         .unwrap()
         .subscribe(VoiceTurn::TOPIC, "test")
-        .unwrap()
+        .unwrap();
+    let (told, taken) = std::sync::mpsc::channel();
+    let done = std::sync::Arc::new(AtomicBool::new(false));
+    let stopped = done.clone();
+    std::thread::spawn(move || {
+        while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
+            let Ok(message) = subscriber.recv(Duration::from_millis(100)) else {
+                return;
+            };
+            if let Some(message) = message
+                && told.send(message.parse::<VoiceTurn>()).is_err()
+            {
+                return;
+            }
+        }
+    });
+    Turns { taken, done }
 }
 
 /// Waits up to `within` on the host for `request` to be told `verdict`.
@@ -444,14 +475,14 @@ fn turns(root: &Root) -> lamp_bus::Subscriber {
 /// numbered by their own rigs, so a verdict for another request, or for
 /// this number with the other verdict, is passed over until this one
 /// comes.
-fn told(turns: &mut lamp_bus::Subscriber, request: u64, verdict: TurnVerdict, within: Duration) {
+fn told(turns: &Turns, request: u64, verdict: TurnVerdict, within: Duration) {
     let until = std::time::Instant::now() + within;
     let mut heard = Vec::new();
     while let Some(left) = until.checked_duration_since(std::time::Instant::now()) {
-        let Some(message) = turns.recv(left).unwrap() else {
+        let Ok(turn) = turns.taken.recv_timeout(left) else {
             break;
         };
-        let turn: VoiceTurn = message.parse().unwrap();
+        let turn = turn.unwrap();
         if (turn.request, turn.verdict) == (request, verdict) {
             return;
         }
@@ -468,7 +499,7 @@ async fn an_answer_the_rule_holds_is_told_held_back() {
     let _clock = logical_clock();
     let _turn = one_at_a_time().await;
     let root = Root::new();
-    let mut turns = turns(&root);
+    let turns = turns(&root);
     let mut rig = LiveRig::start_with(quick_policy(), in_a_busy_room());
     let mut dial = rig.ready().await;
     let request = rig.speak(&mut dial, false, true).await;
@@ -486,7 +517,7 @@ async fn an_answer_the_rule_holds_is_told_held_back() {
         what(&first)
     );
     told(
-        &mut turns,
+        &turns,
         request,
         TurnVerdict::HeldBack,
         Duration::from_secs(2),
@@ -500,7 +531,7 @@ async fn an_answer_the_rule_lets_out_is_told_answered() {
     let _clock = logical_clock();
     let _turn = one_at_a_time().await;
     let root = Root::new();
-    let mut turns = turns(&root);
+    let turns = turns(&root);
     let mut options = in_a_busy_room();
     options.attention = Some(|| (crate::room_told::Room::Quiet, false));
     let mut rig = LiveRig::start_with(quick_policy(), options);
@@ -524,7 +555,7 @@ async fn an_answer_the_rule_lets_out_is_told_answered() {
         ProviderOutput::TurnComplete { .. }
     ));
     told(
-        &mut turns,
+        &turns,
         request,
         TurnVerdict::Answered,
         Duration::from_secs(2),
@@ -540,7 +571,7 @@ async fn a_line_the_model_declines_is_told_held_back() {
     let _clock = logical_clock();
     let _turn = one_at_a_time().await;
     let root = Root::new();
-    let mut turns = turns(&root);
+    let turns = turns(&root);
     let mut options = in_a_busy_room();
     options.attention = None;
     options.tools = crate::tools::Settings {
@@ -556,7 +587,7 @@ async fn a_line_the_model_declines_is_told_held_back() {
     // With no rule here, a verdict for this request can only be the
     // decline's: what other tests' workers said before it is let go, and
     // the decline's is looked for in the half second after it.
-    while turns.recv(Duration::ZERO).unwrap().is_some() {}
+    while turns.taken.try_recv().is_ok() {}
     dial.service
         .send(function_call("c1", crate::tools::NOT_FOR_ME))
         .await;
@@ -570,7 +601,7 @@ async fn a_line_the_model_declines_is_told_held_back() {
         what(&first)
     );
     told(
-        &mut turns,
+        &turns,
         request,
         TurnVerdict::HeldBack,
         Duration::from_millis(500),
