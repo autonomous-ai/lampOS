@@ -1320,6 +1320,7 @@ fn second_route_worker_environment(
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
+        crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -1390,6 +1391,7 @@ mod tests {
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
+            crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
@@ -1798,6 +1800,7 @@ mod tests {
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
+                    || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
@@ -1880,6 +1883,7 @@ mod tests {
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
+                    "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
