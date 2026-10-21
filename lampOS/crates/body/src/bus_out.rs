@@ -1469,10 +1469,12 @@ mod tests {
     }
 
     /// A hand is aged by what came before it on the same step too: the
-    /// joints' write is file I/O, and here it is held up 1.2 s (the
-    /// reviewer's case, a FIFO where the joints' next value is written), so
-    /// a push seen as the step began is a second and more old by the time
-    /// it would be said, and is not said as fresh.
+    /// joints' write is file I/O, and here it is held up (the reviewer's
+    /// case, a FIFO where the joints' next value is written), so a push is
+    /// a second and more old by the time it would be said, and is not said
+    /// as fresh. Seen 900 ms before the step and held up 250 ms, not seen as
+    /// the step began and held up 1.2 s (#1806): without the write's time
+    /// it would be under the second and said.
     #[test]
     fn a_hand_after_a_slow_joints_write_is_aged_by_it() {
         let root = std::path::PathBuf::from(format!("/tmp/lb-handio-{}", std::process::id()));
@@ -1493,15 +1495,15 @@ mod tests {
                 .success()
         );
         let reader = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(1_200));
+            std::thread::sleep(Duration::from_millis(250));
             let _ = std::fs::read(&fifo);
         });
         let mut pushed = glimpse(EVERY_STEPS);
         pushed.hand = true;
-        publishing.step(&pushed, false, Instant::now());
+        publishing.step(&pushed, false, Instant::now() - Duration::from_millis(900));
         reader.join().unwrap();
         let said: Hand = bus.latest(Hand::TOPIC).unwrap().unwrap().parse().unwrap();
-        assert!(!said.pushed, "a push 1.2 s old is not said as fresh");
+        assert!(!said.pushed, "a push 1.15 s old is not said as fresh");
         drop(publishing);
         std::fs::remove_dir_all(root).unwrap();
     }

@@ -18,7 +18,7 @@ use std::{
     rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const CLOCK: &str = "test-boot";
@@ -413,8 +413,12 @@ fn quiet_event_publisher_renews_liveness_without_inventing_a_gesture() {
     assert_eq!(first.len(), 1);
     // lamp-bus leases and refresh throttling use real wall/Instant clocks.
     // The recognizer clock remains injected; this is no lamp timing claim.
-    thread::sleep(Duration::from_millis(1_050));
-    assert!(bus.publishers(ControlGesture::TOPIC).unwrap().is_empty());
+    // Until the lease has lapsed, not a fixed 1050 ms (#1806).
+    let until = Instant::now() + Duration::from_secs(5);
+    while !bus.publishers(ControlGesture::TOPIC).unwrap().is_empty() {
+        assert!(Instant::now() < until, "the lease never lapsed");
+        thread::sleep(Duration::from_millis(10));
+    }
     service.step(|| 2_000_000);
     let renewed = bus.publishers(ControlGesture::TOPIC).unwrap();
     assert_eq!(renewed.len(), 1);
