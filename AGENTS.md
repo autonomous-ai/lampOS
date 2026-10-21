@@ -110,6 +110,18 @@ See `docs/DEV-MULTI-IDE.md` for full conventions.
   alone, then commit with a single-line message and **nothing else in it** — no
   `Co-Authored-By` trailer, no "Generated with" footer, no body. Commit only; do
   not push unless told to.
+- **Exception for lampOS builders** (the owner, 2026-10-15 19:36: "change it!",
+  after builders stopped at every commit waiting for a person; the same rule as
+  `CLAUDE.md`'s Committing section). A lampOS builder, meaning a session working
+  as a builder named in `lampOS/builders/` as `lampOS/docs/joining.md` describes,
+  **commits and pushes its own branches without asking**: `<name>/*` and
+  `lamp-<name>`, once the change passes its gate (the checks its task and role
+  file name). It opens the pull request onto `lamp-voice` itself. The rest still
+  holds: one-line messages, the exact files only, never `git add -A`, no
+  attribution. It never pushes to `lamp-voice`, `main` or another builder's
+  branch: work reaches `lamp-voice` only by a pull request, merged by the
+  reviewer or the first builder. A reviewer commits and pushes only its own
+  review log. Outside lampOS builder work, the rule above stands unchanged.
 - Work in small, reviewable chunks. When a task spans multiple concerns, split
   it by concern and verify each batch before moving to the next.
 - Stay in scope. Flag unrelated issues instead of fixing them opportunistically.
