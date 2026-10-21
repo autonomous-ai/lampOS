@@ -333,3 +333,12 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **#2666 (2a)** merged as `849c0829f`.
 - **#2667 (2b):** retargeted onto lamp-voice through the REST API and rebased as `6d035c151` (`=`), then pushed so CI runs. #2675 is restacked as `caac7abcc` (`=`).
 - **#2671:** read with no finding by the Reviewer-lead. It drifted on `tests/judge.rs` from 2a, so it is rebased as `b5d36beb4` (`=`). lamp-addons' tests and clippy pass.
+
+## 22 Oct, 01:5x: #2675's lamp check; #2671 merged
+
+- **First builder (01:50):** while 2b and 2c wait, write #2675's lamp check for lamp-4ace.
+  - Folded into #2675 as `864b53429`, adding files only: `tools/played/addon-say.sh`, `tools/played/addon-say-test.sh`, a `lamp-runs.md` row, and the played README.
+  - The script turns `LAMP_ADDON_SAY` on with a `/run` drop-in, removed on exit. It asks the say socket for one `{skill, quoted}` and compares the lamp's transcript for that turn with the kept text: kept in order, changed, added, refused.
+  - The stand-in test passes (11 cases). Not run on a lamp yet.
+- **#2671** merged.
+- #2667 is third in the Reviewer-lead's lane.
