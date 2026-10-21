@@ -6,6 +6,16 @@ The one list of every merged row and fix that now waits only for a run on a real
 
 **As of** `lamp-voice` `4c733283b` and #1712 `0f92dd0ff` (21 Oct, 12:5x +07), with the runs and merges up to 12:5x struck or noted. A row's owner says on #1722 when a run is done, and the first builder strikes it here. The sources are every `until` row of `switches.md` on both branches, `build-rows.md` (the 20 Oct 18:28 copy), the morning list of 21 Oct and the open PRs.
 
+**A physical input by a test input** (the lead, 22 Oct 05:5x on #2602): an input already proven by hand once, namely the privacy slide (Fifth flipped it on lamp-52e6 on 20 Oct, and the microphones closed) and the head pads (#1362, a real touch on lamp-52e6), needs no hand again. A row that only tests what the software does *after* the input runs with the input given by a test input. The input is a test hook, off in every product unit, and the row's result names it. A row that changes how the switch itself is read (the pin, the chip, the controls worker's reading) still gets one real flip. Freed this way:
+
+- `LAMP_SKILL_ROUTINES` and `LAMP_REST_REQUESTS` (lamp-06c1, Jarvis): the privacy step of each.
+- Guard mode (lamp-06c1, Jarvis): "with privacy closed it texts".
+- `LAMP_LIGHT_WHILE_MUTED` (lamp-0c89, Mobile): the app's light row with the switch closed.
+- `LAMP_PRIVACY_GAP_RIDE` (lamp-75c9, Eighth for Third): its talk hour, with the gaps given by the input.
+- The head pads, after the touch (lamp-c0a4, Thirteen): `LAMP_HEAD_TAP_CUE_DBFS` (the hum's level, by ear, after a tap), `lamp-voice --controls-mute` (a tap opens a crash's mute), `LAMP_RING_ASLEEP` (sleep by a held touch, tap to wake), `LAMP_STOP_TOLD` (a head stop, then the next request is told), `LAMP_CONTROLS_WAIT` (a press or touch still stops at once), `LAMP_REMINDER_PULSE` (a hand on the head shows no pulse), and #2668's stretch yielding to a hand.
+
+Still a real flip or touch, because they change how the input itself is read: `LAMP_PRIVACY_CONTROLS` on lamp-52e6 (the controls worker's own reading of the slide), `LAMP_PRIVACY_CONTROLS=no-slide` (a lamp with no slide), #1362's head touch in the product units (lines 97 and 98 read as touch, stroke and sleep), and the factory step that finds a unit's pads (#2208 item 4). The test inputs themselves are Eighth's (#2602, 22 Oct 05:5x): until they are merged, these rows wait for them, not for a hand.
+
 ## lamp-4ace (the first builder)
 
 The owner's desk. Most of these ride on a few sessions: the owner at the desk, the ten cut-ins (`cutins.sh`, A/B, three rounds), the played test (day lines, scenes, hand-overs), `handovers.sh`, and the speed arm. Each switch is still run on and off by itself.
