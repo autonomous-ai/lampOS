@@ -4285,6 +4285,10 @@ thread_local! {
     static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_VOICE_TONE=on`, as `TEST_CAMERA_FOLLOWS_EYES`.
     static TEST_VOICE_TONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's known person at the lamp for the voice's tone, by
+    /// memory id, in place of the eyes' file.
+    static TEST_TONE_PERSON: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// A line's tone told, in the session record and on the bus: with its
@@ -4687,7 +4691,10 @@ fn conversation_with_gate(
     #[cfg(test)]
     let tone_on = tone_on || TEST_VOICE_TONE.with(std::cell::Cell::get);
     let mut tone_meter = tone_on.then(crate::voice_tone::ToneMeter::default);
-    let mut tone_baseline = crate::voice_tone::Baseline::default();
+    // Each known person's own way of speaking, and the room's; and whose the
+    // last line was, the eyes' known person at its End by memory id.
+    let mut tone_baselines = crate::voice_tone::Baselines::default();
+    let mut tone_person: Option<String> = None;
     let mut tone_out = tone_on
         .then(crate::bus_out::ToneOut::from_environment)
         .flatten();
@@ -5891,6 +5898,31 @@ fn conversation_with_gate(
                             turn,
                             reading,
                             words.then_some(text.as_str()),
+                        )?;
+                    }
+                    // Asked to forget their face, or everything: their own
+                    // baseline goes (the room's for someone not known), or
+                    // every one. The words decide, before any function
+                    // runs. Never the words or the person.
+                    if request.is_none()
+                        && finished
+                        && tone_meter.is_some()
+                        && let Some(forget) = crate::voice_tone::forgets(&text)
+                    {
+                        let all = forget == crate::voice_tone::Forget::All;
+                        if all {
+                            tone_baselines.forget_all();
+                        } else {
+                            tone_baselines.forget(tone_person.as_deref());
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"voice_tone_forgot","all":all,
+                                "whose":(!all).then_some(if tone_person.is_some() {
+                                    crate::voice_tone::Whose::Person
+                                } else {
+                                    crate::voice_tone::Whose::Room
+                                }),"at_us":monotonic_us()}),
                         )?;
                     }
                     // A line whose words end before a name, its answer
@@ -7693,10 +7725,21 @@ fn conversation_with_gate(
                         if let Some((turn, reading)) = tone_pending.take() {
                             tell_tone(trace, tone_out.as_mut(), turn, reading, None)?;
                         }
+                        // Whose it is: the known person at the lamp, read
+                        // from the eyes' small file as the hello reads it.
+                        tone_person = crate::known_faces::known_from_environment()
+                            .map(|name| crate::known_faces::memory_person(&name));
+                        #[cfg(test)]
+                        if let Some(person) =
+                            TEST_TONE_PERSON.with(|person| person.borrow().clone())
+                        {
+                            tone_person = Some(person);
+                        }
                         if let Some(tone) = tone {
-                            let reading = tone_baseline.hear(&tone);
+                            let (reading, whose, lines) =
+                                tone_baselines.hear(tone_person.as_deref(), &tone);
                             endpoint_record["tone"] = json!({"tone": tone, "reading": reading,
-                                "baseline_lines": tone_baseline.lines()});
+                                "whose": whose, "baseline_lines": lines});
                             tone_pending = Some((current.owner.turn(), reading));
                         }
                     }

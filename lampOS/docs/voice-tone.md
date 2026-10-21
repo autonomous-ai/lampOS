@@ -62,9 +62,25 @@ isn't taken here: it sends a person's voice to a server for every line.
   5. A line is read against it before it's taken in: steps of 6 dB of level,
   3 semitones of pitch, 2 of spread and 1.5 syllables a second, weighted
   0.35, 0.30, 0.20 and 0.15, through `tanh`. A loud speaker's own loud
-  lines are their calm. **One baseline for the lamp:** at a desk that is
-  mostly its one person. A baseline each, by the known face, comes with the
-  face half.
+  lines are their calm.
+- **A baseline for each known person** (`Baselines`):
+  - **Whose:** at each line's End, the eyes' known person at the lamp, read
+    from their small file as the hello reads it, keyed by the memory person
+    id, never the name.
+  - **No known face:** a line goes to the room's baseline.
+  - **Kept:** in memory only, at most 8 people; the one heard longest ago
+    goes first. Nothing is written, and it's all gone at a restart.
+  - **The records** say whose (`whose`: `person` or `room`), never who.
+  - **The known person is the face at the lamp, not always the one
+    speaking:** someone unknown talking beside them is read against theirs.
+- **Forgets:** a line whose words ask to forget their face lets that
+  person's baseline go, or the room's if no face is known. One that asks to
+  forget everything lets every baseline go, the room's too.
+  - The heard words decide, before any function runs, so a forget the lamp
+    then holds back still lets it go; it is learned again in a few lines.
+  - A forget from elsewhere (the app, another lamp) doesn't reach it, but
+    nothing of it outlives a restart.
+  - The `voice_tone_forgot` record says which, never whose words.
 - **Valence** (`valence_of`): glad and down words from a small list, a
   "not", "never" or an n't word in the two words before turning one by
   half; the mean, or nothing when no word says it. "No" turns nothing: it's
@@ -100,7 +116,12 @@ settle with this one (#1722).
   - against a person's own calm lines, a livelier one reads lively and a
     calmer one calm; the first line says nothing, and the baseline is sure
     only after a few; a loud speaker's own lines are their calm;
-  - the words' valence, turned by "not", never by "no".
+  - the words' valence, turned by "not", never by "no";
+  - each known person read against their own way, and a line with no known
+    face against the room's; a new person's first line says nothing;
+  - at most 8 people, the one heard longest ago going first;
+  - a forget of their face lets theirs go (the room's with none known), and
+    of everything every one; which words ask it.
 - **`coordinator::tests::second_route`** (a voiced fixture, the switch on):
   - a line spoken over the lamp's answer is read only from what was heard
     once the lamp fell silent (53 of its 60 blocks; taken while the answer
