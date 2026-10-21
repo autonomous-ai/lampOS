@@ -143,7 +143,27 @@ uses `append_linked`. Missing or deleted sources cause refusal, never a
 retry as an unlinked append. A confirmed forget, an uncertain mutation
 acknowledgement, or source-union overflow inhibits subsequent journalling
 until a fresh worker establishes fresh context. A new provider session alone
-does not clear that inhibition. Forget also invalidates the local recap;
+does not clear that inhibition. With `LAMP_MEMORY_JOURNAL_RESUMES=on` (#2176
+row 1b) it ends with a fresh context instead: a new Days session opened after
+the stop, whose snapshot is read after it, presenting no resumption, and with
+the recap already cleared by the forget. After a stop, or a write whose answer
+was lost, the second route opens a new session on its next turn
+(`second_provider::worker::opens_anew`). Live, only after a stop (a forget,
+a rule forgotten, a limit), presents no resumption handle on its next
+connect (`thread::presents_resumption`), leaving behind what the provider
+held of the earlier session; a lost write alone keeps its resumption, since
+dropping it costs what the provider held beyond the thread. A fresh open
+that doesn't resume, the store slow or refusing, isn't asked for again for
+30 s (`FRESH_RETRY`), so a slow store doesn't cost every turn its note
+budget. Its sources and rules are then that session's alone,
+writes whose answer was lost before it are settled (one still in flight is
+not: it may commit after the snapshot was read), and a journal line says so
+with counts only. A stop that comes while the session is opening keeps it
+stopped. A write whose outcome is known is always settled (row 1c), the rules'
+writes too: one never sent, one the store refused with nothing to tell, and
+one answered but not told (a rule or memory the store forgot then still stops
+journalling). Only an answer that never came stays uncertain, until such a
+fresh session. Forget also invalidates the local recap;
 this code cannot retract words already delivered to a cloud provider.
 Conservative links may delete more derived exchanges than exact citations
 would. Exchanges that use remember/forget still stay out of the journal.
@@ -426,7 +446,7 @@ message. A refusal leaves the connection usable.
 | `session_open {session, max_bytes?}` | `{ok:true,snapshot:Note}`. Default/max cap 1,200 UTF-8 bytes for `Note.note`, including its inner JSON framing and escaping. Outer response metadata and re-escaping are outside that cap. |
 | `follow_up {person}` | `{ok:true,follow_up:{id,category,text}|null}`: at most one open `thread`/`promise` observation of a known person's, 6 h to 14 days old, never given before, none within 24 h of the last given; recorded as given in the same transaction (table `follow_ups`, `ON DELETE CASCADE` with its entry, created `IF NOT EXISTS`, `user_version` unchanged). The room's or a rules scope: `bad_person`. #1693 (3). |
 | `session_close {session}` | `{ok:true}`; safe to repeat. |
-| `conversation_end {conversation, source_ids, previous_ids?, submit?}` | Absent/false `submit`: `{ok:true,input:Input}`. Sources: 1–64 distinct journal exchanges that have already happened. Up to 32 optional current observation IDs select known correction context. True `submit`: the no-model skipped receipt below. |
+| `conversation_end {conversation, source_ids, previous_ids?, submit?}` | Absent/false `submit`: `{ok:true,input:Input}`. Sources: 1–64 distinct journal exchanges that have already happened; ids this store no longer has under any person (a forget since) are passed over; an id another person's scope still has is refused as before, counted in its journal (`conversation_end named N source(s) it no longer has`), and the end goes on with the rest, refused only when none is left (#2176 row 13). Up to 32 optional current observation IDs select known correction context. True `submit`: the no-model skipped receipt below. |
 | `tidy_apply {job, observations}` | `{ok:true,ids:[...]}`. Entire validated batch commits or none does. Repeat of a completed, retained job returns its original IDs without duplicating writes. |
 | `adopt {to, ids}` | `{ok:true,moved:N,ids:[[old,new]...]}`. #2176 (5a), `LAMP_MEMORY_EARLY_WORDS`: the room's (`person` absent or `everyone`; another `person` is `bad_person`) 1–64 distinct exchanges and kept things, each active, become `to`'s, someone known (`everyone` or an `r-` scope is `bad_person`), in one transaction, with anything of the room's derived only from them (every parent moving; a replacement in either direction stays). Each keeps its row, so its search row, its links and a moved observation's follow-up row (now `to`'s, for their pacing) go with it, and gets the next id in `to`'s numbering; links to what stays are kept, so a forget on either side still reaches it. The room's generation moves on and its notes and jobs are dropped, as for anything of it forgotten. An id not the room's or not active, or `to`'s kept list or observations full (`full`), moves nothing. |
 

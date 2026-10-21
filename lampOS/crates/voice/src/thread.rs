@@ -1044,6 +1044,15 @@ pub struct Recalling {
     given: Option<std::sync::Arc<crate::session_tools::Given>>,
 }
 
+/// Whether a Live connect may present its resumption handle: as the session
+/// allows, and never while the memory wants a fresh context after
+/// journalling stopped (`LAMP_MEMORY_JOURNAL_RESUMES`, Friday's P1 and P3 on
+/// #2226): what the provider held of the earlier session, forgotten words
+/// included, is then left behind.
+pub(crate) fn presents_resumption(allowed: bool) -> bool {
+    allowed && !crate::remember::wants_fresh_live()
+}
+
 impl Recalling {
     pub fn new(config: SessionConfig) -> Self {
         Self {
@@ -1213,7 +1222,10 @@ impl Connect for Recalling {
             }
             Err(_) => None,
         };
-        if !self.presents_handle() {
+        // After a stop, a reconnect is made fresh, so journalling can go on
+        // (Friday's P1 on #2226): what the provider held of the earlier
+        // session, forgotten words included, is left behind.
+        if !presents_resumption(self.presents_handle()) {
             resume = None;
         }
         let mut time = crate::local_time::told_here(self.tools.clock, self.tools.places);
@@ -1223,7 +1235,14 @@ impl Connect for Recalling {
         // The legacy cached note, or an explicitly opted-in Days snapshot
         // with its provenance and a total acquisition budget of 300 ms.
         if let Some(socket) = &self.tools.memory {
-            let kept = crate::remember::told_for_session(socket, session.get(), person.as_deref());
+            // Fresh when no resumption is presented: Live's server-side
+            // context then holds nothing of an earlier session (#2176 row 1b).
+            let kept = crate::remember::told_for_fresh_session(
+                socket,
+                session.get(),
+                person.as_deref(),
+                resume.is_none(),
+            );
             if !kept.is_empty() {
                 time = Some(time.unwrap_or_default() + &kept);
             }

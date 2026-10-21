@@ -887,6 +887,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_journal_resumes_worker_environment(
+            role,
+            var(crate::remember::JOURNAL_RESUMES_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_recall_v2_worker_environment(
             role,
             var(crate::remember::RECALL_V2_ENVIRONMENT).as_deref(),
@@ -1017,6 +1021,17 @@ fn memory_forget_about_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
+}
+
+// Journalling resumed with a fresh session (#2176 row 1b), passed the same
+// narrow way: the exact `on`, to the two routes whose Days client stops and
+// resumes it.
+fn memory_journal_resumes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::JOURNAL_RESUMES_ENVIRONMENT, "on"))
 }
 
 // Recall's second version (#2176), passed the same narrow way: the exact
@@ -1537,6 +1552,7 @@ mod tests {
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
+                    crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
@@ -1630,6 +1646,7 @@ mod tests {
                     "LAMP_MEMORY_EARLY_WORDS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
@@ -1648,6 +1665,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
