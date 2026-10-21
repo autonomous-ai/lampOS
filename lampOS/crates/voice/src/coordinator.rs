@@ -3635,6 +3635,7 @@ fn provider_arguments(
     arguments.extend(crate::going_on_same_one::arguments_from_environment());
     arguments.extend(crate::said_as_heard::arguments_from_environment());
     arguments.extend(crate::scoped_session::arguments_from_environment());
+    arguments.extend(crate::music_holds::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }

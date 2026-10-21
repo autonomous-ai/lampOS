@@ -557,6 +557,85 @@ turn is made for a misheard cut-in.
   and the switch off, told nothing), `misheard_hum::tests` and
   `provider_worker::tests::going_on_asks::misheard_hum_is_read_after_cut_in_told`.
 
+## Music that opens a turn (#2602)
+
+The detector takes tonal music for speech at any level. On lamp-c0a4, a 6 s
+tune of two-tone notes over a 65 Hz hum, played from a Mac, opened a turn
+admitted 914 ms in (Thirteen on #2602). `tests/it/music_turns.rs` feeds six
+tunes synthesised in the test (nothing recorded from people) block by block
+through the voice's own detector, at three levels each:
+
+| | turns opened | ≥30 speech blocks (past the length gate above) |
+|---|---|---|
+| Piper's "Stop. Please stop talking." | 1 | 1 (89 blocks) |
+| 6 tunes × 3 levels (peak 0.5, 0.15, 0.05) | 17 of 18 | 17 of 18 (205 to 824 blocks: the whole tune) |
+
+The only one that opened nothing was the beat with a bass, at the lowest
+level. With `LAMP_MUSIC_TURNS_WAVS=DIR` the test writes the tunes there as
+16 kHz WAVs, to play in a room or score off the lamp.
+
+`ears/classes` tells them apart ([sound-events.md](sound-events.md)): the
+pinned YAMNet, through `lamp-ears`'s `score_wav`, scored music over 0.6 in
+every 500 ms window of the two-tone tune, the held chords, the beat and all
+of them together, in 6 of 16 of the plucked arpeggio's, and in none of a
+bright line with vibrato (at most 0.56). In 40.8 s of Piper's speech (24
+lines), none of 80 windows went over 0.02.
+
+**With `LAMP_MUSIC_HOLDS=on`** (and `LAMP_ATTENTION`, which judges the
+lines), a line whose sound was music throughout is held at its first
+output, as a busy room's line is held, in every room. Throughout means at
+least two windows read over its own sound, from 0.96 s after it began (a
+window's length) to 0.6 s after it ended. Every one of them must have
+music over 0.6 and speech at most 0.05, and none can be one the lamp spoke
+into (`own_voice` present). No fresh window over the line means no music:
+none read with the classifier off or stopped, or a message older than its
+1.5 s. Old scores never hold a line.
+
+The speech bar keeps someone speaking over music. YAMNet scored speech at
+most 0.02 in the tunes' 82 windows. Nine Piper lines were mixed over the held
+chords at the music's level, and 6 and 12 dB over it. On music alone, 2
+of those 27 lines stayed over 0.6 in every window. Both had a window with
+speech over 0.05 (0.17 and 0.99), as did 26 of the 27. The one under it
+(0.03) was not music throughout either. So none of them is held.
+
+A line is let out with something that shows it was said to the lamp:
+
+- its name heard, or its words calling it;
+- a face turned to it;
+- said close to it with a close face turned to it (`LAMP_ADDRESSED`);
+- a tap on its head, or the line after its name said alone;
+- an answer to its own question, or a conversation going on.
+
+So someone singing or humming to the lamp is still answered (El on
+#2602). The room microphone's rise alone is no sign here: music raises it
+over the room's quiet too, and the quiet is the tenth percentile of the
+last 30 s. Both routes judge it: the Live worker reads `ears/classes` every
+100 ms beside the room's levels, and the second route reads it on a thread
+of its own. With no scores on the bus (`LAMP_EARS_CLASSES` off, as on every
+lamp now), nothing is held.
+
+**A known miss:** the bright line with vibrato was music in none of its
+11 windows (at most 0.56), so it is answered as before. It is left as a
+miss rather than chased with a lower bar. Music with sung words may score
+as speech and be let out too; only instrumental tunes were measured.
+
+The journal says `its answer is held back:
+music is playing, …`, and `voice/turn` says held back.
+
+Tests:
+- `music_holds::tests`: only `on` turns it on, and only the line's own
+  windows count. Speech over music is not music alone (the two lines'
+  measured windows); its mutant without the speech bar fails. No fresh
+  scores over the line is no music. Stale, repeated or own-voice windows
+  are not read.
+- `attention::tests::with_the_switch_music_*`: music with no sign is held
+  in a quiet or unknown room; speech, or music without the switch, is let
+  out as before. Its name, its words, a face, addressed, a tap, its own
+  question or a conversation going on let it out, and the room's rise
+  alone doesn't. The mutant without the music check fails the speech case.
+- `second_provider::worker::tests::with_music_holds_a_line_of_music_on_the_bus_is_held_unless_named`:
+  through a real bus. It's about 8 s.
+
 ## An answer with no word in it
 
 Told to stay quiet, the model sometimes says so aloud: an answer whose

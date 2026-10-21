@@ -31,6 +31,7 @@ fn options(
         cut_in_told: false,
         scoped_session: false,
         misheard_hum: false,
+        music_holds: false,
         policy_holds: None,
         follows_run: false,
         wait_for_room: false,

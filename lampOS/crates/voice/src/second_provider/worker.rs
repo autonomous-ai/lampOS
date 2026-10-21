@@ -2590,6 +2590,12 @@ pub fn serve(
         {
             heeding.hear_levels(root, true);
         }
+        if files.attention
+            && files.music_holds
+            && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
+        {
+            heeding.holding_music(root);
+        }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
         if files.going_on_asks
@@ -3316,6 +3322,9 @@ pub(crate) struct Heeding {
     /// (`--attention-near`), as on the Live route: with `--addressed` alone
     /// it is sampled for that judgement only.
     near_sign: bool,
+    /// With `--music-holds`: the room's music scores on `ears/classes`,
+    /// read beside the levels ([`Self::holding_music`]).
+    music: Option<Arc<Mutex<crate::music_holds::Music>>>,
     /// With `--addressed`: the eyes' looks, sampled beside the levels, and
     /// where each request's judgement is published, if the bus can be used.
     addressed: Option<(Looked, Option<crate::addressed::AddressedOut>)>,
@@ -3887,6 +3896,7 @@ impl Heeding {
             thread,
             levels: None,
             near_sign: false,
+            music: None,
             addressed: None,
             judged: None,
             keeps_room: false,
@@ -4474,6 +4484,45 @@ impl Heeding {
         }
     }
 
+    /// Hold a line that was music throughout unless something shows it was
+    /// said to the lamp ([`crate::music_holds`]), its scores read off
+    /// `ears/classes` every 100 ms on a thread of its own, as the levels
+    /// are: the line is judged only after it has been heard.
+    pub(crate) fn holding_music(&mut self, root: &Path) {
+        self.attention.hold_music(true);
+        if self.music.is_some() {
+            return;
+        }
+        let Ok(bus) = lamp_bus::Bus::new(root) else {
+            return;
+        };
+        let music: Arc<Mutex<crate::music_holds::Music>> = Arc::default();
+        // Weak: the thread ends once this `Heeding` is gone.
+        let kept = Arc::downgrade(&music);
+        let started = std::thread::Builder::new()
+            .name("second-music".into())
+            .spawn(move || {
+                loop {
+                    std::thread::sleep(LEVEL_EVERY);
+                    let Some(music) = kept.upgrade() else { return };
+                    if let Ok(Some(message)) = bus.latest(lamp_msgs::SoundClasses::TOPIC)
+                        && let Ok(classes) = message.parse::<lamp_msgs::SoundClasses>()
+                        && let Ok(mut music) = music.lock()
+                    {
+                        music.read(
+                            &classes,
+                            message.header.at_unix_ms,
+                            unix_ms(SystemTime::now()),
+                            monotonic_us(),
+                        );
+                    }
+                }
+            });
+        if started.is_ok() {
+            self.music = Some(music);
+        }
+    }
+
     pub(crate) fn heed(
         &mut self,
         request: u64,
@@ -4658,6 +4707,11 @@ impl Heeding {
         heard: &str,
         signs: Signs,
     ) -> Option<&'static str> {
+        let music = self
+            .music
+            .as_ref()
+            .and_then(|music| music.lock().ok())
+            .is_some_and(|music| music.throughout((began_us, Some(ended_us)), monotonic_us()));
         let attention = &mut self.attention;
         // What the engine gave: a request going on from one cut short has
         // that one's words in front of its own (#1168).
@@ -4712,6 +4766,7 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
+        attention.set_music(music);
         // `LAMP_BUSY_CALLED_STRICT=on`: in a busy room with nobody turned to
         // the lamp, a stand-in or "Lamp is broken, …" is no call in itself.
         attention.narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
@@ -8732,6 +8787,90 @@ mod tests {
         assert!(heeding.signs(9, near).near, "risen: near");
         assert!(!heeding.signs(10, own).near, "its own voice: not near");
         assert!(!heeding.signs(11, quiet).near, "quiet: not near");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #2602, `LAMP_MUSIC_HOLDS=on` on the second route: music scores read
+    /// off the bus (`ears/classes`, `holding_music`, every 100 ms). A line
+    /// whose sound was music throughout is held in a quiet room; the same
+    /// with the lamp's name heard in it, or speech, is let out; without the
+    /// switch, music is let out as before. On the real clock, about eight
+    /// seconds.
+    #[test]
+    fn with_music_holds_a_line_of_music_on_the_bus_is_held_unless_named() {
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lsm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut ears = bus
+            .publisher_declared(
+                lamp_msgs::SoundClasses::TOPIC,
+                &lamp_msgs::SoundClasses::declaration(),
+                "ears",
+            )
+            .unwrap();
+        let quiet = |names: Vec<(u64, f32)>| super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let mut holding = super::Heeding::new(true, false, None, None);
+        holding.holding_music(&root);
+        let mut without = super::Heeding::new(true, false, None, None);
+        // A line of 2 s, a window scored every 250 ms with `music`.
+        let mut line = |music: f32| {
+            let began = monotonic_us();
+            for _ in 0..8 {
+                let end_us = monotonic_us();
+                let classes = lamp_msgs::SoundClasses::Scored {
+                    model_id: "yamnet-qai-v0.59.0".into(),
+                    window: lamp_msgs::SoundWindow {
+                        start_us: end_us - 960_000,
+                        end_us,
+                        completed_us: end_us,
+                        capture_epoch: 1,
+                    },
+                    scores: lamp_msgs::SoundScores {
+                        speech: if music > 0.5 { 0.01 } else { 0.9 },
+                        music,
+                        laughter: 0.0,
+                    },
+                    own_voice: lamp_msgs::OwnVoiceEvidence::Clear,
+                };
+                ears.publish_json(monotonic_us(), &classes).unwrap();
+                std::thread::sleep(Duration::from_millis(250));
+            }
+            (began, monotonic_us())
+        };
+        let heard = "la la la, la la";
+        let music = line(0.9);
+        assert_eq!(
+            holding.judge(1, music, heard, quiet(Vec::new())),
+            Some(crate::music_holds::HELD),
+            "music: held"
+        );
+        assert_eq!(
+            without.judge(2, music, heard, quiet(Vec::new())),
+            None,
+            "no switch: let out"
+        );
+        let named = line(0.9);
+        assert_eq!(
+            holding.judge(3, named, heard, quiet(vec![(named.0 + 200_000, 0.95)])),
+            None,
+            "its name over music: let out"
+        );
+        let speech = line(0.05);
+        assert_eq!(
+            holding.judge(4, speech, heard, quiet(Vec::new())),
+            None,
+            "speech: let out"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

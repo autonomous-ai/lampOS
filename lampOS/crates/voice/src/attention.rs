@@ -1078,6 +1078,12 @@ pub struct Attention {
     /// The name heard only in the room's sound counts only with a second
     /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
     name_second_sign: bool,
+    /// A line that was music throughout is held unless something shows it
+    /// was said to the lamp (`LAMP_MUSIC_HOLDS=on`, [`crate::music_holds`]),
+    /// and whether the request in hand was, as the caller read it before
+    /// judging.
+    music_holds: bool,
+    music: bool,
 }
 
 /// The most text kept for one request.
@@ -1092,6 +1098,23 @@ impl Attention {
     /// Whether remarks are held ([`Self::hold_remarks`]).
     pub fn holds_remarks(&self) -> bool {
         self.remarks
+    }
+
+    /// Hold a line that was music throughout, unless something shows it
+    /// was said to the lamp ([`crate::music_holds`]).
+    pub fn hold_music(&mut self, on: bool) {
+        self.music_holds = on;
+    }
+
+    /// Whether music is held ([`Self::hold_music`]).
+    pub fn holds_music(&self) -> bool {
+        self.music_holds
+    }
+
+    /// Whether the request in hand's sound was music throughout, for the
+    /// next judgement ([`crate::music_holds::Music::throughout`]).
+    pub fn set_music(&mut self, music: bool) {
+        self.music = music;
     }
 
     /// The name heard only in the room's sound counts only with a second
@@ -1808,6 +1831,25 @@ impl Attention {
                     && !(self.day_bars() && strict && room == Room::Busy) =>
             {
                 Verdict::Play(NAMED)
+            }
+            // #2602, with `LAMP_MUSIC_HOLDS=on`: a line that was music
+            // throughout is held as a busy room's is, in every room, unless
+            // something shows it was said to the lamp. Said close to it
+            // counts only with a close face turned to it (`addressed`):
+            // music raises the room microphone over its quiet too.
+            Verdict::Play(_)
+                if self.music_holds
+                    && self.music
+                    && !own
+                    && !going_on
+                    && !called_in_text
+                    && !self.named
+                    && !self.named_sure
+                    && turned != Some(true)
+                    && !self.addressed
+                    && !self.lamp_asked =>
+            {
+                Verdict::Hold(crate::music_holds::HELD)
             }
             // #829, scene 3, with `LAMP_REMARKS=on`: a line let out only as
             // the conversation going on, in a busy room, that asks nothing
@@ -4642,5 +4684,105 @@ mod tests {
         attention.name_heard_scored(began + 1_600_000, 0.95);
         attention.continued_at(2, 1, began + 1_800_000);
         assert!(attention.weigh_the_name(None));
+    }
+
+    /// #2602, `LAMP_MUSIC_HOLDS=on`: a line begun at 1 s, its sound music
+    /// throughout when `music`, judged in `room` with `going_on` and what
+    /// the eyes say (`turned`), after `signs` gave it whatever else it had.
+    fn music_line(
+        holds: bool,
+        music: bool,
+        room: Room,
+        going_on: bool,
+        turned: Option<bool>,
+        signs: impl FnOnce(&mut Attention),
+    ) -> Option<Verdict> {
+        let mut attention = Attention::default();
+        attention.hold_music(holds);
+        attention.began_at(31, 6, 1_000_000);
+        signs(&mut attention);
+        attention.set_music(music);
+        attention.first_output_busy(31, room, going_on, false, turned)
+    }
+
+    /// Music with nothing to show it was said to the lamp is held in every
+    /// room; speech, or music without the switch, is let out as before.
+    #[test]
+    fn with_the_switch_music_with_no_sign_is_held_and_speech_is_not() {
+        let held = Some(Verdict::Hold(crate::music_holds::HELD));
+        for room in [Room::Quiet, Room::Unknown] {
+            assert_eq!(
+                music_line(true, true, room, false, Some(false), |_| {}),
+                held,
+                "{room:?}"
+            );
+            assert_eq!(
+                music_line(true, true, room, false, None, |_| {}),
+                held,
+                "{room:?}"
+            );
+        }
+        // A busy room held it already, as its own.
+        assert!(matches!(
+            music_line(true, true, Room::Busy, false, None, |_| {}),
+            Some(Verdict::Hold(_))
+        ));
+        let before = Some(Verdict::Play(ROOM_NOT_BUSY));
+        assert_eq!(
+            music_line(true, false, Room::Quiet, false, None, |_| {}),
+            before
+        );
+        assert_eq!(
+            music_line(false, true, Room::Quiet, false, None, |_| {}),
+            before
+        );
+        assert_eq!(
+            music_line(false, false, Room::Quiet, false, None, |_| {}),
+            before
+        );
+        // A busy room's own hold stays its own.
+        assert_eq!(
+            music_line(true, false, Room::Busy, false, Some(false), |_| {}),
+            Some(Verdict::Hold(
+                "a new session in a busy room, and nothing shows it was called"
+            ))
+        );
+    }
+
+    /// Someone singing or humming to the lamp (El on #2602): its name, a
+    /// call in its words, a face turned to it, said close to it with a close
+    /// face, a tap, its own question answered or a conversation going on
+    /// let the line out over music.
+    #[test]
+    fn with_the_switch_music_said_to_the_lamp_is_let_out() {
+        let held = Some(Verdict::Hold(crate::music_holds::HELD));
+        let named = music_line(true, true, Room::Quiet, false, None, |a| {
+            a.name_heard(1_200_000)
+        });
+        assert_ne!(named, held);
+        assert!(matches!(named, Some(Verdict::Play(_))));
+        let called = music_line(true, true, Room::Quiet, false, None, |a| {
+            a.heard("Lamp, sing along with me.")
+        });
+        assert!(matches!(called, Some(Verdict::Play(_))), "{called:?}");
+        let turned = music_line(true, true, Room::Quiet, false, Some(true), |_| {});
+        assert!(matches!(turned, Some(Verdict::Play(_))), "{turned:?}");
+        let addressed = music_line(true, true, Room::Quiet, false, None, |a| {
+            a.set_addressed(true)
+        });
+        assert!(matches!(addressed, Some(Verdict::Play(_))), "{addressed:?}");
+        let tapped = music_line(true, true, Room::Quiet, false, None, |a| {
+            a.head_tapped(1_100_000)
+        });
+        assert_eq!(tapped, Some(Verdict::Play(TAPPED)));
+        let asked = music_line(true, true, Room::Quiet, false, None, |a| a.lamp_asked(true));
+        assert!(matches!(asked, Some(Verdict::Play(_))), "{asked:?}");
+        let going_on = music_line(true, true, Room::Quiet, true, None, |_| {});
+        assert!(matches!(going_on, Some(Verdict::Play(_))), "{going_on:?}");
+        // The room microphone's rise alone is the music's own: still held.
+        assert_eq!(
+            music_line(true, true, Room::Quiet, false, None, |a| a.set_near(true)),
+            held
+        );
     }
 }

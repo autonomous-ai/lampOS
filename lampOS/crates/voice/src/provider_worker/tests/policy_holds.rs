@@ -88,6 +88,7 @@ impl Desk {
             cut_in_told: false,
             scoped_session: false,
             misheard_hum: false,
+            music_holds: false,
             policy_holds: holds.then(|| self.bus.clone()),
             follows_run: false,
             wait_for_room: false,

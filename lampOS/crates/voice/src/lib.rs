@@ -73,6 +73,7 @@ pub mod messages;
 pub mod mic_holder;
 pub mod misheard_hum;
 pub mod motion_voice;
+pub mod music_holds;
 pub mod person;
 pub mod photo_faces;
 pub mod scoped_session;

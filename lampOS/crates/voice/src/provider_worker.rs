@@ -266,6 +266,10 @@ pub struct Files {
     /// Whether a line goes only into a session opened for the person it was
     /// admitted for (`--live-scoped-session`, [`crate::scoped_session`]).
     pub scoped_session: bool,
+    /// Whether a line that was music throughout is held unless something
+    /// shows it was said to the lamp (`--music-holds`, `LAMP_MUSIC_HOLDS`,
+    /// [`crate::music_holds`]). Only with the attention rule.
+    pub music_holds: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -352,6 +356,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (going_on_same_one, flags) = crate::going_on_same_one::take(flags);
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     let (scoped_session, flags) = crate::scoped_session::take(flags);
+    let (music_holds, flags) = crate::music_holds::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -404,6 +409,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         going_on_same_one,
         said_as_heard,
         scoped_session,
+        music_holds,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -1065,6 +1071,8 @@ pub(crate) struct Options {
     pub(crate) scoped_session: bool,
     /// A misheard cut-in's next request is told so ([`crate::misheard_hum`]).
     pub(crate) misheard_hum: bool,
+    /// A line that was music throughout is held ([`crate::music_holds`]).
+    pub(crate) music_holds: bool,
     /// The bus the Policy's decisions are read from when, in a busy room, a
     /// line let out only as a conversation going on waits for its decision
     /// ([`crate::going_on_asks`], #1522). `None`: it is let out at once.
@@ -1124,6 +1132,7 @@ impl Options {
             cut_in_told: false,
             scoped_session: false,
             misheard_hum: false,
+            music_holds: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -1411,6 +1420,7 @@ pub async fn run_with_continuation(
         cut_in_told: files.cut_in_told,
         scoped_session: files.scoped_session,
         misheard_hum: files.attention && files.ask_unclear && files.misheard_hum,
+        music_holds: files.attention && files.music_holds,
         going_on_asks: match (files.attention && files.going_on_asks, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
             (true, None) => {
@@ -1603,6 +1613,14 @@ async fn serve_with_visual<C: Connect>(
         .filter(|_| attention_near || addressed)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
     let mut ears_levels: VecDeque<(u64, f32)> = VecDeque::new();
+    // With `--music-holds`: the room's music scores on `ears/classes`, read
+    // every 100 ms ([`crate::music_holds`]).
+    let music_bus = BUS_ROOT
+        .get()
+        .filter(|_| options.music_holds)
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
+    let mut music = crate::music_holds::Music::default();
+    let mut music_read_at: Option<Instant> = None;
     // The newest request whose output came with another in hand, and was
     // so never judged: said once (#829, 17:21).
     let mut unjudged_told: Option<u64> = None;
@@ -1717,6 +1735,7 @@ async fn serve_with_visual<C: Connect>(
     attention.ask_again_when_unclear(options.attention.is_some() && options.ask_unclear);
     attention.ignore_name_in_passing(options.name_in_passing_ignored);
     attention.hold_remarks(options.remarks);
+    attention.hold_music(options.music_holds);
     // In a busy room, a line going on waits for the Policy (#1522).
     let mut going_on_policy = options.going_on_asks.as_deref().and_then(|root| {
         crate::policy_holds::Verdicts::on(root)
@@ -2091,6 +2110,19 @@ async fn serve_with_visual<C: Connect>(
                         "lamp-voice provider: request {}: they gave their name, and the model is told to keep it",
                         open.request.get()
                     );
+                }
+                if let Some(bus) = music_bus.as_ref()
+                    && music_read_at.is_none_or(|at| at.elapsed() >= Duration::from_millis(100))
+                {
+                    music_read_at = Some(Instant::now());
+                    let now_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |since| since.as_millis() as u64);
+                    if let Some(message) = bus.latest(lamp_msgs::SoundClasses::TOPIC).ok().flatten()
+                        && let Ok(classes) = message.parse::<lamp_msgs::SoundClasses>()
+                    {
+                        music.read(&classes, message.header.at_unix_ms, now_ms, monotonic_us());
+                    }
                 }
                 if let Some(bus) = ears_bus.as_ref()
                     && ears_read_at.is_none_or(|at| at.elapsed() >= Duration::from_millis(100))
@@ -2723,6 +2755,10 @@ async fn serve_with_visual<C: Connect>(
                                 night_read = Some((request, crate::local_time::night_here()));
                             }
                             attention.set_night(night_read.is_some_and(|(_, night)| night));
+                            if attention.holds_music() {
+                                let music = attention.window().is_some_and(|window| music.throughout(window, monotonic_us()));
+                                attention.set_music(music);
+                            }
                             let verdict = attention.first_output_busy(request, room, going_on, attention_busy, turned);
                             // Let out as the conversation going on, or for
                             // itself: a line that called the lamp begins a
@@ -9486,6 +9522,7 @@ pub(crate) mod tests {
             cut_in_told: false,
             scoped_session: false,
             misheard_hum: false,
+            music_holds: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -9518,6 +9555,7 @@ pub(crate) mod tests {
                 cut_in_told: false,
                 scoped_session: false,
                 misheard_hum: false,
+                music_holds: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -9575,6 +9613,7 @@ pub(crate) mod tests {
                 cut_in_told: false,
                 scoped_session: false,
                 misheard_hum: false,
+                music_holds: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -10578,6 +10617,7 @@ pub(crate) mod tests {
                 cut_in_told: false,
                 scoped_session: false,
                 misheard_hum: false,
+                music_holds: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -14191,6 +14231,7 @@ pub(crate) mod tests {
                     cut_in_told: false,
                     scoped_session: false,
                     misheard_hum: false,
+                    music_holds: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
@@ -14268,6 +14309,7 @@ pub(crate) mod tests {
                     cut_in_told: false,
                     scoped_session: false,
                     misheard_hum: false,
+                    music_holds: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
