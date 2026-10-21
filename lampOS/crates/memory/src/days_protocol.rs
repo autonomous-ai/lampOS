@@ -210,15 +210,17 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             source_ids,
             replaces: Some(old),
             shown,
+            on,
             ..
         } => {
-            let id = store.remember_replacing(
+            let id = store.remember_replacing_on(
                 &one(person)?,
                 at_unix_ms,
                 &text,
                 &source_ids,
                 old,
                 &shown,
+                on.as_deref(),
             )?;
             json!({"ok":true,"id":id,"replaced":old})
         }
@@ -228,9 +230,19 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             text,
             source_ids,
             once: false,
+            on,
             ..
         } => value(Response::Added {
-            id: store.remember_from(&one(person)?, at_unix_ms, &text, &source_ids)?,
+            id: store
+                .remember_on(
+                    &one(person)?,
+                    at_unix_ms,
+                    &text,
+                    &source_ids,
+                    false,
+                    on.as_deref(),
+                )?
+                .0,
         }),
         // #2176: what this person already keeps (the same words, ignoring
         // case, spacing and a final punctuation mark) is that kept thing; no
@@ -241,8 +253,16 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             text,
             source_ids,
             once: true,
+            on,
             ..
-        } => match store.remember_once_from(&one(person)?, at_unix_ms, &text, &source_ids, true)? {
+        } => match store.remember_on(
+            &one(person)?,
+            at_unix_ms,
+            &text,
+            &source_ids,
+            true,
+            on.as_deref(),
+        )? {
             (id, true) => json!({"ok":true,"id":id,"existing":true}),
             (id, false) => value(Response::Added { id }),
         },

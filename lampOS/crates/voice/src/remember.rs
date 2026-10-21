@@ -55,6 +55,7 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub mod heard;
+pub mod on;
 
 /// Where the coordinator reads the memory's socket: an absolute path.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_SOCKET";
@@ -742,11 +743,28 @@ fn recall_v2_request(
 /// [`tools`] with the rules switched on or off.
 pub fn tools_with(rules: bool) -> Vec<Tool> {
     let tools = tools_for(rules, forget_all_on(), forget_about_on());
-    if replaces_on() {
+    let tools = if replaces_on() {
         replaces_described(tools)
     } else {
         tools
+    };
+    dated(tools, events_on())
+}
+
+/// `remember` with `on`, the day a kept fact is about (#1693,
+/// [`EVENTS_ENVIRONMENT`], [`on`]); off, every function as it is.
+fn dated(mut tools: Vec<Tool>, events: bool) -> Vec<Tool> {
+    if !events {
+        return tools;
     }
+    for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
+        tool.description.push_str(on::DESCRIBED);
+        if let Some(parameters) = tool.parameters.as_mut() {
+            parameters["properties"]["on"] =
+                json!({"type": "string", "description": on::PARAMETER});
+        }
+    }
+    tools
 }
 
 /// `remember` with `replaces` (#2510, [`REPLACES_ENVIRONMENT`]): the other
@@ -2785,6 +2803,15 @@ impl DaysClient {
         }
         if call.name == REMEMBER && self.remember_once.load(Ordering::Acquire) {
             request["once"] = json!(true);
+        }
+        // #1693: the day it is about, from the person's own words (the
+        // caller drops an `on` they did not name, [`on::call_as_heard`]),
+        // from today to 60 days on; anything else is not sent.
+        if call.name == REMEMBER
+            && self.events.load(Ordering::Acquire)
+            && let Some(day) = on::day_within(call.args.get("on"), now, zone)
+        {
+            request["on"] = json!(day);
         }
         // #2510: a correction, with what this session was shown of this
         // scope; the store checks it. An id that is no id is not sent.
@@ -7428,6 +7455,65 @@ mod tests {
         assert_eq!(read[1]["once"], true, "{}", read[1]);
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #1693, `LAMP_MEMORY_EVENTS`: `remember` sends the day only with the
+    /// switch, and only a day from today to 60 days on; off, the request is
+    /// byte for byte as before.
+    #[test]
+    fn with_the_events_switch_remember_sends_its_day() {
+        let (socket, served) = memory_lines("remember-on", 4, |_| json!({"ok":true,"id":25}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let remember = |on: &str| {
+            let args = json!({"text":"Sister's wedding is on Saturday.","on":on});
+            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None)
+        };
+        assert!(!client.events.load(Ordering::Acquire));
+        assert_eq!(remember("2026-10-17"), (json!({"remembered": true}), true));
+        client.events.store(true, Ordering::Release);
+        for on in ["2026-10-17", "2026-10-12", "Saturday"] {
+            assert_eq!(remember(on), (json!({"remembered": true}), true));
+        }
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[0],
+            format!(
+                "{}\n",
+                json!({"op":"remember","at_unix_ms":NOW,"text":"Sister's wedding is on Saturday."})
+            )
+        );
+        let on: Vec<Value> = read[1..]
+            .iter()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap()["on"].clone())
+            .collect();
+        assert_eq!(on, [json!("2026-10-17"), Value::Null, Value::Null]);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #1693: off unless set, the functions are exactly as before; on, only
+    /// `remember` takes `on`.
+    #[test]
+    fn without_the_events_switch_remember_is_declared_as_before() {
+        for rules in [false, true] {
+            let off = tools_for(rules, forget_all_on(), forget_about_on());
+            assert_eq!(dated(off.clone(), false), off);
+            assert!(
+                off[0].parameters.as_ref().unwrap()["properties"]
+                    .get("on")
+                    .is_none()
+            );
+            let on = dated(off.clone(), true);
+            assert_eq!(on[1..], off[1..]);
+            assert_eq!(
+                on[0].parameters.as_ref().unwrap()["properties"]["on"],
+                json!({"type":"string","description":on::PARAMETER})
+            );
+            assert_eq!(
+                on[0].description,
+                format!("{}{}", off[0].description, on::DESCRIBED)
+            );
+        }
     }
 
     /// The switch-off proof: with nobody known, every line the voice sends

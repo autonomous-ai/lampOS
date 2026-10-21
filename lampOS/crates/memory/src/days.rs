@@ -417,7 +417,7 @@ impl Days {
         if heard.is_empty() && said.is_empty() {
             return Err(Error::new("empty", "there is no exchange to remember"));
         }
-        self.add(person, at, &heard, &said, "", sources, rules, None)
+        self.add(person, at, &heard, &said, "", sources, rules, None, None)
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
         self.remember_from(person, at, text, &[])
@@ -451,13 +451,38 @@ impl Days {
         from: &[u64],
         once: bool,
     ) -> Result<(u64, bool)> {
+        self.remember_on(person, at, text, from, once, None)
+    }
+
+    /// [`Self::remember_once_from`], with the day it is about (#1693, the
+    /// voice's `LAMP_MEMORY_EVENTS`): `on`, `YYYY-MM-DD`, kept in
+    /// `event_days` for the kept entry when it is a real day from the local
+    /// day of `at` to [`EVENT_WITHIN_DAYS`] after it ([`kept_day`]); any
+    /// other `on` is dropped and the fact kept undated. A kept thing that
+    /// is found already (`once`) gains the day only when it has none.
+    pub fn remember_on(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        once: bool,
+        on: Option<&str>,
+    ) -> Result<(u64, bool)> {
+        let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         if once && let Some(id) = self.kept_already(person, &text)? {
             self.link_sources(person, id, from)?;
+            if let Some(on) = on {
+                self.db.execute(
+                    "INSERT OR IGNORE INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
+                    params![person.as_str(), id, on.to_string()],
+                )?;
+            }
             return Ok((id, true));
         }
         self.kept_room(person)?;
-        self.add(person, at, "", "", &text, from, &[], None)
+        self.add(person, at, "", "", &text, from, &[], None, on)
             .map(|id| (id, false))
     }
 
@@ -477,6 +502,24 @@ impl Days {
         from: &[u64],
         old: u64,
         shown: &[u64],
+    ) -> Result<u64> {
+        self.remember_replacing_on(person, at, text, from, old, shown, None)
+    }
+
+    /// [`Self::remember_replacing`], the correction with its own day `on`
+    /// as [`Self::remember_on`] keeps one. The replaced one's day goes in
+    /// the same transaction, whether or not the correction has one: what
+    /// is only history is never followed up.
+    #[allow(clippy::too_many_arguments)]
+    pub fn remember_replacing_on(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        old: u64,
+        shown: &[u64],
+        on: Option<&str>,
     ) -> Result<u64> {
         // Not shown first: an id this session never saw says nothing of
         // what it is, or whether it is.
@@ -510,9 +553,10 @@ impl Days {
                 "a correction cannot be older than what it replaces",
             ));
         }
+        let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         self.kept_room(person)?;
-        self.add(person, at, "", "", &text, from, &[], Some(old))
+        self.add(person, at, "", "", &text, from, &[], Some(old), on)
     }
 
     /// A remember's `from`, the person's own exchanges, and its text tidied.
@@ -601,6 +645,7 @@ impl Days {
         sources: &[u64],
         rules: &[u64],
         supersedes: Option<u64>,
+        on: Option<Day>,
     ) -> Result<u64> {
         if Day::at(at, &self.local).is_none() {
             return Err(Error::new(
@@ -647,7 +692,21 @@ impl Days {
             supersedes,
             active: true,
         };
+        // A replaced kept thing's day goes with its being replaced (#1693):
+        // only the current version is ever followed up.
+        if let Some(old) = supersedes {
+            tx.execute(
+                "DELETE FROM event_days WHERE rid IN (SELECT rid FROM entries WHERE person=?1 AND id=?2)",
+                params![person.as_str(), old],
+            )?;
+        }
         insert_record(&tx, &record, &self.local, self.now)?;
+        if let Some(on) = on {
+            tx.execute(
+                "INSERT INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
+                params![person.as_str(), id, on.to_string()],
+            )?;
+        }
         if let Some(scope) = ruled {
             let rid: i64 = tx.query_row(
                 "SELECT rid FROM entries WHERE person=? AND id=?",
@@ -1041,7 +1100,10 @@ impl Days {
     /// [`FOLLOW_UP_WITHIN_DAYS`] after it, never on the day itself or
     /// before, whenever it was said. An undated one keeps its rules. A
     /// dated one comes first, then the newest; once, and one a day, as
-    /// ever. The answer carries a dated one's `on`.
+    /// ever. The answer carries a dated one's `on`. A kept thing with a
+    /// day ([`Self::remember_on`]) is one of these too, with the category
+    /// `"kept"`; a kept thing without one is never given, as without
+    /// `events`.
     pub fn follow_up_with(
         &mut self,
         person: &Person,
@@ -1073,7 +1135,7 @@ impl Days {
                 .map(|day| day.to_string())
                 .unwrap_or_default();
             tx.query_row(
-                "SELECT e.rid,e.id,e.text,e.category,d.day FROM entries e LEFT JOIN event_days d ON d.rid=e.rid WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) AND ((d.day IS NULL AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3) OR (d.day<?4 AND d.day>=?5)) ORDER BY d.day IS NULL,e.at_unix_ms DESC,e.id DESC LIMIT 1",
+                "SELECT e.rid,e.id,e.text,coalesce(e.category,'kept'),d.day FROM entries e LEFT JOIN event_days d ON d.rid=e.rid WHERE e.person=?1 AND e.active=1 AND ((e.kind='observation' AND e.category IN ('thread','promise')) OR (e.kind='kept' AND d.day IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) AND ((d.day IS NULL AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3) OR (d.day<?4 AND d.day>=?5)) ORDER BY d.day IS NULL,e.at_unix_ms DESC,e.id DESC LIMIT 1",
                 params![
                     person.as_str(),
                     now.saturating_sub(FOLLOW_UP_AFTER_MS),
@@ -1885,7 +1947,15 @@ fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Option<Da
     if proposal.category == tidy::Category::Preference {
         return None;
     }
-    let on = Day::parse(proposal.on.as_deref()?)?;
+    kept_day(proposal.on.as_deref()?, at, local)
+}
+
+/// `on` as an event day said at `at`: a real `YYYY-MM-DD` from the local
+/// day of `at` to [`EVENT_WITHIN_DAYS`] after it, else `None`. The one
+/// check of an observation's day ([`event_day`]) and a kept thing's
+/// ([`Days::remember_on`]).
+fn kept_day(on: &str, at: u64, local: &LocalTime) -> Option<Day> {
+    let on = Day::parse(on)?;
     let said = Day::at(at, local)?;
     let far = on
         .before(EVENT_WITHIN_DAYS)

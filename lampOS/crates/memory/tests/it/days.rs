@@ -2011,6 +2011,242 @@ fn forgetting_leaves_no_event_day() {
     assert_eq!(event_rows(&scratch), 0, "forget_person");
 }
 
+/// A kept thing remembered over the protocol at `at`, with `on` when
+/// given: its id.
+fn kept_on(store: &mut Days, person: &str, at: u64, text: &str, on: Option<&str>) -> u64 {
+    let mut line = json!({"op":"remember","person":person,"at_unix_ms":at,"text":text});
+    if let Some(on) = on {
+        line["on"] = json!(on);
+    }
+    let (answer, _) = request(store, line, at);
+    assert_eq!(answer["ok"], true, "{answer}");
+    answer["id"].as_u64().unwrap()
+}
+
+const KEPT_WEDDING: &str = "My sister's wedding is on Saturday.";
+
+/// #1693, `remember {on}`: a kept wedding on Saturday, said on Monday, is
+/// not given before Sunday, is given once on Sunday with its day, and
+/// never again.
+#[test]
+fn a_kept_thing_with_a_day_is_given_once_the_day_after_it() {
+    let scratch = Scratch::new("kept-on");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    let id = kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    assert_eq!(event_rows(&scratch), 1);
+    for at in [MONDAY + DAY, MONDAY + 4 * DAY, MONDAY + 5 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap(),
+        Some(json!({"id":id,"category":"kept","text":KEPT_WEDDING,"on":"2026-10-24"}))
+    );
+    for at in [MONDAY + 7 * DAY + 3_600_000, MONDAY + 12 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    // Without `events` a kept thing is never given, dated or not.
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh"}),
+        MONDAY + 13 * DAY,
+    );
+    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
+}
+
+/// Kept without a day, or with a day the store can't take (past, over 60
+/// days out, not a date), it is kept undated and never given.
+#[test]
+fn a_kept_thing_without_a_good_day_is_never_given() {
+    let scratch = Scratch::new("kept-undated");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    for on in [
+        None,
+        Some("2026-10-18"),
+        Some("2026-12-19"),
+        Some("2026-02-30"),
+        Some("Saturday"),
+    ] {
+        kept_on(&mut store, "p-minh", MONDAY, KEPT_WEDDING, on);
+    }
+    assert_eq!(event_rows(&scratch), 0);
+    for at in [
+        MONDAY + DAY,
+        MONDAY + 2 * DAY,
+        MONDAY + 6 * DAY,
+        MONDAY + 10 * DAY,
+    ] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    // The furthest day it takes is 60 days out.
+    kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY + 10 * DAY,
+        "Exam",
+        Some("2026-12-28"),
+    );
+    assert_eq!(event_rows(&scratch), 1);
+}
+
+/// Replaced by a correction (#2510), its day is gone with it and nothing is
+/// given; a correction with its own day is given after that day.
+#[test]
+fn a_replaced_kept_thing_loses_its_day() {
+    let scratch = Scratch::new("kept-replaced");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    let old = kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","person":"p-minh","at_unix_ms":MONDAY + DAY,"text":"My sister's wedding was called off.","replaces":old,"shown":[old]}),
+        MONDAY + DAY,
+    );
+    assert_eq!(answer["replaced"], old, "{answer}");
+    assert_eq!(event_rows(&scratch), 0, "the replaced one's day is gone");
+    for at in [MONDAY + 6 * DAY, MONDAY + 8 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    // A correction to a new day keeps that day, the old one's gone.
+    let first = kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY + 8 * DAY,
+        "Dentist on Friday.",
+        Some("2026-10-30"),
+    );
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","person":"p-minh","at_unix_ms":MONDAY + 8 * DAY,"text":"Dentist on Thursday.","replaces":first,"shown":[first],"on":"2026-10-29"}),
+        MONDAY + 8 * DAY,
+    );
+    let new = answer["id"].as_u64().unwrap();
+    assert_eq!(event_rows(&scratch), 1);
+    store.maintain(MONDAY + 11 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["id"],
+        new
+    );
+}
+
+/// Forgetting by id, everything, or the person removes a kept thing's day.
+#[test]
+fn forgetting_a_kept_thing_removes_its_day() {
+    let scratch = Scratch::new("kept-forget");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    let id = kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    assert_eq!(event_rows(&scratch), 1);
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"forget","person":"p-minh","id":id}),
+        MONDAY,
+    );
+    assert_eq!(answer["removed"], 1, "{answer}");
+    assert_eq!(event_rows(&scratch), 0, "forget");
+    kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"forget_last","person":"p-minh"}),
+        MONDAY,
+    );
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(event_rows(&scratch), 0, "forget_last");
+    kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    request(
+        &mut store,
+        json!({"op":"forget_all","person":"p-minh"}),
+        MONDAY,
+    );
+    assert_eq!(event_rows(&scratch), 0, "forget_all");
+    kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    store.forget_person(&minh).unwrap();
+    assert_eq!(event_rows(&scratch), 0, "forget_person");
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+}
+
+/// Another person and the room never get a kept thing's day; the room's
+/// own dated kept thing is never given to anyone.
+#[test]
+fn a_kept_day_is_given_only_to_the_person_who_kept_it() {
+    let scratch = Scratch::new("kept-scope");
+    let mut store = scratch.open(30, MONDAY);
+    let (minh, mai) = (person("p-minh"), person("p-mai"));
+    let id = kept_on(
+        &mut store,
+        "p-minh",
+        MONDAY,
+        KEPT_WEDDING,
+        Some("2026-10-24"),
+    );
+    // The room's, said with no person.
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","at_unix_ms":MONDAY,"text":"Party on Saturday.","on":"2026-10-24"}),
+        MONDAY,
+    );
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(event_rows(&scratch), 2);
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","events":true}),
+        MONDAY + 6 * DAY,
+    );
+    assert_eq!(answer["ok"], false, "{answer}");
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["id"],
+        id
+    );
+    store.maintain(MONDAY + 8 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+    assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
+}
+
 /// A store made before `event_days` gets it on open, and its threads are
 /// asked about as undated ones.
 #[test]
