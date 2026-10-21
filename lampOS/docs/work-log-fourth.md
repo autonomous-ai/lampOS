@@ -5168,6 +5168,20 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The open name on lamp-4ace** (the first builder, 05:57): 2 of 3 names joined, 1 kept, no "Dylan". Round 2's name came about 2.05 s after the End and missed the 1.5 s window.
 - **#2394** (`006e0492d`, stacked on #2392): `OPEN_NAME_WITHIN` = 2.5 s for both halves. Two mutations each fail a test. Gate: 3596 passed, plus the known probe failure.
 
+## 2026-10-21, 08:54 ICT: the uncertain Ends measured (neither lever built); #2418 up; #2427 up (the voice half of mood)
+
+- **The uncertain Ends** (the first builder, 07:16): measured with `turn_end_replay` on the real-speech bundles (53 lines) and the played ones (428 lines).
+  - The second verdict ended 1 real line 140 ms sooner, and 12 played lines sooner while cutting 2 in two.
+  - Bars of 0.8 and 0.75 each cut lines.
+  - The short verdict changed no End, for 340 more inferences.
+  - The first builder agreed: neither lever is built, and `LAMP_ENDPOINT_SHORT_VERDICT` stays off.
+- **#2418** (#2416 with the docs folded in): the detector's `recheck_uncertain` (off, no switch) and the replay's `recheck` and `short` flags, kept to measure the next real bundles. The reviewer found no finding.
+- **#2427, the voice half of "Reads your mood"** (with Ten on the face): `LAMP_VOICE_TONE`, `voice/tone`.
+  - Arousal from prosody against the person's baseline, valence from the line's words, numbers only.
+  - The research (Wav2Small fits but is research-only; emotion2vec+ is too big; Hume is gone) is in `docs/voice-tone.md`.
+  - The gate's one failure was the `BUS_TOPICS` census, fixed.
+- **#2394 merged** at 07:58 (the 2.5 s open-name window).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5192,6 +5206,7 @@ takes a cut answer as heard only with #2186. `LAMP_SECOND_SPEECH_SOCKET` and
 The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
+`LAMP_VOICE_TONE` (#2427) is off unless set and was not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
