@@ -1810,8 +1810,9 @@ as root) is how a seated lamp gets its standing file without the factory:
   meets the body stopped.
 - **The yes.** A touch on the head pads or a button, held 1 s, read from
   `controls/state` (`head_active`, `buttons[].pressed`). It counts only if
-  begun after the ask began: a hand already on the head must be lifted and
-  put back.
+  begun once the ask's words have ended (a hand on the head while the lamp
+  speaks, a pet, is no answer): a hand already on the head must be lifted
+  and put back. An ask not said to its end is asked again later.
 - **The stand.** `steps.sh`'s body step:
   1. `lamp-body.service` is stopped and the lamp is read at rest. A lamp
      held with torque on is first let go by a body run.
@@ -1824,8 +1825,14 @@ as root) is how a seated lamp gets its standing file without the factory:
   eases back and lets go, and nothing is written.
   - Controls that aren't known for 1 s while it moves stop it the same way,
     since a touch could no longer be seen.
-  - A body run by hand is eased back and waited for however its run ends, so
-    none is left holding the servo lock.
+  - The yes hand must be off the head and buttons before anything moves
+    (up to 10 s, or nothing moves), so any touch while it moves is a stop.
+  - The body and its read run as the body's user through `setpriv`, which
+    execs them: the SIGTERM reaches the body itself, never a `runuser` that
+    passes it on and kills the body 2 s later, mid-fold (Jarvis on #2541).
+    However its run ends, a body still running is sent SIGTERM and given
+    20 s to ease back, fold (about 6 s) and let go; only past that is it
+    killed. So none is left holding the servo lock or cut short.
   - Its folder is a new one in the unit's private `/tmp`.
   - `lamp.env` is synced to disk before it is linked into place.
 - **No yes, nothing moves.** Without a touch within 2 minutes the lamp
