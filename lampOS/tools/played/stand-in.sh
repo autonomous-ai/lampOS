@@ -1,6 +1,6 @@
 #!/bin/sh
 # The played kit's stand-in Harness, on the lamp, run there as root (`sudo -n sh -s -- in|out`), for ask-again.sh
-# (#2702) and calendar.sh (#751): `in` puts lamp-tasks-harness-fixture in as lamp-tasks' --harness, with
+# (#2702), calendar.sh (#751) and make-skill.sh (#2424): `in` puts lamp-tasks-harness-fixture in as lamp-tasks' --harness, with
 # --sign-in-by-code, and the voice's LAMP_TASKS_SIGN_IN=on, through /run drop-ins; `out` takes them out and removes
 # the stand-in's folder. Nothing reaches a real Harness, account or calendar. The fixture is already at
 # $PLAYED_REMOTE/harness-fixture. `in` stops at the first step that fails, says which on stderr, exits 1, and leaves
@@ -10,7 +10,8 @@
 #                     already in $PLAYED_REMOTE is used before it
 #   PLAYED_TARGET     `auto` (the voice's LAMP_TASKS_TARGET, else office) or an alias: a targets file for the run,
 #                     that one alias on the fixture's machine with Claude Code, in place of the unit's --targets
-#   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on)
+#   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on,
+#                     make-skill.sh: LAMP_MAKE_SKILL=on)
 #   PLAYED_TASKS      a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
 # lamp-tasks always gets a store of its own for the run ($PLAYED_REMOTE/store, in place of --dir): the real one is
 # never touched.
