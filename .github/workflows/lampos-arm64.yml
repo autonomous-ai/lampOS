@@ -114,6 +114,12 @@ jobs:
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 90
+    # Everything links with lld, the lamps' binaries too: a third off every
+    # test compile, a lamp-voice change's 291 s to 186 s (devops007-P1's trial
+    # 39540759083 on #1806). One job keeps one cache; the binaries were checked
+    # on a lamp first (#1806).
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=lld
     strategy:
       fail-fast: false
       matrix:
@@ -124,7 +130,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
+            ca-certificates curl git build-essential pkg-config clang lld libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
         with:
           # A pull request's merge commit and its first parent (lamp-voice), for the crates it changes.
