@@ -1278,10 +1278,13 @@ const AIR_GIVEN_MOST: usize = 4;
 /// told only once that request's answer begins to be heard (the second
 /// part), so a line cut short or retired before any word keeps it for the
 /// next (the reviewer's P3 on #1960). In a busy room it is neither said nor
-/// counted.
+/// counted. `clock` is the monotonic clock in µs: [`monotonic_us`], or a
+/// test's, which can't place ten minutes before a runner up for less (#1569
+/// row 64).
 fn air_noting(
     air: Arc<Mutex<crate::air_told::AirTold>>,
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+    clock: fn() -> u64,
 ) -> (
     crate::second_provider::TaskNote,
     crate::second_provider::AirHeard,
@@ -1293,7 +1296,7 @@ fn air_noting(
     let giving = given.clone();
     let spent = air.clone();
     let note: crate::second_provider::TaskNote = Arc::new(move |request| {
-        let now = monotonic_us();
+        let now = clock();
         if busy(now) {
             return None;
         }
@@ -1312,7 +1315,7 @@ fn air_noting(
         }
         given.clear();
         if let Ok(mut air) = spent.lock() {
-            air.told(monotonic_us());
+            air.told(clock());
             eprintln!("lamp-voice second: request {request} is told the air is stuffy");
         }
     });
@@ -1775,7 +1778,7 @@ pub fn serve(
                 .lock()
                 .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
         };
-        let (note, heard) = air_noting(told.clone(), busy);
+        let (note, heard) = air_noting(told.clone(), busy, monotonic_us);
         engine = engine.noting_the_air(note, heard);
     }
     if let Some(staff) = staff {
@@ -4292,13 +4295,21 @@ mod tests {
     /// reviewer's P3 on #1960), and not again within three hours.
     #[test]
     fn the_airs_note_is_given_once_when_due() {
+        // An hour ahead of the monotonic clock, so eleven minutes before now
+        // is a time on it even on a runner up for less: from the clock itself,
+        // the note was never due there (probe run 39538962883, #1569 row 64).
+        fn clock() -> u64 {
+            monotonic_us() + 3_600_000_000
+        }
         let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
         let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let room_busy = busy.clone();
-        let (note, heard) = super::air_noting(air.clone(), move |_| {
-            room_busy.load(std::sync::atomic::Ordering::Relaxed)
-        });
-        let now = monotonic_us();
+        let (note, heard) = super::air_noting(
+            air.clone(),
+            move |_| room_busy.load(std::sync::atomic::Ordering::Relaxed),
+            clock,
+        );
+        let now = clock();
         air.lock()
             .unwrap()
             .seen(true, Some(1180), now.saturating_sub(5 * 60_000_000));
@@ -4324,7 +4335,7 @@ mod tests {
         // Two given it before the first's answer plays (the reviewer's P3 on
         // #2083): the earlier one's answer heard still spends it.
         let air = Arc::new(Mutex::new(crate::air_told::AirTold::default()));
-        let (note, heard) = super::air_noting(air.clone(), |_| false);
+        let (note, heard) = super::air_noting(air.clone(), |_| false, clock);
         air.lock()
             .unwrap()
             .seen(true, Some(1180), now.saturating_sub(11 * 60_000_000));
