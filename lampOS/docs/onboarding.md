@@ -26,7 +26,7 @@ ready, not paused) and a face is in front of it.
 | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | the model calls `setup_step` as soon as the name (and the face, if asked) is settled | the face in the eyes' people file, when asked and agreed; otherwise nothing |
 | 3 | `how_you_sound` | the core onboarding skill requests a short prompt: stay in their usual seat and call the lamp's name once (#1803, below); then one to say a sentence from there in their own words | the name part: three accepted calls make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once ("a little louder" or "a little closer"), then done or failed | the prompts and accepted tries (`rise_db`, `score`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |
 | 4 | `touch` | asks them, in a few words, to touch the top of its head gently, then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder; 60 s after the ask: failed. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |
-| 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
+| 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | an invitation begun, a fresh physical close (even while it is said), the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | the core onboarding skill requests a short invitation: take its head gently, move it a little, let go (#1800, below) | in the minute after the invitation's playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
 | 6½ | `room_sounds` | only on a lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`, exactly): asks once whether it may notice music and laughter, with the line "the lamp notices music and laughter, nothing is recorded" (see "Room sounds" below); elsewhere `not_available`, unspoken | the model calls `setup_step`: `done` only after a clear yes, `skipped` for a no; never reported, `failed` after 90 s as any step | a yes alone, as `/var/lib/lampOS/consent/room-sounds.json` |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
@@ -217,14 +217,23 @@ The next open, fresh receipt makes privacy available again and it is offered
 then, as privacy always is once available. Never done: the bound adds no
 evidence. A restart re-arms the wait.
 
-The runner gives the model a note to word the invitation itself, not fixed
-words: the hardware profile's verified switch location, that the switch closes
-the microphones and camera, to close it and open it again, and that the lamp
-can't hear or see them while it is closed. An invitation is delivered only on the
-voice turn's complete playback evidence; queue acceptance is insufficient.
-An interrupted invitation can be retried once, then skipped. Software mute,
-sleep, an initial open level, and model `setup_step done` are not evidence of
-physical close followed by open.
+The runner gives the model one short sentence to say and nothing else,
+about 3-5 s spoken: "Try my privacy switch <verified location>: turn it off,
+then on again." (`privacy_invitation` in `onboarding.rs`). The attempt is
+armed as the invitation's turn begins (its words taken for that turn, the
+`onboarding_privacy_armed` row), not when the turn ends: a fresh close from
+then on counts, even while the lamp is still saying it. That close mutes the
+lamp as any physical mute does, ends the voice cycle with the close as its
+candidate and is neither a failed try nor a new offer; the next cycle
+completes on the fresh open as below. On the lead's 52e6 run (21 October) the
+person closed the switch 13 s after the offer while a longer invitation was
+still being said, nothing was armed yet, and the step was offered again and
+skipped. A close stamped before the invitation began is not its answer. An
+invitation that ends without being heard whole (cut off, a playback gap, no
+audio: the turn's shared `heard_whole` proof) drops the armed attempt and can
+be retried once, then skipped. Software mute, sleep, an initial open level,
+and model `setup_step done` are not evidence of physical close followed by
+open.
 
 Controls' existing fence provides the publisher, reader and acquisition
 identity through the same privacy worker channel. Close observation only
@@ -234,8 +243,8 @@ microphones closed, not the camera: the eyes are told nothing new on a mute
 (the permit link only stops saying yes) and close the camera on their own
 1.5 s permit timeout, which this step does not observe. Done's note to the
 model claims the microphones only. A close read just before the
-invitation's end is processed is the person acting early: the attempt is
-offered again (within the two-try budget), not failed. The normal no-audio
+invitation began is the person acting early: the attempt is offered again
+(within the two-try budget), not failed. The normal no-audio
 privacy wait is unchanged. A later voice cycle can complete the step only
 with fresh, advancing evidence from the same physical source and its normal
 input-readiness gate. Source/clock changes, failed cleanup and missing evidence

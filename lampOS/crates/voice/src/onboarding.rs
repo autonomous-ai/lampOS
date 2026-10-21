@@ -341,6 +341,9 @@ struct PrivacyOffer {
     claimed: bool,
     persisted: bool,
     offered_us: u64,
+    /// When its words were taken: the invitation begins, and a close from
+    /// then on is the person's answer (the lead's 52e6 run, 21 October).
+    claimed_us: u64,
     bound: Option<(BootId, u64)>,
 }
 
@@ -379,6 +382,13 @@ fn fresh_token() -> io::Result<u64> {
 // Only the voice's own teardown is verified; the eyes close the camera on
 // their own permit timeout, which this step does not observe (#1802).
 const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+/// The invitation's note: one sentence, about 3-5 s spoken, so the person
+/// can act before the lamp is done talking (the lead's 52e6 run, 21 October).
+fn privacy_invitation(location: &str) -> String {
+    format!(
+        "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: turn it off, then on again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
+    )
+}
 const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
 
 pub struct Onboarding {
@@ -924,24 +934,50 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
-        Some(format!(
-            "(Say this short invitation completely before they act: the physical privacy switch {location} closes both microphones and camera. Invite them to close it, then open it again. Explain before they close it that you cannot hear or see them while it is closed. Do not claim success or ask a tool to mark privacy done.)"
-        ))
+        offer.claimed_us = now_us;
+        Some(privacy_invitation(location))
     }
 
+    /// Arms the attempt as the invitation's turn begins, not when it ends:
+    /// a close while the lamp is still saying it counts, and the mute stops
+    /// the words as any physical mute does (the lead's 52e6 run, 21 October).
     pub(crate) fn bind_privacy_invitation(
         &mut self,
         token: u64,
         voice_boot: BootId,
         turn: u64,
     ) -> bool {
-        let Some(offer) = self.privacy_flow.offer.as_mut() else {
+        let Some(offer) = self.privacy_flow.offer.as_ref() else {
             return false;
         };
         if offer.token != token || !offer.claimed || offer.bound.is_some() || turn == 0 {
             return false;
         }
-        offer.bound = Some((voice_boot, turn));
+        let began_us = offer.claimed_us;
+        let armed = self.privacy_flow.context.as_ref().and_then(|context| {
+            self.privacy_open_receipt(began_us).map(|baseline| {
+                privacy::Attempt::arm(
+                    context.epoch.clone(),
+                    privacy::Invitation {
+                        voice_boot,
+                        turn,
+                        delivered_at_us: began_us,
+                    },
+                    baseline,
+                    began_us,
+                )
+            })
+        });
+        let Some(Ok(attempt)) = armed else {
+            self.retry_privacy(began_us);
+            return false;
+        };
+        self.privacy_flow.attempt = Some(attempt);
+        if let Some(offer) = self.privacy_flow.offer.as_mut() {
+            offer.bound = Some((voice_boot, turn));
+        }
+        self.records
+            .push(json!({"kind":"onboarding_privacy_armed","turn":turn,"at_us":began_us}));
         true
     }
 
@@ -973,8 +1009,11 @@ impl Onboarding {
         }
     }
 
-    /// Called only on the existing attributable whole-turn playback result.
-    /// Admission, first audio and model text never arm a physical attempt.
+    /// Called on the existing attributable whole-turn playback result. The
+    /// attempt was armed as the turn began; an invitation not heard whole
+    /// (cut off, a playback gap, no audio) drops it and is offered again
+    /// within the two-try budget. A physical mute while it is said never
+    /// gets here: that cycle ends with the close as its candidate.
     pub(crate) fn privacy_invitation_finished(
         &mut self,
         voice_boot: BootId,
@@ -985,32 +1024,18 @@ impl Onboarding {
         if self.privacy_invitation_binding() != Some((voice_boot, turn)) {
             return;
         }
+        self.privacy_flow.offer = None;
         if !delivered_whole {
-            self.retry_privacy(now_us);
-            return;
-        }
-        let armed = self.privacy_flow.context.as_ref().and_then(|context| {
-            self.privacy_open_receipt(now_us).map(|baseline| {
-                privacy::Attempt::arm(
-                    context.epoch.clone(),
-                    privacy::Invitation {
-                        voice_boot,
-                        turn,
-                        delivered_at_us: now_us,
-                    },
-                    baseline,
-                    now_us,
-                )
-            })
-        });
-        match armed {
-            Some(Ok(attempt)) => {
-                self.privacy_flow.attempt = Some(attempt);
-                self.privacy_flow.offer = None;
-                self.records
-                    .push(json!({"kind":"onboarding_privacy_armed","turn":turn,"at_us":now_us}));
+            // Nothing of an armed attempt was persisted: dropping it is enough.
+            if self
+                .privacy_flow
+                .attempt
+                .as_ref()
+                .is_some_and(|attempt| attempt.phase() == privacy::Phase::Armed)
+            {
+                self.privacy_flow.attempt = None;
             }
-            _ => self.retry_privacy(now_us),
+            self.retry_privacy(now_us);
         }
     }
 
@@ -1037,8 +1062,8 @@ impl Onboarding {
         let early = acquisition.physical.stamp.at_us <= attempt.delivered_at_us();
         match attempt.observe_close(acquisition, now_us) {
             Ok(()) => Some(privacy::Checkpoint::new(attempt, self.privacy_path())),
-            // A slide read just before the invitation's end was processed is
-            // the person acting early, not a failed check: offer it again.
+            // A slide read just before the invitation began is the person
+            // acting early, not a failed check: offer it again.
             Err(_) if early => {
                 self.privacy_flow.erase_pending = true;
                 self.retry_privacy(now_us);
@@ -1242,6 +1267,7 @@ impl Onboarding {
             claimed: false,
             persisted: false,
             offered_us: now_us,
+            claimed_us: now_us,
             bound: None,
         });
         if let Some(led) = self.led.as_mut() {
