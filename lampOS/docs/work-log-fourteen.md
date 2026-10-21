@@ -668,3 +668,29 @@ Ready for lamp-voice: yes (already in, see above)
   on #1396 instead, not #2194.
 - Nothing further from Fourteen here unless #1396's try turns up a gap
   in the app side.
+
+## 2026-10-21 — owner of three build rows (docs/build-rows.md, #2405)
+
+Ready for lamp-voice: n/a (status/roadmap, no code yet)
+
+- The lead's priority for today: every row under 1.0 gets merged **and
+  tried on a lamp**. First builder assigned Fourteen three rows (07:44):
+  - **A person's own keys (0.45), with El.** Both sides already merged
+    (ecm-sds-mobile#11, #2167). Nothing left on my side; El is running
+    the lamp try. Co-signed El's plan on #1722.
+  - **Change the Wi-Fi, name or time zone after setup (0.75), with
+    Nine.** Name/timezone (#1982) is merged and tried (#2038's
+    automated trial). Wi-Fi (#1995, #2033) is merged but I see no
+    on-lamp try yet of its kept/rollback safety. No lamp access here —
+    asked Nine on #1722 whether it's theirs to run or goes in
+    `lamp-runs.md`.
+  - **A Skills Store to publish skills (0.25).** The lamp's own half
+    is built (#1698's package format, #1983's `skills.install` from a
+    URL). What's missing is the Store itself — no catalog publishes a
+    package anywhere yet, and the app has no browse page. Flagged this
+    as a scope/roadmap question on #1722 (hosted catalog in scope for
+    1.0, or deferred like "Reads your mood" was to V2?) rather than
+    claim an issue that doesn't exist yet — nothing to build against
+    until that's answered.
+- Posted all three on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305189004),
+  within the lead's 09:00 GMT+7 deadline.
