@@ -12,11 +12,15 @@
 //!
 //! Each file is one of three, as #1913 decides: the build's before (its
 //! SHA-256 in the state's `settings`, as install or the last round wrote
-//! it), the build's now (the bundle), and the lamp's now (the file). Only
-//! one still the build's before, or one never there and never recorded, is
-//! written; one the lamp changed or removed is kept, and said. A folder the
-//! bundle does not name (a skill the person installed) is never read or
-//! written.
+//! it), the build's now (the bundle), and the lamp's now (the file). A
+//! product skill's files are the build's, not the person's (the first
+//! builder on #1722, 21 Oct 16:2x): one not already the build's now is
+//! written, and one the lamp changed or removed is put back, and said. What
+//! is the person's lies outside these folders and is never read or written:
+//! the skills turned off (`/var/lib/lampos-skills-state/off`) and a skill's
+//! state there, and a folder the bundle does not name (a skill the person
+//! installed). The one exception is the core skills turned on on the lamp,
+//! kept beside `off` in [`ON`] and written turned on ([`keep_turned_on`]).
 use crate::{
     manifest,
     records::{SkillBack, write_whole},
@@ -217,10 +221,17 @@ fn check(bundle: &Bundle) -> Result<(), String> {
 pub enum Act {
     /// Written: the lamp has the build's before, or never had it.
     Write,
+    /// Written over what the lamp did to it, with what that was.
+    PutBack(&'static str),
     /// Already the build's now: only recorded.
     Record,
-    /// The lamp's own: kept, with why.
-    Keep(&'static str),
+}
+
+impl Act {
+    /// Whether the file is written.
+    pub fn writes(&self) -> bool {
+        matches!(self, Act::Write | Act::PutBack(_))
+    }
 }
 
 /// One file, where it goes on the lamp (`/var/lib/lampOS/skills/…`), and
@@ -263,8 +274,8 @@ pub fn plan(
         let act = match now_sha(root, &path)? {
             Some(now) if now == new => (recorded.get(&path) != Some(&new)).then_some(Act::Record),
             Some(now) if builds(&now) => Some(Act::Write),
-            Some(_) => Some(Act::Keep("this lamp's own")),
-            None if recorded.contains_key(&path) => Some(Act::Keep("removed on this lamp")),
+            Some(_) => Some(Act::PutBack("changed on this lamp")),
+            None if recorded.contains_key(&path) => Some(Act::PutBack("removed on this lamp")),
             None => Some(Act::Write),
         };
         if let Some(act) = act {
@@ -279,9 +290,153 @@ pub fn plan(
     Ok(steps)
 }
 
+/// The file's bytes, never through a link (`O_NOFOLLOW`: a link is ELOOP).
+fn read_no_link(path: &Path) -> io::Result<Vec<u8>> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    let mut bytes = Vec::new();
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
+        .open(path)?
+        .read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+/// The core skills turned on on this lamp, beside lamp-skills' `off` in its
+/// `--state-dir`: one name a line, written whole (`write_whole`, 0644) and
+/// read never through a link. A lamp without it has none: an updater from
+/// before it never reads it, and one after reads its absence as empty.
+pub const ON: &str = "/var/lib/lampos-skills-state/on";
+
+/// Whether a `skill.toml` turns its skill on: its top-level `enabled`, true
+/// when it has none (lamp-skills' default).
+fn says_on(toml: &str) -> bool {
+    for line in toml.lines().map(str::trim) {
+        if line.starts_with('[') {
+            break;
+        }
+        if let Some((key, value)) = line.split_once('=')
+            && key.trim() == "enabled"
+        {
+            return value.split('#').next().unwrap_or_default().trim() != "false";
+        }
+    }
+    true
+}
+
+/// A core skill's `skill.toml` as the build ships it, turned on: install's
+/// [`OFF_LINE`](crate::install::OFF_LINE) taken off, and a top-level
+/// `enabled = false` (the folder's own default) made `true`.
+pub fn turned_on(toml: &str) -> String {
+    let toml = toml.strip_prefix(crate::install::OFF_LINE).unwrap_or(toml);
+    let mut tables = false;
+    let mut out = String::with_capacity(toml.len());
+    for line in toml.split_inclusive('\n') {
+        tables |= line.trim_start().starts_with('[');
+        if !tables
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim() == "enabled"
+            && value.trim() == "false"
+        {
+            out.push_str(&line.replacen("false", "true", 1));
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
+}
+
+/// The build's core skill files (`files`: each one's path on the lamp and
+/// the build's text) with each core skill turned on on this lamp kept on
+/// (the first builder on #2585, 22:24): an update changes what the build
+/// ships, not what was chosen on the lamp. A `skill.toml` the build ships
+/// off becomes [`turned_on`] when [`ON`] names its skill, or when the lamp's
+/// own file turns it on and is not the build's before (`recorded`, or
+/// `writing`), or is already this build turned on. One the lamp turned off
+/// again (changed, and off) leaves [`ON`]. A name in [`ON`] the build no
+/// longer carries is dropped, and said once. With `keep`, [`ON`] is
+/// written when this changes it (lamp-skills' state folder must be there);
+/// without, nothing is (`--apply off`).
+pub fn keep_turned_on<'a>(
+    root: &Path,
+    files: impl IntoIterator<Item = (&'a str, &'a mut String)>,
+    recorded: &BTreeMap<String, String>,
+    writing: &BTreeMap<String, String>,
+    keep: bool,
+    say: &mut dyn FnMut(&str),
+) -> io::Result<()> {
+    let file = on_root(root, ON);
+    let was: BTreeSet<String> = match read_no_link(&file) {
+        Ok(bytes) => String::from_utf8_lossy(&bytes)
+            .lines()
+            .map(str::trim)
+            .filter(|name| is_skill_name(name))
+            .map(str::to_owned)
+            .collect(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => BTreeSet::new(),
+        Err(error) => return Err(io::Error::new(error.kind(), format!("{ON}: {error}"))),
+    };
+    let mut on = was.clone();
+    let mut carried = BTreeSet::new();
+    let mut tomls = Vec::new();
+    for (path, text) in files {
+        let Some(name) = path
+            .strip_prefix(FOLDER)
+            .and_then(|rest| rest.strip_prefix('/'))
+            .and_then(|rest| rest.strip_suffix("/skill.toml"))
+        else {
+            continue;
+        };
+        carried.insert(name.to_owned());
+        if says_on(text) {
+            continue;
+        }
+        let now = match read_no_link(&on_root(root, path)) {
+            Ok(bytes) => Some(String::from_utf8_lossy(&bytes).into_owned()),
+            Err(error)
+                if error.kind() == io::ErrorKind::NotFound
+                    || error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) =>
+            {
+                None
+            }
+            Err(error) => return Err(io::Error::new(error.kind(), format!("{path}: {error}"))),
+        };
+        if let Some(now) = now {
+            let sha = manifest::sha256_hex(now.as_bytes());
+            let builds = recorded.get(path) == Some(&sha) || writing.get(path) == Some(&sha);
+            if says_on(&now) && (!builds || now == turned_on(text)) {
+                on.insert(name.to_owned());
+            } else if !says_on(&now) && !builds {
+                on.remove(name);
+            }
+        }
+        tomls.push((name.to_owned(), text));
+    }
+    for (name, text) in tomls {
+        if on.contains(&name) {
+            *text = turned_on(text);
+        }
+    }
+    for gone in was.difference(&carried) {
+        say(&format!(
+            "{gone} is no longer a core skill of this build: its turn-on in {ON} is dropped"
+        ));
+        on.remove(gone);
+    }
+    if keep && on != was {
+        let lines: String = on.iter().map(|name| format!("{name}\n")).collect();
+        if let Err(error) = write_whole(&file, lines.as_bytes(), 0o644) {
+            say(&format!(
+                "{ON} cannot be written ({error}): the core skills turned on are kept on this time only"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Whether a plan writes anything.
 pub fn writes(steps: &[Step]) -> bool {
-    steps.iter().any(|step| step.act == Act::Write)
+    steps.iter().any(|step| step.act.writes())
 }
 
 /// What each file to be written is before it is: its text (or none, not
@@ -291,8 +446,8 @@ pub fn writes(steps: &[Step]) -> bool {
 pub fn backs(root: &Path, steps: &[Step]) -> io::Result<Vec<SkillBack>> {
     let mut made_already = BTreeSet::new();
     let mut backs = Vec::new();
-    for step in steps.iter().filter(|step| step.act == Act::Write) {
-        let before = match fs::read(on_root(root, &step.path)) {
+    for step in steps.iter().filter(|step| step.act.writes()) {
+        let before = match read_no_link(&on_root(root, &step.path)) {
             Ok(bytes) => Some(String::from_utf8(bytes).map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -300,6 +455,12 @@ pub fn backs(root: &Path, steps: &[Step]) -> io::Result<Vec<SkillBack>> {
                 )
             })?),
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            // A link where a file was: changed, with nothing of it to keep,
+            // so no text behind it reaches the journal (the reviewer on
+            // #2585).
+            Err(error) if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) => {
+                None
+            }
             Err(error) => {
                 return Err(io::Error::new(
                     error.kind(),
@@ -333,7 +494,7 @@ pub fn backs(root: &Path, steps: &[Step]) -> io::Result<Vec<SkillBack>> {
 /// them. A file that cannot be written stops the rest.
 pub fn write(root: &Path, steps: &[Step]) -> Result<Vec<String>, String> {
     let mut wrote = Vec::new();
-    for step in steps.iter().filter(|step| step.act == Act::Write) {
+    for step in steps.iter().filter(|step| step.act.writes()) {
         let at = on_root(root, &step.path);
         let failed = |error: io::Error| format!("{}: {error}", step.path);
         if let Some(parent) = at.parent() {
@@ -438,7 +599,7 @@ pub fn stage(root: &Path, folder: &str, steps: &[Step], into: &Path) -> io::Resu
             .mode(0o755)
             .create(into)?;
     }
-    for step in steps.iter().filter(|step| step.act == Act::Write) {
+    for step in steps.iter().filter(|step| step.act.writes()) {
         let rest = step
             .path
             .strip_prefix(folder)
@@ -550,9 +711,9 @@ mod tests {
             acts,
             [
                 (p("a/skill.toml"), Act::Write),
-                (p("b/skill.toml"), Act::Keep("this lamp's own")),
+                (p("b/skill.toml"), Act::PutBack("changed on this lamp")),
                 (p("c/skill.toml"), Act::Record),
-                (p("d/skill.toml"), Act::Keep("removed on this lamp")),
+                (p("d/skill.toml"), Act::PutBack("removed on this lamp")),
                 (p("e/skill.toml"), Act::Write),
                 (p("f/skill.toml"), Act::Write),
             ]
@@ -598,6 +759,42 @@ mod tests {
         // Twice is the same as once.
         restore(root, &backs, &mut |_| {}).unwrap();
         assert_eq!(fs::read_to_string(at("a/skill.toml")).unwrap(), "old");
+    }
+
+    /// The reviewer on #2585: a core skill's file that is now a link is
+    /// changed with nothing to keep: what it points at never reaches the
+    /// journal, and the build's file replaces the link, not its target.
+    #[test]
+    fn a_link_in_place_of_a_core_file_is_put_back_and_never_read() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path();
+        let at = |rest: &str| on_root(root, &format!("{FOLDER}/{rest}"));
+        fs::create_dir_all(at("a")).unwrap();
+        let secret = root.join("secret");
+        fs::write(&secret, "not the skill's").unwrap();
+        std::os::unix::fs::symlink(&secret, at("a/skill.toml")).unwrap();
+        let recorded = BTreeMap::from([(
+            format!("{FOLDER}/a/skill.toml"),
+            manifest::sha256_hex(b"old"),
+        )]);
+        let steps = plan(
+            root,
+            &bundle(&[("a/skill.toml", "new")]),
+            &recorded,
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(steps[0].act, Act::PutBack("changed on this lamp"));
+        let backs = backs(root, &steps).unwrap();
+        assert_eq!(backs[0].before, None);
+        write(root, &steps).unwrap();
+        assert!(
+            !fs::symlink_metadata(at("a/skill.toml"))
+                .unwrap()
+                .is_symlink()
+        );
+        assert_eq!(fs::read_to_string(at("a/skill.toml")).unwrap(), "new");
+        assert_eq!(fs::read_to_string(&secret).unwrap(), "not the skill's");
     }
 
     /// The bundle CI makes from `lampOS/skills` is, file for file, what

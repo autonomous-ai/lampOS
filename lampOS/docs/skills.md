@@ -968,7 +968,25 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
 the product, ten folders with Bedtime and Morning disabled and the other nine enabled, and the eight of `PRODUCT_SKILLS_OFF` disabled), and a core
-skill's file taken away by hand is written again at the next install. `lamp-skills remove`
+skill's file taken away or changed by hand is written again at the next
+install and the next update round: a core skill's files are the build's,
+not the person's (#1722; [updates.md](updates.md), "The product's
+skills"). What the person set is kept: the skills turned off with
+`[stop]` (`--state-dir`'s `off`; its `on` only takes a name out of it)
+and a skill's state there. A core skill someone turned on stays on
+through an install or update round (the first builder on #2585): an
+update changes what the build ships, not what was chosen on the lamp. A
+core skill that is off by default (Bedtime and Morning, and those of
+`install::PRODUCT_SKILLS_OFF`) is turned on by editing its installed
+`skill.toml` (`enabled = true`, or install's off line taken out). The next
+install or round sees that, keeps the name in `--state-dir`'s `on` (one
+name a line, beside `off`, written whole, 0644), and writes the build's
+file turned on. A skill named in `on` is written turned on even when its
+file is gone or the build's file changes. Editing the file back to off
+takes the name out of `on`. A lamp with no `on` has none turned on, as
+before. A skill the build no longer carries leaves `on` with one journal
+line (`NAME is no longer a core skill of this build: its turn-on in
+/var/lib/lampos-skills-state/on is dropped`). `lamp-skills remove`
 refuses it, and `lamp-skills install` refuses a folder or a package that
 says it is core, or that would take the place of a core skill on the lamp.
 A core skill also keeps its tool's name: the program loads no other skill

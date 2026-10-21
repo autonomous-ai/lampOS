@@ -403,16 +403,37 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
   `/var/lib/lamp-skills`) is given nothing. The file is fetched in step 3's
   checks (a SHA-256 that doesn't match refuses the build), also with
   `--apply off`, which lists each file it would write or keep.
-- **File by file, as #1913 decides**, from three: the build's before (its
-  SHA-256 in `state.json`'s `settings`, the record install keeps, or one
-  install was about to write), the build's now, and the lamp's now. Written:
-  one still the build's before, and one never there and never recorded.
-  Recorded only: one already the build's now. Kept, and said (`kept PATH:
-  this lamp's own; the build's is not written`): one the lamp changed, and
-  one removed on the lamp after it was recorded. A folder the build's
-  bundle doesn't name (a skill the person installed) is never read or
-  written but by the guard's copy. A skill the build no longer carries is
-  left as it is.
+- **File by file**, from three: the build's before (its SHA-256 in
+  `state.json`'s `settings`, the record install keeps, or one install was
+  about to write), the build's now, and the lamp's now. Recorded only: one
+  already the build's now. Written: every other. A core skill's files are
+  the build's, not the person's (the first builder on #1722, 21 Oct), so one
+  the lamp changed, or removed after it was recorded, is put back, and said
+  (`put back PATH: changed on this lamp; a core skill's files are the
+  build's`, or `removed on this lamp`); a put-back of the build puts the
+  lamp's text back. Install writes over a changed core skill's file the
+  same way and says `put back PATH: changed on this lamp`. **A core skill
+  someone turned on stays on** (the first builder on #2585): an update
+  changes what the build ships, not what was chosen on the lamp. For a
+  `skill.toml` the build ships off, a lamp file that turns it on and is
+  not the build's before (or is already this build turned on) puts its
+  name in `/var/lib/lampos-skills-state/on`, beside `off` (one name a line,
+  written whole beside and renamed, 0644, read never through a link). One
+  the lamp turned off again takes it out. Every skill `on` names is then
+  written turned on: install's off line taken out and a top-level
+  `enabled = false` made `true`. A lamp with no `on` has none, as before;
+  an updater from before never reads it. A name the build no longer
+  carries leaves `on`, said once: `NAME is no longer a core skill of this
+  build: its turn-on in /var/lib/lampos-skills-state/on is dropped`.
+  `--apply off` writes no `on`. `lamp-update.service` has
+  `-/var/lib/lampos-skills-state` in `ReadWritePaths` for it; a round that
+  can't write it says so and keeps the skill on for that round. What #1913
+  keeps is the person's otherwise: the skills they turned off
+  (`/var/lib/lampos-skills-state/off`) and a skill's state there
+  (`daily.json`), never read or written by a round; and a folder the build's
+  bundle doesn't name (a skill the person installed), never read or written
+  but by the guard's copy. A skill the build no longer carries is left as
+  it is.
 - **When:** judged staged before the quiet moment (step 6), written at the
   switch after the units and links and before any restart (step 8), put
   back with the units (step 10), and recorded in `settings` only once the
@@ -429,7 +450,7 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
   needs it in ReadWritePaths; nothing is switched`.
 
 Tests (`crates/update/tests/round.rs`):
-`a_round_places_the_builds_product_skills_and_keeps_the_lamps_own`,
+`a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own`,
 `the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load`,
 `a_build_put_back_puts_the_product_skills_back`,
 `product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start`,

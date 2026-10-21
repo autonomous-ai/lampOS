@@ -1882,7 +1882,7 @@ fn build_with_product_skills(
 }
 
 /// A lamp with pre-#1698 product skill folders, as install wrote them, a
-/// file of one the lamp changed, and a skill the person installed.
+/// file of one changed on the lamp, and a skill the person installed.
 fn lamp_before_permissions() -> Lamp {
     let lamp = Lamp::new().with_skills(
         SKILLS_BEFORE_CHECKS,
@@ -1910,11 +1910,23 @@ fn lamp_before_permissions() -> Lamp {
 /// #2014's P2 (the reviewer, 01:22; the first builder, 01:29): a lamp
 /// whose product skills are from before #1698, given a round to a build
 /// with #1698's checks, gets the build's product skills from the channel
-/// and switches, every one loaded. The person's own skill is not touched,
-/// and a file of a product skill the lamp changed is kept.
+/// and switches, every one loaded.
+///
+/// The first builder on #1722 (21 Oct, 16:2x): a core skill's files are
+/// the build's, not the person's, so a file of one removed by hand comes
+/// back and one changed is written over, each said. What #1913 keeps is the
+/// person's: the skills they turned off or on and a skill's state, in
+/// lamp-skills' own folder, and a skill they installed. None is touched.
 #[test]
-fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
+fn a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own() {
     let mut lamp = lamp_before_permissions();
+    fs::remove_file(lamp.root.join(format!("{PRODUCT_SKILLS}/dance/SKILL.md"))).unwrap();
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let off = "reminders\n";
+    let daily = "{\"consumed\":[]}\n";
+    fs::write(state_dir.join("off"), off).unwrap();
+    fs::write(state_dir.join("daily.json"), daily).unwrap();
     let checks = skills_with_checks("2", "");
     build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
     let mine_before = (
@@ -1935,10 +1947,26 @@ fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
             .unwrap(),
         "glow"
     );
-    // The lamp's own file and the person's skill, as they were.
+    // A core skill's file changed by hand is the build's again.
     assert_eq!(
         lamp.skill_file("reminders/SKILL.md").unwrap(),
-        "Reminders, as this lamp's person wrote them."
+        "Reminders, the build's."
+    );
+    for said in [
+        "put back /var/lib/lampOS/skills/dance/SKILL.md: removed on this lamp",
+        "put back /var/lib/lampOS/skills/reminders/SKILL.md: changed on this lamp",
+    ] {
+        assert!(
+            lamp.said.iter().any(|line| line.contains(said)),
+            "{said}: {:?}",
+            lamp.said
+        );
+    }
+    // The person's: Reminders still off, its state, and their own skill.
+    assert_eq!(fs::read_to_string(state_dir.join("off")).unwrap(), off);
+    assert_eq!(
+        fs::read_to_string(state_dir.join("daily.json")).unwrap(),
+        daily
     );
     assert_eq!(
         (
@@ -1946,14 +1974,6 @@ fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
             lamp.skill_file("mine/SKILL.md")
         ),
         mine_before
-    );
-    assert!(
-        lamp.said
-            .iter()
-            .any(|line| line
-                .contains("kept /var/lib/lampOS/skills/reminders/SKILL.md: this lamp's own")),
-        "{:?}",
-        lamp.said
     );
     let listed = lamp.listed();
     assert!(!listed.contains("not loaded"), "{listed}");
@@ -1969,6 +1989,62 @@ fn a_round_places_the_builds_product_skills_and_keeps_the_lamps_own() {
     assert!(state["settings"]["/var/lib/lampOS/skills/mine/skill.toml"].is_null());
     assert!(!lamp.exists("/var/lib/lampos-update/skills-staged"));
     assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+/// The first builder on #2585 (22:24): a core skill someone turned on stays
+/// on through a round. The build ships Dance off; the lamp turned it on by
+/// hand. The round writes the build's file turned on and keeps the choice in
+/// lamp-skills' state folder, beside `off`.
+#[test]
+fn a_core_skill_turned_on_stays_on_through_a_round() {
+    let mut lamp = lamp_before_permissions();
+    let off = format!("enabled = false\n{NEW_SKILL}");
+    lamp.put_skill_file("dance/skill.toml", &format!("enabled = true\n{NEW_SKILL}"));
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let checks = skills_with_checks("2", "");
+    let product = bundle(&[
+        ("dance/skill.toml", off.as_str()),
+        ("dance/SKILL.md", "Dance, the build's."),
+        ("reminders/skill.toml", NEW_SKILL),
+        ("reminders/SKILL.md", "Reminders, the build's."),
+    ]);
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product);
+
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let on = format!("enabled = true\n{NEW_SKILL}");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), on);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+    assert_eq!(
+        lamp.state()["settings"]["/var/lib/lampOS/skills/dance/skill.toml"],
+        sha(&on)
+    );
+}
+
+/// The first builder on #2585 (22:24): a skill the build removes is gone
+/// whatever was chosen. Its name leaves the record of the core skills
+/// turned on, with one journal line, and the rest of the record stays.
+#[test]
+fn a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line() {
+    let mut lamp = lamp_before_permissions();
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    fs::write(state_dir.join("on"), "dance\nold-skill\n").unwrap();
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product_skills_of_build());
+
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let lines: Vec<&String> = lamp
+        .said
+        .iter()
+        .filter(|line| line.contains("old-skill"))
+        .collect();
+    assert_eq!(lines.len(), 1, "{:?}", lamp.said);
+    assert!(
+        lines[0].starts_with("old-skill is no longer a core skill of this build"),
+        "{lines:?}"
+    );
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
 }
 
 /// The guard stays the net: a skill of the person's that the new
@@ -2035,6 +2111,18 @@ fn a_build_put_back_puts_the_product_skills_back() {
         "Dance, install's."
     );
     assert_eq!(lamp.skill_file("reminders/skill.toml").unwrap(), OLD_SKILL);
+    // A file written over is put back as the lamp had it: it was written
+    // (a lamp that kept it would say "kept"), then restored.
+    assert!(
+        lamp.said.iter().any(|line| line
+            .contains("put back /var/lib/lampOS/skills/reminders/SKILL.md: changed on this lamp")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.skill_file("reminders/SKILL.md").unwrap(),
+        "Reminders, as this lamp's person wrote them."
+    );
     assert!(!lamp.exists(&format!("/{PRODUCT_SKILLS}/welcome-back")));
     assert_eq!(lamp.skills_link(), sha(SKILLS_BEFORE_CHECKS));
     assert_eq!(

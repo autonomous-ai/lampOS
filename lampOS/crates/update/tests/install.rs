@@ -1193,6 +1193,55 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
 }
 
+/// The reviewer on #2585: a core skill's file changed by hand is written
+/// back by the next install, as a round puts it back, and said so.
+#[test]
+fn an_install_puts_a_core_skills_changed_file_back_and_says_so() {
+    let mut lamp = Lamp::new(189, &[]);
+    lamp.install().unwrap();
+    let path = "/var/lib/lampOS/skills/dance/skill.toml";
+    let ours = fs::read(skills_root().join("dance/skill.toml")).unwrap();
+    fs::write(lamp.on(path), "enabled = false\n").unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(fs::read(lamp.on(path)).unwrap(), ours);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("put back {path}: changed on this lamp"))),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// The first builder on #2585 (22:24): a disabled core skill turned on
+/// stays on through an install. Bedtime and Morning ships off; turned on by
+/// hand, the next install keeps it on and records it in lamp-skills' state
+/// folder, so an install with its file gone writes it turned on again.
+#[test]
+fn a_disabled_core_skill_turned_on_stays_on_through_an_install() {
+    let mut lamp = Lamp::new(196, &[]);
+    lamp.install().unwrap();
+    let state_dir = lamp.on("/var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let folder = lamp.on("/var/lib/lampOS/skills/bedtime-morning");
+    let toml = folder.join("skill.toml");
+    let shipped = fs::read_to_string(&toml).unwrap();
+    assert!(!lamp_skills::load(&folder).unwrap().enabled);
+    fs::write(&toml, shipped.replace("enabled = false", "enabled = true")).unwrap();
+
+    lamp.install().unwrap();
+    assert!(lamp_skills::load(&folder).unwrap().enabled);
+    assert_eq!(
+        fs::read_to_string(state_dir.join("on")).unwrap(),
+        "bedtime-morning\n"
+    );
+    // The choice is the record's, not only the file's.
+    fs::remove_file(&toml).unwrap();
+    lamp.install().unwrap();
+    assert!(lamp_skills::load(&folder).unwrap().enabled);
+}
+
 #[test]
 fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     let mut lamp = Lamp::new(195, &[]);
