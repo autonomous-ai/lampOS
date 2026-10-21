@@ -301,7 +301,27 @@ mod run {
         if message.expired {
             return None;
         }
-        touched(&message.parse::<lamp_msgs::ControlsState>().ok()?)
+        let state = message.parse::<lamp_msgs::ControlsState>().ok()?;
+        // Each change of what the controls say, for the journal: which
+        // source a yes or a stop came from.
+        static SEEN: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+        let pressed: Vec<&str> = state
+            .buttons
+            .iter()
+            .filter(|button| button.pressed)
+            .map(|button| button.name.as_str())
+            .collect();
+        let now = format!(
+            "ready {} head {} buttons {pressed:?}",
+            state.ready, state.head_active
+        );
+        if let Ok(mut seen) = SEEN.lock()
+            && *seen != now
+        {
+            say(&format!("controls: {now}"));
+            *seen = now;
+        }
+        touched(&state)
     }
 
     fn near_now(options: &Options) -> bool {
@@ -383,9 +403,13 @@ mod run {
         loop {
             match told.try_recv() {
                 Ok(Said::Begun) => {
+                    say("the ask has begun");
                     begun.get_or_insert_with(Instant::now);
                 }
-                Ok(Said::Outcome(outcome)) if outcome == "spoken" => spoken = true,
+                Ok(Said::Outcome(outcome)) if outcome == "spoken" => {
+                    say("the ask was spoken");
+                    spoken = true;
+                }
                 Ok(Said::Outcome(outcome)) => {
                     if begun.is_none() {
                         say(&format!(
