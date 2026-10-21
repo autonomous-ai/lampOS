@@ -5,7 +5,7 @@
 //! `cargo run --release -p lamp-voice-eval --example turn_end_replay --
 //!  MODEL CLIPS.json [--end-silence-ms 600] [--verdict-ms 130]
 //!  [--speech-level-db DB] [--faint-floor-db DB [--faint-hold-ms MS]]
-//!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short] ...`
+//!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short][:start] ...`
 //!
 //! `CLIPS.json` is `[{"id": "...", "wav": "/path.wav"}, ...]`, each a 16 kHz
 //! mono 16-bit WAV. Each clip gets 600 ms of lead-in and 2.5 s of tail at a
@@ -160,7 +160,7 @@ fn profile(text: &str) -> Result<Profile, Error> {
     let parts: Vec<&str> = text.split(':').collect();
     let [name, commit, complete, least, ref flags @ ..] = parts[..] else {
         return Err(format!(
-            "profile {text}: NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short]"
+            "profile {text}: NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short][:start]"
         )
         .into());
     };
@@ -172,12 +172,15 @@ fn profile(text: &str) -> Result<Profile, Error> {
         ..ConfirmPolicy::default()
     };
     // The voice's switches, as the lamp sets them: an uncertain verdict
-    // asked again (`recheck_uncertain`), and lines under the floor asked
-    // from 0.2 s (`LAMP_ENDPOINT_SHORT_VERDICT`).
+    // asked again (`recheck_uncertain`), lines under the floor asked
+    // from 0.2 s (`LAMP_ENDPOINT_SHORT_VERDICT`), and the line's start
+    // counted toward the floor (`count_start`, as `LAMP_ENDPOINT_LEAST_SPEECH_MS`
+    // sets it with the floor in LEAST_SPEECH_MS, #2602).
     for flag in flags {
         match *flag {
             "recheck" => policy.recheck_uncertain = true,
             "short" => policy.short_verdict_blocks = 20,
+            "start" => policy.count_start = true,
             other => return Err(format!("profile {text}: unknown flag {other}").into()),
         }
     }
@@ -308,6 +311,7 @@ fn replay(
                     "p": decision.and_then(|decision| decision.probability),
                     "first_p": decision.and_then(|decision| decision.rechecked_from),
                     "short_asks": decision.map_or(0, |decision| decision.short_asks),
+                    "speech_ms": decision.and_then(|decision| decision.speech_ms),
                 }));
                 started = None;
             }

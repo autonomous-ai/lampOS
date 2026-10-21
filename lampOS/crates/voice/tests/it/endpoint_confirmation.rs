@@ -444,6 +444,68 @@ fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as
     assert_eq!(long.decision().short_asks, 0);
 }
 
+/// The lamp's responsive profile under its 600 ms window: as it is, or as
+/// `LAMP_ENDPOINT_LEAST_SPEECH_MS` sets it (#2602).
+fn lamp(policy: ConfirmPolicy) -> Rig {
+    Rig::with_window(policy, Some(60))
+}
+
+/// Speaks `blocks` after the six start blocks, pauses, answers the verdict
+/// complete if one was asked, and returns the End's basis, pause and
+/// counted speech in ms.
+fn end_after(mut rig: Rig, blocks: usize) -> (&'static str, u64, Option<u64>) {
+    rig.speak(blocks);
+    rig.quiet(20);
+    if let Some(token) = rig.script.submissions().first() {
+        rig.script.reply(*token, 0.95);
+    }
+    rig.quiet_until_end(200).expect("an End");
+    let decision = rig.decision();
+    (decision.basis, decision.silence_ms, decision.speech_ms)
+}
+
+/// The first builder on #2602 (22 Oct 04:28): on lamp-4ace a third of whole
+/// played day lines ended as `silence_fallback: short`, never asked, at
+/// 600 ms. A 0.6 s line (six start blocks and 54) is one of them as the
+/// lamp is; with `LAMP_ENDPOINT_LEAST_SPEECH_MS=500` its complete verdict
+/// ends it at the 400 ms commit. Each End says the speech it counted.
+#[test]
+fn a_lower_floor_ends_a_short_finished_line_at_the_commit() {
+    let off = ConfirmPolicy::responsive();
+    assert_eq!(
+        end_after(lamp(off), 54),
+        ("silence_fallback", 600, Some(540))
+    );
+    assert_eq!(
+        end_after(lamp(off.with_floor_ms(500)), 54),
+        ("model_complete", 400, Some(600))
+    );
+    let mut short = lamp(off);
+    short.speak(54);
+    short.quiet_until_end(200);
+    assert_eq!(short.decision().fallback, Some("short"));
+}
+
+/// #2602: the line's start counts toward the floor only with the switch.
+/// 46 blocks after the start are under a 0.5 s floor, the six start blocks
+/// with them (52) over it: asked and ended at the commit with the start
+/// counted, `short` at the window without.
+#[test]
+fn the_start_counts_toward_the_floor_only_with_the_switch() {
+    let not_counted = ConfirmPolicy {
+        least_speech_blocks: 50,
+        ..ConfirmPolicy::responsive()
+    };
+    assert_eq!(
+        end_after(lamp(not_counted), 46),
+        ("silence_fallback", 600, Some(460))
+    );
+    assert_eq!(
+        end_after(lamp(ConfirmPolicy::responsive().with_floor_ms(500)), 46),
+        ("model_complete", 400, Some(520))
+    );
+}
+
 /// #2135 (`ConfirmPolicy::recheck_uncertain`, off unless set; kept to
 /// measure, the first builder on #1722 at 07:48): an uncertain verdict is
 /// asked again at once with the pause so far. A complete second ends the

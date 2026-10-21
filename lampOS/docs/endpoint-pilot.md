@@ -861,6 +861,50 @@ two people talking (#829's `twopeople829.sh`, or an hour at the desk), with
 the `short_asks` sum, the worker's CPU and the board's temperature beside
 the same stretch with it off (the reviewer's P3 on #2380).
 
+### A lower floor, the start counted (`LAMP_ENDPOINT_LEAST_SPEECH_MS`, #2602, 22 Oct)
+
+On lamp-4ace a third of whole played day lines ended as `silence_fallback`
+with `fallback: short`: never asked, ended at the 600 ms window, not the
+400 ms commit (the first builder on #2602, 22 Oct 04:28). Two things keep
+them under the floor:
+
+- the floor itself, 0.8 s, set for "Hey Lamp," said alone (about 0.6 s,
+  14 Oct above), which the call's wait (`--call-wait-ms`, #782) now holds
+  for 2 s when a line is only the name;
+- the count: the confirmation counts speech blocks (scored 0.35 or more)
+  only after the line starts, so the six start blocks (`START_BLOCKS`) never
+  count, and a line needs 0.86 s of speech to be asked.
+
+With `LAMP_ENDPOINT_LEAST_SPEECH_MS=MS` (off unless set), a whole number of
+ms from 200 to the profile's own floor (800 with `--end-silence-ms 600`):
+
+- the floor is `MS` (`ConfirmPolicy::least_speech_blocks`, MS / 10 blocks),
+  and the short lines' floor (`LAMP_ENDPOINT_SHORT_VERDICT`) is kept under it;
+- the line's start counts toward it (`ConfirmPolicy::count_start`): the
+  count begins at the speech blocks the detector heard to start the line.
+
+Anything else (not a number, under 200, over the profile's floor, or the
+parity profile, which has none) leaves the floor as it is, and the voice
+says so once on stderr; with it on, it says the floor once. Off, the policy
+and its record are as before (`count_start` is absent from
+`endpoint_policy` when off).
+
+Every End now says the speech the confirmation counted (`speech_ms`,
+`local_endpoint.endpoint`, with the switch on or off), so a day's
+`silence_fallback: short` lines show how far under the floor each was, and
+the replay (`start` below) can try floors on the same lines.
+
+Tests: `a_lower_floor_ends_a_short_finished_line_at_the_commit` and
+`the_start_counts_toward_the_floor_only_with_the_switch`
+(`tests/it/endpoint_confirmation.rs`), and
+`coordinator::endpoint::tests::the_floor_is_lowered_only_by_ms_from_200_to_the_profiles`.
+
+For a lamp: the played day both ways, the `silence_fallback: short` count
+and the `speech_ms` of each; "Hey Lamp," alone with `--call-wait-ms` (it
+must still wait for the rest); the cut-ins of #782's comma scenes; and the
+worker's CPU and the board's temperature in a talkative stretch, since
+more lines are asked.
+
 ## Cut at a comma (#782, 2026-10-15)
 
 Measured by the fourth builder on its Intel Mac, from the first builder's
@@ -940,15 +984,16 @@ A rule built on it would hold about as many finished turns as it keeps
 pauses whole, so it was not built.
 
 **The replay.** `cargo run --release -p lamp-voice-eval --example
-turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS[:recheck][:short] …`
+turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS[:recheck][:short][:start] …`
 feeds 16 kHz mono WAV files through `TurnDetector` with the model in its own
 process, each verdict handed over a fixed 130 ms later on the replay's own
 clock, and prints each turn's start, end and decision, and every verdict.
 `--speech-level-db` and `--faint-floor-db`/`--faint-hold-ms` add the
-voice's own level and floor. Nothing is played. A profile's two flags set
+voice's own level and floor. Nothing is played. A profile's three flags set
 the policy as the lamp would:
 - `recheck` asks an uncertain verdict again at once, with the pause so far, and a complete second ends the line at the commit (`ConfirmPolicy::recheck_uncertain`, off on every lamp, with no switch). A turn it ended says `first_p`, the first verdict's probability.
 - `short` asks lines under the commit's floor from 0.2 s, as `LAMP_ENDPOINT_SHORT_VERDICT` does. Each turn says its `short_asks`.
+- `start` counts the line's start toward `LEAST_MS` (`ConfirmPolicy::count_start`), as `LAMP_ENDPOINT_LEAST_SPEECH_MS` does with its floor in `LEAST_MS`; so `lower:400:0.9:500:start` is the switch at 500 beside `lamp:400:0.9:800`. Each turn says its `speech_ms`, as counted.
 
 On 21 Oct (#2135, #1722 07:45) neither paid. On 53 real-speech lines the second ask ended 1 line 140 ms sooner. On 428 played lines it ended 12 sooner and cut 2 in two. The short verdict changed no End on either, for 340 more inferences. Both are kept to measure the next real bundles. Its evidence for #782 is in
 [verification/comma-pause-20261015/](verification/comma-pause-20261015/).

@@ -143,6 +143,7 @@ fn only_a_call_whose_wait_ran_out_is_told_to_the_model() {
         verdict: None,
         call_wait_ms,
         short_asks: 0,
+        speech_ms: None,
         rechecked_from: None,
     };
     let (waited, other) = (end(Some(2_000)), end(None));

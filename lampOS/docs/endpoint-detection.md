@@ -226,7 +226,11 @@ Each `Activity::End` records an `EndpointDecision`:
     `includes_silence_wait_ms` is the actual pause; `short_asks` on a
     line under the commit's floor sent to the model all the same, one a
     pause
-    (`LAMP_ENDPOINT_SHORT_VERDICT`, `endpoint-pilot.md`); and
+    (`LAMP_ENDPOINT_SHORT_VERDICT`, `endpoint-pilot.md`); `speech_ms`, the
+    line's speech as the confirmation counted it at the decision, what the
+    commit's floor (`least_speech_blocks`) was held against (with
+    `LAMP_ENDPOINT_LEAST_SPEECH_MS` the floor is lower and the line's start
+    counts toward it, `endpoint-pilot.md`); and
     `rechecked_from`, the first verdict's probability, when an uncertain
     verdict asked again came back complete and ended the line
     (`ConfirmPolicy::recheck_uncertain`: off, with no switch, for the
