@@ -337,6 +337,100 @@ impl Baseline {
     }
 }
 
+/// Most known people whose baselines are held at once: the one heard
+/// longest ago goes first.
+pub const MOST_PEOPLE: usize = 8;
+
+/// Whose way of speaking a line was read against: the known person's at the
+/// lamp, or the room's, for a line with no known face there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Whose {
+    Person,
+    Room,
+}
+
+/// A baseline for each known person, by their memory id (never a name), and
+/// the room's for every line with no known face. In memory only: nothing is
+/// written, and all of it goes at a restart. The eyes' known person is the
+/// face at the lamp, not always the one speaking: someone unknown talking
+/// beside them is read against theirs.
+#[derive(Debug, Default)]
+pub struct Baselines {
+    room: Baseline,
+    /// The one heard longest ago first.
+    people: Vec<(String, Baseline)>,
+}
+
+impl Baselines {
+    /// How `tone` sits against `person`'s own baseline, or the room's with
+    /// none, which then takes it in; whose it was, and its lines since.
+    pub fn hear(&mut self, person: Option<&str>, tone: &Tone) -> (Reading, Whose, u32) {
+        let Some(person) = person else {
+            let reading = self.room.hear(tone);
+            return (reading, Whose::Room, self.room.lines());
+        };
+        let mut theirs = match self.people.iter().position(|(id, _)| id == person) {
+            Some(at) => self.people.remove(at).1,
+            None => Baseline::default(),
+        };
+        let reading = theirs.hear(tone);
+        let lines = theirs.lines();
+        if self.people.len() >= MOST_PEOPLE {
+            self.people.remove(0);
+        }
+        self.people.push((person.to_owned(), theirs));
+        (reading, Whose::Person, lines)
+    }
+
+    /// Lets `person`'s baseline go, or with no known person the room's,
+    /// which their lines went into.
+    pub fn forget(&mut self, person: Option<&str>) {
+        match person {
+            Some(person) => self.people.retain(|(id, _)| id != person),
+            None => self.room = Baseline::default(),
+        }
+    }
+
+    /// Lets every baseline go, the room's too.
+    pub fn forget_all(&mut self) {
+        *self = Self::default();
+    }
+
+    /// The known people whose baselines are held.
+    pub fn people(&self) -> usize {
+        self.people.len()
+    }
+}
+
+/// What a line's words ask the baselines to let go of.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Forget {
+    /// Their face: the known person's own baseline, or the room's with
+    /// none known.
+    Theirs,
+    /// Everything: every baseline, the room's too.
+    All,
+}
+
+/// Whether `said` asks to forget their face or everything, by its words
+/// ([`crate::remember::asks_to_forget`] and
+/// [`crate::remember::names_forget`]). Read before any function runs, so a
+/// forget the lamp then holds back still lets the baseline go: it is
+/// learned again in a few lines.
+pub fn forgets(said: &str) -> Option<Forget> {
+    if !crate::remember::asks_to_forget(said) {
+        return None;
+    }
+    if crate::remember::names_forget(said, crate::remember::FORGET_EVERYTHING) {
+        Some(Forget::All)
+    } else if crate::remember::names_forget(said, crate::known_faces::FORGET) {
+        Some(Forget::Theirs)
+    } else {
+        None
+    }
+}
+
 /// What `voice/tone` says of the line `request`: its reading and its words'
 /// valence, if any.
 pub fn told(request: u64, reading: Reading, valence: Option<f32>) -> lamp_msgs::VoiceTone {
@@ -590,6 +684,92 @@ mod tests {
             loud.hear(&theirs);
         }
         assert!(loud.hear(&theirs).arousal.abs() < 0.1);
+    }
+
+    /// Each known person is read against their own way of speaking, and a
+    /// line with no known face against the room's: a quiet person's
+    /// ordinary line isn't calm because a loud one spoke before them.
+    #[test]
+    fn each_known_person_is_read_against_their_own_way() {
+        let quiet = tone_of(&voice(110.0, 1.0, -30.0, 3.5, 1.5)).unwrap();
+        let loud = tone_of(&voice(170.0, 4.0, -18.0, 6.0, 1.5)).unwrap();
+        let mut baselines = Baselines::default();
+        for _ in 0..6 {
+            baselines.hear(Some("p-jim"), &quiet);
+            baselines.hear(Some("p-ann"), &loud);
+        }
+        let (jim, whose, lines) = baselines.hear(Some("p-jim"), &quiet);
+        assert!(jim.arousal.abs() < 0.1 && jim.sure > 0.9, "{jim:?}");
+        assert_eq!((whose, lines), (Whose::Person, 7));
+        let (ann, ..) = baselines.hear(Some("p-ann"), &loud);
+        assert!(ann.arousal.abs() < 0.1, "{ann:?}");
+        // Jim's ordinary line read against Ann's would be calm.
+        let mut theirs = Baseline::default();
+        for _ in 0..6 {
+            theirs.hear(&loud);
+        }
+        assert!(theirs.hear(&quiet).arousal < -0.5);
+        // The room's is apart: its first line says nothing.
+        let (room, whose, lines) = baselines.hear(None, &loud);
+        assert_eq!((room.sure, whose, lines), (0.0, Whose::Room, 1));
+        // A new person's first line says nothing either.
+        let (new, ..) = baselines.hear(Some("p-sam"), &loud);
+        assert_eq!(new.sure, 0.0);
+    }
+
+    /// At most eight people: the one heard longest ago goes first, and one
+    /// heard again is kept.
+    #[test]
+    fn the_person_heard_longest_ago_goes_first() {
+        let tone = tone_of(&voice(120.0, 1.0, -26.0, 4.0, 1.5)).unwrap();
+        let mut baselines = Baselines::default();
+        for person in 0..MOST_PEOPLE {
+            baselines.hear(Some(&format!("p-{person}")), &tone);
+        }
+        baselines.hear(Some("p-0"), &tone);
+        baselines.hear(Some("p-new"), &tone);
+        assert_eq!(baselines.people(), MOST_PEOPLE);
+        // p-1 went; p-0, heard again, kept its two lines.
+        assert_eq!(baselines.hear(Some("p-1"), &tone).2, 1);
+        assert_eq!(baselines.hear(Some("p-0"), &tone).2, 3);
+    }
+
+    /// Forgetting their face lets their baseline go and no one else's, or
+    /// the room's for someone not known; forgetting everything lets every
+    /// one go, the room's too.
+    #[test]
+    fn a_forget_lets_the_baselines_go() {
+        let tone = tone_of(&voice(120.0, 1.0, -26.0, 4.0, 1.5)).unwrap();
+        let mut baselines = Baselines::default();
+        for _ in 0..3 {
+            baselines.hear(Some("p-jim"), &tone);
+            baselines.hear(Some("p-ann"), &tone);
+            baselines.hear(None, &tone);
+        }
+        baselines.forget(Some("p-jim"));
+        assert_eq!(baselines.hear(Some("p-jim"), &tone).2, 1);
+        assert_eq!(baselines.hear(Some("p-ann"), &tone).2, 4);
+        assert_eq!(baselines.hear(None, &tone).2, 4);
+        // Someone with no known face: their lines went into the room's.
+        baselines.forget(None);
+        assert_eq!(baselines.hear(None, &tone).2, 1);
+        assert_eq!(baselines.hear(Some("p-ann"), &tone).2, 5);
+        baselines.forget_all();
+        assert_eq!(baselines.people(), 0);
+        assert_eq!(baselines.hear(None, &tone).2, 1);
+
+        assert_eq!(forgets("Forget my face, please"), Some(Forget::Theirs));
+        assert_eq!(
+            forgets("Please forget everything about me"),
+            Some(Forget::All)
+        );
+        assert_eq!(
+            forgets("Delete everything you know about my face"),
+            Some(Forget::All)
+        );
+        assert_eq!(forgets("Forget what I said about the dentist"), None);
+        assert_eq!(forgets("What a lovely face that dog has"), None);
+        assert_eq!(forgets("Did you forget your keys?"), None);
     }
 
     /// The words' valence: glad and down words, turned by a "not" just
