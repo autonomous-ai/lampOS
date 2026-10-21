@@ -221,8 +221,12 @@ gives the app one narrow call for it and no read access.
 - **The narrow socket:** `--forget-socket ABSOLUTE_SOCKET_PATH
   --forget-group NAME` (both or neither; off unless set) opens a second
   socket beside the main one, mode 0660 and owned by group `NAME`, looked up
-  in `/etc/group` at the start (an unknown group ends the start). The main
-  socket stays 0600. A line on it must be exactly
+  in `/etc/group` at the start. One that can't be made (an unknown group,
+  or a group memory's own user can't give the socket, EPERM) is logged as
+  `the forget socket is not open` and left out: memory still serves its
+  own socket, and an app removal answers that memory was kept. So memory's
+  user must be in that group too, as lamp-cloud's. The main socket stays
+  0600. A line on it must be exactly
   `{"op":"forget_person","person":ID}`, those two keys and an id of the
   shape above; it is re-encoded before the store sees it
   (`protocol::narrow`). Anything else (`recall`, `search`, `kept`, `status`,

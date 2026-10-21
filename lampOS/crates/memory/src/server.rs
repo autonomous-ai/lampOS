@@ -245,6 +245,14 @@ impl Server {
     /// main socket: a stale one is replaced, and it is never at its path
     /// with any other mode.
     pub fn forget_socket(mut self, socket: &Path, group: u32) -> io::Result<Self> {
+        self.open_forget_socket(socket, group)?;
+        Ok(self)
+    }
+
+    /// [`Self::forget_socket`] in place: on an error the server is as it
+    /// was, serving its own socket, so a narrow socket that can't be made
+    /// (its group not memory's to give) never stops memory itself.
+    pub fn open_forget_socket(&mut self, socket: &Path, group: u32) -> io::Result<()> {
         directory_of(socket)?;
         if socket == self.socket {
             return Err(io::Error::new(
@@ -257,7 +265,7 @@ impl Server {
         listener.set_nonblocking(true)?;
         self.listener.set_nonblocking(true)?;
         self.forget = Some((listener, socket.into()));
-        Ok(self)
+        Ok(())
     }
 
     /// Wait this long for a client and no longer.
