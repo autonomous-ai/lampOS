@@ -39,7 +39,11 @@ impl KeyRefusals {
                     self.in_a_row
                 );
             }
-            ProviderOutput::TurnComplete { .. } => *self = Self::default(),
+            // Answered: the model's generation finished. An idle
+            // `TurnComplete` alone is no answer: a line held as unclear or
+            // not for the lamp, onboarding's count, a held or given-up turn
+            // never asked the services (the reviewer-lead on #2561).
+            ProviderOutput::GenerationComplete { .. } => *self = Self::default(),
             _ => {}
         }
     }
@@ -73,12 +77,18 @@ mod tests {
         assert!(!refusals.said(1_000_000), "one refusal is the journal's");
         refusals.observe(&refused(2), 2_000_000);
         assert!(refusals.said(2_000_000));
+        // A turn that ended without asking the services is no answer.
         refusals.observe(
             &ProviderOutput::TurnComplete {
                 request: 3,
                 idle: true,
             },
             3_000_000,
+        );
+        assert!(refusals.said(3_000_000));
+        refusals.observe(
+            &ProviderOutput::GenerationComplete { request: 4 },
+            4_000_000,
         );
         assert!(!refusals.said(STILL_REFUSED_US * 2));
     }
