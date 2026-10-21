@@ -2052,6 +2052,117 @@ pub(crate) mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// The reports' records kept as fixtures, one folder for each change of a
+    /// record's shape, each written by its day's builds: setup's answer
+    /// (lamp-setup's `write_a_reports_answer_fixture`), and lamp-cloud's own
+    /// choice and queue ([`write_a_reports_fixture`]). Every later build reads
+    /// each as it was kept: the person's yes stands, with who gave it, and
+    /// the queued crash waits to be sent, nothing set aside, so an update
+    /// never turns reports off or drops what waits (the build row "Updates
+    /// cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_reports_record_reads_as_it_was_kept() {
+        macro_rules! day {
+            ($day:literal) => {
+                (
+                    $day,
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/setup.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/own.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/queue/state.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/queue/1.json"
+                    )),
+                )
+            };
+        }
+        let kept_days = [day!("2026-10-21")];
+        for (day, setup, own, state, crash) in kept_days {
+            // Setup's answer alone, as on a lamp nobody has changed it on.
+            let alone = places(&format!("kept-setup-{day}"));
+            fs::write(&alone.setup, setup).unwrap();
+            let consent = consent(&alone);
+            assert!(consent.share, "{day}");
+            assert_eq!(consent.by, Some(lamp_msgs::ReportsBy::Setup), "{day}");
+            assert_eq!(
+                consent.since.as_deref(),
+                Some("2026-10-21T02:40:00Z"),
+                "{day}"
+            );
+            let _ = fs::remove_dir_all(alone.own.parent().unwrap());
+            // With lamp-cloud's own choice and its queue.
+            let kept = places(&format!("kept-own-{day}"));
+            fs::write(&kept.setup, setup).unwrap();
+            fs::write(&kept.own, own).unwrap();
+            fs::create_dir_all(&kept.queue).unwrap();
+            fs::write(kept.queue.join("state.json"), state).unwrap();
+            fs::write(kept.queue.join("1.json"), crash).unwrap();
+            let mut reports = Reports::open(kept.clone());
+            let consent = reports.consent();
+            assert!(consent.share, "{day}");
+            assert_eq!(consent.by, Some(lamp_msgs::ReportsBy::App), "{day}");
+            assert_eq!(
+                consent.since.as_deref(),
+                Some("2026-10-21T02:41:00Z"),
+                "{day}"
+            );
+            assert_eq!(reports.state().queued, 1, "{day}");
+            let due = reports.due(ID);
+            assert_eq!(due.len(), 1, "{day}");
+            let (seq, sent) = &due[0];
+            let mut sent: Value = serde_json::from_str(sent).unwrap();
+            assert_eq!(sent["id"], ID, "{day}");
+            sent.as_object_mut().unwrap().remove("id");
+            assert_eq!(
+                (*seq, sent),
+                (1, serde_json::from_str::<Value>(crash).unwrap()),
+                "{day}"
+            );
+            assert_eq!(reports.said(), Vec::<String>::new(), "{day}");
+            let _ = fs::remove_dir_all(kept.own.parent().unwrap());
+        }
+    }
+
+    /// Writes lamp-cloud's own reports records to the folder in
+    /// `LAMP_CLOUD_REPORTS_FIXTURE`: the app's yes (`own.json`), and the
+    /// queue with one crash (`queue/`). Setup's answer beside them comes from
+    /// lamp-setup's own writer. Run by hand when a record's shape changes,
+    /// keeping the folders kept.
+    #[test]
+    #[ignore = "writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set"]
+    fn write_a_reports_fixture() {
+        let target = PathBuf::from(
+            std::env::var_os("LAMP_CLOUD_REPORTS_FIXTURE").expect("LAMP_CLOUD_REPORTS_FIXTURE"),
+        );
+        // 21 Oct 2026, 02:40 UTC.
+        const AT: u64 = 1_792_550_400;
+        let places = places("fixture");
+        let mut reports = Reports::open(places.clone());
+        reports.set(true, AT + 60).unwrap();
+        let note = planted_note("lamp-voice.service", 5_521_000_000);
+        let seq = reports.crash(AT + 120, Build::of("1712+9f3c1a2b7d4e").as_ref(), &note);
+        assert_eq!(seq, Some(1));
+        fs::create_dir_all(target.join("queue")).unwrap();
+        fs::copy(&places.own, target.join("own.json")).unwrap();
+        for name in ["state.json", "1.json"] {
+            fs::copy(places.queue.join(name), target.join("queue").join(name)).unwrap();
+        }
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
     pub(crate) fn places(name: &str) -> Places {
         let root = PathBuf::from(format!("/tmp/lcr-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
