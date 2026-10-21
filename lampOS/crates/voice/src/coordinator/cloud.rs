@@ -74,16 +74,34 @@ impl CloudAvailability {
         )
     }
 
-    /// The link ended on a refusal that passes with time: the provider's
-    /// quota or its rate limit. Asking again at once only adds load.
-    pub(super) fn refused_for_now(&self) -> bool {
-        matches!(
-            self.latest.map(|link| link.state),
-            Some(ProviderLinkState::Terminal {
-                fault: Fault::QuotaExceeded | Fault::RateLimited,
+    /// The link ended on a refusal that asking again at once does not
+    /// mend: the provider's quota or its rate limit, which pass with time,
+    /// or the lamp's key, which needs a person (#2231: a lamp moved from V1
+    /// kept V1's key, and systemd restarted the voice every five seconds on
+    /// it). Asking again at once only adds load.
+    pub(super) fn refused_for_now(&self) -> Option<Fault> {
+        match self.latest.map(|link| link.state)? {
+            ProviderLinkState::Terminal {
+                fault: fault @ (Fault::QuotaExceeded | Fault::RateLimited | Fault::Authentication),
                 ..
-            })
-        )
+            } => Some(fault),
+            _ => None,
+        }
+    }
+
+    /// Why the link is down, when the provider refused it rather than
+    /// could not be reached: the lamp's key, or its quota or rate limit
+    /// (#2231). Said in the voice's health as it is, not as a link down.
+    pub(super) fn refusal(&self) -> Option<Fault> {
+        match self.latest.map(|link| link.state)? {
+            ProviderLinkState::Terminal { fault, .. }
+            | ProviderLinkState::Unavailable { reason: fault, .. } => matches!(
+                fault,
+                Fault::Authentication | Fault::QuotaExceeded | Fault::RateLimited
+            )
+            .then_some(fault),
+            _ => None,
+        }
     }
 }
 
@@ -998,14 +1016,63 @@ mod tests {
         assert!(!cloud.available());
         assert!(cloud.observe(ready(5, 3, 500), 500).is_err());
         // A lost connection is not a refusal that passes with time.
-        assert!(!cloud.refused_for_now());
+        assert!(cloud.refused_for_now().is_none());
+    }
+
+    /// #2231 (the reviewer on #2459): `refusal()` names a refused key, a
+    /// spent quota and a rate limit, from a link unavailable or ended, and
+    /// nothing else, so any other fault is said as a link down.
+    #[test]
+    fn a_refusal_is_named_from_an_unavailable_or_ended_link_and_nothing_else_is() {
+        let seen = |state: ProviderLinkState| {
+            let mut cloud = CloudAvailability::default();
+            cloud
+                .observe(
+                    ProviderLink {
+                        revision: 1,
+                        session: 1,
+                        observed_at_us: 100,
+                        source_clock: None,
+                        state,
+                    },
+                    100,
+                )
+                .unwrap();
+            cloud.refusal()
+        };
+        for fault in [
+            Fault::Authentication,
+            Fault::QuotaExceeded,
+            Fault::RateLimited,
+        ] {
+            assert_eq!(
+                seen(ProviderLinkState::Unavailable { reason: fault }),
+                Some(fault)
+            );
+            assert_eq!(
+                seen(ProviderLinkState::Terminal {
+                    reason: LinkFailure::InitialConnect,
+                    fault,
+                    attempts: 0,
+                }),
+                Some(fault)
+            );
+        }
+        for fault in [
+            Fault::Transport,
+            Fault::ConnectTimeout,
+            Fault::ServerUnavailable,
+        ] {
+            assert_eq!(seen(ProviderLinkState::Unavailable { reason: fault }), None);
+        }
+        assert_eq!(CloudAvailability::default().refusal(), None);
     }
 
     #[test]
     fn a_spent_quota_or_a_rate_limit_is_a_refusal_for_now_and_nothing_else_is() {
         let ended_on = |fault: Fault| {
             let mut cloud = CloudAvailability::default();
-            assert!(!cloud.refused_for_now());
+            assert!(cloud.refused_for_now().is_none());
             cloud
                 .observe(
                     ProviderLink {
@@ -1022,12 +1089,13 @@ mod tests {
                     100,
                 )
                 .unwrap();
-            cloud.refused_for_now()
+            cloud.refused_for_now().is_some()
         };
         assert!(ended_on(Fault::QuotaExceeded));
         assert!(ended_on(Fault::RateLimited));
+        // #2231: a refused key is not mended by asking again at once either.
+        assert!(ended_on(Fault::Authentication));
         for other in [
-            Fault::Authentication,
             Fault::ServerUnavailable,
             Fault::Transport,
             Fault::ConnectTimeout,
