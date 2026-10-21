@@ -29,7 +29,9 @@ fn judge(root: &Path, enabled: bool) -> Running {
         .arg(root)
         .env_remove("LAMP_ADDONS")
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        // Its journal, kept in the test's folder for a failure to show
+        // (Second on #2602, 22:0x: a failure on a Mac said only `[]`).
+        .stderr(std::fs::File::create(root.join("judge.log")).unwrap());
     if enabled {
         command.arg("--enable");
     }
@@ -181,14 +183,29 @@ fn run(
     while let Some(message) = said.recv(Duration::from_millis(300)).unwrap() {
         decisions.push(message.parse().unwrap());
     }
+    let journal = std::fs::read_to_string(dir.path().join("judge.log")).unwrap_or_default();
+    JOURNAL.with(|kept| *kept.borrow_mut() = journal);
     (requests, decisions)
+}
+
+thread_local! {
+    /// The judge's journal in this test's last run, for a failure to show.
+    static JOURNAL: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// What the judge journaled in this thread's last run.
+fn journal() -> String {
+    JOURNAL.with(|kept| kept.borrow().clone())
 }
 
 #[test]
 fn a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle() {
-    let requests = asked(true, false);
+    let (requests, decisions) = judged(true, false);
     let [request] = requests.as_slice() else {
-        panic!("{requests:?}");
+        panic!(
+            "asked {requests:?}; decided {decisions:?}; the judge's journal:\n{}",
+            journal()
+        );
     };
     assert_eq!(request.claim.source, "addon:evening-glow");
     assert_eq!(request.claim.priority, Priority::Idle);
