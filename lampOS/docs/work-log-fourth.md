@@ -5417,6 +5417,38 @@ ARM64 gates. #2638 passed both gates and is merged.
   request. The six yielded-then-resumed gaps stay with Third, and the
   actual before/after lamp run stays with First.
 
+## 2026-10-21, 23:5x ICT: cue and continuing-answer counter pass their final-head ARM64 gates
+
+Ready for lamp-voice: yes (#2665, #2684). #2638 is already merged.
+
+- **#2665**, `3e52d435f567d6a1f28665360936614d58a74f22`: native ARM64
+  **39636846326** passed **9740 tests, zero failed, 63 skipped**;
+  workspace Clippy **39636846685** passed. Four doc tests,
+  `relay_signals`, all twelve turn-end-wire process tests, release
+  build and packaging passed. Artifact **12365245322** is
+  `lampos-arm64-3e52d435f567d6a1f28665360936614d58a74f22`.
+  The current head's gate, commands and counts are posted on the PR.
+- **#2684**, `b89414abc74af03e6340d57a1d8c055d71f0af0b`: native ARM64
+  **39636433392** passed **9747 tests, zero failed, 63 skipped**;
+  workspace Clippy **39636432392** passed. Four doc tests,
+  `relay_signals`, all twelve turn-end-wire process tests, release
+  build and packaging passed. Artifact **12364210039** is
+  `lampos-arm64-b89414abc74af03e6340d57a1d8c055d71f0af0b`. The PR is
+  now non-draft, and its ready head and counts are on Queue #2602.
+- Each native run marks the same existing passing voice journal test
+  leaky, as in the preceding entry; neither gate failed. Logs and final
+  CI metadata are retained under `/private/tmp/fourth-cue-review-20261021-checks/`
+  and `/private/tmp/fourth-answer-gaps-checks/`.
+- **The test-only slow-second-piece follow-up is not ready yet.** Its
+  paused-clock regression passes both release and retirement. Skipping
+  a pending later speech queue makes it fail at the intended hold/order
+  assertion; restoring the production file byte for byte makes it pass.
+  Formatting and scoped Clippy pass; the full Voice test gate is running.
+  Only the test fixture, regression and verification README are changed.
+- The remaining real measurement is First's same-hour cue comparison on
+  lamp-4ace. Fourth has no lamp and made no provider or device request.
+  No speculative connection pool or other runtime policy was added.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
