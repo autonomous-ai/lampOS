@@ -1,6 +1,8 @@
-# Authored defaults, off until the first lamp comparison (#1672).
+# Authored defaults, off until the first lamp comparison (#1672). The lamp's
+# sleep and its wake are Night sleep's and Expression's (#940): this keeps
+# the evening glow, the morning hum and the night's ceilings.
 enabled = false
-needs = ["eyes", "voice", "body", "light"]
+needs = ["eyes", "voice", "light"]
 kind = "core"
 version = "1.0.0"
 
@@ -8,7 +10,6 @@ version = "1.0.0"
 topics = ["humans/faces/tracked", "voice/state", "voice/heard"]
 speak = true
 light = true
-body = true
 output_limits = true
 
 # Restrictions do not wait for a presentation or for someone to be there.
@@ -26,16 +27,6 @@ for = "30s"
 wait = "1m"
 rearm = "ends"
 during = { from = "21:00", to = "23:00" }
-once_per_day = true
-
-[[trigger]]
-name = "bedtime"
-topic = "humans/faces/tracked"
-present = false
-for = "15m"
-wait = "15m"
-rearm = "ends"
-during = { from = "23:00", to = "06:00" }
 once_per_day = true
 
 [[trigger]]
@@ -65,10 +56,5 @@ on = "evening"
 light = { relative = { warmer = 1, dimmer = 1 }, for = "20s", pattern = { kind = "breathe", period = "10s" } }
 
 [[do]]
-on = "bedtime"
-rest = { op = "rest", during = { from = "23:00", to = "10:00" }, resettle = { most = 3, after = "30s", during = { from = "23:00", to = "06:00" } } }
-
-[[do]]
 on = "morning"
-rest = { op = "wake" }
 cue = "hum"

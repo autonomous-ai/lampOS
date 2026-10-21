@@ -103,6 +103,68 @@ Uncorroborated names produce a one-shot journal line beginning
 are coalesced between ticks). This does not change microphone privacy or the
 independent touch, reminder, morning-face and Thinking/Speaking wake paths.
 
+## Night sleep is a skill
+
+Since #940 the *when* of the night's sleep is the core skill
+[`night-sleep`](../skills/night-sleep/skill.toml), installed in every product
+lamp but inert until its switches are on (below), and the *how* stays here: the bow, the breath, the 4 s settle, the bounds,
+and every reflex that wakes it. The skill holds today's trigger exactly:
+nobody seen for 15 minutes (`present = false`, `for = "15m"`), the voice
+resting all those 15 minutes (`[[while]]` on `voice/state`, `for = "15m"`:
+the built-in clock began again whenever the voice was not resting, so not
+Bedtime's 30 s), awake all those 15 minutes (`[[while]]` on
+`expression/state`'s `asleep`, `for = "15m"`: woken, it sleeps again only
+after nobody again for as long), and 23:00 to 06:00 as its `[active]`
+hours, so someone gone since 22:30 is slept on at 23:00 as before. Its one
+step is `do.rest`, renewed every second through the night, to 22:59 at
+most. It has no light, sound or words, and its runs ask nobody (the core
+grant `sleep`, [skills.md](skills.md)).
+
+Expression holds the claimed skill's rest as it holds its own sleep: the
+voice listening (a night sound), a new voice turn, a privacy mute or the
+body held do not end it; its name with speech, a touch, a tap on the head, a
+reminder, a conversation, manual sleep, Expression off or a lapsed lease
+do. The first face out of the night wakes it, as it wakes the built-in
+sleep. It begins on the built-in sleep's own conditions (a free body and a
+resting voice; a privacy mute does not keep it awake). Another skill's rest
+keeps the generic gate ([expression.md](expression.md#leased-skill-rest-requests)).
+
+**The claim.** With `LAMP_SKILL_ROUTINES=on`, lamp-skills says
+`expression/sleep_claim` (`{"skill":"night-sleep","on":true}`) at each
+reload and every 60 s while the folder loads. Turned off by a person (the
+`off` file) or disabled, it says `on: false`: a lamp that does not sleep at
+night is that person's choice, so Expression does not sleep by itself
+either. With `LAMP_REST_REQUESTS=on`, Expression reads it once a second: a
+claim from `skills` said under 180 s ago gives the night to the skill.
+None, or one older, is the fallback: Expression sleeps by its own schedule
+as before, so a crashed lamp-skills or an old skills folder never leaves a
+lamp that does not sleep. The journal says each change once:
+`lamp-expression: no skill claims the night's sleep: Expression sleeps by
+its own schedule, the fallback kept for one release (#940)`, and
+`lamp-expression: night-sleep claims the night's sleep (on): ...`. A
+claim that comes back while the fallback sleeps leaves that sleep be; the
+first face of the morning or a reflex wakes it. The fallback is marked
+`FALLBACK (#940` in `engine.rs` and `runtime.rs`, and goes in the release
+after. Both switches stay off in the product units for now: Night sleep is
+installed but inert, and Expression's built-in sleep keeps every lamp's
+nights as before. They are turned on in a later PR, after the rest
+handover (a skills restart or the window's edge with no lift).
+
+**The same sleep.** `crates/skills/tests/it/night_sleep.rs` runs one fixture
+night (22:30 to 06:05: a sound, a touch, a reminder, a conversation, its
+name, the first face at 06:01) through both routes with today's product
+catalogue. Each of the five settles is within one look of the eyes
+(600 ms) of the built-in one (four to the tick; after the name, 0.6 s
+earlier, as the skill's voice clock begins at the voice's word and the
+built-in one at the next look), and the same five wakes come at the same
+tick. Nothing a person sees or hears changes: the same bow, breath and
+settle, no light and no sound. Known differences, none in the fixture: a
+face below Expression's 0.6 confidence counts as someone for the skill; a
+rest refused by Expression (the body held) is tried again a minute later;
+a lamp nobody saw for a whole day lifts its head at 22:59 and settles
+again at 23:15 (the rest's longest window); and a lamp-skills restarted
+mid-night counts its 15 minutes from its start.
+
 Nothing is random. A drift's wait and size come from a fixed hash of how
 many drifts came before, so a replay gives the same plan every time. All
 of it runs on the planner's injected clock and the inputs it was given.

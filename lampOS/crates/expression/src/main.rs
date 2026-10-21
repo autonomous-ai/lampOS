@@ -296,8 +296,9 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .as_deref(),
     );
+    // With rest requests on as well: with no skill claiming the night, the
+    // built-in schedule is the fallback (#940), and it needs the zone too.
     if args.command == "serve"
-        && !rest_requests
         && catalogue
             .alive
             .as_ref()

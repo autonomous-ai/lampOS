@@ -21,6 +21,12 @@ pub(super) struct Gate {
     pub eligible: bool,
     /// Why it is not eligible: the first shut gate.
     pub why_not: Option<&'static str>,
+    /// Why not even the night's sleep may be held: Expression off or
+    /// faulted. The built-in sleep stops only with them too.
+    pub off: Option<&'static str>,
+    /// The skill that claims the night's sleep (#940): its rest is held as
+    /// the built-in sleep is, through what does not wake that sleep.
+    pub sleep: Option<String>,
     pub owner: Option<Owner>,
     pub context: Context,
 }
@@ -81,12 +87,31 @@ impl Rest {
         self.end(now, Phase::Cancelled, life);
     }
 
+    /// End the active rest, if any, saying why once, as `sync` does.
+    pub fn withdraw(&mut self, now: u64, why: &'static str, life: &mut Option<Life>) {
+        if self.active.is_some() {
+            self.cancel(now, life);
+            self.ended = Some(why);
+        }
+    }
+
     pub fn sync(&mut self, now: u64, gate: &Gate, life: &mut Option<Life>) {
         let Some(active) = &self.active else {
             return;
         };
         let why = if now >= active.request.valid_until_us {
             Some("its lease ran out")
+        } else if active.phase == Phase::Resting && sleeps(gate, &active.request) {
+            // The night's sleep: the voice listening, a privacy mute, the
+            // body held or a new turn of the voice do not end it, as they
+            // do not end the built-in sleep. A reflex does.
+            gate.off.or(match life.as_ref() {
+                None => Some("there is no life planner"),
+                Some(life) if !life.routine_owned() => Some(
+                    "a stronger reflex took it over: a name, a touch, a reminder or a conversation",
+                ),
+                Some(_) => None,
+            })
         } else if !gate.eligible {
             Some(gate.why_not.unwrap_or("its gate is shut"))
         } else if gate.owner.as_ref() != Some(&active.owner) {
@@ -268,7 +293,16 @@ impl Rest {
             self.reason = None;
             return Ok(());
         }
-        if !gate.eligible || gate.owner.is_none() || (self.active.is_some() && current.is_none()) {
+        let sleep = sleeps(gate, &request);
+        let renewed = current
+            .as_ref()
+            .is_some_and(|active| active.phase == Phase::Resting);
+        let admitted = if sleep {
+            gate.off.is_none() && (gate.owner.is_some() || renewed)
+        } else {
+            gate.eligible && gate.owner.is_some()
+        };
+        if !admitted || (self.active.is_some() && current.is_none()) {
             if current.is_some() {
                 self.cancel(now, life);
             }
@@ -280,7 +314,7 @@ impl Rest {
         let allowed = match (current.as_ref().map(|active| active.phase), request.op) {
             (None, Op::Rest) | (Some(Phase::Resting), Op::Rest) => life
                 .as_mut()
-                .is_some_and(|life| life.request_routine_rest(now, &gate.context)),
+                .is_some_and(|life| life.request_routine_rest(now, &gate.context, sleep)),
             (Some(Phase::Resting), Op::Wake) => life
                 .as_mut()
                 .is_some_and(|life| life.wake_routine(now, &gate.context)),
@@ -301,9 +335,16 @@ impl Rest {
         } else {
             Phase::Waking
         };
+        // The night's sleep renewed while the voice is stale keeps the
+        // owner it began with: only a generic rest is bound to it.
+        let owner = gate
+            .owner
+            .clone()
+            .or_else(|| current.map(|active| active.owner))
+            .expect("checked owner");
         self.active = Some(Active {
             request: request.clone(),
-            owner: gate.owner.clone().expect("checked owner"),
+            owner,
             phase,
         });
         self.request = Some(request);
@@ -311,6 +352,11 @@ impl Rest {
         self.reason = None;
         Ok(())
     }
+}
+
+/// Whether `request` is from the skill that claims the night's sleep.
+fn sleeps(gate: &Gate, request: &Request) -> bool {
+    gate.sleep.as_deref() == Some(request.skill.as_str())
 }
 
 #[cfg(test)]
@@ -329,6 +375,8 @@ mod tests {
             let gate = Gate {
                 eligible: true,
                 why_not: None,
+                off: None,
+                sleep: None,
                 owner: Some(Owner {
                     session: "voice".into(),
                     turn: 1,
@@ -388,6 +436,8 @@ mod tests {
         Gate {
             eligible: true,
             why_not: None,
+            off: None,
+            sleep: None,
             owner: Some(Owner {
                 session: "voice".into(),
                 turn: 1,

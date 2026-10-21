@@ -80,6 +80,46 @@ pub fn privacy_muted_in(message: Option<lamp_bus::Message>) -> bool {
     })
 }
 
+/// The skill's claim on the night's sleep (#940), if `message` is a valid
+/// one from lamp-skills said within [`lamp_msgs::EXPRESSION_SLEEP_CLAIM_FRESH_US`]
+/// of `now_us` on this host's monotonic clock. Anything else is no claim.
+pub fn sleep_claim_in(
+    message: Option<lamp_bus::Message>,
+    now_us: u64,
+) -> Option<lamp_msgs::ExpressionSleepClaim> {
+    use lamp_msgs::{EXPRESSION_SLEEP_CLAIM_FRESH_US, ExpressionSleepClaim};
+    let message = message?;
+    if message.header.source != ExpressionSleepClaim::SOURCE
+        || message.header.at_us > now_us.saturating_add(1_000_000)
+        || now_us.saturating_sub(message.header.at_us) >= EXPRESSION_SLEEP_CLAIM_FRESH_US
+    {
+        return None;
+    }
+    message
+        .parse::<ExpressionSleepClaim>()
+        .ok()
+        .filter(|claim| claim.check().is_ok())
+}
+
+/// The journal's line for the night's sleep as `claim` leaves it.
+pub fn sleep_claim_line(claim: Option<&lamp_msgs::ExpressionSleepClaim>) -> String {
+    match claim {
+        // FALLBACK (#940, for one release): see `Engine::set_sleep_claim`.
+        None => "no skill claims the night's sleep: Expression sleeps by its own \
+                 schedule, the fallback kept for one release (#940)"
+            .into(),
+        Some(claim) => format!(
+            "{} claims the night's sleep ({}): Expression keeps no schedule of its own",
+            claim.skill,
+            if claim.on {
+                "on"
+            } else {
+                "off: a person chose that it not sleep at night"
+            }
+        ),
+    }
+}
+
 /// How often the live service tells the planner the local time of day.
 pub const DAYTIME_EVERY_US: u64 = 60_000_000;
 const DRAIN_LIMIT: usize = 32;
@@ -445,6 +485,13 @@ pub struct Service {
     pause: lamp_body::pause_in::PauseIn,
     paused: bool,
     rest: Option<(Subscriber, Publisher)>,
+    /// With rest requests, `expression/sleep_claim` read once a second
+    /// (#940): when it was last read, and the claim last said in the journal.
+    sleep_claim: Option<(
+        Bus,
+        Option<u64>,
+        Option<Option<lamp_msgs::ExpressionSleepClaim>>,
+    )>,
     /// The last rest refusal said in the journal, so a renewal refused for
     /// the same reason is not said again.
     rest_refusal_said: Option<String>,
@@ -522,6 +569,7 @@ impl Service {
             pause: lamp_body::pause_in::PauseIn::on(bus.clone()),
             paused: false,
             rest: None,
+            sleep_claim: None,
             rest_refusal_said: None,
             unplug: unplug
                 .then(|| crate::unplug::Unplug::new(bus, resting))
@@ -562,6 +610,7 @@ impl Service {
             )?);
         }
         self.privacy = Some(bus.clone());
+        self.sleep_claim = Some((bus.clone(), None, None));
         self.engine = self.engine.with_rest_requests();
         Ok(self)
     }
@@ -631,6 +680,22 @@ impl Service {
                         .flatten(),
                 ));
             }
+        }
+        if let Some((bus, looked, said)) = self.sleep_claim.as_mut()
+            && looked.is_none_or(|at| began.saturating_sub(at) >= 1_000_000)
+        {
+            *looked = Some(began);
+            let claim = sleep_claim_in(
+                bus.latest(lamp_msgs::ExpressionSleepClaim::TOPIC)
+                    .ok()
+                    .flatten(),
+                began,
+            );
+            if said.as_ref() != Some(&claim) {
+                eprintln!("lamp-expression: {}", sleep_claim_line(claim.as_ref()));
+                *said = Some(claim.clone());
+            }
+            self.engine.set_sleep_claim(began, claim.as_ref());
         }
         if let Some((bus, looked)) = self.online.as_mut()
             && looked.is_none_or(|at| began.saturating_sub(at) >= 1_000_000)

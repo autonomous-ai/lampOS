@@ -277,6 +277,7 @@ rest = {{ op = "wake" }}
                     warnings: vec![],
                     body: false,
                     light: false,
+                    asleep: None,
                 },
             )
             .unwrap();

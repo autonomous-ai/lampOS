@@ -5,6 +5,7 @@ mod call_wait;
 mod daily_engine;
 mod journal_output;
 mod made;
+mod night_sleep;
 mod package;
 mod routine_service;
 mod skills;

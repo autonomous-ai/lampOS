@@ -85,7 +85,11 @@ fn core_bedtime_manifest_is_disabled_and_has_no_model_function() {
     assert!(!skill.enabled);
     assert!(skill.is_routine());
     assert!(skill.tool.is_none());
-    assert_eq!(skill.triggers.len(), 3);
+    // Its rest and wake are Night sleep's now (#940): the evening glow and
+    // the morning hum are left.
+    assert_eq!(skill.triggers.len(), 2);
+    // A rest needs the body, which it no longer has.
+    assert!(!skill.permissions.body);
     assert!(skill.triggers.iter().all(|trigger| trigger.once_per_day));
     // The morning greeting (the first builder's ruling): 06:00 to 11:00,
     // and not once the person has spoken to the lamp since 06:00.
@@ -752,9 +756,7 @@ fn morning_minute(engine: &mut Engine, minute: u64, face: bool) -> (Vec<Call>, V
 }
 
 fn greeted(made: &[Call]) -> bool {
-    made.iter().any(
-        |call| matches!(call, Call::Rest(rest) if rest.op == lamp_msgs::ExpressionRestOp::Wake),
-    ) && made.contains(&Call::Cue)
+    made.contains(&Call::Cue)
 }
 
 #[test]

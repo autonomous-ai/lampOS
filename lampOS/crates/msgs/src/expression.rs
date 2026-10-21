@@ -189,6 +189,26 @@ mod rest_contract_tests {
     }
 
     #[test]
+    fn a_sleep_claim_names_a_skill_and_says_on_or_off() {
+        let claim = ExpressionSleepClaim {
+            skill: "night-sleep".into(),
+            on: false,
+        };
+        claim.check().unwrap();
+        assert_eq!(
+            serde_json::to_value(&claim).unwrap(),
+            serde_json::json!({"skill": "night-sleep", "on": false})
+        );
+        for skill in ["", "Night", "night sleep", &"a".repeat(65)] {
+            let wrong = ExpressionSleepClaim {
+                skill: skill.into(),
+                on: true,
+            };
+            assert!(wrong.check().is_err(), "{skill:?}");
+        }
+    }
+
+    #[test]
     fn rest_receipt_reads_nested_additions_without_guessing_operations_or_phases() {
         let request = request();
         let state = ExpressionRestState {
@@ -773,6 +793,54 @@ impl ExpressionLight {
     }
 }
 
+/// How often `lamp-skills` says its claim on the night's sleep.
+pub const EXPRESSION_SLEEP_CLAIM_EVERY_US: u64 = 60_000_000;
+/// A claim older than this is gone: Expression sleeps by its own schedule.
+pub const EXPRESSION_SLEEP_CLAIM_FRESH_US: u64 = 180_000_000;
+// Renewed well inside its freshness: two in a row may be lost.
+const _: () = assert!(3 * EXPRESSION_SLEEP_CLAIM_EVERY_US <= EXPRESSION_SLEEP_CLAIM_FRESH_US);
+
+/// The skill that holds when the lamp sleeps at night (#940, `night-sleep`),
+/// said by `lamp-skills` while that skill is installed, and again every
+/// [`EXPRESSION_SLEEP_CLAIM_EVERY_US`]. `on` false is a person's choice that
+/// the lamp not sleep at night: Expression keeps the night for the skill and
+/// does not sleep by itself. With no claim, or one older than
+/// [`EXPRESSION_SLEEP_CLAIM_FRESH_US`], Expression sleeps by its own
+/// schedule, as before skills held it (for one release).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExpressionSleepClaim {
+    pub skill: String,
+    pub on: bool,
+}
+
+impl ExpressionSleepClaim {
+    pub const TYPE: &str = "lamp_msgs/ExpressionSleepClaim";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "expression/sleep_claim";
+    pub const SOURCE: &str = "skills";
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(Duration::from_micros(EXPRESSION_SLEEP_CLAIM_EVERY_US))
+            .lasting(Duration::from_micros(EXPRESSION_SLEEP_CLAIM_FRESH_US))
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        if self.skill.is_empty()
+            || self.skill.len() > 64
+            || !self
+                .skill
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return Err(Invalid(
+                "a sleep claim names a skill: 1..64 lowercase letters, digits or hyphens".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// What the planner intends, never a hardware completion report. `body` and
 /// `light` say whether this step emits a leased command, so shadow is explicit.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -788,6 +856,12 @@ pub struct ExpressionState {
     pub warnings: Vec<String>,
     pub body: bool,
     pub light: bool,
+    /// Asleep or falling asleep, as `behaviours` names it, as one value a
+    /// skill's `[[while]]` can test (#940: night sleep waits for the lamp to
+    /// have been awake its fifteen minutes, as the built-in sleep does).
+    /// Absent where Expression plans no idle layer this step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asleep: Option<bool>,
 }
 
 impl ExpressionState {
@@ -848,6 +922,10 @@ pub fn expression_topics() -> Vec<(&'static str, Declaration)> {
         (
             ExpressionRestState::TOPIC,
             ExpressionRestState::declaration(),
+        ),
+        (
+            ExpressionSleepClaim::TOPIC,
+            ExpressionSleepClaim::declaration(),
         ),
     ];
     topics.sort_by_key(|(name, _)| *name);

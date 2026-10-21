@@ -1,5 +1,20 @@
 # Bedtime and Morning (#1672)
 
+**Since #940 (the first builder on #2602, 22 Oct):** the lamp's sleep is
+the core skill [Night sleep](alive.md#night-sleep-is-a-skill), installed in
+every product lamp (its switches stay off for now, so Expression's built-in
+sleep runs), and the first face of the morning wakes it as Expression's
+reflex. Bedtime and Morning dropped its own `rest` and `wake` steps and its
+bedtime trigger: it keeps the evening glow, the morning hum and the night's
+ceilings, installed and off, a person's add-on. Its morning hum no longer
+waits for a night it rested or for a wake it owns, and it plays no stretch
+of its own. What this page says below of its bedtime rest, settling again
+after a night sound and the morning's owned wake describes the routine
+mechanism as Bedtime used it before #940; no shipped skill uses `resettle`
+or `op = "wake"` now. The hazard where rest requests on with no skill meant
+a lamp that never slept is closed: with no fresh claim on the night,
+Expression sleeps by its own schedule (the fallback, for one release).
+
 The product installer includes the [core skill](../skills/bedtime-morning/skill.toml)
 at `/var/lib/lampOS/skills/bedtime-morning/`, disabled with `enabled = false`.
 It copies `skill.toml` and `SKILL.md`, excluding `tests/`: eighteen product
@@ -21,7 +36,7 @@ leaves that feature off.
 | Switch | Owner and effect |
 |---|---|
 | `LAMP_SKILL_ROUTINES` | Skills admits routine definitions and runs their rest manager. Disabled manifests still contribute no active triggers or tools. |
-| `LAMP_REST_REQUESTS` | Expression accepts leased rest intents and replaces its automatic night/absence and morning/face decisions with skill scheduling. Its existing `--enable` remains necessary for actuator requests. |
+| `LAMP_REST_REQUESTS` | Expression accepts leased rest intents. While lamp-skills claims the night (`expression/sleep_claim`, renewed every 60 s, gone after 180 s), its automatic night/absence decision is the skill's; with no fresh claim it keeps its own schedule, the fallback for one release (#940). Its existing `--enable` remains necessary for actuator requests. |
 | `LAMP_OUTPUT_CAPS` | Actions serves durable private cap operations; Voice applies their snapshots in the ordinary ring worker. Skills starts its limits client only when this switch and `LAMP_SKILL_ROUTINES` are both on. |
 
 These controls and the manifest's `enabled` field must be coordinated during
@@ -43,8 +58,11 @@ would exit 2 on an option it doesn't know (#2157). Their respective
 `StateDirectory=lampos-skills-state` and `StateDirectory=lampos-output-caps`
 declarations use mode 0700 and the service user `lampos`. Systemd creates
 these durable directories when the services start. The paths do not enable
-the new features: all three switches remain unset in the product units,
-and the manifest stays disabled with no active trigger or advertised tool.
+the new features. The product units leave `LAMP_SKILL_ROUTINES` and
+`LAMP_REST_REQUESTS` off for now, so Night sleep (#940) is inert and
+Expression's built-in sleep runs; the switch-on is a later PR.
+`LAMP_OUTPUT_CAPS` stays unset, so this skill's ceilings stay off, and its
+manifest stays disabled with no active trigger or advertised tool.
 
 Skills chooses when a routine is eligible. Expression owns its rest pose
 and transitions; Body retains the existing fold, pause, range and motor
@@ -80,10 +98,9 @@ excluding its end.
 |---|---|---|
 | Night ceilings | 21:00–06:00, independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
 | Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Always a level under their light, never over, in their colour when it is already warm. At level 1, off or not known, nothing is shown and the journal says why. |
-| Bedtime | 23:00–06:00; a fresh empty face list continuously for 15 minutes, kept for up to 15 minutes more while the voice has not yet rested its 30 seconds | Ask Expression to sustain this skill's rest, renewable until 10:00. A sound that ends it is followed by settling again (below), at most three times a night. |
-| Morning | 06:00–11:00; a nearby person for three seconds, the lamp rested that night, and nothing heard on `voice/heard` since 06:00 | Wake this skill's still-owned rest and, after its planned stretch completes, ask Say for a hum. A rest a sound ended early (the lamp is already up): the body's `stretching` clip, then the hum once the body says it is over. One stretch and one hum, never a second greeting. |
+| Morning | 06:00–11:00; a nearby person for three seconds and nothing heard on `voice/heard` since 06:00 | Ask Say for a hum. The lamp's wake is Expression's, at the first face (Night sleep, #940). |
 
-Evening, bedtime and morning each have one daily chance and require Voice to
+Evening and morning each have one daily chance and require Voice to
 have reported resting for 30 seconds. They retain the process's existing
 `LAMP_SKILLS_ASK` mode. The product unit currently sets `skip`, so it does not
 ask Policy. With `policy`, their `nudge` declaration becomes an `unprompted`

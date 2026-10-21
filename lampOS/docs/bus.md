@@ -430,6 +430,7 @@ that owns it:
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
 | `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
+| `expression/sleep_claim` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and the `night-sleep` folder, every 60 s | Expression, with `LAMP_REST_REQUESTS=on`: fresh under 180 s, the night is the skill's (#940) |
 | `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
@@ -482,7 +483,8 @@ importer warns when it estimates a shared timeline from legacy wall stamps.
 
 `expression_topics()` also declares `expression/rest_request` (event,
 one-second period, 500 ms lifespan) and `expression/rest_state` (latest,
-200 ms period, 500 ms lifespan). Skills' request is a clock/session/episode
+200 ms period, 500 ms lifespan), and `expression/sleep_claim` (latest,
+60 s period, 180 s lifespan, #940). Skills' request is a clock/session/episode
 bound rest, wake or cancel intent with at most a three-second lease.
 Expression publishes the correlated planning receipt; completed does not
 prove that an actuator moved. The feature switches default off. Both

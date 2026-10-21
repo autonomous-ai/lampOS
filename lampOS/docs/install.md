@@ -202,9 +202,12 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): eighteen folders are installed,
-nine enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): nineteen folders are installed,
+ten enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
+Night sleep (#940) is enabled but inert: when the lamp sleeps at night, moved out of
+Expression ([alive.md](alive.md#night-sleep-is-a-skill)); its switches stay
+off for now, so Expression's built-in sleep runs.
 Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
@@ -295,9 +298,11 @@ with `StateDirectory=lampos-skills-state`; Actions is given
 `StateDirectory=lampos-output-caps`. Both declare
 `StateDirectoryMode=0700` and run as `lampos`; systemd creates and owns these
 directories when their services start. Install writes the unit declarations,
-not the runtime journals. The paths do not enable a feature:
-`LAMP_SKILL_ROUTINES`, `LAMP_REST_REQUESTS` and `LAMP_OUTPUT_CAPS` remain
-unset in the product units, and the new skill remains disabled. Actions
+not the runtime journals. The paths do not enable a feature.
+`LAMP_SKILL_ROUTINES` (Skills) and `LAMP_REST_REQUESTS` (Expression) stay off
+in the product units for now, so Night sleep (#940) is inert and
+Expression's built-in sleep runs (the switch-on is a later PR); `LAMP_OUTPUT_CAPS` remains unset, and Bedtime
+and Morning remains disabled. Actions
 requires its caps directory only when `LAMP_OUTPUT_CAPS=on`.
 The paths come as `Environment=` lines, not as the binaries' `--daily-state`
 and `--caps-dir` options, so an older Actions or Skills from the channel
