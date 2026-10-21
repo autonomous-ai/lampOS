@@ -9,7 +9,8 @@ use lamp_bus::{Bus, Publisher};
 use lamp_local_time::LocalTime;
 use lamp_msgs::{
     ClockStamp, ExpressionRestOp as Op, ExpressionRestPhase as Phase,
-    ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionState,
+    ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionState, Faces,
+    Voice, VoiceState,
 };
 use serde::Deserialize;
 use std::{
@@ -26,6 +27,11 @@ const ADMISSION_US: u64 = 1_000_000;
 const MAX_EPISODE_US: u64 = 86_400_000_000;
 /// Includes the largest valid custom sleep-settle fallback (10 s).
 const WAKE_US: u64 = 12_000_000;
+/// The most re-settles a rest may declare a night (#1672: three).
+pub const MOST_RESETTLES: u8 = 3;
+/// A voice state older than this is not known to be resting: the voice
+/// says its state once a second.
+const VOICE_FRESH_US: u64 = 3_000_000;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -83,12 +89,33 @@ impl LimitsFile {
 pub struct RestFile {
     op: Op,
     during: Option<Hours>,
+    resettle: Option<ResettleFile>,
+}
+
+/// `resettle = { most = 3, after = "30s", during = { from, to } }`: a rest
+/// that a sound ended (the voice no longer resting) settles again, with no
+/// run, no wake clip and no daily claim, once the voice has rested `after`
+/// again inside `during`, at most `most` times (#1672).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResettleFile {
+    most: u8,
+    after: String,
+    during: Hours,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Resettle {
+    pub most: u8,
+    pub after_us: u64,
+    pub during: Window,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rest {
     pub op: Op,
     pub during: Option<Window>,
+    pub resettle: Option<Resettle>,
 }
 
 impl RestFile {
@@ -96,9 +123,31 @@ impl RestFile {
         if (self.op == Op::Rest) != self.during.is_some() {
             return Err("rest requires a during window; wake and cancel have none".into());
         }
+        if self.op != Op::Rest && self.resettle.is_some() {
+            return Err("resettle goes with op = \"rest\"".into());
+        }
+        let resettle = self
+            .resettle
+            .map(|file| {
+                let after_us = crate::duration_us(&file.after)?;
+                if !(1..=MOST_RESETTLES).contains(&file.most)
+                    || !(5_000_000..=600_000_000).contains(&after_us)
+                {
+                    return Err(format!(
+                        "resettle is most 1 to {MOST_RESETTLES}, after 5s to 10m"
+                    ));
+                }
+                Ok(Resettle {
+                    most: file.most,
+                    after_us,
+                    during: file.during.checked()?,
+                })
+            })
+            .transpose()?;
         Ok(Rest {
             op: self.op,
             during: self.during.map(Hours::checked).transpose()?,
+            resettle,
         })
     }
 }
@@ -228,6 +277,30 @@ struct Active {
     /// This does not predict future zone changes or daylight-saving shifts.
     window_until_us: u64,
     waiting: Option<Asked>,
+    /// Expression said `resting` for this episode at least once.
+    admitted: bool,
+    resettle: Option<Resettle>,
+    /// Re-settles already made this night, this episode included.
+    resettled: u8,
+}
+
+/// A rest a night sound ended, waiting for the voice to rest again.
+struct Stirred {
+    resettle: Resettle,
+    /// The rest's own renewal window.
+    during: Window,
+    resettled: u8,
+    quiet_since_us: Option<u64>,
+}
+
+/// What `humans/faces/tracked` says of the desk now, read as bedtime's
+/// `present = false` trigger reads it: a valid list, empty, still within its
+/// lifespan. Missing, malformed or stale faces are not an empty desk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Desk {
+    Empty,
+    Face,
+    Unknown,
 }
 
 impl Active {
@@ -245,6 +318,7 @@ impl Active {
 struct Source {
     last_episode: u64,
     active: Option<Active>,
+    stirred: Option<Stirred>,
 }
 
 pub struct Manager {
@@ -294,6 +368,7 @@ impl Manager {
         self.invalidate_runs();
         for source in self.sources.values_mut() {
             cancel(&mut self.publisher, source, now);
+            source.stirred = None;
         }
         self.definitions.clear();
         self.enabled = names;
@@ -319,6 +394,9 @@ impl Manager {
             });
             if !unchanged || !resting {
                 cancel(&mut self.publisher, source, now);
+            }
+            if !unchanged {
+                source.stirred = None;
             }
         }
         self.enabled = definitions.keys().cloned().collect();
@@ -376,7 +454,39 @@ impl Manager {
                     && now - receipt.stamp.at_us < 500_000)
                     .then_some(receipt)
             });
-        for source in self.sources.values_mut() {
+        let voice = self
+            .bus
+            .latest(VoiceState::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| {
+                message.header.at_us <= now && now - message.header.at_us < VOICE_FRESH_US
+            })
+            .and_then(|message| message.parse::<VoiceState>().ok())
+            .map(|state| state.state);
+        let desk = self
+            .bus
+            .latest(Faces::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| {
+                let lifespan_us = message
+                    .header
+                    .expires_ms
+                    .unwrap_or(crate::FACE_LIFESPAN_MS)
+                    .saturating_mul(1_000);
+                message.header.at_us <= now && now - message.header.at_us < lifespan_us
+            })
+            .and_then(|message| message.parse::<Faces>().ok())
+            .filter(|faces| faces.check().is_ok())
+            .map_or(Desk::Unknown, |faces| {
+                if faces.faces.is_empty() {
+                    Desk::Empty
+                } else {
+                    Desk::Face
+                }
+            });
+        for (name, source) in &mut self.sources {
             let Some(active) = &mut source.active else {
                 continue;
             };
@@ -441,6 +551,9 @@ impl Manager {
                 continue;
             }
             active.window_until_us = window_until_us.expect("checked window end");
+            if accepted {
+                active.admitted = true;
+            }
             if accepted && let Some(asked) = active.waiting.take() {
                 // A caller that already left cannot leave an active routine.
                 if now >= asked.expires_us || asked.answer.try_send(Ok(())).is_err() {
@@ -449,6 +562,14 @@ impl Manager {
                 }
             }
             if terminal {
+                let cancelled = correlated.is_some_and(|receipt| receipt.phase == Phase::Cancelled);
+                if cancelled && active.admitted && active.request.op == Op::Rest {
+                    source.stirred = stirred(name, active, voice);
+                } else if active.resettled > 0 && !active.admitted {
+                    eprintln!(
+                        "lamp-skills: skill:{name}: Expression did not take its settling again; it stays awake"
+                    );
+                }
                 cancel(&mut self.publisher, source, now);
                 continue;
             }
@@ -467,6 +588,108 @@ impl Manager {
                     .is_err()
             {
                 cancel(&mut self.publisher, source, now);
+            }
+        }
+        // A rest a night sound ended settles again once the voice has
+        // rested, inside its night window and with the desk empty: the fold
+        // and the dim, no run, no wake clip and no daily claim, so bedtime's
+        // trigger stays spent. A turn or a face means someone is up.
+        for (name, source) in &mut self.sources {
+            if source.active.is_some() {
+                continue;
+            }
+            let Some(stir) = &mut source.stirred else {
+                continue;
+            };
+            let Some(moment) = moment else {
+                // Pending transitions still require trusted time.
+                stir.quiet_since_us = None;
+                continue;
+            };
+            if !stir.resettle.during.contains(moment.minute) || !stir.during.contains(moment.minute)
+            {
+                eprintln!(
+                    "lamp-skills: skill:{name}: the night window ended; it does not settle again"
+                );
+                source.stirred = None;
+                continue;
+            }
+            if matches!(voice, Some(Voice::Thinking | Voice::Speaking)) {
+                eprintln!(
+                    "lamp-skills: skill:{name}: the voice took a turn; someone is up, so the night's rest ends"
+                );
+                source.stirred = None;
+                continue;
+            }
+            if voice != Some(Voice::Resting) {
+                stir.quiet_since_us = None;
+                continue;
+            }
+            let since = *stir.quiet_since_us.get_or_insert(now);
+            let Some(target) = target.filter(|_| now - since >= stir.resettle.after_us) else {
+                continue;
+            };
+            // Bedtime's own test again, at this moment: a face in view is
+            // someone at the desk, and an unknown desk is not an empty one.
+            match desk {
+                Desk::Empty => {}
+                Desk::Face => {
+                    eprintln!(
+                        "lamp-skills: skill:{name}: a face is in view; someone is up, so the night's rest ends"
+                    );
+                    source.stirred = None;
+                    continue;
+                }
+                Desk::Unknown => continue,
+            }
+            let Some(episode) = source.last_episode.checked_add(1) else {
+                source.stirred = None;
+                continue;
+            };
+            let Some(window_until_us) = stir
+                .during
+                .remaining_ms(moment.minute, unix_ms % 60_000)
+                .and_then(|remaining| sampled_at_us.checked_add(remaining * 1000))
+                .filter(|until| now < *until)
+            else {
+                source.stirred = None;
+                continue;
+            };
+            let resettled = stir.resettled + 1;
+            let mut active = Active {
+                request: Request {
+                    stamp: ClockStamp {
+                        clock_id: self.clock_id.clone(),
+                        at_us: now,
+                        sequence: 1,
+                    },
+                    skill: name.clone(),
+                    skill_session_id: self.publisher.boot().into(),
+                    expression_session_id: target.clone(),
+                    episode,
+                    op: Op::Rest,
+                    valid_until_us: now.saturating_add(3_000_000),
+                },
+                during: stir.during,
+                began_us: now,
+                window_until_us,
+                waiting: None,
+                admitted: false,
+                resettle: Some(stir.resettle.clone()),
+                resettled,
+            };
+            eprintln!(
+                "lamp-skills: skill:{name}: woke at a night sound; the voice has rested {} s again and no face is in view, so it settles again ({resettled} of {})",
+                stir.resettle.after_us / 1_000_000,
+                stir.resettle.most
+            );
+            source.last_episode = episode;
+            source.stirred = None;
+            if active
+                .send(&self.clock_id, &mut self.publisher, now)
+                .is_ok()
+            {
+                source.active = Some(active);
             }
         }
         // Every ask in the channel was issued before it was sent, so the
@@ -526,10 +749,13 @@ impl Manager {
                     Source {
                         last_episode: 0,
                         active: None,
+                        stirred: None,
                     },
                 );
             }
             let source = self.sources.get_mut(&ask.skill).expect("source created");
+            // The skill's own operation ends any waiting re-settle.
+            source.stirred = None;
             if ask.rest.op == Op::Cancel {
                 cancel(&mut self.publisher, source, now);
                 let _ = ask.answer.try_send(Ok(()));
@@ -572,6 +798,9 @@ impl Manager {
                     began_us: now,
                     window_until_us,
                     waiting: None,
+                    admitted: false,
+                    resettle: ask.rest.resettle.clone(),
+                    resettled: 0,
                 });
             }
             let Some(active) = &mut source.active else {
@@ -594,6 +823,46 @@ impl Manager {
             active.waiting = Some(ask);
         }
     }
+}
+
+/// After Expression ended an admitted rest: whether it may settle again,
+/// said in the journal either way. Only a night sound (the voice listening,
+/// not yet a turn) stirs it; a turn, a hand, privacy, a pause or a reflex
+/// ends the night's rest. A listening that becomes a turn ends it later.
+fn stirred(name: &str, active: &Active, voice: Option<Voice>) -> Option<Stirred> {
+    let resettle = active.resettle.clone()?;
+    match voice {
+        Some(Voice::Listening) => {}
+        Some(Voice::Thinking | Voice::Speaking) => {
+            eprintln!(
+                "lamp-skills: skill:{name}: Expression ended its rest for a turn; someone is up, so it does not settle again"
+            );
+            return None;
+        }
+        Some(Voice::Resting) | None => {
+            eprintln!(
+                "lamp-skills: skill:{name}: Expression ended its rest, not for a sound; it does not settle again"
+            );
+            return None;
+        }
+    }
+    if active.resettled >= resettle.most {
+        eprintln!(
+            "lamp-skills: skill:{name}: woke at a night sound; it has settled again {} times tonight and stays awake",
+            resettle.most
+        );
+        return None;
+    }
+    eprintln!(
+        "lamp-skills: skill:{name}: woke at a night sound; it settles again once the voice has rested {} s with no face in view",
+        resettle.after_us / 1_000_000
+    );
+    Some(Stirred {
+        during: active.during,
+        resettled: active.resettled,
+        quiet_since_us: None,
+        resettle,
+    })
 }
 
 fn send(
@@ -717,6 +986,7 @@ mod tests {
                     skill: "routine".into(),
                     rest: Rest {
                         op,
+                        resettle: None,
                         during: (op == Op::Rest).then(|| Window::parse("23:00", "10:00").unwrap()),
                     },
                     issued_us: self.now,
@@ -796,6 +1066,7 @@ mod tests {
                 skill: "routine".into(),
                 rest: Rest {
                     op: Op::Wake,
+                    resettle: None,
                     during: None,
                 },
                 issued_us,
@@ -1559,6 +1830,7 @@ mod tests {
                 "routine",
                 Rest {
                     op: Op::Rest,
+                    resettle: None,
                     during: Some(Window::parse("23:00", "10:00").unwrap())
                 }
             )
@@ -1684,5 +1956,367 @@ mod tests {
         f.tick(NIGHT);
         assert!(late.try_recv().unwrap().is_err());
         assert!(f.manager.sources["routine"].active.is_none());
+    }
+
+    fn resettling(f: &mut Fixture) -> mpsc::Receiver<Result<(), String>> {
+        let (answer, result) = mpsc::sync_channel(1);
+        f.client
+            .send
+            .try_send(Asked {
+                skill: "routine".into(),
+                rest: Rest {
+                    op: Op::Rest,
+                    during: Some(Window::parse("23:00", "10:00").unwrap()),
+                    resettle: Some(Resettle {
+                        most: 3,
+                        after_us: 30_000_000,
+                        during: Window::parse("23:00", "06:00").unwrap(),
+                    }),
+                },
+                issued_us: f.now,
+                expires_us: f.now + ADMISSION_US,
+                answer,
+                generation: f.client.generation.lock().unwrap().clone(),
+            })
+            .unwrap();
+        result
+    }
+
+    fn eyes(f: &Fixture) -> Publisher {
+        f.manager
+            .bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap()
+    }
+
+    /// The eyes' look now: no one, or one face at the desk.
+    fn look(f: &Fixture, eyes: &mut Publisher, someone: bool) {
+        let faces = if someone {
+            serde_json::json!({ "faces": [{ "id": "f1", "xmin": 0.4, "ymin": 0.3,
+                "xmax": 0.6, "ymax": 0.6, "confidence": 0.9 }] })
+        } else {
+            serde_json::json!({ "faces": [] })
+        };
+        eyes.publish_json(f.now, &faces).unwrap();
+    }
+
+    /// Bedtime's rest, admitted, then ended by Expression while the voice
+    /// listens: a night sound or the start of a turn.
+    fn woken(f: &mut Fixture, voice: &mut Publisher) {
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        let rest = resettling(f);
+        f.tick(NIGHT);
+        f.admitted(Phase::Resting);
+        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        f.now += 100_000;
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Listening,
+                },
+            )
+            .unwrap();
+        f.admitted(Phase::Cancelled);
+        assert_eq!(episode(f), None);
+        assert!(f.manager.sources["routine"].stirred.is_some());
+    }
+
+    fn voice_of(f: &Fixture) -> Publisher {
+        f.manager
+            .bus
+            .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap()
+    }
+
+    /// `seconds` of the voice in `state`, one tick a second, the eyes
+    /// looking each second.
+    fn hold(
+        f: &mut Fixture,
+        voice: &mut Publisher,
+        eyes: &mut Publisher,
+        state: Voice,
+        someone: bool,
+        seconds: u64,
+    ) {
+        for _ in 0..seconds {
+            f.now += 1_000_000;
+            voice.publish_json(f.now, &VoiceState { state }).unwrap();
+            look(f, eyes, someone);
+            f.tick(NIGHT);
+        }
+    }
+
+    fn episode(f: &Fixture) -> Option<u64> {
+        f.manager.sources["routine"]
+            .active
+            .as_ref()
+            .map(|active| active.request.episode)
+    }
+
+    /// #1672: a lamp gone to bed that hears a sound stirs and settles again,
+    /// as a pet does, at most three times a night, and only in the window.
+    #[test]
+    fn a_rest_a_sound_ended_settles_again_at_most_three_times_a_night() {
+        let mut f = Fixture::new();
+        let mut voice = f
+            .manager
+            .bus
+            .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap();
+        let mut say = |f: &mut Fixture, state: Voice| {
+            voice.publish_json(f.now, &VoiceState { state }).unwrap();
+        };
+        let mut eyes = eyes(&f);
+        say(&mut f, Voice::Resting);
+        let rest = resettling(&mut f);
+        f.tick(NIGHT);
+        f.admitted(Phase::Resting);
+        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        assert_eq!(episode(&f), Some(1));
+        for night_sound in 1..=4_u64 {
+            // A sound: the voice listens, and Expression ends the rest.
+            f.now += 100_000;
+            say(&mut f, Voice::Listening);
+            f.admitted(Phase::Cancelled);
+            assert_eq!(episode(&f), None);
+            assert_eq!(
+                f.manager.sources["routine"].stirred.is_some(),
+                night_sound <= 3,
+                "sound {night_sound}"
+            );
+            // Quiet again, nobody in view: not before the voice has rested
+            // 30 s.
+            for second in 0..=30 {
+                f.now += 1_000_000;
+                say(&mut f, Voice::Resting);
+                look(&f, &mut eyes, false);
+                f.tick(NIGHT);
+                if second < 30 || night_sound > 3 {
+                    assert_eq!(episode(&f), None, "sound {night_sound}, {second} s");
+                }
+            }
+            if night_sound <= 3 {
+                // A new episode, no run and no daily claim behind it.
+                assert_eq!(episode(&f), Some(1 + night_sound));
+                assert_eq!(
+                    f.manager.sources["routine"]
+                        .active
+                        .as_ref()
+                        .unwrap()
+                        .resettled,
+                    night_sound as u8
+                );
+                f.admitted(Phase::Resting);
+            }
+        }
+        assert!(f.manager.sources["routine"].stirred.is_none());
+    }
+
+    #[test]
+    fn leaving_the_night_window_ends_the_resettling() {
+        let mut f = Fixture::new();
+        let mut voice = f
+            .manager
+            .bus
+            .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap();
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        let rest = resettling(&mut f);
+        f.tick(NIGHT);
+        f.admitted(Phase::Resting);
+        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        f.now += 100_000;
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Listening,
+                },
+            )
+            .unwrap();
+        f.admitted(Phase::Cancelled);
+        assert!(f.manager.sources["routine"].stirred.is_some());
+        // 06:00: the re-settle window is over before the voice rests again.
+        let morning = NIGHT + 7 * 3_600_000;
+        for _ in 0..=31 {
+            f.now += 1_000_000;
+            voice
+                .publish_json(
+                    f.now,
+                    &VoiceState {
+                        state: Voice::Resting,
+                    },
+                )
+                .unwrap();
+            f.tick(morning);
+        }
+        assert!(f.manager.sources["routine"].stirred.is_none());
+        assert_eq!(episode(&f), None);
+    }
+
+    #[test]
+    fn a_rest_ended_for_anything_but_a_sound_does_not_settle_again() {
+        let mut f = Fixture::new();
+        let mut voice = f
+            .manager
+            .bus
+            .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+            .unwrap();
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        let rest = resettling(&mut f);
+        f.tick(NIGHT);
+        f.admitted(Phase::Resting);
+        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        // A hand or the privacy switch: the voice still rests.
+        f.now += 100_000;
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        f.admitted(Phase::Cancelled);
+        assert!(f.manager.sources["routine"].stirred.is_none());
+    }
+
+    /// The reviewer-lead's P2 on #2512: a name call arrives as the voice
+    /// listening, then becomes a turn. Someone is up: the night's rest ends,
+    /// and 30 s of quiet after the answer does not fold the lamp beside them.
+    #[test]
+    fn a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again() {
+        let mut f = Fixture::new();
+        let mut voice = voice_of(&f);
+        let mut eyes = eyes(&f);
+        woken(&mut f, &mut voice);
+        hold(&mut f, &mut voice, &mut eyes, Voice::Thinking, false, 2);
+        assert!(f.manager.sources["routine"].stirred.is_none());
+        hold(&mut f, &mut voice, &mut eyes, Voice::Speaking, false, 3);
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 40);
+        assert_eq!(f.manager.sources["routine"].last_episode, 1);
+        assert!(f.manager.sources["routine"].stirred.is_none());
+    }
+
+    /// A rest Expression ended mid-turn is not a night sound either.
+    #[test]
+    fn a_rest_ended_in_a_turn_does_not_settle_again() {
+        let mut f = Fixture::new();
+        let mut voice = voice_of(&f);
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        let rest = resettling(&mut f);
+        f.tick(NIGHT);
+        f.admitted(Phase::Resting);
+        assert_eq!(rest.try_recv().unwrap(), Ok(()));
+        f.now += 100_000;
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Speaking,
+                },
+            )
+            .unwrap();
+        f.admitted(Phase::Cancelled);
+        assert!(f.manager.sources["routine"].stirred.is_none());
+    }
+
+    #[test]
+    fn a_sound_with_no_turn_and_no_face_settles_again_once() {
+        let mut f = Fixture::new();
+        let mut voice = voice_of(&f);
+        let mut eyes = eyes(&f);
+        woken(&mut f, &mut voice);
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 29);
+        assert_eq!(episode(&f), None);
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 2);
+        assert_eq!(episode(&f), Some(2));
+        assert!(f.manager.sources["routine"].stirred.is_none());
+        // Once: more quiet starts no further episode.
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 40);
+        assert_eq!(f.manager.sources["routine"].last_episode, 2);
+    }
+
+    /// Someone sat back down after the sound: the lamp stays with them.
+    #[test]
+    fn a_sound_with_a_face_in_view_does_not_settle_again() {
+        let mut f = Fixture::new();
+        let mut voice = voice_of(&f);
+        let mut eyes = eyes(&f);
+        woken(&mut f, &mut voice);
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, true, 40);
+        assert_eq!(f.manager.sources["routine"].last_episode, 1);
+        assert!(f.manager.sources["routine"].stirred.is_none());
+        // Gone again later: the night's rest has ended, nothing re-settles.
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 40);
+        assert_eq!(f.manager.sources["routine"].last_episode, 1);
+    }
+
+    /// Missing or stale faces are not an empty desk: it waits, it does not
+    /// settle on no news.
+    #[test]
+    fn stale_or_missing_faces_do_not_settle_again() {
+        let mut f = Fixture::new();
+        let mut voice = voice_of(&f);
+        let mut eyes = eyes(&f);
+        woken(&mut f, &mut voice);
+        for _ in 0..40 {
+            f.now += 1_000_000;
+            voice
+                .publish_json(
+                    f.now,
+                    &VoiceState {
+                        state: Voice::Resting,
+                    },
+                )
+                .unwrap();
+            f.tick(NIGHT);
+        }
+        assert_eq!(episode(&f), None);
+        look(&f, &mut eyes, false);
+        f.now += 3_000_000;
+        voice
+            .publish_json(
+                f.now,
+                &VoiceState {
+                    state: Voice::Resting,
+                },
+            )
+            .unwrap();
+        f.tick(NIGHT);
+        assert_eq!(episode(&f), None);
+        assert!(f.manager.sources["routine"].stirred.is_some());
+        // A fresh empty look: now it settles.
+        hold(&mut f, &mut voice, &mut eyes, Voice::Resting, false, 1);
+        assert_eq!(episode(&f), Some(2));
     }
 }

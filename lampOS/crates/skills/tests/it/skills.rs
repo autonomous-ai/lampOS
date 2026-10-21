@@ -810,6 +810,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
         (
             Call::Rest(lamp_skills::routine::Rest {
                 op: lamp_msgs::ExpressionRestOp::Rest,
+                resettle: None,
                 during: Some(lamp_skills::daily::Window::parse("22:00", "06:00").unwrap()),
             }),
             "body",
@@ -817,6 +818,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
         (
             Call::Rest(lamp_skills::routine::Rest {
                 op: lamp_msgs::ExpressionRestOp::Wake,
+                resettle: None,
                 during: None,
             }),
             "body",
@@ -824,6 +826,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
         (
             Call::Rest(lamp_skills::routine::Rest {
                 op: lamp_msgs::ExpressionRestOp::Cancel,
+                resettle: None,
                 during: None,
             }),
             "body",

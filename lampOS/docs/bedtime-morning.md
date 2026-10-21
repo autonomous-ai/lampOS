@@ -77,8 +77,8 @@ excluding its end.
 | Part | Eligibility | Authored result |
 |---|---|---|
 | Night ceilings | 21:00–06:00, independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
-| Evening | 21:00–23:00; a nearby person for 30 seconds | One warm, slow eight-second light breath at level 2, with low level 1. |
-| Bedtime | 23:00–06:00; a fresh empty face list continuously for 15 minutes | Ask Expression to sustain this skill's rest, renewable until 10:00. |
+| Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Already as warm and as low as that goes, nothing is shown and the journal says `already evening`. |
+| Bedtime | 23:00–06:00; a fresh empty face list continuously for 15 minutes, kept for up to 15 minutes more while the voice has not yet rested its 30 seconds | Ask Expression to sustain this skill's rest, renewable until 10:00. A sound that ends it is followed by settling again (below), at most three times a night. |
 | Morning | 06:00–10:00; a nearby person for three seconds | Wake only this skill's still-owned rest; after its planned stretch completes, ask Say for a hum. |
 
 Evening, bedtime and morning each have one daily chance and require Voice to
@@ -92,9 +92,79 @@ rule for this skill. With neither mode, no automatic presentation starts.
 Record the ask mode in the lamp comparison; the policy-mode night path is
 not qualified by the host tests.
 
-Evening and morning may wait up to one minute for admission. A failed,
+Evening and morning may wait up to one minute for admission, and bedtime
+up to 15 minutes (`wait = "15m"`, #1672): on lamp-06c1 the empty desk
+matured two seconds before the voice had rested its 30 seconds after a
+sound, and without the wait the night's chance was spent with no line.
+A chance dropped because its conditions did not hold within its wait now
+says so in the journal (`bedtime chance dropped: ...`). A failed,
 interrupted or refused chance is consumed; there is no later catch-up that
 day. Missing, malformed or stale faces never count as an empty desk.
+
+### The evening glow, relative to the person's light
+
+The evening glow was fixed numbers, warm level 2 breathing to 1. On
+lamp-06c1 the person's light was already warm at level 1 and nobody saw the
+glow (#1672). It is now `light = { relative = { warmer = 1, dimmer = 1 },
+for = "20s", pattern = { kind = "breathe", period = "10s" } }`, made as the
+run begins against `light/state`:
+
+- **A step warmer** is one along white, then the amber `warm`, the ring's
+  own warmth as `light_warmer` steps it (`glow::EVENING_WARMTH`). Warm is
+  as warm as evening light goes; orange or any other colour is one the
+  person chose, kept as it is.
+- **A step dimmer** is one of the ring's five levels. With the breath, the
+  light stays at the person's level at the top and breathes down one step
+  and back; at level 1 there is no step under it, and the light is steady.
+- Already warm (or orange, or another colour) at level 1, or a light that is
+  off or not known: nothing is asked of the ring, and the journal says why
+  (`already evening`, `the light is off`).
+
+The glow is asked of the ring as any skill's light is, at skill priority,
+and given back after its 20 seconds.
+
+### Settling again after a night sound
+
+A lamp gone to bed that hears one sound stirs and settles back, as a pet
+does, rather than staying up all night (the first builder's ruling, rule 8).
+Bedtime's rest step says so:
+`resettle = { most = 3, after = "30s", during = { from = "23:00", to = "06:00" } }`.
+
+- **What wakes it.** Expression ends a routine rest itself when its gate
+  shuts. Its journal says why, once (`lamp-expression: ended a skill's
+  rest: the voice is no longer resting: it is listening`). The skill's
+  cancel of that already ended episode is then a no-op, not a refusal (row
+  7's "rest episode was already spent").
+- **What re-settles.** Only a night sound: the voice listening that never
+  became a turn. A turn (the voice thinking or speaking, so a name call or
+  anything the person asked for) means someone is up and ends the night's
+  rest, whether Expression's cancellation arrives during the turn or the
+  listening becomes one while the lamp waits to settle (the reviewer-lead's
+  P2 and the first builder's ruling on #2512). A hand, privacy, a pause, a
+  reflex such as a touch, or a lapsed lease end the night's rest as before,
+  and Skills says so.
+- **Only at an empty desk.** Each re-settle reads `humans/faces/tracked`
+  again at that moment, as bedtime's `present = false` trigger does: a
+  valid, empty face list within its lifespan (the header's, else the eyes'
+  two seconds). A face in view means someone is up and ends the night's
+  rest (`a face is in view; someone is up, so the night's rest ends`).
+  Missing, malformed or stale faces are not an empty desk: it waits, and
+  settles only on a fresh empty look.
+- **How.** Skills' rest manager, not a run, starts a new episode once the
+  voice has said `resting` for 30 seconds again and no face is in view,
+  inside 23:00–06:00 and the rest's own window. It uses the same `rest`
+  operation: Expression has no bow clip, so this is the settle into the
+  sleeping pose and the asleep face
+  (the fold and the dim), and the release before it eased the pose away
+  without the wake stretch. No new operation was needed.
+- **How often.** At most three a night. Each says in Skills' journal why it
+  woke and that it settled again (`woke at a night sound; the voice has
+  rested 30 s again and no face is in view, so it settles again (1 of 3)`).
+  A fourth sound leaves it awake, and leaving the window ends the waiting.
+- **The daily chance.** A re-settle makes no run and no daily claim: the
+  bedtime trigger stays spent for the night, so it cannot fire twice. The
+  skill's own next operation (a morning wake, a cancel), a reload that
+  changes the skill and a restart all end the waiting.
 
 A successful morning request waits for a correlated Expression `completed`
 receipt, for at most 12 seconds. `waking` only means the plan is running.
@@ -265,6 +335,13 @@ pose smoothly, without playing another wake clip. Expression reports
 planning state, not proof that Body moved or unfolded.
 
 ## Durable output ceilings
+
+The night volume cap is on the software volume Actions already owns:
+`Speaker` on `allwinnerhdmi`, the mixer `volume_up` and the app slider
+change. The C-Media card stays where the hardware team set it. Two caps in
+series, one on each card, would multiply and leave the night voice
+inaudible (the first builder's ruling on #1672), so the routine adds no
+second mixer.
 
 Limits are restrictions, independent of light request priorities. All
 active restrictions combine by minimum with the product ceiling. Volume

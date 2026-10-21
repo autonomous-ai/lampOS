@@ -129,7 +129,7 @@ pub const SHOW_AT_MOST_US: u64 = 60_000_000;
 const MOST_WAIT_US: u64 = 3_600_000_000;
 /// How long a face message counts when its header names no lifespan: the
 /// eyes' two seconds. A value on another topic counts until it is replaced.
-const FACE_LIFESPAN_MS: u64 = 2_000;
+pub(crate) const FACE_LIFESPAN_MS: u64 = 2_000;
 const ROUTINE_VOICE_FRESH_US: u64 = 3_000_000;
 /// How long a held run's trigger topic may say nothing, when its newest
 /// value names no lifespan, before the run ends (#1021: until the air part
@@ -711,6 +711,18 @@ struct LightFile {
     /// The person's own light, set as they asked and never given back
     /// (#1679: a scene). Only in a skill its tool alone starts.
     keep: Option<bool>,
+    /// Steps from the person's light as the ring shows it now, read as the
+    /// run begins (#1672: the evening glow), in place of a colour.
+    relative: Option<RelativeFile>,
+}
+
+/// `relative = { warmer = 1, dimmer = 1 }`: steps along the ring's own
+/// scales, warmth ([`glow::EVENING_WARMTH`]) and level (1 to 5).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RelativeFile {
+    warmer: Option<u8>,
+    dimmer: Option<u8>,
 }
 
 /// How a skill's light moves, as its file says it (#940 item 3):
@@ -850,9 +862,11 @@ impl Permissions {
             | Call::Move(_)
             | Call::Mood { .. }
             | Call::Rest(_) => ("body", self.body),
-            Call::Light { .. } | Call::Dim { .. } | Call::Out { .. } | Call::Show { .. } => {
-                ("light", self.light)
-            }
+            Call::Light { .. }
+            | Call::Relative { .. }
+            | Call::Dim { .. }
+            | Call::Out { .. }
+            | Call::Show { .. } => ("light", self.light),
             Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. } | Call::Cue => {
                 ("speak", self.speak)
             }
@@ -1590,6 +1604,17 @@ pub enum Call {
         /// the pale breath of a lamp that is a little unwell).
         until_ends: bool,
     },
+    /// A light some steps warmer and dimmer than the person's own as the
+    /// run begins (#1672), made into a [`Call::Light`] by
+    /// [`glow::relative`] then: with a breath, the light breathes from the
+    /// person's level down `dimmer` steps and back; without, it is steady
+    /// `dimmer` steps down. Given back as any skill's light.
+    Relative {
+        warmer: u8,
+        dimmer: u8,
+        lasting: Option<String>,
+        breathe_ms: Option<u32>,
+    },
     /// A light show (`shows/NAME.toml`): each frame's light in turn, held
     /// its while, then the light given back (#1679). Only in a skill its
     /// tool alone starts: never on its own.
@@ -1840,6 +1865,10 @@ impl Call {
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
             Self::Cue => ("sound", json!({ "cue": "hum" })),
             Self::Rest(rest) => ("rest", json!({ "op": rest.op })),
+            Self::Relative { warmer, dimmer, .. } => (
+                "light",
+                json!({ "relative": { "warmer": warmer, "dimmer": dimmer } }),
+            ),
             Self::AfterSay => ("after_say", json!({})),
             Self::Text(text) => ("text", json!({ "text": text })),
             Self::Propose(proposal) => {
@@ -2721,6 +2750,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             }
         }
         if let Some(light) = step.light {
+            let with_tool = file.tool.is_some();
             let (file, place) = match light {
                 LightStep::Named(light) => {
                     if !plain_name(&light) {
@@ -2734,6 +2764,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 LightStep::Inline(file) => (file, "a light step".into()),
             };
             let call = light_call(file).map_err(|why| format!("{place}: {why}"))?;
+            // Made against the light shown as an automatic run begins.
+            if matches!(call, Call::Relative { .. }) && with_tool {
+                return Err(format!(
+                    "{place}: relative is only for a skill its triggers start, without a tool"
+                ));
+            }
             if matches!(call, Call::Light { keep: true, .. }) && !asked_alone {
                 return Err(format!(
                     "{place}: keep = true only in a skill started by its tool alone: only a light a person asked for is theirs to keep"
@@ -3176,6 +3212,62 @@ fn item_order(name: &str) -> (bool, u64, &str) {
 }
 
 fn light_call(file: LightFile) -> Result<Call, String> {
+    if let Some(relative) = file.relative {
+        if file.colour.is_some()
+            || file.level.is_some()
+            || file.dim.is_some()
+            || file.out.is_some()
+            || file.over.is_some()
+            || file.until.is_some()
+            || file.keep.is_some()
+        {
+            return Err(
+                "relative takes only for and a breathe pattern: its colour and level are the person's light, stepped"
+                    .into(),
+            );
+        }
+        let warmer = relative.warmer.unwrap_or(0);
+        let dimmer = relative.dimmer.unwrap_or(0);
+        if warmer > 1 || dimmer > 4 || warmer + dimmer == 0 {
+            return Err("relative is warmer = 0 or 1 and dimmer = 0 to 4, not both 0".into());
+        }
+        let Some(lasting) = file.lasting else {
+            return Err("relative needs a for: it is a glow, given back".into());
+        };
+        if duration_us(&lasting)? > 600_000_000 {
+            return Err("a light's for is at most 10m".into());
+        }
+        let breathe_ms = file
+            .pattern
+            .map(|pattern| {
+                if pattern.kind != "breathe" || pattern.low.is_some() {
+                    return Err(
+                        "relative takes a breathe pattern with no low: it breathes down its dimmer steps"
+                            .to_owned(),
+                    );
+                }
+                let ms = match &pattern.period {
+                    Some(period) => u32::try_from(duration_us(period)? / 1_000)
+                        .map_err(|_| format!("pattern period {period:?} is too long"))?,
+                    None => LightPattern::BREATHE_DEFAULT_MS,
+                };
+                if !LightPattern::BREATHE_MS.contains(&ms) {
+                    return Err(format!(
+                        "a breath takes {} to {} ms",
+                        LightPattern::BREATHE_MS.start(),
+                        LightPattern::BREATHE_MS.end()
+                    ));
+                }
+                Ok(ms)
+            })
+            .transpose()?;
+        return Ok(Call::Relative {
+            warmer,
+            dimmer,
+            lasting: Some(lasting),
+            breathe_ms,
+        });
+    }
     let until_ends = match file.until.as_deref() {
         None => false,
         Some("ends") => true,
@@ -4826,6 +4918,29 @@ impl Engine {
                     if waited < trigger.wait_us {
                         watch.spent = false;
                         watch.disarmed = false;
+                    } else if once && trigger.once_per_day {
+                        // A daily chance let go says so, once: on lamp-06c1
+                        // bedtime matured 2 s before the voice had rested
+                        // its 30 s, and nothing said why it never came
+                        // (#1672).
+                        runs.push(Run {
+                            generation: None,
+                            skill: skill.name.clone(),
+                            events: vec![event(
+                                &skill.name,
+                                SkillStage::Answered,
+                                format!(
+                                    "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
+                                    trigger.name.as_deref().unwrap_or("trigger"),
+                                    trigger.wait_us / 1_000_000
+                                ),
+                                Some(false),
+                            )],
+                            calls: Vec::new(),
+                            ask: None,
+                            queue: false,
+                            from: None,
+                        });
                     }
                     continue;
                 }
