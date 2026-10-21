@@ -637,6 +637,26 @@ fn failure_notice_failed_transport_keeps_attempt_then_uses_existing_cancellation
     )
     .unwrap();
     drop(speaker);
+    // A child another test forks as `speaker` drops holds a copy of its
+    // socket until its exec (CLOEXEC), so the dispatch below could still be
+    // taken (#1569 row 73): sent to until refused first, as
+    // `Worker::send_stop_until_peer_gone` does.
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while !parent.data.send(0u8).is_err_and(|error| {
+        matches!(
+            error.kind(),
+            std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionRefused
+                | std::io::ErrorKind::NotConnected
+                | std::io::ErrorKind::BrokenPipe
+        )
+    }) {
+        assert!(
+            std::time::Instant::now() < until,
+            "the speaker's peer was not gone after 5 s"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
     assert!(
         dispatch_speaker_chunk(
             &mut owner,
