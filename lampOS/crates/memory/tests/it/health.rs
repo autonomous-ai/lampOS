@@ -742,7 +742,9 @@ fn forgetting_everything_removes_a_set_aside_database_and_health_stops_warning()
         .execute_batch("PRAGMA user_version=2")
         .unwrap();
     let mut reports = scratch.subscribe();
-    let mut process = Process::start(&scratch, true, true, false);
+    // The fixture's schedule, stepped by `report_when` and `logged`: not
+    // two of the host's report seconds (#1806).
+    let mut process = Process::start_controlled(&scratch, true, true, false);
     process.ready(&scratch);
     let report = report_when(&mut reports, |report| {
         report.values.iter().any(|pair| pair.key == "set_aside")
