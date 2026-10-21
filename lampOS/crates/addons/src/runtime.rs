@@ -4,7 +4,8 @@
 //! journal, one line each, with why. A kept mood is said to `lamp-mood` as a
 //! nudge on `mood/nudge`, which it holds inside its own bounds. A say past
 //! the rules is put to the policy on `addon/ask` (#2530 part 2) and kept or
-//! dropped by its answer on `policy/decisions`, `by` `jev`.
+//! dropped by its answer on `policy/decisions`, `by` `jev`. A kept move is
+//! asked of the body as one gesture at idle on its mood socket.
 use crate::carry;
 use crate::rules::{Drop, Judge, Verdict};
 use crate::situation::{TOPICS, Watcher};
@@ -16,7 +17,8 @@ use lamp_msgs::{
 };
 use std::{
     io,
-    path::PathBuf,
+    os::unix::net::UnixDatagram,
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -26,6 +28,10 @@ use std::{
 
 /// The product's switch, as `lamp-skills`' (`lamp_skills::ADDONS_ENVIRONMENT`).
 pub const ENVIRONMENT: &str = "LAMP_ADDONS";
+
+/// The body's mood socket, where a gesture is asked (`lamp-skills`' own
+/// `--mood-socket` default).
+pub const BODY_SOCKET: &str = "/run/lampos-body/mood.sock";
 
 /// How long one pass waits for a proposal before reading the lamp again.
 const PASS: Duration = Duration::from_millis(100);
@@ -39,6 +45,10 @@ pub struct Config {
     pub run_for: Option<Duration>,
     /// A shorter quiet before a say, for tests only (`--say-quiet-ms`).
     pub say_quiet: Option<Duration>,
+    /// A shorter quiet before a move, for tests only (`--move-quiet-ms`).
+    pub move_quiet: Option<Duration>,
+    /// The body's mood socket, [`BODY_SOCKET`] if unset.
+    pub body_socket: Option<PathBuf>,
 }
 
 /// What it did, said when it stops.
@@ -48,6 +58,7 @@ pub struct Report {
     pub dropped: u64,
     pub lights_asked: u64,
     pub moods_nudged: u64,
+    pub moves_asked: u64,
 }
 
 /// The boot's identity, which the ring holds a claim's clock to.
@@ -68,6 +79,10 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         None => Bus::from_environment()?,
     };
     let clock_id = boot_clock(config.clock_id.as_deref())?;
+    let body = config
+        .body_socket
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(BODY_SOCKET));
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "addons")?;
     let mut lamp: Vec<Subscriber> = TOPICS
         .iter()
@@ -96,8 +111,13 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
     let mut judge = config.say_quiet.map_or_else(Judge::default, |quiet| {
         Judge::with_say_quiet(quiet.as_micros() as u64)
     });
+    if let Some(quiet) = config.move_quiet {
+        judge = judge.with_move_quiet(quiet.as_micros() as u64);
+    }
     let mut report = Report::default();
-    eprintln!("lamp-addons: judging addon/proposal; a kept light is asked of the ring at Idle");
+    eprintln!(
+        "lamp-addons: judging addon/proposal; a kept light is asked of the ring at Idle, a kept move of the body"
+    );
     let began = Instant::now();
     while !stop.load(Ordering::Relaxed)
         && config
@@ -229,6 +249,7 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             Outputs {
                 lights: &mut lights,
                 nudges: &mut nudges,
+                body: &body,
                 watcher: &mut watcher,
                 over_persons: situation.persons_light,
             },
@@ -282,11 +303,13 @@ fn write(
     }
 }
 
-/// Where a kept act goes: the ring's requests, and Mood's nudges; and
-/// whether a light lies over the person's own, which rests, so is brief.
+/// Where a kept act goes: the ring's requests, Mood's nudges and the body's
+/// mood socket; and whether a light lies over the person's own, which
+/// rests, so is brief.
 struct Outputs<'a> {
     lights: &'a mut Publisher,
     nudges: &'a mut Publisher,
+    body: &'a Path,
     watcher: &'a mut Watcher,
     over_persons: bool,
 }
@@ -312,6 +335,23 @@ fn decide(
         }
         Verdict::Kept => {
             report.kept += 1;
+            if let Some(ask) = carry::gesture_ask(proposal) {
+                let gesture = proposal.gesture.as_deref().unwrap_or_default();
+                return match UnixDatagram::unbound()
+                    .and_then(|socket| socket.send_to(ask.as_bytes(), out.body))
+                {
+                    Ok(_) => {
+                        report.moves_asked += 1;
+                        let why = format!("asked of the body at idle: {gesture}");
+                        eprintln!("lamp-addons: kept {named}: {why}");
+                        why
+                    }
+                    Err(error) => {
+                        eprintln!("lamp-addons: kept {named}, not asked: {error}");
+                        "kept, but the body was not reached".into()
+                    }
+                };
+            }
             match carry::light_request(proposal, clock_id, now_us, out.over_persons) {
                 Some(request) => match out.lights.publish_json(now_us, &request) {
                     Ok(_) => {

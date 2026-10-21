@@ -60,7 +60,7 @@ judge: rules (light, move, mood, note), then Jev for a say ("speak now?")
         ▼ kept
 lamp-skills carries it out through today's owners, each call checked again:
   light  → light/request       (ring arbitration, priority Skill or Idle)
-  move   → the body's sockets  (body arbitration, priority Skill or Idle)
+  move   → the body's mood socket (one gesture, priority Idle)
   mood   → lamp-mood's nudge input (new, bounded)
   say    → the say service, as a note the model phrases
   note   → refused at load for now (typed notes, later)
@@ -143,7 +143,7 @@ A `lamp-msgs` type, `lamp_msgs/AddonProposal`, version 1, an event topic.
 | `sure` | How sure the add-on is, 0.0 to 1.0, as its manifest states it; the judge may weigh it, never be bound by it |
 | `holds_ms` | How long the proposal stays worth doing: 1 s to 30 s, as a `Claim`'s lease (`msgs/src/arbitration.rs`) |
 | `light` | For `light`: colour, level 1 to 5, and an optional pattern (`breathe`, `candle`, `pulse`), the same shape a skill's light takes |
-| `gesture` | For `move`: one of the body's gestures, by name, played within the body's limits. A clip of the add-on's own `moves/` comes later |
+| `gesture` | For `move`: `nod`, `curious` or `stretching` (`ADDON_GESTURES`), the body's gesture by name, played within the body's limits. The body's other gestures are refused at load and by the judge: a scan, a shake of the head, a greeting, a dance read as a machine or an answer (the first builder on #2530, 22 Oct 04:25). Others are added one at a time, each after its lamp row. A clip of the add-on's own `moves/` comes later |
 | `mood` | For `mood`: a nudge of `energy` or `warmth`, at most ±0.1, and `for_ms`, how long, 1 s to 10 minutes (`for = "10m"` in the folder) |
 | `note` | For `say` and `note`: what the add-on suggests the lamp might mention, at most 300 bytes, written in the add-on's folder, never made at run time. It reaches the model quoted and untrusted, never as an instruction (below, "The judge") |
 
@@ -176,7 +176,10 @@ on a lamp without the head's controls):
 | A busy room | `room/state` | not `quiet` (`unknown` included), or nothing fresh (3 s) |
 | Colder (a `mood` only) | the proposal | its warmth is below 0: an add-on may warm the lamp, never cool it |
 | The person's light (a `light` only) | `light/command`, `light/state`, `mood/state` | the newest `light/command` this boot came from the actions part or the app, and `light/state` shows it (or one of the judge's own glows is over it); with none, the ring shows its own idle light. It stays the person's base for good. Once it **rests**, an add-on light is not dropped but asked for **5 s at most** (`BRIEF_GLOW_US`), and the ring then shows their light again by itself. A light they set **off** never rests: off stays dark. An on light rests when Mood has said `asleep` (on the judge's own boot clock) since they set it, or 12 h have passed (`PERSONS_LIGHT_RESTS_US`, the first builder on #2530, 20:1x, after the lamp-75c9 run). Their next choice is fresh again |
-| Not yet | the act | `note` or `move` |
+| Not yet | the act | `note` (refused at load besides) |
+| Too soon (a `move` only) | `voice/state` | the voice has not rested for a minute since it last spoke or was spoken to, whoever is near (`MOVE_QUIET_US`): after talk, any move reads as an answer |
+| Moved lately (a `move` only) | the judge's own memory | its add-on had a move kept within 30 minutes (`MOVE_EVERY_US`) |
+| Enough moves this hour (a `move` only) | the judge's own memory | add-ons together had 2 moves kept within the hour (`MOVES_AN_HOUR`) |
 | Too soon (a `say` only) | `voice/state` | the voice has not rested for 15 s since it last spoke or was spoken to (`SAY_QUIET_US`), as progress news waits |
 | Enough this hour (a `say` only) | the judge's own memory | add-ons together had 4 says kept within the hour (`SAYS_AN_HOUR`) |
 | Asking (a `say` only) | the judge's own memory | another say is being put to the policy: one at a time |
@@ -189,6 +192,8 @@ on a lamp without the head's controls):
 - **On the second route** the turn is framed as a partner's line, untrusted, never an instruction, which the model may leave unsaid (`say::quoted_turn`). Its every round declares no function at all, and a call made in it all the same is refused at execution and journaled.
 - **Never the person's:** it is kept out of memory (no memory scope, and `keep_out` from the journal), and, a turn the lamp wrote, it is never what the person said. Neither the line nor what the lamp said of it is kept for the thread, so the person's next turn, which has its functions, never carries it (`keep_written`).
 - **The journal:** `lamp-skills` names the add-on and the proposal (`music-says say #…, quoted: spoken`), and `said nothing` when the model left it unsaid. `--say-quiet-ms` shortens the 15 s for tests only.
+
+**A move.** A kept `move` is sent by the judge itself to the body's mood socket (`--body-socket`, `/run/lampos-body/mood.sock` by default) as one datagram, `{"gesture", "source": "addon:<name>", "priority": "idle"}`, the fields a skill's gesture carries with `skill:`. A body that weighs who asks drops it while anything else holds the body and ends it for whatever comes after; it is never resumed. The body plays a gesture only while the lamp stands, and the judge's own rules keep it from a lamp asleep or paused and from a room that is not quiet. `--move-quiet-ms` shortens the minute for tests only. Its decision says `asked of the body at idle: nod`; the exit line counts `moves_asked`.
 
 A kept `light` becomes one `LightRequest` on `light/request` from
 `addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on
@@ -393,7 +398,5 @@ on-lamp half has run on a lamp. Its draft:
 
 - The reasons list for `why` and the colours a `light` proposal may name.
 - The numbers for rate, lease and the mood nudge, until a lamp shows them.
-- Whether `move` is in 1.0 or waits for the body's arbitration to be on
-  by default.
 - The package signing key for partners' add-ons (the Skills Store's key
   is still the first builder's call, #1983).

@@ -9,10 +9,10 @@ publish.workspace = true
 lamp-bus = { path = "../bus" }
 lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
+serde_json.workspace = true
 signal-hook = "0.4"
 
 [dev-dependencies]
-serde_json.workspace = true
 tempfile = "3"
 
 [lints]

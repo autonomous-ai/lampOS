@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 /// What an add-on may propose.
 pub const ADDON_ACTS: [&str; 5] = ["say", "light", "move", "mood", "note"];
 
+/// The body's gestures an add-on's `move` may name: small ones that read as
+/// a living thing's, never a performance or an answer to someone (rule 8;
+/// the first builder on #2530, 22 Oct 04:25). Others are added one at a
+/// time, each after its lamp row.
+pub const ADDON_GESTURES: [&str; 3] = ["nod", "curious", "stretching"];
+
 /// Why it proposes it: a fixed list, never free text, so the reason a
 /// partner gives says nothing the lamp did not already know.
 pub const ADDON_WHYS: [&str; 9] = [
@@ -90,7 +96,7 @@ pub struct AddonProposal {
     /// For `light`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub light: Option<AddonLight>,
-    /// For `move`: one of the body's gestures, by name.
+    /// For `move`: one of [`ADDON_GESTURES`], the body's gesture by name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gesture: Option<String>,
     /// For `mood`.
@@ -162,13 +168,9 @@ impl AddonProposal {
             }
         }
         if let Some(gesture) = &self.gesture
-            && (gesture.is_empty()
-                || gesture.len() > 32
-                || !gesture
-                    .bytes()
-                    .all(|byte| byte.is_ascii_lowercase() || byte == b'_'))
+            && !ADDON_GESTURES.contains(&gesture.as_str())
         {
-            return invalid("a gesture is named in lowercase letters and _");
+            return invalid("a move is nod, curious or stretching");
         }
         if let Some(mood) = &self.mood {
             let small = |nudge: Option<f32>| {
@@ -440,13 +442,42 @@ mod tests {
             ..glow()
         };
         assert_eq!(note.check(), Ok(()));
-        let nod = AddonProposal {
-            act: "move".into(),
-            light: None,
-            gesture: Some("nod".into()),
-            ..glow()
-        };
-        assert_eq!(nod.check(), Ok(()));
+        for gesture in ADDON_GESTURES {
+            let moved = AddonProposal {
+                act: "move".into(),
+                light: None,
+                gesture: Some(gesture.into()),
+                ..glow()
+            };
+            assert_eq!(moved.check(), Ok(()), "{gesture}");
+        }
+    }
+
+    /// The first builder on #2530 (22 Oct 04:25): an add-on moves the body
+    /// by nod, curious or stretching only. The body's other gestures, a
+    /// scan, a shake of the head, a greeting, a dance, are refused.
+    #[test]
+    fn a_move_names_one_of_the_add_ons_gestures_only() {
+        for gesture in [
+            "scanning",
+            "headshake",
+            "greeting",
+            "dance_chill",
+            "happy",
+            "idle",
+        ] {
+            let moved = AddonProposal {
+                act: "move".into(),
+                light: None,
+                gesture: Some(gesture.into()),
+                ..glow()
+            };
+            assert_eq!(
+                moved.check(),
+                Err(Invalid("a move is nod, curious or stretching".into())),
+                "{gesture}"
+            );
+        }
     }
 
     #[test]

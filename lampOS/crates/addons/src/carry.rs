@@ -5,8 +5,14 @@
 //! push a skill's own glow aside, since the ring shows the newest of equals.
 //! The judge keeps one asker per add-on, `addon:<name>`; its claim lapses by
 //! itself at the proposal's `holds_ms` (at most 30 s), and a person's own
-//! light is over it at once.
-use lamp_msgs::{AddonProposal, Claim, ClockStamp, Light, LightRequest, MoodNudge, Priority};
+//! light is over it at once. A move is asked of the body on its mood socket
+//! as one gesture at [`Priority::Idle`], from the same asker: a body that
+//! weighs who asks drops it while anything else holds the body, and ends it
+//! for anything that comes after (`crates/body/src/moves.rs`); it is never
+//! resumed.
+use lamp_msgs::{
+    ADDON_GESTURES, AddonProposal, Claim, ClockStamp, Light, LightRequest, MoodNudge, Priority,
+};
 
 /// The claim's source for an add-on's light: one a partner's skill cannot
 /// take, as a skill's is `skill:<name>`.
@@ -76,6 +82,24 @@ pub fn mood_nudge(
         until_us: now_us + u64::from(mood.for_ms) * 1_000,
     };
     nudge.check().ok().map(|()| nudge)
+}
+
+/// The body's datagram for a kept `move`: its gesture, at idle, from the
+/// add-on (`lamp_skills::body_ask`'s fields, `addon:<name>` for `skill:`).
+/// `None` for any other act, or a gesture not one of [`ADDON_GESTURES`].
+pub fn gesture_ask(proposal: &AddonProposal) -> Option<String> {
+    let gesture = proposal.gesture.as_deref()?;
+    if proposal.act != "move" || !ADDON_GESTURES.contains(&gesture) {
+        return None;
+    }
+    Some(
+        serde_json::json!({
+            "gesture": gesture,
+            "source": source(&proposal.addon),
+            "priority": Priority::Idle,
+        })
+        .to_string(),
+    )
 }
 
 #[cfg(test)]
@@ -159,6 +183,28 @@ mod tests {
         let request = light_request(&glow(), "b", 1_000, true).unwrap();
         assert_eq!(request.claim.until_us, 1_000 + BRIEF_GLOW_US);
         assert_eq!(request.claim.priority, Priority::Idle);
+    }
+
+    #[test]
+    fn a_kept_move_is_one_gesture_at_idle_from_the_add_on() {
+        let nod = AddonProposal {
+            act: "move".into(),
+            light: None,
+            gesture: Some("nod".into()),
+            ..glow()
+        };
+        let asked: serde_json::Value = serde_json::from_str(&gesture_ask(&nod).unwrap()).unwrap();
+        assert_eq!(
+            asked,
+            serde_json::json!({"gesture": "nod", "source": "addon:evening-glow", "priority": "idle"})
+        );
+        assert!(light_request(&nod, "b", 0, false).is_none());
+        assert!(gesture_ask(&glow()).is_none(), "a light is no gesture");
+        let scan = AddonProposal {
+            gesture: Some("scanning".into()),
+            ..nod
+        };
+        assert!(gesture_ask(&scan).is_none(), "not one of an add-on's");
     }
 
     #[test]
