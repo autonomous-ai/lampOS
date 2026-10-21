@@ -574,7 +574,20 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    `journalctl`; a command that ends while a child of its own keeps its
    output open is waited on 1 s more, then its group is killed, #2617's P3
    6), and the reconfigure and the restart are tried up to 3 times
-   (`BACK_TRIES`), each try waiting 60 s for an address and the broker. A
+   (`BACK_TRIES`), each try waiting 60 s for the old network: its name the
+   one joined (`ssid=` in `wpa_cli status`, against the old file's
+   `ssid=`), with an address and the broker, not merely any address (#2617's
+   follow-up 1). If all three writes of the old file fail, wpa_supplicant
+   runs the old network from memory at once (its control socket:
+   `REMOVE_NETWORK all`, `ADD_NETWORK`, the old file's `SET_NETWORK` lines,
+   `SELECT_NETWORK`, never `SAVE_CONFIG`, and not `wpa_cli`, so the password
+   is in no command line), with no radio restart, which would read the new
+   file, up to 3 tries a second apart; `.lamp-previous` stays for the stop's
+   restore, which writes it (follow-up 6). A hold that fails part-way may
+   have left wpa_supplicant with no network, since its networks are removed
+   first, so `wpa_cli reconfigure` follows it at once, and once more if the
+   old network never came back: the lamp is then on the live file's
+   network, the new one that worked, not on none (#2686's P2). A
    lamp whose old network does not come back either stays on it and keeps
    trying it: **never the hotspot**, since after setup there is no setup page
    behind it.
@@ -582,10 +595,15 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    before the switch and removed only once the change has ended. A helper cut
    before that (a crash, `RuntimeMaxSec=25min`, a kill) is followed by the
    unit's `ExecStopPost=lamp-setup wifi-restore`, which puts the old file back
-   and has wpa_supplicant re-read it and the radio restarted, with the way
-   back's 3 tries, the old network judged back by its address
-   (`TimeoutStopSec=8min` gives it room). `.lamp-previous` is removed only
-   once that has worked; otherwise it stays for the boot (#2617's P3 1).
+   and has wpa_supplicant re-read it and the radio restarted, the old
+   network judged back by its name and an address, all within 90 s
+   (`RESTORE_MOST`; a try starts only while its two commands' bounds, 55 s,
+   fit). In practice that is **one** radio try, not the way back's three:
+   after one try and its wait, 55 s no longer fits. A shutdown is held 90 s
+   at most
+   (`TimeoutStopSec=2min`, room for a poll past it; follow-up 4).
+   `.lamp-previous` is removed only once that has worked; otherwise it stays
+   for the boot's restore, the backstop (#2617's P3 1).
    `lamp-setup-wifi-restore.service` (at boot, before `wpa_supplicant@wlan0`
    and `dhcpcd.service`, only when `.lamp-previous` is there) puts the old
    file back after a power cut, so the lamp always boots on the network it

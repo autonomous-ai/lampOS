@@ -1033,12 +1033,21 @@ hotspot's `/wifi` page), so this one is new. Off unless
   it fails safe.
 - **Confirmed by the app (#1959's P1, #2617's P2-2):** on `wifi.joined`, the
   app sends `{"cmd":"data","kind":"wifi.confirm","data":{}}`, which reaches
-  the lamp only over the new network. **The window is the helper's**, sent
+  the lamp only over the new network. A `request_id` in it must be the
+  change's (`wifi.set`'s), else `failure`, `this wifi.confirm's request_id
+  is not the Wi-Fi change's`, and nothing is handed on; one with none is
+  taken as before (#2617's follow-up 5), and one with a `request_id` is
+  taken for a `wifi.set` that had none, which has nothing to differ from
+  (#2686's P3 5). **The window is the helper's**, sent
   in its `joined` line (`confirm_within_ms`, 120 s), and **starts when the
   broker acks `wifi.joined`**, not at the join: `lamp-cloud` starts its copy
   then and tells the helper (`{"online": true}`), which starts its own, so
   `lamp-cloud`'s never ends after the helper's. Its wait for that ack is the
-  helper's bound too (`online_within_ms`, 60 s). Within the window a
+  helper's bound less 1 s (`online_within_ms`, 60 s, so 59 s;
+  `WIFI_ONLINE_MARGIN`), so it ends before the helper's, which started
+  first (follow-up 2). A `wifi.joined` not yet said when that wait ends (the
+  link not back in time) is dropped, never said after the lamp has gone
+  back (follow-up 3). Within the window a
   `wifi.confirm` is answered `success` at once, and so is a second one (the
   app resends every 10 s); after it, or with no change waiting, `failure`,
   `no Wi-Fi change waits for a confirmation`. A confirmation is answered
@@ -1062,7 +1071,10 @@ hotspot's `/wifi` page), so this one is new. Off unless
   lost with the old connection goes again, first, on the next one, with the
   same `request_id`. A change that never joined (a wrong password, a network
   out of range) leaves the old link alive, and its failure goes out on it
-  (Mobile on lamp-0c89, #1959: the result lost there was the app's). Kept in
+  (Mobile on lamp-0c89, #1959: the result lost there was the app's); if the
+  broker does not ack it within 5 s (`WIFI_RESULT_ACK_WAIT`), the link is
+  made again and the failure goes on the new one, rather than waiting up to
+  2 min for the keepalive on a link the radio's switch killed (follow-up 3). Kept in
   `lamp-cloud`'s memory only: a `lamp-cloud` restarted mid-change loses its
   result (the change itself finishes in root's helper either way).
 - **The journal (#1959):** one line per step of each change's result: `a

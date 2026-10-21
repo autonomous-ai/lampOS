@@ -706,6 +706,47 @@ impl ImageHost {
         }
     }
 
+    /// wpa_supplicant runs one network from its memory, given as its file's
+    /// `key=value` lines, its file never saved over (#2617's P3 2): the
+    /// networks it has are removed, this one added, set and selected. Over
+    /// its control socket itself, not `wpa_cli`, so the password is never
+    /// in a command line; each request bounded by [`QUERY_TIMEOUT`].
+    pub fn hold(&self, fields: &[(String, String)]) -> std::io::Result<()> {
+        let control = std::path::Path::new("/run/wpa_supplicant").join(&self.interface);
+        let mine = std::env::temp_dir().join(format!("lamp-setup-wpa-{}", std::process::id()));
+        let _ = std::fs::remove_file(&mine);
+        let socket = std::os::unix::net::UnixDatagram::bind(&mine)?;
+        let asked = (|| {
+            socket.connect(&control)?;
+            socket.set_read_timeout(Some(QUERY_TIMEOUT))?;
+            socket.set_write_timeout(Some(QUERY_TIMEOUT))?;
+            let ask = |request: &str| -> std::io::Result<String> {
+                socket.send(request.as_bytes())?;
+                let mut reply = [0u8; 4_096];
+                let read = socket.recv(&mut reply)?;
+                Ok(String::from_utf8_lossy(&reply[..read]).trim().to_owned())
+            };
+            let ok = |request: &str, what: &str| match ask(request)?.as_str() {
+                "OK" => Ok(()),
+                _ => Err(std::io::Error::other(format!(
+                    "wpa_supplicant refused {what}"
+                ))),
+            };
+            ok("REMOVE_NETWORK all", "removing its networks")?;
+            let id = ask("ADD_NETWORK")?;
+            if id.parse::<u32>().is_err() {
+                return Err(std::io::Error::other("wpa_supplicant refused a network"));
+            }
+            for (key, value) in fields {
+                // The field's name only: its value may be the password.
+                ok(&format!("SET_NETWORK {id} {key} {value}"), key)?;
+            }
+            ok(&format!("SELECT_NETWORK {id}"), "selecting the network")
+        })();
+        let _ = std::fs::remove_file(&mine);
+        asked
+    }
+
     fn field(&self, key: &str) -> Option<String> {
         self.status()
             .into_iter()

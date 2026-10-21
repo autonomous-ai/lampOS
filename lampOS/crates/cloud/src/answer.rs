@@ -240,7 +240,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // broker acks `wifi.joined` (#2617's P2-1 and P2-2).
         crate::settings::WIFI_CONFIRM_KIND if lamp.changes().is_some_and(|c| c.wifi_on()) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
-            changes.confirm_wifi()?;
+            changes.confirm_wifi(data)?;
             Ok(None)
         }
         // A person's own keys (#2094), with LAMP_OWN_KEYS=on too: to root's

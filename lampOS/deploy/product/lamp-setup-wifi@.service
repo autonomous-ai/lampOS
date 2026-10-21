@@ -27,9 +27,10 @@ RuntimeMaxSec=25min
 # A change cut before it ended (this limit, a kill, a crash) puts the old network's file back
 # from .lamp-previous, and wpa_supplicant re-reads it (#1959's P1). A finished change left none.
 ExecStopPost=/opt/lampOS/setup/current/lamp-setup wifi-restore
-# That restore tries the radio as the way back does, 3 tries of 45 s, 10 s and 60 s: systemd's
-# default 90 s for the stop would cut it (#2617's P3 1).
-TimeoutStopSec=8min
+# That restore tries the radio within 90 s in all, in practice once (a try starts only while its
+# 55 s of commands fit), so a shutdown is held that long at most; a lamp whose old network is not
+# back by then keeps .lamp-previous for the boot's restore. 2 min leaves room for a poll's queries past it (#2617's P3 1, follow-up 4).
+TimeoutStopSec=2min
 # #1982's lamp-setup-change@ sandbox, minus what the radio needs.
 NoNewPrivileges=yes
 ProtectSystem=strict

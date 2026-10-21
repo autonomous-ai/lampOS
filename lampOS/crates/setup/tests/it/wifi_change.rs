@@ -3,8 +3,8 @@
 use lamp_setup::wifi::Host;
 use lamp_setup::wifi_change::{
     Asked, BACK_TRIES, BACK_WAIT, CONFIRM_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth,
-    RECORDING_LOST, Rejoin, Restored, SAY_BACK, SAY_JOINED, SAY_LOST, SayService, answer, change,
-    line_for, parse, restore, say_after,
+    RECORDING_LOST, RESTORE_MOST, Rejoin, Restored, SAY_BACK, SAY_JOINED, SAY_LOST, SayService,
+    answer, change, line_for, parse, restore, say_after,
 };
 use serde_json::json;
 use std::{collections::HashMap, io, time::Duration};
@@ -48,6 +48,14 @@ struct Fake {
     app_confirms: bool,
     /// The confirmations asked for.
     asked_confirm: u32,
+    /// The old network run from wpa_supplicant's memory, its file untouched.
+    holds: u32,
+    /// Holds that fail part-way, as the real one can (#2686's P2): its
+    /// networks removed first, then a step refused or timed out, so
+    /// wpa_supplicant is left holding no network.
+    holds_failing: u32,
+    /// When each hold was asked.
+    hold_at_ms: Vec<u64>,
 }
 
 fn hex(text: &str) -> String {
@@ -78,6 +86,9 @@ impl Fake {
             reloads: 0,
             app_confirms: true,
             asked_confirm: 0,
+            holds: 0,
+            holds_failing: 0,
+            hold_at_ms: Vec::new(),
         };
         fake.start_radio();
         fake.stations = 0;
@@ -92,10 +103,16 @@ impl Fake {
 
     /// wpa_supplicant reading its file: the network it runs is the file's.
     fn load(&mut self) {
+        let conf = self.conf.clone().unwrap_or_default();
+        self.run(&conf);
+    }
+
+    /// wpa_supplicant running `conf`'s network, from its file or its memory.
+    fn run(&mut self, conf: &[u8]) {
         self.started_ms = self.now_ms;
         self.wrong_key = false;
         self.joined = None;
-        let conf = String::from_utf8(self.conf.clone().unwrap_or_default()).unwrap();
+        let conf = String::from_utf8(conf.to_vec()).unwrap();
         self.radio.push(conf.clone().into_bytes());
         for (name, network) in &self.networks {
             if conf.contains(&format!("ssid={}\n", hex(name))) {
@@ -199,6 +216,20 @@ impl Rejoin for Fake {
             self.now_ms += most.as_millis() as u64;
             false
         }
+    }
+    fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+        self.holds += 1;
+        self.hold_at_ms.push(self.now_ms);
+        if self.holds_failing > 0 {
+            self.holds_failing -= 1;
+            // `REMOVE_NETWORK all` was taken; `ADD_NETWORK` was not.
+            self.started_ms = self.now_ms;
+            self.wrong_key = false;
+            self.joined = None;
+            return Err(io::Error::other("wpa_supplicant refused a network"));
+        }
+        self.run(conf);
+        Ok(())
     }
 }
 
@@ -316,6 +347,9 @@ fn the_old_file_is_kept_until_the_new_network_is_confirmed() {
         }
         fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
             self.0.app_confirms(ssid, most)
+        }
+        fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+            self.0.hold(conf)
         }
     }
     let mut watch = Watch(&mut fake, true);
@@ -734,6 +768,9 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
         fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
             self.0.app_confirms(ssid, most)
         }
+        fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+            self.0.hold(conf)
+        }
     }
     let mut host = Clocked(&mut fake, &clock);
     // The old network comes back 150 s after the radio's last start.
@@ -906,6 +943,13 @@ struct Twist<'a> {
     removes_failing: u32,
     /// `.lamp-previous` cannot be read (P3 5).
     previous_unreadable: bool,
+    /// Every write of the file from this one, counted from 1, fails.
+    writes_failing_from: Option<u32>,
+    /// An address is always there, whatever network is joined: one left
+    /// from the network before, or another's.
+    address_always: bool,
+    /// Every radio start hangs until its bound.
+    stations_hanging: bool,
 }
 
 impl<'a> Twist<'a> {
@@ -924,6 +968,9 @@ impl<'a> Twist<'a> {
             write_calls: 0,
             removes_failing: 0,
             previous_unreadable: false,
+            writes_failing_from: None,
+            address_always: false,
+            stations_hanging: false,
         }
     }
 }
@@ -934,7 +981,11 @@ impl Host for Twist<'_> {
     }
     fn write_conf(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
         self.write_calls += 1;
-        if self.fail_write == Some(self.write_calls) {
+        if self.fail_write == Some(self.write_calls)
+            || self
+                .writes_failing_from
+                .is_some_and(|from| self.write_calls >= from)
+        {
             return Err(io::Error::other("no space left on device"));
         }
         self.fake.write_conf(bytes)
@@ -946,7 +997,7 @@ impl Host for Twist<'_> {
                 "device-sta-mode ended with exit status: 1",
             ));
         }
-        if self.hang_station == Some(self.station_calls) {
+        if self.stations_hanging || self.hang_station == Some(self.station_calls) {
             self.fake.now_ms += lamp_setup::wifi::RADIO_TIMEOUT.as_millis() as u64;
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
@@ -968,7 +1019,7 @@ impl Host for Twist<'_> {
         self.fake.current_ssid()
     }
     fn has_station_ip(&mut self) -> bool {
-        !self.dropped && self.fake.has_station_ip()
+        self.address_always || (!self.dropped && self.fake.has_station_ip())
     }
     fn wpa_state(&mut self) -> String {
         self.fake.wpa_state()
@@ -1024,6 +1075,9 @@ impl Rejoin for Twist<'_> {
             return false;
         }
         self.fake.app_confirms(ssid, most)
+    }
+    fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+        self.fake.hold(conf)
     }
 }
 
@@ -1195,13 +1249,11 @@ fn p1_the_units_restore_at_the_helpers_stop_and_at_boot() {
     let unit = include_str!("../../../../deploy/product/lamp-setup-wifi@.service");
     assert!(unit.contains("\nExecStopPost=/opt/lampOS/setup/current/lamp-setup wifi-restore\n"));
     assert!(unit.contains("\nRuntimeMaxSec=25min\n"));
-    // ExecStopPost's restore tries the radio BACK_TRIES times, each
-    // RADIO_TIMEOUT and BACK_WAIT (the first builder's P3 1): systemd's
-    // default 90 s would kill it.
-    assert!(unit.contains("\nTimeoutStopSec=8min\n"));
-    let tries = BACK_TRIES as u64
-        * (lamp_setup::wifi::RADIO_TIMEOUT + lamp_setup::wifi::QUERY_TIMEOUT + BACK_WAIT).as_secs();
-    assert!(tries + 30 <= 8 * 60, "{tries}");
+    // ExecStopPost's restore ends within RESTORE_MOST (the first builder's
+    // follow-up 4): systemd's default 90 s would cut it, 8 min held a
+    // shutdown for minutes.
+    assert!(unit.contains("\nTimeoutStopSec=2min\n"));
+    assert!(RESTORE_MOST + Duration::from_secs(25) <= Duration::from_secs(120));
     let boot = include_str!("../../../../deploy/product/lamp-setup-wifi-restore.service");
     for line in [
         "\nDefaultDependencies=no\n",
@@ -1339,7 +1391,8 @@ fn p3_1_the_stop_time_restore_with_the_radio_failing_keeps_the_old_file_and_trie
     twist.reloads_failing = u32::MAX;
     let calls = twist.station_calls;
     assert_eq!(restore(&mut twist, true), Restored::NotBack);
-    assert_eq!(twist.station_calls - calls, BACK_TRIES);
+    // As many tries as fit in the stop's bound (follow-up 4).
+    assert!((1..=BACK_TRIES).contains(&(twist.station_calls - calls)));
     // The file is the old one, and `.lamp-previous` stays for the boot's
     // restore: nothing is deleted before the old network is back.
     assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
@@ -1464,6 +1517,9 @@ fn p3_a_cut_during_the_confirm_wait_leaves_the_old_network_to_restore() {
             fn app_confirms(&mut self, _ssid: &str, _most: Duration) -> bool {
                 panic!("the helper was cut while the app's confirmation was waited for");
             }
+            fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+                self.0.hold(conf)
+            }
         }
         change(&mut Panicking(&mut twist), "VN", &asked("New Home"))
     }));
@@ -1473,4 +1529,127 @@ fn p3_a_cut_during_the_confirm_wait_leaves_the_old_network_to_restore() {
     assert_eq!(fake.conf.as_deref(), Some(&old_conf()[..]));
     assert_eq!(fake.radio.last().unwrap(), &old_conf());
     assert_eq!(fake.previous, None);
+}
+
+/// The first builder's follow-up 1 on #2617: the old network is back only
+/// when it is the one joined, not on any address (one left from the new
+/// network, or another network's).
+#[test]
+fn followup_1_back_is_the_old_network_joined_not_any_address() {
+    // The old network is gone; an address is there all the same.
+    let mut fake = Fake::new(&[(
+        "New Home",
+        Network {
+            password: "another-fake-pass",
+            ..GOOD
+        },
+    )]);
+    fake.previous = Some(old_conf());
+    let mut twist = Twist::new(&mut fake);
+    twist.address_always = true;
+    assert_eq!(restore(&mut twist, true), Restored::NotBack);
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    // With the old network there, it is back.
+    let mut fake = wrong_password_fake();
+    fake.previous = Some(old_conf());
+    let mut twist = Twist::new(&mut fake);
+    twist.address_always = true;
+    assert_eq!(restore(&mut twist, true), Restored::Put);
+    // The old network's name, from setup's file and from V1's.
+    assert_eq!(
+        lamp_setup::wifi_change::conf_ssid(&old_conf()).as_deref(),
+        Some("Old Home")
+    );
+    let v1 = b"ctrl_interface=DIR=/run/wpa_supplicant\nnetwork={\n\tbssid=aa:bb:cc:dd:ee:ff\n\tssid=\"Nh\xc3\xa0 Lan\"\n\tscan_ssid=1\n\tpsk=\"fake-pass-OLD-5678\"\n}\n";
+    assert_eq!(
+        lamp_setup::wifi_change::conf_ssid(v1).as_deref(),
+        Some("Nh\u{e0} Lan")
+    );
+    assert_eq!(lamp_setup::wifi_change::conf_ssid(b"country=VN\n"), None);
+}
+
+/// Follow-up 4: the stop-time restore ends within its bound, well inside the
+/// unit's stop timeout, even with every radio start hanging; the kept file
+/// stays for the boot's restore, the backstop.
+#[test]
+fn followup_4_the_stop_time_restore_is_bounded_within_the_stop_timeout() {
+    let mut fake = wrong_password_fake();
+    fake.previous = Some(old_conf());
+    fake.networks.remove("Old Home");
+    let mut twist = Twist::new(&mut fake);
+    twist.stations_hanging = true;
+    let started = twist.fake.now_ms;
+    assert_eq!(restore(&mut twist, true), Restored::NotBack);
+    let took = twist.fake.now_ms - started;
+    assert!(took <= RESTORE_MOST.as_millis() as u64, "{took} ms");
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    let unit = include_str!("../../../../deploy/product/lamp-setup-wifi@.service");
+    assert!(unit.contains("\nTimeoutStopSec=2min\n"));
+    // Its bound, a poll's wpa_cli queries past it and put_back's 2 s.
+    let worst = RESTORE_MOST
+        + 2 * lamp_setup::wifi::QUERY_TIMEOUT
+        + Duration::from_secs(1 + u64::from(BACK_TRIES - 1));
+    assert!(worst < Duration::from_secs(120), "{worst:?}");
+}
+
+/// Follow-up 6 (P3 2's remainder): the old file's three writes all fail; the
+/// old network is run from wpa_supplicant's memory at once, not left to the
+/// stop's restore, and the old file stays kept for that restore.
+#[test]
+fn followup_6_an_old_file_that_cannot_be_written_is_run_from_memory_at_once() {
+    let mut fake = wrong_password_fake();
+    let mut twist = Twist::new(&mut fake);
+    // The 1st write is the new network's; every one after fails.
+    twist.writes_failing_from = Some(2);
+    let started = twist.fake.now_ms;
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    let Changed::Back { why } = &changed else {
+        panic!("{changed:?}");
+    };
+    assert!(why.contains("from memory"), "{why}");
+    assert_eq!(fake.holds, 1);
+    assert_eq!(
+        fake.radio.last().unwrap(),
+        &old_conf(),
+        "the radio runs the old network"
+    );
+    assert_eq!(fake.current_ssid().as_deref(), Some("Old Home"));
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    assert!(fake.now_ms - started < JOIN_WAIT.as_millis() as u64 + 2 * 60_000);
+    assert_eq!(line_for(&changed), Some(SAY_BACK));
+}
+
+/// #2686's P2: the old file cannot be written and every hold fails
+/// part-way, its networks already removed. The lamp is not left on no
+/// network: wpa_supplicant reads the live file again, the new network that
+/// worked, and the stop's restore leaves it there.
+#[test]
+fn p2_a_hold_that_fails_part_way_leaves_the_lamp_on_the_live_network() {
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    fake.app_confirms = false;
+    fake.holds_failing = BACK_TRIES;
+    let mut twist = Twist::new(&mut fake);
+    twist.writes_failing_from = Some(2);
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::NotBack { .. }), "{changed:?}");
+    // The tries were spaced, not back to back.
+    let at = &twist.fake.hold_at_ms;
+    assert_eq!(at.len(), BACK_TRIES as usize);
+    assert!(at.windows(2).all(|w| w[1] - w[0] >= 1_000), "{at:?}");
+    twist.sleep(Duration::from_secs(10));
+    assert_eq!(twist.current_ssid().as_deref(), Some("New Home"));
+    assert_eq!(restore(&mut twist, true), Restored::Failed);
+    twist.sleep(Duration::from_secs(10));
+    assert_eq!(twist.current_ssid().as_deref(), Some("New Home"));
+    assert_eq!(fake.previous.as_deref(), Some(&old_conf()[..]));
+    // One hold failing part-way, the next taken: back on the old network.
+    let mut fake = Fake::new(&[("Old Home", OLD), ("New Home", GOOD)]);
+    fake.app_confirms = false;
+    fake.holds_failing = 1;
+    let mut twist = Twist::new(&mut fake);
+    twist.writes_failing_from = Some(2);
+    let changed = change(&mut twist, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
+    assert_eq!(fake.holds, 2);
+    assert_eq!(fake.current_ssid().as_deref(), Some("Old Home"));
 }

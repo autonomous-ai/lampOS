@@ -140,6 +140,66 @@ pub trait Rejoin: Host {
     /// Tell the asker the new network `ssid` is proven, and wait at most
     /// `most` for the app's confirmation through it.
     fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool;
+    /// wpa_supplicant runs `conf`'s network from its memory, its file left
+    /// as it is and never saved over: the way back when the old file cannot
+    /// be written (the first builder's P3 2 on #2617). On an error it may
+    /// hold no network (its networks are removed first): the caller then
+    /// [`reload`](Rejoin::reload)s the live file (#2686's P2).
+    fn hold(&mut self, conf: &[u8]) -> io::Result<()>;
+}
+
+/// The stop-time restore's bound, all its tries (the first builder's
+/// follow-up 4 on #2617): inside the unit's `TimeoutStopSec=2min` with a
+/// poll's queries and the file's writes to spare, so a shutdown is held at
+/// most that. A try starts only while its radio steps fit. The boot's
+/// restore is the backstop: the kept file stays while the old network is
+/// not back.
+pub const RESTORE_MOST: Duration = Duration::from_secs(90);
+
+/// The network's name in a wpa_supplicant file: its first `ssid=` line, as
+/// hex (setup's writer) or between quotes (V1's `connect-wifi`, `P"…"` with
+/// wpa_cli's escapes). `None` when there is none to read.
+pub fn conf_ssid(conf: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(conf);
+    let value = text
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("ssid="))?
+        .trim();
+    if let Some(quoted) = value.strip_prefix("P\"").and_then(|v| v.strip_suffix('"')) {
+        return Some(wifi::decode_wpa(quoted));
+    }
+    if let Some(quoted) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+        return Some(quoted.to_owned());
+    }
+    if value.is_empty() || value.len() % 2 != 0 {
+        return None;
+    }
+    let bytes = (0..value.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(value.get(at..at + 2)?, 16).ok())
+        .collect::<Option<Vec<u8>>>()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The `key=value` lines of a wpa_supplicant file's first network, as
+/// `SET_NETWORK` takes them (it parses a value as the file does). `None`
+/// when it has none.
+pub fn network_lines(conf: &[u8]) -> Option<Vec<(String, String)>> {
+    let text = String::from_utf8_lossy(conf);
+    let mut lines = text.lines().map(str::trim);
+    lines.find(|line| line.replace(' ', "") == "network={")?;
+    let mut fields = Vec::new();
+    for line in lines {
+        if line == "}" {
+            return (!fields.is_empty()).then_some(fields);
+        }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let (key, value) = line.split_once('=')?;
+        fields.push((key.trim().to_owned(), value.trim().to_owned()));
+    }
+    None
 }
 
 /// How a change ended.
@@ -243,13 +303,22 @@ pub fn change(host: &mut impl Rejoin, country: &str, asked: &Asked) -> Changed {
     // old network waited for; each step bounded, the radio tried again. A
     // write that fails is tried again at once (the first builder's P3 2 on
     // #2617), not left to the stop's restore.
+    let old_ssid = conf_ssid(&previous);
     if !put_back(host, &previous) {
-        // The old file stays kept beside the new one, for `restore`.
+        // The old file stays kept beside the new one, for `restore`; the
+        // radio runs the old network from memory meanwhile (P3 2).
+        if held_on_old(host, &previous, &asked.broker, old_ssid.as_deref()) {
+            return Changed::Back {
+                why: format!(
+                    "{why}; the lamp is back on its old Wi-Fi, run from memory since its file could not be written"
+                ),
+            };
+        }
         return Changed::NotBack {
             why: format!("{why}; the old Wi-Fi could not be put back"),
         };
     }
-    let back = back_on_old(host, Some(&asked.broker));
+    let back = back_on_old(host, Some(&asked.broker), old_ssid.as_deref(), None);
     // The live file is the old one now: nothing is left to restore.
     let _ = host.keep_previous(None);
     if back {
@@ -299,21 +368,70 @@ fn forget_previous<H: Rejoin>(host: &mut H, conf: &[u8]) {
     }
 }
 
+/// Whether the old network is back: `ssid` (when the old file names one)
+/// the one joined, not merely an address (the first builder's follow-up 1
+/// on #2617: one left from the new network, or another's), and the broker
+/// reached when one is known.
+fn on_old<H: Rejoin>(host: &mut H, broker: Option<&str>, ssid: Option<&str>) -> bool {
+    host.has_station_ip()
+        && ssid.is_none_or(|ssid| host.current_ssid().as_deref() == Some(ssid))
+        && broker.is_none_or(|broker| host.broker(broker))
+}
+
 /// The old file is live: `wpa_cli reconfigure` first, so the new network is
 /// never left loaded even when the radio's script fails or hangs, then the
-/// radio's restart; each try waits [`BACK_WAIT`] for an address and, when
-/// one is known, the broker, [`BACK_TRIES`] tries. Whether the old network
-/// is back.
-fn back_on_old<H: Rejoin>(host: &mut H, broker: Option<&str>) -> bool {
+/// radio's restart; each try waits [`BACK_WAIT`] for the old network
+/// ([`on_old`]), [`BACK_TRIES`] tries. With `most`, all of it ends within
+/// that: a try starts only while its two commands' bounds fit, and its wait
+/// ends at the bound. Whether the old network is back.
+fn back_on_old<H: Rejoin>(
+    host: &mut H,
+    broker: Option<&str>,
+    ssid: Option<&str>,
+    most: Option<Duration>,
+) -> bool {
+    let started = host.now_ms();
+    let steps = (wifi::RADIO_TIMEOUT + wifi::QUERY_TIMEOUT).as_millis() as u64;
     for _ in 0..BACK_TRIES {
+        let left = |host: &mut H| {
+            most.map(|most| (most.as_millis() as u64).saturating_sub(host.now_ms() - started))
+        };
+        if left(host).is_some_and(|left| left < steps) {
+            return false;
+        }
         let _ = host.reload();
         let _ = host.station();
-        if wait_for(host, BACK_WAIT, |host| {
-            host.has_station_ip() && broker.is_none_or(|broker| host.broker(broker))
-        }) {
+        let wait = left(host).map_or(BACK_WAIT, |left| BACK_WAIT.min(Duration::from_millis(left)));
+        if wait_for(host, wait, |host| on_old(host, broker, ssid)) {
             return true;
         }
     }
+    false
+}
+
+/// The old file could not be written: wpa_supplicant runs the old network
+/// from memory ([`Rejoin::hold`]), with no radio restart (it would read the
+/// new file again), each try waiting [`BACK_WAIT`] for it, [`BACK_TRIES`]
+/// tries a second apart. A hold that fails may have removed wpa_supplicant's
+/// networks before its failing step (#2686's P2), so it is told to read the
+/// live file again at once; and when the old network never came back, it
+/// reads it once more, so the lamp ends on the new network that worked, not
+/// on none. The kept file stays for the stop's restore, which writes it.
+/// Whether the old network is back.
+fn held_on_old<H: Rejoin>(host: &mut H, previous: &[u8], broker: &str, ssid: Option<&str>) -> bool {
+    for try_ in 0..BACK_TRIES {
+        if try_ > 0 {
+            host.sleep(Duration::from_secs(1));
+        }
+        if host.hold(previous).is_err() {
+            let _ = host.reload();
+            continue;
+        }
+        if wait_for(host, BACK_WAIT, |host| on_old(host, Some(broker), ssid)) {
+            return true;
+        }
+    }
+    let _ = host.reload();
     false
 }
 
@@ -337,9 +455,9 @@ pub enum Restored {
 /// A change cut before it ended (killed, `RuntimeMaxSec`, a power cut):
 /// the old network's file kept beside the live one goes back. `live` after
 /// the helper's own stop (`ExecStopPost=`), with wpa_supplicant running: it
-/// re-reads the file and the radio restarts, with the way back's own
-/// retries, the old network judged back by its address (no broker is known
-/// at the stop). The kept file goes only once that has worked (the first
+/// re-reads the file and the radio restarts, within [`RESTORE_MOST`] (in
+/// practice one try: a second's 55 s no longer fits), the old network judged back by its name
+/// and an address (no broker is known at the stop). The kept file goes only once that has worked (the first
 /// builder's P3 1 on #2617). At boot (`lamp-setup-wifi-restore.service`,
 /// before wpa_supplicant and dhcpcd) only the file.
 pub fn restore(host: &mut impl Rejoin, live: bool) -> Restored {
@@ -351,7 +469,14 @@ pub fn restore(host: &mut impl Rejoin, live: bool) -> Restored {
     if !put_back(host, &previous) {
         return Restored::Failed;
     }
-    if live && !back_on_old(host, None) {
+    if live
+        && !back_on_old(
+            host,
+            None,
+            conf_ssid(&previous).as_deref(),
+            Some(RESTORE_MOST),
+        )
+    {
         return Restored::NotBack;
     }
     let _ = host.keep_previous(None);
@@ -782,5 +907,11 @@ impl Rejoin for ImageRejoin {
 
     fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
         confirmed_on_stdio(ssid, most)
+    }
+
+    fn hold(&mut self, conf: &[u8]) -> io::Result<()> {
+        let fields = network_lines(conf)
+            .ok_or_else(|| io::Error::other("the old Wi-Fi's file names no network"))?;
+        self.image.hold(&fields)
     }
 }
