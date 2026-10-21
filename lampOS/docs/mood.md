@@ -468,10 +468,14 @@ seen, it starts `lamp-mood` as a transient unit (`lamp-trial-mood`,
 `LAMP_MOOD=on`, as Expression's user). It passes on all of these within
 120 s:
 
-- `mood/state`'s breath at a pace other than 1;
+- `mood/state`'s breath at a pace other than 1, its `pace` and `phase` in
+  either order (`lamp-bus latest` prints a message's keys sorted);
 - the ring's line and Expression's line above;
-- `expression/state` with `enabled` false and a drift asked for
-  (`drifting`).
+- `expression/state` with `enabled` false, and a drift asked for
+  (`drifting`). The drift is a body move: on a lamp with no body, whose
+  `expression/state` says `fresh measured joints` are missing (lamp-75c9,
+  its poses not yet measured), it's said "not checked", never passed, once
+  the rest has been seen (the row's `UNCHECKED`, #1670).
 
 It fails if `mood/state` says a `familiar` level: nobody known.
 Afterwards Mood is stopped, the shadow drop-in removed and Expression
