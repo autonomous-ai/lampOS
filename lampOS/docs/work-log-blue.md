@@ -55,3 +55,14 @@ Ready for lamp-voice: yes (#2499)
 - Found, mine: adding `builder:blue` to #2499 through the API created the
   label, since it did not exist. Told the first builder on #1722; left to
   them.
+
+## 2026-10-21 — #2499: the first builder's three changes
+
+Ready for lamp-voice: yes (#2499)
+
+- The first builder's read (13:4x, on #2499): yes, after three changes in
+  the one commit. Folded as `275145269`: the person's light wins (a light
+  proposal only over the lamp's idle light, #1362); a note is quoted,
+  untrusted context, never an instruction; remote add-ons need their
+  person's yes per subscribed summary, seen and revoked per add-on. Left
+  for reviewer-two to merge.
