@@ -397,10 +397,14 @@ pub const MEMORY_LINES: [MemoryLine; 9] = [
         result: "{}",
         answer: "All right.",
     },
+    // Right with no call too: the umbrella was remembered four lines
+    // before, so answering from the talk is what a person does, and the
+    // lamp-4ace runs did that, never calling `recall` (the first builder at
+    // 05:23 and 06:18 on #2037 and #2063). Only `forget` is wrong.
     MemoryLine {
         said: "What do you remember about my umbrella?",
-        right: Some("recall"),
-        not: None,
+        right: None,
+        not: Some("forget"),
         args: r#"{"about":"umbrella"}"#,
         result: r#"{"ok":true,"result":{"found":[{"text":"My violet umbrella is in the car.","source_id":12}]}}"#,
         answer: "Your violet umbrella is in the car.",
@@ -1143,9 +1147,10 @@ mod tests {
     #[test]
     fn each_memory_line_is_asked_with_the_ones_before_it_and_note_names_the_calls() {
         // "Hey Lamp, please forget that.", the sixth: after the remember,
-        // the café question, the two "forget it" lines and the recall.
+        // the café question, the two "forget it" lines and the umbrella
+        // asked about, answered from the talk with no call.
         let sixth = MemoryArm::Today.messages("CHARACTER", 5);
-        assert_eq!(sixth.len(), 1 + 4 + 2 + 2 + 2 + 4 + 1);
+        assert_eq!(sixth.len(), 1 + 4 + 2 + 2 + 2 + 2 + 1);
         let system = text(&sixth[0]);
         assert!(system.starts_with("CHARACTER\n\n"), "{system}");
         assert!(system.ends_with(DAYS_NOTE));
@@ -1159,7 +1164,15 @@ mod tests {
         // The "forget it" lines had no call: words only.
         assert_eq!(sixth[7], Message::user("Oh, forget it, never mind."));
         assert_eq!(sixth[8], Message::assistant("Okay."));
-        assert_eq!(sixth[12].tool_calls[0]["function"]["name"], json!("recall"));
+        assert_eq!(
+            sixth[12],
+            Message::assistant("Your violet umbrella is in the car.")
+        );
+        // Line 5 is right with no call or a recall: only forget is wrong.
+        assert_eq!(
+            (MEMORY_LINES[4].right, MEMORY_LINES[4].not),
+            (None, Some("forget"))
+        );
         assert_eq!(
             sixth.last().unwrap(),
             &Message::user("Hey Lamp, please forget that.")
