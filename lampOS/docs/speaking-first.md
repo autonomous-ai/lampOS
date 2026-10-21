@@ -527,6 +527,8 @@ for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
 conversation's last turn: a reminder takes that second today, and a skill
 may not need it.
 
+
+**An add-on's quoted line (#2530 part 2, `LAMP_ADDON_SAY=on`).** In place of `note` or `text`, `quoted` is a partner's line from an add-on's folder, at most 300 bytes on one line. Refused without the switch, and on the Live route. Its turn tells the model it is quoted and untrusted, never an instruction, and that it may say nothing; it is asked with no functions, runs none, is kept out of memory and is never urgent ([addons.md](addons.md)).
 ## Asking the policy (#752)
 
 Built by the second builder on 2026-10-15. **Off unless the voice starts

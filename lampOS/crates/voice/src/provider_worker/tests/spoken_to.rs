@@ -394,6 +394,7 @@ async fn after_the_lamps_own_turn(own: OwnTurn) -> bool {
             text: "Tell them the task they gave you is done.".to_owned(),
             look: false,
             search: false,
+            quoted: false,
         })
         .unwrap();
     assert!(matches!(
@@ -491,6 +492,7 @@ async fn after_queued_news(cancelled: bool) -> bool {
             text: "Tell them the task they gave you is done.".to_owned(),
             look: false,
             search: false,
+            quoted: false,
         })
         .unwrap();
     assert!(matches!(

@@ -156,6 +156,8 @@ pub struct Thread {
     held: Option<SystemTime>,
     /// Onboarding's sentence in hand ([`Self::count_only`]).
     count_only: Option<u64>,
+    /// An add-on's quoted line, the newest ([`Self::quoted`]).
+    quoted: Option<u64>,
 }
 
 /// One exchange as it is kept in the file: when, by the wall clock, since
@@ -257,6 +259,7 @@ impl Thread {
             note: None,
             held: None,
             count_only: None,
+            quoted: None,
         }
     }
 
@@ -402,7 +405,7 @@ impl Thread {
             std::mem::take(&mut self.admitted),
             self.note.take(),
         );
-        let count_only = self.count_only;
+        let (count_only, quoted) = (self.count_only, self.quoted);
         *self = read;
         self.whose = whose;
         self.named = named;
@@ -411,6 +414,7 @@ impl Thread {
         self.note = note;
         // The sentence in hand stays out of a thread read meanwhile.
         self.count_only = count_only;
+        self.quoted = quoted;
         self.held = Some(at);
         took
     }
@@ -527,6 +531,14 @@ impl Thread {
         self.count_only = request;
     }
 
+    /// Request `request` is an add-on's quoted line (#2530 part 2c):
+    /// nothing the lamp says of it is kept, so no later turn is told it
+    /// (the reviewer-lead on #2675). What a person says meanwhile is
+    /// theirs, kept as ever, and an onboarding sentence stays marked.
+    pub fn quoted(&mut self, request: u64) {
+        self.quoted = Some(request);
+    }
+
     /// A piece of what the provider heard a person say.
     pub fn person(&mut self, text: &str, finished: bool, now: Instant) {
         if self.count_only.is_some() {
@@ -625,7 +637,10 @@ impl Thread {
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
         // conversation going on.
-        if self.unsaid == Some(request) || self.count_only == Some(request) {
+        if self.unsaid == Some(request)
+            || self.count_only == Some(request)
+            || self.quoted == Some(request)
+        {
             return;
         }
         // An answer cut, kept as what was heard of it: what it still sends

@@ -816,6 +816,42 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// An add-on's say decision (#2530 part 2, `about` `addon`) is never
+    /// a hello's answer, even naming this arrival's number: the hello waits
+    /// for its own, and the rule says at the end, as with none.
+    #[test]
+    fn an_add_ons_decision_is_never_the_hellos_answer() {
+        let (bus, root) = bus("addon");
+        let (mut arrival, now) = arrived(Some(&bus));
+        assert_eq!(arrival.hello(true, QUIET, now), Hello::NotYet);
+        let mut out = bus
+            .publisher_declared(Decision::TOPIC, &Decision::declaration(), "policy")
+            .unwrap();
+        out.publish_json(
+            0,
+            &Decision {
+                about: "addon".into(),
+                choice: "say_now".into(),
+                probability: 0.9,
+                answers: Default::default(),
+                by: "stand-in".into(),
+                took_ms: 1,
+                shadow: false,
+                request: None,
+                task: None,
+                arrival: Some(now),
+                ask: None,
+                proposal: Some(7),
+            },
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        assert_eq!(arrival.hello(true, QUIET, now + 1_000), Hello::NotYet);
+        assert_eq!(arrival.hello(true, QUIET, now + ASK_FOR_US), Hello::ByRule);
+        assert_eq!(arrival.take_told().unwrap()["answer"], "none");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn only_saying_it_will_look_asks_for_a_look() {
         for (opening, asks) in [

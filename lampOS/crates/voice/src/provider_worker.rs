@@ -638,6 +638,12 @@ pub enum ProviderInput {
         /// is as before for every other turn and on the Live route.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         search: bool,
+        /// An add-on's quoted line (#2530 part 2, `say::Words::Quoted`):
+        /// the second route asks it with no functions declared and runs none
+        /// called, and keeps it out of memory. The Live route never gets one
+        /// (the say service refuses it there). Sent only when true.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        quoted: bool,
     },
     /// A due occurrence whose durable identity is owned by the coordinator's
     /// consumer. The provider receives data, never permission to run tools.
