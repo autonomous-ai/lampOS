@@ -307,8 +307,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "dance",
     "bedtime-morning",
     // When the lamp sleeps at night (#940): Expression's built-in trigger,
-    // moved into a skill. Enabled, but inert while the product units leave
-    // LAMP_SKILL_ROUTINES and LAMP_REST_REQUESTS off; the built-in sleep runs.
+    // moved into a skill. On, as the built-in sleep was.
     "night-sleep",
     // A failed part shown as a creature a little unwell (#1681): row 8 on
     // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
