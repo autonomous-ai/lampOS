@@ -60,6 +60,19 @@ Four more you can run on their own:
   it changed or added, and any refusal (`$PLAYED_OUT/scenarios/addon-say-LABEL.txt`).
   Its stand-in test is `addon-say-test.sh`.
 
+- `cut-in-keeps.sh LABEL [ROUNDS]`, about 15 minutes for 3 rounds each way
+  (#2739, `LAMP_CUT_IN_KEEPS_LISTENING`): "Hey Lamp, tell me a long story
+  about a lighthouse keeper.", two asides that pause the story and let it
+  go on ("Hmm, interesting.", "What was that?"), then "Lamp, stop. Please
+  stop the story." about 5 s after the second. A `/run` drop-in sets the
+  switch off, then on, the voice restarted each time, and is removed on
+  exit. Per round it prints whether the third line was heard, whether the
+  story stopped (`user_interrupted`) and the gap from the line's start to
+  the stop, from the voice's session events; a round whose asides were not
+  two yields that resumed is not a trial. On passes when the line is heard
+  and the story stops within about 1 s (`$PLAYED_OUT/scenarios/cut-in-keeps-LABEL.txt`).
+  Its stand-in test is `cut-in-keeps-test.sh`.
+
 - `calendar.sh LABEL FIXTURE`, about 4 minutes (#751, "Email, calendar
   and other connectors, through hand-overs"): "Hey Lamp, what's on my
   calendar today?" is handed over to the computer's agent, which is the

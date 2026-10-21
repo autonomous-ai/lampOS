@@ -38,6 +38,7 @@ The owner's desk. Most of these ride on a few sessions: the owner at the desk, t
 | `LAMP_MISHEARD_HUM` | #828 | The ten cut-ins, A/B, three rounds. | nothing (played) | #1712 |
 | `LAMP_NAME_NOTE_HEARD_AS` | #829 | The ten cut-ins' story requests, A/B: "Hey Mom" and "Hey man" answered more often, no more unnamed talk answered. | nothing (played) | #1712 |
 | `LAMP_CUT_INS_NOT_TALK` | #828 | The ten cut-ins on and off, and a busy office talking over the lamp. | the office busy | #1712 |
+| `LAMP_CUT_IN_KEEPS_LISTENING` | #2739 (#2602) | After the morning's update: `tools/played/cut-in-keeps.sh LABEL` (3 rounds off, then 3 on, the same hour, through a `/run` drop-in removed on exit): a long story, two asides that pause it and let it go on, then "Lamp, stop. Please stop the story." about 5 s after the second. **On:** the third line heard and the story stopped (`user_interrupted`) within about 1 s of its start. **Off:** as today, not heard and the story goes on. | nothing (played) | lamp-voice |
 | `LAMP_FIRST_WORDS` | #936 | A played minute of cut-ins and stories asked over (`cutins.sh`). #1246 found neither microphone carries a word said over the lamp's own speech, which this needs. | nothing (played) | #1712 |
 | `LAMP_STOP_HEARD` | #1555 | `lamp-name check --stop-least 0.9` on the replays, the false stops in an hour of the lamp alone, then a person's "Stop." | a person's voice for the last step | #1712 |
 | `lamp-name --stop-least` | #1555 | The ten cut-ins with `LAMP_STOP_HEARD` on and off. | nothing (played) | lamp-voice |
