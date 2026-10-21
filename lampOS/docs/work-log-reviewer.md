@@ -4,6 +4,42 @@
 
 Newest first. Times from `date` (+07).
 
+- 08:26 #2415 at 47bb21de8: stale doc lines fixed; first builder's
+- 08:26 #2414 (manage helper installs made skill by SHA-256) first read: no P1/P2; P3 replaces an installed skill of the same name; P3 done line wording; first builder's
+- 08:23 #2419 (#2409 refiled, wake.rs apart): my P3 closed; mine when ready and green
+- 08:21 #2418 (#2416 refiled with docs): my P3 closed; first builder's
+- 08:20 #2410 (named ask's agent, journal) first read: no P1/P2, two P3s (two staff in one line; held-line journal untested); conflicts with #1712 after #2393/#2394, rebase; first builder's
+- 08:19 #2415: corrected my docs claim; a fourth stale line bus.md:441
+- 08:16 #2416 (recheck_uncertain off + replay flags) first read: no P1/P2; P3 docs missing; first builder's
+- 08:14 #2415 (Not feeling well in product) first read: no P1/P2, P3 a part stopped on purpose reads as a crash (voice-keys); first builder's
+- 08:10 #2411 (probe story test fresh thread) read: no P1/P2, reproduced; P3 fix the polluter too; first builder's
+- 08:06 #2406 (skills wait drops a broken socket, rest of wait) read: my #2389 P3 fixed; first builder's
+- 07:57 #2409 (#2395 refiled, five crates one test binary) first read: no P1/P2; P3 setup wake.rs flock vs spawning tests in one binary; mine on green out of draft
+- 07:55 #2123 on lamp-voice: rebase only, read stands; Reviewer-lead's
+- 07:50 Merged #2122 (few_tools gives a named function at once; WHO_NOTE closes on the name) as 892b1d323, merge with #1998 built
+- 07:49 #2408 (#2401 folded) same tree; first builder's
+- 07:48 #2403 (#2217 P2 follow-up) read: P2 fixed both halves; P3 E..E+500 answer spends a try; Reviewer-lead's
+- 07:48 #2397 at e516da838: my P3 closed (CODE_DIGITS); fold to one
+- 07:44 Merged #2398 (eleven crates one test binary, #2386's P2/P3 fixed) as 2d50a47b6
+- 07:36 #2402 (four switches on in product) first read: P2 LAMP_CAMERA_FOLLOWS_EYES not in the lead's decision; overlaps #2401; first builder's
+- 07:36 #2401 at 161396218: my P2 answered (says it changes nothing yet); fold to one
+- 07:27 #2401 (scoped context on in product) first read: P2 product never names a person without LAMP_CAMERA_FOLLOWS_EYES, so it changes nothing yet; first builder's/lead's
+- 07:25 #2122 at 0d524c6eb: rebase only; mine on green ARM64
+- 07:23 #2397 (refusal codes in journal) first read: no P1/P2; P3 one-case keys (DeepSeek/Deepgram shape) pass the code filter, probe shown; first builder's
+- 07:22 #2223 at 832678dfb: rebase only; #2398 moves its test file
+- 07:20 #2393 at cc3e145eb: my P3 1 closed (one reader, journal when off); first builder's
+- 07:19 #2270 at 1393a3e44: folded, my P3 fixed (send nothing while asker's id gone); Reviewer-lead's
+- 07:18 #2368 at db0a0d8f4: my two P3s closed; first builder's
+- 07:07 #2394 (open name waits 2.5 s) first read: no finding; first builder's after #2392
+- 07:03 #2393 (forget yes by sight, LAMP_EYES_SPEAKING) first read: no P1/P2, three P3s; first builder's
+- 07:01 #2386 (eleven crates one test binary) first read: P2 turn-end ignored test reruns itself by old --exact name; P3 stale --test commands; mine on green after fix
+- 07:00 #2217: first builder agrees, keeps LAMP_ONBOARDING off, asked Seventh for the follow-up
+- 06:56 #2217 merged by the first builder with my P2 open; asked Seventh for a follow-up, noted on #1803
+- 06:45 #2392 (#2382 refiled) same patch; first builder's
+- 06:43 #1998 at 867a60178: rebase only, same lines
+- 06:42 #2389 (skills wake past a broken socket) read: no P1/P2, closes #2304 P3s, one P3; first builder's
+- 06:38 #2167 at 303b23833: rebase only, 32 stores; first builder's
+- 06:37 #2358 (build-rows 03:35) read: no finding, means check; reviewer-two's
 - 06:34 #2217 rebased onto lamp-voice, same patch: 16:09 P2 still open
 - 06:31 #2390 (joys-scores reads the skill's bar): no finding; first builder's
 - 06:24 #1998 rebase over #2110, both sides kept
