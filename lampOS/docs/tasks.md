@@ -2119,9 +2119,9 @@ it; with the tasks part on), a spoken turn's first chat round whose last message
 and whose words ask one of the staff by name to do something, is sent with
 `tool_choice: {"type": "function", "function": {"name": "start_agent_task"}}`
 (`agent_tasks::named_ask`, `second_provider::worker::named_asks`,
-`net::Chat::forcing`). The model still writes the task and `who`; it can't
-decline the hand-over or do the work itself. A round after a call ends with the
-call's result and is asked as before.
+`net::Chat::forcing`). The model still writes the task; it can't decline the
+hand-over or do the work itself. A round after a call ends with the call's
+result and is asked as before.
 
 - **Asks:** "ask", "tell", "get" or "have" right before the agent's whole name
   with "to" after it ("ask Claude Code to …", "tell Codex to …"), or "can",
@@ -2145,6 +2145,42 @@ call's result and is asked as before.
 - **The relay:** checked on lamp-06c1 on 2026-10-21 at 03:4x: the relay's
   DeepSeek chat, thinking off, called the function `tool_choice` named on "What's two plus two?"
   3 of 3, and none of 3 without it.
+- **Who does it** (played test b0701 on lamp-4ace, #1722, 2026-10-21 07:19):
+  forced, "Hey Lamp, can you ask Claude Code on my office computer to write a
+  short story …" went to Codex. The words matched (Claude Code). The force named
+  only the function, so the model chose `who`. Now the forced round's
+  `start_agent_task` is told only the agent the words name: `who` gets that one
+  value in its `enum` and is required (`net::Forced`). A round 1 call whose
+  `who` names another agent, or nobody, is given to the named agent before the
+  tasks part prepares it (`second_provider::Engine::asking_by_name`).
+- **Several asked** (the reviewer on #2410: "Hey Lamp, ask Codex to check the
+  build and ask Claude Code to write a poem." gave both calls to Claude Code):
+  `named_ask` gives every agent of the staff the words ask, once each, in the
+  order the words ask them. With two or more, round 1 is still forced to
+  `start_agent_task`, but `who` is told as declared, nothing pinned. Each
+  round 1 call whose `who` is one of the asked agents keeps it. A call that
+  names nobody, or an agent the words don't ask, goes to the first asked agent,
+  in word order, that no round 1 call names yet, or else the first asked
+  (`second_provider::given_to_the_named`). So a line's two tasks, one naming
+  Codex and one nobody, go one to each, not both to the first named.
+- **The journal**, once per line, with no words: `named ask: matched <agent>`
+  (several in word order: `matched Codex, Claude Code`), plus, for each agent
+  a call was given to, `; the call named another agent, given to <agent>` or
+  `; the call named nobody, given to <agent>`; `named ask: no match (<n> words)`;
+  `named ask: matched <agent>, not applied: round 1 called <functions>, not
+  start_agent_task` (or `answered in words`); and, for a line held back,
+  `named ask: matched <agent>, not applied: the line is held`.
+- **Over the lamp's voice** (b0701, request 58: "Hey Lamp, ask Codex to write
+  a haiku about coffee.", said while the lamp spoke, a stop phrase heard, then
+  `not_for_me`): every line the second route answers is forced the same way.
+  Over the lamp's voice, after a stop and as a conversation going on, its notes
+  go before the person's words, which stay last. That line's words match
+  (Codex), and the relay keeps `tool_choice` (above). So request 58 most likely
+  asked with other words than those. A stop phrase heard over the lamp abandons
+  the line then being heard until its end (`coordinator/hand.rs`, `cancel`, then
+  `InputAdmission::abandon_until_end`), so the next request can be only the rest
+  of what was said. The journal line now shows which: `no match` with its word
+  count, or `matched` and what round 1 did.
 
 **The probe** (`cargo run -p lamp-voice --example probe_handover`, run where
 the voice runs, as root, with the voice unit's tasks switches): each played ask

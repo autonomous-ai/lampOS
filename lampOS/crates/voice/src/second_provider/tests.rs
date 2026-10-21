@@ -6697,3 +6697,343 @@ fn a_written_turn_waits_longer_only_with_its_switch() {
     assert_eq!(begin_within(false, false), BEGIN_WITHIN);
     assert!(WRITTEN_BEGIN_WITHIN > BEGIN_WITHIN && WRITTEN_BEGIN_WITHIN < Duration::from_secs(8));
 }
+
+/// b0701 on lamp-4ace (#1722, 07:19), `LAMP_TASKS_NAMED_ASK`: a line whose
+/// words ask Claude Code by name had its forced call name Codex. With the
+/// named ask, the call goes to the agent the words name: one naming another,
+/// or nobody, is set to it, over the lamp's voice after a stop as in a quiet
+/// room, and the chat is asked with the line's own words last. A line that
+/// names nobody, or the switch off, leaves the call as the model made it.
+#[tokio::test]
+async fn a_named_asks_call_goes_to_the_agent_its_words_name() {
+    let asked_by_name =
+        "Hey Lamp, can you ask Claude Code on my office computer to write a short story?";
+    let start_call = |who: Option<&str>| {
+        let mut args = json!({"task": "Write a short story."});
+        if let Some(who) = who {
+            args["who"] = json!(who);
+        }
+        call("c1", crate::agent_tasks::START, args)
+    };
+    let begin = |over: bool| ProviderInput::Start {
+        request: 1,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: false,
+        over_the_lamp: over,
+        after_stop: over,
+        follows_on: false,
+        over_the_lamps_voice: over,
+        heard_of_cut: None,
+    };
+    for (line, named, given, over, wanted) in [
+        (
+            asked_by_name,
+            true,
+            Some("Codex"),
+            false,
+            Some("Claude Code"),
+        ),
+        (asked_by_name, true, None, false, Some("Claude Code")),
+        (
+            asked_by_name,
+            true,
+            Some("Codex"),
+            true,
+            Some("Claude Code"),
+        ),
+        (
+            asked_by_name,
+            true,
+            Some("Claude Code"),
+            false,
+            Some("Claude Code"),
+        ),
+        // Off: as the model made it.
+        (asked_by_name, false, Some("Codex"), false, Some("Codex")),
+        (asked_by_name, false, None, false, None),
+        // No ask by name: as the model made it.
+        (
+            "Write a short story for Codex.",
+            true,
+            Some("Codex"),
+            false,
+            Some("Codex"),
+        ),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(line.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![start_call(given)])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Shall I start it?"), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (mut engine, calls, _) = scripted(script.clone());
+        if named {
+            engine = engine.asking_by_name(Arc::new(|words: &str| {
+                words
+                    .contains("ask Claude Code")
+                    .then_some("Claude Code")
+                    .into_iter()
+                    .collect()
+            }));
+        }
+        engine.submit(begin(over));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1, "{line} {named} {given:?} {over}");
+        assert_eq!(
+            calls[0].1.get("who").and_then(Value::as_str),
+            wanted,
+            "{line} {named} {given:?} {over}"
+        );
+        assert_eq!(calls[0].1["task"], "Write a short story.");
+        // The forcing chat reads the line's own words, last.
+        assert_eq!(
+            script.asked.lock().unwrap()[0].last(),
+            Some(&Message::user(line))
+        );
+    }
+}
+
+/// `LAMP_TASKS_NAMED_ASK` (#1722): each line's journal line says what
+/// became of its named ask, with no words.
+#[test]
+fn the_named_asks_journal_line_says_what_became_of_it_and_no_words() {
+    let start = crate::agent_tasks::START;
+    assert_eq!(
+        named_ask_line(34, &["Claude Code"], 21, &[start], &[]),
+        "lamp-voice second: request 34: named ask: matched Claude Code"
+    );
+    assert_eq!(
+        named_ask_line(
+            34,
+            &["Claude Code"],
+            21,
+            &[start],
+            &[(true, "Claude Code"), (false, "Claude Code")]
+        ),
+        "lamp-voice second: request 34: named ask: matched Claude Code; the call named another agent, given to Claude Code"
+    );
+    assert_eq!(
+        named_ask_line(
+            34,
+            &["Claude Code"],
+            21,
+            &[start],
+            &[(false, "Claude Code")]
+        ),
+        "lamp-voice second: request 34: named ask: matched Claude Code; the call named nobody, given to Claude Code"
+    );
+    assert_eq!(
+        named_ask_line(58, &[], 4, &[NOT_FOR_ME], &[]),
+        "lamp-voice second: request 58: named ask: no match (4 words)"
+    );
+    assert_eq!(
+        named_ask_line(58, &["Codex"], 10, &[NOT_FOR_ME], &[]),
+        "lamp-voice second: request 58: named ask: matched Codex, not applied: round 1 called not_for_me, not start_agent_task"
+    );
+    assert_eq!(
+        named_ask_line(58, &["Codex"], 10, &[], &[]),
+        "lamp-voice second: request 58: named ask: matched Codex, not applied: round 1 answered in words, not start_agent_task"
+    );
+    assert_eq!(
+        named_ask_held_line(58, &["Codex"], 10),
+        "lamp-voice second: request 58: named ask: matched Codex, not applied: the line is held"
+    );
+    assert_eq!(
+        named_ask_held_line(58, &[], 4),
+        "lamp-voice second: request 58: named ask: no match (4 words)"
+    );
+    // Several asked, in word order: each call given says to whom.
+    assert_eq!(
+        named_ask_line(61, &["Codex", "Claude Code"], 17, &[start, start], &[]),
+        "lamp-voice second: request 61: named ask: matched Codex, Claude Code"
+    );
+    assert_eq!(
+        named_ask_line(
+            61,
+            &["Codex", "Claude Code"],
+            17,
+            &[start, start],
+            &[(false, "Codex"), (true, "Claude Code")]
+        ),
+        "lamp-voice second: request 61: named ask: matched Codex, Claude Code; the call named nobody, given to Codex; the call named another agent, given to Claude Code"
+    );
+    assert_eq!(
+        named_ask_held_line(61, &["Codex", "Claude Code"], 17),
+        "lamp-voice second: request 61: named ask: matched Codex, Claude Code, not applied: the line is held"
+    );
+}
+
+/// The two of the staff the reviewer's lines on #2410 ask, in word order.
+fn asking_codex_and_claude_code(words: &str) -> Vec<&'static str> {
+    let mut asked: Vec<(usize, &'static str)> = ["Codex", "Claude Code"]
+        .into_iter()
+        .filter_map(|name| Some((words.find(&format!("ask {name}"))?, name)))
+        .collect();
+    asked.sort_by_key(|(at, _)| *at);
+    asked.into_iter().map(|(_, name)| name).collect()
+}
+
+/// The reviewer's P3 on #2410, `LAMP_TASKS_NAMED_ASK`: "ask Codex to check
+/// the build and ask Claude Code to write a poem" gave both round 1 calls
+/// to Claude Code. With several asked, each call that names one of them
+/// keeps it; one naming nobody, or an agent not asked, goes to the first
+/// asked that no call names yet. The journal names both, no words.
+#[tokio::test]
+async fn a_line_that_asks_two_of_the_staff_gives_each_task_to_its_own() {
+    let line = "Hey Lamp, ask Codex to check the build and ask Claude Code to write a poem.";
+    let start_call = |id: &str, task: &str, who: Option<&str>| {
+        let mut args = json!({ "task": task });
+        if let Some(who) = who {
+            args["who"] = json!(who);
+        }
+        call(id, crate::agent_tasks::START, args)
+    };
+    let both = "lamp-voice second: request 1: named ask: matched Codex, Claude Code";
+    for (given, wanted, said) in [
+        // The reviewer's probe: each named its own, each kept.
+        (
+            [Some("Codex"), Some("Claude Code")],
+            ["Codex", "Claude Code"],
+            both.to_owned(),
+        ),
+        // Both said "Claude Code": the line still asks Codex, but the call
+        // names one asked, so it is kept as the model made it.
+        (
+            [Some("Claude Code"), Some("Claude Code")],
+            ["Claude Code", "Claude Code"],
+            both.to_owned(),
+        ),
+        // The build check names nobody: to Codex, which no call names.
+        (
+            [None, Some("Claude Code")],
+            ["Codex", "Claude Code"],
+            format!("{both}; the call named nobody, given to Codex"),
+        ),
+        // The poem names nobody, the build check Codex: the poem to Claude
+        // Code, the first asked that no call names.
+        (
+            [Some("Codex"), None],
+            ["Codex", "Claude Code"],
+            format!("{both}; the call named nobody, given to Claude Code"),
+        ),
+        // Neither names anyone: in word order.
+        (
+            [None, None],
+            ["Codex", "Claude Code"],
+            format!(
+                "{both}; the call named nobody, given to Codex; the call named nobody, given to Claude Code"
+            ),
+        ),
+        // One names an agent the words don't ask.
+        (
+            [Some("OpenCode"), Some("Claude Code")],
+            ["Codex", "Claude Code"],
+            format!("{both}; the call named another agent, given to Codex"),
+        ),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(line.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![
+                            start_call("c1", "Check the build.", given[0]),
+                            start_call("c2", "Write a poem.", given[1]),
+                        ])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Shall I start them?"), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script);
+        let journal: Arc<Mutex<Vec<String>>> = Arc::default();
+        let mut engine = engine
+            .asking_by_name(Arc::new(asking_codex_and_claude_code))
+            .keeping_named_ask_journal(journal.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        let calls = calls.lock().unwrap();
+        let made: Vec<(&str, &str)> = calls
+            .iter()
+            .map(|(_, args, _)| {
+                (
+                    args["task"].as_str().unwrap(),
+                    args["who"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            made,
+            [
+                ("Check the build.", wanted[0]),
+                ("Write a poem.", wanted[1])
+            ],
+            "{given:?}"
+        );
+        assert_eq!(*journal.lock().unwrap(), [said], "{given:?}");
+    }
+}
+
+/// The reviewer's P3 2 on #2410, `LAMP_TASKS_NAMED_ASK`: a held line's
+/// named ask is said in the journal, through the engine, with no words; a
+/// held line that asks nobody says its word count.
+#[tokio::test]
+async fn a_held_lines_named_ask_is_said_in_the_journal() {
+    for (line, said) in [
+        (
+            "ask Codex to check the build",
+            "lamp-voice second: request 1: named ask: matched Codex, not applied: the line is held",
+        ),
+        (
+            "Hey Lamp, ask Codex to check the build and ask Claude Code to write a poem.",
+            "lamp-voice second: request 1: named ask: matched Codex, Claude Code, not applied: the line is held",
+        ),
+        (
+            "check the build",
+            "lamp-voice second: request 1: named ask: no match (3 words)",
+        ),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(line.to_owned())].into()),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script.clone());
+        let journal: Arc<Mutex<Vec<String>>> = Arc::default();
+        let mut engine = engine
+            .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+            .asking_by_name(Arc::new(asking_codex_and_claude_code))
+            .keeping_named_ask_journal(journal.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(
+            turn(&mut engine).await,
+            [
+                "started:1".to_owned(),
+                format!("heard:{line}"),
+                "complete".to_owned()
+            ]
+        );
+        assert!(calls.lock().unwrap().is_empty(), "{line}");
+        assert!(script.asked.lock().unwrap().is_empty(), "{line}");
+        assert_eq!(*journal.lock().unwrap(), [said], "{line}");
+    }
+}

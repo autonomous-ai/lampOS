@@ -386,6 +386,10 @@ pub type StaffNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// began (`worker::Heeding::telling_the_name`, `crate::called`): asked
 /// after the request is judged, with its request.
 pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
+/// Each of the staff a line's own words ask by name to do something, in
+/// the order they are asked, or none (`LAMP_TASKS_NAMED_ASK`,
+/// `crate::agent_tasks::named_ask`).
+pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// The note a spoken request gets while a task this voice prepared waits
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
@@ -513,6 +517,12 @@ struct Shared {
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
     conversation_alone: Option<NameNote>,
+    /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
+    /// ([`Engine::asking_by_name`]).
+    named_ask: Option<NamedAsk>,
+    /// A test's copy of each named-ask journal line ([`Shared::named_ask_said`]).
+    #[cfg(test)]
+    named_ask_journal: Option<Arc<Mutex<Vec<String>>>>,
     /// Whether a request was judged in a busy room ([`Engine::judging_busy`]):
     /// a line that may follow on from the lamp is not told so there.
     busy: Option<Busy>,
@@ -975,6 +985,9 @@ impl Engine {
                 remembered: None,
                 name_note: None,
                 conversation_alone: None,
+                named_ask: None,
+                #[cfg(test)]
+                named_ask_journal: None,
                 busy: None,
                 named_to_a_face: None,
                 policy_now: None,
@@ -1492,6 +1505,31 @@ impl Engine {
     pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.conversation_alone = Some(note);
+        }
+        self
+    }
+
+    /// With `LAMP_TASKS_NAMED_ASK=on` (#1722): a line whose own words ask
+    /// one of the staff by name (`named`) has its round 1 call of
+    /// `start_agent_task` given to that one, whoever the call named; one
+    /// that asks several has each call kept with the asked agent it names,
+    /// and only a call naming nobody or one not asked given to an asked
+    /// one ([`given_to_the_named`]); and
+    /// each line's journal says what became of its named ask, with no
+    /// words ([`named_ask_line`]). The chat's first round is made to call
+    /// it by `net::Chat::forcing`. Before any turn only.
+    pub fn asking_by_name(mut self, named: NamedAsk) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.named_ask = Some(named);
+        }
+        self
+    }
+
+    /// A test's copy of each named-ask journal line, as it is said.
+    #[cfg(test)]
+    fn keeping_named_ask_journal(mut self, journal: Arc<Mutex<Vec<String>>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.named_ask_journal = Some(journal);
         }
         self
     }
@@ -2734,6 +2772,14 @@ async fn spoken(
         }
     }
     if empty || held || heeded.is_some() {
+        // A held line's named ask is said, as an answered one's is.
+        if let Some(named) = shared.named_ask.as_ref().filter(|_| !empty) {
+            shared.named_ask_said(named_ask_held_line(
+                request,
+                &named(&text),
+                text.split_whitespace().count(),
+            ));
+        }
         // Left unanswered: a line held by the rule is not talk, nor are no
         // words at all, which are a sound (as a short sound already is).
         room(|room| {
@@ -3349,6 +3395,134 @@ impl Shared {
     }
 }
 
+impl Shared {
+    /// A named-ask journal line said (`LAMP_TASKS_NAMED_ASK`), and kept
+    /// for a test that asked for it.
+    fn named_ask_said(&self, line: String) {
+        #[cfg(test)]
+        if let Some(journal) = &self.named_ask_journal {
+            journal.lock().unwrap().push(line.clone());
+        }
+        eprintln!("{line}");
+    }
+}
+
+/// The journal's line for what became of a line's named ask
+/// (`LAMP_TASKS_NAMED_ASK`, #1722), once its round 1 has answered: the
+/// agents its words name, in order, or none and how many words they were;
+/// whether round 1 called `start_agent_task`, as it was told to, or what it
+/// did instead; and, for each agent a call was given to
+/// ([`given_to_the_named`]), whether one such call named another agent
+/// (`true`) or each named nobody (`false`). No words.
+fn named_ask_line(
+    request: u64,
+    named: &[&str],
+    words: usize,
+    called: &[&str],
+    set: &[(bool, &str)],
+) -> String {
+    if named.is_empty() {
+        return format!(
+            "lamp-voice second: request {request}: named ask: no match ({words} words)"
+        );
+    }
+    let agent = named.join(", ");
+    let start = crate::agent_tasks::START;
+    if !called.contains(&start) {
+        let did = if called.is_empty() {
+            "answered in words".to_owned()
+        } else {
+            format!("called {}", called.join(", "))
+        };
+        return format!(
+            "lamp-voice second: request {request}: named ask: matched {agent}, not applied: round 1 {did}, not {start}"
+        );
+    }
+    // Grouped by the agent given to, in the order first given.
+    let mut given: Vec<(bool, &str)> = Vec::new();
+    for &(another, to) in set {
+        match given.iter_mut().find(|(_, agent)| *agent == to) {
+            Some(group) => group.0 |= another,
+            None => given.push((another, to)),
+        }
+    }
+    let set: String = given
+        .iter()
+        .map(|(another, to)| {
+            let named = if *another { "another agent" } else { "nobody" };
+            format!("; the call named {named}, given to {to}")
+        })
+        .collect();
+    format!("lamp-voice second: request {request}: named ask: matched {agent}{set}")
+}
+
+/// [`named_ask_line`] for a line held back, which no round answers.
+fn named_ask_held_line(request: u64, named: &[&str], words: usize) -> String {
+    if named.is_empty() {
+        return named_ask_line(request, named, words, &[], &[]);
+    }
+    format!(
+        "lamp-voice second: request {request}: named ask: matched {}, not applied: the line is held",
+        named.join(", ")
+    )
+}
+
+/// The round 1 calls of `start_agent_task` given to one of `asked`, the
+/// agents a named ask's words name, in order: each given call, whether it
+/// named another agent (`true`) or nobody (`false`), and to whom. A call
+/// that already names one of `asked` is kept. With one asked, every other
+/// call goes to it. With several (the reviewer on #2410: "ask Codex to
+/// check the build and ask Claude Code to write a poem"), a call naming
+/// nobody, or an agent the words don't ask, goes to the first asked, in
+/// word order, that no round 1 call names yet, or else the first asked:
+/// so a line's two tasks, one naming Codex and one nobody, go one to each.
+fn given_to_the_named(
+    calls: &mut [net::ToolCall],
+    asked: &[&'static str],
+) -> Vec<(bool, &'static str)> {
+    let Some(&first) = asked.first() else {
+        return Vec::new();
+    };
+    let who = |call: &net::ToolCall| {
+        call.args
+            .get(crate::agent_tasks::WHO)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    let mut named: Vec<&'static str> = calls
+        .iter()
+        .filter(|call| call.name == crate::agent_tasks::START)
+        .filter_map(|call| {
+            let who = who(call)?;
+            asked.iter().copied().find(|agent| *agent == who)
+        })
+        .collect();
+    let mut given = Vec::new();
+    for call in calls
+        .iter_mut()
+        .filter(|call| call.name == crate::agent_tasks::START)
+    {
+        let who = who(call);
+        if who.as_deref().is_some_and(|who| asked.contains(&who)) {
+            continue;
+        }
+        let agent = asked
+            .iter()
+            .copied()
+            .find(|agent| !named.contains(agent))
+            .unwrap_or(first);
+        named.push(agent);
+        match call.args.as_object_mut() {
+            Some(args) => {
+                args.insert(crate::agent_tasks::WHO.to_owned(), Value::from(agent));
+            }
+            None => call.args = serde_json::json!({ crate::agent_tasks::WHO: agent }),
+        }
+        given.push((who.is_some(), agent));
+    }
+    given
+}
+
 /// The journal's line for a held line asked its one round: no words.
 fn held_asked_line(request: u64) -> String {
     format!("lamp-voice second: request {request}: a held line names reports: asked once")
@@ -3930,6 +4104,12 @@ async fn answer(
         Taken::Runs(call) => (Some(call), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
     };
+    // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
+    // once, after round 1 answers.
+    let mut named_ask = shared
+        .named_ask
+        .as_ref()
+        .map(|named| (named(&said), said.split_whitespace().count()));
     let words = Message::user(said.clone());
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
@@ -4198,6 +4378,15 @@ async fn answer(
             if refused {
                 round -= 1;
                 continue;
+            }
+            // Round 1 of a named ask: its hand-over goes to the agent named,
+            // and the journal says what became of it (#1722).
+            if round == 1
+                && let Some((named, count)) = named_ask.take()
+            {
+                let set = given_to_the_named(&mut calls, &named);
+                let names: Vec<&str> = calls.iter().map(|call| call.name.as_str()).collect();
+                shared.named_ask_said(named_ask_line(request, &named, count, &names, &set));
             }
             // Before the unfinished last words are said.
             if !calls.is_empty() {

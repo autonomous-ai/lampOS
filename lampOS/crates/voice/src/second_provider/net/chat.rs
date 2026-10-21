@@ -167,7 +167,41 @@ pub type Narrow =
 
 /// The function a request with these messages must call, if any
 /// ([`Chat::forcing`]): sent as the request's `tool_choice`.
-pub type Force = Arc<dyn Fn(&[Message]) -> Option<&'static str> + Send + Sync>;
+pub type Force = Arc<dyn Fn(&[Message]) -> Option<Forced> + Send + Sync>;
+
+/// A function a request must call ([`Force`]), and the one value one of
+/// its string parameters may take, if any: that parameter is then told
+/// only that value and is required (`LAMP_TASKS_NAMED_ASK`: `who` is the
+/// agent the words name, #1722). A function without that parameter is
+/// told as declared.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Forced {
+    pub name: &'static str,
+    pub only: Option<(&'static str, &'static str)>,
+}
+
+/// `tool`'s parameters with `parameter` told only `value`, and required,
+/// when it has that parameter.
+fn pinned(tool: &mut lamp_gemini::Tool, (parameter, value): (&str, &str)) {
+    let Some(parameters) = tool.parameters.as_mut() else {
+        return;
+    };
+    let Some(property) = parameters
+        .get_mut("properties")
+        .and_then(|properties| properties.get_mut(parameter))
+    else {
+        return;
+    };
+    property["enum"] = json!([value]);
+    match parameters.get_mut("required").and_then(Value::as_array_mut) {
+        Some(required) => {
+            if !required.iter().any(|name| name == parameter) {
+                required.push(json!(parameter));
+            }
+        }
+        None => parameters["required"] = json!([parameter]),
+    }
+}
 
 /// How much Gemini thinks before it answers through its OpenAI-compatible
 /// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
@@ -373,7 +407,9 @@ impl Chat {
     /// A request whose messages `force` names a function for, when that
     /// function is among those it is given, must call it (`tool_choice`,
     /// the OpenAI form, which DeepSeek takes; `LAMP_TASKS_NAMED_ASK`,
-    /// #1722). Never with `only`. Set once: a second call changes nothing.
+    /// #1722), with the one value it names for a parameter, if it names
+    /// one ([`Forced::only`]). Never with `only`. Set once: a second call
+    /// changes nothing.
     pub fn forcing(&self, force: Force) {
         let _ = self.force.set(force);
     }
@@ -415,12 +451,20 @@ impl Chat {
             .is_none()
             .then(|| self.force.get().and_then(|force| force(messages)))
             .flatten()
-            .filter(|name| declared.iter().any(|tool| tool.name == *name));
+            .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
+        if let Some(Forced {
+            name,
+            only: Some(only),
+        }) = forced
+            && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
+        {
+            pinned(tool, only);
+        }
         let tools = functions(&declared);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
         }
-        if let Some(name) = forced {
+        if let Some(Forced { name, .. }) = forced {
             body["tool_choice"] = json!({"type": "function", "function": {"name": name}});
         }
         // The configuration refuses any of the request's own fields here.

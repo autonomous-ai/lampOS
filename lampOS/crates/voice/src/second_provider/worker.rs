@@ -1611,6 +1611,12 @@ pub fn serve(
         .filter(|_| files.staff_note)
         .map(staff_noting);
     let has_tasks = tools.tasks.is_some();
+    // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
+    // forced call goes to that one, and the journal says so (#1722).
+    let named_ask = tools
+        .tasks
+        .clone()
+        .filter(|_| crate::agent_tasks::named_ask_on());
     let declines = tools.decline;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
@@ -1895,6 +1901,11 @@ pub fn serve(
             "lamp-voice second: a spoken turn's chat begins on the line's early words (LAMP_SECOND_PREPARED)"
         );
         engine = engine.preparing(true);
+    }
+    if let Some(place) = named_ask {
+        engine = engine.asking_by_name(Arc::new(move |words: &str| {
+            crate::agent_tasks::named_ask(&place, words)
+        }));
     }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     if has_tasks {
@@ -2450,10 +2461,27 @@ pub(crate) fn few_tools(
 /// the person's words, and is asked as before. On lamp-4ace on 21 Oct, two
 /// of the staff read, the played asks of a poem by name were answered by
 /// the lamp itself or with `not_for_me` (#1722).
+///
+/// When the words ask exactly one of the staff, its `who` is told only
+/// that one, and must be given: on lamp-4ace in b0701 (#1722, 07:19),
+/// forced, "can you ask Claude Code on my office computer to …" went to
+/// Codex, the model's choice. When they ask two or more, it is still
+/// forced, and `who` is told as declared, so each task can go to its own
+/// (the reviewer on #2410).
 pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_provider::net::Force {
     Arc::new(move |messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        crate::agent_tasks::named_ask(&place, last.words()?).map(|_| crate::agent_tasks::START)
+        match crate::agent_tasks::named_ask(&place, last.words()?)[..] {
+            [] => None,
+            [agent] => Some(crate::second_provider::net::Forced {
+                name: crate::agent_tasks::START,
+                only: Some((crate::agent_tasks::WHO, agent)),
+            }),
+            _ => Some(crate::second_provider::net::Forced {
+                name: crate::agent_tasks::START,
+                only: None,
+            }),
+        }
     })
 }
 
@@ -10632,15 +10660,115 @@ mod memory_observer {
         );
         assert_eq!(choice(&forcing, &mention), None);
         assert_eq!(choice(&forcing, &after), None);
-        // Off: the same request as before, word for word.
+        // Off: no tool_choice. A request not forced is the same as off,
+        // word for word; a forced one's `who` is pinned (the test below).
         for messages in [&ask, &mention, &after] {
             assert_eq!(choice(&plain, messages), None);
-            let mut forced = forcing.wire(messages).2;
-            if let Some(body) = forced.as_object_mut() {
-                body.remove("tool_choice");
-            }
-            assert_eq!(plain.wire(messages).2, forced);
         }
+        for messages in [&mention, &after] {
+            assert_eq!(plain.wire(messages).2, forcing.wire(messages).2);
+        }
+        crate::agent_tasks::tests::forget_staff();
+    }
+
+    /// b0701 on lamp-4ace (#1722, 07:19): "can you ask Claude Code on my
+    /// office computer to write a short story …" was forced to
+    /// `start_agent_task` and went to Codex: the model filled in `who`.
+    /// The forced round is told only the named agent, and must give it;
+    /// over the lamp's voice, after a stop, as a conversation going on, the
+    /// same. Without forcing, the request is as before, both agents told.
+    #[test]
+    fn a_named_ask_tells_the_forced_round_only_the_agent_its_words_name() {
+        use super::super::net::{Chat, Message};
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = crate::agent_tasks::tests::STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        crate::agent_tasks::hold_staff(&[("office-claude", "claude"), ("office-codex", "codex")]);
+        let place = crate::agent_tasks::Place {
+            directory: "/run/t".into(),
+            target: "office-claude".into(),
+            who: true,
+            lead_in: true,
+            asked: true,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: true,
+            make_skill: false,
+            named_only: false,
+        };
+        let tools = crate::agent_tasks::tools(&place);
+        let declare: super::super::net::Declare = Arc::new(move || tools.clone());
+        let plain = Chat::deepseek("deepseek-chat", "k", declare.clone(), false).unwrap();
+        let forcing = Chat::deepseek("deepseek-chat", "k", declare, false).unwrap();
+        forcing.forcing(crate::second_provider::worker::named_asks(place));
+        let line = "Hey Lamp, can you ask Claude Code on my office computer to write a short story, about two hundred words, about a desk lamp that learns to sing?";
+        let quiet = vec![Message::system("You are a lamp."), Message::user(line)];
+        // Over the lamp's voice, after a stop, let out as the conversation
+        // going on: the notes go before the person's words.
+        let over = vec![
+            Message::system("You are a lamp."),
+            Message::user("Tell me a poem about the sea."),
+            Message::assistant("The sea rolls in"),
+            Message::system(crate::provider_worker::STOPPED_NOTE),
+            Message::system(crate::cut_in_told::NOTE),
+            Message::system(super::CONVERSATION_ALONE),
+            Message::user(line),
+        ];
+        let start = |body: &serde_json::Value| {
+            body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|tool| tool["function"]["name"] == crate::agent_tasks::START)
+                .unwrap()["function"]["parameters"]
+                .clone()
+        };
+        for messages in [&quiet, &over] {
+            let body = forcing.wire(messages).2;
+            assert_eq!(
+                body["tool_choice"],
+                serde_json::json!({"type": "function", "function": {"name": "start_agent_task"}})
+            );
+            let parameters = start(&body);
+            assert_eq!(
+                parameters["properties"]["who"]["enum"],
+                serde_json::json!(["Claude Code"])
+            );
+            assert_eq!(parameters["required"], serde_json::json!(["task", "who"]));
+            // Off: both told, `who` left to the model, no tool_choice.
+            let before = plain.wire(messages).2;
+            assert!(before.get("tool_choice").is_none());
+            let parameters = start(&before);
+            assert_eq!(
+                parameters["properties"]["who"]["enum"],
+                serde_json::json!(["Claude Code", "Codex"])
+            );
+            assert_eq!(parameters["required"], serde_json::json!(["task"]));
+        }
+        // The reviewer on #2410: a line that asks two of the staff is still
+        // forced, but `who` is told both, so each task can go to its own.
+        let two = vec![
+            Message::system("You are a lamp."),
+            Message::user(
+                "Hey Lamp, ask Codex to check the build and ask Claude Code to write a poem.",
+            ),
+        ];
+        let body = forcing.wire(&two).2;
+        assert_eq!(
+            body["tool_choice"],
+            serde_json::json!({"type": "function", "function": {"name": "start_agent_task"}})
+        );
+        let mut unforced = body.clone();
+        unforced.as_object_mut().unwrap().remove("tool_choice");
+        assert_eq!(unforced, plain.wire(&two).2);
+        assert_eq!(
+            start(&body)["properties"]["who"]["enum"],
+            serde_json::json!(["Claude Code", "Codex"])
+        );
         crate::agent_tasks::tests::forget_staff();
     }
 }
