@@ -159,6 +159,13 @@ jobs:
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
+      # A measure only (#2510): the on-device embeddings bench, behind its own
+      # feature, built apart so the step above (the lamps' binaries) keeps its
+      # features. It goes into the artifact with the others; never packaged.
+      - name: build the embeddings bench (development, embed-bench feature)
+        if: matrix.shard == 1
+        working-directory: lampOS
+        run: cargo build --locked --release -p lamp-memory --features embed-bench --bin lamp-memory-embed-bench
       - name: every built lamp-* binary is classified for the lamp-os package
         working-directory: lampOS
         run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release

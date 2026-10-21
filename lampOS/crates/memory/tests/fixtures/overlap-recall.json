@@ -1,0 +1,487 @@
+{
+ "about": "A partial-overlap recall set for lamp-memory's kept list (#2510): each question rephrases one kept thing of its language the way people do, sharing some of its words, and each target has a distractor that shares words with the question but is the wrong thing (16 targets and 16 distractors each). Which of a pair is newer alternates, so a tie broken by the newest favours neither. A kept thing's id is its order: a higher id is newer. Made-up content, no real people. Vietnamese is accented, in NFC. Never send it to any API.",
+ "kept": [
+  {
+   "id": 1,
+   "lang": "en",
+   "text": "My favourite colour is green."
+  },
+  {
+   "id": 2,
+   "lang": "en",
+   "text": "The colour of my car is silver."
+  },
+  {
+   "id": 3,
+   "lang": "en",
+   "text": "I cancelled my doctor's appointment last week."
+  },
+  {
+   "id": 4,
+   "lang": "en",
+   "text": "I see the dentist on Thursday at nine."
+  },
+  {
+   "id": 5,
+   "lang": "en",
+   "text": "The wifi password is on a sticker under the router."
+  },
+  {
+   "id": 6,
+   "lang": "en",
+   "text": "My email password was changed in May."
+  },
+  {
+   "id": 7,
+   "lang": "en",
+   "text": "The car needs new tyres soon."
+  },
+  {
+   "id": 8,
+   "lang": "en",
+   "text": "I left the car on level three of the mall garage."
+  },
+  {
+   "id": 9,
+   "lang": "en",
+   "text": "My son goes to Riverside Primary School."
+  },
+  {
+   "id": 10,
+   "lang": "en",
+   "text": "School holidays start on the twentieth."
+  },
+  {
+   "id": 11,
+   "lang": "en",
+   "text": "My sister owns a small coffee shop."
+  },
+  {
+   "id": 12,
+   "lang": "en",
+   "text": "I take my coffee with oat milk and no sugar."
+  },
+  {
+   "id": 13,
+   "lang": "en",
+   "text": "I take my blood pressure pill every morning."
+  },
+  {
+   "id": 14,
+   "lang": "en",
+   "text": "Every morning I walk the dog before breakfast."
+  },
+  {
+   "id": 15,
+   "lang": "en",
+   "text": "My birthday party was at the beach."
+  },
+  {
+   "id": 16,
+   "lang": "en",
+   "text": "Mum's birthday is on the fourth of August."
+  },
+  {
+   "id": 17,
+   "lang": "en",
+   "text": "My train to work leaves at seven forty."
+  },
+  {
+   "id": 18,
+   "lang": "en",
+   "text": "The time I missed the train I was an hour late for work."
+  },
+  {
+   "id": 19,
+   "lang": "en",
+   "text": "The dog next door barks all night."
+  },
+  {
+   "id": 20,
+   "lang": "en",
+   "text": "Our dog is called Pepper."
+  },
+  {
+   "id": 21,
+   "lang": "en",
+   "text": "I keep my reading glasses in the bedside drawer."
+  },
+  {
+   "id": 22,
+   "lang": "en",
+   "text": "I'm reading a book about glass blowing."
+  },
+  {
+   "id": 23,
+   "lang": "en",
+   "text": "My boss wants the report by Friday."
+  },
+  {
+   "id": 24,
+   "lang": "en",
+   "text": "My boss at work is Daniel."
+  },
+  {
+   "id": 25,
+   "lang": "en",
+   "text": "I'm allergic to shellfish."
+  },
+  {
+   "id": 26,
+   "lang": "en",
+   "text": "My son is allergic to pollen."
+  },
+  {
+   "id": 27,
+   "lang": "en",
+   "text": "Next week I'm working from home."
+  },
+  {
+   "id": 28,
+   "lang": "en",
+   "text": "My flight to Singapore is next Tuesday morning."
+  },
+  {
+   "id": 29,
+   "lang": "en",
+   "text": "I wear size 42 in running shoes."
+  },
+  {
+   "id": 30,
+   "lang": "en",
+   "text": "My daughter needs new school shoes."
+  },
+  {
+   "id": 31,
+   "lang": "en",
+   "text": "Friday night is pizza night with the kids."
+  },
+  {
+   "id": 32,
+   "lang": "en",
+   "text": "Grandpa picks up the kids from school on Fridays."
+  },
+  {
+   "id": 33,
+   "lang": "vi",
+   "text": "Màu yêu thích của tôi là màu xanh lá."
+  },
+  {
+   "id": 34,
+   "lang": "vi",
+   "text": "Xe của tôi màu bạc."
+  },
+  {
+   "id": 35,
+   "lang": "vi",
+   "text": "Tôi đã hủy lịch hẹn với bác sĩ tuần trước."
+  },
+  {
+   "id": 36,
+   "lang": "vi",
+   "text": "Tôi hẹn nha sĩ vào sáng thứ Năm."
+  },
+  {
+   "id": 37,
+   "lang": "vi",
+   "text": "Mật khẩu wifi dán ở dưới cục phát."
+  },
+  {
+   "id": 38,
+   "lang": "vi",
+   "text": "Mật khẩu email của tôi vừa đổi hồi tháng Năm."
+  },
+  {
+   "id": 39,
+   "lang": "vi",
+   "text": "Xe cần thay lốp mới sớm."
+  },
+  {
+   "id": 40,
+   "lang": "vi",
+   "text": "Tôi để xe ở tầng ba bãi xe của trung tâm thương mại."
+  },
+  {
+   "id": 41,
+   "lang": "vi",
+   "text": "Con trai tôi học ở trường tiểu học Hoà Bình."
+  },
+  {
+   "id": 42,
+   "lang": "vi",
+   "text": "Trường cho học sinh nghỉ hè từ ngày hai mươi."
+  },
+  {
+   "id": 43,
+   "lang": "vi",
+   "text": "Chị gái tôi mở một quán cà phê nhỏ."
+  },
+  {
+   "id": 44,
+   "lang": "vi",
+   "text": "Tôi uống cà phê với sữa yến mạch, không đường."
+  },
+  {
+   "id": 45,
+   "lang": "vi",
+   "text": "Mỗi sáng tôi uống một viên thuốc huyết áp."
+  },
+  {
+   "id": 46,
+   "lang": "vi",
+   "text": "Sáng nào tôi cũng dắt chó đi dạo trước khi ăn sáng."
+  },
+  {
+   "id": 47,
+   "lang": "vi",
+   "text": "Tiệc sinh nhật của tôi tổ chức ở bãi biển."
+  },
+  {
+   "id": 48,
+   "lang": "vi",
+   "text": "Sinh nhật mẹ là ngày bốn tháng Tám."
+  },
+  {
+   "id": 49,
+   "lang": "vi",
+   "text": "Chuyến tàu đi làm của tôi chạy lúc bảy giờ bốn mươi."
+  },
+  {
+   "id": 50,
+   "lang": "vi",
+   "text": "Hôm tôi lỡ tàu, tôi đi làm muộn một giờ."
+  },
+  {
+   "id": 51,
+   "lang": "vi",
+   "text": "Con chó nhà bên sủa cả đêm."
+  },
+  {
+   "id": 52,
+   "lang": "vi",
+   "text": "Chó nhà tôi tên là Mực."
+  },
+  {
+   "id": 53,
+   "lang": "vi",
+   "text": "Tôi cất kính đọc sách trong ngăn kéo đầu giường."
+  },
+  {
+   "id": 54,
+   "lang": "vi",
+   "text": "Tôi đang đọc một cuốn sách về thổi thủy tinh."
+  },
+  {
+   "id": 55,
+   "lang": "vi",
+   "text": "Sếp muốn có báo cáo trước thứ Sáu."
+  },
+  {
+   "id": 56,
+   "lang": "vi",
+   "text": "Sếp ở công ty tôi tên là anh Dũng."
+  },
+  {
+   "id": 57,
+   "lang": "vi",
+   "text": "Tôi bị dị ứng hải sản có vỏ."
+  },
+  {
+   "id": 58,
+   "lang": "vi",
+   "text": "Con trai tôi bị dị ứng phấn hoa."
+  },
+  {
+   "id": 59,
+   "lang": "vi",
+   "text": "Tuần sau tôi làm việc ở nhà."
+  },
+  {
+   "id": 60,
+   "lang": "vi",
+   "text": "Chuyến bay đi Singapore của tôi vào sáng thứ Ba tuần sau."
+  },
+  {
+   "id": 61,
+   "lang": "vi",
+   "text": "Tôi đi giày chạy bộ cỡ 42."
+  },
+  {
+   "id": 62,
+   "lang": "vi",
+   "text": "Con gái tôi cần giày mới để đi học."
+  },
+  {
+   "id": 63,
+   "lang": "vi",
+   "text": "Tối thứ Sáu cả nhà ăn pizza với bọn trẻ."
+  },
+  {
+   "id": 64,
+   "lang": "vi",
+   "text": "Ông đón bọn trẻ ở trường vào các ngày thứ Sáu."
+  }
+ ],
+ "questions": [
+  {
+   "lang": "en",
+   "text": "What colour do I like?",
+   "kept": 1
+  },
+  {
+   "lang": "en",
+   "text": "When is my dentist appointment?",
+   "kept": 4
+  },
+  {
+   "lang": "en",
+   "text": "What's my wifi password?",
+   "kept": 5
+  },
+  {
+   "lang": "en",
+   "text": "Where did I park the car?",
+   "kept": 8
+  },
+  {
+   "lang": "en",
+   "text": "What is my son's school called?",
+   "kept": 9
+  },
+  {
+   "lang": "en",
+   "text": "How do I like my coffee?",
+   "kept": 12
+  },
+  {
+   "lang": "en",
+   "text": "Which medicine do I take in the morning?",
+   "kept": 13
+  },
+  {
+   "lang": "en",
+   "text": "When is my mother's birthday?",
+   "kept": 16
+  },
+  {
+   "lang": "en",
+   "text": "What time does my train leave?",
+   "kept": 17
+  },
+  {
+   "lang": "en",
+   "text": "What's my dog's name?",
+   "kept": 20
+  },
+  {
+   "lang": "en",
+   "text": "Where are my reading glasses?",
+   "kept": 21
+  },
+  {
+   "lang": "en",
+   "text": "What is my boss's name?",
+   "kept": 24
+  },
+  {
+   "lang": "en",
+   "text": "What am I allergic to?",
+   "kept": 25
+  },
+  {
+   "lang": "en",
+   "text": "Which flight am I on next week?",
+   "kept": 28
+  },
+  {
+   "lang": "en",
+   "text": "What size shoes do I wear?",
+   "kept": 29
+  },
+  {
+   "lang": "en",
+   "text": "Who is picking up the kids on Friday?",
+   "kept": 32
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi thích màu gì nhất?",
+   "kept": 33
+  },
+  {
+   "lang": "vi",
+   "text": "Khi nào tôi có lịch hẹn nha sĩ?",
+   "kept": 36
+  },
+  {
+   "lang": "vi",
+   "text": "Mật khẩu wifi nhà mình là gì?",
+   "kept": 37
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi đỗ xe ở đâu?",
+   "kept": 40
+  },
+  {
+   "lang": "vi",
+   "text": "Con trai tôi học trường nào?",
+   "kept": 41
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi uống cà phê thế nào?",
+   "kept": 44
+  },
+  {
+   "lang": "vi",
+   "text": "Buổi sáng tôi uống thuốc gì?",
+   "kept": 45
+  },
+  {
+   "lang": "vi",
+   "text": "Sinh nhật mẹ tôi là ngày nào?",
+   "kept": 48
+  },
+  {
+   "lang": "vi",
+   "text": "Tàu của tôi chạy lúc mấy giờ?",
+   "kept": 49
+  },
+  {
+   "lang": "vi",
+   "text": "Con chó nhà tôi tên là gì?",
+   "kept": 52
+  },
+  {
+   "lang": "vi",
+   "text": "Kính đọc sách của tôi để đâu?",
+   "kept": 53
+  },
+  {
+   "lang": "vi",
+   "text": "Sếp của tôi tên gì?",
+   "kept": 56
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi bị dị ứng với gì?",
+   "kept": 57
+  },
+  {
+   "lang": "vi",
+   "text": "Tuần sau tôi bay chuyến nào?",
+   "kept": 60
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi đi giày cỡ bao nhiêu?",
+   "kept": 61
+  },
+  {
+   "lang": "vi",
+   "text": "Thứ Sáu ai đón bọn trẻ?",
+   "kept": 64
+  }
+ ]
+}

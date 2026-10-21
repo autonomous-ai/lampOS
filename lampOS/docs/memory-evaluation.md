@@ -322,3 +322,68 @@ the memory socket and voice path. It does not measure lamp performance,
 Linux ARM64 behavior, or deployment readiness. The full-context ceiling and
 the session-level gains cannot be read as results for the live capped
 recall response.
+
+## Embeddings on a lamp (#2510)
+
+`lamp-memory-embed-bench` is the lamp half of
+`training/memory-embed/bench.py`: the same paraphrase set
+(`crates/memory/tests/fixtures/paraphrase-recall.json`), the same
+multilingual-e5-small int8 export, `passage: ` and `query: ` prefixes, mean
+pooling over the attention mask and an L2 norm, ranked by cosine within the
+question's language. It is a measure only, behind the `embed-bench` feature
+(`required-features`), so `cargo build -p lamp-memory` and every product
+binary leave its `tokenizers` crate (Apache-2.0, `default-features = false`,
+`fancy-regex`) out. ARM64 CI builds it apart, into the artifact; it is in
+`deploy/package-binaries.json`'s development list, never packaged.
+
+    cargo build --release -p lamp-memory --features embed-bench --bin lamp-memory-embed-bench
+
+On a lamp it runs from a scratch folder with nothing installed, using the
+voice's ONNX Runtime read in place. Copy the binary, the fixture, the sha256
+list and the two model files, keeping the list's folder names:
+
+| File | Size |
+|---|---|
+| `lamp-memory-embed-bench` (ARM64 artifact) | about 5 MB |
+| `paraphrase-recall.json` | 10 KB |
+| `downloads.sha256` | under 1 KB |
+| `e5-int8/onnx/model_quantized.onnx` | 118 MB |
+| `e5-fp32/onnx/tokenizer.json` | 17 MB |
+
+    cd /tmp/embed-bench
+    ./lamp-memory-embed-bench --fixture paraphrase-recall.json \
+        --model e5-int8/onnx/model_quantized.onnx --tokenizer e5-fp32/onnx/tokenizer.json \
+        --sha256 downloads.sha256 --runtime /opt/lampOS/voice/current/libonnxruntime.so.1.30.0 \
+        --runtime-sha256 <the lamp's hash> --threads 1,4
+
+The lamp's runtime hash is the first field of
+
+    sha256sum /opt/lampOS/voice/current/libonnxruntime.so.*
+
+It refuses a model or tokenizer the list does not name or whose sha256
+differs, and, given `--runtime-sha256`, a runtime whose sha256 differs. It
+prints one JSON line per thread count (`--threads`, default `1,4`;
+`--rounds`, default 10 timed passes over the set): query embed p50/p90/p95
+ms, passage embed p50/p90 ms, the load time, peak RSS (`VmHWM`; `getrusage`
+elsewhere), recall@1/@3/@5 per language, counts and the model's and
+runtime's sha256. Each thread count runs in its own process (the bench runs
+itself once per `--threads` value), since a process's peak RSS never resets:
+each line's peak RSS is that count's own. No fixture text is printed. Delete the folder after.
+
+`--fixture` takes several sets, comma-separated, such as
+`paraphrase-recall.json,overlap-recall.json`. The second set
+(`crates/memory/tests/fixtures/overlap-recall.json`) has 16 English and 16
+Vietnamese questions, and each shares some words with its kept thing, the
+way people rephrase. Each target also has a distractor that shares words with
+the question but is the wrong thing. Each set's line reports
+recall@1/@3/@5 per language for four methods on the same kept things:
+`embed`, `fts` and `fts_v2` (the store's FTS5 table and tokenizer,
+`unicode61 remove_diacritics 2`, with `search::query_with`'s first-version
+query and recall_v2's, common words left out), and `kept_words`, the voice's
+kept-list word match. That one is mirrored from `crates/voice/src/remember.rs`
+(`content_words`, `hits_told`'s order). A test checks that its `SMALL_WORDS`
+are the voice's. The live turn is told only three, so `kept_words` @5 is read
+here only. `--arena off` turns off ONNX Runtime's CPU memory arena and the
+memory pattern. `cold_ms` runs from the tokenizer's and session's making to
+the first embedding. `rss_peak_after_mb` gives the peak after the runtime,
+the tokenizer, the session and the first embedding.

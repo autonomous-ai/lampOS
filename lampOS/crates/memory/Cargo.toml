@@ -19,6 +19,17 @@ name = "lamp-memory-fixture"
 path = "src/bin/lamp-memory-fixture.rs"
 test = false
 
+# On-device embeddings timed and scored on the paraphrase set (#2510): a
+# measure only, built with `--features embed-bench`, so no product binary
+# and no default build pulls in its tokenizer or ONNX Runtime.
+[[bin]]
+name = "lamp-memory-embed-bench"
+path = "src/bin/lamp-memory-embed-bench.rs"
+required-features = ["embed-bench"]
+
+[features]
+embed-bench = ["dep:tokenizers", "dep:ort", "dep:nix"]
+
 [dependencies]
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
@@ -32,6 +43,12 @@ rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
 unicode-normalization = "0.1"
 # Used only by the explicit fixture transport and its bounded host watchdogs.
 rustix = { version = "1.1", features = ["fs", "event", "process"] }
+# embed-bench only: the Hugging Face tokenizer (Apache-2.0) without its C
+# regex library, and the voice's pinned ONNX Runtime binding, loaded at run time.
+tokenizers = { version = "=0.23.2", default-features = false, features = ["fancy-regex"], optional = true }
+ort = { version = "=2.0.0-rc.14", default-features = false, features = ["std", "load-dynamic", "api-30"], optional = true }
+# embed-bench only: getrusage's peak RSS where /proc is not there.
+nix = { version = "=0.29.0", default-features = false, features = ["resource"], optional = true }
 
 [lints]
 workspace = true
