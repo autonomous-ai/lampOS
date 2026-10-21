@@ -183,7 +183,14 @@ fn refusal_codes(body: &[u8]) -> Vec<String> {
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
         return Vec::new();
     };
-    let error = &value["error"];
+    // Google's OpenAI-compatible endpoint answers a refusal as a one-item
+    // array, `[{"error": …}]` (the backend on #2133, 21 Oct).
+    let error = match &value {
+        serde_json::Value::Array(items) => {
+            &items.first().unwrap_or(&serde_json::Value::Null)["error"]
+        }
+        _ => &value["error"],
+    };
     let reasons = error["details"]
         .as_array()
         .into_iter()
@@ -372,6 +379,10 @@ mod tests {
         assert!(refusal_codes(deepseek_like).is_empty());
         let hex_40 = br#"{"error":{"status":"0123456789abcdef0123456789abcdef01234567"}}"#;
         assert!(refusal_codes(hex_40).is_empty());
+        // Google's OpenAI-compatible endpoint, as an array of one.
+        let array = br#"[{"error":{"code":400,"message":"Missing or invalid Authorization header.","status":"INVALID_ARGUMENT"}}]"#;
+        assert_eq!(refusal_codes(array), ["INVALID_ARGUMENT"]);
+        assert!(refusal_codes(b"[]").is_empty());
         // Not JSON, or JSON without an error.
         assert!(refusal_codes(b"<html>Bad Gateway</html>").is_empty());
         assert!(refusal_codes(br#"{"status":0,"message":"no"}"#).is_empty());
