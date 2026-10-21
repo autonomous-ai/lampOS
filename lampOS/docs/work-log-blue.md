@@ -412,3 +412,8 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - **No arm:** nothing installed.
 - **Its stand-in test** passes, and a mutant without the SHA-256 comparison fails it.
 - **Docs:** the lamp-runs row, replacing the stale "waits for the lead's ruling" line, and the README.
+- **#2745's P2 (first builder, 05:43):** the yes would have started a real agent on a real machine at night.
+  - Rewritten on `stand-in.sh`, as `calendar.sh` is, so nothing real starts. The fixture's `show` answers with a fixed `stand-up-nudge` skill (light only, a nudge; a made skill can't speak). `LAMP_MAKE_SKILL=on` rides on the stand-in's drop-in.
+  - The steps follow `calendar.sh`: the lamp's confirm or an offer at once.
+  - The test covers both orders and passes; the SHA-256 mutant fails it.
+  - Folded as `7efb56173`.
