@@ -934,6 +934,10 @@ fn worker_command(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_reopen_quiet_worker_environment(
+            role,
+            var(crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_keep_heard_worker_environment(
             role,
             var(crate::remember::heard::ENVIRONMENT).as_deref(),
@@ -1115,6 +1119,20 @@ fn memory_keep_heard_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::heard::ENVIRONMENT, "on"))
+}
+
+// The note asked again after ten quiet minutes (#1693 (1)), passed the
+// same narrow way: the exact `on`, to the second route alone, whose run of
+// turns is otherwise asked its note only when the person changes (a Live
+// session is opened anew after a quiet already).
+fn memory_reopen_quiet_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
+        "on",
+    ))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1465,6 +1483,13 @@ mod tests {
                         "LAMP_MEMORY_OBSERVE",
                         ["second"].as_slice(),
                     ),
+                    // The note asked again after a quiet, the second route's
+                    // (#1693 (1)).
+                    (
+                        memory_reopen_quiet_worker_environment,
+                        "LAMP_MEMORY_REOPEN_QUIET",
+                        ["second"].as_slice(),
+                    ),
                     // The clock's switch, the two that tell the time.
                     (
                         kernel_clock_worker_environment,
@@ -1597,6 +1622,7 @@ mod tests {
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
+                    crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -1713,6 +1739,7 @@ mod tests {
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
+                    "LAMP_MEMORY_REOPEN_QUIET=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_OWN_KEYS=on",

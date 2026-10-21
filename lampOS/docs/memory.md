@@ -668,6 +668,17 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::a_follow_up_is_one_open_thread_given_once_a_day_and_never_for_the_room`,
   `days::the_follow_up_request_answers_for_a_person_and_refuses_the_room`,
   `remember::tests::with_the_switch_a_known_person_s_session_is_told_one_thread_to_ask_about`.
+- **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
+  the second route only; off unless set). A Live session asks for the note
+  each time it connects. The second route asked only when the person
+  changed or the worker restarted, so someone who talked to it last night
+  and is the first known person this morning kept last night's note, and
+  was never asked "how was the wedding?". With the switch, ten minutes with
+  no turn ends the run of turns, and the next turn asks the note again, a
+  new session, told a due thread as above. The memory still gives a thread
+  at most once a day, so a later quiet asks again but tells nothing new.
+  It costs that turn what a person change costs: one note within 300 ms
+  ([second-voice.md](second-voice.md), "Each turn is one person's").
 
 ### Each person's own (#764)
 

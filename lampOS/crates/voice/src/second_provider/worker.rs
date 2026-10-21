@@ -258,6 +258,13 @@ impl Gate {
 /// never the sticky session owner's. `on` only; otherwise as before.
 pub const SCOPED_CONTEXT_ENVIRONMENT: &str = "LAMP_SECOND_SCOPED_CONTEXT";
 
+/// `on`: the same person's conversation quiet for ten minutes
+/// ([`crate::thread::REMEMBERED_FOR`]) is over, and the next turn asks the
+/// memory's note again, a new session, so an open thread due by then
+/// (`LAMP_MEMORY_THREADS`) reaches them (#1693 (1)). Off, the note is asked
+/// again only when the person changes or the worker restarts.
+pub const REOPEN_QUIET_ENVIRONMENT: &str = "LAMP_MEMORY_REOPEN_QUIET";
+
 /// Whether the service's environment says `LAMP_SECOND_SCOPED_CONTEXT=on`.
 pub fn scoped_context_from_environment() -> bool {
     std::env::var(SCOPED_CONTEXT_ENVIRONMENT).ok().as_deref() == Some("on")
@@ -1554,7 +1561,8 @@ pub fn serve(
     // counted from the eyes' known file as the Live worker counts it, opens
     // the thread for them and asks for their kept things. A Days note is
     // frozen for a session; here a session is the run of turns for one
-    // person, so it is asked again only when the person changes.
+    // person, so it is asked again only when the person changes, or, with
+    // LAMP_MEMORY_REOPEN_QUIET, after ten quiet minutes (#1693 (1)).
     let socket = tools.memory.clone();
     let who = tools
         .who
@@ -1608,7 +1616,14 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-    let sessions = std::sync::Mutex::new(Sessions::default());
+    let reopen_quiet =
+        days && std::env::var(REOPEN_QUIET_ENVIRONMENT).ok().as_deref() == Some("on");
+    if reopen_quiet {
+        eprintln!(
+            "lamp-voice second: after ten quiet minutes the next turn asks the memory's note again (LAMP_MEMORY_REOPEN_QUIET)"
+        );
+    }
+    let sessions = std::sync::Mutex::new(Sessions::reopening_after_quiet(reopen_quiet));
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
@@ -1642,6 +1657,9 @@ pub fn serve(
         let Ok(mut sessions) = sessions.lock() else {
             return Told::default();
         };
+        // Counted at every ask, before anything can return early: a turn's
+        // second ask (its prepared chat, then its rounds) is never quiet.
+        let quiet = sessions.quiet_long_enough(now);
         let (opened, person) = sessions.open(who.as_deref(), now);
         let (changed, person) = match lease {
             None => (opened, person),
@@ -1658,8 +1676,10 @@ pub fn serve(
             // session's snapshot: a new session is a fresh context (#2176
             // row 1b).
             // After a stop, the next turn opens one, so journalling can go on
-            // (Friday's P1 on #2226).
-            Some(socket) if days => sessions.frozen(opens_anew(changed), |session| {
+            // (Friday's P1 on #2226). After a quiet, the same synchronous ask
+            // a person change makes, within the note's 300 ms
+            // (`remember::told_for_fresh_session`).
+            Some(socket) if days => sessions.frozen(opens_anew(changed) || quiet, |session| {
                 crate::remember::told_for_fresh_session(socket, session, person.as_deref(), true)
             }),
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
@@ -3857,8 +3877,33 @@ struct Sessions {
     note: Option<String>,
     /// The admitted scope the Days note was last asked for.
     scoped: Option<Option<String>>,
+    /// `LAMP_MEMORY_REOPEN_QUIET`: a run of turns ends after
+    /// [`crate::thread::REMEMBERED_FOR`] with none told.
+    reopen_quiet: bool,
+    /// When a turn was last told, for that quiet.
+    last_told: Option<Instant>,
 }
 impl Sessions {
+    fn reopening_after_quiet(reopen_quiet: bool) -> Self {
+        Self {
+            reopen_quiet,
+            ..Self::default()
+        }
+    }
+
+    /// Whether the conversation was quiet long enough before this ask, `now`,
+    /// that it is over and the note is asked again: with the switch, ten
+    /// minutes since the last turn was told. Each ask is counted, so a
+    /// long conversation's turns, and one turn's several asks, are never
+    /// quiet.
+    fn quiet_long_enough(&mut self, now: Instant) -> bool {
+        let last = self.last_told.replace(now);
+        self.reopen_quiet
+            && last.is_some_and(|at| {
+                now.saturating_duration_since(at) >= crate::thread::REMEMBERED_FOR
+            })
+    }
+
     /// Open the thread for whoever is at the lamp now ([`Thread::opening`]):
     /// whether that is someone other than the last turn's, and whom.
     ///
@@ -3886,7 +3931,8 @@ impl Sessions {
         changed
     }
 
-    /// The Days note for this run of turns, asked anew when the person changed.
+    /// The Days note for this run of turns, asked anew when the person
+    /// changed or, with the switch, after a quiet.
     fn frozen(&mut self, changed: bool, ask: impl FnOnce(u64) -> String) -> String {
         if changed || self.note.is_none() {
             self.opened += 1;
@@ -5298,6 +5344,45 @@ mod tests {
         assert_eq!(note(true), "note 2", "a new session asks again");
         assert_eq!(note(false), "note 2");
         assert_eq!(asked, [1, 2]);
+    }
+
+    /// #1693 (1), `LAMP_MEMORY_REOPEN_QUIET`: the same person back after ten
+    /// quiet minutes (`thread::REMEMBERED_FOR`) is asked their note again,
+    /// as a new session, so an open thread due by then can be told; under
+    /// ten minutes, or with the switch off, the run of turns keeps its note.
+    /// Quiet is counted from the last turn told, so the turns of one long
+    /// conversation, and a turn's own second ask (its prepared chat, then
+    /// its rounds), never reopen it. On a test clock: `Instant`s set ahead.
+    #[test]
+    fn after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again() {
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let quiet = crate::thread::REMEMBERED_FOR.as_secs();
+        let asked_at = |reopen: bool, turns: &[u64]| {
+            let mut sessions = Sessions::reopening_after_quiet(reopen);
+            let mut asked = Vec::new();
+            for &turn in turns {
+                let changed = sessions.quiet_long_enough(at(turn));
+                sessions.frozen(changed, |session| {
+                    asked.push(session);
+                    format!("note {session}")
+                });
+            }
+            asked
+        };
+        // Back after ten quiet minutes: asked again, once, and the turns
+        // after it, and the same turn's second ask, keep that note.
+        assert_eq!(asked_at(true, &[0, quiet, quiet + 1, quiet + 30]), [1, 2]);
+        // Just under ten minutes: the same run of turns.
+        assert_eq!(asked_at(true, &[0, quiet - 1]), [1]);
+        // A long conversation, a turn every two minutes for half an hour.
+        let long: Vec<u64> = (0..=15).map(|turn| turn * 120).collect();
+        assert_eq!(asked_at(true, &long), [1]);
+        // Two quiet gaps, two reopens.
+        assert_eq!(asked_at(true, &[0, quiet, 2 * quiet + 5]), [1, 2, 3]);
+        // Off: as before, whatever the quiet.
+        assert_eq!(asked_at(false, &[0, quiet, 10 * quiet]), [1]);
+        assert!(!Sessions::default().reopen_quiet, "off unless set");
     }
 
     /// Tests' map on #1712 (20:11), (2): `LAMP_ROOM_FILE` on the second route
@@ -8008,6 +8093,40 @@ mod memory_switches {
             "{:?}",
             read.lock().unwrap()
         );
+
+        // #1693 (1), `LAMP_MEMORY_REOPEN_QUIET`: the same person's turn after
+        // ten quiet minutes opens a new Days session, told the open thread
+        // once; the turns of each run keep their note and ask nothing more.
+        let mut sessions = super::Sessions::reopening_after_quiet(true);
+        let start = Instant::now();
+        let count = |op: &str| {
+            read.lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line["op"] == op)
+                .count()
+        };
+        let (opens, follow_ups) = (count("session_open"), count("follow_up"));
+        let quiet = crate::thread::REMEMBERED_FOR.as_secs();
+        let mut notes = Vec::new();
+        for seconds in [0, 60, 60 + quiet, 61 + quiet] {
+            let at = start + std::time::Duration::from_secs(seconds);
+            let changed = sessions.quiet_long_enough(at);
+            notes.push(sessions.frozen(changed, |session| {
+                crate::remember::told_for_session(&socket, session + 10, Some(&person))
+            }));
+            let runs = if seconds < 60 + quiet { 1 } else { 2 };
+            assert_eq!(count("follow_up"), follow_ups + runs, "at {seconds} s");
+            assert!(count("session_open") > opens, "at {seconds} s");
+        }
+        let after_first = notes[0].clone();
+        assert_eq!(notes[1], after_first, "the same run keeps its note");
+        assert!(
+            notes[2].contains("\"Sister's wedding is on Saturday\""),
+            "{}",
+            notes[2]
+        );
+        assert_eq!(notes[3], notes[2]);
         drop(scope);
         let _ = std::fs::remove_dir_all(&dir);
     }
