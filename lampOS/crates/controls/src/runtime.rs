@@ -1,6 +1,7 @@
 use crate::{
     engine::{Config, Engine, Output},
     input::{InputError, PinReader},
+    pace::Pace,
 };
 use lamp_bus::{Bus, Published, Publisher};
 use lamp_msgs::{ControlFault, ControlGesture, ControlsState, Diagnostic, Level};
@@ -101,6 +102,7 @@ pub struct Service<R: PinReader> {
     last_report: Option<u64>,
     last_feedback: Option<Feedback>,
     pub counts: Counts,
+    pub pace: Pace,
     recorder: Option<crate::record::Recorder>,
     privacy: Option<crate::privacy::Source>,
     /// The privacy route on a lamp with no slide ([`Self::mark_no_slide`]).
@@ -167,6 +169,7 @@ impl<R: PinReader> Service<R> {
             last_report: None,
             last_feedback: None,
             counts: Counts::default(),
+            pace: Pace::default(),
             recorder: None,
             privacy: None,
             no_slide: false,
@@ -272,6 +275,9 @@ impl<R: PinReader> Service<R> {
     /// slow adapter cannot make its old samples fresh by taking time to read.
     pub fn step(&mut self, now: impl Fn() -> u64) -> Output {
         let start = now();
+        if let Some(line) = self.pace.step(start) {
+            eprintln!("lamp-controls: {line}");
+        }
         if let Some(privacy) = &mut self.privacy
             && let Some((received, sample)) = privacy.poll(&now)
             && let Some(recorder) = &mut self.recorder
@@ -380,7 +386,9 @@ impl<R: PinReader> Service<R> {
             self.last_report = Some(at_us);
         }
         self.counts.steps += 1;
-        self.counts.longest_step_us = self.counts.longest_step_us.max(now().saturating_sub(start));
+        let elapsed = now().saturating_sub(start);
+        self.counts.longest_step_us = self.counts.longest_step_us.max(elapsed);
+        self.pace.worked(elapsed);
         output
     }
 
@@ -438,6 +446,9 @@ impl<R: PinReader> Service<R> {
             .with("publish_errors", self.counts.publish_errors)
             .with("dropped", self.counts.dropped)
             .with("longest_step_us", self.counts.longest_step_us)
+            .with("longest_gap_us", self.pace.longest_gap_us)
+            .with("long_gaps", self.pace.long_gaps)
+            .with("slow_steps", self.pace.slow_steps)
             .with("record_dropped", record.dropped)
             .with("record_failed", record.failed)
             .with("physical_stop_verified", false)

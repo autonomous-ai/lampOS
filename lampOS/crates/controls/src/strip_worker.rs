@@ -393,6 +393,16 @@ pub fn send(socket: &UnixDatagram, packet: &Packet) -> io::Result<()> {
     }
 }
 
+/// Pace the whole acquisition and send on the strip's own thread. A read
+/// that exceeds the polling period still leaves CPU time for other work;
+/// time blocked in I2C is not charged again as sleep.
+#[cfg(any(target_os = "linux", test))]
+fn read_loop(poll_us: u64, mut read: impl FnMut(u64) -> io::Result<()>) -> io::Result<()> {
+    loop {
+        crate::pace::try_run_step(poll_us, &mut read)?;
+    }
+}
+
 /// Internal child entry point. It opens no GPIO, bus topic or output owner.
 #[cfg(target_os = "linux")]
 pub fn run(config: mpr121::Config, sink: &Path, clock: &str, session: &str) -> io::Result<()> {
@@ -408,15 +418,14 @@ pub fn run(config: mpr121::Config, sink: &Path, clock: &str, session: &str) -> i
         at_us,
         sequence,
     };
-    let every = Duration::from_millis(config.every_ms);
+    let poll_us = config.every_ms.saturating_mul(1_000);
     let result: io::Result<()> = (|| {
         let _claim = DeviceClaim::acquire(&config)?;
         let io = mpr121::LinuxIo::open(&config).map_err(io::Error::other)?;
         let mut delay = mpr121::ThreadDelay;
         let mut device =
             mpr121::Device::initialize(io, config, &mut delay).map_err(io::Error::other)?;
-        loop {
-            let began = lamp_ipc::monotonic_us();
+        read_loop(poll_us, |began| {
             sequence = sequence
                 .checked_add(1)
                 .ok_or_else(|| io::Error::other("strip sequence exhausted"))?;
@@ -428,12 +437,8 @@ pub fn run(config: mpr121::Config, sink: &Path, clock: &str, session: &str) -> i
                     session_id: session.into(),
                     mask,
                 },
-            )?;
-            let elapsed = lamp_ipc::monotonic_us().saturating_sub(began);
-            if let Some(remaining) = every.checked_sub(Duration::from_micros(elapsed)) {
-                thread::sleep(remaining);
-            }
-        }
+            )
+        })
     })();
     if let Err(error) = &result {
         let _ = send(
@@ -451,4 +456,46 @@ pub fn run(config: mpr121::Config, sink: &Path, clock: &str, session: &str) -> i
 #[cfg(not(target_os = "linux"))]
 pub fn run(_: mpr121::Config, _: &Path, _: &str, _: &str) -> io::Result<()> {
     Err(io::Error::other("MPR121 hardware requires Linux"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cpu_us() -> u64 {
+        let time = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
+        u64::try_from(time.tv_sec).unwrap() * 1_000_000
+            + u64::try_from(time.tv_nsec).unwrap() / 1_000
+    }
+
+    #[test]
+    fn first_and_repeated_slow_strip_reads_leave_at_least_their_cpu_work_to_rest() {
+        let mut previous: Option<(u64, u64)> = None;
+        let mut reads = 0;
+        let error = read_loop(1_000, |began| {
+            if let Some((finished, worked)) = previous {
+                let rested = began.checked_sub(finished).unwrap();
+                eprintln!("strip pacing host: read={reads}, cpu_us={worked}, rest_us={rested}");
+                assert!(rested >= worked, "a slow strip read skipped its rest");
+            }
+            if reads == 3 {
+                return Err(io::Error::other("end of strip fixture"));
+            }
+            // Exercise the production loop with a read that outlasts its
+            // period through CPU work, rather than a sleeping I2C stand-in.
+            let began_cpu = cpu_us();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while cpu_us().saturating_sub(began_cpu) < 5_000 {
+                assert!(Instant::now() < deadline, "fixture did not get CPU time");
+                std::hint::spin_loop();
+            }
+            let worked = cpu_us() - began_cpu;
+            previous = Some((lamp_ipc::monotonic_us(), worked));
+            reads += 1;
+            Ok(())
+        })
+        .unwrap_err();
+        assert_eq!(error.to_string(), "end of strip fixture");
+        assert_eq!(reads, 3);
+    }
 }

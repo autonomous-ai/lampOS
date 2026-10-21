@@ -1044,20 +1044,66 @@ never holds it back
 (`a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh`), but a loop
 that doesn't run lapses both
 (`a_loop_that_stalls_for_100_ms_lapses_the_reset_and_the_privacy_reading_together`).
-On lamp-75c9 (21 Oct, twice) the journal said `hand: reset not read`, which
-needs 100 ms between two touch readings, 40 ms before the voice lost the switch,
-and Controls ran at ordinary priority (nice 5) on a core the voice's real-time
-workers also ran on (Nine's `ps`, 20:36). So Controls runs at real-time round-robin priority 30, above the voice's 20
+On lamp-75c9 (21 Oct, twice) the journal said `hand: reset not read` about
+40 ms before the voice lost the switch. That line can mean a failed touch read
+or at least 100 ms between readings. Controls ran at ordinary priority (nice 5)
+on a core the voice's real-time workers also ran on (Nine's `ps`, 20:36).
+No lapse occurred during the accompanying 200 s bus recording, so scheduling
+remains a suspected cause rather than a measured one. Controls runs at
+real-time round-robin priority 30, above the voice's 20
 (`CPUSchedulingPolicy=rr`, `CPUSchedulingPriority=30`, in the product unit and
 lamp-4ace's), with the kernel's real-time throttling as it is. Its step works
-well under 1 ms (0.5 ms the longest on lamp-4ace), and the loop rests at least
-as long as a step worked (`rest_us`), so a slow step never makes it spin.
+well under 1 ms (0.5 ms the longest reported on lamp-4ace). The touch loop,
+the legacy loop used for a privacy-only pins profile, and the strip child's
+acquisition/send loop share the pacing in `pace::run_step`/`try_run_step`.
+After each completed step they sleep for the remaining polling period, and
+at least that iteration's measured thread CPU time (minimum 1 us). CPU time
+includes the hand journal writes. Time blocked or descheduled is not charged
+again as sleep; genuine CPU work still gets an equally long rest. This uses
+two thread-CPU clock reads per iteration, whose lamp cost is not measured yet.
+Both units leave `CPUSchedulingResetOnFork` unset. The MPR121 child keeps
+RR 30 above Voice's RR 20 so a hand can still be read while speech is busy
+(the first builder's ruling on #2677). Its own CPU-time rest floor also
+applies when a read exceeds the polling period; time blocked in I2C does
+not become another equally long sleep. The privacy read, GPIO drain and
+state publication stay on the main thread at RR 30. Leaving reset unset
+also means the optional `controls-record` and stderr relay threads inherit
+RR 30; recording is not enabled in the product units. Worker scheduling,
+strip read latency during voice load, and the cost of the two thread-CPU
+clock calls still need measurement on a lamp.
 Controls' report on `diagnostics` counts the loop's pace beside
 `longest_step_us`: `longest_gap_us` (the longest time between two steps'
 starts), `long_gaps` (gaps of 50 ms or more, past the switch's freshness) and
-`slow_steps` (steps whose own work took 1 ms or more). A long gap is also said
+`slow_steps` (service steps whose elapsed time took 1 ms or more, including
+waits but excluding the outer hand journal writes). Both service paths report
+these counts. A long gap is also said
 in the journal, at most once a second: "the loop didn't run for N ms, past the
 privacy reading's 50 ms".
+
+The injected-clock regression covers the first and repeated delays: with
+30 ms elapsed and 0.2 ms CPU work, the old touch-loop sleep made consecutive readings
+60 ms apart and lost privacy continuity; the shared pacing makes them 30.2 ms
+apart and keeps the actual privacy monitor fresh on both service paths.
+Separate tests keep an equally long rest after repeated CPU-heavy steps.
+A strip-worker regression runs the production acquisition loop with three
+synthetic reads that each consume at least 5 ms of thread CPU, past its
+1 ms test polling period, and checks the rest before every subsequent read.
+On the x86_64 development Mac (Rust 1.96.0), those three reads each used
+5.000 ms of thread CPU and left 6.481, 6.130 and 6.797 ms before the next
+read began. The measured rest starts at the end of the synthetic read and
+ends at the next iteration's monotonic timestamp.
+Terminal strip errors return without sleeping so their fault is sent at once;
+an injected-clock regression covers a slow failing step too.
+In the same host run, the real thread-clock test's first and repeated
+30 ms sleeps elapsed 35.104 and 32.284 ms and each requested only
+0.017 ms of further rest. Elapsed time runs from the pre-closure
+monotonic timestamp to the first clock read after the 30 ms sleep. The next
+rest is computed afterward and recorded instead of slept. The injected-clock
+values above provide the comparable
+before/after result without host scheduling noise.
+These are software timing checks, not lamp latency measurements. The first
+builder checks device latency on lamp-4ace after the merge; the voice-load
+run and gap counters remain in [lamp-runs.md](lamp-runs.md).
 
 The physical field is independent of top-level hand `ready` and `fault`.
 Base-only touch mode creates the `controls/state` owner when privacy is selected.

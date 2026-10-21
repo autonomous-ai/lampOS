@@ -49,8 +49,9 @@ the route without valid switch evidence leaves Voice and Ears closed. Shadow
 gesture mode does not hide electrical privacy evidence. Controls reads and
 publishes evidence; it cannot open microphones or clear a software mute. It
 reads the switch in the same loop as the hand, so it runs at real-time priority
-30, above the voice, and its health counts the loop's gaps (#2602,
-[controls.md](controls.md)).
+30, above the voice. Both the touch and privacy-only loops rest for at least
+their thread CPU work, without sleeping again for time spent blocked, and
+their health counts elapsed steps and gaps (#2602, [controls.md](controls.md)).
 
 The selected Voice privacy child reads `controls/state` instead of requesting
 GPIO. Each accepted observation retains the actual acquisition clock, time,

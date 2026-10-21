@@ -118,7 +118,7 @@ What is known and what is not:
 | Slice | Parts | Weight | Why |
 |---|---|---|---|
 | `lampos-voice.slice` | voice | `CPUWeight=1000`, `IOWeight=1000` | A late word is worse than anything else late. The voice's microphone and speaker threads are also round-robin real-time at 20 (lamp-4ace, 2026-10-13: with every core busy the voice ended four times at ordinary priority) |
-| `lampos-parts.slice` | every other part | `CPUWeight=100` | Together no more than one ordinary service. Within it: eyes `Nice=10` (looking is never worth a late word); name, Expression, policy, health `Nice=5`; body and memory ordinary; controls round-robin real-time at 30, above the voice, since its one loop also reads the privacy switch (#2602, [controls.md](controls.md)) |
+| `lampos-parts.slice` | every other part | `CPUWeight=100` | Together no more than one ordinary service. Within it: eyes `Nice=10` (looking is never worth a late word); name, Expression, policy, health `Nice=5`; body and memory ordinary; controls' main loop and strip child round-robin real-time at 30, above the voice, so the switch and hand can be read while speech is busy. Each loop rests for at least its thread CPU work; reset-on-fork stays unset (#2602, [controls.md](controls.md)) |
 
 The name also keeps to the board's fast processors (`CPUAffinity=`), as on
 lamp-4ace.
