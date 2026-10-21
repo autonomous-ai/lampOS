@@ -331,6 +331,9 @@ host boot, publisher session, sequence, monotonic stamp and durable
 revision. Wrong identities, stale or future observations, lower revisions,
 and conflicting equal revisions cannot loosen a limit. Failed intake stays
 on the enabled, dark path rather than reverting to unrestricted output.
+When Actions holds its caps back because their store is from a later build
+(`actions.md`), it still publishes an empty snapshot each second, so the
+ring takes the product's ceiling rather than staying dark.
 
 The ring retains an accepted snapshot through bus silence. Initialized wall
 time can expire an individual cap. Unknown or implausible wall time, a cached

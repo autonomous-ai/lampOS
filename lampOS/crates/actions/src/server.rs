@@ -277,6 +277,12 @@ pub fn serve_with_clock_and_caps<S: Mixer, L: Light>(
     })
 }
 
+/// What the part's health warns of about its caps: held back for this run,
+/// or begun empty beside a later build's store kept aside.
+fn caps_warning(caps: &crate::caps_service::Service) -> Option<&str> {
+    caps.held_back().or(caps.kept_aside())
+}
+
 struct ServingFiles<'a>(&'a Path);
 impl Drop for ServingFiles<'_> {
     fn drop(&mut self) {
@@ -318,6 +324,9 @@ fn serve_configured<S: Mixer, L: Light>(
     let mut ready = None;
     set_ready(directory, false, &mut ready)?;
     let mut caps = start_caps()?;
+    if let Some(why) = caps.as_ref().and_then(caps_warning) {
+        eprintln!("lamp-actions: {why}");
+    }
     if let Some(caps) = caps.as_mut() {
         caps.tick(&mut executive.sound)?;
     }
@@ -358,6 +367,10 @@ fn serve_configured<S: Mixer, L: Light>(
             let mut diagnostic = report(&offered, answered);
             if let Some(caps) = caps.as_ref() {
                 diagnostic = diagnostic.with("output_caps_ready", caps.ready());
+                if let Some(why) = caps_warning(caps) {
+                    diagnostic.level = lamp_msgs::Level::Warn;
+                    diagnostic.message = why.to_owned();
+                }
             }
             let _ = health.publish_json(lamp_ipc::monotonic_us(), &diagnostic);
         }
