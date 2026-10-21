@@ -49,6 +49,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     // How the near face seems, as an input (#1671): off unless set.
     config.seems = std::env::var(lamp_mood::input::SEEMS_ENVIRONMENT).as_deref() == Ok("on");
+    // How a line sounded, as an input (#1722): off unless set.
+    config.tone = std::env::var(lamp_mood::input::TONE_ENVIRONMENT).as_deref() == Ok("on");
     // Disabled invocation does not read the clock, resolve a zone, open files,
     // install signal handlers, start threads, subscribe or publish.
     if !config.enabled {

@@ -1104,3 +1104,55 @@ fn how_a_face_seems_is_taken_only_when_switched_on_and_as_its_kind() {
             .is_err()
     );
 }
+
+/// #1722: how a line sounded is taken only with `LAMP_MOOD_TONE=on`
+/// (`with_tone`), from the voice only, good for five seconds, as what it
+/// counts as: glad, low, lively, or nothing. Numbers out of their ranges are
+/// refused.
+#[test]
+fn how_a_line_sounded_is_taken_only_when_switched_on_and_as_its_kind() {
+    use lamp_mood::engine::ToneKind;
+    let line = |arousal: f32, sure: f32, valence: Option<f32>| {
+        message(
+            11,
+            &serde_json::json!({"request": 7, "arousal": arousal, "sure": sure, "valence": valence}),
+        )
+    };
+    let mut off = adapter();
+    assert!(
+        off.ingest(&line(0.0, 0.9, Some(1.0)), NOW, WALL)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(off.counts().accepted, 0);
+    for (arousal, sure, valence, taken) in [
+        (0.0, 0.9, Some(1.0), Some(ToneKind::Glad)),
+        (0.2, 0.9, Some(-1.0), Some(ToneKind::Low)),
+        (0.8, 0.9, None, Some(ToneKind::Lively)),
+        (-0.8, 0.9, None, None),
+        (0.0, 0.0, None, None),
+    ] {
+        let events = adapter()
+            .with_tone(true)
+            .ingest(&line(arousal, sure, valence), NOW, WALL)
+            .unwrap();
+        match taken {
+            Some(kind) => {
+                assert_eq!(events.len(), 1, "{arousal} {sure} {valence:?}");
+                assert_eq!(events[0].kind, EventKind::Tone(kind));
+                assert_eq!(events[0].valid_until_us, NOW + 5_000_000);
+            }
+            None => assert!(events.is_empty(), "{arousal} {sure} {valence:?}"),
+        }
+    }
+    let mut other = line(0.0, 0.9, Some(1.0));
+    other.header.source = "replay".into();
+    assert!(adapter().with_tone(true).ingest(&other, NOW, WALL).is_err());
+    for wrong in [
+        line(1.5, 0.9, None),
+        line(0.0, -0.1, None),
+        line(0.0, 0.9, Some(2.0)),
+    ] {
+        assert!(adapter().with_tone(true).ingest(&wrong, NOW, WALL).is_err());
+    }
+}
