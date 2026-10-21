@@ -152,6 +152,8 @@ pub const DEFAULT_TARGET: &str = "office";
 pub const START: &str = "start_agent_task";
 pub const CONFIRM: &str = "confirm_agent_task";
 pub const CHECK: &str = "check_agent_task";
+/// [`START`]'s parameter that names who does the work.
+pub const WHO: &str = "who";
 /// A yes counts this long after the task was prepared.
 pub const CONFIRM_WITHIN: Duration = Duration::from_secs(120);
 /// The longest task text the tasks part takes.
@@ -291,15 +293,16 @@ const NOT: [&str; 3] = ["not", "never", "dont"];
 /// ("should I ask Claude Code to …").
 const SHOULD_I: [&str; 3] = ["should", "shall", "do"];
 
-/// The one of the staff whose name the person's own words ask to do
-/// something (#1722, `LAMP_TASKS_NAMED_ASK`): "ask/tell/get/have <name> to
+/// Each of the staff whose name the person's own words ask to do
+/// something (#1722, `LAMP_TASKS_NAMED_ASK`), once each, in the order the
+/// words first ask them (empty for none): "ask/tell/get/have <name> to
 /// …", or "can/could you ask/get <name> …". The name is the agent's own,
 /// whole ("Claude Code", "Codex"), of the staff as last read, or the one who
 /// does the work when none is read. A mention is none: "I told Claude Code
 /// yesterday", "is Codex done?", "what did Claude Code say?", "did you ask
 /// Codex to …", a negation right before the verb ("don't ask …", "never
 /// ask …") or a question to oneself ("should I ask …"); nor a name garbled ("Claude Co") or not of the staff.
-pub fn named_ask(place: &Place, heard: &str) -> Option<&'static str> {
+pub fn named_ask(place: &Place, heard: &str) -> Vec<&'static str> {
     let staff = staff_now(place);
     let names: Vec<&'static str> = if staff.is_empty() {
         vec![CLAUDE_CODE]
@@ -312,6 +315,7 @@ pub fn named_ask(place: &Place, heard: &str) -> Option<&'static str> {
         .map(str::to_lowercase)
         .collect();
     let word = |at: Option<usize>| at.and_then(|at| words.get(at)).map(String::as_str);
+    let mut asked: Vec<(usize, &'static str)> = Vec::new();
     for name in names {
         let said: Vec<String> = name.split(' ').map(str::to_lowercase).collect();
         for at in 1..words.len() {
@@ -335,11 +339,13 @@ pub fn named_ask(place: &Place, heard: &str) -> Option<&'static str> {
             }
             let to = word(Some(at + said.len())) == Some("to");
             if to || (you && CAN_YOU.contains(&before_you) && ASKING_THE_LAMP.contains(&verb)) {
-                return Some(name);
+                asked.push((at, name));
+                break;
             }
         }
     }
-    None
+    asked.sort_by_key(|(at, _)| *at);
+    asked.into_iter().map(|(_, name)| name).collect()
 }
 
 /// The staff as if the tasks part had answered with these `(alias,
@@ -2269,8 +2275,14 @@ pub(crate) mod tests {
                 "Claude Code",
             ),
             ("Why don't you ask Codex to check it?", "Codex"),
+            // b0701 on lamp-4ace (#1722, 07:19): a place between the name
+            // and "to", after "can you ask".
+            (
+                "Hey Lamp, can you ask Claude Code on my office computer to write a short story, about two hundred words, about a desk lamp that learns to sing?",
+                "Claude Code",
+            ),
         ] {
-            assert_eq!(asked(heard), Some(who), "{heard}");
+            assert_eq!(asked(heard), vec![who], "{heard}");
         }
         for heard in [
             "I told Claude Code yesterday.",
@@ -2297,15 +2309,33 @@ pub(crate) mod tests {
             "Shall I ask Codex to look at it?",
             "Do I tell Claude Code to stop?",
         ] {
-            assert_eq!(asked(heard), None, "{heard}");
+            assert!(asked(heard).is_empty(), "{heard}");
+        }
+        // The reviewer on #2410: a line that asks two of the staff gives
+        // both, in the order the words ask them.
+        for (heard, who) in [
+            (
+                "Hey Lamp, ask Codex to check the build and ask Claude Code to write a poem.",
+                vec!["Codex", "Claude Code"],
+            ),
+            (
+                "Tell Claude Code to fix it, then tell Codex to review it, and ask Claude Code to push it.",
+                vec!["Claude Code", "Codex"],
+            ),
+            (
+                "Don't ask Codex to do it, ask Claude Code to do it.",
+                vec!["Claude Code"],
+            ),
+        ] {
+            assert_eq!(asked(heard), who, "{heard}");
         }
         // With none of the staff read, the one who does the work.
         STAFF.lock().unwrap().clear();
         assert_eq!(
             asked("ask Claude Code to write a poem"),
-            Some("Claude Code")
+            vec!["Claude Code"]
         );
-        assert_eq!(asked("ask Codex to write a poem"), None);
+        assert!(asked("ask Codex to write a poem").is_empty());
     }
 
     /// The reviewer on #1446: a named member keeps its own engine through

@@ -15,8 +15,8 @@ mod tts;
 pub mod weather;
 
 pub use chat::{
-    Chat, ChatEvent, ChatStream, Declare, Force, GEMINI_REASONING, Message, Narrow, ToolCall,
-    cache_counts,
+    Chat, ChatEvent, ChatStream, Declare, Force, Forced, GEMINI_REASONING, Message, Narrow,
+    ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;

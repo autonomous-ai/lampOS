@@ -43,8 +43,8 @@ chat đầu tiên của một câu nói có tin nhắn cuối là lời người
 đích danh một người trong đội làm việc gì, sẽ được gửi kèm
 `tool_choice: {"type": "function", "function": {"name": "start_agent_task"}}`
 (`agent_tasks::named_ask`, `second_provider::worker::named_asks`,
-`net::Chat::forcing`). Mô hình vẫn tự viết nội dung việc và `who`, nhưng không
-thể từ chối giao việc hay tự làm. Lượt sau một lần gọi kết thúc bằng kết quả
+`net::Chat::forcing`). Mô hình vẫn tự viết nội dung việc, nhưng không thể từ
+chối giao việc hay tự làm. Lượt sau một lần gọi kết thúc bằng kết quả
 của lần gọi đó, và được hỏi như trước.
 
 - **Là lời nhờ:** "ask", "tell", "get" hoặc "have" đứng ngay trước tên đầy đủ
@@ -74,6 +74,45 @@ của lần gọi đó, và được hỏi như trước.
   "What's two plus two?", chat DeepSeek qua relay (tắt chế độ suy nghĩ) gọi
   đúng hàm mà `tool_choice` chỉ định 3 trên 3 lần, và 0 trên 3 lần khi không có
   `tool_choice`.
+- **Ai làm** (lượt thử phát b0701 trên lamp-4ace, #1722, 2026-10-21 07:19):
+  khi bị ép gọi, câu "Hey Lamp, can you ask Claude Code on my office computer
+  to write a short story …" lại đi đến Codex. Lời nói có khớp (Claude Code),
+  nhưng lệnh ép chỉ nêu tên hàm, nên `who` là do mô hình chọn. Giờ đây, trong
+  lượt bị ép, `start_agent_task` chỉ được cho biết agent mà lời nói nêu tên:
+  `enum` của `who` chỉ còn đúng giá trị đó, và `who` là bắt buộc
+  (`net::Forced`). Một lần gọi ở lượt 1 có `who` là agent khác, hoặc bỏ trống,
+  sẽ được giao cho agent được nêu tên trước khi phần tasks chuẩn bị nó
+  (`second_provider::Engine::asking_by_name`).
+- **Nhờ nhiều người** (người review trên #2410: câu "Hey Lamp, ask Codex to
+  check the build and ask Claude Code to write a poem." giao cả hai lần gọi cho
+  Claude Code): `named_ask` trả về mọi agent trong đội mà lời nói nhờ, mỗi
+  agent một lần, theo thứ tự lời nói nhờ họ. Khi có từ hai agent trở lên, lượt
+  1 vẫn bị ép gọi `start_agent_task`, nhưng `who` được cho biết như đã khai
+  báo, không ghim giá trị nào. Mỗi lần gọi ở lượt 1 có `who` là một trong các
+  agent được nhờ thì giữ nguyên. Một lần gọi bỏ trống `who`, hoặc nêu một agent
+  mà lời nói không nhờ, được giao cho agent được nhờ đầu tiên, theo thứ tự lời
+  nói, mà chưa lần gọi nào ở lượt 1 nêu tên, nếu không thì cho agent được nhờ
+  đầu tiên (`second_provider::given_to_the_named`). Vậy hai việc trong một câu,
+  một việc nêu Codex và một việc bỏ trống, mỗi agent nhận một việc, chứ không
+  phải cả hai cùng về agent được nêu đầu tiên.
+- **Nhật ký**, mỗi câu một dòng, không có lời nói nào: `named ask: matched
+  <agent>` (nhiều agent thì theo thứ tự lời nói: `matched Codex, Claude Code`),
+  kèm, với mỗi agent được giao một lần gọi, `; the call named another agent,
+  given to <agent>` hoặc `; the call named nobody, given to <agent>`; `named ask: no
+  match (<n> words)`; `named ask: matched <agent>, not applied: round 1 called
+  <các hàm>, not start_agent_task` (hoặc `answered in words`); và với một câu
+  bị giữ lại, `named ask: matched <agent>, not applied: the line is held`.
+- **Nói đè lên giọng đèn** (b0701, request 58: "Hey Lamp, ask Codex to write a
+  haiku about coffee.", nói khi đèn đang nói, nghe thấy một cụm từ dừng, rồi
+  `not_for_me`): mọi câu mà tuyến thứ hai trả lời đều bị ép theo cùng một cách.
+  Khi nói đè lên giọng đèn, sau một lần dừng, hay như một cuộc trò chuyện đang
+  diễn ra, các ghi chú đứng trước lời người dùng, và lời người dùng vẫn ở cuối.
+  Lời của câu đó có khớp (Codex), và relay giữ `tool_choice` (ở trên). Vậy rất
+  có thể request 58 đã được hỏi bằng lời khác. Một cụm từ dừng nghe được khi
+  đèn đang nói sẽ bỏ câu đang được nghe cho đến hết câu (`coordinator/hand.rs`,
+  `cancel`, rồi `InputAdmission::abandon_until_end`), nên request kế tiếp có
+  thể chỉ là phần còn lại của lời đã nói. Giờ dòng nhật ký cho thấy là trường
+  hợp nào: `no match` kèm số từ, hoặc `matched` và lượt 1 đã làm gì.
 
 **Probe** (`cargo run -p lamp-voice --example probe_handover`, chạy ở nơi voice
 chạy, bằng quyền root, với các công tắc tasks của unit voice): mỗi lời nhờ đã
