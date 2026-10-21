@@ -134,6 +134,7 @@ Seventh borrows it this morning. Fifth offered (07:4x on #1722) to take runs the
 | `lamp-eyes` `LAMP_PRESENCE` | #1677 | The light out about 10 minutes after the last face, over 30 s; back within a second of sitting or speaking; someone reading face down for 15 minutes never put out; the eyes' CPU before and after. | the person's face | lamp-voice |
 | `lamp-eyes` `LAMP_PRESENCE_FAR` | #1678 | The light-out run again with a far face in view: nobody within about 24 s of the sitter leaving, a person walking up still someone, leaning back still someone. | the person, and a far face | lamp-voice |
 | `lamp-skills` `LAMP_WHO_WAS_HERE_KNOWN` | #1685 | A remembered person at the desk is "someone the lamp knows" in the answer, a stranger is "someone", and no name is said. | two people's faces, one remembered | lamp-voice |
+| `LAMP_MEMORY_EVENTS` (Twelve, with `LAMP_MEMORY_OBSERVE` and `LAMP_MEMORY_THREADS`) | #1693 | The Mac plays a known person: "my sister's wedding is on Saturday". The observation is kept with that Saturday's date (`on`). A session for them before that day is told nothing of it; after the day (across a clock change, or the day stubbed) one is told it once, with "(it was on Saturday …: ask how it went)", and the model asks how it went; a later session that day is told nothing. | nothing (played); a known face | #1712 |
 
 ## lamp-06c1 (El, Jarvis)
 

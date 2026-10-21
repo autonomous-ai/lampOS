@@ -659,14 +659,18 @@ pub fn observer_at(base: &str, model: &str, key: &str) -> io::Result<crate::reme
 }
 
 /// One observation pass: the prompt, the job as quoted data, and the
-/// model's whole answer read as [`crate::remember::observe_output`].
+/// model's whole answer read as [`crate::remember::observe_output`]. A job
+/// given its day (`"today"`, `LAMP_MEMORY_EVENTS`) is asked for an event's
+/// day too ([`crate::remember::observe_prompt`]); any other as before.
 async fn ask_observations(
     chat: &crate::second_provider::net::Chat,
     input: &serde_json::Value,
 ) -> Option<serde_json::Value> {
     let mut stream = chat
         .send(&[
-            Message::system(crate::remember::OBSERVE_PROMPT),
+            Message::system(crate::remember::observe_prompt(
+                input.get("today").is_some(),
+            )),
             Message::user(input.to_string()),
         ])
         .await

@@ -70,3 +70,10 @@ CREATE TABLE IF NOT EXISTS follow_ups (
     person TEXT NOT NULL,
     asked_unix_ms INTEGER NOT NULL
 );
+-- #1693: the local day, YYYY-MM-DD, a thread or promise is about (`on` in a
+-- tidy proposal). Its row goes with the observation when that is forgotten
+-- or expires. Older builds pass this table over.
+CREATE TABLE IF NOT EXISTS event_days (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    day TEXT NOT NULL
+);

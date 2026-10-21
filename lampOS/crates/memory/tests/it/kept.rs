@@ -212,5 +212,8 @@ fn each_kept_database_opens_with_what_it_held() {
                 .any(|found| found == "kept||The bread takes ten minutes"),
             "{day}: {heard:?}"
         );
+        // A store from before #1693's event days: the table is made on
+        // open, and a follow-up with `events` answers.
+        assert_eq!(days.follow_up_with(&an, true).unwrap(), None, "{day}");
     }
 }

@@ -28,6 +28,9 @@ pub const FOLLOW_UP_AFTER_MS: u64 = 6 * 3_600_000;
 pub const FOLLOW_UP_WITHIN_MS: u64 = 14 * 86_400_000;
 /// At most one follow-up a day for a person, so open threads never nag.
 pub const FOLLOW_UP_EVERY_MS: u64 = 86_400_000;
+/// An observation with an event day is asked about at most this many local
+/// days after it, instead of [`FOLLOW_UP_WITHIN_MS`] from when it was said.
+pub const FOLLOW_UP_WITHIN_DAYS: u32 = 14;
 pub const NOTE_BYTES: usize = 1200;
 pub const UNUSED_DAYS: u64 = 30;
 pub const MAX_RECORDS: u64 = 50_000;
@@ -1019,8 +1022,24 @@ impl Days {
     /// [`FOLLOW_UP_EVERY_MS`]. The one given is recorded as given in the
     /// same transaction: once, even if the moment never comes. The room's
     /// scope and a rules scope have none: a lamp that can't tell who is
-    /// there never asks one person about another's week.
+    /// there never asks one person about another's week. Event days are
+    /// passed over: [`Self::follow_up_with`] without `events`.
     pub fn follow_up(&mut self, person: &Person) -> Result<Option<serde_json::Value>> {
+        self.follow_up_with(person, false)
+    }
+
+    /// [`Self::follow_up`], and with `events` (the voice's
+    /// `LAMP_MEMORY_EVENTS`) an observation with an event day (`event_days`)
+    /// is asked about after it: from the local day after its event day to
+    /// [`FOLLOW_UP_WITHIN_DAYS`] after it, never on the day itself or
+    /// before, whenever it was said. An undated one keeps its rules. A
+    /// dated one comes first, then the newest; once, and one a day, as
+    /// ever. The answer carries a dated one's `on`.
+    pub fn follow_up_with(
+        &mut self,
+        person: &Person,
+        events: bool,
+    ) -> Result<Option<serde_json::Value>> {
         if person.as_str() == Person::EVERYONE || person.as_str().starts_with("r-") {
             return Err(Error::new(
                 "bad_person",
@@ -1037,18 +1056,40 @@ impl Days {
         if lately.is_some_and(|at| now.saturating_sub(at) < FOLLOW_UP_EVERY_MS) {
             return Ok(None);
         }
-        let found: Option<(i64, u64, String, String)> = tx
-            .query_row(
+        let found: Option<(i64, u64, String, String, Option<String>)> = if events {
+            let today = Day::at(now, &self.local).ok_or_else(|| {
+                Error::new("bad_time", "the timestamp is outside 1970 through 9999")
+            })?;
+            // Days are `YYYY-MM-DD`, so text order is day order.
+            let earliest = today
+                .before(FOLLOW_UP_WITHIN_DAYS)
+                .map(|day| day.to_string())
+                .unwrap_or_default();
+            tx.query_row(
+                "SELECT e.rid,e.id,e.text,e.category,d.day FROM entries e LEFT JOIN event_days d ON d.rid=e.rid WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) AND ((d.day IS NULL AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3) OR (d.day<?4 AND d.day>=?5)) ORDER BY d.day IS NULL,e.at_unix_ms DESC,e.id DESC LIMIT 1",
+                params![
+                    person.as_str(),
+                    now.saturating_sub(FOLLOW_UP_AFTER_MS),
+                    now.saturating_sub(FOLLOW_UP_WITHIN_MS),
+                    today.to_string(),
+                    earliest
+                ],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .optional()?
+        } else {
+            tx.query_row(
                 "SELECT e.rid,e.id,e.text,e.category FROM entries e WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3 AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT 1",
                 params![
                     person.as_str(),
                     now.saturating_sub(FOLLOW_UP_AFTER_MS),
                     now.saturating_sub(FOLLOW_UP_WITHIN_MS)
                 ],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, None)),
             )
-            .optional()?;
-        let Some((rid, id, text, category)) = found else {
+            .optional()?
+        };
+        let Some((rid, id, text, category, on)) = found else {
             return Ok(None);
         };
         tx.execute(
@@ -1056,9 +1097,11 @@ impl Days {
             params![rid, person.as_str(), now],
         )?;
         tx.commit()?;
-        Ok(Some(
-            serde_json::json!({"id":id,"category":category,"text":text}),
-        ))
+        let mut given = serde_json::json!({"id":id,"category":category,"text":text});
+        if let Some(on) = on {
+            given["on"] = on.into();
+        }
+        Ok(Some(given))
     }
 
     pub fn session_close(&mut self, person: &Person, session: &str) -> Result<()> {
@@ -1410,6 +1453,7 @@ impl Days {
                 .map(|record| record.at_unix_ms)
                 .max()
                 .ok_or_else(|| bad("an observation needs dated evidence"))?;
+            let on = event_day(proposal, at, &self.local)?;
             if let Some(old) = proposal.supersedes {
                 let old = read_record(&tx, person, old)?
                     .ok_or_else(|| bad("the superseded observation is missing"))?;
@@ -1442,6 +1486,12 @@ impl Days {
                 &self.local,
                 self.now,
             )?;
+            if let Some(on) = on {
+                tx.execute(
+                    "INSERT INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
+                    params![person.as_str(), id, on.to_string()],
+                )?;
+            }
             ids.push(id);
         }
         tx.execute(
@@ -1544,7 +1594,8 @@ impl Days {
             moved.push((old, new));
         }
         // A moved observation asked about once is still asked about once,
-        // now as `to`'s: their pacing counts it.
+        // now as `to`'s: their pacing counts it. Its event day, by rid, is
+        // still its own.
         tx.execute(
             "UPDATE follow_ups SET person=?1 WHERE rid IN (SELECT rid FROM adopting)",
             [to.as_str()],
@@ -1806,6 +1857,35 @@ fn insert_record(db: &Connection, r: &Record, local: &LocalTime, used: u64) -> R
         )?;
     }
     Ok(())
+}
+/// At most this many days after its evidence's day, an event's day: a
+/// wedding next month, not a plan for next year.
+pub const EVENT_WITHIN_DAYS: u32 = 60;
+
+/// A proposal's event day (#1693), checked like the rest of a proposal: a
+/// bad one refuses the whole result, nothing kept. A real `YYYY-MM-DD`, of
+/// a `thread` or `promise` only (a preference has no day), from the local
+/// day of its newest evidence `at` to [`EVENT_WITHIN_DAYS`] after it.
+fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Result<Option<Day>> {
+    let Some(text) = proposal.on.as_deref() else {
+        return Ok(None);
+    };
+    if proposal.category == tidy::Category::Preference {
+        return Err(bad("only a thread or a promise has an event day"));
+    }
+    let on = Day::parse(text).ok_or_else(|| bad("an event day is a real YYYY-MM-DD"))?;
+    let said = Day::at(at, local)
+        .ok_or_else(|| Error::new("bad_time", "the timestamp is outside 1970 through 9999"))?;
+    if on < said
+        || on
+            .before(EVENT_WITHIN_DAYS)
+            .is_some_and(|start| start > said)
+    {
+        return Err(bad(
+            "an event day is from its evidence's day to 60 days after it",
+        ));
+    }
+    Ok(Some(on))
 }
 /// The label a plain fact carries in a session note, the one voice reads
 /// for a kept fact (`voice/src/remember.rs`).

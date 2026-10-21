@@ -893,6 +893,26 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::a_follow_up_is_one_open_thread_given_once_a_day_and_never_for_the_room`,
   `days::the_follow_up_request_answers_for_a_person_and_refuses_the_room`,
   `remember::tests::with_the_switch_a_known_person_s_session_is_told_one_thread_to_ask_about`.
+- **An event, with its day** (#1693, `LAMP_MEMORY_EVENTS=on`, with the
+  Days client only; off unless set; both voice routes). It acts only beside
+  `LAMP_MEMORY_OBSERVE` and `LAMP_MEMORY_THREADS`. The observation pass's
+  job, as the model gets it, has `"today": "<Weekday> YYYY-MM-DD"`, the
+  local day of the conversation's last record (`remember::observe_input`;
+  the memory never sees it), and the prompt one more sentence: a thread or
+  promise about an event on a day the cited words make clear also has
+  `"on":"YYYY-MM-DD"`, worked out from "today", and is left without it
+  when the day isn't clear, never guessed (`remember::observe_prompt`).
+  A thread's or promise's `on` goes to `tidy_apply`; any other is dropped.
+  The session's `follow_up` sends `"events": true`, so the memory gives a
+  dated one only after its day, with its `"on"`, and the session is told
+  "(it was on Saturday 24 October: ask how it went)" after its words, so
+  the model asks how it went, not how it's coming along. Off, the prompt,
+  the job, what goes to `tidy_apply` (every `on` stripped, so an older
+  memory never sees it) and the note are byte for byte as before. Tests:
+  `remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one`,
+  `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`,
+  `remember::tests::with_events_a_dated_follow_up_is_told_with_its_day`,
+  `local_time::tests::a_named_day_is_read_back_and_said_as_a_person_would`.
 - **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
   the second route only; off unless set). A Live session asks for the note
   each time it connects. The second route asked only when the person
