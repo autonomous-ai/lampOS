@@ -2,8 +2,8 @@ use lamp_bus::{Declaration, Header, Kind, Message};
 use lamp_mood::{
     engine::{Engine, Event, EventKind, FaceTarget, Reject},
     input::{
-        INPUTS, InputAdapter, InputError, MAX_PAYLOAD_BYTES, MAX_REMINDER_IDENTITIES,
-        MAX_RETIRED_PUBLISHERS,
+        BLENDSHAPES_HOLD_US, INPUTS, InputAdapter, InputError, MAX_PAYLOAD_BYTES,
+        MAX_REMINDER_IDENTITIES, MAX_RETIRED_PUBLISHERS,
     },
 };
 use lamp_msgs::{
@@ -1103,6 +1103,78 @@ fn how_a_face_seems_is_taken_only_when_switched_on_and_as_its_kind() {
             .ingest(&wrong, NOW, WALL)
             .is_err()
     );
+}
+
+/// With both face readers on, taking turns on `humans/seems` (the measure's
+/// set-up), Mood takes Blendshape V2's reads and not FER+'s, so FER+'s
+/// never break the product reader's run (Ten's 75c9 run on #2602, 22 Oct
+/// 02:05: each FER+ smile was followed by Blendshape's `unsure`, and Mood
+/// never smiled). FER+ alone is taken as before, and again once Blendshape
+/// V2 has been quiet for `BLENDSHAPES_HOLD_US`.
+#[test]
+fn with_both_face_readers_only_blendshapes_is_taken() {
+    use lamp_msgs::SeemsKind;
+    let read = |kind: &str, from: &str, sequence: u64, elapsed_ms: u64| {
+        newer(
+            message(
+                10,
+                &serde_json::json!({"kind": kind, "confidence": 0.8, "from": from}),
+            ),
+            sequence,
+            elapsed_ms,
+        )
+    };
+    let mut input = adapter().with_seems(true);
+    let mut taken = Vec::new();
+    // Every 2 s, the readers in turn: Blendshape V2 smiles, FER+ is unsure
+    // or smiles too, and Blendshape smiles again.
+    for (n, (kind, from)) in [
+        ("positive", "blendshapes"),
+        ("unsure", "fer_plus"),
+        ("positive", "blendshapes"),
+        ("negative", "fer_plus"),
+        ("positive", "blendshapes"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let elapsed = n as u64 * 2_000;
+        let events = input
+            .ingest(
+                &read(kind, from, n as u64 + 1, elapsed),
+                NOW + elapsed * 1_000,
+                WALL + elapsed,
+            )
+            .unwrap();
+        taken.push(
+            events
+                .iter()
+                .map(|event| event.kind.clone())
+                .collect::<Vec<_>>(),
+        );
+    }
+    let smile = vec![EventKind::Seems(Some(SeemsKind::Positive))];
+    assert_eq!(taken, [smile.clone(), vec![], smile.clone(), vec![], smile]);
+    // Blendshape V2 quiet for the hold: FER+ is taken again.
+    let quiet = 8_000 + BLENDSHAPES_HOLD_US / 1_000;
+    let events = input
+        .ingest(
+            &read("negative", "fer_plus", 6, quiet),
+            NOW + quiet * 1_000,
+            WALL + quiet,
+        )
+        .unwrap();
+    assert_eq!(events[0].kind, EventKind::Seems(Some(SeemsKind::Negative)));
+    // FER+ alone, with no `from` (its messages before the field): taken.
+    let alone = message(
+        10,
+        &serde_json::json!({"kind": "positive", "confidence": 0.8}),
+    );
+    let events = adapter()
+        .with_seems(true)
+        .ingest(&alone, NOW, WALL)
+        .unwrap();
+    assert_eq!(events[0].kind, EventKind::Seems(Some(SeemsKind::Positive)));
 }
 
 /// A kept add-on's nudge (#2530): taken only from the add-ons' judge, on

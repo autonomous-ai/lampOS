@@ -35,6 +35,27 @@ pub const EXPRESSIONS: [&str; 8] = [
 ];
 /// A face is read at most this often.
 pub const READ_EVERY: Duration = Duration::from_secs(2);
+/// A face is read only with its eyes at least this far apart, in the look's
+/// pixels: under it, a read says nothing but `unsure` (Ten on #2602, 22 Oct
+/// 02:4x: a smile Blendshape V2 reads 0.87 with the eyes 9.9 px apart reads
+/// 0.18 at 7.0), and an `unsure` would break Mood's run of reads. A far
+/// face gets no read instead.
+pub const READ_EYES_PX: f32 = 10.0;
+
+/// The face to read: the largest at or over [`crate::who::NEAR_ENOUGH`] of
+/// the picture's height `tall`, with its eyes at least [`READ_EYES_PX`]
+/// apart; none if there is none.
+pub fn near_face(faces: &[crate::faces::Face], tall: f32) -> Option<(usize, &crate::faces::Face)> {
+    faces
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| {
+            let ((left_x, left_y), (right_x, right_y)) = (face.marks[0], face.marks[1]);
+            face.height / tall.max(1.0) >= crate::who::NEAR_ENOUGH
+                && (right_x - left_x).hypot(right_y - left_y) >= READ_EYES_PX
+        })
+        .max_by(|a, b| a.1.height.total_cmp(&b.1.height))
+}
 /// A kind is named only at or over this share of the eight; under it, the
 /// read is `unsure`. Authored, to be set from the week's measure (#1671).
 pub const NAMED_FROM: f32 = 0.6;
@@ -162,6 +183,47 @@ impl Reader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A face this tall in a 240-high look, its eyes `eyes` px apart.
+    fn face(height: f32, eyes: f32) -> crate::faces::Face {
+        crate::faces::Face {
+            score: 0.9,
+            x: 100.0,
+            y: 60.0,
+            width: height * 240.0,
+            height: height * 240.0,
+            marks: [
+                (140.0, 90.0),
+                (140.0 + eyes, 90.0),
+                (0.0, 0.0),
+                (0.0, 0.0),
+                (0.0, 0.0),
+            ],
+        }
+    }
+
+    /// The face read is the largest near one whose eyes are at least
+    /// [`READ_EYES_PX`] apart: one just under the line gets no read, so a
+    /// far face never says `unsure` to Mood.
+    #[test]
+    fn only_a_near_face_with_its_eyes_far_enough_apart_is_read() {
+        let over = face(0.12, 10.2);
+        let under = face(0.12, 9.8);
+        assert_eq!(near_face(&[over], 240.0).map(|(at, _)| at), Some(0));
+        assert_eq!(near_face(&[under], 240.0), None);
+        // Under the line, a larger face is passed over for one that's over.
+        let larger_under = face(0.2, 9.8);
+        assert_eq!(
+            near_face(&[larger_under, over], 240.0).map(|(at, _)| at),
+            Some(1)
+        );
+        // Too small a share of the picture, however far apart its eyes.
+        assert_eq!(near_face(&[face(0.09, 12.0)], 240.0), None);
+        // A turned line between the eyes counts its length, not its width.
+        let mut turned = face(0.12, 0.0);
+        turned.marks[1] = (140.0 + 7.5, 90.0 + 7.5);
+        assert!(near_face(&[turned], 240.0).is_some());
+    }
 
     fn even(value: f32) -> Vec<f32> {
         vec![value; 3 * ALIGNED * ALIGNED]
