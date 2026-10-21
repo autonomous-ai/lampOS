@@ -348,6 +348,13 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     for line in super::quality::verdict(&super::quality::ask(&today, &character, runs).await) {
         println!("{line}");
     }
+    println!(
+        "tools: says kept with no remember call, {} lines, {runs} runs each (#2510)",
+        super::says_kept::LINES.len()
+    );
+    for line in super::says_kept::verdict(&super::says_kept::ask(&today, &character, runs).await) {
+        println!("{line}");
+    }
     Ok(())
 }
 
