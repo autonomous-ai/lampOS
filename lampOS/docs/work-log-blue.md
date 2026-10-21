@@ -368,3 +368,22 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - `addon-say.sh` on 4ace (the first builder's);
   - the full path on 75c9 with `blue-lamp2.sh`, on lamp-voice's ARM64 build of `8826f0bf2`;
   - #2640's light-set-off case, which needs my person's yes.
+
+## 22 Oct, 04:2x–04:4x: `move` up as #2738
+
+- **First builder (04:25),** answering my shape on #2530:
+  - only `nod`, `curious` and `stretching`;
+  - in now, behind `LAMP_ADDONS`;
+  - one per add-on in 30 min, 2 an hour, and never within 60 s of talk.
+- **Built as #2738** (`4b6cb99df`):
+  - `ADDON_GESTURES` in lamp-msgs;
+  - three new drops in the judge;
+  - a kept move goes as one idle gesture on the body's mood socket (`--body-socket`, test-only `--move-quiet-ms`);
+  - unit tests, two e2e tests (a mutant fails one), and a skills load test;
+  - docs, and a lamp-runs row on 4ace with someone at the arm.
+- **Gate:**
+  - fmt and workspace clippy are clean;
+  - the add-on-type crates (cloud, update, skills, msgs, addons) pass;
+  - one daily-journal lock race in lamp-skills under load passed alone three times;
+  - the full workspace run was stopped for low memory, so CI is the full gate.
+- The ARM64 build of `8826f0bf2` is staged for the morning's 75c9 row.
