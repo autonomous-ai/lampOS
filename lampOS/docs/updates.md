@@ -646,7 +646,10 @@ storage location, certify arbitrary unit overrides or protect against an
 administrator changing recovery afterward. The `systemctl show` query uses
 `output_within` with the existing 5 s `JOURNAL_WITHIN` command deadline. A
 failed or timed-out query defers self-update just as unavailable recovery
-does. It does not enable or start the recovery timer.
+does. It does not enable or start the recovery timer. With the switch on in
+`lamp-cloud`'s environment as well, a health report says lamp-update waits
+while the timer is not armed (`waits`, `cloud.md`, "Health and crash
+reports").
 
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of

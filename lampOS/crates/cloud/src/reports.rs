@@ -362,6 +362,30 @@ pub struct HealthBody {
     pub selftest: Option<SelfTestSummary>,
     /// Each unit's restarts since boot, [`UNITS`] only.
     pub restarts: BTreeMap<&'static str, u32>,
+    /// A unit that waits, and why, both fixed text ([`update_waits`]).
+    /// Left out when nothing waits, so a report without it is unchanged.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub waits: BTreeMap<&'static str, &'static str>,
+}
+
+/// The self-update switch, as `lamp-update.service` reads it (#2709). Set
+/// in `lamp-cloud`'s environment too, it asks whether lamp-update waits.
+pub const UPDATE_SELF_ENVIRONMENT: &str = "LAMP_UPDATE_SELF";
+/// The armed way back lamp-update requires before it switches itself.
+pub const RECOVERY_TIMER: &str = "lamp-update-back.timer";
+/// Why lamp-update waits, as its own journal line begins it (#2709).
+pub const RECOVERY_NOT_READY: &str =
+    "independent recovery is not ready: no armed lamp-update-back.timer";
+
+/// Whether lamp-update's self-update waits, from `systemctl show -p
+/// LoadState -p UnitFileState -p ActiveState` of [`RECOVERY_TIMER`]: unless
+/// it is loaded, persistently enabled and active, lamp-update refuses to
+/// hand over (`update/src/world.rs`, which also checks the fallback and its
+/// service; this reads only the timer).
+pub fn update_waits(show: &str) -> bool {
+    let fields = shown(show);
+    let is = |key: &str, value: &str| fields.get(key).is_some_and(|v| v == value);
+    !(is("LoadState", "loaded") && is("UnitFileState", "enabled") && is("ActiveState", "active"))
 }
 
 /// systemd's `$SERVICE_RESULT`, past `success`.
@@ -523,6 +547,8 @@ pub struct Seen {
     pub selftest: Option<SelfTest>,
     /// `systemctl show`'s output for the units.
     pub restarts: BTreeMap<&'static str, u32>,
+    /// What waits ([`HealthBody::waits`]).
+    pub waits: BTreeMap<&'static str, &'static str>,
 }
 
 /// The health part of a report, from what was seen: names by the lists only.
@@ -600,6 +626,7 @@ pub fn health_body(seen: &Seen) -> HealthBody {
         down_for_s: seen.online.as_ref().and_then(|online| online.down_for_s),
         selftest,
         restarts: seen.restarts.clone(),
+        waits: seen.waits.clone(),
     }
 }
 
@@ -1671,6 +1698,10 @@ pub trait Sources {
     fn restarts(&mut self) -> BTreeMap<&'static str, u32> {
         BTreeMap::new()
     }
+    /// The units that wait, and why ([`HealthBody::waits`]).
+    fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
+        BTreeMap::new()
+    }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
     /// Asks taken from `reports/request` since the last look.
@@ -1761,6 +1792,7 @@ pub fn step(
                 timing.next_health = now + HEALTH_EVERY;
             }
             seen.restarts = sources.restarts();
+            seen.waits = sources.waits();
             put |= shared
                 .with(|reports| reports.health(now_s, build, &seen))
                 .is_some();
@@ -1812,6 +1844,8 @@ const REQUESTS_NAME: &str = "cloud_reports";
 pub struct Lamp {
     pub bus: Option<lamp_bus::Bus>,
     pub systemctl: PathBuf,
+    /// [`UPDATE_SELF_ENVIRONMENT`] is `on`.
+    pub update_self: bool,
     requests: Option<lamp_bus::Subscriber>,
     requests_refused: bool,
     state: Option<lamp_bus::Publisher>,
@@ -1823,6 +1857,7 @@ impl Lamp {
         Self {
             bus,
             systemctl: "/usr/bin/systemctl".into(),
+            update_self: switched_on(std::env::var(UPDATE_SELF_ENVIRONMENT).ok().as_deref()),
             requests: None,
             requests_refused: false,
             state: None,
@@ -1852,7 +1887,33 @@ impl Sources for Lamp {
                 .latest::<SelfTest>(SelfTest::TOPIC)
                 .map(|(test, _)| test),
             restarts: BTreeMap::new(),
+            waits: BTreeMap::new(),
         }
+    }
+
+    /// Only with the self-update switch on, asked of systemd within
+    /// [`SYSTEMCTL_WITHIN`]; a query that fails says nothing.
+    fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
+        let mut waits = BTreeMap::new();
+        if self.update_self
+            && bounded_output(
+                &self.systemctl,
+                &[
+                    "show",
+                    "-p",
+                    "LoadState",
+                    "-p",
+                    "UnitFileState",
+                    "-p",
+                    "ActiveState",
+                    RECOVERY_TIMER,
+                ],
+            )
+            .is_some_and(|show| update_waits(&show))
+        {
+            waits.insert("lamp-update.service", RECOVERY_NOT_READY);
+        }
+        waits
     }
 
     /// Asked of systemd at most once a minute, within
@@ -2326,6 +2387,7 @@ pub(crate) mod tests {
             restarts: restarts(
                 "Id=lamp-voice.service\nNRestarts=0\n\nId=Alice.service\nNRestarts=4\n\nId=lamp-eyes.service\nNRestarts=1\n",
             ),
+            waits: BTreeMap::new(),
         }
     }
 

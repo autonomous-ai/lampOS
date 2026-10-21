@@ -728,7 +728,16 @@ Every report has:
   (`lamp/online`), `selftest` (`{verdict, failed, other_failed,
   not_checked, build}`, part names only, never a reason or a value) and
   `restarts` (each unit's `NRestarts` since boot, asked of `systemctl show`
-  within 2 s, at most once a minute).
+  within 2 s, at most once a minute), and `waits`, only when something waits
+  (`{unit: why}`, both fixed text): with `LAMP_UPDATE_SELF=on` in
+  `lamp-cloud`'s own environment too, `systemctl show` of
+  `lamp-update-back.timer` within 2 s, and unless it is loaded, persistently
+  enabled and active, `{"lamp-update.service": "independent recovery is not
+  ready: no armed lamp-update-back.timer"}`: lamp-update's self-update waits
+  for it (#2709, `updates.md`). It reads only the timer, not the fallback
+  file or its service, which lamp-update checks too; a query that fails says
+  nothing. Off (the switch unset), the field is left out and nothing is
+  asked. An added field, so still `lamp-report/1`.
 - **`crash`** adds `unit`, `result` (systemd's `$SERVICE_RESULT`:
   `exit-code`, `signal`, `core-dump`, `watchdog`, `timeout`, `oom-kill`,
   `start-limit-hit`, or `other`), `exit_code` (with `$EXIT_CODE=exited`),
