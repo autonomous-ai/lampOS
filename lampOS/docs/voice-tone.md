@@ -118,8 +118,9 @@ isn't taken here: it sends a person's voice to a server for every line.
     the line they were heard in, and the forget reads the same whole line
     (Thirteen's c0a4 run on #1722, 21 Oct: before this, a forget there
     never let the baseline go, and no duplex line was told with its words).
-  - Words heard while another line is the lamp's are taken for that line's,
-    so a reading still waiting for its own is told without them.
+  - Words heard while a later line is the lamp's are taken for that line's:
+    kept for its reading, as below, and a reading still waiting isn't told
+    for them.
   - A line whose words never come is told without them at the next End.
   - Told without words, it's still recorded (`voice_tone`, `words: false`),
     so the records and the bus agree.
@@ -127,6 +128,26 @@ isn't taken here: it sends a person's voice to a server for every line.
     the next line has ended are taken for that next line's.
   - An End whose request never went (a sound, a line given up) clears the
     meter.
+- **A line that goes on** (the first builder on #2602, 21 Oct 21:49, from
+  lamp-75c9's played calm lines: a pause made them two Ends, and only the
+  second, words-only half read calm). A line begun within 1.5 s
+  (`GOES_ON_US`, the voice's own `CARRY_AFTER_END`) of the last one's End,
+  with the lamp not yet answering, goes on from it. It's read as one line,
+  from the first one's first speech to its own last:
+  - **The meter** keeps the line it read last for that long. A line that
+    goes on takes its blocks first, then what came between, and its End
+    reads over all of them. A sound let through, or the lamp beginning to
+    answer, lets the kept line go.
+  - **The baseline** takes the line in once: at the second End it's put
+    back as it was before the first (`TonePending::before`), unless a
+    forget came in between, which is kept.
+  - **Told once,** under the last turn, with every part's words, and
+    `went_on_from` (the first turn) in that End's `tone`. The line before
+    isn't told.
+  - **So a line's tone waits** until its words have come and no line can
+    go on from it: until the lamp answers, or for 1.5 s after its End. A
+    later line's words heard before its own End (the duplex route's early
+    pieces) are kept for its reading, and don't tell the one waiting.
 
 ## What reads it
 

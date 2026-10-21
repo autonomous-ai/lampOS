@@ -4664,19 +4664,45 @@ impl ToneLine {
 fn tone_line_over(
     line: &str,
     heard_in: Option<u64>,
-    pending: &mut Option<(u64, crate::voice_tone::Reading)>,
+    held: &mut ToneHeld,
     baselines: &mut crate::voice_tone::Baselines,
     person: Option<&str>,
-    out: Option<&mut crate::bus_out::ToneOut>,
     trace: &mut SessionState,
 ) -> Result<()> {
-    if let Some((turn, reading)) = pending.take() {
-        let words = (heard_in == Some(turn)).then_some(line);
-        tell_tone(trace, out, turn, reading, words)?;
+    let ToneHeld {
+        reading: pending,
+        later,
+    } = held;
+    let held_turn = pending.as_ref().map(TonePending::turn);
+    if let Some(held) = pending.as_mut()
+        && heard_in.is_some_and(|turn| held.turns.contains(&turn))
+    {
+        held.heard(line, heard_in == Some(held.turn()));
+    } else if let (Some(turn), Some(held_turn)) = (heard_in, held_turn)
+        && turn > held_turn
+    {
+        // A later line's words, before its End: kept for its reading, which
+        // may yet go on from the one waiting, so that one isn't told for
+        // them.
+        let words = later.get_or_insert_with(|| (turn, String::new()));
+        if words.0 == turn && words.1.len() + line.len() < TONE_LINE_BYTES {
+            words.1.push_str(line);
+        }
+    } else if let Some(held) = pending.as_mut() {
+        // Words of no lamp line, or an older one's: not its own, so its own
+        // are taken as not coming. It is told as it falls due, never here,
+        // so a line that still goes on from it is taken in once (the
+        // reviewer-lead's P3 on #2670).
+        held.worded = true;
     }
     let Some(forget) = crate::voice_tone::forgets(line) else {
         return Ok(());
     };
+    // A forget is kept: a line that goes on puts back no baseline from
+    // before it.
+    if let Some(held) = pending.as_mut() {
+        held.before = None;
+    }
     let all = forget == crate::voice_tone::Forget::All;
     if all {
         baselines.forget_all();
@@ -4692,6 +4718,73 @@ fn tone_line_over(
                 crate::voice_tone::Whose::Room
             }),"at_us":monotonic_us()}),
     )
+}
+
+/// What the voice holds of the person's lines for their tone: the reading
+/// waiting to be told, and a later line's words heard before its End.
+#[derive(Debug, Default)]
+struct ToneHeld {
+    reading: Option<TonePending>,
+    later: Option<(u64, String)>,
+}
+
+/// A line's reading, waiting to be told: until its words come, and for
+/// [`crate::voice_tone::GOES_ON_US`] after its End, since a line that goes
+/// on from it is read over both and told once, under the last one's turn
+/// (the first builder on #2602, 21 Oct 21:49). In memory only.
+#[derive(Debug)]
+struct TonePending {
+    /// The turns its line was heard in, the first first: one, or more when
+    /// a line went on from the one before.
+    turns: Vec<u64>,
+    reading: crate::voice_tone::Reading,
+    ended_us: u64,
+    /// Its words so far, from any of its turns, and whether its last turn's
+    /// have come.
+    words: Option<String>,
+    worded: bool,
+    /// The baselines before its line was taken in, put back when the next
+    /// line goes on from it; none once a forget came, which is kept.
+    before: Option<crate::voice_tone::Baselines>,
+}
+
+impl TonePending {
+    /// The turn it is told under: its last.
+    fn turn(&self) -> u64 {
+        self.turns.last().copied().unwrap_or_default()
+    }
+
+    /// Words heard in one of its turns, its last turn's if `last`.
+    fn heard(&mut self, line: &str, last: bool) {
+        let words = self.words.get_or_insert_with(String::new);
+        if words.len() + line.len() < TONE_LINE_BYTES {
+            if !words.is_empty() {
+                words.push(' ');
+            }
+            words.push_str(line);
+        }
+        self.worded |= last;
+    }
+
+    /// Whether it is told now, at `now_us`: its words have come, no line is
+    /// going on from it, and none can any more (the lamp answered, or the
+    /// line was let go) or the window for one has passed.
+    fn due(&self, now_us: u64, meter: Option<&crate::voice_tone::ToneMeter>) -> bool {
+        let going_on = meter.is_some_and(crate::voice_tone::ToneMeter::going_on);
+        let may_go_on = meter.is_some_and(crate::voice_tone::ToneMeter::may_go_on);
+        self.worded
+            && !going_on
+            && (!may_go_on || now_us.saturating_sub(self.ended_us) >= crate::voice_tone::GOES_ON_US)
+    }
+
+    fn tell(
+        self,
+        trace: &mut SessionState,
+        out: Option<&mut crate::bus_out::ToneOut>,
+    ) -> Result<()> {
+        let turn = self.turn();
+        tell_tone(trace, out, turn, self.reading, self.words.as_deref())
+    }
 }
 
 /// A line's tone told, in the session record and on the bus: with its
@@ -5199,8 +5292,9 @@ fn conversation_with_gate(
     if tone_on && let Some(given) = TEST_FORGOT_IN.with(|slot| slot.borrow_mut().take()) {
         forgot_in = Some(given);
     }
-    // A line's reading, waiting for its words: its turn and when it ended.
-    let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
+    // A line's reading, waiting for its words and for a line that goes on
+    // from it ([`TonePending`]).
+    let mut tone_held = ToneHeld::default();
     // The person's line so far: the duplex route hears a line in pieces and
     // marks none finished (Thirteen on #1722, 21 Oct), so a line's words
     // are put together to be read whole.
@@ -6710,10 +6804,9 @@ fn conversation_with_gate(
                             tone_line_over(
                                 &words,
                                 heard_in,
-                                &mut tone_pending,
+                                &mut tone_held,
                                 &mut tone_baselines,
                                 tone_person.as_deref(),
-                                tone_out.as_mut(),
                                 trace,
                             )?;
                         }
@@ -6722,10 +6815,9 @@ fn conversation_with_gate(
                             tone_line_over(
                                 &words,
                                 heard_in,
-                                &mut tone_pending,
+                                &mut tone_held,
                                 &mut tone_baselines,
                                 tone_person.as_deref(),
-                                tone_out.as_mut(),
                                 trace,
                             )?;
                         }
@@ -7267,6 +7359,15 @@ fn conversation_with_gate(
             rise.sample(frame.read_completed_at_us);
             // How loud what the detector calls speech has been lately, for
             // the record of each utterance: its last eight seconds.
+            // Once the lamp answers, nothing after goes on from the line
+            // before for its tone.
+            if let Some(meter) = tone_meter.as_mut()
+                && reply
+                    .as_ref()
+                    .is_some_and(|current| current.playback.is_some())
+            {
+                meter.answered();
+            }
             if probability.is_finite() && probability >= 0.5 {
                 // A line's tone takes only speech while the lamp is silent:
                 // the line's own, and what came just before it began. Never
@@ -8614,9 +8715,25 @@ fn conversation_with_gate(
                     // never came is told without them. A sound let through
                     // is not a line.
                     if let Some(meter) = tone_meter.as_mut() {
-                        let tone = meter.finish().filter(|_| !as_sound);
-                        if let Some((turn, reading)) = tone_pending.take() {
-                            tell_tone(trace, tone_out.as_mut(), turn, reading, None)?;
+                        let went_on = meter.going_on() && !as_sound;
+                        let tone = meter.finish(input_end_us).filter(|_| !as_sound);
+                        // A line that went on from the one before is read
+                        // over both and taken in once: the one before is
+                        // not told, and the baselines are as they were
+                        // before it. Any other line before it is told now,
+                        // with its words or without.
+                        let mut before_line = tone_held.reading.take();
+                        let mut gone_on_from = None;
+                        if went_on && tone.is_some() {
+                            gone_on_from = before_line.take();
+                            if let Some(before) =
+                                gone_on_from.as_mut().and_then(|held| held.before.take())
+                            {
+                                tone_baselines = before;
+                            }
+                        }
+                        if let Some(held) = before_line {
+                            held.tell(trace, tone_out.as_mut())?;
                         }
                         #[cfg(test)]
                         if let Some(person) = TEST_TONE_FORGOT
@@ -8641,11 +8758,37 @@ fn conversation_with_gate(
                             tone_person = Some(person);
                         }
                         if let Some(tone) = tone {
+                            let before = tone_baselines.clone();
                             let (reading, whose, lines) =
                                 tone_baselines.hear(tone_person.as_deref(), &tone);
                             endpoint_record["tone"] = json!({"tone": tone, "reading": reading,
                                 "whose": whose, "baseline_lines": lines});
-                            tone_pending = Some((current.owner.turn(), reading));
+                            let mut held = TonePending {
+                                turns: vec![current.owner.turn()],
+                                reading,
+                                // When the End was handled, not the
+                                // capture time the meter's window counts
+                                // from: a little later, so this waits at
+                                // least as long as a line could still go
+                                // on, the safe side (the reviewer-lead's P3
+                                // on #2670).
+                                ended_us: monotonic_us(),
+                                words: None,
+                                worded: false,
+                                before: Some(before),
+                            };
+                            if let Some(from) = gone_on_from {
+                                endpoint_record["tone"]["went_on_from"] = json!(from.turns[0]);
+                                held.turns.splice(0..0, from.turns);
+                                held.words = from.words;
+                            }
+                            // This line's words, if they came before its End.
+                            if let Some((turn, words)) = tone_held.later.take()
+                                && turn == current.owner.turn()
+                            {
+                                held.heard(&words, true);
+                            }
+                            tone_held.reading = Some(held);
                         }
                     }
                     // The asker's level, for what is said while its answer
@@ -10251,7 +10394,22 @@ fn conversation_with_gate(
         if let Some(forgot) = forgot_in.as_mut() {
             for person in forgot.forgotten(clock) {
                 tone_forgotten(&mut tone_baselines, person.as_deref(), trace, clock)?;
+                // Kept: a line that goes on puts back no baseline from
+                // before it.
+                if let Some(held) = tone_held.reading.as_mut() {
+                    held.before = None;
+                }
             }
+        }
+        // A reading with its words is told once no line can still go on
+        // from it ([`TonePending::due`]).
+        if tone_held
+            .reading
+            .as_ref()
+            .is_some_and(|held| held.due(clock, tone_meter.as_ref()))
+            && let Some(held) = tone_held.reading.take()
+        {
+            held.tell(trace, tone_out.as_mut())?;
         }
         // The person's line is over once the lamp's line it was heard in is
         // no longer the lamp's, or its pieces have stopped after that line's
@@ -10267,10 +10425,9 @@ fn conversation_with_gate(
             tone_line_over(
                 &words,
                 heard_in,
-                &mut tone_pending,
+                &mut tone_held,
                 &mut tone_baselines,
                 tone_person.as_deref(),
-                tone_out.as_mut(),
                 trace,
             )?;
         }
