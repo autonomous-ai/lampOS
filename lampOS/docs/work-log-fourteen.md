@@ -756,3 +756,18 @@ Ready for lamp-voice: yes (already in; this is verification, not new code)
   Flagged this on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6307552573)
   rather than quietly patching only mine, since fixing it would be a
   cross-cutting UX call across 4+ pages.
+
+## 2026-10-21 — #2194 fully verified on real hardware, every phase
+
+Ready for lamp-voice: yes (already in; closing the loop)
+
+- Mobile ran the middle phases on lamp-0c89 by hand-installing a real
+  build-4685: `fetching`, `switching`, `watching`, `restoring`, then
+  `idle`/`rolled-back` — all seen correctly in the app, in the right
+  warn colours. Combined with yesterday's `idle`/`up-to-date`/`stale`,
+  that's every phase and outcome except `checking` (too fast on a 1 s
+  poll, expected). The rollback itself was triggered by a real,
+  unrelated lamp-voice bug in 4685 (a privacy-worker crash during
+  restart) — not anything in #2194's app or lamp-cloud code.
+- Nothing left to verify on #2194 from the app side. Thanked Mobile on
+  [the issue](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6309445475).
