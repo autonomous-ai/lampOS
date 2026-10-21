@@ -5483,6 +5483,75 @@ Ready for lamp-voice: no (#2691) — native ARM64 is running. #2665 and
   request. The remaining observed slow service does not justify a
   connection pool or another runtime change.
 
+## 2026-10-22, 00:25 ICT: cue merged; held-second-piece gate green; Third's six timing slices pushed
+
+Ready for lamp-voice: yes (#2691). #2697 is draft pending its native
+gates; #2684 is draft again while its three P3s are folded and checked.
+#2665 and #2638 are merged.
+
+- **#2665** merged by the reviewer-lead as
+  `b87b3e91ad04b5811fe441efa118773d33416630`, from the qualified
+  `3e52d435f` head in the preceding entry. Its bound remains measured
+  from the wait sound. First's paired 1500/3000 ms lamp comparison is
+  still owed; lamp-4ace may not run played tests before 07:00 under the
+  first builder's current allowance restriction.
+- **#2691**, `97ac4f27f460e2e88a7cc2cf2a48a2cc8d41069a`, is ready.
+  Native ARM64 **39639670528** passed **6205, zero failed, 28 skipped**
+  across the selected twelve crates, plus four doc tests, the relay
+  harness and all twelve process tests. The new held-second-piece
+  regression explicitly passed in **0.006 seconds**. Workspace Clippy
+  **39639670347** passed. The unchanged passing same-voice journal test
+  was marked leaky, as in previous runs. Local full Voice remains
+  **3280 passed, zero failed, 14 existing ignored**; the production
+  file was restored byte for byte after the intended mutation failure.
+  The PR has the final head's gate and is no longer draft.
+- **#2684 review follow-up:** all-origin/listening receipt scope and
+  identical-duplicate exclusion are made explicit; the runtime and
+  report now use one shared receipt predicate with unchanged runtime
+  validation. The work is rebased onto `b87b3e91a`, with full Voice and
+  evaluator gates before the next exact-lease push. The local evaluator
+  rerun passed **623, zero failed, zero ignored** (378 library, seven
+  binary, 238 integration) with permission for local test sockets.
+  The first sandboxed attempt is retained separately: **509 passed,
+  114 failed**, with denied fixture listener binds. That environment-
+  limited attempt is not hidden or presented as the passing result.
+  Full Voice is running. The old published head's green native run
+  does not qualify the changed head; both new native gates will follow.
+- **#2697**, draft, `ea27e09e1632d45634b32d3dffc1f86a322cc63e`, is
+  one evidence-only commit on `b87b3e91a`, branch
+  `fourth/yield-gap-timings`. It answers Third's Queue request for the
+  six resumed-yield cases in the supplied timing exports: base turns
+  28/44/49/59 and po350 turns 34/51. The source lines, manifest and
+  limitations are committed in
+  `docs/verification/yield-gap-timings-20261022/` and linked on #2602.
+  - Independent audit passed **201 unchanged source lines in six
+    slices**: whole-source/output hashes, source-line byte equality,
+    full owner/cursor pairings, frame arithmetic, exact enqueue window
+    selection, and recursive endpoint field/type/string checks. The
+    provider context is **153 in-window plus six preceding rows**.
+    `git diff --cached --check` passed. No local Rust commands were
+    run for this evidence-only change. Native ARM64 **39643593845**
+    and workspace Clippy **39643593687** are running on this head.
+  - Each yield-to-resume `frame_sequence` increases by 75; coordinator
+    elapsed time is **747.111-752.458 ms**, while accepted zero PCM
+    is **740/750 ms**. These are existing recorded boundaries, not a
+    new acoustic measurement or proof of a complete capture history.
+  - Six matching endpoint context rows preserve five endpoint
+    classifier worker/request identities and one null fallback.
+    These are not provider request IDs. Their pre-endpoint level
+    diagnostics do not fill the missing gap hearing history.
+  - The exports lack complete hearing/yield-end/stop/drop history and
+    exact build/policy/flags. First was asked on #2602 to recover that
+    original-session evidence for Third. A read-only session-file
+    identity search on this Mac found only these two timing exports.
+    No policy change was inferred. Proofs and the extraction program
+    are in `/private/tmp/fourth-yield-gap-timings-checks/`; no Python,
+    transcript, PCM, credential or free-form journal text was committed.
+- Fourth has no lamp and made no device or provider request. The six
+  yield cases remain Third's; Fourth supplied the accessible evidence.
+  The original two heads, the held-piece readiness, and the new timing
+  evidence head are posted on Queue #2602.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
