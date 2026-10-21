@@ -4,7 +4,7 @@
 use lamp_body::{calibration::UnitId, moves::Asker};
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet) runs with gaze off and\nsays so. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window; one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
+const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet) runs with gaze off and\nsays so. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
 (--give-way off is the body as it was before them, and --limp off keeps giving way without the
 slump). With --give-way, a joint that pushes at its goal without moving for\n1.5 s is told to stop (its goal becomes where it is; torque is never written off); with\n--give-way stay, a head or base joint that gave way and is moved more than 15 counts by\na hand for over a second stays where it was put. With --limp on as well, as the old runtime
 did, a head or base joint that a hand stops and still pushes a second later makes the lamp
@@ -37,6 +37,8 @@ struct Arguments {
     limp: bool,
     overload_release: bool,
     let_go_at_stop: bool,
+    /// `--folded-arm` alone with `--let-go-at-stop on` (#1682).
+    let_go_folded_arm: Option<[u16; 2]>,
     rest_glance: bool,
     pitch_window: Option<(u16, u16)>,
     look_at_name: bool,
@@ -485,6 +487,25 @@ fn parse_with(
     {
         return Err("--arm-load must be under --force-limit");
     }
+    // `--folded-arm` alone is a let-go run's (#1682): with `--let-go-at-stop
+    // on`, no `--home` and no `--torque on`, nothing else of standing. Its
+    // counts are ones a person confirmed folded, never this run's read.
+    let let_go_folded_arm = match (stand, folded_arm) {
+        (None, Some(folded))
+            if let_go_at_stop == Some(true)
+                && home.is_none()
+                && torque != Some(true)
+                && arm_load.is_none()
+                && stand_share.is_none()
+                && stand_seconds.is_none()
+                && awake_seconds.is_none()
+                && idle.is_none() =>
+        {
+            folded_arm = None;
+            Some(folded)
+        }
+        _ => None,
+    };
     // Standing is one choice made whole: a pose, the folded arm and a home.
     let standing = match (stand, folded_arm) {
         (Some(pose), Some(folded)) if home.is_some() => Some(StandingChoice {
@@ -541,6 +562,7 @@ fn parse_with(
         limp: limp.unwrap_or(give_way.is_none_or(|way| way.is_some())),
         overload_release: overload.unwrap_or(false),
         let_go_at_stop: let_go_at_stop.unwrap_or(false),
+        let_go_folded_arm,
         rest_glance: rest_glance.unwrap_or(true),
         pitch_window,
         look_at_name: look_at_name.unwrap_or(true),
@@ -939,6 +961,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.limp,
         arguments.overload_release,
         arguments.let_go_at_stop,
+        arguments.let_go_folded_arm,
         arguments.rest_glance,
         arguments.pitch_window,
         arguments.look_at_name,
@@ -1143,6 +1166,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         limp: arguments.limp,
         overload_release: arguments.overload_release,
         let_go_at_stop: arguments.let_go_at_stop,
+        let_go_folded_arm: arguments.let_go_folded_arm,
         rest_glance: arguments.rest_glance,
         pitch_window: arguments.pitch_window.unwrap_or(folded.pitch_window),
         look_at_name: arguments.look_at_name,
@@ -2113,6 +2137,21 @@ mod tests {
             &["--let-go-at-stop"],
             &["--let-go-at-stop", "on", "--let-go-at-stop", "on"],
             &["--let-go-at-stop", "on", "--help"],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
+        // `--folded-arm` alone is a let-go run's only (#1682).
+        let arm = ["--let-go-at-stop", "on", "--folded-arm", "2057,2056"];
+        assert_eq!(
+            with(&arm).unwrap().unwrap().let_go_folded_arm,
+            Some([2_057, 2_056])
+        );
+        for refused in [
+            &["--folded-arm", "2057,2056"][..],
+            &["--let-go-at-stop", "off", "--folded-arm", "2057,2056"],
+            &[&arm[..], &["--home", "1772,2052,2038"]].concat(),
+            &[&arm[..], &["--torque", "on"]].concat(),
+            &[&arm[..], &["--arm-load", "900,900"]].concat(),
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }

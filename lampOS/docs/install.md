@@ -546,7 +546,7 @@ stops the steps. Every body run passes `--let-go-at-stop on` (#1776), so the
 lamp is let go once it is down and step 1 can be done again: a lamp that has
 run `lamp-body` since power-on is otherwise held, torque on, and the rest
 read refuses it. Found held, a written step 1 asks, lets it go with a body
-run that only starts and stops, and reads it then; dry, it says so. Written, steps 2 and 4 also ask first; each is refused
+run that only starts and stops (a head resting outside its start window is let go at once, torque off only, only by a run given `--folded-arm SHOULDER,ELBOW` with the arm found within 20 counts of it; the folded counts must come from a read the person confirmed was folded, never from this run's own read of where the arm is now; step 1 passes none, so there it is refused, nothing written, #1682), and reads it then; dry, it says so. Written, steps 2 and 4 also ask first; each is refused
 without a console. On GPIO head pads the touch step runs `discover-head`
 with `lamp-controls` stopped, and writes the two lines that each gave two
 touches, with their polarity (pull-up for active-low, pull-down for

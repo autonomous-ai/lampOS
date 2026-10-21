@@ -4357,6 +4357,82 @@ fn a_head_found_pressed_on_the_base_rises_out_of_it_slowly_and_then_runs() {
     assert!(lamp.nothing_was_written());
 }
 
+/// lamp-0c89 (#1682): rested at pitch 1755, under its window, held with
+/// torque on, its arm where its person confirmed it folded (2057, 2056).
+fn held_at_1755(arm: [u16; 2], folded_arm: Option<[u16; 2]>) -> (Lamp, BodyReport) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    lamp.servos[PITCH].position = 1_755.0;
+    lamp.servos[PITCH].goal = 1_755;
+    for (index, counts) in [1, 2].into_iter().zip(arm) {
+        lamp.servos[index].position = f32::from(counts);
+        lamp.servos[index].goal = counts;
+    }
+    let let_go = Limits {
+        let_go_at_stop: true,
+        let_go_folded_arm: folded_arm,
+        ..Limits::FOLDED
+    };
+    let report = run(&mut lamp, &mut clock, let_go, None, || None, |_| {});
+    (lamp, report)
+}
+
+/// A let-go run outside the window, its arm at the folded counts given,
+/// is let go: torque off on all five, no goal, until asked to stop.
+#[test]
+fn a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only() {
+    let (lamp, report) = held_at_1755([2_057, 2_056], Some([2_057, 2_056]));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.let_go_at_stop && report.let_go_outside_window.is_some());
+    assert!(lamp.goals.is_empty() && report.goal_writes == 0);
+    let off: Vec<_> = (1..=5).map(|id| (id, 40, vec![0])).collect();
+    assert_eq!(lamp.registers, off);
+    assert!(lamp.servos.iter().all(|servo| servo.torque == 0));
+}
+
+/// The same with its arm standing, or with no folded counts given, is
+/// refused as before, nothing written: nothing standing falls.
+#[test]
+fn a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused() {
+    for (arm, folded_arm) in [
+        ([2_657, 2_602], Some([2_057, 2_056])),
+        ([2_057, 2_056], None),
+    ] {
+        let (lamp, report) = held_at_1755(arm, folded_arm);
+        assert_eq!(
+            report.stop,
+            Stop::Refused {
+                why: "head pitch 1755 is outside 1760..=2020".into()
+            },
+            "{arm:?} {folded_arm:?}"
+        );
+        assert!(lamp.nothing_was_written() && report.let_go_outside_window.is_none());
+    }
+}
+
+/// Every other run outside the window is refused, nothing written: one
+/// with a home, or with --torque on, though it lets go at the stop.
+#[test]
+fn a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused() {
+    for (home, torque_on) in [(Some(HOME), false), (None, true)] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+        lamp.servos[PITCH].position = 1_755.0;
+        lamp.servos[PITCH].goal = 1_755;
+        let limits = Limits {
+            let_go_at_stop: true,
+            torque_on,
+            ..Limits::FOLDED
+        };
+        let report = run(&mut lamp, &mut clock, limits, home, || None, |_| {});
+        assert_eq!(
+            report.stop,
+            Stop::Refused {
+                why: "head pitch 1755 is outside 1760..=2020".into()
+            }
+        );
+        assert!(lamp.nothing_was_written() && report.let_go_outside_window.is_none());
+    }
+}
+
 #[test]
 fn a_base_turned_300_counts_comes_home_without_moving_away_or_faster_than_waking() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(28));
