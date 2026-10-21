@@ -1,0 +1,15 @@
+{
+  "status": "Verified after all 15 host gate stages completed successfully.",
+  "source_file_count": 2180,
+  "source_tree_sha256": "1fd1c57cca9d64ec7c95aba03f213ddcdf8fcb23c409d0549f385a6ad9ac22c4",
+  "manifest_reconstructed_from": "source-delta.json",
+  "original_checkout_matches": true,
+  "source_only_copy_matches": true,
+  "all_source_hashes_still_match": true,
+  "mismatches": {
+    "original_checkout": [],
+    "source_only_copy": []
+  },
+  "source_manifest_raw_sha256": "d0aff4d5e6b07de4b8720cddaeb9d593a4713c423f636bdaefe0ecdbce7b0f02",
+  "scope": "All frozen non-document inputs; lampOS/docs is excluded. No Cargo command was rerun for this evidence export."
+}

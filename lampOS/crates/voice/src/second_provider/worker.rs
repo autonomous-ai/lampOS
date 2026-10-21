@@ -224,6 +224,37 @@ impl Gate {
         Ok(())
     }
 
+    /// Taking an event from Engine does not authorize a later IPC retry. A
+    /// camera change can revoke its scope, or its original start deadline
+    /// can expire, while the microphone owner stays.
+    /// `true` consumes the pending entry. A discard spends no output credit.
+    fn send_or_discard(
+        &mut self,
+        engine: &Engine,
+        now_us: u64,
+        event: &ProviderOutput,
+        send: impl FnOnce(&ProviderOutput) -> io::Result<()>,
+    ) -> io::Result<bool> {
+        if !engine.current_output(event) {
+            return Ok(true);
+        }
+        if let ProviderOutput::RequestedAudio {
+            request,
+            session,
+            offer,
+        } = event
+            && (offer.check().is_err()
+                || offer.context.request != *request
+                || offer.context.provider_session != *session
+                || now_us < offer.issued_us
+                || now_us >= offer.start_before_us)
+        {
+            return Ok(true);
+        }
+        self.may_send(now_us, event)?;
+        self.flow.try_send(|| send(event))
+    }
+
     fn drain(&mut self, control: &mut Channel, engine: &mut Engine) -> io::Result<Drain> {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
@@ -2050,6 +2081,9 @@ pub fn serve(
     // A held line's `reports_stop` is done, its answer kept held, as on the
     // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
     let though_held = tools.reports_stop;
+    let audio_runner = tools
+        .requested_audio
+        .then(|| requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed));
     let runner = tool_runner(tools, search.clone(), early.clone(), policed);
     // The same calls with the admitted request's memory authority (#1794).
     let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed);
@@ -2123,6 +2157,9 @@ pub fn serve(
         };
         let (note, heard) = seems_noting(told.clone(), busy, monotonic_us);
         engine = engine.noting_how_they_seem(note, heard);
+    }
+    if let Some(runner) = audio_runner {
+        engine = engine.requesting_audio(boot, runner);
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
@@ -2882,15 +2919,20 @@ pub(crate) fn tool_runner(
     policed: bool,
 ) -> ToolRunner {
     Arc::new(move |request, heard, name, args| {
-        Box::pin(run_call(
+        let answer = run_call(
             tools.clone(),
             search.clone(),
             early.clone(),
             (request, heard, policed),
-            name,
-            args,
+            lamp_gemini::ToolCall {
+                id: String::new(),
+                name,
+                args,
+            },
             None,
-        ))
+            None,
+        );
+        Box::pin(async move { answer.await.told })
     })
 }
 
@@ -2904,14 +2946,40 @@ pub(crate) fn scoped_tool_runner(
     policed: bool,
 ) -> crate::second_provider::ScopedToolRunner {
     Arc::new(move |request, heard, name, args, scope| {
-        Box::pin(run_call(
+        let answer = run_call(
             tools.clone(),
             search.clone(),
             early.clone(),
             (request, heard, policed),
-            name,
-            args,
+            lamp_gemini::ToolCall {
+                id: String::new(),
+                name,
+                args,
+            },
             Some(scope),
+            None,
+        );
+        Box::pin(async move { answer.await.told })
+    })
+}
+
+/// The same dispatcher with a spoken request's private audio capability.
+/// Its complete call ID and immutable scope survive every local tool hop.
+pub(crate) fn requested_audio_runner(
+    tools: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+    early: Option<Arc<Early>>,
+    policed: bool,
+) -> super::RequestedAudioRunner {
+    Arc::new(move |context, call, scope| {
+        Box::pin(run_call(
+            tools.clone(),
+            search.clone(),
+            early.clone(),
+            (context.request, true, policed),
+            call,
+            Some(scope),
+            Some(context),
         ))
     })
 }
@@ -3076,32 +3144,43 @@ pub(crate) fn skill_call(settings: crate::tools::Settings) -> crate::second_prov
     })
 }
 
-/// One call of the model's, as both runners run it.
+/// One call of the model's, as all spoken runners run it.
 async fn run_call(
     settings: crate::tools::Settings,
     search: Option<Arc<Search>>,
     early: Option<Arc<Early>>,
     (request, heard, policed): (u64, bool, bool),
-    name: String,
-    args: serde_json::Value,
+    call: lamp_gemini::ToolCall,
     scope: Option<crate::memory_scope::ScopeLease>,
-) -> serde_json::Value {
-    if name == crate::attention::HEARD_MY_NAME {
-        named(request);
-        return crate::tools::declined();
+    context: Option<lamp_msgs::RequestedAudioContext>,
+) -> crate::tools::ToolAnswer {
+    use crate::tools::ToolAnswer;
+    if context.as_ref().is_some_and(|context| {
+        context.check().is_err()
+            || context.call_id != call.id
+            || !scope
+                .as_ref()
+                .is_some_and(|scope| super::audio_scope_current(scope, context))
+    }) {
+        return ToolAnswer::plain(crate::tools::unavailable());
     }
-    if name == MORE {
+    if call.name == crate::attention::HEARD_MY_NAME {
+        named(request);
+        return ToolAnswer::plain(crate::tools::declined());
+    }
+    if call.name == MORE {
         eprintln!(
             "lamp-voice second: request {request} called {MORE}: its next round is given every function"
         );
-        return serde_json::json!({"ok": true, "result": MORE_GIVEN});
+        return ToolAnswer::plain(serde_json::json!({"ok": true, "result": MORE_GIVEN}));
     }
-    if let Some(search) = search.filter(|search| search.answers(&name)) {
+    if let Some(search) = search.filter(|search| search.answers(&call.name)) {
         // The request's first search takes the one begun from its
         // words, if any (#1712).
-        if name == crate::second_provider::net::search::NAME
-            && let Some(taken) = early
-                .and_then(|early| early.take(request, args["query"].as_str().unwrap_or_default()))
+        if call.name == crate::second_provider::net::search::NAME
+            && let Some(taken) = early.and_then(|early| {
+                early.take(request, call.args["query"].as_str().unwrap_or_default())
+            })
         {
             match taken {
                 Ok((begun, answer)) => {
@@ -3109,20 +3188,15 @@ async fn run_call(
                         "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
                         begun.elapsed().as_millis()
                     );
-                    return answer.await;
+                    return ToolAnswer::plain(answer.await);
                 }
                 Err(added) => eprintln!(
                     "lamp-voice second: request {request} web_search asks {added} words the search begun from its words did not: searched as asked"
                 ),
             }
         }
-        return search.answer(&name, &args).await;
+        return ToolAnswer::plain(search.answer(&call.name, &call.args).await);
     }
-    let call = lamp_gemini::ToolCall {
-        id: String::new(),
-        name,
-        args,
-    };
     tokio::task::spawn_blocking(move || {
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
@@ -3155,10 +3229,21 @@ async fn run_call(
         }
         // A news key stays in the answer: the turn takes it out before
         // its model reads it, and tells the coordinator (#1390).
-        crate::tools::answer_keeping_news(&settings, &call, request, heard, scope.as_ref())
+        match (context.as_ref(), scope.as_ref()) {
+            (Some(context), Some(scope)) => {
+                crate::tools::answer_spoken_scoped_keeping_news(&settings, &call, context, scope)
+            }
+            _ => ToolAnswer::plain(crate::tools::answer_keeping_news(
+                &settings,
+                &call,
+                request,
+                heard,
+                scope.as_ref(),
+            )),
+        }
     })
     .await
-    .unwrap_or_else(|_| crate::tools::unavailable())
+    .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
 }
 
 /// The Policy's decisions for the lamp's actions on this route, when they
@@ -6096,11 +6181,12 @@ pub async fn run(
                 .control
                 .send(WorkerEvent::ProviderLink { link: changed })?;
         }
-        if let Some(event) = pending.take() {
-            gate.may_send(monotonic_us(), &event)?;
-            if !gate.flow.try_send(|| channels.data.send(&event))? {
-                pending = Some(event);
-            }
+        if let Some(event) = pending.take()
+            && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
+                channels.data.send(event)
+            })?
+        {
+            pending = Some(event);
         }
     }
 }
@@ -8516,6 +8602,276 @@ mod tests {
             serde_json::json!({"ok": true, "result": MORE_GIVEN})
         );
     }
+
+    fn audio_runner_scope() -> (
+        crate::memory_scope::RequestScope,
+        lamp_msgs::RequestedAudioContext,
+    ) {
+        let worker = BootId::new([0xaa; 16]).unwrap();
+        let context = lamp_msgs::RequestedAudioContext {
+            worker_boot: crate::process::boot_text(worker),
+            provider_session: 4,
+            request: 5,
+            privacy_generation: 1,
+            call_id: "original-music-call".into(),
+            issued_us: monotonic_us(),
+        };
+        let owner = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker,
+                session: context.provider_session,
+                request: context.request,
+            },
+            crate::memory_scope::ScopeSnapshot::room(),
+        );
+        (owner, context)
+    }
+
+    /// One exchange has one absolute budget, including a held test reply.
+    fn audio_runner_exchange(
+        listener: std::os::unix::net::UnixListener,
+        reply: impl FnOnce(&serde_json::Value, Duration) -> serde_json::Value,
+    ) -> serde_json::Value {
+        use rustix::event::{PollFd, PollFlags, Timespec, poll};
+        use std::io::{BufRead, BufReader, Read, Write};
+        listener.set_nonblocking(true).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        let left = || {
+            deadline
+                .checked_duration_since(Instant::now())
+                .filter(|left| !left.is_zero())
+                .expect("the runner did not finish its local RPC within three seconds")
+        };
+        let mut stream = loop {
+            let timeout = Timespec::try_from(left()).unwrap();
+            let mut waiting = [PollFd::new(&listener, PollFlags::IN)];
+            match poll(&mut waiting, Some(&timeout)) {
+                Ok(0) => continue,
+                Ok(_) => match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(error) => panic!("the runner peer could not accept: {error}"),
+                },
+                Err(error) if error == rustix::io::Errno::INTR => continue,
+                Err(error) => panic!("the runner peer could not wait: {error}"),
+            }
+        };
+        // macOS accepted sockets inherit nonblocking mode.
+        stream.set_nonblocking(false).unwrap();
+        stream.set_read_timeout(Some(left())).unwrap();
+        let mut line = String::new();
+        BufReader::new((&stream).take(8192))
+            .read_line(&mut line)
+            .unwrap();
+        assert!(line.ends_with('\n'), "one complete bounded request");
+        let asked = serde_json::from_str(&line).unwrap();
+        let reply = reply(&asked, left());
+        stream.set_write_timeout(Some(left())).unwrap();
+        writeln!(stream, "{reply}").unwrap();
+        asked
+    }
+
+    /// A local Skills/executive peer; even a missing dispatch cannot leave
+    /// its accept, request read, reply write or terminal await unbounded.
+    fn audio_runner_peer(
+        directory: &Path,
+        reply: serde_json::Value,
+    ) -> tokio::task::JoinHandle<serde_json::Value> {
+        let listener =
+            std::os::unix::net::UnixListener::bind(directory.join(crate::tools::CALL_SOCKET))
+                .unwrap();
+        tokio::task::spawn_blocking(move || audio_runner_exchange(listener, |_, _| reply))
+    }
+
+    #[tokio::test]
+    async fn the_production_audio_runner_keeps_skills_identity_and_private_offers() {
+        for mode in ["direct", "wrapped", "off", "executive"] {
+            let directory = crate::process::SessionDirectory::create().unwrap();
+            std::fs::write(
+                directory.path.join(crate::tools::CATALOG_FILE),
+                r#"{"tools":[{"name":"play_relaxing_music","description":"An explicitly requested recording."}]}"#,
+            )
+            .unwrap();
+            let settings = crate::tools::Settings {
+                skills: (mode != "executive").then(|| directory.path.clone()),
+                exec: (mode == "executive").then(|| directory.path.clone()),
+                use_skill: mode == "wrapped",
+                requested_audio: mode != "off",
+                ..Default::default()
+            };
+            let (owner, context) = audio_runner_scope();
+            let offer = lamp_msgs::RequestedAudioOffer {
+                skills_boot: "skills-test".into(),
+                definition_generation: 1,
+                offer_id: 1,
+                context: context.clone(),
+                skill: "relaxing-music".into(),
+                asset: "/local/relaxing.wav".into(),
+                sha256: "a".repeat(64),
+                frames: 24_000,
+                issued_us: context.issued_us,
+                start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+                finish_before_us: context.issued_us
+                    + lamp_msgs::REQUESTED_AUDIO_START_US
+                    + 1_000_000,
+            };
+            let told = serde_json::json!({"next":"Say one short confirmation."});
+            let peer = audio_runner_peer(
+                &directory.path,
+                serde_json::json!({"ok":true,"result":{
+                    "next":"Say one short confirmation.","requested_audio":&offer,
+                }}),
+            );
+            let runner = requested_audio_runner(settings, None, None, false);
+            let answer = tokio::time::timeout(
+                Duration::from_secs(3),
+                runner(
+                    context.clone(),
+                    lamp_gemini::ToolCall {
+                        id: context.call_id.clone(),
+                        name: if mode == "wrapped" {
+                            crate::use_skill::NAME
+                        } else {
+                            "play_relaxing_music"
+                        }
+                        .into(),
+                        args: if mode == "wrapped" {
+                            serde_json::json!({"skill":"play_relaxing_music"})
+                        } else {
+                            serde_json::json!({})
+                        },
+                    },
+                    owner.lease(),
+                ),
+            )
+            .await
+            .expect("the production runner did not answer the local call");
+            let asked = tokio::time::timeout(Duration::from_secs(3), peer)
+                .await
+                .expect("the local peer did not finish its bounded exchange")
+                .unwrap();
+            let authorized = matches!(mode, "direct" | "wrapped");
+            assert_eq!(answer.told, told, "{mode}");
+            assert_eq!(
+                answer.requested_audio,
+                authorized.then_some(offer),
+                "{mode}"
+            );
+            let mut expected = serde_json::json!({
+                "op":"call","name":"play_relaxing_music","args":{},
+            });
+            if authorized {
+                expected["requested_audio_context"] = serde_json::json!(context);
+            }
+            assert_eq!(asked, expected, "{mode}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_audio_runner_keeps_more_and_the_requests_early_search() {
+        let search = Arc::new(Search::deepseek_at("http://127.0.0.1:9", "k").unwrap());
+        let early = Arc::new(Early::default());
+        let runner = requested_audio_runner(
+            crate::tools::Settings {
+                requested_audio: true,
+                ..Default::default()
+            },
+            Some(search),
+            Some(early.clone()),
+            false,
+        );
+        let (owner, context) = audio_runner_scope();
+        let call = |name: &str, args| lamp_gemini::ToolCall {
+            id: context.call_id.clone(),
+            name: name.into(),
+            args,
+        };
+        let answer = tokio::time::timeout(
+            Duration::from_secs(3),
+            runner(
+                context.clone(),
+                call(MORE, serde_json::json!({})),
+                owner.lease(),
+            ),
+        )
+        .await
+        .expect("the audio runner did not answer MORE");
+        assert_eq!(
+            answer.told,
+            serde_json::json!({"ok":true,"result":MORE_GIVEN})
+        );
+        assert!(answer.requested_audio.is_none());
+        early.begin(
+            context.request,
+            "who won the race".into(),
+            Box::pin(async { serde_json::json!({"results":["early"]}) }),
+        );
+        assert!(
+            early
+                .take(context.request + 1, "who won the race")
+                .is_none()
+        );
+        let args = serde_json::json!({"query":"who won the race"});
+        let answer = tokio::time::timeout(
+            Duration::from_secs(3),
+            runner(
+                context.clone(),
+                call("web_search", args.clone()),
+                owner.lease(),
+            ),
+        )
+        .await
+        .expect("the audio runner did not take its early search");
+        assert_eq!(answer.told, serde_json::json!({"results":["early"]}));
+        assert!(answer.requested_audio.is_none());
+        assert!(
+            early.take(context.request, "who won the race").is_none(),
+            "taken once"
+        );
+        let again = tokio::time::timeout(
+            Duration::from_secs(3),
+            runner(context.clone(), call("web_search", args), owner.lease()),
+        )
+        .await
+        .expect("the audio runner's later search did not finish at the closed port");
+        assert!(again.told.get("error").is_some(), "{}", again.told);
+        assert!(again.requested_audio.is_none());
+    }
+
+    #[tokio::test]
+    async fn the_audio_runner_refuses_a_changed_or_retired_capability_before_dispatch() {
+        for change in ["call", "worker", "session", "request", "retired"] {
+            let (owner, mut context) = audio_runner_scope();
+            let call = lamp_gemini::ToolCall {
+                id: context.call_id.clone(),
+                name: MORE.into(),
+                args: serde_json::json!({}),
+            };
+            match change {
+                "call" => context.call_id = "another-call".into(),
+                "worker" => context.worker_boot = "bb".repeat(16),
+                "session" => context.provider_session += 1,
+                "request" => context.request += 1,
+                "retired" => owner.revoke(),
+                _ => unreachable!(),
+            }
+            let runner = requested_audio_runner(
+                crate::tools::Settings {
+                    requested_audio: true,
+                    ..Default::default()
+                },
+                None,
+                None,
+                false,
+            );
+            let answer =
+                tokio::time::timeout(Duration::from_secs(3), runner(context, call, owner.lease()))
+                    .await
+                    .expect("the audio runner did not refuse the invalid capability");
+            assert_eq!(answer.told, crate::tools::unavailable(), "{change}");
+            assert!(answer.requested_audio.is_none(), "{change}");
+        }
+    }
     use futures_util::{
         future::BoxFuture,
         stream::{self, BoxStream},
@@ -8534,6 +8890,277 @@ mod tests {
         }
         fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
             Box::pin(stream::pending())
+        }
+    }
+
+    /// Stop must return while the real Music RPC is still in the blocking
+    /// pool. Its valid late reply cannot revive the revoked owner or chat.
+    #[test]
+    fn stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply() {
+        check_stop_during_music_rpc(false);
+    }
+
+    /// The next STT connection can still be opening when Music waits for
+    /// Skills. Stop and runtime teardown cancel it without waiting for
+    /// either connection, and the late Music reply still has no authority.
+    #[test]
+    fn stop_during_music_rpc_and_warm_stt_opening_finishes_without_waiting() {
+        check_stop_during_music_rpc(true);
+    }
+
+    fn check_stop_during_music_rpc(warm_stt: bool) {
+        use crate::second_provider::requested_audio_tests::{RecordingScript, offered};
+        use serde_json::json;
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        struct Opening(Arc<AtomicBool>);
+        impl Drop for Opening {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        struct WithSpare {
+            script: Arc<RecordingScript>,
+            listens: AtomicUsize,
+            opened: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+            cancelled: Arc<AtomicBool>,
+        }
+        impl Services for WithSpare {
+            fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+                let connection = self.listens.fetch_add(1, Ordering::SeqCst);
+                if connection == 0 {
+                    return self.script.listen();
+                }
+                assert_eq!(connection, 1, "only one spare may be opening");
+                let opened = self.opened.lock().unwrap().take().unwrap();
+                let cancelled = self.cancelled.clone();
+                Box::pin(async move {
+                    let _opening = Opening(cancelled);
+                    opened.send(()).unwrap();
+                    std::future::pending().await
+                })
+            }
+            fn chat(
+                &self,
+                messages: Vec<net::Message>,
+            ) -> BoxStream<'static, net::Result<net::ChatEvent>> {
+                self.script.chat(messages)
+            }
+            fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+                self.script.speak(text)
+            }
+        }
+
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let skills = directory.path.join("skills");
+        std::fs::create_dir(&skills).unwrap();
+        std::fs::write(
+            skills.join(crate::tools::CATALOG_FILE),
+            r#"{"tools":[{"name":"play_relaxing_music","description":"A requested recording."}]}"#,
+        )
+        .unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(skills.join(crate::tools::CALL_SOCKET)).unwrap();
+        let (taken, mut received) = tokio::sync::oneshot::channel();
+        let (release, held) = std::sync::mpsc::channel();
+        let peer = std::thread::spawn(move || {
+            audio_runner_exchange(listener, |asked, left| {
+                let context: lamp_msgs::RequestedAudioContext =
+                    serde_json::from_value(asked["requested_audio_context"].clone()).unwrap();
+                taken.send(context.clone()).unwrap();
+                held.recv_timeout(left)
+                    .expect("the stopped worker must release the test peer");
+                json!({"ok":true,"result":{
+                    "next":"Confirm.","requested_audio":offered(context),
+                }})
+            })
+        });
+        let boot = BootId::new([37; 16]).unwrap();
+        let worker_boot = BootId::new([38; 16]).unwrap();
+        let mut parent =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+        let mut worker =
+            WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+        parent.connect(&directory.path, "second", false).unwrap();
+        worker.connect(&directory.path, "second", true).unwrap();
+        let script = Arc::new(RecordingScript {
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(net::ChatEvent::ToolCalls(vec![net::ToolCall {
+                            id: "stop-music".into(),
+                            name: "play_relaxing_music".into(),
+                            args: json!({}),
+                            extra: None,
+                        }])),
+                        Ok(net::ChatEvent::Done),
+                    ],
+                    vec![Ok(net::ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            messages: Mutex::default(),
+        });
+        let (opened, mut opening) = tokio::sync::oneshot::channel();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let services = Arc::new(WithSpare {
+            script: script.clone(),
+            listens: AtomicUsize::new(0),
+            opened: Mutex::new(Some(opened)),
+            cancelled: cancelled.clone(),
+        });
+        let settings = crate::tools::Settings {
+            skills: Some(skills),
+            requested_audio: true,
+            ..Default::default()
+        };
+        let runner = requested_audio_runner(settings, None, None, false);
+        let lease: Arc<Mutex<Option<crate::memory_scope::ScopeLease>>> = Arc::default();
+        let kept_lease = lease.clone();
+        let engine = Engine::new(
+            services.clone(),
+            Told::default,
+            Arc::new(|_, _, _, _| panic!("the admitted Music runner owns dispatch")),
+        )
+        .with_memory_scope(
+            boot,
+            Arc::default(),
+            Arc::new(|_, _, _, _, _| panic!("the admitted Music runner owns dispatch")),
+            Some(Arc::new(|scope: &crate::memory_scope::ScopeLease| {
+                Told::from(format!("context {:?}", scope.scope().unwrap().person()))
+            })),
+        )
+        .requesting_audio(
+            boot,
+            Arc::new(move |context, call, scope| {
+                *kept_lease.lock().unwrap() = Some(scope.clone());
+                runner(context, call, scope)
+            }),
+        )
+        .keeping_a_listener_ready(warm_stt)
+        .announcing(false);
+        struct RestoreThread(Option<crate::thread::Thread>);
+        impl Drop for RestoreThread {
+            fn drop(&mut self) {
+                if let Some(saved) = self.0.take() {
+                    *crate::thread::THREAD
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = saved;
+                }
+            }
+        }
+        // Declared before the runtime so its tasks stop before restoration,
+        // including when a later assertion unwinds.
+        let _restore_thread = RestoreThread(Some(std::mem::take(
+            &mut *crate::thread::THREAD.lock().unwrap(),
+        )));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let stopped = runtime.block_on(async {
+            let at_us = monotonic_us();
+            let at = MonoTime::from_micros(at_us);
+            let mut owner = Controller::new(boot, at);
+            owner.set_microphone_permission(at, Permission::Allowed).unwrap();
+            let renew = |owner: &mut Controller| {
+                let now = MonoTime::from_micros(monotonic_us());
+                let until = MonoTime::from_micros(now.as_micros() + 100_000);
+                owner.set_capture(now, CaptureState::RetainingUntil(until)).unwrap();
+                owner.set_admission(now, AdmissionState::OpenUntil(until)).unwrap();
+                owner.snapshot(now).unwrap()
+            };
+            renew(&mut owner);
+            let request = owner.admit(
+                MonoTime::from_micros(monotonic_us()), AdmittedInput::NewTurn,
+            ).unwrap().turn();
+            let snapshot = renew(&mut owner);
+            let privacy_generation = snapshot.microphone_generation();
+            parent.control.send(Control::Authority { snapshot }).unwrap();
+            for input in [
+                ProviderInput::Start {
+                    request, session:1, privacy_generation, continues:false,
+                    continues_cut_off:false, over_the_lamp:false, after_stop:false,
+                    follows_on:false, over_the_lamps_voice:false,
+                    heard_of_cut: None,
+                },
+                ProviderInput::Audio {
+                    request, privacy_generation, sequence:1,
+                    read_completed_at_us:monotonic_us(), samples:vec![1;160],
+                },
+                ProviderInput::End { request, privacy_generation, sound:false, cut_in:false },
+            ] { parent.data.send(input).unwrap(); }
+            let running = tokio::spawn(run(worker, boot, engine, None, None));
+            let mut heartbeat = tokio::time::interval(Duration::from_millis(20));
+            let context = tokio::time::timeout(Duration::from_secs(2), async {
+                let mut context = None;
+                let mut spare_pending = !warm_stt;
+                loop {
+                    if spare_pending && let Some(context) = context.take() {
+                        break context;
+                    }
+                    tokio::select! {
+                        received = &mut received, if context.is_none() => {
+                            context = Some(received.unwrap());
+                        }
+                        opened = &mut opening, if !spare_pending => {
+                            opened.expect("the warm STT spare must begin opening");
+                            spare_pending = true;
+                        }
+                        _ = heartbeat.tick() => {
+                            parent.control.send(Control::Authority { snapshot:renew(&mut owner) }).unwrap();
+                            while let Some(event) = parent.data.receive::<ProviderOutput>().unwrap() {
+                                assert!(!matches!(event, ProviderOutput::RequestedAudio { .. } | ProviderOutput::Audio { .. }));
+                            }
+                        }
+                    }
+                }
+            }).await.expect("the Music RPC and enabled warm STT opening must both be pending");
+            assert_eq!(services.listens.load(Ordering::SeqCst), 1 + usize::from(warm_stt));
+            assert!(!cancelled.load(Ordering::SeqCst), "the spare is still opening before Stop");
+            assert_eq!((context.request, context.provider_session, context.privacy_generation), (request,1,privacy_generation));
+            assert_eq!(context.worker_boot, crate::process::boot_text(boot));
+            assert_eq!(context.call_id, "stop-music");
+            assert!(lease.lock().unwrap().as_ref().unwrap().is_current());
+            let stopped = Instant::now();
+            parent.control.send(Control::Stop).unwrap();
+            tokio::time::timeout(Duration::from_millis(300), running).await
+                .expect("Stop must end worker::run while the Music reply is held")
+                .unwrap().unwrap();
+            assert!(!lease.lock().unwrap().as_ref().unwrap().is_current());
+            stopped
+        });
+        finish(runtime);
+        let elapsed = stopped.elapsed();
+        assert_eq!(
+            cancelled.load(Ordering::SeqCst),
+            warm_stt,
+            "runtime teardown cancels the pending spare connection"
+        );
+        release.send(()).unwrap();
+        let asked = peer.join().unwrap();
+        assert_eq!(asked["name"], "play_relaxing_music");
+        assert!(
+            elapsed < Duration::from_millis(300),
+            "Music shutdown waited {elapsed:?} for its RPC"
+        );
+        assert_eq!(
+            script.messages.lock().unwrap().len(),
+            1,
+            "no chat round follows a late reply"
+        );
+        loop {
+            match parent.data.receive::<ProviderOutput>() {
+                Ok(Some(event)) => assert!(!matches!(
+                    event,
+                    ProviderOutput::RequestedAudio { .. } | ProviderOutput::Audio { .. }
+                )),
+                Ok(None) => break,
+                // As in reference_link's terminal-notice test, Darwin reports
+                // peer closure after its queued datagrams have been drained.
+                Err(error) if error.kind() == io::ErrorKind::ConnectionReset => break,
+                Err(error) => panic!("unexpected post-Stop receive failure: {error}"),
+            }
         }
     }
 
@@ -8625,6 +9252,244 @@ mod tests {
         gate.install(40_000, owner.snapshot(at(40_000)).unwrap(), &mut engine)
             .unwrap();
         assert_eq!(told_now(), 2, "a mute");
+    }
+
+    #[tokio::test]
+    async fn requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry() {
+        const NOW: u64 = 10_000_000;
+        let at = MonoTime::from_micros(NOW);
+        for change in ["none", "denied", "reopened", "before_deadline", "expired"] {
+            let directory = crate::process::SessionDirectory::create().unwrap();
+            let boot = BootId::new([7; 16]).unwrap();
+            let worker_boot = BootId::new([8; 16]).unwrap();
+            let mut parent =
+                WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+            let mut worker =
+                WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+            parent.connect(&directory.path, "second", false).unwrap();
+            worker.connect(&directory.path, "second", true).unwrap();
+            let mut owner = Controller::new(boot, at);
+            owner
+                .set_microphone_permission(at, Permission::Allowed)
+                .unwrap();
+            owner
+                .set_camera_permission(at, Permission::Allowed)
+                .unwrap();
+            let until = MonoTime::from_micros(NOW + 100_000);
+            owner
+                .set_capture(at, CaptureState::RetainingUntil(until))
+                .unwrap();
+            owner
+                .set_admission(at, AdmissionState::OpenUntil(until))
+                .unwrap();
+            let request = owner.admit(at, AdmittedInput::NewTurn).unwrap().turn();
+            let before = owner.snapshot(at).unwrap();
+            let cache = Arc::new(crate::memory_scope::FaceCache::default());
+            let mut engine = Engine::new(
+                Arc::new(Silent),
+                Told::default,
+                Arc::new(|_, _, _, _| panic!("the fixture runs no tools")),
+            )
+            .with_memory_scope(
+                boot,
+                cache.clone(),
+                Arc::new(|_, _, _, _, _| panic!("the fixture runs no tools")),
+                None,
+            )
+            .requesting_audio(
+                boot,
+                Arc::new(|_, _, _| panic!("the fixture runs no tools")),
+            );
+            let mut gate = Gate::new(boot, NOW);
+            gate.install(NOW, before, &mut engine).unwrap();
+            let face = directory.path.join("face");
+            std::fs::write(&face, "credit-fixture").unwrap();
+            assert!(cache.replace(
+                cache.begin_refresh(),
+                crate::known_faces::FaceObservation::read(&face)
+            ));
+            engine.submit(ProviderInput::Start {
+                request,
+                session: 1,
+                privacy_generation: before.microphone_generation(),
+                continues: false,
+                continues_cut_off: false,
+                over_the_lamp: false,
+                after_stop: false,
+                follows_on: false,
+                over_the_lamps_voice: false,
+                heard_of_cut: None,
+            });
+            engine.submit(ProviderInput::End {
+                request,
+                privacy_generation: before.microphone_generation(),
+                sound: false,
+                cut_in: false,
+            });
+            engine.urgent.clear();
+            let lease = engine
+                .turn
+                .as_ref()
+                .unwrap()
+                .memory_scope
+                .as_ref()
+                .unwrap()
+                .lease();
+            assert!(lease.scope().unwrap().person().is_some());
+            // These are already-generated events; taking them does not retire
+            // the turn. Both initial credits are spent on the real IPC channel.
+            for event in [
+                ProviderOutput::GenerationComplete { request },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                engine.shared.out.try_send(event).unwrap();
+                let pending = engine.try_output().unwrap();
+                assert!(
+                    gate.send_or_discard(&engine, NOW, &pending, |event| worker
+                        .data
+                        .send_with(event, || NOW))
+                        .unwrap()
+                );
+                assert!(
+                    parent
+                        .data
+                        .receive_with::<ProviderOutput>(|| NOW)
+                        .unwrap()
+                        .is_some()
+                );
+            }
+            let offer = lamp_msgs::RequestedAudioOffer {
+                skills_boot: "skills-test".into(),
+                definition_generation: 1,
+                offer_id: 1,
+                context: lamp_msgs::RequestedAudioContext {
+                    worker_boot: crate::process::boot_text(boot),
+                    provider_session: 1,
+                    request,
+                    privacy_generation: before.microphone_generation(),
+                    call_id: "credit-call".into(),
+                    issued_us: NOW,
+                },
+                skill: "relaxing-music".into(),
+                asset: "/local/relaxing.wav".into(),
+                sha256: "a".repeat(64),
+                frames: 24_000,
+                issued_us: NOW,
+                start_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US,
+                finish_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            };
+            engine
+                .shared
+                .out
+                .try_send(ProviderOutput::RequestedAudio {
+                    request,
+                    session: 1,
+                    offer,
+                })
+                .unwrap();
+            // This is the event held outside Engine when the worker has no
+            // credit. The later retry must not trust that earlier dequeue.
+            let pending = engine.try_output().unwrap();
+            assert!(
+                !gate
+                    .send_or_discard(&engine, NOW, &pending, |event| worker
+                        .data
+                        .send_with(event, || NOW))
+                    .unwrap()
+            );
+            assert!(
+                parent
+                    .data
+                    .receive_with::<ProviderOutput>(|| NOW)
+                    .unwrap()
+                    .is_none()
+            );
+            if matches!(change, "denied" | "reopened") {
+                owner.set_camera_permission(at, Permission::Denied).unwrap();
+                if change == "reopened" {
+                    owner
+                        .set_camera_permission(at, Permission::Allowed)
+                        .unwrap();
+                }
+                gate.install(NOW, owner.snapshot(at).unwrap(), &mut engine)
+                    .unwrap();
+            }
+            let retry_us = match change {
+                "before_deadline" => NOW + lamp_msgs::REQUESTED_AUDIO_START_US - 1,
+                "expired" => NOW + lamp_msgs::REQUESTED_AUDIO_START_US,
+                _ => NOW,
+            };
+            if retry_us != NOW {
+                // Renew the same owner and leases through the credit wait.
+                // Only the offer's immutable start deadline may expire.
+                for renewed_us in ((NOW + 50_000)..retry_us)
+                    .step_by(50_000)
+                    .chain(std::iter::once(retry_us))
+                {
+                    let renewed_at = MonoTime::from_micros(renewed_us);
+                    let until = MonoTime::from_micros(renewed_us + 100_000);
+                    owner
+                        .set_capture(renewed_at, CaptureState::RetainingUntil(until))
+                        .unwrap();
+                    owner
+                        .set_admission(renewed_at, AdmissionState::OpenUntil(until))
+                        .unwrap();
+                    gate.install(renewed_us, owner.snapshot(renewed_at).unwrap(), &mut engine)
+                        .unwrap();
+                }
+            }
+            gate.fresh(retry_us).unwrap();
+            gate.may_send(retry_us, &pending).unwrap();
+            let after = gate.guard.state().unwrap();
+            assert_eq!(before.owner(), after.owner());
+            assert_eq!(
+                before.microphone_generation(),
+                after.microphone_generation()
+            );
+            assert!(request > gate.retired_through);
+            assert_eq!(lease.is_current(), !matches!(change, "denied" | "reopened"));
+            let delivered = matches!(change, "none" | "before_deadline");
+            gate.flow.grant(3).unwrap();
+            assert!(
+                gate.send_or_discard(&engine, retry_us, &pending, |event| worker
+                    .data
+                    .send_with(event, || retry_us))
+                    .unwrap()
+            );
+            assert_eq!(
+                matches!(
+                    parent
+                        .data
+                        .receive_with::<ProviderOutput>(|| retry_us)
+                        .unwrap(),
+                    Some(ProviderOutput::RequestedAudio { .. })
+                ),
+                delivered,
+                "{change}"
+            );
+            assert_eq!(
+                gate.flow.can_send(),
+                !delivered,
+                "a discard spends no credit"
+            );
+            gate.flow.grant(4).unwrap();
+            assert!(
+                gate.send_or_discard(
+                    &engine,
+                    retry_us,
+                    &ProviderOutput::GenerationComplete { request },
+                    |event| worker.data.send_with(event, || retry_us)
+                )
+                .unwrap()
+            );
+            assert!(
+                matches!(parent.data.receive_with::<ProviderOutput>(|| retry_us).unwrap(),
+                Some(ProviderOutput::GenerationComplete { request: got }) if got == request)
+            );
+        }
     }
 
     #[tokio::test]
@@ -9266,12 +10131,17 @@ mod tests {
             None,
             None,
             (41, true, false),
-            name.to_owned(),
-            serde_json::json!({}),
+            lamp_gemini::ToolCall {
+                id: String::new(),
+                name: name.to_owned(),
+                args: serde_json::json!({}),
+            },
+            None,
             None,
         )
         .await;
-        assert_eq!(answered, crate::tools::declined());
+        assert_eq!(answered.told, crate::tools::declined());
+        assert!(answered.requested_audio.is_none());
         assert_eq!(
             super::NAMED.lock().unwrap().map(|(request, _)| request),
             Some(41),
@@ -9768,32 +10638,38 @@ mod tests {
             texts_system_message("You are a lamp.", Some(" It is noon."), "\n\nYour memory\n");
         assert_eq!(typed.text, "You are a lamp. It is noon.\n\nYour memory\n");
         assert!(typed.history.is_empty());
-        // As the worker gives a text's answer its system message.
-        let (texts, _) = texts_ends("You are a lamp.".into(), crate::tools::Settings::default());
-        let told = texts();
-        assert!(!told.text.contains("Under the blue mat."), "{}", told.text);
-        assert!(!told.text.contains("spare key"), "{}", told.text);
-        assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
-        assert!(told.history.is_empty());
-        // Told the time as it is asked (#1712) with `LAMP_CLOCK`, and as
-        // before without it (the first builder on #1921), where this
-        // machine has one.
-        if crate::local_time::offset_here().is_some() {
-            assert!(told.text.contains("give it roughly"), "{}", told.text);
-            assert!(!told.text.contains("as you were asked"), "{}", told.text);
-            let (texts, _) = texts_ends(
-                "You are a lamp.".into(),
-                crate::tools::Settings {
-                    clock: true,
-                    ..Default::default()
-                },
-            );
-            let told = texts();
-            assert!(
-                told.text.contains("Your clock read this as you were asked"),
-                "{}",
-                told.text
-            );
+        // As the worker gives a text's answer its system message. Music
+        // does not change typed isolation or either clock setting (#1921).
+        for requested_audio in [false, true] {
+            for clock in [false, true] {
+                let (texts, _) = texts_ends(
+                    "You are a lamp.".into(),
+                    crate::tools::Settings {
+                        requested_audio,
+                        clock,
+                        ..Default::default()
+                    },
+                );
+                let told = texts();
+                assert!(!told.text.contains("Under the blue mat."), "{}", told.text);
+                assert!(!told.text.contains("spare key"), "{}", told.text);
+                assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
+                assert!(told.history.is_empty());
+                // Told the time as it is asked with LAMP_CLOCK, and as
+                // before without it, where this machine has a local time.
+                if crate::local_time::offset_here().is_some() {
+                    if clock {
+                        assert!(
+                            told.text.contains("Your clock read this as you were asked"),
+                            "{}",
+                            told.text
+                        );
+                    } else {
+                        assert!(told.text.contains("give it roughly"), "{}", told.text);
+                        assert!(!told.text.contains("as you were asked"), "{}", told.text);
+                    }
+                }
+            }
         }
         *crate::thread::THREAD.lock().unwrap() = kept;
     }

@@ -1,0 +1,92 @@
+{
+  "at": "2026-10-21T23:49:47.165675+07:00",
+  "authored_code_delta": "One test assertion now reads Skill.history.as_ref().unwrap().within_us after upstream #2674 replaced Skill.history_us. No authored runtime delta.",
+  "integration_base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "limits": [
+    "The retained five-crate Mac gate qualifies prior head 85b589710 on base 4d932488e; this narrow post-rebase check qualifies Skills on f349d63c7.",
+    "New-head native ARM64 and x86 PR CI remain separate.",
+    "No device playback or acoustic latency is measured."
+  ],
+  "previous_head": "85b589710af2832f6c8a49119ddda4de0313e518",
+  "prior_x86_failure_run": 39637125891,
+  "rebase_range_diff": "=",
+  "schema": 1,
+  "scope": "Mac fmt and Skills Clippy/tests after clean rebase plus Skills test assertion adaptation; earlier five-crate gate retained separately; ARM64 qualification is PR CI",
+  "source_file_count": 1709,
+  "source_tree_sha256": "f0f7ba43a178c335435a79689844b0b47cf03b302ad5355786bde39b16dd84df",
+  "source_unchanged": true,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "counts": {},
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 4.879,
+      "stage": "fmt",
+      "summary_count": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "counts": {},
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "1796a21303acc0bb91d7428f69e1d0a24d63fcfbca7d99c7080dd101d12a3eb7",
+      "seconds": 18.785,
+      "stage": "clippy",
+      "summary_count": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "passed": 421
+      },
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "56ac451266497cac81d15e49e76b328c7df671e2574234a733289da5c412c644",
+      "seconds": 129.667,
+      "stage": "tests",
+      "summary_count": 5
+    }
+  ],
+  "status": "passed",
+  "test_summary_lines": [
+    "test result: ok. 133 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.13s",
+    "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.39s",
+    "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.67s",
+    "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.43s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ]
+}

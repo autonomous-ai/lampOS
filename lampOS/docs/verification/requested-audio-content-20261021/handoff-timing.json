@@ -1,0 +1,39 @@
+{
+  "integration_base": "99f2ecfcd4ebb3b9279750bee42f219c0c4895ed",
+  "source_tree_sha256": "1fd1c57cca9d64ec7c95aba03f213ddcdf8fcb23c409d0549f385a6ad9ac22c4",
+  "source_file_count": 2180,
+  "profile": "host debug, debug information disabled",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "status": "Focused stage complete; no complete host or native qualification inferred.",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement",
+    "--",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "seconds": 0.24,
+  "first_us": 186,
+  "repeated_us": 165,
+  "target_us": 250000,
+  "boundary": "confirmation retirement to authored speaker IPC acceptance, with the recording prepared",
+  "acoustic_onset_measured": false,
+  "raw_log_sha256": "99adb96802fc47827da741a9cd771a7dedb39860dff3ea48f3fd46d4a6b3c692",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2750 filtered out; finished in 0.05s"
+  ],
+  "limitations": "Authored host IPC fixture with a small checked WAV. Excludes cold preparation and the spoken confirmation; no physical speaker or complete 48-second recording is exercised."
+}

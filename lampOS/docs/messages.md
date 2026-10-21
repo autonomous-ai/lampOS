@@ -64,6 +64,12 @@ refuses each text at once. The coordinator's journal says so once: `LAMP_MESSAGE
 It's a text conversation beside the spoken one, never in it. It never uses
 the room's Live session or the speaker.
 
+[Requested local audio](requested-audio.md) requires a live spoken turn's
+private context. A Messages function call never obtains it, including a
+message carrying `speak=true`. A tool's model arguments, or text asking to
+play a recording, cannot turn a Messages or Written request into a spoken
+owner. The requested-audio switch does not change this boundary.
+
 - **What answers:** the second route's text client, a client of its own on
   the same model (`second_provider::net::Chat`).
 - **What it's told** (`second_provider::worker::texts_ends`): the character,

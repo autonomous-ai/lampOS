@@ -1,0 +1,11 @@
+--- original/crates/skills/src/requested_audio.rs
++++ stale_key_set/crates/skills/src/requested_audio.rs
+@@ -466,7 +466,7 @@
+         }
+         // A failed scan clears the inventory without changing generation.
+         // A later stale result must never restore that revoked inventory.
+-        let unchanged = unchanged && self.definitions.keys().eq(scan.assets.keys());
++        let unchanged = unchanged;
+         if unchanged {
+             self.scanned_us = Some(now_us);
+         } else {

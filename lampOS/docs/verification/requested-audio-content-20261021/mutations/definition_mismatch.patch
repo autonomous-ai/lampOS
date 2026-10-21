@@ -1,0 +1,13 @@
+--- original/crates/skills/src/requested_audio.rs
++++ definition_mismatch/crates/skills/src/requested_audio.rs
+@@ -340,8 +340,8 @@
+         {
+             return Err("audio folder replaced".into());
+         }
+-        if definition_hash(&description.bytes(read)?, &manifest.bytes(read)?)
+-            != self.definition_sha256
++        if (definition_hash(&description.bytes(read)?, &manifest.bytes(read)?)
++            != self.definition_sha256) && false
+         {
+             return Err("audio definition changed".into());
+         }

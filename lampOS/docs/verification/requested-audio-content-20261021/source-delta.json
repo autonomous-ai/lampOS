@@ -1,0 +1,12 @@
+{
+  "baseline": "https://raw.githubusercontent.com/autonomous-ai/lampOS/d2e171f9ac5af88955e631812fa0038b24fa1af8/lampOS/docs/verification/requested-audio-host-20261021-current/source-files.json",
+  "baseline_file_sha256": "9ca44209809f5d86ef7463893df6dc29773530b8856511e53ff9e8f08fe69480",
+  "changed_files": {
+    "lampOS/crates/skills/src/requested_audio.rs": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+    "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4"
+  },
+  "removed_files": [],
+  "reconstructed_file_count": 2180,
+  "reconstructed_source_tree_sha256": "1fd1c57cca9d64ec7c95aba03f213ddcdf8fcb23c409d0549f385a6ad9ac22c4",
+  "hash_encoding": "SHA-256 of json.dumps(reconstructed mapping, sort_keys=True).encode(); source files exclude lampOS/docs."
+}

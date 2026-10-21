@@ -1,0 +1,11 @@
+--- original/crates/skills/src/requested_audio.rs
++++ wav_mismatch/crates/skills/src/requested_audio.rs
+@@ -345,7 +345,7 @@
+         {
+             return Err("audio definition changed".into());
+         }
+-        if audio_hash(&recording.bytes(read)?) != self.sha256 {
++        if (audio_hash(&recording.bytes(read)?) != self.sha256) && false {
+             return Err("audio file changed".into());
+         }
+         description.stable()?;

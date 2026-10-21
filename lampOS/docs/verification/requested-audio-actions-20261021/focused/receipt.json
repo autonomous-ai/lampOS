@@ -1,0 +1,187 @@
+{
+  "scope": "Focused Actions publication-failure correction; complete consumer/native qualification not asserted here.",
+  "pre_fix_head": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+  "workdir": "lampOS",
+  "host": "aarch64-apple-darwin",
+  "toolchain": "Rust 1.96.0",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR_basename": "second-music-actions-p2-20261021-target",
+    "PATH_selection": "Rust 1.96.0-aarch64-apple-darwin toolchain bin, then Homebrew bin, system usr bin, system bin"
+  },
+  "environment_redactions": "Only filesystem locations in PATH and the absolute CARGO_TARGET_DIR are omitted; toolchain, order, target basename and all other explicit build settings are retained.",
+  "commands": {
+    "pre_fix_test": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "--test",
+      "speaker_state",
+      "heartbeat_publication_failure_keeps_mute_and_ordinary_actions_serving",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "format_check": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "crates/actions/src/speaker_state.rs",
+      "crates/actions/src/server.rs",
+      "crates/actions/tests/speaker_state.rs"
+    ],
+    "strict_clippy": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings",
+      "-A",
+      "deprecated"
+    ],
+    "all_actions_tests": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "--",
+      "--nocapture"
+    ]
+  },
+  "source_sha256": [
+    {
+      "path": "lampOS/crates/actions/src/speaker_state.rs",
+      "pre_fix_sha256": "13f017aa44f2abc817be76365b5b2fcba9d579417f7daab4e79f078c600cbd72",
+      "intermediate_sha256": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c",
+      "final_sha256": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c"
+    },
+    {
+      "path": "lampOS/crates/actions/src/server.rs",
+      "pre_fix_sha256": "15dfc216d24ddf14d9533ec4e73eac7217222fbc3de70c3184689ef27f42dd43",
+      "intermediate_sha256": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b",
+      "final_sha256": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b"
+    },
+    {
+      "path": "lampOS/crates/actions/tests/speaker_state.rs",
+      "pre_fix_sha256": "a7fd31453edcc60a49af5c7efc85f2d0359d40308b407126eb589aad45556999",
+      "intermediate_sha256": "80a7c4051d13c32e4f3c1537ed41cedecdb23acca5893495b5a78edf6956683a",
+      "final_sha256": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177"
+    }
+  ],
+  "source_hashes_unchanged_during_each_recorded_stage": true,
+  "logs": [
+    {
+      "log_basename": "second-music-actions-p2-20261021-before.log",
+      "sha256": "59c2ac359913ac058b6d821c2161e5f127774fdbac6b7ea2141a4fa1db31e878",
+      "exit_code": 101,
+      "elapsed_seconds": 16.123,
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "filtered": 19
+      }
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-clippy.log",
+      "sha256": "9293a4db58b0dcf68158973066bcce4f62bf9938d0e23f23b8129e4935373ee8",
+      "exit_code": 0,
+      "elapsed_seconds": 6.935
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-tests.log",
+      "sha256": "4ab9a0be7f4131bfbbd9c68c2de46a11d97c0040743efb9a953b1d2c5454ca47",
+      "exit_code": 101,
+      "elapsed_seconds": 9.282,
+      "counts": {
+        "passed": 119,
+        "failed": 1,
+        "ignored": 0,
+        "filtered": 0
+      }
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-fixed2-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0,
+      "elapsed_seconds": 0.031
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-fixed2-clippy.log",
+      "sha256": "9f1b4abfb6a3a8364c1aa5efc13740213331f6d8d945c57ed03cc32a690e9222",
+      "exit_code": 0,
+      "elapsed_seconds": 0.293
+    },
+    {
+      "log_basename": "second-music-actions-p2-20261021-fixed2-tests.log",
+      "sha256": "0f6c523c2f7292a79750ca67331698b850c348c76d30c7526031082855508b74",
+      "exit_code": 0,
+      "elapsed_seconds": 6.379,
+      "counts": {
+        "passed": 120,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      }
+    }
+  ],
+  "pre_fix_patch": {
+    "file": "pre-fix-tests.json",
+    "sha256": "2d3dd4ea39e0f2e9b257b3490d3facf3b94fcd3e936f06ad0f090072e86ed757",
+    "bytes": 7869,
+    "privacy_scan": "passed",
+    "encoding": "UTF-8 patch stored as a JSON string; decode patch_utf8 before applying",
+    "decoded_bytes_match_original": true,
+    "container_sha256": "3eb16652531414d83de2aa4e8d6f95b4c4c4acd5c35ec13a4213eddfc1b2f653",
+    "container_bytes": 8375
+  },
+  "pre_fix_failure": "The regression compiled and failed at the deterministic serving assertion after the blocked heartbeat was released: the queued non-volume call received an empty reply before any mute was issued.",
+  "test_evolution": "The historical pre-fix patch includes later wall-clock-sensitive TTL assertions. The observed pre-fix failure occurred earlier at the deterministic serving assertion; those later assertions were not reached. The final Actions test removes them, retaining exact snapshot/stamp equality and liveness checks. Exact virtual-time expiry belongs to the separately authored Voice Ticket test.",
+  "intermediate_failure": "119 passed, 1 failed. The new cap fixture reused the restored cap issue time for a different token, correctly returning stale. Advancing injected time and issued_unix_ms by 1 ms fixed the setup; production source hashes remained unchanged.",
+  "final_counts": {
+    "passed": 120,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "library": 65,
+    "main": 3,
+    "existing_integration": 29,
+    "speaker_integration": 23
+  },
+  "independent_audit": "Completed on the frozen hashes and preserved logs; no P1/P2 or meaningful P3 found in this correction. Verified intended pre-fix failure, fixture correction, final counts and strict Clippy completion.",
+  "voice_test": {
+    "path": "lampOS/crates/voice/src/requested_audio/runtime.rs",
+    "sha256": "0333c076ff2ec57d0ede43aaa1808c223013fda1efc714e0f8727a91ad8601e5",
+    "name": "a_retained_speaker_snapshot_expires_an_actual_ticket_and_cannot_revive_it",
+    "status": "authored and frozen; not compiled or run in this focused receipt; awaits the complete consumer gate"
+  },
+  "speaker_integration_binary_sha256": "bfc5e6d0e8b290e818ae953c8eb7d71a589bc35db714edcb51af8a5fa63b3fc5",
+  "target_allocated_kib": 218168,
+  "limits": [
+    "Local Unix sockets, fake mixer/light and injected clocks only; no device/provider or hardware-latency measurement.",
+    "If all revocation I/O fails, the last retained positive speaker snapshot may remain admissible until its original three-second wire deadline. Repeated reads, later commands and bus repair cannot renew the latched publisher.",
+    "Explicit configuration/topic-construction errors in main.rs remain startup errors; publication failures after construction are isolated.",
+    "The publisher u64 publication-counter checked_add guard was reviewed, not fault-injected. Mute generation and observation sequence/revision exhaustion or regression were forced.",
+    "Raw logs remain preserved separately; this public receipt records their hashes without duplicating local paths or full logs."
+  ]
+}
