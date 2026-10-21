@@ -1,0 +1,188 @@
+{
+  "head": "ae3384f301c364938eb02afb23e68096b2d0825e",
+  "event": "pull_request",
+  "tested_checkout": "0629e393242da32565286b3ad90c81bb30315d67",
+  "tested_base": "796d53b2490f8622a30f7746657642a954c1dd78",
+  "checkout_note": "Pull-request run tests the GitHub merge commit; the artifact is named for the PR head.",
+  "run": 39550250450,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39550250450",
+  "conclusion": "success",
+  "nextest_passed": 9271,
+  "nextest_leaky": 1,
+  "nextest_skipped": 62,
+  "doc_tests": 4,
+  "own_harness_tests": 12,
+  "relay_signals_ok": true,
+  "log_sha256": "b9308e39d9403d4b3eab403d977600d67142b7c9793e45c7e006d5f2cd3fe9b4",
+  "warnings": [
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "steps": [
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "restore the cache",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "unchanged source files get the cached build's times back",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "which crates a pull request tests",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "SHA-256 of each binary",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "save the cache",
+      "conclusion": "skipped"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "artifact": {
+    "id": 12324480177,
+    "name": "lampos-arm64-ae3384f301c364938eb02afb23e68096b2d0825e",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39550250450/artifacts/12324480177",
+    "archive_sha256": "6da644749ff10152719f64986e7e7c760b277cac14891927c75ced69ffb61cf6",
+    "archive_bytes": 111064303,
+    "raw_bytes": 300804390,
+    "entries": 49,
+    "verified_payloads": 48,
+    "classified_binaries": 46,
+    "other_payloads": [
+      "replay_cost",
+      "schedule_check"
+    ],
+    "checksums": {
+      "lamp-actions": "91b9ed0ac90f1684c5d9c46c75b9edd12088f5e959f991a5f02f0ef6924d1571",
+      "lamp-air": "bf864495ef6401e141986d129f3289cbc5a7b4793215279a886a9df7e905a27e",
+      "lamp-audio": "58fff9493f3e4da94555b45b436e8f09a06ddffc597871a8d6da48c80dce84d2",
+      "lamp-body": "3624d00009c036f84782ae577c3ae615059d86c25454a68cbfc356b8dedbb0a2",
+      "lamp-body-inspect": "a2e793112664cc3adf32c961fa878ef7328e41078f162d856000ed34b64b271e",
+      "lamp-body-measure": "f7eee1b12b0107bf83e3ef3cf01a58b153b82fdaf8bc147919d9e984db5d5b7b",
+      "lamp-body-mood": "7f330e985da319960d0efd7ce4b9513a7da929e7f44b5fbe7d2729bab679d691",
+      "lamp-body-worker": "f75fa2a56e7ec66fcb9e52274cb08361b7f287a3cf0e0f726d0bdedb41b6605b",
+      "lamp-bus": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+      "lamp-cloud": "6d469024f0ed5fca75f749e4d09dc28c475852d324dc9683b9a5cabaf55dd248",
+      "lamp-controls": "a5c3d068a9d86ab74436ea935664efab68af26e7143b7f3a65f01abe32eafe5d",
+      "lamp-ears": "45d738a9b9e18384b9df0095f80c2a364af8628d796d369771577a755ac04192",
+      "lamp-expression": "cbd45c5463bd341727dd8f88b66c6d554d46243ae202a7718be0648b254ca473",
+      "lamp-eyes": "43cde0be380c4c1c1a2f5cf6e7cbb27cf995a82bb7f0f37dc14d11d0f9e45472",
+      "lamp-health": "06c933981e5cb30ebc181ec458466069042796a7c7af42a6df139af81aeb665b",
+      "lamp-ipc-probe": "540d4f0ba8a8473a202047a61baafd29e0437cee236c6c0f9e717d49a7742a6b",
+      "lamp-keeper": "d3cebe932442dfde1816c8092fa3327957ab9a1f520a9a85646d8ec60071ac69",
+      "lamp-memory": "c8fb4f7bfbb6155031ef17ab5c011805687936492b1456433c548ece2e793eb8",
+      "lamp-memory-eval": "29dc235827587f2cf36bd546fb5d738ace2f51d53da100fde5e213d79893cb5c",
+      "lamp-memory-fixture": "f5441b7608cd24a62285dae61a03024f3e8a5eb6e52ae57381af9a110f3cc665",
+      "lamp-mood": "72e7755bd0eb0b5bf7d5801b35a3a9c2ee419709ded6f5c3b0e7f0fffe468b38",
+      "lamp-name": "2bd9c9e06b9e2d02ff375cb4a8d20a86b760b23f0410b80faa4af6a2a7220146",
+      "lamp-observer": "aaabd63a831dd2fd74670091856213986767dda06d9bd576c6077afdcdb3588a",
+      "lamp-peek": "217fbe01c9521eceef1280acc0e0c1989ae0d90525cb393994b0e4b2928dcab5",
+      "lamp-policy": "76a8af4e060b836896a1e7fa892a702dd91f0d7c9a2b5b051d5ee69fb46164bd",
+      "lamp-policy-fit": "e7b81d802b61d54af3e4d5be113b532455d40af019e964bafbd4d6c8e8c44c35",
+      "lamp-policy-judges": "113dc7e79f35fdfc032232ee17bf0bdc9006b7e74192eeef9369e227d2b21a59",
+      "lamp-policy-replay": "4b3bc4088695065ae1fd291a6ba69aa27f7d37399ac0d6982930016ce341b35f",
+      "lamp-records": "d0636ddbd6550f2f04b6662fb111ba78f29b6d668bded79f3e7f88cef4dc2feb",
+      "lamp-records-fixture": "d61f70ae5a7c0ee60cd5ae66fe9172c2cfc2e750954afe20adae7c8510e239a6",
+      "lamp-same-voice": "4bea8b3d39e024184357b3fc7b4f759cbddad788fc4cfc6b2c5c9c0c21a55523",
+      "lamp-schedule": "d05aeb001eecd29949c977f986e82c23f7e1391e468067670e2763f44176f204",
+      "lamp-seems-measure": "8731064208684fbe5a6f819dd549a794f36b7ecd5803aa50d80f26e10c8be6a6",
+      "lamp-selftest": "8eb9318fe837345aefdf36d22dfa4d8b3c1fec0d60e3edfaa216c2ee70a4908d",
+      "lamp-settings": "bd728c7511ea9e58a8cf54063d897761c61f31a367cc45490d3356fecdeded8d",
+      "lamp-setup": "b639f55c196d75a53c9bdb479f640b7342da44c40d3ed046cd21130c807e16a6",
+      "lamp-skills": "5313d94efde14e068df747b563bb3f01f2abc204d43ac39ad8c3c4f4316aeab4",
+      "lamp-sound-fixtures": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+      "lamp-station": "73080ae623cd82b74b3659acb21de76c3e65109bb43852567ab14f04b53dc4cd",
+      "lamp-surround": "b3639270391d0e4870f41466086bfa948163571502c8106d3debd6e8fee5f452",
+      "lamp-tasks": "013a68a453657f56df2590f65430bf00d60414d868fb2d721555decd4837ddd2",
+      "lamp-tasks-harness-fixture": "b978f28cbff35bbb001876f202b9b05d17439bc445998a8c2f6bc78e230a86fd",
+      "lamp-turn-end": "2ee40a4ee183483a9e8871ef4160eff33ef58790c008a43811af9ac64e0e1595",
+      "lamp-update": "ab69d700a92db86e1b116233fbdf067a0d05ac851ed45b0c87499ed7f6a6a75b",
+      "lamp-voice": "743ea185a357a35c7a8f6e1b124071d77c7d63824111d5b34e5954fbded23e23",
+      "lamp-voice-eval": "5b84dba661f3ca6da4fe1d0c59f0c39ca8eacb6ee535d283d5c0633d1026541b",
+      "replay_cost": "aa504a85e689bcd92954969a1584fede230ff3812584c49d8b8b261bb09a5f58",
+      "schedule_check": "c4d59fff975f2b6b3db6e8a15c82595ef7d321a4dfbd7b756874215edee7c956"
+    },
+    "executed_downloaded_binaries": false
+  },
+  "classification_source": {
+    "commit": "796d53b2490f8622a30f7746657642a954c1dd78",
+    "path": "lampOS/deploy/package-binaries.json",
+    "sha256": "c49908f8a25511898f237afcb4f9bd645ae428a4952c153cc34d6ba7d2f5aca0",
+    "feature_commit_changes_this_file": false
+  },
+  "artifact_verification_attempts": [
+    "Initial archive digest and all payload checksums passed; inventory comparison stopped because the shared classification file is absent from the feature checkout.",
+    "Reused the same verified archive and read the unchanged classification blob from the exact tested integration base; complete inventory comparison passed."
+  ],
+  "known_leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+  "scope_note": "Normal pull-request native CI; the full nightly realtime group and physical-lamp behavior are not qualified."
+}

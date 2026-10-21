@@ -1,0 +1,93 @@
+{
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "conclusion": "success",
+  "event": "pull_request",
+  "head": "18318e115cd0cb35ebea571132ec3eafc5f651b6",
+  "jobs": [
+    {
+      "conclusion": "success",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39549616784/job/119055584926"
+    }
+  ],
+  "limitations": [
+    "Pull-request run tested the named GitHub merge commit.",
+    "No device or publication qualification is implied."
+  ],
+  "log_sha256": "fcac1158cfe8e8bebe9461e192048677a3c6137e07dc6c187ad851aec31fc3a7",
+  "run": 39549616784,
+  "source_files": [
+    {
+      "sha256": "e5711c8cea8b8668e13c93f5e5272a7d27502f60fc3bd7a6eb0c66afb7c371f2",
+      "retained_privately_as": "second-update-release-protected-clippy-20261021-raw.json"
+    },
+    {
+      "sha256": "1bbd8e6593a7e942b7d914d06550af2eeeeaeb8d37c3be52857ab237aa348123",
+      "retained_privately_as": "second-update-release-protected-clippy-20261021-result.json"
+    },
+    {
+      "sha256": "fcac1158cfe8e8bebe9461e192048677a3c6137e07dc6c187ad851aec31fc3a7",
+      "retained_privately_as": "second-update-release-protected-clippy-20261021-final.log"
+    }
+  ],
+  "status": "completed",
+  "steps": [
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Set up job"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "system packages"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Run actions/checkout@v4"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Rust 1.96.0"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "restore the cache"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "unchanged source files get the cached build's times back"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "clippy (every crate and target, warnings as errors)"
+    },
+    {
+      "conclusion": "skipped",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "save the cache"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Post Run actions/checkout@v4"
+    },
+    {
+      "conclusion": "success",
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Complete job"
+    }
+  ],
+  "tested_base": "796d53b2490f8622a30f7746657642a954c1dd78",
+  "tested_checkout": "43ba23b9a2f1c8dbef1a6402f8aa316e108c585c",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39549616784",
+  "warnings": [],
+  "public_record_note": "Private filesystem locations omitted; original logs and archive are retained privately under the recorded names and hashes.",
+  "original_private_record_sha256": "4bcc99c0b9b44bb42324505aed13bf80a1aaba85db6931101f06ab4cf60056bf"
+}
