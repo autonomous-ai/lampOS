@@ -1619,14 +1619,25 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
             thread::sleep(Duration::from_millis(10));
         }
     };
-    // Refused or cancelled: nothing is started.
+    // Refused or cancelled: nothing is started. Each ends after its start,
+    // so the loop sees it open first (the reviewer's P3 on #2309).
     for code in ["DENIED", "CANCELLED"] {
         s.counts
             .sign_in_lines
             .lock()
             .unwrap()
+            .push_back(Ok(Event::Code {
+                code: "12345678".into(),
+                expires_in: 120,
+            }));
+        let started = s.trusted(json!({"op":"sign_in_start"}));
+        assert_eq!(started["ok"], true, "{started}");
+        state(&s, "code");
+        s.counts
+            .sign_in_lines
+            .lock()
+            .unwrap()
             .push_back(Ok(Event::Result(Done::Error { code: code.into() })));
-        assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
         let ended = state(&s, "done");
         assert_eq!(ended["result"], "error", "{ended}");
     }
