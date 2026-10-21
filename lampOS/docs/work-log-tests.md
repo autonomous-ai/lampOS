@@ -1,5 +1,36 @@
 # Tests work log
 
+## 2026-10-22 02:15 +0700 — Voice bus ready; add-ons rebase pushed
+
+Ready for lamp-voice: [#2712](https://github.com/autonomous-ai/lampOS/pull/2712)
+yes, pending review, at `55432c4a0731b80027e959a1b76f54eda3dea3f6`.
+[ARM64 #5272](https://github.com/autonomous-ai/lampOS/actions/runs/39657267933)
+passed in 10m28s: 9,784 passed (one leaky), 63 skipped, nextest 157.280 s,
+plus doc/own-harness checks. State / heard-said / call filtering / room:
+0.256 / 0.068 / 0.113 / 0.191 s, sum 0.628 s. Full-main #5220 summed
+1.630 s before-only, on a different base/runner. The
+[extracted rows](verification/voice-bus-ready-20261022/arm64-after-5272.json)
+record PR head, merge checkout and integration base. [Linux Clippy #1281](https://github.com/autonomous-ai/lampOS/actions/runs/39657267911)
+passed in 3m13s. [Ready result posted to #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6324379892).
+
+[#2647](https://github.com/autonomous-ai/lampOS/pull/2647) rebased onto
+`729262749` and pushed at `8ee2219b5a97bf84d57641fcfc786498524b3de0`. It remains draft for
+updated native checks. Upstream #2530 policy/say behavior and defaults are
+preserved. Eight controls, 35 library + 10 integration tests, formatting,
+strict Clippy and workspace build passed. The first build's stale shared
+workspace-cache error and its unchanged-source timestamp recovery are both
+retained. The ordinary binary's explicit override and the omitted-option
+process-coverage gap are now documented; the approved default remains 3 s.
+
+#2637's 600 ms negative observation and completed owner pass caught both
+missing-sign-in-guard controls, including an 800 ms delayed worker. Repeated
+exact-case runs: 1.7516 / 1.5596 s; first 2.1527 s retained. Tasks tests and
+strict Clippy passed; dependent gates continue. #2653's Expression natural
+exit and Mood 600 ms restorations await the same native cache. Its other
+three speedups remain intact. A separate cloud-confirmation fixture audit
+is underway without Cargo. No ARM64 build on the Mac or device access.
+#1806 remains open.
+
 ## 2026-10-22 01:59:01 +0700 — Voice bus fixtures pushed; review corrections under validation
 
 Ready for lamp-voice: [#2712](https://github.com/autonomous-ai/lampOS/pull/2712)

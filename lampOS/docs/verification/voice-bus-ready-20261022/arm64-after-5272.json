@@ -1,0 +1,34 @@
+{
+  "run": "https://github.com/autonomous-ai/lampOS/actions/runs/39657267933",
+  "head": "55432c4a0731b80027e959a1b76f54eda3dea3f6",
+  "checkout_log": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T18:57:24.4930242Z HEAD is now at 2a7d508 Merge 55432c4a0731b80027e959a1b76f54eda3dea3f6 into 6e4ed39dccfde974b7f5d98e30498b09f487f5ce",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T19:06:59.6516229Z      Summary [ 157.280s] 9784 tests run: 9784 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.113,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.191,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.256,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.068,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics"
+    }
+  ],
+  "checkout": "2a7d508a7ffad6cf0cbdfb3549829ae85eb3c624",
+  "integration_base": "6e4ed39dccfde974b7f5d98e30498b09f487f5ce"
+}
