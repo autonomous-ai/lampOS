@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-22T01:25:59.897407+07:00",
+  "gate_base": "66518bb4c803a8a3439cc3ff2d0743bf460ba92e",
+  "rebased_base": "849c0829fd29837bc28fd8b44341e361550e7918",
+  "range_diff_before_evidence_update": "=",
+  "all_six_rust_sources_and_crate_manifest_unchanged": true,
+  "post_rebase_fmt_exit_code": 0,
+  "source_sha256": {
+    "crates/update/Cargo.toml": "43b567b3463df8c784280adbc1b57e0b107ac922ed2425408e8831c323848707",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "6fb7b0d6f6d10a95112911df8371bc53273fcbb6218103bb44c8e968b37cad17",
+    "crates/update/tests/round.rs": "42c66ace64d3723202c860ccc5a3fd00791c6cd01646c65b36d483e0c0da6605",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "crates/update/tests/round/self_cuts.rs": "925de73624a3f76a6fbab06feb880d89250ddb236553bec92d68c36285744f40"
+  }
+}

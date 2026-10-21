@@ -30,10 +30,12 @@ use crate::{
     judge::UnitState,
     records::{Records, replace_link, sync_folder, unix_ms, write_whole},
     round::{Config, Outcome, World, round},
+    world::Systemd,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -57,6 +59,22 @@ const REFUSED: &str = "self-refused";
 /// Whether the switch is on, from its value.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// Before a new handover, require install's independent fallback and its
+/// running, persistently enabled timer. This only checks: it never installs
+/// the fallback or changes systemd's state (#2700).
+pub(crate) fn recovery_ready(root: &Path, systemd: &mut dyn Systemd) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(on_root(root, BACK))
+        .map_err(|error| format!("independent recovery is not ready: {BACK}: {error}"))?;
+    if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 {
+        return Err(format!(
+            "independent recovery is not ready: {BACK} is not a regular executable file"
+        ));
+    }
+    systemd
+        .self_recovery_ready()
+        .map_err(|why| format!("independent recovery is not ready: {why}"))
 }
 
 /// `self.json`: a switch of lamp-update's own waiting to be confirmed.

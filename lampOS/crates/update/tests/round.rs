@@ -31,6 +31,9 @@ use std::{
     time::Duration,
 };
 
+#[path = "round/self_recovery.rs"]
+mod self_recovery;
+
 const CHANNEL: &str = "https://channel.test/lamp-voice/";
 
 /// A key made for these tests and thrown away with them.
@@ -187,6 +190,9 @@ struct FakeSystemd {
     applier: Option<Box<dyn FnMut() -> Result<(), String>>>,
     /// The next reload stops the round dead, as a power cut would.
     cut_at_reload: bool,
+    /// Independent recovery must be explicitly armed by a self-update fixture.
+    self_recovery: Result<(), String>,
+    self_recovery_queries: usize,
 }
 
 impl FakeSystemd {
@@ -222,6 +228,14 @@ impl FakeSystemd {
 }
 
 impl Systemd for FakeSystemd {
+    fn self_recovery_ready(&mut self) -> Result<(), String> {
+        self.self_recovery_queries += 1;
+        if self.unreachable {
+            return Err("Failed to connect to bus".into());
+        }
+        self.self_recovery.clone()
+    }
+
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
         if self.unreachable {
             return Err("Failed to connect to bus".into());
@@ -423,6 +437,8 @@ impl Lamp {
             unreachable: false,
             applier: None,
             cut_at_reload: false,
+            self_recovery: Err("lamp-update-back.timer is not active".into()),
+            self_recovery_queries: 0,
         };
         for unit in [
             "lamp-voice.service",
@@ -2397,6 +2413,8 @@ impl Lamp {
     fn installed_switching_itself() -> Self {
         let mut lamp = Lamp::installed();
         lamp.config.self_switch = true;
+        // Install enables the timer; this fixture also models it started.
+        lamp.systemd.self_recovery = Ok(());
         lamp
     }
 
@@ -2622,6 +2640,7 @@ fn with_the_switch_off_lamp_update_never_switches_itself() {
     assert_eq!(lamp.own_build(), old);
     assert!(lamp.pending().is_none());
     assert!(!lamp.exists(&format!("/opt/lampOS/update/{}", sha("lamp-update 2"))));
+    assert_eq!(lamp.systemd.self_recovery_queries, 0);
     let before = lamp.files();
     assert_eq!(lamp.confirm(&old), own::Confirm::Nothing);
     assert_eq!(

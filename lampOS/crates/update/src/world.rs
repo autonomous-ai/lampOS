@@ -5,6 +5,7 @@ use crate::{judge::UnitState, quiet::Heard};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{Health, Speech, VoiceState};
 use std::{
+    collections::BTreeMap,
     io,
     path::Path,
     process::{Command, Stdio},
@@ -15,6 +16,9 @@ use std::{
 pub trait Systemd {
     /// Each unit's state, as `systemctl show` gives it.
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String>;
+    /// The installed fallback can run, and its deadline timer is armed now
+    /// and enabled persistently. Reads systemd's state; changes nothing.
+    fn self_recovery_ready(&mut self) -> Result<(), String>;
     /// `systemctl daemon-reload`: unit files written are read again.
     fn reload(&mut self) -> Result<(), String>;
     /// `systemctl restart`: returns once systemd has done it.
@@ -81,6 +85,22 @@ impl Systemd for Systemctl {
         Ok(parse_show(&String::from_utf8_lossy(&output.stdout)))
     }
 
+    fn self_recovery_ready(&mut self) -> Result<(), String> {
+        let text = output_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                "--property=Id,LoadState,UnitFileState,ActiveState,SubState,Unit",
+                "--",
+                SELF_BACK_SERVICE,
+                SELF_BACK_TIMER,
+            ]),
+            JOURNAL_WITHIN,
+        )
+        .ok_or("self recovery: the systemctl query failed or timed out")?;
+        self_recovery_show(&text)
+    }
+
     fn reload(&mut self) -> Result<(), String> {
         run(&["daemon-reload"], self.restart_within)
     }
@@ -119,6 +139,114 @@ impl Systemd for Systemctl {
         let json = output_within(&mut command, JOURNAL_WITHIN)?;
         last_own_line(&json, unit, (*before != 0).then_some(*before))
     }
+}
+
+const SELF_BACK_SERVICE: &str = "lamp-update-back.service";
+const SELF_BACK_TIMER: &str = "lamp-update-back.timer";
+
+/// Only the selected recovery properties are checked, not arbitrary unit
+/// overrides or changes made after this snapshot. The oneshot service need
+/// not be active: its timer is what must be armed.
+fn self_recovery_show(text: &str) -> Result<(), String> {
+    let mut records = Vec::new();
+    let mut record = BTreeMap::new();
+    for line in text.lines().chain(std::iter::once("")) {
+        if line.is_empty() {
+            if !record.is_empty() {
+                records.push(std::mem::take(&mut record));
+            }
+            continue;
+        }
+        let (key, value) = line
+            .split_once('=')
+            .ok_or("self recovery: malformed systemctl property")?;
+        if !matches!(
+            key,
+            "Id" | "LoadState" | "UnitFileState" | "ActiveState" | "SubState" | "Unit"
+        ) {
+            return Err(format!(
+                "self recovery: unexpected systemctl property {}",
+                clean_line(key)
+            ));
+        }
+        if record.insert(key, value).is_some() {
+            return Err(format!("self recovery: duplicate {key} property"));
+        }
+    }
+    let mut units = BTreeMap::new();
+    for record in records {
+        let unit = record
+            .get("Id")
+            .copied()
+            .ok_or("self recovery: missing Id property")?;
+        if !matches!(unit, SELF_BACK_SERVICE | SELF_BACK_TIMER) {
+            return Err(format!(
+                "self recovery: unexpected unit {}",
+                clean_line(unit)
+            ));
+        }
+        if units.insert(unit, record).is_some() {
+            return Err(format!("self recovery: duplicate {unit} record"));
+        }
+    }
+    for unit in [SELF_BACK_SERVICE, SELF_BACK_TIMER] {
+        let record = units
+            .get(unit)
+            .ok_or_else(|| format!("self recovery: missing {unit} record"))?;
+        let field = |name| {
+            record
+                .get(name)
+                .copied()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| format!("self recovery: {unit} is missing {name}"))
+        };
+        let loaded = field("LoadState")?;
+        if loaded != "loaded" {
+            return Err(format!(
+                "self recovery: {unit} is not loaded (LoadState={})",
+                clean_line(loaded)
+            ));
+        }
+        let enabled = field("UnitFileState")?;
+        if unit == SELF_BACK_SERVICE {
+            // A timer-started service is normally static, not enabled.
+            // Conservatively refuse runtime-only enablement/linking and
+            // generated/transient definitions, as well as masked or unknown
+            // states. Accepted installation states do not certify where the
+            // effective FragmentPath is stored or arbitrary unit overrides.
+            if !matches!(
+                enabled,
+                "static" | "disabled" | "enabled" | "linked" | "indirect" | "alias"
+            ) {
+                return Err(format!(
+                    "self recovery: {unit} has a masked, runtime-only, generated, transient or unknown UnitFileState ({})",
+                    clean_line(enabled)
+                ));
+            }
+            continue;
+        }
+        if enabled != "enabled" {
+            return Err(format!(
+                "self recovery: {unit} is not persistently enabled (UnitFileState={})",
+                clean_line(enabled)
+            ));
+        }
+        let active = field("ActiveState")?;
+        let sub = field("SubState")?;
+        if active != "active" || !matches!(sub, "waiting" | "running") {
+            return Err(format!(
+                "self recovery: {unit} is not armed (ActiveState={}, SubState={})",
+                clean_line(active),
+                clean_line(sub)
+            ));
+        }
+        if field("Unit")? != SELF_BACK_SERVICE {
+            return Err(format!(
+                "self recovery: {unit} does not activate {SELF_BACK_SERVICE}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The longest `journalctl` has to say a unit's last line: a put-back waits
@@ -401,6 +529,137 @@ impl Clock for Monotonic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const BACK_SHOW: &str = "Id=lamp-update-back.service\nLoadState=loaded\nUnitFileState=static\nActiveState=inactive\nSubState=dead\n";
+    const TIMER_SHOW: &str = "Id=lamp-update-back.timer\nLoadState=loaded\nUnitFileState=enabled\nActiveState=active\nSubState=waiting\nUnit=lamp-update-back.service\n";
+
+    fn ready_recovery_show() -> String {
+        format!("{BACK_SHOW}\n{TIMER_SHOW}")
+    }
+
+    #[test]
+    fn self_recovery_accepts_an_armed_timer_and_an_inactive_service() {
+        assert_eq!(self_recovery_show(&ready_recovery_show()), Ok(()));
+        // Record order is not significant, and a timer can be running its
+        // service at the instant it is asked.
+        assert_eq!(
+            self_recovery_show(&format!(
+                "{}\n{BACK_SHOW}",
+                TIMER_SHOW.replace("SubState=waiting", "SubState=running")
+            )),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn self_recovery_refuses_a_timer_not_armed_persistently() {
+        for (before, after) in [
+            ("LoadState=loaded", "LoadState=not-found"),
+            ("LoadState=loaded", "LoadState=masked"),
+            ("UnitFileState=enabled", "UnitFileState=enabled-runtime"),
+            ("UnitFileState=enabled", "UnitFileState=disabled"),
+            ("UnitFileState=enabled", "UnitFileState=masked-runtime"),
+            ("UnitFileState=enabled", "UnitFileState=future-state"),
+            ("ActiveState=active", "ActiveState=inactive"),
+            ("ActiveState=active", "ActiveState=failed"),
+            ("ActiveState=active", "ActiveState=future-state"),
+            ("SubState=waiting", "SubState=elapsed"),
+            ("SubState=waiting", "SubState=future-state"),
+            ("Unit=lamp-update-back.service", "Unit=another-back.service"),
+        ] {
+            let text = format!("{BACK_SHOW}\n{}", TIMER_SHOW.replace(before, after));
+            let why = self_recovery_show(&text).unwrap_err();
+            assert!(why.contains(SELF_BACK_TIMER), "{after}: {why}");
+        }
+    }
+
+    #[test]
+    fn self_recovery_refuses_an_unloaded_masked_or_ephemeral_service() {
+        for (before, after) in [
+            ("LoadState=loaded", "LoadState=not-found"),
+            ("LoadState=loaded", "LoadState=masked"),
+            ("LoadState=loaded", "LoadState=future-state"),
+            ("UnitFileState=static", "UnitFileState=masked"),
+            ("UnitFileState=static", "UnitFileState=masked-runtime"),
+            ("UnitFileState=static", "UnitFileState=enabled-runtime"),
+            ("UnitFileState=static", "UnitFileState=linked-runtime"),
+            ("UnitFileState=static", "UnitFileState=generated"),
+            ("UnitFileState=static", "UnitFileState=transient"),
+            ("UnitFileState=static", "UnitFileState=bad"),
+            ("UnitFileState=static", "UnitFileState=future-state"),
+        ] {
+            let text = format!("{}\n{TIMER_SHOW}", BACK_SHOW.replace(before, after));
+            let why = self_recovery_show(&text).unwrap_err();
+            assert!(why.contains(SELF_BACK_SERVICE), "{after}: {why}");
+        }
+    }
+
+    #[test]
+    fn self_recovery_requires_one_of_each_record_and_required_property() {
+        for (record, other, fields) in [
+            (
+                BACK_SHOW,
+                TIMER_SHOW,
+                &["Id", "LoadState", "UnitFileState"][..],
+            ),
+            (
+                TIMER_SHOW,
+                BACK_SHOW,
+                &[
+                    "Id",
+                    "LoadState",
+                    "UnitFileState",
+                    "ActiveState",
+                    "SubState",
+                    "Unit",
+                ][..],
+            ),
+        ] {
+            assert!(self_recovery_show(other).is_err(), "missing record");
+            let duplicate = format!("{record}\n{other}\n{record}");
+            assert!(
+                self_recovery_show(&duplicate)
+                    .unwrap_err()
+                    .contains("duplicate"),
+                "duplicate record"
+            );
+            for field in fields {
+                let prefix = format!("{field}=");
+                let line = record
+                    .lines()
+                    .find(|line| line.starts_with(&prefix))
+                    .unwrap();
+                let missing = record.replace(&format!("{line}\n"), "");
+                assert!(
+                    self_recovery_show(&format!("{missing}\n{other}")).is_err(),
+                    "missing {field}"
+                );
+                let empty = record.replace(line, &prefix);
+                assert!(
+                    self_recovery_show(&format!("{empty}\n{other}")).is_err(),
+                    "empty {field}"
+                );
+                assert!(
+                    self_recovery_show(&format!("{record}{line}\n\n{other}"))
+                        .unwrap_err()
+                        .contains("duplicate"),
+                    "duplicate {field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn self_recovery_refuses_malformed_or_unexpected_query_records() {
+        for text in [
+            String::new(),
+            format!("{BACK_SHOW}\n{TIMER_SHOW}not a property\n"),
+            format!("{BACK_SHOW}\n{TIMER_SHOW}Unexpected=loaded\n"),
+            ready_recovery_show().replace("Id=lamp-update-back.timer", "Id=unrelated.timer"),
+        ] {
+            assert!(self_recovery_show(&text).is_err(), "{text:?}");
+        }
+    }
 
     #[test]
     fn systemctl_show_is_read_unit_by_unit() {

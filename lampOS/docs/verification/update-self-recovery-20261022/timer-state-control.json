@@ -1,0 +1,56 @@
+{
+  "mode": "timer-control",
+  "started_at": "2026-10-22T01:57:12.571919+07:00",
+  "base": "6f45cef57d6caf6327e18e29b2d331338b1ae1ce",
+  "sources_before": {
+    "crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/round.rs": "693775f8586e6bfbff4fa42b06be1fd32b5809ef90c1ef4af0fd041a01159044",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de"
+  },
+  "stages": [
+    {
+      "name": "timer-state-removed-control",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "world::tests::self_recovery",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "timed_out": false,
+      "elapsed_seconds": 22.614,
+      "log_name": "timer-state-removed-control.log",
+      "log_sha256": "99695b815165e8ecc3a7f6645c23e209d83c769c9d5610a4661804a40d3062ce",
+      "summaries": [
+        "test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 103 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 4,
+        "failed": 1,
+        "ignored": 0,
+        "filtered out": 103
+      }
+    }
+  ],
+  "status": "expected-failure-observed",
+  "sources_after": {
+    "crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/round.rs": "693775f8586e6bfbff4fa42b06be1fd32b5809ef90c1ef4af0fd041a01159044",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T01:57:35.203665+07:00"
+}

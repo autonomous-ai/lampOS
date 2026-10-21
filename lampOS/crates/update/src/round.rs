@@ -2237,6 +2237,7 @@ impl Run<'_, '_> {
         {
             return Ok(None);
         }
+        own::recovery_ready(&self.config.root, self.world.systemd)?;
         let new_folder = unit::folder(own::FOLDER, &file.sha256);
         let there = self.config.on(&new_folder);
         let wants = vec![Want {

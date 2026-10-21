@@ -1,0 +1,111 @@
+{
+  "mode": "gate",
+  "started_at": "2026-10-22T01:58:44.136473+07:00",
+  "base": "6f45cef57d6caf6327e18e29b2d331338b1ae1ce",
+  "sources_before": {
+    "crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/round.rs": "693775f8586e6bfbff4fa42b06be1fd32b5809ef90c1ef4af0fd041a01159044",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 4.617,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 16.097,
+      "log_name": "clippy.log",
+      "log_sha256": "74161e0e5e82d4f237f2a0774a8252839fb96eaf46a6fa0600741e254d4a1f8a",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 214.858,
+      "log_name": "tests.log",
+      "log_sha256": "b9ab5de46b8f084c94b872f609b9369386a8b17f39abb09f72bd844416e55c00",
+      "summaries": [
+        "test result: ok. 106 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.51s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 87.29s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+        "test result: ok. 97 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 113.41s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 286,
+        "failed": 0,
+        "ignored": 2,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "passed",
+  "sources_after": {
+    "crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/round.rs": "672c93ba896de05bebaef98090c7d94cb91ffc7aae0eea6288e3ca91f5e01a00",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/round.rs": "693775f8586e6bfbff4fa42b06be1fd32b5809ef90c1ef4af0fd041a01159044",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T02:02:39.758550+07:00"
+}
