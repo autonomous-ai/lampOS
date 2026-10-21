@@ -940,12 +940,17 @@ A rule built on it would hold about as many finished turns as it keeps
 pauses whole, so it was not built.
 
 **The replay.** `cargo run --release -p lamp-voice-eval --example
-turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS …`
+turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS[:recheck][:short] …`
 feeds 16 kHz mono WAV files through `TurnDetector` with the model in its own
 process, each verdict handed over a fixed 130 ms later on the replay's own
 clock, and prints each turn's start, end and decision, and every verdict.
 `--speech-level-db` and `--faint-floor-db`/`--faint-hold-ms` add the
-voice's own level and floor. Nothing is played. Its evidence for #782 is in
+voice's own level and floor. Nothing is played. A profile's two flags set
+the policy as the lamp would:
+- `recheck` asks an uncertain verdict again at once, with the pause so far, and a complete second ends the line at the commit (`ConfirmPolicy::recheck_uncertain`, off on every lamp, with no switch). A turn it ended says `first_p`, the first verdict's probability.
+- `short` asks lines under the commit's floor from 0.2 s, as `LAMP_ENDPOINT_SHORT_VERDICT` does. Each turn says its `short_asks`.
+
+On 21 Oct (#2135, #1722 07:45) neither paid. On 53 real-speech lines the second ask ended 1 line 140 ms sooner. On 428 played lines it ended 12 sooner and cut 2 in two. The short verdict changed no End on either, for 340 more inferences. Both are kept to measure the next real bundles. Its evidence for #782 is in
 [verification/comma-pause-20261015/](verification/comma-pause-20261015/).
 
 ## A bare call ends nothing (#782, 2026-10-15)
