@@ -378,14 +378,32 @@ fn send_told(directory: &Path, key: &str) -> Sent {
     Sent::Again
 }
 
+/// A made skill's news heard whole, or given in a text, has just asked
+/// whether to put it on: what the person's yes is held to
+/// ([`crate::made_skill::asked`]).
+fn asked(made: Option<&crate::made_skill::Keeping>, key: &str) {
+    if let Some(made) = made
+        && let Err(error) = crate::made_skill::asked(&made.directory, key, unix_ms())
+    {
+        eprintln!("lamp-voice: a made skill's ask was not kept: {error}");
+    }
+}
+
 /// Tell the tasks part in `directory` of each piece of news heard as it
 /// comes from `heard`, and again every [`READ_EVERY`] while it can't take
-/// one, for [`TOLD_PASSES`] passes. Ends when the news is let go.
-fn send_heard(directory: &Path, heard: &Receiver<String>, stopping: &AtomicBool) {
+/// one, for [`TOLD_PASSES`] passes; a made skill's as asked ([`asked`]).
+/// Ends when the news is let go.
+fn send_heard(
+    directory: &Path,
+    heard: &Receiver<String>,
+    stopping: &AtomicBool,
+    made: Option<&crate::made_skill::Keeping>,
+) {
     let mut unsent: Vec<(String, u32)> = Vec::new();
     loop {
         match heard.recv_timeout(READ_EVERY) {
             Ok(key) => {
+                asked(made, &key);
                 if observation_of(&key).is_some() && !unsent.iter().any(|(kept, _)| *kept == key) {
                     unsent.push((key, 0));
                 }
@@ -437,6 +455,9 @@ pub struct ForTexts {
     typed_file: PathBuf,
     read: Arc<Mutex<Vec<News>>>,
     stopping: Arc<AtomicBool>,
+    /// Where a made skill is kept: its news given in a text asks whether
+    /// to put it on ([`asked`]).
+    made: Option<crate::made_skill::Keeping>,
 }
 
 /// The tasks asked for and started by text in this process (#1673),
@@ -530,6 +551,7 @@ impl ForTexts {
         clock: fn() -> Option<BootClock>,
         made: Option<crate::made_skill::Keeping>,
     ) -> Option<Self> {
+        let kept = made.clone();
         let read = Arc::new(Mutex::new(Vec::new()));
         let stopping = Arc::new(AtomicBool::new(false));
         {
@@ -566,6 +588,7 @@ impl ForTexts {
             typed_file,
             read,
             stopping,
+            made: kept,
         })
     }
 
@@ -591,6 +614,7 @@ impl ForTexts {
     pub fn given(&self, keys: &[String]) {
         for key in keys {
             keep_told(&self.told_file, key);
+            asked(self.made.as_ref(), key);
         }
         if let Ok(mut read) = self.read.lock() {
             read.retain(|news| !keys.contains(&news.key));
@@ -727,7 +751,10 @@ impl TaskNews {
             let (directory, stopping) = (directory.clone(), stopping.clone());
             std::thread::Builder::new()
                 .name("lamp-voice-task-heard".into())
-                .spawn(move || send_heard(&directory, &to_send, &stopping))
+                .spawn(move || {
+                    let made = crate::made_skill::Keeping::from_environment();
+                    send_heard(&directory, &to_send, &stopping, made.as_ref())
+                })
                 .ok()?;
         }
         let shared = told_already.clone();
@@ -1273,10 +1300,12 @@ fn made_note(
     }
     let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
     match &made {
-        Ok(made) => eprintln!(
-            "lamp-voice: a skill made by voice is kept, version {}, sha256 {}",
-            made.version, made.sha256
-        ),
+        Ok(made) => {
+            eprintln!(
+                "lamp-voice: a skill made by voice is kept, version {}, sha256 {}",
+                made.version, made.sha256
+            );
+        }
         Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
     }
     let when = if age_ms <= JUST_MS {
@@ -2167,7 +2196,7 @@ mod tests {
 
     /// #1685, a skill made by voice: the hand-over of a brief, back done,
     /// is told as the skill kept (what it would do, what it would use and
-    /// "putting it on needs a yes from the team first"), alone, never its
+    /// "Shall I put it on the lamp?"), alone, never its
     /// files; its request is what is quoted of it, never the brief; and
     /// read again it is the kept one, not checked again. Without the switch
     /// its news is any task's, the request quoted. Here the checker is a
@@ -2232,7 +2261,7 @@ mod tests {
             told.contains("It would use its light and whether it is talking."),
             "{told}"
         );
-        assert!(told.contains(crate::made_skill::NEEDS_A_YES), "{told}");
+        assert!(told.contains(crate::made_skill::ASK_TO_PUT_ON), "{told}");
         assert!(
             !told.contains("skill.toml") && !told.contains("[permissions]"),
             "{told}"
@@ -2245,6 +2274,33 @@ mod tests {
             .collect();
         assert_eq!(kept.len(), 1, "{kept:?}");
         assert!(kept[0].starts_with("evening-dim-1.0.0-"), "{kept:?}");
+        // Kept, but not told yet: nothing asked, so a yes puts nothing on
+        // (the reviewer's P2 on #2424).
+        let index = || -> Value {
+            serde_json::from_slice(
+                &std::fs::read(root.join("made").join(crate::made_skill::INDEX)).unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(index()[0]["offered_at_unix_ms"].is_null(), "{}", index());
+        let early = crate::made_skill::put_on(
+            &keeping.directory,
+            &root.join("nobody.sock"),
+            Some("Yes."),
+            unix_ms(),
+        );
+        assert_eq!(
+            early["error"], "no skill made here is waiting for a yes",
+            "{early}"
+        );
+        // Heard whole (or given in a text): asked now, what a yes is held to.
+        asked(Some(&keeping), &news[0].key);
+        assert!(
+            index()[0]["offered_at_unix_ms"].as_u64().is_some(),
+            "{}",
+            index()
+        );
+        assert!(crate::made_skill::waiting_note(&keeping.directory, unix_ms()).is_some());
         // Read again: the kept one, not checked again.
         let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
         assert_eq!(again[0].note, *told);
@@ -2402,18 +2458,18 @@ mod tests {
             named_only: false,
         };
         let kept = read(&on);
-        assert!(kept.contains(crate::made_skill::NEEDS_A_YES), "{kept}");
+        assert!(kept.contains(crate::made_skill::ASK_TO_PUT_ON), "{kept}");
         assert!(!kept.contains("skill.toml"), "{kept}");
         let typed_note = crate::messages::typed(&kept);
         assert!(
-            typed_note.contains(crate::made_skill::NEEDS_A_YES),
+            typed_note.contains(crate::made_skill::ASK_TO_PUT_ON),
             "{typed_note}"
         );
         let plain = read(&crate::agent_tasks::Place {
             make_skill: false,
             ..on.clone()
         });
-        assert!(!plain.contains(crate::made_skill::NEEDS_A_YES), "{plain}");
+        assert!(!plain.contains(crate::made_skill::ASK_TO_PUT_ON), "{plain}");
         assert!(plain.contains(&format!("\"{request}\"")), "{plain}");
         let _ = std::fs::remove_dir_all(&root);
     }
