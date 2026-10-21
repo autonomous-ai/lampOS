@@ -4,6 +4,53 @@
 
 Newest first. Times from `date` (+07).
 
+- 10:28 #2456 (name at line start 1.3 s) read: no P1/P2, P3 one sample; first builder's
+- 10:28 #2449 (face-gap hold no recall) first read: P2 held line still reaches A's memory (words forget, remember, Days note); first builder's after fix
+- 10:27 #2457 (per-person tone baselines) read: no P1/P2, P3 forget scope wording; first builder's after #2450
+- 10:26 Merged #2443 (voice thread fixture) as 99f2ecfcd
+- 10:21 #2063 folded e3310fae3 same tree; first builder's
+- 10:19 #2439 (messages/out to phone) first read (late): no P1/P2; P3 any publisher; P3 doc boot key; needs rebase; first builder's
+- 10:18 Merged #2438 (lamp-update records fixtures) as 4eb3a9ea0
+- 10:17 Merged #2447 (#2430 refiled: memory hook tests apart) as 0ffce1198
+- 10:16 #2429 at 08913ae83: docs note on install once; first builder's
+- 10:15 #2063 at ee5e33b52: rebase + preference line fix; fold; first builder's
+- 10:14 #2446 green, held by file-order rule behind #2439 (switches.md)
+- 10:13 #2428 at 3774ebae1: P3 closed narrow way; first builder's
+- 10:11 #1948 at 07d52b97e: both P3s closed; first builder's
+- 10:09 #2446 gate: P3 worker call untested (mutation not caught); mine on green
+- 10:07 #2450 (#2427 folded) same tree; first builder's
+- 10:04 #2427 at 316526df6: P2 and P3s closed; fold; first builder's
+- 10:03 #2402 at 31bb7e625: my P2 answered (lead's yes + 52e6 run); first builder's
+- 09:59 #2447 (#2430 refiled) same patch; mine on green
+- 09:56 #2446 (memory note reopens after quiet) first read: no finding; mine on green
+- 09:56 #2434 (caps store from later build held back) first read: no P1/P2; P3 held back every start; P3 bedtime doc says dark not unrestricted; first builder's
+- 09:55 #2223 at af0e1b6c0: rebase after #2398's move, same lines; first builder's
+- 09:52 #2437 (reset plan follows the build) first read: no P1/P2; P3 RESET_PLAN_SHIPPED vs #2306/#1362; P3 #2421 updater level; no CI run yet; first builder's
+- 09:51 #2444 (#2266 refiled) same patch + test-peer merge; first builder's
+- 09:47 Merged #2435 (eyes people-file fixture) as 75bd939ad
+- 09:47 #2440 (stopping part forgotten by lamp-health) read: my #2415 P3 fixed, no finding; first builder's
+- 09:45 #2441 (wordless sound no longer starts the quiet) first read: no P1/P2; P3 wordless real talk counts as quiet; first builder's
+- 09:43 #2429: corrected my 09:40 (9028ee118 deleted #2420/#2422's files); e0eab120b right; first builder's after #1699
+- 09:40 #2429 at 9028ee118: slice test in, folded; first builder's after #1699
+- 09:38 #2432 (memory days fixture) read after Reviewer-lead's merge: no finding; it binary's 3 known row-58 failures are #2430's
+- 09:36 #2424 (made skill's spoken yes) first read: P2 ask stamped when kept not when told (yes window wrong both ways); two P3s; first builder's after fix
+- 09:30 #1948 (camera close receipt) first read: no P1/P2; P3 mute path reads bus/tmpfs before teardown; P3 CameraClosed missing from privacy_topics/msgs.md; first builder's
+- 09:27 #2429 at bc9ff5a86: peer check in; P3 pin ASKERS to units' Slice=; fold; first builder's
+- 09:25 Merged #2422 (schedule store fixtures) as 7694f046c; Reviewer-lead had planned to, and the P3s go to Tests' follow-up
+- 09:25 #2420 (tasks store fixtures) read after Reviewer-lead's merge: no finding
+- 09:23 #2410 at ae721b453: rebase + both P3s in; first builder's
+- 09:20 #1115 folded at 86ea0c54c: same lines; first builder's
+- 09:19 #2427 (voice tone, LAMP_VOICE_TONE) first read: P2 meter takes speech blocks outside the line (lamp's own answer); three P3s; first builder's after fix
+- 09:16 #2431 (refusal as a one-item array) read: no finding; first builder's
+- 09:11 #2429 (install the skills manage helper socket) first read: no P1/P2; P3 any lampos part can remove a person's skill; first builder's
+- 09:02 #2428 (same-voice child for two more switches) first read: no P1/P2; P3 #829's check now runs without LAMP_SPOKEN_TO (short own lines read low); first builder's
+- 08:52 Merged #2417 (four stores' later-build tests) as be02c775c
+- 08:49 #2426 (polluter test puts thread back) read: no finding; first builder's
+- 08:49 #2405 (build-rows 07:43) read: no finding, means check; reviewer-two's
+- 08:47 #2414 at 8e2c70343: both P3s closed; first builder's
+- 08:44 Merged #2419 (five crates' tests one binary each, wake.rs apart) as 6d0ab7b11
+- 08:37 #2415 at 3101b1f25: docs P3 closed; first builder's
+- 08:35 #2423 (LAMP_APP_UPDATE row): body carries attribution, asked to remove; reviewer-two's
 - 08:26 #2415 at 47bb21de8: stale doc lines fixed; first builder's
 - 08:26 #2414 (manage helper installs made skill by SHA-256) first read: no P1/P2; P3 replaces an installed skill of the same name; P3 done line wording; first builder's
 - 08:23 #2419 (#2409 refiled, wake.rs apart): my P3 closed; mine when ready and green
