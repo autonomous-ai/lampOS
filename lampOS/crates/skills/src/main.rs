@@ -348,6 +348,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         ("asked", []) => {
             return match package::asked(
                 &dir,
+                Path::new(lamp_voice::made_skill::DIRECTORY),
                 package::ASKED_LOCK_WAIT,
                 std::io::stdin(),
                 std::io::stdout(),

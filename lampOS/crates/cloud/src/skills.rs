@@ -501,7 +501,13 @@ pub mod tests {
         let folder = places.folder.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let _ = lamp_skills::package::asked(&folder, lock_wait, &stream, &stream);
+                let _ = lamp_skills::package::asked(
+                    &folder,
+                    &folder.join("no-made"),
+                    lock_wait,
+                    &stream,
+                    &stream,
+                );
             }
         });
     }

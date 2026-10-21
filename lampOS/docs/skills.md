@@ -978,7 +978,7 @@ for it.
   `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
   skills folder writable, no network (`PrivateNetwork=yes`, Unix sockets
   only), no capabilities, `NoNewPrivileges` and 60 s at most.
-- **It checks each request itself,** whoever connected: the only request
+- **It checks each request itself,** whoever connected: one request
   taken is `{"remove": NAME}`, exactly that one key with a string, and it
   runs `remove` above, which refuses a name that is not a skill's (1 to 64
   lowercase letters, digits and hyphens: no `/`, `..`, NUL, hidden name or
@@ -987,8 +987,35 @@ for it.
   answer), then refuses, `the lamp's skills can't be changed now`, with
   nothing done. A skill renamed aside whose `.removed-NAME-PID` was not then
   deleted is answered done (the next install deletes it); that folder's
-  path is in the journal only. Anything else is
-  refused, `a request is one line, {"remove": NAME}`. `install` is refused
+  path is in the journal only.
+- **A skill made here, put on at its person's yes** (#1685; the lead, 20
+  Oct 08:37 on #1711: a spoken yes bound to the package's SHA-256, the
+  helper installing only those bytes, re-checked and capped). The voice
+  asks `{"install_made": SHA256}`, 64 lowercase hex, and nothing else
+  (`package::install_made`). The helper finds the package the voice's
+  made-skills folder (`/var/lib/lampOS/voice/made-skills`, root's, 0700,
+  read by the helper as its owner) names with that hash in its
+  `made.json`. It reads its bytes once and hashes them, and a package
+  whose hash has changed is refused (`its SHA-256 has changed`). Then it
+  reads those same bytes as the package, so nothing is read twice. Its
+  `skill.toml` is held again to a made skill's cap
+  (`lamp_voice::made_skill::capped`, the voice's own: light, body, and
+  only `voice/state` and `room/presence`), and its `SKILL.md` must say
+  `made: here`. Then it is installed as any package is, under the same lock
+  and wait, with two differences:
+  - **It never takes the place of a skill put on another way** (the
+    reviewer's P3 on #2414): one of the same name whose `SKILL.md` doesn't
+    say `made: here` (Guard mode, Look for my keys, a store one) stays, and
+    the answer names it (`… is already on the lamp, put on another way`).
+    Only a skill made here before is replaced.
+  - Its done line says it is bound to the person's yes by its SHA-256, not
+    that it carries no signature.
+  Tests: `made::a_made_skill_goes_on_by_its_sha256_and_only_by_it`,
+  `…never_takes_the_place_of_one_put_on_another_way`,
+  `…whose_package_changed_does_not_go_on`,
+  `…past_the_cap_or_not_made_here_does_not_go_on`.
+- Anything else is refused, `a request is one line, {"remove": NAME} or
+  {"install_made": SHA256}`. `install` is refused
   (`install is not taken here yet: …`): it will be taken only for a package
   from the update channel under its key's signature, once the channel
   carries skills.

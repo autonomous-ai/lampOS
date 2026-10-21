@@ -299,7 +299,19 @@ pub fn read_package(path: &Path) -> Result<Package, String> {
             "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
         ));
     }
-    let mut archive = tar::Archive::new(&bytes[..]);
+    package_of(&bytes)
+}
+
+/// A package read from its `bytes` and checked, as [`read_package`] does a
+/// file's: the made-skill install hashes the bytes it was given a yes for,
+/// then reads these same bytes, so nothing is read twice ([`install_made`]).
+pub fn package_of(bytes: &[u8]) -> Result<Package, String> {
+    if bytes.len() as u64 > MOST_PACKAGE_BYTES {
+        return Err(format!(
+            "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
+        ));
+    }
+    let mut archive = tar::Archive::new(bytes);
     let (mut manifest, mut signature) = (None, None);
     let mut files = Files::new();
     let mut folder: Option<String> = None;
@@ -640,6 +652,133 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
         let files = std::mem::take(&mut package.files);
         (package.manifest.name.clone(), files, Some(package))
     };
+    installed(skills, name, files, package, swept)
+}
+
+/// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
+/// put on at its person's spoken yes, which is bound to its package's
+/// SHA-256 (the lead, 20 Oct 08:37 on #1711): the voice asks with that hash
+/// alone. The package is the one the voice's made-skills folder `made`
+/// names with that hash in its index; its bytes are read once and hashed,
+/// and those same bytes are then read as a package, so what goes on is what
+/// the person said yes to. Its `skill.toml` is held again to a made skill's
+/// cap (`lamp_voice::made_skill::capped`: light, body, two topics) and its
+/// `SKILL.md` must say `made: here`. Then it is installed as any package
+/// is, the folder waited for at most `wait`.
+pub fn install_made(
+    skills: &Path,
+    made: &Path,
+    sha256: &str,
+    wait: Duration,
+) -> Result<String, String> {
+    if sha256.len() != 64
+        || !sha256
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(
+            "not installed: a made skill is asked for by its SHA-256, 64 lowercase hex".into(),
+        );
+    }
+    let index: Vec<serde_json::Value> = fs::read(made.join(lamp_voice::made_skill::INDEX))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    let Some(file) = index
+        .iter()
+        .find(|entry| entry["sha256"] == sha256)
+        .and_then(|entry| entry["package"].as_str())
+        .filter(|file| !file.is_empty() && !file.contains('/') && !file.starts_with('.'))
+    else {
+        return Err("not installed: no made skill is kept with that SHA-256".into());
+    };
+    let path = made.join(file);
+    let meta =
+        fs::symlink_metadata(&path).map_err(|error| format!("not installed: {file}: {error}"))?;
+    if !meta.is_file() || meta.len() > MOST_PACKAGE_BYTES {
+        return Err(format!("not installed: {file} is not a package"));
+    }
+    let mut bytes = Vec::new();
+    open_plain(&path, &meta)
+        .and_then(|opened| {
+            opened
+                .take(MOST_PACKAGE_BYTES + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|error| error.to_string())
+        })
+        .map_err(|why| format!("not installed: {file}: {why}"))?;
+    if sha256_hex(&bytes) != sha256 {
+        return Err(format!(
+            "not installed: {file} is not what was said: its SHA-256 has changed"
+        ));
+    }
+    let mut package = package_of(&bytes).map_err(|why| format!("not installed: {file}: {why}"))?;
+    let card = |name: &str| {
+        package
+            .files
+            .get(name)
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            .unwrap_or_default()
+    };
+    lamp_voice::made_skill::capped(&card("skill.toml"))
+        .map_err(|refused| format!("not installed: {}", refused.0))?;
+    if !made_here(&card("SKILL.md")) {
+        return Err("not installed: its SKILL.md doesn't say it was made here".into());
+    }
+    if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
+        return Err(format!("no skills folder at {}", skills.display()));
+    }
+    let name = package.manifest.name.clone();
+    if !skill_name_ok(&name) {
+        return Err(format!("not installed: {name:?} is not a skill's name"));
+    }
+    let _held = locked_within(skills, wait)?;
+    // A person's yes to their own made skill never takes the place of a
+    // skill they put on another way (Guard mode, Look for my keys, one from
+    // a store) without a word (the reviewer's P3 on #2414): only one made
+    // here is replaced, and the one in the way is named.
+    let there = skills.join(&name);
+    if there.exists()
+        && !fs::read_to_string(there.join("SKILL.md")).is_ok_and(|card| made_here(&card))
+    {
+        return Err(format!(
+            "not installed: {name} is already on the lamp, put on another way, and a skill made here doesn't take its place"
+        ));
+    }
+    let swept = swept(skills);
+    let files = std::mem::take(&mut package.files);
+    // What binds these bytes is the person's yes, by their SHA-256, not a
+    // signature (the reviewer's P3 on #2414).
+    installed(skills, name, files, Some(package), swept).map(|said| {
+        said.replace(
+            NO_SIGNATURE,
+            &format!(
+                "bound to the person's yes by its SHA-256, {}",
+                &sha256[..12]
+            ),
+        )
+    })
+}
+
+/// What an install's done line says of a package with no signature.
+const NO_SIGNATURE: &str = "it carries no signature, and none is checked yet: signing is not built";
+
+/// Whether a skill's `SKILL.md` says it was made on this lamp by voice
+/// (`made: here` in its front matter, `lamp_voice::made_skill`).
+fn made_here(card: &str) -> bool {
+    card.lines().any(|line| line.trim() == "made: here")
+}
+
+/// `files`, the skill `name`, put together beside the live skills, loaded
+/// and moved in ([`moved_in`]), with the folder held by the caller and what
+/// it [`swept`] said after.
+fn installed(
+    skills: &Path,
+    name: String,
+    files: Files,
+    package: Option<Package>,
+    swept: Vec<String>,
+) -> Result<String, String> {
     if !skill_name_ok(&name) {
         return Err(format!(
             "not installed: {name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
@@ -764,7 +903,7 @@ fn moved_in(
             if package.signature.is_some() {
                 "its signature not checked: signing is not built yet"
             } else {
-                "it carries no signature, and none is checked yet: signing is not built"
+                NO_SIGNATURE
             }
         ),
     };
@@ -854,10 +993,15 @@ pub const ASKED_MOST: u64 = 4_096;
 /// #1722). It waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
 /// shorter only in a test) for the folder, then refuses
 /// with [`BUSY`] having done nothing; a skill renamed aside whose old folder
-/// was not deleted is answered done, that folder's path in the journal only. `install` is not taken: it will be, for a package from the update
-/// channel under its key's signature alone, once the channel carries skills.
+/// was not deleted is answered done, that folder's path in the journal only.
+/// `{"install_made": SHA256}` puts on a skill made here by voice, from the
+/// voice's made-skills folder `made`, at its person's spoken yes
+/// ([`install_made`]). `install` is not taken: it will be, for a package
+/// from the update channel under its key's signature alone, once the
+/// channel carries skills.
 pub fn asked(
     skills: &Path,
+    made: &Path,
     lock_wait: Duration,
     input: impl Read,
     mut output: impl io::Write,
@@ -874,6 +1018,12 @@ pub fn asked(
             .and_then(|asked| asked.get(key))
     };
     let done = match (only("remove"), only("install")) {
+        _ if only("install_made").is_some() => match only("install_made") {
+            Some(serde_json::Value::String(sha256)) => {
+                install_made(skills, made, sha256, lock_wait)
+            }
+            _ => Err("a made skill is asked for as {\"install_made\": SHA256}".to_owned()),
+        },
         // Renamed aside is removed: where it was set aside, and why it
         // was not then deleted, go to the journal alone.
         (Some(serde_json::Value::String(name)), _) => {
@@ -889,7 +1039,9 @@ pub fn asked(
              signature, will be"
                 .to_owned(),
         ),
-        _ => Err("a request is one line, {\"remove\": NAME}".to_owned()),
+        _ => Err(
+            "a request is one line, {\"remove\": NAME} or {\"install_made\": SHA256}".to_owned(),
+        ),
     };
     let answer = match &done {
         Ok(said) => serde_json::json!({ "done": said }),

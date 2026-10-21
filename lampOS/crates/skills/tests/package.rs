@@ -960,6 +960,7 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     let mut answer = Vec::new();
     let ok = package::asked(
         &skills,
+        &skills.join("no-made"),
         WAIT,
         &b"{\"remove\": \"desk-tutor\"}\n"[..],
         &mut answer,
@@ -1136,7 +1137,7 @@ fn the_manage_helper_refuses_core_skills_and_bad_names_on_its_own() {
         assert!(!ok);
         assert_eq!(
             answer["refused"],
-            "a request is one line, {\"remove\": NAME}"
+            "a request is one line, {\"remove\": NAME} or {\"install_made\": SHA256}"
         );
     }
     // Past its bound, the request is cut and taken for none.
