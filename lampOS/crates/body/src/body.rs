@@ -626,6 +626,12 @@ pub struct Limits {
     /// the lamp held. The product's unit never passes it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub let_go_at_stop: bool,
+    /// `--folded-arm` given alone with `let_go_at_stop` (#1682): the
+    /// shoulder and elbow counts a person confirmed folded, never this run's
+    /// own read of where the arm is. A let-go run found outside its start
+    /// window is let go only when its arm is within `LET_GO_NEAR` of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub let_go_folded_arm: Option<[u16; 2]>,
     /// Let a lamp at rest take what Expression asks of the head, within
     /// [`REST_GLANCE_REACH`], and come back to rest once it runs out: a
     /// resting lamp lifts its head at a sudden sound. The arm is not
@@ -769,6 +775,7 @@ impl Limits {
         limp: false,
         overload_release: false,
         let_go_at_stop: false,
+        let_go_folded_arm: None,
         rest_glance: false,
         look_at_name: false,
         arbitration: false,
@@ -1096,6 +1103,10 @@ pub struct BodyReport {
     /// Asked to stop, it was let go folded (`Limits::let_go_at_stop`).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub let_go_at_stop: bool,
+    /// A let-go run found outside its start window (#1682): why, after it
+    /// was let go at once, torque off only, with no goal written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub let_go_outside_window: Option<String>,
     pub arm_peak_load: [u16; 2],
     pub arm_peak_temperature: [u8; 2],
     /// Each time the arm was sent back down, and why.
@@ -1283,6 +1294,12 @@ const ARM_GOAL_STEP: u16 = 50;
 /// already a surprise, so that an arm a little short of folded (40 counts
 /// up, say) keeps holding rather than dropping (the reviewer on #1776).
 const LET_GO_NEAR: u16 = 20;
+
+/// The arm is down: shoulder and elbow each within `LET_GO_NEAR` of their
+/// folded counts. The one bound every let-go uses (#1682).
+fn arm_folded(samples: &[Sample; 5], folded: [u16; 2]) -> bool {
+    (0..2).all(|index| samples[ARM[index].index()].position.abs_diff(folded[index]) <= LET_GO_NEAR)
+}
 
 /// The most a position may move from the last good reading of its joint,
 /// per step (`TICK`) since that reading, unless it is this near the goal
@@ -3120,6 +3137,7 @@ fn run_on<P: PortIo, R: Runtime>(
         force: None,
         stood: false,
         let_go_at_stop: false,
+        let_go_outside_window: None,
         arm_peak_load: [0; 2],
         arm_peak_temperature: [0; 2],
         retreats: Vec::new(),
@@ -3329,6 +3347,11 @@ fn run_on<P: PortIo, R: Runtime>(
     // Only a home that was given is one to wake to: without it, the home is
     // wherever the lamp was found.
     let may_wake = limits.wake && home.is_some();
+    // A let-go run (#1682): --let-go-at-stop with no --home (so no stand,
+    // which needs one) and no --torque on, as the factory's that lets a
+    // held lamp go. All it ever writes is torque off, so the start window
+    // does not hold it.
+    let let_go_only = limits.let_go_at_stop && home.is_none() && !limits.torque_on;
     let mut home = home.unwrap_or(found_pose);
     report.home = Some(home);
     for (index, joint) in COMMANDED.iter().enumerate() {
@@ -3516,10 +3539,32 @@ fn run_on<P: PortIo, R: Runtime>(
                 to_wake = true;
                 continue;
             }
-            report.stop = refused(format!(
+            let why = format!(
                 "head pitch {pitch} is outside {}..={}",
                 limits.pitch_home.0, limits.pitch_home.1
-            ));
+            );
+            // Only with an arm found at the folded counts a person
+            // confirmed, so that nothing standing falls; without them,
+            // refused as any other run.
+            if let_go_only
+                && limits
+                    .let_go_folded_arm
+                    .is_some_and(|folded| arm_folded(&found, folded))
+            {
+                // Let go at once, torque off on all five and no goal, and
+                // left so until asked to stop, as the run would have been.
+                let_go_at_end(bus, &mut report);
+                report.let_go_at_stop = true;
+                report.let_go_outside_window =
+                    Some(format!("{why}: a let-go run, torque off only"));
+                while matches!(bus.runtime.cancelled(), Ok(false)) {
+                    let due = bus.runtime.now() + TICK;
+                    bus.sleep_until(due);
+                }
+                report.stop = Stop::Cancelled;
+                return report;
+            }
+            report.stop = refused(why);
             return report;
         }
     }
@@ -6050,11 +6095,7 @@ fn run_on<P: PortIo, R: Runtime>(
                         .position
                         .abs_diff(home[index])
                         <= LET_GO_NEAR
-            }) && standing.is_none_or(|up| {
-                (0..2).all(|index| {
-                    last[ARM[index].index()].position.abs_diff(up.folded[index]) <= LET_GO_NEAR
-                })
-            })
+            }) && standing.is_none_or(|up| arm_folded(&last, up.folded))
         });
         if limits.let_go_at_stop && stand <= 0.0 && off.is_none() && bus.refused.is_none() && down {
             let_go_at_end(bus, &mut report);

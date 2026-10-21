@@ -222,6 +222,11 @@ step_body() {
     fi
     ask "the lamp is held, torque on: it is let go where it lies, folded, and may sag a little; keep a hand by the arm and the head." || return 1
     say "letting the lamp go"
+    # A head found outside its start window is let go only with
+    # --folded-arm SHOULDER,ELBOW given alone and the arm within 20 counts
+    # of it (#1682); without it, as here, the run is refused, nothing written.
+    # The folded counts must come from a read the person confirmed was
+    # folded, never from this run's own read of where the arm is now.
     body_once "" "" || { fail "the body would not run to let the lamp go (its lines are above)"; return 1; }
     rest_read "$read_file" || { fail "lamp-body-measure still refused after the lamp was let go (its reason is above)"; return 1; }
   fi
