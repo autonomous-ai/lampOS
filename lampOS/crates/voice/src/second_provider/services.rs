@@ -127,6 +127,27 @@ pub struct Net {
     /// `LAMP_SECOND_SPEECH_SOCKET=on`: a speech socket is opened as each
     /// answer begins, for its first piece ([`Tts::open_ahead`]).
     speech_socket: bool,
+    /// With the person's own DeepSeek key (`LAMP_OWN_KEYS`, #2094): the
+    /// relay's chat a request goes to when their endpoint refuses it (401,
+    /// 403) before any answer, and what is told of each refusal.
+    refused_to: Option<RefusedTo>,
+}
+
+/// Where a request the person's own key was refused for goes instead.
+#[derive(Clone)]
+pub struct RefusedTo {
+    pub relay: Arc<Chat>,
+    /// Told each refusal's status: the journal's line, the health warning.
+    pub told: Arc<dyn Fn(u16) + Send + Sync>,
+}
+
+/// Whether a chat's failure is its key refused: the request goes to the
+/// relay then, and for nothing else.
+pub fn key_refused(error: &net::Error) -> Option<u16> {
+    match error {
+        net::Error::Status(status @ (401 | 403)) => Some(*status),
+        _ => None,
+    }
 }
 
 /// Where the worker reads whether the chat's connection is opened as a line
@@ -157,6 +178,7 @@ impl Net {
             warm_chat: false,
             warm_speech: false,
             speech_socket: false,
+            refused_to: None,
             config: Arc::new(config),
         })
     }
@@ -206,8 +228,32 @@ impl Net {
     /// ([`net::Chat::narrowing`]). Called after the chat is chosen: one
     /// chosen later is given every tool.
     pub fn narrowing(self, narrow: net::Narrow) -> Self {
+        if let Some(refused) = &self.refused_to {
+            refused.relay.narrowing(narrow.clone());
+        }
         self.chat.narrowing(narrow);
         self
+    }
+
+    /// A request the person's own key is refused for goes to the relay's
+    /// DeepSeek chat at `relay` with the relay's key, never a failed answer
+    /// (the first builder on #2094); `told` hears each refusal's status.
+    pub fn falling_back_to_the_relay(
+        mut self,
+        relay: &str,
+        told: Arc<dyn Fn(u16) + Send + Sync>,
+    ) -> net::Result<Self> {
+        self.refused_to = Some(RefusedTo {
+            relay: Arc::new(Chat::deepseek_at(
+                relay,
+                &self.config.hosted.deepseek_model,
+                self.config.llm_key.expose(),
+                self.declare.clone(),
+                false,
+            )?),
+            told,
+        });
+        Ok(self)
     }
 
     /// The text model is Gemini, called directly (`LAMP_SECOND_CHAT=gemini`),
@@ -261,14 +307,24 @@ impl Net {
         only: Option<&'static [&'static str]>,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
-        stream::once(async move { chat.send_only(&messages, only).await })
-            .map_ok(|answer| {
-                stream::try_unfold(answer, |mut answer| async move {
-                    Ok(answer.next().await?.map(|event| (event, answer)))
-                })
+        let refused_to = self.refused_to.clone();
+        stream::once(async move {
+            let answer = chat.send_only(&messages, only).await;
+            if let (Err(error), Some(refused)) = (&answer, &refused_to)
+                && let Some(status) = key_refused(error)
+            {
+                (refused.told)(status);
+                return refused.relay.send_only(&messages, only).await;
+            }
+            answer
+        })
+        .map_ok(|answer| {
+            stream::try_unfold(answer, |mut answer| async move {
+                Ok(answer.next().await?.map(|event| (event, answer)))
             })
-            .try_flatten()
-            .boxed()
+        })
+        .try_flatten()
+        .boxed()
     }
 
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a

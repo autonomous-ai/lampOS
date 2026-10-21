@@ -53,7 +53,7 @@ stream, and `output_caps_topics()` the Actions-owned output restrictions.
 | `JointState` | `body/joint_states` | latest | 100 ms | ROS's `sensor_msgs/JointState`: `name`, `position` (rad), `velocity` (rad/s), and `effort`, which here is the share of its full strength each servo reports (0 to 1) and not ROS's newton metres. And `commanded` (rad), which ROS's has not |
 | `Faces` | `humans/faces/tracked` | latest | none | A list of faces: a passing id, a box in fractions of the picture as in ROS4HRI, confidence, yaw if it was estimated, whether it faces the lamp if that was judged, and with `LAMP_EYES_SPEAKING=on` whether its mouth is speaking (`speaking`: `state` yes/no/unknown, a `score`, and `from`, `corners` or `mesh` with `--mouth-model`, whose scale the score is on; `from` absent from eyes before #1470), absent otherwise |
 | `HumanFamiliar` | `humans/familiar` | latest | 2 s, good for 5 s | How familiar the remembered person at the lamp is: `level` `new`, `regular` or `close`, or `null` for nobody near, someone not remembered or not recognised. No name (#1670, [eyes.md](eyes.md)) |
-| `HumanSeems` | `humans/seems` | latest | 2 s, good for 5 s | How the near face seems: `kind` `positive`, `negative` or `unsure`, and a `confidence` from 0 to 1. `from`: `fer_plus` or `blendshapes`, the reader that said it; without it, `fer_plus` (the one reader before it). With both readers on, a consumer that wants one takes the stream, not `latest`, and splits by `from`. No name, print or picture, and nothing reads it yet (#1671, [eyes.md](eyes.md)) |
+| `HumanSeems` | `humans/seems` | latest | 2 s, good for 5 s | How the near face seems: `kind` `positive`, `negative` or `unsure`, and a `confidence` from 0 to 1. `from`: `fer_plus` or `blendshapes`, the reader that said it; without it, `fer_plus` (the one reader before it). With both readers on, a consumer that wants one takes the stream, not `latest`, and splits by `from`. No name, print or picture. Mood reads its kind with `LAMP_MOOD_SEEMS=on`, whichever reader said it, so a lamp trying it runs one reader (mood.md) (#1671, [eyes.md](eyes.md)) |
 | `Speech` | `voice/heard`, `voice/said` | event | none | Text, whether it is finished, and the locale and the request's number if known. After `hri_msgs/LiveSpeech` |
 | `VoiceState` | `voice/state` | latest | 1 s | Resting, listening, thinking or speaking |
 | `VoiceLink` | `voice/link` | latest | 1 s | Ready, or unavailable with one of seven kinds of reason |
@@ -72,6 +72,7 @@ stream, and `output_caps_topics()` the Actions-owned output restrictions.
 | `NameHeard` | `name/rising` | event | none | The same hearing's first sign, as soon as the score reaches the listener's bar and while the name is still being said: the score so far, and how long ago it reached the bar. Its final word, with the highest score, is on `name/heard`; a first sign with none was a near miss (#782, [name.md](name.md)) |
 | `StopHeard` | `stop/heard` | event | none | "Stop", "wait" or "hold on" was heard in what the microphone hears, by `lamp-name`'s `stop.onnx` with `--stop-least` (off unless set): the score at the step it first reached the bar, and how many milliseconds before this was sent. Said at once; a sign, never proof (#828, [stop-word.md](stop-word.md)) |
 | `Pause` | `lamp/pause` | latest | none | Whether the lamp is paused, as `lamp-keeper pause` or `resume` last said; kept until the next, read with `latest` by each part that honours it ([keeper.md](keeper.md), "Named states and the pause") |
+| `UpdateStatus` | `update/status` | latest | every 60 s, lasting 180 s | What lamp-update is doing and last did: the running build, `now` (`idle`, `checking`, `fetching`, `switching`, `watching`, `restoring`) and the last round's outcome by name, build and time, with no reason text; said at each phase by a round that acts, read by lamp-cloud for the app (#2194, [cloud.md](cloud.md)) |
 | `Hand` | `body/hand` | latest | 1 s | Whether a hand is pushing the lamp now, as the body feels it (`pushed`), and when that push began on the body's own clock (`since_us`, 0 when not pushed); said with every step lamp-body passes on the bus, every 80 ms ([body.md](body.md), "A hand on the bus") |
 | `BodyGesture` | `body/gesture` | event | none | What became of one of the body's gestures: its `name` (the clip's, the body's own `idle` and shifts included) and `state`, `began`, `over` (played out, let go, replaced, or the run stopped) or `dropped` (asked and dropped before it began, the anti-tip rule's refusal and #1239's `busy` and `held by a hand` included, or ended for a higher ask, so no `over` follows). Said by lamp-body with `LAMP_BUS=on` where its journal says the same ([body.md](body.md), "On the bus"). Under `lamp-body --arbitration on` (#940), a drop or an end also carries optional `source` (whose it was), `why` (the journal's reason) and `by` (who holds the body instead, a skill or the conversation that named itself), each left out when not known, so the message is unchanged without the switch. Read-only. `body_topics()` lists it |
 | `VoiceMute` | `voice/mute` | latest | 3 s | Whether the voice's software mute is on (`muted`), and why: `reason: "sleep"` when a hand held on the head put the lamp to sleep, absent for the mute as it always was (#711). Said by the voice with `LAMP_HEAD_TOUCH=on` and `--controls-mute`, when it changes and every second; Expression's `--head-touch` sleeps from it. `mute_topics()` lists it. Not the physical slide |
@@ -242,12 +243,14 @@ the coordinated opt-in across Controls, Voice and Ears.
 
 ## Optional microphone permission contract (#755)
 
-`privacy_topics()` declares one new topic, separate from the original
-seventeen. Only Voice's selected privacy worker publishes it.
+`privacy_topics()` declares two new topics, separate from the original
+seventeen. Only Voice's selected privacy worker publishes `voice/privacy`;
+only the eyes publish `eyes/camera_closed`.
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `MicrophonePrivacy` | `voice/privacy` | latest | 10 / 50 ms | Voice controller identity, microphone generation, original physical acquisition, expiry, capture permission and known/unknown physical mute |
+| `CameraClosed` | `eyes/camera_closed` | latest | on ask | The eyes' receipt for a camera close the voice asked about (`{"close_receipt":N}`, #1802): the voice's token `close` and `released`, whether the last stop of the capture device returned without a fault; said only once the camera is shut |
 
 Version 1 of `lamp_msgs/MicrophonePrivacy` carries a publication `ClockStamp`,
 16-character hexadecimal Bus `session_id`, 32-character hexadecimal

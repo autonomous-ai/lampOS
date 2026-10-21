@@ -1,0 +1,28 @@
+# lampOS restart from the app (#2193, lampOS/docs/keeper.md, "A restart asked from the app"):
+# one request from lamp-cloud on lamp-keeper-restart.socket, as standard input and output.
+# Refused while lamp-update holds its lock (an update installs); else answered, and 3 s later,
+# with that lock held, the lamp paused, the voice's quiet waited for (45 s at most) and
+# lampos.target restarted. Never the machine.
+[Unit]
+Description=lampOS restart from the app: one request
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+# Root: lamp-update's lock (/var/lib/lampos-update, 0700) and systemctl.
+User=root
+ExecStart=/usr/local/bin/lamp-keeper restart-asked
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+SyslogIdentifier=lamp-keeper-restart
+# The answer, 3 s, the quiet's 45 s and the target's restart.
+RuntimeMaxSec=5min
+NoNewPrivileges=yes
+ProtectSystem=strict
+# The update's lock; the bus for the pause and the voice's state; /run for systemctl.
+ReadWritePaths=/var/lib/lampos-update /run
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX

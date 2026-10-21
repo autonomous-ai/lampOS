@@ -113,7 +113,7 @@ pub fn at_pause(value: Option<&str>) -> bool {
 }
 
 /// Whether it is quiet enough now (`now_us`) to tell news: [`QUIET_US`]
-/// since the last turn, by or to the lamp (`last_turn_us`); or, `at_pause`,
+/// since the last talk: the lamp's words, a person's, or any speech (`last_turn_us`); or, `at_pause`,
 /// the first pause: [`PAUSE_US`] since the turn, with nobody heard speaking
 /// for as long (`speech_paused`, as the coordinator judges it for a
 /// reminder), and, unless anyone's speech (`last_speech_us`) was heard past
@@ -2284,7 +2284,7 @@ mod tests {
     /// files; its request is what is quoted of it, never the brief; and
     /// read again it is the kept one, not checked again. Without the switch
     /// its news is any task's, the request quoted. Here the checker is a
-    /// stand-in that writes the package; `crates/skills/tests/skills.rs`
+    /// stand-in that writes the package; `crates/skills/tests/it/skills.rs`
     /// runs the real one.
     #[test]
     fn a_skill_made_by_voice_is_told_as_kept_and_never_read_out() {

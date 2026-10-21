@@ -15,17 +15,18 @@ simplest version that works end to end ("wide first, deep later"):
   switches at a quiet moment, watches each part for a minute, and puts the
   previous build back by itself if a part is not well.
 
-**Kind: off unless set.** Nothing changes on a lamp until `lamp-update` is
-installed there, and then nothing is written until its switch
-`--apply on` is given: with `--apply off` (the default) it reads the
+**Apply is off by default on the command line.** Nothing changes on a lamp
+until `lamp-update` is installed there, and then nothing is written until
+`--apply on` is given: with `--apply off` (the command's default) it reads the
 channel and says what it would do, and writes nothing, not even its own
 records. A test shows it
 (`without_apply_nothing_is_written_and_what_would_change_is_said`: every
 file under the lamp's root byte for byte the same, and systemd not asked).
 It publishes nothing on the bus at any setting, and with `--apply off` it
-does not even subscribe. After
-its minute on lamp-4ace the default becomes `on` and `off` stays to turn it
-off ([joining.md](joining.md), "The switch is for that first minute").
+does not even subscribe. The product unit already passes `--apply on`.
+The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS`, `LAMP_UPDATE_APPLY`
+and `LAMP_UPDATE_IMAGE` switches remain off unless set to `on`; the product
+unit sets none of them. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -103,8 +104,9 @@ that is the channel's head.**
 - The sequence is the workflow's run number, which only goes up. A lamp
   takes a build only if its sequence is greater than the one it runs.
 - `min_updater` (#1680), when set, is the oldest updater that can apply the
-  build. It's a level, `manifest::UPDATER` in `lamp-update` (2 now: 2 reads `models`), raised
-  whenever the updater learns to apply something an older one can't. It
+  build. It's a level, `manifest::UPDATER` in `lamp-update` (4 now: 2 reads
+  `models`, 3 reads `settings`, and 4 reads `image`), raised whenever the
+  updater learns to apply something an older one can't. It
   isn't the sequence, because a binary doesn't know its CI run number. It
   sits in the manifest's signed bytes like every other field. Left out
   (`lamp-update manifest` without `--min-updater`), it isn't written, and
@@ -491,6 +493,19 @@ the link and the build it named; the way back by hand), `log.jsonl` (one line pe
 with one old file kept) and `lock`. Every line it says also goes to its
 journal (`journalctl -u lamp-update`).
 
+The records stay root's alone. What a part may know of them is said on the
+bus instead: a round that acts says `update/status` (#2194,
+`lamp_update::status`) as each phase begins (`checking`, `fetching`,
+`switching`, `watching`, and `restoring` for a rollback's put-back) and
+`idle` with its outcome's name and build when it ends, with the build
+`state.json` says the lamp runs and no reason text. A round's end is logged
+in `log.jsonl` with `"round": true` and its build, and read back when
+lamp-update starts, so the last result outlives a restart and its own
+switch. It is said again every minute and lasts three, so a lamp-update that
+died mid-round reads stale.
+lamp-cloud answers the app's `update.status` from it ([cloud.md](cloud.md)).
+A bus that cannot be used is said once, and the round goes on.
+
 To go back by hand to the build before the last switch:
 
 ```sh
@@ -531,10 +546,11 @@ later install takes them as its own.
 
 ### lamp-update's own build on a product lamp
 
-A round never switches lamp-update itself (`lamp-update.service` is never
-a part), on either kind of lamp. On a product lamp its unit also runs
-through `/opt/lampOS/update/current/`. It moves to its own newer build only
-when `lamp-update install` is run again, which installs every product
+With `LAMP_UPDATE_SELF` off, a round never switches lamp-update itself
+(`lamp-update.service` is never a part), on either kind of lamp. On a
+product lamp its unit also runs through `/opt/lampOS/update/current/`. It
+moves to its own newer build only when `lamp-update install` is run again,
+which installs every product
 part's newest build beside the old and moves each link, its own among them,
 without restarting anything; the new updater runs from its next start.
 Replacing the link under a running updater is safe on Linux: the program
@@ -651,9 +667,9 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. `UPDATER` is 2. A manifest without models
-doesn't write the field and is byte for byte what it was. A model's path
-must be under `/opt/lampOS/`, neither the store nor in it, nor in a
+before the field climbs first. The current `UPDATER` is 4. A manifest
+without models doesn't write the field and is byte for byte what it was.
+A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
 plain parts.
 
@@ -727,7 +743,8 @@ A build can carry the product's settings and tmpfiles (`apply.rs`,
 (`install::SETTINGS` and `lampos.conf`, `install::product_settings`), but
 for the product skills' files under `/var/lib/lampOS/skills/`: those are
 `lamp-product-skills`', placed by the round and judged by the skills
-guard, so one file never has two writers at the switch. It also raises `min_updater` to 3 (`manifest::SETTINGS_UPDATER`). `UPDATER` is 3.
+guard, so one file never has two writers at the switch. It also raises
+`min_updater` to 3 (`manifest::SETTINGS_UPDATER`). The current `UPDATER` is 4.
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -997,6 +1014,29 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   made of lamp-4ace's units, with a key made for that check and thrown
   away, printed the plan for nine units and wrote nothing.
 
+### Lamp trials: local channels signed with test keys
+
+- **19 October 2026, 10:54–10:59 (+07), lamp-4ace:** the first builder's
+  [parts update proof on #737](https://github.com/autonomous-ai/lampOS/issues/737#issuecomment-6259361314)
+  ran `lamp-update once --apply on`. Build 3005 installed 15 parts beside
+  the old ones, switched at a quiet moment and passed the health watch.
+  Build 3006 deliberately failed the voice and was put back automatically.
+  The body was excluded from the channel and kept its build.
+- **20 October 2026, 05:54–06:11 (+07), lamp-4ace:**
+  [the self-update proof on #1788](https://github.com/autonomous-ai/lampOS/pull/1788#issuecomment-6279387052)
+  ran `run-1788.sh` v3b on merged commit `647f1ee63`. Cases A, B and C and
+  restoration passed: a good updater confirmed; one that exited was put
+  back 107 s after the restart; one that never confirmed was put back about
+  693 s after its switch (the 600 s deadline plus a timer pass). The channel
+  used the lamp's installed sequence, so only lamp-update switched: no
+  product part or skill changed. Restoration checked the records, units,
+  fallback binary and key against their originals, removed the trial's
+  unit and drop-in, and left lamp-update inactive as before.
+
+Both trials used local channels and test keys. They do not show a release
+fetched over the internet with the real signing key, an update including
+the body, or a combined update of models, settings and image files.
+
 ## On lamp-4ace: from one build of `lamp-voice` to the next
 
 For the first builder, who owns the lamp. Before CI publishes, the channel
@@ -1104,6 +1144,20 @@ the part starts. A store it truly can't read (a real schema bump) is set
 aside under a new name with a journal line, and the part starts without
 it.
 
+**And one version back** (the build row "Updates cover the whole lamp, V3 to
+V5", 21 Oct): each store as its day's build wrote it is kept as a
+fixture, and every later build's tests read it, as a restart in the same
+boot and after a reboot. A shape change adds the new day's file and keeps
+the old ones. Kept so far, each in its crate's `tests/fixtures/stores/`:
+lamp-tasks (the state and the database around it, as SQL); lamp-schedule
+(its reminders and timers, the same two, and the voice's delivery ledger,
+which Schedule's code keeps in a store of its own); memory across days (its database,
+as SQL); the eyes (their known people); lamp-update (its own state and
+journal); the voice (its thread file, which outlives a restart in
+`/run/lampos-voice`); and lamp-cloud's reports (setup's answer, the person's
+own choice, the queue and the exit note a crash came from). The other parts
+follow, by harm.
+
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
 were also checked with temporary tests, since removed. "Unread" marks what
@@ -1163,6 +1217,8 @@ the file is never read back.
 | voice | second route's settings, `/etc/lampOS/voice/second.json` | JSON | none | read past and named, as `provider.json` (`second_config.rs:79`, `319`; line `lamp-voice second: …`), a key's field refused by name | `tts_provider` is a string checked against a list (`second_config.rs:338-347`), still refused | as `provider.json`: unreadable or a bad known value refuses to start, naming the file (`second_config.rs:310-336`) |
 | voice | conversation thread, `/run/lampos-voice/thread.json` (kept across a restart) | JSON | none | refused (`thread.rs:153`) | n/a | set aside as `.unreadable-<ms>` with a line (`thread.rs:368-372`, `917-940`) |
 | voice | news told, tasks typed, `/var/lib/lampOS/voice/tasks-told`, `tasks-typed` | text lines | none | n/a | n/a | read as empty, no line (`task_news.rs:419-423`): news may be told again |
+| voice | room sounds yes, `/var/lib/lampOS/consent/room-sounds.json` (`LAMP_ONBOARDING`, no-slide lamps only) | JSON | `version` 1, ignored | ignored | only `"yes"` is yes | lamp-ears reads anything else, or no file, as no; the voice removes it at start when its progress holds no yes, never writes it back (`onboarding/storage.rs`) |
+| voice | onboarding progress, `/var/lib/lampOS/voice/onboarding/progress.json` | JSON | none | ignored | a step name this build doesn't know is read past and kept, the walk goes on with the steps it knows (#2110); an outcome it doesn't know is refused | an unreadable file stops the walk with `onboarding_storage_failed` (`onboarding.rs`, `Progress::check`) |
 | voice | relay key `/etc/lampOS/voice/credential`; person's name `/etc/lampOS/person/name` | text | n/a | n/a | n/a | key read raw (`config.rs:400`); an unfit name is no name, with a line (`person.rs`) |
 | voice | sessions and first output, `/var/lib/lampOS/voice/sessions/…`, `first-output/*.jsonl` | JSONL | first output `schema` 1 | — | — | written only, never read back at start |
 | cloud | setup's account, `/etc/lampOS/setup/backend.json` | JSON | none | read (`account.rs:14`, all `serde(default)`) | n/a | an extra field reads. A changed type or bad JSON refuses to start, exit 2 (`main.rs:120-123`) |
@@ -1189,7 +1245,7 @@ the file is never read back.
 | keeper, bus | `keeper.json`; kept logs `logs.*.jsonl` | JSON / JSONL | none | read | n/a | not ready by default (`keeper/src/package.rs:259`); logs only listed by name |
 | settings | snapshot, `--dir/settings.json` | JSON | `version` must be 1 | refused (`settings/src/engine.rs:47,57`) | refused | refuses to start (`main.rs:156`; `#[should_panic]` test `engine.rs:331`). No unit runs lamp-settings |
 | station | a run's record, `--out/<run>.json` | JSON | `format` 1 | refused | refused | only as `--retest-of`, which refuses that run (`station/src/main.rs:117`). A bench tool, not on the lamp |
-| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1; another is refused | **read**, named once in the journal by path (`catalogue.rs`, `Catalogue::from_json_naming`; `main.rs`, #1680) | refused (`Trigger`, `catalogue.rs:13`) | a newer catalogue's unknown fields, at any depth, are read past and named ("fields this build does not read, ignored: …"); a bad known value, a new trigger or another `version` still refuses to start. Tests: `crates/expression/tests/forward.rs` |
+| expression | `/etc/lampOS/expression/expression.json` (update's settings, `install.rs:335`) | JSON | `version` must be 1; another is refused | **read**, named once in the journal by path (`catalogue.rs`, `Catalogue::from_json_naming`; `main.rs`, #1680) | refused (`Trigger`, `catalogue.rs:13`) | a newer catalogue's unknown fields, at any depth, are read past and named ("fields this build does not read, ignored: …"); a bad known value, a new trigger or another `version` still refuses to start. Tests: `crates/expression/tests/it/forward.rs` |
 
 No store: health, mood, air, name (it reads only its models), actions,
 turn-end, observer, ears, camera, audio, ring, environment, lean,
@@ -1263,23 +1319,25 @@ test does (#1512):
   made again right after the units are written, but someone who starts
   speaking in the second before the restart is cut off: the voice has no
   pause that closes it to new turns yet.
-- **`ProtectSystem=strict` and systemd's own calls.** `daemon-reload` and
-  `restart` from inside the unit's sandbox were not tried on a lamp.
+- **Switching parts from the updater's sandbox.** The 19 October
+  parts trial ran `once` directly; the 20 October service trial switched
+  only the updater. Neither shows a round that switches parts under the product
+  updater unit's `ProtectSystem=strict` sandbox.
 - **The body's restart folds the lamp** (body.md); at a quiet moment it
   may still be standing from the last conversation.
 
 ## Not shown
 
-- Anything on a lamp: no lamp-update has run on any lamp, and no number
-  above is a lamp's.
-- CI publishing: the job above has not run; no key exists.
+- A published release fetched over the internet, verified with the real
+  signing key, switched quietly and put back on failure, including an
+  attended run with the body. These remain
+  [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s acceptance
+  checks. That issue records the owner's deferral of publishing and the
+  real key until about 20 November; the local trials do not complete them.
+- CI publishing: the job above remains a proposal. Test keys used by the
+  lamp trials are not the real signing key.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
-- lamp-update switching itself on a lamp (`LAMP_UPDATE_SELF`): tested on
-  the Mac only (`tests/round.rs`, #1680), with a new binary that exits at
-  once run for real and lamp-update-back called as its unit would call it.
-  The `exec`, `OnFailure=`, the timer and the `systemctl` calls haven't run
-  under systemd. The rehearsal on lamp-4ace is the first builder's.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
   (`tests/round.rs`). A download cut short starts again from nothing; it
   isn't resumed. No published build carries models yet.
@@ -1307,5 +1365,3 @@ test does (#1512):
   switch: everything changed is put back together, but a part that stores
   data in a new form (memory, schedule) before being put back is not
   undone.
-- The Linux build: built and tested natively on Linux ARM64 by CI on this
-  branch, not run there by hand.

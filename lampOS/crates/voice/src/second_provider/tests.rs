@@ -3242,7 +3242,9 @@ async fn a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered(
 
 /// #1854's follow-up (lamp-75c9, 20 Oct 18:19): with
 /// `LAMP_SECOND_WRITTEN_WAIT=on` a turn the lamp wrote itself, such as task
-/// news, is said though its chat begins at 5 s, past `BEGIN_WITHIN`; one that
+/// news, is said though its chat begins at 6.9 s, just under
+/// `WRITTEN_BEGIN_WITHIN` and past `BEGIN_WITHIN`, so its words are said
+/// after it (the reviewer's P3 3 on #2307); one that
 /// never begins ends unanswered at `WRITTEN_BEGIN_WITHIN`. A spoken line is
 /// bounded as before. Without the switch, the written turn ends at 3 s
 /// (`a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered`).
@@ -3273,7 +3275,7 @@ async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
         }
     }
     let news = || written(1, "(Nobody has spoken. News from work you handed over.)");
-    let (slow, _) = said(Duration::from_secs(5), news()).await;
+    let (slow, _) = said(WRITTEN_BEGIN_WITHIN - Duration::from_millis(100), news()).await;
     assert_eq!(slow, ["Devin finished."]);
     let (never, after) = said(Duration::from_secs(60), news()).await;
     assert!(never.is_empty(), "{never:?}");
@@ -3383,6 +3385,125 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
         script.asked.lock().unwrap()[0].last(),
         Some(&Message::user(crate::speak_up::NO_LOOK_NOTE))
     );
+}
+
+/// Jarvis on #2031 (#1803): onboarding's sentence is count-only. Its words
+/// go to the coordinator to be counted, and the model is never asked, so
+/// there is no answer to it; a line going on from it does not begin with
+/// them.
+#[tokio::test]
+async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("I sit by the zebrafinch window".to_owned()),
+                Ok("and the lamp".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(ProviderInput::CountOnly {
+        request: 1,
+        privacy_generation: 1,
+    });
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1",
+            "heard:I sit by the zebrafinch window",
+            "complete"
+        ]
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+    engine.submit(ProviderInput::Start {
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: true,
+        over_the_lamp: false,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: false,
+        heard_of_cut: None,
+    });
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1);
+    assert!(
+        asked[0]
+            .iter()
+            .all(|message| !format!("{message:?}").contains("zebrafinch")),
+        "{asked:?}"
+    );
+}
+
+/// The reviewer-lead on #2031: onboarding's sentence is not carried into
+/// the next line's speech to text by its sound either, whether that line
+/// begins within `CARRY_AFTER_END` of it or is marked continuing.
+#[tokio::test]
+async fn the_sentences_sound_is_not_carried_into_the_next_line() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    for continues in [false, true] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("I sit by the zebrafinch window".to_owned()),
+                    Ok("what's the weather?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(ProviderInput::CountOnly {
+            request: 1,
+            privacy_generation: 1,
+        });
+        engine.submit(audio_at(1, 1, 1_000));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let first = script.samples_heard.load(Ordering::Relaxed);
+        assert_eq!(first, frame);
+        engine.submit(ProviderInput::Start {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            continues,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: false,
+            heard_of_cut: None,
+        });
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(
+            script.samples_heard.load(Ordering::Relaxed) - first,
+            frame,
+            "continues {continues}: only the line's own sound"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 1);
+        assert!(
+            asked[0]
+                .iter()
+                .all(|message| !format!("{message:?}").contains("zebrafinch")),
+            "{asked:?}"
+        );
+    }
 }
 
 /// A request that goes on from one given up after an early end is asked
@@ -4792,6 +4913,67 @@ async fn a_skills_look_dropped_in_a_written_turn_goes_on_to_the_next_round() {
     );
     assert_eq!(said, ["There, by the mug."]);
     assert_eq!(script.asked.lock().unwrap().len(), 2);
+}
+
+/// The reviewers' P2 and P3 on #2265 (`LAMP_FACE_GAP_HOLD`): a known face's
+/// gap is held only for someone the lamp answered aloud. A line the model
+/// judged not for the lamp (`not_for_me`) ends its turn but marks no one, so
+/// the face lost after it is the room's; a line the lamp answers marks them,
+/// so the face lost after it is held.
+#[tokio::test]
+async fn only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let known = crate::remember::person_id("A");
+    for (said, held) in [
+        (
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NOT_FOR_ME,
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            false,
+        ),
+        (vec![text("Sure, here it is."), Ok(ChatEvent::Done)], true),
+    ] {
+        let path =
+            std::env::temp_dir().join(format!("twelve-answered-{}-{held}", std::process::id()));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What did I keep?".to_owned())].into()),
+            chats: Mutex::new([said].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        let until = seen.valid_until();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        engine.memory_answered(1, until);
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        let whose = cache.snapshot(until + Duration::from_secs(1));
+        assert_eq!(
+            whose.person() == Some(known.as_str()),
+            held,
+            "answered aloud: {held}"
+        );
+        std::fs::remove_file(&path).unwrap();
+    }
 }
 
 #[tokio::test]

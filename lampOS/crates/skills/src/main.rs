@@ -38,8 +38,8 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
-                     lamp-skills pack [--out DIR] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR]";
+                     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR\n       \
+                     lamp-skills asked [--dir DIR] [--key-file PATH]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -317,12 +317,23 @@ fn test(dirs: &[String]) -> ExitCode {
 fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut out = PathBuf::from(".");
+    // `asked`: the update channel's public key a Store package must be
+    // signed with. `pack`: the private key it is signed with, if any.
+    let mut key_file: Option<PathBuf> = None;
     let mut named = Vec::new();
     let mut given = given.iter();
     while let Some(word) = given.next() {
         let flag = match word.as_str() {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
+            "--key-file" if matches!(command, "pack" | "asked") => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                key_file = Some(value.into());
+                continue;
+            }
             flag if flag.starts_with("--") => {
                 eprintln!("{USAGE}");
                 return ExitCode::from(2);
@@ -345,11 +356,42 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // The manage helper (#1722): one request on the standard input, its
         // answer on the standard output, as systemd hands it a connection
         // to `lamp-skills-manage.socket`; the journal says what was done.
+        // `install` fetches the package itself, over HTTPS within
+        // `package::FETCH_WITHIN`, and takes it only signed with the update
+        // channel's key (`--key-file`, `package::STORE_KEY` by default),
+        // and only with the Store's switch on in its own environment
+        // (`package::STORE_SWITCH`): off, an install is refused as
+        // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
         ("asked", []) => {
+            let store_on =
+                package::store_switched_on(std::env::var(package::STORE_SWITCH).ok().as_deref());
+            let mut web = match store_on
+                .then(|| {
+                    lamp_update::fetch::Web::within(
+                        Duration::from_secs(10),
+                        Duration::from_secs(10),
+                        package::FETCH_WITHIN,
+                    )
+                })
+                .transpose()
+            {
+                Ok(web) => web,
+                Err(error) => {
+                    eprintln!("lamp-skills: asked: no HTTPS client, so no install: {error}");
+                    None
+                }
+            };
+            let store = web.as_mut().map(|web| package::Store {
+                key_file: key_file
+                    .clone()
+                    .unwrap_or_else(|| package::STORE_KEY.into()),
+                channel: web,
+            });
             return match package::asked(
                 &dir,
                 Path::new(lamp_voice::made_skill::DIRECTORY),
                 package::ASKED_LOCK_WAIT,
+                store,
                 std::io::stdin(),
                 std::io::stdout(),
             ) {
@@ -361,9 +403,17 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 }
             };
         }
-        ("pack", [skill]) => {
-            package::pack(Path::new(skill), &out).map(|path| format!("packed {}", path.display()))
-        }
+        ("pack", [skill]) => match &key_file {
+            None => package::pack(Path::new(skill), &out)
+                .map(|path| format!("packed {}", path.display())),
+            Some(key_file) => std::fs::read_to_string(key_file)
+                .map_err(|error| format!("{}: {error}", key_file.display()))
+                .and_then(|text| {
+                    lamp_update::manifest::read_private_key(&text).map_err(|why| why.0)
+                })
+                .and_then(|key| package::pack_signed(Path::new(skill), &out, Some(&key)))
+                .map(|path| format!("packed and signed {}", path.display())),
+        },
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -483,11 +533,144 @@ struct Options {
 /// done.
 type Skip = (Duration, mpsc::Sender<Result<(), String>>);
 
+/// The longest the main loop waits for a message, a call, a skip or a run's
+/// end before it looks at the skills folder, the held runs and every topic's
+/// `latest` again. A turn of its old round of the topics took as long.
+const WAIT_AT_MOST: Duration = Duration::from_millis(250);
+
+/// A sender to the main loop that wakes its wait ([`wait_any`]) with each
+/// send, so a tool call, a skip or a run's end is taken at once, not after
+/// the wait runs out. Before #1806 a tool call waited out a topic's turn,
+/// about 50 ms each on a lamp's skills.
+struct Waking<T> {
+    sender: mpsc::Sender<T>,
+    waker: Arc<std::os::fd::OwnedFd>,
+}
+
+impl<T> Clone for Waking<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            waker: self.waker.clone(),
+        }
+    }
+}
+
+impl<T> Waking<T> {
+    fn send(&self, value: T) -> Result<(), mpsc::SendError<T>> {
+        self.sender.send(value)?;
+        // A full pipe already wakes the wait; a write that fails leaves it
+        // to its time.
+        let _ = rustix::io::write(&*self.waker, &[1]);
+        Ok(())
+    }
+}
+
+/// A channel whose sends wake the main loop through `waker`.
+fn waking<T>(waker: &Arc<std::os::fd::OwnedFd>) -> (Waking<T>, mpsc::Receiver<T>) {
+    let (sender, receiver) = mpsc::channel();
+    (
+        Waking {
+            sender,
+            waker: waker.clone(),
+        },
+        receiver,
+    )
+}
+
+/// The main loop's wake: read end and write end, neither ever blocking.
+/// Made with `pipe` and `fcntl`, as the voice's controls make theirs, since
+/// `pipe2` is not on macOS.
+fn wake_pipe() -> io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
+    let (read, write) = rustix::pipe::pipe()?;
+    for end in [&read, &write] {
+        rustix::io::fcntl_setfd(end, rustix::io::FdFlags::CLOEXEC)?;
+        rustix::fs::fcntl_setfl(end, rustix::fs::OFlags::NONBLOCK)?;
+    }
+    Ok((read, write))
+}
+
+/// Until a topic's or the Policy's socket is readable, the wake is written,
+/// or `wait` passes; at once if one already holds a datagram read ahead
+/// ([`wait_on`]). The wake is emptied.
+fn wait_any(
+    subscribers: &[Subscriber],
+    answers: Option<&Subscriber>,
+    woken: &std::os::fd::OwnedFd,
+    wait: Duration,
+) {
+    use std::os::fd::AsFd;
+    let mut drained = [0u8; 64];
+    if !subscribers.iter().chain(answers).any(Subscriber::holds) {
+        let sockets: Vec<_> = subscribers
+            .iter()
+            .chain(answers)
+            .map(|subscriber| subscriber.as_fd())
+            .collect();
+        wait_on(&sockets, woken, wait);
+    }
+    while matches!(rustix::io::read(woken, &mut drained), Ok(read) if read > 0) {}
+}
+
+/// Until one of `sockets` is readable, `woken` is, or `wait` passes. A
+/// socket that says an error or hang-up with nothing to read is left out
+/// for the rest of `wait`: the other sockets and the wake are waited on
+/// without it, so the loop cannot spin on it, and a call, a skip, a run's
+/// end or another topic's message still ends the wait at once (Fourth on
+/// #2304, the reviewer on #2389).
+fn wait_on(sockets: &[std::os::fd::BorrowedFd<'_>], woken: &std::os::fd::OwnedFd, wait: Duration) {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let until = Instant::now() + wait;
+    let broken = |flags: PollFlags| {
+        !flags.contains(PollFlags::IN)
+            && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
+    };
+    let mut waiting = sockets.to_vec();
+    loop {
+        let left = until.saturating_duration_since(Instant::now());
+        let timeout = Timespec::try_from(left).unwrap_or(Timespec {
+            tv_sec: 0,
+            tv_nsec: 250_000_000,
+        });
+        let mut fds: Vec<PollFd<'_>> = waiting
+            .iter()
+            .map(|socket| PollFd::new(socket, PollFlags::IN))
+            .collect();
+        fds.push(PollFd::new(woken, PollFlags::IN));
+        match poll(&mut fds, Some(&timeout)) {
+            Ok(_) => {}
+            Err(rustix::io::Errno::INTR) => return,
+            // A poll that fails waits on the wake alone, and one of the
+            // wake alone that fails sleeps out the rest.
+            Err(_) if !waiting.is_empty() => {
+                waiting.clear();
+                continue;
+            }
+            Err(_) => return std::thread::sleep(left),
+        }
+        let (wake, socket_flags) = fds.split_last().expect("the wake is polled");
+        if broken(wake.revents()) {
+            return std::thread::sleep(until.saturating_duration_since(Instant::now()));
+        }
+        let kept: Vec<_> = waiting
+            .iter()
+            .zip(socket_flags)
+            .filter(|(_, fd)| !broken(fd.revents()))
+            .map(|(socket, _)| *socket)
+            .collect();
+        // Something readable, the wait over, or nothing new broken.
+        if kept.len() == waiting.len() {
+            return;
+        }
+        waiting = kept;
+    }
+}
+
 /// Listens on `path` for a test: each line `{"skip_us": N}` skips the
 /// program's clock N µs, which the main loop does, and is answered with
 /// `{"now_us": ...}` once it is done, or `{"error": ...}`. Production has
 /// no such socket.
-fn clock_control(path: &Path, skips: mpsc::Sender<Skip>) -> io::Result<()> {
+fn clock_control(path: &Path, skips: Waking<Skip>) -> io::Result<()> {
     // An old socket of its own is taken over; anything else at `path` is
     // left, and the bind fails on it.
     if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket()) {
@@ -607,7 +790,9 @@ fn serve(
     } else {
         None
     };
-    let (finished, done) = mpsc::channel::<SkillEvent>();
+    let (woken, waker) = wake_pipe()?;
+    let waker = Arc::new(waker);
+    let (finished, done) = waking::<SkillEvent>(&waker);
     let limits =
         if options.routines && std::env::var("LAMP_OUTPUT_CAPS").is_ok_and(|value| value == "on") {
             let local = options
@@ -714,11 +899,11 @@ fn serve(
             retaken: HashMap::new(),
         }),
     };
-    let (ask, asks) = mpsc::channel::<ToolAsk>();
+    let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
         listen(tools, ask.clone())?;
     }
-    let (skip, skips) = mpsc::channel::<Skip>();
+    let (skip, skips) = waking::<Skip>(&waker);
     if let Some(path) = &options.clock_control {
         clock_control(path, skip)?;
     }
@@ -779,6 +964,7 @@ fn serve(
                 seen = Some(print);
                 let (mut skills, errors) = load_all(dir);
                 skills.retain(|skill| options.routines || !skill.is_routine());
+                skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
@@ -859,60 +1045,65 @@ fn serve(
         for run in engine.tick(now_us) {
             handle(run, &mut runs, &mut out, &runner);
         }
-        if subscribers.is_empty() {
-            if let Ok(call) = asks.recv_timeout(clock::poll(Duration::from_millis(250))) {
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
+        // One wait for any topic's message, the Policy's answer, or a call,
+        // a skip or a run's end (the wake), not each topic in its turn: a
+        // tool call waited out the turn of whichever topic the loop was on
+        // (#1806). While the Policy is asked, its answers are looked for
+        // every 5 ms, so a late one is given up on time.
+        let wait = if asking.waiting.is_empty() {
+            WAIT_AT_MOST
+        } else {
+            Duration::from_millis(5)
+        };
+        wait_any(
+            &subscribers,
+            asking.gate.as_ref().map(|(_, answers)| answers),
+            &woken,
+            clock::poll(wait),
+        );
+        take_skips(
+            &skips,
+            &mut subscribers,
+            &mut engine,
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        while let Ok(call) = asks.try_recv() {
+            // What was heard before the call, read first: `[again]` asks
+            // whether it asked for the call.
+            for subscriber in subscribers
+                .iter_mut()
+                .filter(|subscriber| subscriber.topic() == Speech::TOPICS[0])
+            {
+                while let Some(message) = receive(subscriber, Duration::ZERO) {
+                    observe(
+                        &message,
+                        &mut engine,
+                        &mut runs,
+                        &mut out,
+                        &runner,
+                        &mut asking,
+                    );
+                }
             }
-            continue;
+            tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
         }
-        let count = subscribers.len() as u64;
-        for index in 0..subscribers.len() {
-            take_skips(
-                &skips,
-                &mut subscribers,
+        if let Some((_, answers)) = &mut asking.gate {
+            answer_asks(
+                answers,
+                &mut asking.waiting,
                 &mut engine,
                 &mut runs,
                 &mut out,
                 &runner,
-                &mut asking,
             );
-            while let Ok(call) = asks.try_recv() {
-                // What was heard before the call, read first: `[again]`
-                // asks whether it asked for the call.
-                for subscriber in subscribers
-                    .iter_mut()
-                    .filter(|subscriber| subscriber.topic() == Speech::TOPICS[0])
-                {
-                    while let Some(message) = receive(subscriber, Duration::ZERO) {
-                        observe(
-                            &message,
-                            &mut engine,
-                            &mut runs,
-                            &mut out,
-                            &runner,
-                            &mut asking,
-                        );
-                    }
-                }
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
-            }
-            if let Some((_, answers)) = &mut asking.gate {
-                answer_asks(
-                    answers,
-                    &mut asking.waiting,
-                    &mut engine,
-                    &mut runs,
-                    &mut out,
-                    &runner,
-                );
-            }
-            // While the Policy is asked, look for its answer every 5 ms.
-            let wait = if asking.waiting.is_empty() {
-                Duration::from_millis(250 / count).max(Duration::from_millis(10))
-            } else {
-                Duration::from_millis(5)
-            };
-            if let Some(message) = receive(&mut subscribers[index], clock::poll(wait)) {
+        }
+        // A message a topic, as its turn did; one waiting still makes the
+        // next wait end at once.
+        for subscriber in &mut subscribers {
+            if let Some(message) = receive(subscriber, Duration::ZERO) {
                 observe(
                     &message,
                     &mut engine,
@@ -1113,7 +1304,7 @@ fn start_or_queue(
 /// What a run needs from the program.
 struct Runner {
     sockets: Sockets,
-    finished: mpsc::Sender<SkillEvent>,
+    finished: Waking<SkillEvent>,
     bus: Bus,
     /// With `LAMP_LIGHT_REQUESTS=on`, how a skill's light is asked of the ring.
     glows: Option<Glows>,
@@ -1855,6 +2046,19 @@ fn tool_call(
     let sockets = runner.sockets_for(&run.skill);
     run.calls
         .retain(|call| *call != Call::Look || sockets.may.refuses(call).is_none());
+    if run.calls.contains(&Call::PrepareUnplug)
+        && !lamp_skills::unplug::core_identity(&run.skill, &name)
+    {
+        return refuse("Unplug preparation belongs only to prepare-unplug / prepare_to_unplug.");
+    }
+    if run.calls.contains(&Call::PrepareUnplug)
+        && let Some(why) = sockets.may.refuses(&Call::PrepareUnplug)
+    {
+        return refuse(&why);
+    }
+    if run.calls.contains(&Call::PrepareUnplug) && !lamp_body::unplug::enabled() {
+        return refuse("Preparing to unplug is not enabled. Do not unplug on my confirmation.");
+    }
     let made: Vec<Call> = run
         .calls
         .iter()
@@ -1980,7 +2184,7 @@ fn write_tools(dir: &Path, engine: &Engine) {
 ///   it again as its user, under a sandbox whose writable bind went with
 ///   the folder (the reviewer on #1656); systemd makes the folder again as
 ///   it starts it once more (`Restart=on-failure`).
-fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::Result<()> {
+fn keep_tools(dir: &Path, asks: &Waking<ToolAsk>, engine: &Engine) -> io::Result<()> {
     if dir.join("call.sock").exists() {
         return Ok(());
     }
@@ -2005,7 +2209,7 @@ fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
 /// answering.
-fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
+fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
     let _ = std::fs::remove_file(&socket);
@@ -2056,6 +2260,107 @@ fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
         }
     });
     Ok(())
+}
+
+/// Folding runs outside the tool listener. Its admission is not success; only
+/// current body evidence and the matching asleep publication permit that line.
+fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
+    use lamp_skills::unplug::{self, Progress};
+    if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        return why;
+    }
+    if !lamp_body::unplug::enabled() {
+        return "unplug preparation is disabled; nothing requested".into();
+    }
+    let began = clock::now_us();
+    let (request, since) = match unplug::begin(bus, skill, unplug::TOOL, began) {
+        Ok(request) => request,
+        Err(error) => return format!("unplug preparation could not start: {error}"),
+    };
+    let failure = loop {
+        match unplug::read(bus, &request, since, clock::now_us()) {
+            Ok(Progress::Ready) => {
+                // Recheck after the socket opens, immediately before sending.
+                // The voice must not queue a readiness claim for a later scene.
+                match say_unplug_ready(skill, sockets, bus, &request, since) {
+                    Ok(Some(outcome)) => return outcome,
+                    Ok(None) => {}
+                    Err(error) => break format!("the readiness line could not be sent: {error}"),
+                }
+            }
+            Ok(Progress::Failed(why)) => break why,
+            Err(error) => break format!("completion evidence could not be read: {error}"),
+            Ok(Progress::Waiting) => {}
+        }
+        if clock::now_us().saturating_sub(began) >= unplug::WAIT_US {
+            break "the body and asleep presentation were not confirmed in time".into();
+        }
+        clock::sleep(POLL);
+    };
+    // The latch is deliberately not undone by a failure or a cancelled say.
+    // Resuming automatically could raise the arm after the person heard a reply.
+    let outcome = say_unplug_failure(skill, sockets);
+    format!("unplug preparation failed: {failure}; {outcome}")
+}
+
+fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
+    if let Some(why) = sockets.may.refuses(&Call::Say(String::new())) {
+        return why;
+    }
+    say(
+        &sockets.say,
+        "unplug preparation failed",
+        skill,
+        json!({"note": "Say briefly: I could not confirm a safe folded position. Please do not unplug yet.", "priority": 5}),
+        &[],
+        || {},
+    )
+}
+
+fn say_unplug_ready(
+    skill: &str,
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    since: u64,
+) -> io::Result<Option<String>> {
+    // Use the admitted run's captured grants, as other skill runs do. A
+    // reload changes future admissions, not this run's permission snapshot.
+    if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, why));
+    }
+    let attempt = || -> io::Result<Option<String>> {
+        let mut stream = UnixStream::connect(&sockets.say)?;
+        stream.set_write_timeout(Some(Duration::from_millis(500)))?;
+        stream.set_read_timeout(Some(SAY_TIMEOUT))?;
+        if lamp_skills::unplug::read(bus, request, since, clock::now_us())?
+            != lamp_skills::unplug::Progress::Ready
+        {
+            return Ok(None);
+        }
+        let ask = json!({
+            "skill": skill, "priority": 8, "expires_in_ms": 500,
+            "unplug_request": request,
+            "text": "My arm is folded. You can unplug me now."
+        });
+        writeln!(stream, "{ask}")?;
+        let mut lines = BufReader::new(stream.take(64 * 1_024));
+        loop {
+            let mut line = String::new();
+            if lines.read_line(&mut line)? == 0 {
+                return Ok(Some(
+                    "the voice closed without confirming the readiness line".into(),
+                ));
+            }
+            let response: serde_json::Value = serde_json::from_str(&line)?;
+            if let Some(outcome) = response["outcome"].as_str() {
+                return Ok(
+                    (outcome != "expired").then(|| format!("unplug readiness line: {outcome}"))
+                );
+            }
+        }
+    };
+    attempt()
 }
 
 /// How the light was changed, to give it back.
@@ -2165,6 +2470,10 @@ fn perform(
     // its trigger ends, told that end.
     (made, end): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>),
 ) -> String {
+    if calls == [Call::PrepareUnplug] {
+        let _ = made.send(());
+        return prepare_unplug(skill, sockets, bus);
+    }
     // A light the run gives back. One the person keeps is theirs (#1679).
     let is_light = |call: &Call| {
         matches!(
@@ -2934,6 +3243,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             Err(error) => format!("{what}: the actions part was not reached ({error})"),
         };
     match call {
+        Call::PrepareUnplug => "unplug preparation must run with its completion check".into(),
         Call::Gaze { face: None } => "look at the face: no face in view".into(),
         Call::Gaze {
             face: Some((x, y, size)),
@@ -3083,6 +3393,78 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 mod tests {
     use super::*;
 
+    /// Fourth on #2304: a descriptor that says a hang-up with nothing to
+    /// read makes the wait wait on the wake alone, so a call still wakes it
+    /// at once, where a sleep of the whole wait held it (2 s here). Linux
+    /// only: there a pipe whose writer has gone says so; on macOS it says
+    /// it is readable too, as a stream whose peer has gone does.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_broken_socket_still_lets_a_wake_end_the_wait() {
+        use std::os::fd::AsFd;
+        let (socket, writer) = rustix::pipe::pipe().unwrap();
+        drop(writer);
+        let (woken, waker) = wake_pipe().unwrap();
+        let waking = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            rustix::io::write(&waker, &[1]).unwrap();
+            waker
+        });
+        let began = std::time::Instant::now();
+        wait_on(&[socket.as_fd()], &woken, Duration::from_secs(2));
+        let took = began.elapsed();
+        drop(waking.join().unwrap());
+        assert!(took < Duration::from_secs(1), "{took:?}");
+    }
+
+    /// The reviewer on #2389: while one socket is broken, a message on
+    /// another topic still ends the wait at once, where the wake was waited
+    /// on alone (2 s here). Linux only, as above.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_broken_socket_still_lets_another_topics_message_end_the_wait() {
+        use std::os::fd::AsFd;
+        let (broken, writer) = rustix::pipe::pipe().unwrap();
+        drop(writer);
+        let (topic, sender) = std::os::unix::net::UnixDatagram::pair().unwrap();
+        let (woken, _waker) = wake_pipe().unwrap();
+        let sending = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            sender.send(b"x").unwrap();
+            sender
+        });
+        let began = std::time::Instant::now();
+        wait_on(
+            &[broken.as_fd(), topic.as_fd()],
+            &woken,
+            Duration::from_secs(2),
+        );
+        let took = began.elapsed();
+        drop(sending.join().unwrap());
+        assert!(took < Duration::from_secs(1), "{took:?}");
+    }
+
+    /// The reviewer on #2389: a hang-up late in the wait leaves only the
+    /// rest of it to wait, not a whole wait more (600 ms, where it was
+    /// 900 ms). Linux only, as above.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_late_hang_up_waits_out_only_the_rest_of_the_wait() {
+        use std::os::fd::AsFd;
+        let (socket, writer) = rustix::pipe::pipe().unwrap();
+        let (woken, _waker) = wake_pipe().unwrap();
+        let hanging_up = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            drop(writer);
+        });
+        let began = std::time::Instant::now();
+        wait_on(&[socket.as_fd()], &woken, Duration::from_millis(600));
+        let took = began.elapsed();
+        hanging_up.join().unwrap();
+        assert!(took >= Duration::from_millis(550), "{took:?}");
+        assert!(took < Duration::from_millis(800), "{took:?}");
+    }
+
     fn clock_fixture(windowed: bool, enabled: bool) -> lamp_skills::Skill {
         let root = tempfile::tempdir().unwrap();
         let folder = root.path().join("clock-check");
@@ -3207,6 +3589,115 @@ mod tests {
                 permissions,
             },
         }
+    }
+
+    fn unplug_grants() -> Permissions {
+        Permissions {
+            body: true,
+            speak: true,
+            topics: lamp_skills::unplug::READ_TOPICS
+                .iter()
+                .map(|topic| (*topic).to_owned())
+                .collect(),
+            ..Permissions::default()
+        }
+    }
+
+    #[test]
+    fn unplug_denied_at_dispatch_neither_latches_nor_sends_delayed_speech() {
+        // Short path for macOS Unix sockets; no process-wide environment change.
+        let dir = tempfile::Builder::new()
+            .prefix("ug")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let listener = UnixListener::bind(dir.path().join("say.sock")).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let mut denied = Vec::new();
+        let mut body = unplug_grants();
+        body.body = false;
+        denied.push(body);
+        let mut speak = unplug_grants();
+        speak.speak = false;
+        denied.push(speak);
+        for topic in lamp_skills::unplug::READ_TOPICS {
+            let mut permission = unplug_grants();
+            permission.topics.retain(|given| given != topic);
+            denied.push(permission);
+        }
+        for permission in denied {
+            let sockets = nowhere(dir.path(), permission.clone());
+            let (made, _) = mpsc::channel();
+            let outcome = perform(
+                lamp_skills::unplug::SKILL,
+                (&[Call::PrepareUnplug], &[]),
+                &sockets,
+                &bus,
+                None,
+                (None, false),
+                (made, None),
+            );
+            assert!(outcome.contains("refused"), "{outcome}");
+            assert!(
+                bus.latest(lamp_body::unplug::Request::TOPIC)
+                    .unwrap()
+                    .is_none()
+            );
+            let error =
+                say_unplug_ready(lamp_skills::unplug::SKILL, &sockets, &bus, "r", 1).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            if !permission.speak {
+                assert!(
+                    say_unplug_failure(lamp_skills::unplug::SKILL, &sockets).contains("refused")
+                );
+            }
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                io::ErrorKind::WouldBlock
+            );
+        }
+    }
+
+    #[test]
+    fn unplug_reload_changes_new_admissions_not_captured_run_grants() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
+        let runner = Runner {
+            sockets: nowhere(dir.path(), Permissions::default()),
+            finished,
+            bus: Bus::new(dir.path().join("bus")).unwrap(),
+            glows: None,
+            body_requests: false,
+            ends: RefCell::default(),
+            looks: RefCell::default(),
+            local_time: None,
+            trust_clock: false,
+            clock_waiting: Cell::new(false),
+            rest_client: None,
+            permissions: RefCell::new(HashMap::from([(
+                lamp_skills::unplug::SKILL.to_owned(),
+                unplug_grants(),
+            )])),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+                signs: None,
+                retaken: HashMap::new(),
+            }),
+        };
+        let admitted = runner.sockets_for(lamp_skills::unplug::SKILL);
+        runner.permissions.borrow_mut().clear();
+        assert!(admitted.may.refuses(&Call::PrepareUnplug).is_none());
+        assert!(
+            runner
+                .sockets_for(lamp_skills::unplug::SKILL)
+                .may
+                .refuses(&Call::PrepareUnplug)
+                .is_some()
+        );
     }
 
     fn light(colour: &str) -> Call {
@@ -3382,7 +3873,8 @@ mod tests {
                     .unwrap();
                 let say = UnixListener::bind(root.path().join("say.sock")).unwrap();
                 say.set_nonblocking(true).unwrap();
-                let (finished, done) = mpsc::channel();
+                let (_woken, waker) = wake_pipe().unwrap();
+                let (finished, done) = waking(&Arc::new(waker));
                 let runner = Runner {
                     sockets: nowhere(root.path(), Permissions::default()),
                     finished,
@@ -3456,7 +3948,8 @@ mod tests {
     #[test]
     fn a_runs_sockets_carry_its_skills_permissions_and_nothing_for_another() {
         let dir = tempfile::tempdir().unwrap();
-        let (finished, _done) = mpsc::channel();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
         let runner = Runner {
             sockets: nowhere(dir.path(), Permissions::default()),
             finished,

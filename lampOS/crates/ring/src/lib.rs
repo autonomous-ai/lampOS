@@ -33,15 +33,25 @@ pub const SPI_SPEED_HZ: u32 = 6_400_000;
 pub const WRITE_BUDGET_US: u64 = 10_000;
 /// Writes over the budget are a run of late frames, not a fault, until the
 /// run has lasted this long. A run is late writes in a row: an on-time
-/// write, or more than [`LATE_GAP_US`] with no write, ends it. The frame of a late write did go out. On
-/// lamp-4ace the SD/MMC host re-tunes about once an hour and holds the bus
-/// for 0.3 s; one write then returns after 11 to 15 ms (#911).
+/// write, or more than [`LATE_GAP_US`] with no write, ends it. The frame of a
+/// late write did go out. On lamp-4ace the SD/MMC host re-tunes about once an
+/// hour and holds the bus for 0.3 s: a run of late writes then, or one write
+/// that blocks for most of it (#911). This is the only write-time fault: no
+/// single write, however slow, is one (#1620).
 pub const LATE_RUN_US: u64 = 2_000_000;
 /// The longest pause between two late writes that still keeps them in one run:
 /// one frame period of the slowest steady writer (a frame older than this is
 /// dropped by the voice's ring worker anyway). A held cue or a dark ring writes
 /// nothing, so a late write after it starts a new run.
 pub const LATE_GAP_US: u64 = 100_000;
+
+/// The newest late write that was kept as a frame, for the owner to say.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LateWrite {
+    pub elapsed_us: u64,
+    /// How long its run of late writes has lasted, to this write's return.
+    pub run_us: u64,
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Rgb {
@@ -142,6 +152,13 @@ pub fn encode(pixels: &[Rgb; PIXEL_COUNT], ceiling: ChannelCeiling) -> EncodedFr
 /// This interface does not promise a hard wall-clock bound on kernel I/O.
 pub trait FrameSink {
     fn write_frame(&mut self, frame: &EncodedFrame) -> io::Result<()>;
+
+    /// A test seam: a fake sink's own duration for the write just made, so a
+    /// host test of the late-write rule does not race the host's scheduler.
+    /// Real sinks keep the default, `None`, and the measured time counts.
+    fn simulated_elapsed_us(&self) -> Option<u64> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,7 +201,11 @@ pub struct BlankReceipt {
 pub enum WriteFailure {
     Io(io::Error),
     ClockRegression,
-    OverBudget { elapsed_us: u64 },
+    /// `run_us`: how long the run of late writes had lasted.
+    OverBudget {
+        elapsed_us: u64,
+        run_us: u64,
+    },
 }
 
 impl fmt::Display for WriteFailure {
@@ -192,9 +213,10 @@ impl fmt::Display for WriteFailure {
         match self {
             Self::Io(error) => write!(f, "SPI frame write failed: {error}"),
             Self::ClockRegression => f.write_str("monotonic clock regressed during SPI write"),
-            Self::OverBudget { elapsed_us } => write!(
+            Self::OverBudget { elapsed_us, run_us } => write!(
                 f,
-                "SPI write returned after {elapsed_us} us; budget is {WRITE_BUDGET_US} us"
+                "SPI write returned after {elapsed_us} us; budget is {WRITE_BUDGET_US} us, late for {} ms",
+                run_us / 1_000
             ),
         }
     }
@@ -280,6 +302,8 @@ pub struct GuardedRing<S: FrameSink> {
     late_last: Option<MonoTime>,
     /// Late writes so far that were kept as frames, for the owner to say.
     late_writes: u64,
+    /// The newest of them.
+    last_late: Option<LateWrite>,
     clock: fn() -> MonoTime,
     black: EncodedFrame,
 }
@@ -306,6 +330,7 @@ impl<S: FrameSink> GuardedRing<S> {
             late_since: None,
             late_last: None,
             late_writes: 0,
+            last_late: None,
             clock,
             black: EncodedFrame::black(),
         };
@@ -466,6 +491,11 @@ impl<S: FrameSink> GuardedRing<S> {
         self.late_writes
     }
 
+    /// The newest late write kept as a frame, if any.
+    pub fn last_late(&self) -> Option<LateWrite> {
+        self.last_late
+    }
+
     pub fn is_stopped(&self) -> bool {
         self.stopped
     }
@@ -493,10 +523,11 @@ impl<S: FrameSink> GuardedRing<S> {
     ) -> Result<WriteReceipt, WriteFailure> {
         self.sink.write_frame(frame).map_err(WriteFailure::Io)?;
         let finished_at = (self.clock)();
-        let elapsed_us = finished_at
+        let measured_us = finished_at
             .as_micros()
             .checked_sub(started_at.as_micros())
             .ok_or(WriteFailure::ClockRegression)?;
+        let elapsed_us = self.sink.simulated_elapsed_us().unwrap_or(measured_us);
         if elapsed_us > WRITE_BUDGET_US {
             let in_a_row = self.late_last.is_some_and(|last| {
                 started_at.as_micros().saturating_sub(last.as_micros()) <= LATE_GAP_US
@@ -506,10 +537,16 @@ impl<S: FrameSink> GuardedRing<S> {
             }
             self.late_last = Some(finished_at);
             let since = self.late_since.unwrap_or(started_at);
-            if finished_at.as_micros().saturating_sub(since.as_micros()) >= LATE_RUN_US {
-                return Err(WriteFailure::OverBudget { elapsed_us });
+            // A simulated write still counts its own duration in the run.
+            let run_us = finished_at
+                .as_micros()
+                .saturating_sub(since.as_micros())
+                .max(elapsed_us);
+            if run_us >= LATE_RUN_US {
+                return Err(WriteFailure::OverBudget { elapsed_us, run_us });
             }
             self.late_writes += 1;
+            self.last_late = Some(LateWrite { elapsed_us, run_us });
         } else {
             self.late_since = None;
             self.late_last = None;

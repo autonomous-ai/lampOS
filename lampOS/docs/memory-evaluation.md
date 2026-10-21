@@ -238,7 +238,7 @@ run used the evaluator's explicit timers and reported no resource total.
 
 ## Local store and socket measurements
 
-The separate `tests/days_timing.rs` fixture compares the default file store
+The separate `tests/it/days_timing.rs` fixture compares the default file store
 with the optional database, through the same Unix-socket server. The final
 run on the Mac identified above used the completed implementation with
 SQLite DELETE/EXTRA/fullfsync, in release mode. The two functional test
@@ -248,7 +248,7 @@ It does not reuse the LongMemEval corpus. Exact values and machine metadata
 are in [memory-socket-results.json](memory-socket-results.json).
 
 ```sh
-/Users/autonomous/.cargo/bin/cargo test -p lamp-memory --release --test days_timing -- --ignored --nocapture
+/Users/autonomous/.cargo/bin/cargo test -p lamp-memory --release --test it days_timing:: -- --ignored --nocapture
 ```
 
 The boundary starts before socket connect and request serialization, then

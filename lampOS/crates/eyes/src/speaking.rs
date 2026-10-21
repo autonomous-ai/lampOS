@@ -20,6 +20,7 @@
 //! less than [`LEAST_EYES_PX`] apart, turned more than [`MOST_TURN_DEG`],
 //! too new, or with jittering marks is `unknown`, never `no`.
 use lamp_msgs::{Speaking, SpeakingFrom, SpeakingState};
+use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 
 /// Where the eyes read whether to judge speaking. `on` only; with
@@ -97,6 +98,39 @@ const UNKNOWN: Speaking = Speaking {
     from: None,
 };
 
+/// The branch that returned this decision. Earlier gates take precedence;
+/// a metric that was not reached remains null rather than being recomputed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Reason {
+    InvalidEyes,
+    TurnUnavailable,
+    Turned,
+    Small,
+    TooFewLooks,
+    Jitter,
+    Mesh,
+    Corners,
+}
+
+/// Numeric, ephemeral diagnostics only: no face id, marks, image or name.
+#[derive(Clone, Debug, Serialize)]
+pub struct MouthDiagnostic {
+    pub eyes_px: Option<f32>,
+    pub window_mean_eyes_px: Option<f32>,
+    pub window_looks: Option<usize>,
+    pub window_span_us: Option<u64>,
+    pub turn_deg: Option<f32>,
+    pub jitter_rad: Option<f32>,
+    pub reason: Reason,
+    pub mesh_current: bool,
+    pub mesh_window_looks: Option<usize>,
+    pub mouth_open: Option<f32>,
+    /// This valid look begins a new window; invalid looks never claim a reset.
+    pub window_reset: bool,
+    pub speaking: Speaking,
+}
+
 impl Mouths {
     /// This look of the face `id`: its marks in the detector's pixels, how
     /// far it is turned, in degrees, if that was measured, and how open the
@@ -108,6 +142,46 @@ impl Mouths {
         turn_deg: Option<f32>,
         open: Option<f32>,
         now_us: u64,
+    ) -> Speaking {
+        self.judge_observed(id, marks, turn_deg, open, now_us, None)
+    }
+
+    /// The same state transition and gates as `judge`, with an opt-in record.
+    pub fn judge_with_diagnostics(
+        &mut self,
+        id: u32,
+        marks: &[(f32, f32); 5],
+        turn_deg: Option<f32>,
+        open: Option<f32>,
+        now_us: u64,
+    ) -> (Speaking, MouthDiagnostic) {
+        let mut diagnostic = MouthDiagnostic {
+            eyes_px: None,
+            window_mean_eyes_px: None,
+            window_looks: None,
+            window_span_us: None,
+            turn_deg,
+            jitter_rad: None,
+            reason: Reason::InvalidEyes,
+            mesh_current: open.is_some(),
+            mesh_window_looks: None,
+            mouth_open: open,
+            window_reset: false,
+            speaking: UNKNOWN,
+        };
+        let result = self.judge_observed(id, marks, turn_deg, open, now_us, Some(&mut diagnostic));
+        diagnostic.speaking = result;
+        (result, diagnostic)
+    }
+
+    fn judge_observed(
+        &mut self,
+        id: u32,
+        marks: &[(f32, f32); 5],
+        turn_deg: Option<f32>,
+        open: Option<f32>,
+        now_us: u64,
+        mut diagnostic: Option<&mut MouthDiagnostic>,
     ) -> Speaking {
         self.faces.retain(|_, mouth| {
             mouth
@@ -132,9 +206,34 @@ impl Mouths {
         }
         let looks = &mouth.looks;
         let turned = turn_deg.is_none_or(|degrees| degrees > MOST_TURN_DEG);
-        let small =
-            looks.iter().map(|look| look.2).sum::<f32>() / (looks.len() as f32) < LEAST_EYES_PX;
-        if turned || small || looks.len() < LEAST_LOOKS {
+        let mean_eyes = looks.iter().map(|look| look.2).sum::<f32>() / (looks.len() as f32);
+        let small = mean_eyes < LEAST_EYES_PX;
+        if let Some(detail) = diagnostic.as_deref_mut() {
+            detail.eyes_px = Some(eyes);
+            detail.window_mean_eyes_px = Some(mean_eyes);
+            detail.window_looks = Some(looks.len());
+            detail.window_span_us =
+                Some(now_us.saturating_sub(looks.front().map_or(now_us, |look| look.0)));
+            detail.window_reset = looks.len() == 1;
+            detail.mesh_window_looks = Some(looks.iter().filter(|look| look.4.is_some()).count());
+        }
+        let refusal = if turned {
+            Some(if turn_deg.is_none() {
+                Reason::TurnUnavailable
+            } else {
+                Reason::Turned
+            })
+        } else if small {
+            Some(Reason::Small)
+        } else if looks.len() < LEAST_LOOKS {
+            Some(Reason::TooFewLooks)
+        } else {
+            None
+        };
+        if let Some(reason) = refusal {
+            if let Some(detail) = diagnostic {
+                detail.reason = reason;
+            }
             return UNKNOWN;
         }
         let pairs = looks.iter().zip(looks.iter().skip(1));
@@ -152,7 +251,13 @@ impl Mouths {
             .sum::<f32>()
             / (looks.len() - 2) as f32)
             .sqrt();
+        if let Some(detail) = diagnostic.as_deref_mut() {
+            detail.jitter_rad = Some(jitter);
+        }
         if jitter > MOST_JITTER {
+            if let Some(detail) = diagnostic {
+                detail.reason = Reason::Jitter;
+            }
             return UNKNOWN;
         }
         // The eye line's jitter at rest, fed on every judged look, so the
@@ -165,6 +270,9 @@ impl Mouths {
         // corners, and its own steadiness is not the eye line's.
         let opens: Option<Vec<f32>> = looks.iter().map(|look| look.4).collect();
         if let Some(opens) = opens {
+            if let Some(detail) = diagnostic {
+                detail.reason = Reason::Mesh;
+            }
             let score = (opens
                 .windows(2)
                 .map(|two| (two[1] - two[0]).powi(2))
@@ -181,6 +289,9 @@ impl Mouths {
                 score,
                 from: Some(SpeakingFrom::Mesh),
             };
+        }
+        if let Some(detail) = diagnostic {
+            detail.reason = Reason::Corners;
         }
         let change = pairs.map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
         // What the jitter explains of the width's change is taken off.
@@ -581,5 +692,130 @@ mod tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::*;
+
+    fn marks(eyes: f32, angle: f32) -> [(f32, f32); 5] {
+        let (sin, cos) = angle.sin_cos();
+        [
+            (0.0, 0.0),
+            (eyes * cos, eyes * sin),
+            (eyes / 2.0, 10.0),
+            (0.0, 20.0),
+            (eyes, 20.0),
+        ]
+    }
+
+    #[test]
+    fn diagnostic_names_the_branch_that_actually_returned_the_verdict() {
+        for (turn, eyes, expected) in [
+            (None, 30.0, Reason::TurnUnavailable),
+            (Some(31.0), 30.0, Reason::Turned),
+            (Some(0.0), 23.75, Reason::Small),
+            (Some(0.0), 30.0, Reason::TooFewLooks),
+        ] {
+            let (said, detail) =
+                Mouths::default().judge_with_diagnostics(1, &marks(eyes, 0.0), turn, Some(0.0), 0);
+            assert_eq!(said, UNKNOWN);
+            assert_eq!(detail.reason, expected);
+            assert_eq!(detail.eyes_px, Some(eyes));
+            assert_eq!(detail.jitter_rad, None, "later gates are not evaluated");
+            assert!(detail.window_reset);
+        }
+        for (mesh, changing, expected, state) in [
+            (true, false, Reason::Mesh, SpeakingState::No),
+            (true, true, Reason::Mesh, SpeakingState::Yes),
+            (false, false, Reason::Corners, SpeakingState::No),
+        ] {
+            let mut judge = Mouths::default();
+            for look in 0..5 {
+                let open = mesh.then_some(if changing && look % 2 == 1 { 0.04 } else { 0.0 });
+                let (said, detail) = judge.judge_with_diagnostics(
+                    1,
+                    &marks(30.0, 0.0),
+                    Some(0.0),
+                    open,
+                    look * 250_000,
+                );
+                if look == 4 {
+                    assert_eq!(detail.reason, expected);
+                    assert_eq!(said.state, state);
+                    assert_eq!(detail.speaking, said);
+                    assert_eq!(detail.jitter_rad, Some(0.0));
+                    assert_eq!(detail.window_span_us, Some(1_000_000));
+                }
+            }
+        }
+        let mut judge = Mouths::default();
+        for look in 0..5 {
+            let (_, detail) = judge.judge_with_diagnostics(
+                1,
+                &marks(30.0, if look % 2 == 0 { 0.2 } else { -0.2 }),
+                Some(0.0),
+                Some(0.0),
+                look * 250_000,
+            );
+            if look == 4 {
+                assert_eq!(detail.reason, Reason::Jitter);
+                assert!(detail.jitter_rad.unwrap() > MOST_JITTER);
+            }
+        }
+    }
+
+    #[test]
+    fn window_mean_and_mesh_coverage_are_not_current_sample_or_rounded_values() {
+        let mut judge = Mouths::default();
+        for look in 0..4 {
+            judge.judge(1, &marks(23.0, 0.0), Some(0.0), Some(0.0), look * 250_000);
+        }
+        let (said, detail) =
+            judge.judge_with_diagnostics(1, &marks(28.0, 0.0), Some(0.0), None, 1_000_000);
+        assert_eq!(detail.window_mean_eyes_px, Some(24.0));
+        assert_eq!(detail.eyes_px, Some(28.0));
+        assert_eq!(detail.window_looks, Some(5));
+        assert_eq!(detail.mesh_window_looks, Some(4));
+        assert!(!detail.mesh_current);
+        assert_eq!(detail.reason, Reason::Corners);
+        assert_eq!(said.from, Some(SpeakingFrom::Corners));
+    }
+
+    #[test]
+    fn invalid_eyes_do_not_report_empty_history_and_reset_means_new_valid_window() {
+        let mut judge = Mouths::default();
+        for look in 0..5 {
+            judge.judge(1, &marks(30.0, 0.0), Some(0.0), Some(0.0), look * 250_000);
+        }
+        let (_, invalid) =
+            judge.judge_with_diagnostics(1, &[(0.0, 0.0); 5], Some(0.0), Some(0.0), 1_250_000);
+        assert_eq!(invalid.reason, Reason::InvalidEyes);
+        assert_eq!(invalid.window_looks, None);
+        assert_eq!(invalid.window_span_us, None);
+        assert_eq!(invalid.mesh_window_looks, None);
+        assert!(!invalid.window_reset);
+        let (_, next) =
+            judge.judge_with_diagnostics(1, &marks(30.0, 0.0), Some(0.0), Some(0.0), 1_500_000);
+        assert_eq!(
+            next.window_looks,
+            Some(6),
+            "invalid look left history untouched"
+        );
+        assert!(!next.window_reset);
+        let (_, gap) =
+            judge.judge_with_diagnostics(1, &marks(30.0, 0.0), Some(0.0), Some(0.0), 3_750_000);
+        assert_eq!(gap.window_looks, Some(1));
+        assert!(
+            gap.window_reset,
+            "expired window, even before the face is forgotten"
+        );
+        let (_, other) =
+            judge.judge_with_diagnostics(2, &marks(30.0, 0.0), Some(0.0), Some(0.0), 4_000_000);
+        assert!(
+            other.window_reset,
+            "a new passing track begins its own window"
+        );
     }
 }

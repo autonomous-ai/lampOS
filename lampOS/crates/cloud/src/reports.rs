@@ -110,6 +110,7 @@ pub const UNITS: &[&str] = &[
     "lamp-expression.service",
     "lamp-eyes.service",
     "lamp-health.service",
+    "lamp-keeper-restart@.service",
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
@@ -118,6 +119,7 @@ pub const UNITS: &[&str] = &[
     "lamp-schedule.service",
     "lamp-selftest.service",
     "lamp-setup-change@.service",
+    "lamp-setup-keys@.service",
     "lamp-setup-reset.service",
     "lamp-setup-wifi@.service",
     "lamp-setup.service",
@@ -2048,6 +2050,175 @@ pub(crate) mod tests {
         let kinds = shared.with(sent_kinds);
         assert!(kinds.iter().all(|kind| kind == "stopped"), "{kinds:?}");
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The reports' records kept as fixtures, one folder for each change of a
+    /// record's shape, each written by its day's builds: setup's answer
+    /// (lamp-setup's `write_a_reports_answer_fixture`), and lamp-cloud's own
+    /// choice, queue and the exit note its crash came from
+    /// ([`write_a_reports_fixture`]). Every later build reads each as it was
+    /// kept: the person's yes stands, with who gave it, the queued crash waits
+    /// to be sent, nothing set aside, and the note it came from isn't taken
+    /// again in the same boot (`/run` keeps it across an update), so an update
+    /// never turns reports off, drops what waits or sends a crash twice (the
+    /// build row "Updates cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_reports_record_reads_as_it_was_kept() {
+        macro_rules! day {
+            ($day:literal) => {
+                (
+                    $day,
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/setup.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/own.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/queue/state.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/queue/1.json"
+                    )),
+                    include_str!(concat!(
+                        "../tests/fixtures/stores/reports-",
+                        $day,
+                        "/exits/lamp-voice.service@5521000000.json"
+                    )),
+                )
+            };
+        }
+        let kept_days = [day!("2026-10-21")];
+        for (day, setup, own, state, crash, exit) in kept_days {
+            // Setup's answer alone, as on a lamp nobody has changed it on.
+            let alone = places(&format!("kept-setup-{day}"));
+            fs::write(&alone.setup, setup).unwrap();
+            let consent = consent(&alone);
+            assert!(consent.share, "{day}");
+            assert_eq!(consent.by, Some(lamp_msgs::ReportsBy::Setup), "{day}");
+            assert_eq!(
+                consent.since.as_deref(),
+                Some("2026-10-21T02:40:00Z"),
+                "{day}"
+            );
+            let _ = fs::remove_dir_all(alone.own.parent().unwrap());
+            // With lamp-cloud's own choice and its queue.
+            let kept = places(&format!("kept-own-{day}"));
+            fs::write(&kept.setup, setup).unwrap();
+            fs::write(&kept.own, own).unwrap();
+            fs::create_dir_all(&kept.queue).unwrap();
+            fs::write(kept.queue.join("state.json"), state).unwrap();
+            fs::write(kept.queue.join("1.json"), crash).unwrap();
+            fs::create_dir_all(&kept.exits).unwrap();
+            fs::write(kept.exits.join("lamp-voice.service@5521000000.json"), exit).unwrap();
+            let mut reports = Reports::open(kept.clone());
+            // The queue's state whole: `Kept` takes a field it can't find as
+            // its default, so a renamed `crashes` would forget the crashes
+            // already counted (the reviewer-lead on #2473).
+            assert_eq!(
+                missing(
+                    &serde_json::from_str::<Value>(state).unwrap(),
+                    &serde_json::to_value(&reports.kept).unwrap(),
+                    "state",
+                ),
+                None,
+                "{day}"
+            );
+            // The same boot: its note was taken for the crash that waits.
+            assert_eq!(reports.new_notes(), Vec::new(), "{day}");
+            let consent = reports.consent();
+            assert!(consent.share, "{day}");
+            assert_eq!(consent.by, Some(lamp_msgs::ReportsBy::App), "{day}");
+            assert_eq!(
+                consent.since.as_deref(),
+                Some("2026-10-21T02:41:00Z"),
+                "{day}"
+            );
+            assert_eq!(reports.state().queued, 1, "{day}");
+            let due = reports.due(ID);
+            assert_eq!(due.len(), 1, "{day}");
+            let (seq, sent) = &due[0];
+            let mut sent: Value = serde_json::from_str(sent).unwrap();
+            assert_eq!(sent["id"], ID, "{day}");
+            sent.as_object_mut().unwrap().remove("id");
+            assert_eq!(
+                (*seq, sent),
+                (1, serde_json::from_str::<Value>(crash).unwrap()),
+                "{day}"
+            );
+            assert_eq!(reports.said(), Vec::<String>::new(), "{day}");
+            let _ = fs::remove_dir_all(kept.own.parent().unwrap());
+        }
+    }
+
+    /// The first thing a kept record holds that `read` doesn't: a key of an
+    /// object missing or different, by its path, an array of another length, or
+    /// another value. A key `read` has beyond the kept one is a later build's
+    /// addition, and passes: a kept day's test is never edited (#1505; the
+    /// reviewer on #2486).
+    fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Option<String> {
+        use serde_json::Value;
+        match (kept, read) {
+            (Value::Object(kept), Value::Object(read)) => kept.iter().find_map(|(key, value)| {
+                let path = format!("{path}.{key}");
+                match read.get(key) {
+                    Some(got) => missing(value, got, &path),
+                    None => Some(format!("{path}: not read")),
+                }
+            }),
+            (Value::Array(kept), Value::Array(read)) if kept.len() == read.len() => kept
+                .iter()
+                .zip(read)
+                .enumerate()
+                .find_map(|(i, (value, got))| missing(value, got, &format!("{path}[{i}]"))),
+            _ if kept == read => None,
+            _ => Some(format!("{path}: kept {kept}, read {read}")),
+        }
+    }
+
+    /// Writes lamp-cloud's own reports records to the folder in
+    /// `LAMP_CLOUD_REPORTS_FIXTURE`: the app's yes (`own.json`), the queue
+    /// with one crash (`queue/`), and the exit note it was taken from
+    /// (`exits/`), as a lamp takes it. Setup's answer beside them comes from
+    /// lamp-setup's own writer. Run by hand when a record's shape changes,
+    /// keeping the folders kept.
+    #[test]
+    #[ignore = "writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set"]
+    fn write_a_reports_fixture() {
+        let target = PathBuf::from(
+            std::env::var_os("LAMP_CLOUD_REPORTS_FIXTURE").expect("LAMP_CLOUD_REPORTS_FIXTURE"),
+        );
+        // 21 Oct 2026, 02:40 UTC.
+        const AT: u64 = 1_792_550_400;
+        let places = places("fixture");
+        let mut reports = Reports::open(places.clone());
+        reports.set(true, AT + 60).unwrap();
+        // As a lamp takes a crash: the unit's exit note, through `new_notes`.
+        let note = write_exit_note(
+            &places.exits,
+            &planted_note("lamp-voice.service", 5_521_000_000),
+        )
+        .unwrap();
+        let notes = reports.new_notes();
+        assert_eq!(notes.len(), 1);
+        let seq = reports.crash(AT + 120, Build::of("1712+9f3c1a2b7d4e").as_ref(), &notes[0]);
+        assert_eq!(seq, Some(1));
+        fs::create_dir_all(target.join("queue")).unwrap();
+        fs::create_dir_all(target.join("exits")).unwrap();
+        fs::copy(&places.own, target.join("own.json")).unwrap();
+        for name in ["state.json", "1.json"] {
+            fs::copy(places.queue.join(name), target.join("queue").join(name)).unwrap();
+        }
+        fs::copy(&note, target.join("exits").join(note.file_name().unwrap())).unwrap();
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
     pub(crate) fn places(name: &str) -> Places {

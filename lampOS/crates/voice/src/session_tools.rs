@@ -1156,8 +1156,9 @@ mod tests {
 
     /// El's peer read of #1588 (the first builder's 21:09 step: three
     /// stop/starts of lamp-actions in 20 s). systemd removes
-    /// `/run/lampos-actions` with the unit (`RuntimeDirectory=`), so each
-    /// restart is no catalog at all, read as empty, and then the whole one 2
+    /// `/run/lampos-actions` when the unit stops (`RuntimeDirectory=`; a
+    /// restart keeps it, `RuntimeDirectoryPreserve=restart`), so each stop
+    /// and start is no catalog at all, read as empty, and then the whole one 2
     /// s later, the light, the volume and the reminders together, at 0, 7
     /// and 14 s. A
     /// session takes the catalog as it is when renewed. A renewal is asked

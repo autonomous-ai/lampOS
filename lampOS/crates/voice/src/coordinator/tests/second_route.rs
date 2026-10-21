@@ -213,6 +213,22 @@ struct Script {
     voiced: bool,
     /// One parsed Say request, read at this capture frame's scenario time.
     say_at_frame: Option<(u64, crate::say::LineForTest)>,
+    /// Onboarding's near-call try window opens this many milliseconds from
+    /// the scenario's start, for its 7 s (#1803).
+    near_window_ms: Option<u64>,
+    /// The lamp's name is heard beginning this many milliseconds from the
+    /// scenario's start, as that step reads it (#1803).
+    near_name_ms: Option<u64>,
+    /// Capture frames of speech in the person's first utterance, from frame
+    /// 20 (60: 0.6 s, as long as a call).
+    speech_frames: u64,
+    /// Onboarding's sentence window is open over these milliseconds
+    /// from the scenario's start (#1803).
+    sentence_window_ms: Option<(u64, u64)>,
+    /// What Gemini Live heard the person say, in pieces, the last one
+    /// finished, then what its answer says, before the answer's audio.
+    live_hears: &'static [&'static str],
+    live_says: Option<&'static str>,
 }
 
 impl Script {
@@ -257,6 +273,12 @@ impl Script {
             silent: false,
             say_at_frame: None,
             voiced: false,
+            near_window_ms: None,
+            sentence_window_ms: None,
+            live_hears: &[],
+            live_says: None,
+            near_name_ms: None,
+            speech_frames: 60,
         }
     }
 }
@@ -383,6 +405,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
         | ProviderInput::Paused { request, .. }
+        | ProviderInput::CountOnly { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -471,7 +494,7 @@ impl Peers {
 
     fn speech(&self, frame: u64) -> bool {
         !self.script.silent
-            && ((20..80).contains(&frame)
+            && ((20..20 + self.script.speech_frames).contains(&frame)
                 || self
                     .speech_offset
                     .is_some_and(|offset| (offset..offset + 60).contains(&frame))
@@ -1069,6 +1092,21 @@ impl Peers {
                         self.finish(index, request);
                         continue;
                     }
+                    let queued = &mut self.peers[index].queued;
+                    for (at, piece) in self.script.live_hears.iter().enumerate() {
+                        queued.push_back(ProviderOutput::Transcript {
+                            request: None,
+                            text: (*piece).into(),
+                            finished: at + 1 == self.script.live_hears.len(),
+                        });
+                    }
+                    if let Some(text) = self.script.live_says {
+                        queued.push_back(ProviderOutput::Transcript {
+                            request: Some(request),
+                            text: text.into(),
+                            finished: false,
+                        });
+                    }
                     let position = self.live_requests.iter().position(|&r| r == request);
                     // After the scripted ones, the Live route answers.
                     let answer = position
@@ -1459,6 +1497,30 @@ fn run(script: Script) -> Run {
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
     let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
+    let origin = monotonic_us();
+    // The step's own rule, on the step's own evidence: its Unix clock is
+    // the scenario's origin at `UNIX`.
+    const UNIX: u64 = 1_760_000_000_000;
+    TEST_NEAR.with(|near| {
+        *near.borrow_mut() = script.near_window_ms.map(|from| {
+            crate::onboarding::near::NearFlow::listening_for_test(
+                UNIX + from,
+                origin + from * 1_000,
+                &script
+                    .near_name_ms
+                    .map(|at| UNIX + at)
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+            )
+        })
+    });
+    TEST_SENTENCE_WINDOW.with(|window| {
+        window.set(
+            script
+                .sentence_window_ms
+                .map(|(from, to)| (origin + from * 1_000, origin + to * 1_000)),
+        )
+    });
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
     let mut startup = StartupEvents::default();
@@ -1555,6 +1617,8 @@ fn run(script: Script) -> Run {
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, result,
     );
+    TEST_NEAR.with(|near| near.borrow_mut().take());
+    TEST_SENTENCE_WINDOW.with(|window| window.set(None));
     let mut exits = vec![
         ("speaker", matches!(rig.speaker.try_exit(), Ok(Some(_)))),
         ("capture", matches!(rig.capture.try_exit(), Ok(Some(_)))),
@@ -3359,6 +3423,75 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
     }
 }
 
+/// lamp-52e6 on 21 October: with the person seated quietly, the lamp's fan
+/// opened 11 wordless requests in two minutes, each held the quiet the
+/// lamp's own turns wait for (`last_turn_us`) until it ended, and the
+/// onboarding walk's 3 s never came. Now only talk holds it: the detector's
+/// own speech, words or none (a line in a language the route takes no
+/// words from), the person's words heard, and the lamp speaking. A request
+/// that heard no words and was not answered aloud holds it through its
+/// speech and no longer: not through its end's silence or the wait for its
+/// answer. Read from the news told at the first pause after it.
+#[test]
+fn speech_holds_the_quiet_with_or_without_words_and_a_wordless_requests_tail_does_not() {
+    let _one = super::pilot_faults::one_session();
+    let told = |hears: &'static [&'static str]| {
+        let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:4".into(),
+                note: "Claude Code just finished the story you asked for.".into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            live_hears: hears,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(0))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        run
+    };
+    for (hears, words) in [(&[][..], false), (&["what time is it"][..], true)] {
+        let run = told(hears);
+        run.assert_clean();
+        assert_eq!(run.finished(1)["outcome"], "no_audio_answer", "{words}");
+        let news = run.events("task_news");
+        assert_eq!(news.len(), 1, "{words}: {}", run.summary());
+        let quiet_from =
+            news[0]["at_us"].as_u64().unwrap() - news[0]["since_turn_ms"].as_u64().unwrap() * 1_000;
+        let started = run
+            .events("provider_input_started")
+            .into_iter()
+            .find(|event| event["turn"] == 1)
+            .unwrap()["at_us"]
+            .as_u64()
+            .unwrap();
+        // Speech with no transcript holds it as words do.
+        assert!(quiet_from >= started, "{words}: {quiet_from} < {started}");
+        if !words {
+            // From its last speech, not its end's silence (0.6 s) or after.
+            let finished = run.finished(1)["at_us"].as_u64().unwrap();
+            assert!(
+                quiet_from + 300_000 < finished,
+                "{quiet_from} not before {finished}"
+            );
+        }
+        assert!(
+            news[0]["since_turn_ms"].as_u64().unwrap() >= crate::task_news::PAUSE_US / 1_000,
+            "{words}"
+        );
+    }
+}
+
 /// `LAMP_SAY` (#939) on the second route alone, as on Live: a skill's say
 /// is begun as the lamp's own turn once the person's answer is over and the
 /// room is quiet, sent to the voice that answers, said whole, and its asker
@@ -4341,6 +4474,65 @@ fn with_the_switch_the_eyes_camera_is_permitted_with_the_microphone_through_the_
     }
 }
 
+/// #1803: in onboarding's near-call try window the person calls the lamp's
+/// name for the measurement, and an answer within a second of it spoils the
+/// try. The voice holds its reply to that call, on Gemini Live and on the
+/// second route alone: the turn ends unanswered, nothing is played, and it is
+/// not counted as a sound. The hold is the step's own rule
+/// (`Onboarding::near_holds_reply`), read on its evidence.
+#[test]
+fn a_call_in_the_near_call_window_is_not_answered_on_either_route() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        let held = run(Script {
+            second: false,
+            only,
+            near_window_ms: Some(0),
+            near_name_ms: Some(200),
+            mute_at_frame: Some(300),
+            ..Script::question(Live::Answer(12))
+        });
+        held.assert_clean();
+        assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
+        assert_eq!(held.finished(1)["outcome"], "onboarding_near_call");
+        let endpoint = held.events("local_endpoint");
+        assert_eq!(endpoint.len(), 1, "{endpoint:?}");
+        assert!(endpoint[0]["onboarding_near_call"].is_string());
+        assert!(endpoint[0].get("not_speech").is_none());
+    }
+}
+
+/// #1803, the reviewer on #1964: in the same window only the name is held.
+/// A line with no name heard ("skip that") and one with more said than a
+/// call ("Lamp, can we skip this?", 1.8 s) are answered as any other.
+#[test]
+fn a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        for (name, speech_frames) in [(None, 60), (Some(200), 180)] {
+            let answered = run(Script {
+                second: false,
+                only,
+                near_window_ms: Some(0),
+                near_name_ms: name,
+                speech_frames,
+                ..Script::question(Live::Answer(12))
+            });
+            answered.assert_clean();
+            assert_eq!(
+                answered.played(1),
+                vec![if only { SECOND } else { LIVE }; 48],
+                "{only} {name:?} {speech_frames}"
+            );
+            assert!(
+                answered.events("local_endpoint")[0]
+                    .get("onboarding_near_call")
+                    .is_none()
+            );
+        }
+    }
+}
+
 /// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
 /// with the second route alone, a line whose words end before a name ("Hey
 /// Lamp, my name is"), its answer held, and speech again as soon as its End
@@ -4446,4 +4638,115 @@ fn in_a_busy_room_a_sound_after_a_line_that_ends_before_its_name_is_held_as_befo
         "{}",
         run.summary()
     );
+}
+
+/// #1803, the sentence part: a line ending in onboarding's sentence window
+/// goes on to the words, which on the second route come back before any
+/// answer. Only their count is recorded, nothing of them is published or
+/// kept, and the turn ends unanswered as they arrive; on Gemini Live, whose
+/// words may come later, it ends at the answer's first audio. Past the
+/// window the same line is answered.
+#[test]
+fn a_sentence_in_its_window_is_counted_and_not_answered_on_either_route() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        let held = run(Script {
+            second: false,
+            only,
+            sentence_window_ms: Some((0, 15_000)),
+            second_hears: Some("I usually sit at the desk by the window"),
+            mute_at_frame: Some(300),
+            ..Script::question(Live::Answer(12))
+        });
+        held.assert_clean();
+        assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
+        assert_eq!(held.finished(1)["outcome"], "onboarding_sentence");
+        let line = held.events("onboarding_sentence_line");
+        assert_eq!(line.len(), 1, "{line:?}");
+        assert!(line[0]["speech_ms"].as_u64().unwrap() > 0, "{line:?}");
+        let words = held.events("onboarding_sentence_words");
+        if only {
+            assert_eq!(words.len(), 1, "{words:?}");
+            assert_eq!(words[0]["words"], 9);
+        } else {
+            assert!(words.is_empty(), "{words:?}");
+        }
+        // Nothing of the sentence is in the record.
+        assert!(
+            !held
+                .trace
+                .iter()
+                .any(|event| event.to_string().contains("desk")),
+            "{only}"
+        );
+        let after = run(Script {
+            second: false,
+            only,
+            sentence_window_ms: Some((0, 1)),
+            second_hears: Some("I usually sit at the desk by the window"),
+            ..Script::question(Live::Answer(12))
+        });
+        after.assert_clean();
+        assert_eq!(
+            after.played(1),
+            vec![if only { SECOND } else { LIVE }; 48],
+            "{only}"
+        );
+        assert!(after.events("onboarding_sentence_line").is_empty());
+    }
+}
+
+/// Jarvis on #2031 (#1803): a planted marker in the sentence never leaves
+/// the coordinator on either route. The provider is told the line is
+/// count-only right after its Start, before any of its sound; on Live every
+/// piece of its words is counted (ten words in three pieces, not the last
+/// piece's three), and neither those pieces nor the model's answer, which
+/// repeats the marker, is put in the trace (the journal), said on
+/// `voice/heard` or `voice/said` (the `transcript` record is that branch),
+/// or played.
+#[test]
+fn the_sentences_words_and_its_answer_are_counted_only_on_either_route() {
+    let _one = super::pilot_faults::one_session();
+    for only in [false, true] {
+        let held = run(Script {
+            second: false,
+            only,
+            sentence_window_ms: Some((0, 15_000)),
+            second_hears: Some("I usually sit at the zebrafinch desk by the window"),
+            second_says: Some("A zebrafinch desk, lovely."),
+            live_hears: &["I usually sit ", "at the zebrafinch desk ", "by the window"],
+            live_says: Some("A zebrafinch desk, lovely."),
+            mute_at_frame: Some(300),
+            ..Script::question(Live::Answer(12))
+        });
+        held.assert_clean();
+        assert!(held.played(1).is_empty(), "{only}: {}", held.summary());
+        assert_eq!(held.finished(1)["outcome"], "onboarding_sentence");
+        let words = held.events("onboarding_sentence_words");
+        assert_eq!(words.len(), 1, "{only}: {words:?}");
+        assert_eq!(words[0]["words"], 10, "{only}");
+        assert!(held.events("transcript").is_empty(), "{only}");
+        assert!(
+            !held
+                .trace
+                .iter()
+                .any(|event| event.to_string().contains("zebrafinch")),
+            "{only}"
+        );
+        // The provider was told right after the Start.
+        let inputs = if only {
+            &held.seen.second
+        } else {
+            &held.seen.live
+        };
+        let kinds: Vec<_> = inputs
+            .iter()
+            .map(|input| serde_json::to_value(input).unwrap()["kind"].clone())
+            .collect();
+        assert_eq!(
+            kinds[..2],
+            [json!("start"), json!("count_only")],
+            "{kinds:?}"
+        );
+    }
 }

@@ -39,7 +39,7 @@ attributed reply turns can establish duplicate/split findings; repetition
 within one spoken reply still needs content review and is not automatically
 detected by this rule.
 
-Focused regression coverage is in `crates/voice-eval/tests/answer_review.rs`.
+Focused regression coverage is in `crates/voice-eval/tests/it/answer_review.rs`.
 It includes irrelevant/incomplete/positive/absent reviews, gaps, preserved
 failure denominators, duplicate attributed replies, legacy saved scores, and
 an unrelated ring defect. Its trace and silent WAV fixtures exercise evidence

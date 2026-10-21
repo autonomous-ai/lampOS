@@ -1,0 +1,7 @@
+[[call_tool]]
+name = "prepare_to_unplug"
+at = "0s"
+
+[[expect]]
+call = "body.prepare_unplug"
+at = "0s"

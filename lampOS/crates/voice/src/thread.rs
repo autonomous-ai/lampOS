@@ -152,6 +152,8 @@ pub struct Thread {
     /// last read or written, or the moment of the last forgetting, whichever
     /// is later. A file no newer than this is not read again.
     held: Option<SystemTime>,
+    /// Onboarding's sentence in hand ([`Self::count_only`]).
+    count_only: Option<u64>,
 }
 
 /// One exchange as it is kept in the file: when, by the wall clock, since
@@ -195,6 +197,14 @@ pub static THREAD: Mutex<Thread> = Mutex::new(Thread::new());
 pub fn unsay(request: u64) {
     if let Ok(mut thread) = THREAD.lock() {
         thread.unsay(request);
+    }
+}
+
+/// Onboarding's sentence (#1803) is `request`, or with `None` a new line
+/// is not it: [`Thread::count_only`] on this process's thread.
+pub fn count_only(request: Option<u64>) {
+    if let Ok(mut thread) = THREAD.lock() {
+        thread.count_only(request);
     }
 }
 
@@ -244,6 +254,7 @@ impl Thread {
             admitted: Vec::new(),
             note: None,
             held: None,
+            count_only: None,
         }
     }
 
@@ -389,12 +400,15 @@ impl Thread {
             std::mem::take(&mut self.admitted),
             self.note.take(),
         );
+        let count_only = self.count_only;
         *self = read;
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
         self.admitted = admitted;
         self.note = note;
+        // The sentence in hand stays out of a thread read meanwhile.
+        self.count_only = count_only;
         self.held = Some(at);
         took
     }
@@ -502,8 +516,20 @@ impl Thread {
         Ok(thread)
     }
 
+    /// The line in hand is onboarding's sentence (#1803), or with `None`
+    /// it is not: while it is, nothing heard is kept, and nothing of the
+    /// lamp's answer to it either, so its words reach no exchange, no file,
+    /// no journal and no later prompt. Set just after its Start; a Start
+    /// clears it.
+    pub fn count_only(&mut self, request: Option<u64>) {
+        self.count_only = request;
+    }
+
     /// A piece of what the provider heard a person say.
     pub fn person(&mut self, text: &str, finished: bool, now: Instant) {
+        if self.count_only.is_some() {
+            return;
+        }
         // A sign-in's code or email is never kept (#1676).
         let text = &crate::sign_in::scrub(text);
         // Something new after something that was never answered: the old
@@ -597,7 +623,7 @@ impl Thread {
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
         // conversation going on.
-        if self.unsaid == Some(request) {
+        if self.unsaid == Some(request) || self.count_only == Some(request) {
             return;
         }
         // An answer cut, kept as what was heard of it: what it still sends
@@ -1082,6 +1108,15 @@ pub struct Recalling {
     given: Option<std::sync::Arc<crate::session_tools::Given>>,
 }
 
+/// Whether a Live connect may present its resumption handle: as the session
+/// allows, and never while the memory wants a fresh context after
+/// journalling stopped (`LAMP_MEMORY_JOURNAL_RESUMES`, Friday's P1 and P3 on
+/// #2226): what the provider held of the earlier session, forgotten words
+/// included, is then left behind.
+pub(crate) fn presents_resumption(allowed: bool) -> bool {
+    allowed && !crate::remember::wants_fresh_live()
+}
+
 impl Recalling {
     pub fn new(config: SessionConfig) -> Self {
         Self {
@@ -1251,7 +1286,10 @@ impl Connect for Recalling {
             }
             Err(_) => None,
         };
-        if !self.presents_handle() {
+        // After a stop, a reconnect is made fresh, so journalling can go on
+        // (Friday's P1 on #2226): what the provider held of the earlier
+        // session, forgotten words included, is left behind.
+        if !presents_resumption(self.presents_handle()) {
             resume = None;
         }
         let mut time = crate::local_time::told_here(self.tools.clock, self.tools.places);
@@ -1261,7 +1299,14 @@ impl Connect for Recalling {
         // The legacy cached note, or an explicitly opted-in Days snapshot
         // with its provenance and a total acquisition budget of 300 ms.
         if let Some(socket) = &self.tools.memory {
-            let kept = crate::remember::told_for_session(socket, session.get(), person.as_deref());
+            // Fresh when no resumption is presented: Live's server-side
+            // context then holds nothing of an earlier session (#2176 row 1b).
+            let kept = crate::remember::told_for_fresh_session(
+                socket,
+                session.get(),
+                person.as_deref(),
+                resume.is_none(),
+            );
             if !kept.is_empty() {
                 time = Some(time.unwrap_or_default() + &kept);
             }
@@ -1918,6 +1963,86 @@ mod tests {
             .count();
         assert_eq!(said, 1, "one line for it");
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// The thread files kept as fixtures, one for each change of the
+    /// file's shape, each written by its day's build
+    /// ([`write_a_thread_fixture`]). The file outlives the voice's restart
+    /// (`RuntimeDirectoryPreserve=yes`), so an update's new build reads the
+    /// old build's file. Every later build reads each with every exchange
+    /// in it, under whose it was, the written note kept, so an update never
+    /// sets the conversation aside (the build row "Updates cover the whole
+    /// lamp, V3 to V5").
+    #[test]
+    fn each_kept_thread_file_reads_back_as_it_was_said() {
+        let kept: [(&str, &str); 1] = [(
+            "2026-10-21",
+            include_str!("../tests/fixtures/stores/thread-2026-10-21.json"),
+        )];
+        // A's memory id as the file holds it, not worked out again here.
+        let a = "p-ca978112ca1bbdca";
+        let said = |written: Option<&str>, person: &str, lamp: &str| Recent {
+            written: written.map(str::to_owned),
+            person: person.to_owned(),
+            lamp: lamp.to_owned(),
+        };
+        for (day, text) in kept {
+            // Read a minute after its newest exchange, within the ten
+            // minutes a thread is remembered.
+            let newest = serde_json::from_str::<Vec<serde_json::Value>>(text)
+                .unwrap()
+                .iter()
+                .filter_map(|exchange| exchange["at_unix_ms"].as_u64())
+                .max()
+                .unwrap();
+            let now = Instant::now() + Duration::from_secs(3_600);
+            let wall = UNIX_EPOCH + Duration::from_millis(newest + 60_000);
+            let thread = Thread::read(text, now, wall).unwrap_or_else(|why| panic!("{day}: {why}"));
+            let recent = |scope| thread.recent_for(scope, now, REMEMBERED_FOR, EXCHANGES);
+            assert_eq!(
+                recent(None),
+                [said(None, "What time is it?", "Ten past nine.")],
+                "{day}"
+            );
+            assert_eq!(
+                recent(Some(a)),
+                [
+                    said(None, "Remind me to water the plants.", "I will, at six."),
+                    said(
+                        Some("The parcel came at noon."),
+                        "",
+                        "Your parcel came at noon."
+                    ),
+                ],
+                "{day}"
+            );
+        }
+    }
+
+    /// Writes this build's thread file to the path in
+    /// `LAMP_VOICE_THREAD_FIXTURE`: the room's exchange, then a known
+    /// person's (A, made up) spoken one and written one. Run by hand when the
+    /// file's shape changes, keeping the ones kept.
+    #[test]
+    #[ignore = "writes a thread fixture: run by hand with LAMP_VOICE_THREAD_FIXTURE set"]
+    fn write_a_thread_fixture() {
+        let target =
+            std::env::var_os("LAMP_VOICE_THREAD_FIXTURE").expect("LAMP_VOICE_THREAD_FIXTURE");
+        let start = Instant::now() + Duration::from_secs(3_600);
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        // 21 Oct 2026, 02:40 UTC.
+        let wall = UNIX_EPOCH + Duration::from_secs(1_792_550_400);
+        let mut thread = Thread::new();
+        thread.person("What time is it?", true, at(0));
+        thread.lamp(1, "Ten past nine.", at(1));
+        let a = crate::remember::person_id("A");
+        assert_eq!(a, "p-ca978112ca1bbdca");
+        thread.at_lamp(Some(a));
+        thread.person("Remind me to water the plants.", true, at(10));
+        thread.lamp(2, "I will, at six.", at(11));
+        thread.written(3, "The parcel came at noon.");
+        thread.lamp(3, "Your parcel came at noon.", at(20));
+        std::fs::write(target, thread.save(at(30), wall).unwrap()).unwrap();
     }
 
     #[test]

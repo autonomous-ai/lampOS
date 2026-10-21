@@ -60,6 +60,9 @@ pub struct Desk {
     follows_run: bool,
     facts: Facts,
     here: AnsweredHere,
+    /// How long a call waits for its turn's decision: the lamp's
+    /// [`crate::policy_holds::WAIT`], shorter only in a test.
+    cap: std::time::Duration,
 }
 
 impl Desk {
@@ -76,7 +79,16 @@ impl Desk {
             follows_run,
             facts,
             here,
+            cap: crate::policy_holds::WAIT,
         }
+    }
+
+    /// The same, a call waiting at most `cap` for its decision: a test's,
+    /// so as not to wait the lamp's 2 s out (#1806).
+    #[cfg(test)]
+    pub fn with_cap(mut self, cap: std::time::Duration) -> Self {
+        self.cap = cap;
+        self
     }
 
     /// The engine's gate ([`super::Engine::holding_for_the_policy`]).
@@ -114,7 +126,13 @@ impl Desk {
                 )
             });
             let waited = called.elapsed();
-            match crate::policy_holds::gate(verdict, turn.name_heard, waited, on_a_reply) {
+            match crate::policy_holds::gate_within(
+                verdict,
+                turn.name_heard,
+                waited,
+                on_a_reply,
+                self.cap,
+            ) {
                 crate::policy_holds::Gate::Wait => tokio::time::sleep(LOOK_EVERY).await,
                 crate::policy_holds::Gate::Run => {
                     waiting.settled = true;

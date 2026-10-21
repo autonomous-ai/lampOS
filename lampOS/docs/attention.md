@@ -715,7 +715,9 @@ Only numbers are kept, never sound: `/var/lib/lampOS/voice/near-call.json`
 "at_unix_s"}`. A file whose bar its own tries don't make is not used, nor
 one with a try no step could have accepted (a score outside 0.95 to 1, or
 not a number).
-Setup's step (Seventh) takes the tries.
+Setup's `how_you_sound` step (#1803, [onboarding.md](onboarding.md)) takes
+the tries, with the prompt's end read from the Unix clock when its playback is
+whole, and writes the file on onboarding's storage worker.
 
 **The rule reads it with `LAMP_ATTENTION_NEAR_CALIBRATED=on`** (off unless
 set), on both routes: the Live worker's busy-near rule and `--addressed`
@@ -1428,7 +1430,7 @@ shadow and progress decisions and ones without a number passed over; a late
 decision of the turn before neither releasing nor holding this turn's
 action, in both orders; one still owed to an earlier turn never settling a
 later one), `crates/voice/src/bus_out.rs` (what was heard told with the
-number of the turn whose input began last), `crates/policy/tests/policy.rs`
+number of the turn whose input began last), `crates/policy/tests/it/policy.rs`
 (`a_piece_marked_finished_is_judged_without_the_pause_and_carries_its_request`:
 the decision carries the number of what it judged;
 `pieces_of_two_turns_are_judged_apart_each_with_its_own_number`: turn 1's

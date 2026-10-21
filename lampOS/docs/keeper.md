@@ -219,10 +219,45 @@ in the session record. Expression, paused, publishes nothing on
 200 ms lease, and the next request after resume is the planner's own.
 With nothing said on `lamp/pause` both do exactly what they did before.
 
+## A restart asked from the app (#2193)
+
+The app's `system.reboot` reaches the keeper through `lamp-cloud`
+([cloud.md](cloud.md), "A restart from the app"), which runs as `lampos`
+with no capabilities and so cannot restart anything itself.
+`lamp-keeper-restart.socket` (root's, group `lampos`, mode 0660, one
+connection at a time) starts `lamp-keeper restart-asked` as root for each
+connection (`lamp-keeper-restart@.service`), with the connection as its
+standard input and output. It reads one line, which must be
+`{"restart":"lamp"}`, and:
+
+- **refuses while an update installs**: it takes lamp-update's own lock
+  (`/var/lib/lampos-update/lock`, `Records::lock`); held by a lamp-update
+  at work, it answers `{"refused":"an update is being installed: try again
+  once it is done"}`. A lock it cannot check is refused too, with why;
+- else answers `{"done":{"restarting":true}}`, waits 3 s so the asker's
+  reply leaves the lamp, and then restarts as `stop lamp` stops: pause,
+  wait up to 45 s for the voice to rest, `systemctl restart lampos.target`,
+  clear the pause. It holds the update's lock to the end, so no update
+  starts under the restart.
+
+Never the machine: the keeper does not reboot (above, "Not taken"). The
+socket is wanted by `lampos.target` but not part of it, as the keeper's own
+unit, so the restart it starts does not stop it.
+
+**Who may ask:** the switch, `LAMP_APP_RESTART=on`, is `lamp-cloud`'s;
+the helper reads none. The socket trusts the `lampos` group, the same
+trust as `lamp-setup-change.socket`, and doesn't check which part asks:
+once the units are installed, any part running as `lampos` can ask for a
+restart, one at a time. The two units are in `deploy/product/` but not
+yet in `lamp-update`'s install list. Whether the app's restart should be a
+machine reboot, as V1's is, waits on the first builder's answer on #2193.
+
 ## Switches
 
-Every action the keeper takes is behind a switch, off unless set: without
-it the keeper reports and does nothing. Copying the units in starts
+Every action the keeper takes on its own is behind a switch, off unless
+set: without it the keeper reports and does nothing. A restart asked on
+`lamp-keeper-restart.socket` has none of the keeper's: its switch is
+`lamp-cloud`'s (above, "A restart asked from the app"). Copying the units in starts
 nothing; each part is in the lamp once enabled, and the lamp starts at
 power-up once `lampos.target` is enabled. Nothing restarts the voice while
 someone speaks to the lamp: the keeper's restarts of the voice, and every

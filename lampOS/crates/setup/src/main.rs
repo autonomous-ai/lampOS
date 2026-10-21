@@ -52,6 +52,14 @@ usage: lamp-setup COMMAND [OPTIONS]
       line on standard output, at the end; then the lamp says what happened.
       The password is never printed.
       Without --enable every request is refused.
+  keys [--folder DIR] [--bus-root PATH] [--enable]
+      Root's helper for a person's own DeepSeek and Deepgram keys (#2094):
+      one request line on standard input from lamp-cloud, a key to check and
+      keep, one to remove, or whose each service uses. A key is kept only
+      once its service took it, in DIR (/etc/lampOS/voice/own), and the
+      voice is restarted at a quiet moment to take it. One reply line on
+      standard output. A key is never printed.
+      Without --enable every request is refused.
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
@@ -80,6 +88,7 @@ fn options(
             "--bus-root",
             "--clock-id",
             "--seconds",
+            "--folder",
         ]
         .contains(&key.as_str())
         {
@@ -134,6 +143,9 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     if command == "wifi" {
         return wifi_change(given);
+    }
+    if command == "keys" {
+        return own_keys(given);
     }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
@@ -309,6 +321,85 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         }
         Err(why) => eprintln!(
             "lamp-setup: change: the lamp was not quiet within {} min ({why}); lamp-schedule keeps the old zone until it next starts",
+            change::QUIET_MOST.as_secs() / 60
+        ),
+    }
+    Ok(true)
+}
+
+/// `keys`: one request about a person's own keys from `lamp-cloud`, on the
+/// socket systemd hands over as standard input and output
+/// (`lamp-setup-keys@.service`, #2094).
+fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::{change, keys};
+    use std::io::{BufRead, Write};
+    let (mut options, enabled) = options(given)?;
+    let folder = PathBuf::from(
+        options
+            .remove("--folder")
+            .unwrap_or_else(|| keys::FOLDER.to_owned()),
+    );
+    let bus_root = options.remove("--bus-root");
+    if !options.is_empty() || !folder.is_absolute() {
+        return Err("keys takes an absolute --folder, --bus-root and --enable".into());
+    }
+    // Only lamp-cloud may ask: any other peer is refused before its line
+    // is read (Third's privacy read on #2094).
+    if !keys::peer_is_asker() {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", keys::refused(keys::NOT_THE_ASKER, "not_allowed"))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: keys refused: the peer is not {}",
+            keys::ASKER_UNIT
+        );
+        return Ok(true);
+    }
+    let mut line = String::new();
+    io::stdin()
+        .lock()
+        .take(keys::LINE_MOST as u64 + 1)
+        .read_line(&mut line)?;
+    let (reply, done) = keys::answer(
+        &line,
+        &keys::Store(folder),
+        &mut keys::HttpCheck::default(),
+        enabled,
+    );
+    {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{reply}")?;
+        out.flush()?;
+    }
+    // Which service and what happened, never a key: the journal is not the person's.
+    match (&done, reply.get("refused")) {
+        (Some(done), _) => eprintln!("lamp-setup: keys: {}", done.said),
+        (None, Some(why)) => {
+            eprintln!("lamp-setup: keys refused: {}", why.as_str().unwrap_or(""))
+        }
+        _ => {}
+    }
+    if !done.is_some_and(|done| done.restart_voice) {
+        return Ok(true);
+    }
+    let bus = match bus_root {
+        Some(root) => Bus::new(root)?,
+        None => Bus::from_environment()?,
+    };
+    let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: keys: {line}"));
+    match change::wait_for_quiet(&mut ears, change::QUIET_MOST) {
+        Ok(()) => match std::process::Command::new("/usr/bin/systemctl")
+            .args(["try-restart", keys::VOICE_UNIT])
+            .status()
+        {
+            Ok(status) if status.success() => {
+                eprintln!("lamp-setup: keys: the voice restarted to take them, at a quiet moment")
+            }
+            Ok(status) => eprintln!("lamp-setup: keys: the voice's restart ended with {status}"),
+            Err(error) => eprintln!("lamp-setup: keys: the voice could not be restarted: {error}"),
+        },
+        Err(why) => eprintln!(
+            "lamp-setup: keys: the lamp was not quiet within {} min ({why}); the voice takes them at its next start",
             change::QUIET_MOST.as_secs() / 60
         ),
     }

@@ -19,8 +19,11 @@
 //! `--look-on-change on`, [`change`] says when a frame of an empty room is
 //! like the last one the detector ran on, and needs no detector. With
 //! `LAMP_PRESENCE=on`, [`away`] says whether anyone is at the lamp, from the
-//! faces and the voice's lines, on `room/presence` (#1677).
+//! faces and the voice's lines, on `room/presence` (#1677). With
+//! `LAMP_TURN_TO_ANSWERED=on`, [`answered`] picks the face seen asking as an
+//! answer begins, for the body to turn to while it lasts (#1810).
 pub mod activity;
+pub mod answered;
 pub mod away;
 pub mod blendshapes;
 pub mod bus_out;
@@ -35,6 +38,7 @@ pub mod photo;
 pub mod picture;
 pub mod reopen;
 pub mod seems;
+pub mod seems_log;
 pub mod sight;
 pub mod speaking;
 pub mod steady;

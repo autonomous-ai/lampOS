@@ -68,6 +68,7 @@ pub struct Senses {
     /// The lamp's inner state, for the eye's pace at rest
     /// ([`crate::ring_mood`]).
     pub mood: Option<crate::ring_mood::RingMood>,
+    pub unplug: Option<crate::ring_unplug::RingUnplug>,
 }
 
 /// Startup Ready is emitted only after the sink accepted its initial black frame.
@@ -243,8 +244,13 @@ pub fn run_continuous(
             None
         }
     });
+    let unplug = bus_root
+        .filter(|_| lamp_body::unplug::enabled())
+        .map(crate::ring_unplug::RingUnplug::on)
+        .transpose()?;
     let senses = Senses {
         caps,
+        unplug,
         light,
         eye,
         eye_strong,
@@ -540,6 +546,7 @@ fn service(
         mut sight,
         mut head,
         mut mood,
+        mut unplug,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -549,7 +556,7 @@ fn service(
     face.eye_strong(eye_strong);
     let mut rested_at = 0u64;
     // From zero, so a late startup black write in GuardedRing::new is said too.
-    let mut late_said = 0;
+    let mut late_said = LateSaid::default();
     let mut lapse = Lapse::default();
     let mut cap_ceiling = if caps.is_some() { 0 } else { 120 };
     // With LAMP_STALLS=on: a pass of this loop, or a gap between two, of
@@ -557,13 +564,10 @@ fn service(
     let mut stalls = crate::stalls::Stalls::from_environment("ring");
     loop {
         // A late SPI write (the SD/MMC host re-tuning holds the bus) is a
-        // late frame, said once each; only a run of them ends the ring (#911).
-        if ring.late_writes() != late_said {
-            late_said = ring.late_writes();
-            eprintln!(
-                "lamp-voice ring: an SPI write came back over its {} us budget; the frame was kept ({late_said} so far)",
-                lamp_ring::WRITE_BUDGET_US
-            );
+        // late frame; only a run of them lasting 2 s ends the ring (#911,
+        // #1620). Said at most once a minute, with how long the run has been.
+        if let Some(line) = late_said.line(ring.late_writes(), ring.last_late(), monotonic_us()) {
+            eprintln!("{line}");
         }
         let tick = monotonic_us();
         let stall_pass = stalls.begin();
@@ -671,17 +675,32 @@ fn service(
                             face.toward(sight.tick(monotonic_us()));
                         }
                         face.accent(frame.accent, frame.accent_at_us);
-                        let pixels = draw(&mut face, &frame, monotonic_us(), ceiling.get());
+                        let at = monotonic_us();
+                        let presentation = unplug
+                            .as_ref()
+                            .filter(|_| face.lit().on)
+                            .and_then(|unplug| unplug.prepare(at));
+                        let pixels = presentation.as_ref().map_or_else(
+                            || draw(&mut face, &frame, at, ceiling.get()),
+                            |presentation| presentation.pixels,
+                        );
                         match ring.show(&pixels, ceiling, frame.permit) {
-                            Ok(write) => link.publish(WorkerEvent::Ring {
-                                report: RingFeedback::Presented {
-                                    owner: frame.permit.owner(),
-                                    phase: frame.phase,
-                                    requested_at_us: frame.requested_at_us,
-                                    write_started_at_us: write.started_at().as_micros(),
-                                    write_finished_at_us: write.finished_at().as_micros(),
-                                },
-                            })?,
+                            Ok(write) => {
+                                if let (Some(unplug), Some(presentation)) =
+                                    (unplug.as_mut(), presentation.as_ref())
+                                {
+                                    unplug.drew(write.finished_at().as_micros(), presentation)?;
+                                }
+                                link.publish(WorkerEvent::Ring {
+                                    report: RingFeedback::Presented {
+                                        owner: frame.permit.owner(),
+                                        phase: frame.phase,
+                                        requested_at_us: frame.requested_at_us,
+                                        write_started_at_us: write.started_at().as_micros(),
+                                        write_finished_at_us: write.finished_at().as_micros(),
+                                    },
+                                })?;
+                            }
                             Err(error) => match error.cause {
                                 Failure::Authority(reason)
                                     if error.cleanup_error.is_none() && !ring.is_faulted() =>
@@ -723,14 +742,75 @@ fn service(
             rested_at = at;
             let ceiling = ChannelCeiling::new(u16::from(ceiling.get()).min(cap_ceiling))
                 .map_err(io::Error::other)?;
-            let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
-            let own_light = face.rests_on_its_light(at);
-            rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+            let presentation = unplug
+                .as_ref()
+                .filter(|_| face.lit().on)
+                .and_then(|unplug| unplug.prepare(at));
+            if let (Some(unplug), Some(presentation)) = (unplug.as_mut(), presentation.as_ref()) {
+                if let Some(receipt) = ring
+                    .show_resting(&presentation.pixels, ceiling)
+                    .map_err(io::Error::other)?
+                {
+                    unplug.drew(receipt.finished_at().as_micros(), presentation)?;
+                }
+            } else {
+                let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                let own_light = face.rests_on_its_light(at);
+                rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+            }
         }
         stall_pass.done();
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {
             std::thread::sleep(Duration::from_micros(wait));
         }
+    }
+}
+
+/// Late writes are said at most this often.
+const LATE_SAID_EVERY_US: u64 = 60_000_000;
+
+/// The journal of late SPI writes: the newest one, at most once a minute,
+/// with how many went unsaid since the last line.
+#[derive(Default)]
+struct LateSaid {
+    /// Late writes seen so far.
+    seen: u64,
+    /// Of them, the ones counted into a line.
+    said: u64,
+    at_us: Option<u64>,
+}
+
+impl LateSaid {
+    fn line(
+        &mut self,
+        late_writes: u64,
+        last: Option<lamp_ring::LateWrite>,
+        now_us: u64,
+    ) -> Option<String> {
+        if late_writes == self.seen {
+            return None;
+        }
+        self.seen = late_writes;
+        let last = last?;
+        if self
+            .at_us
+            .is_some_and(|at| now_us.saturating_sub(at) < LATE_SAID_EVERY_US)
+        {
+            return None;
+        }
+        let unsaid = late_writes - self.said - 1;
+        self.said = late_writes;
+        self.at_us = Some(now_us);
+        let mut line = format!(
+            "lamp-voice ring: SPI write {} us, over {} us, late for {} ms",
+            last.elapsed_us,
+            lamp_ring::WRITE_BUDGET_US,
+            last.run_us / 1_000
+        );
+        if unsaid > 0 {
+            line.push_str(&format!(" ({unsaid} more since the last line)"));
+        }
+        Some(line)
     }
 }
 
@@ -967,6 +1047,33 @@ mod drawn_tests {
             ("skill:desk-tutor", asked)
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod late_said_tests {
+    use super::*;
+    use lamp_ring::LateWrite;
+
+    #[test]
+    fn late_writes_are_said_at_most_once_a_minute_with_the_unsaid_counted() {
+        let late = |elapsed_us, run_us| Some(LateWrite { elapsed_us, run_us });
+        let mut said = LateSaid::default();
+        assert_eq!(said.line(0, None, 1), None);
+        assert_eq!(
+            said.line(1, late(13_180, 340_000), 1_000).as_deref(),
+            Some("lamp-voice ring: SPI write 13180 us, over 10000 us, late for 340 ms")
+        );
+        // The same count again, and two more within the minute: nothing.
+        assert_eq!(said.line(1, late(13_180, 340_000), 2_000), None);
+        assert_eq!(said.line(2, late(14_000, 360_000), 3_000), None);
+        assert_eq!(said.line(3, late(12_000, 12_000), 59_000_999), None);
+        assert_eq!(
+            said.line(4, late(11_500, 11_500), 60_001_000).as_deref(),
+            Some(
+                "lamp-voice ring: SPI write 11500 us, over 10000 us, late for 11 ms (2 more since the last line)"
+            )
+        );
     }
 }
 

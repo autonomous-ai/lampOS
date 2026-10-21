@@ -153,10 +153,46 @@ the room's Live session or the speaker.
     pass of it (10 s), both can still tell the same news. The tasks part is
     told so once, which closes the harness with `--close-told`. A fault
     gives none, and the news waits.
-- **Unasked, when nobody's at the lamp (later):** news the lamp starts can't
-  reach the phone yet. Delivering it needs a change outside lampOS (#1673
-  has the pointer). When it can, the presence topic (#1677, #1721) says
-  when nobody's there.
+- **Unasked, when nobody was told** (built, off with the rest; the first
+  builder, 20 Oct 21:14): news of work **asked for by text** that is still
+  untold a minute after the texts' reader first has it (`UNASKED_AFTER`)
+  goes to the phone as **one `task_news` piece on `chat/out`, with no run
+  and no chat** (`messages::tell_unasked`), which `lamp-cloud` sends as
+  `task_news`.
+  - **The minute is the lamp's:** if someone is at the lamp, the voice's own
+    reader tells it aloud in that time, and news told aloud is in the file
+    of what was told, so the texts' reader no longer has it. Only work asked
+    for by text, as above: work asked for at the lamp never goes to the
+    phone.
+  - **Its words are the model's only:** the second route's text model is
+    given the character, the typed note and the news (`messages::UNASKED`,
+    each note typed), and the piece is what it writes, cut to one message
+    (`fitted`). No note, key or output of the work is added, and a function
+    it calls is not run: nobody asked for anything.
+  - **Once:** up to 3 pieces of news waiting together make one piece. Once
+    sent, they're kept as told, so they're never sent again or given with a
+    text. News told aloud, or given with a text, while the model writes is
+    not sent. As with a text's news, within one pass of the voice's reader
+    (10 s) the lamp can still say aloud news the phone has just had, when
+    someone was at the lamp but it was busy for the whole minute.
+  - **Only while something takes `chat/out`** (`lamp-cloud` with the
+    switch on, a live subscriber on the bus): otherwise it isn't tried, and
+    the news waits. A piece counts as told only once its publish reached
+    `lamp-cloud` (delivered to a subscriber). One that reached nothing is
+    a try, and is sent again a minute on (the first builder, 20 Oct 04:08).
+    Past `lamp-cloud` it can still be lost: if the broker's link drops before
+    the backend has it, it isn't told at the lamp or with the next text
+    either (a `chat.event` isn't sent again, as a change's result is).
+  - **A fault, or no words,** sends nothing and keeps nothing. It's tried
+    again a minute on, at most 3 times (`UNASKED_TRIES`), and then the news
+    waits for the person's next text.
+  - Looked at once a second between texts. A text that comes while the
+    model writes it ends that round, without using a try, and is answered at
+    once, with the news: a text never waits on it.
+  - **Off** with `LAMP_MESSAGES`: the worker then runs no texts at all
+    (`files.messages`), and nothing goes on `chat/out`.
+  - The backend's push to a phone that isn't open on the chat is its own
+    (mobile-P1, #1673).
 
 ## Unasked texts (`messages/out`)
 
@@ -190,7 +226,7 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
 - `lamp_cloud::online::tests::a_slow_connack_is_waited_for_while_texts_are_taken`:
   a broker that answers CONNECT after 300 ms, six of the looks, is joined at
   the first try, and only once.
-- `crates/cloud/tests/texts.rs`, through `Real` on a bus of the test's own: a
+- `crates/cloud/tests/it/texts.rs`, through `Real` on a bus of the test's own: a
   text on `chat/in` and its answer from a stand-in voice back as V1's events;
   refused at once with nothing listening, and "not on this lamp" with the
   switch off; task news with no text asked first; a text on `chat/in`
@@ -215,6 +251,22 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
   model is never sent a line said at the lamp.
 - `tools::tests::a_face_is_kept_or_forgotten_only_on_words_heard_at_the_lamp`:
   an unheard face call never reaches the eyes; a heard one does.
+- `messages::tests::news_nobody_was_told_goes_to_the_phone_once_in_the_models_words`:
+  nothing before the minute; at the minute exactly one `task_news` piece,
+  with no run or chat, whose text is the model's words alone; it is kept as
+  told and never sent again; the model is given the note typed.
+- `messages::tests::news_for_the_phone_waits_on_a_fault_and_stops_after_its_tries`:
+  a model with only a call and then no answer sends nothing and keeps
+  nothing; it is tried at the minute, then a minute apart, three times,
+  then waits for the next text.
+- `messages::tests::news_for_the_phone_waits_for_a_listener_and_isnt_sent_once_told_aloud`:
+  with nothing on `chat/out` it isn't tried; news told aloud during the
+  round isn't sent or kept.
+- `messages::tests::news_for_the_phone_lost_on_the_way_is_sent_again`: a
+  piece that reached nothing is not kept, and is sent again a minute on.
+- `messages::tests::a_text_never_waits_on_the_news_for_the_phone`: through a
+  bus, a text during a 30 s round for the phone is answered within 2 s,
+  with the news, and nothing more is sent.
 - `messages::tests::news_waiting_is_given_with_the_next_texts_answer_once`:
   the next text's answer is given the news, typed, and keeps it as given;
   the text after has none; a model that can't answer gives none.

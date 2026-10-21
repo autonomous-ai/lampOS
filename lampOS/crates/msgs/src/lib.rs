@@ -806,6 +806,28 @@ impl Diagnostic {
         }
     }
 
+    /// The fact that says a part's state beside its level; with
+    /// [`Self::STOPPING`] the part is stopping on purpose (#2415's P3).
+    pub const STATE: &str = "state";
+    /// [`Self::STATE`]'s value of a part that stops on purpose.
+    pub const STOPPING: &str = "stopping";
+
+    /// `name` is stopping on purpose, not failing: an `ok` report with
+    /// `state` = `stopping`. lamp-health forgets the part rather than count
+    /// its silence as a part that stopped working; it is tracked again once
+    /// it reports again. A fact, not a field or a level, so a reader a
+    /// version behind takes it as one more well report (#1505's rule).
+    pub fn stopping(name: &str) -> Self {
+        Self::new(Level::Ok, name, "stopped on purpose").with(Self::STATE, Self::STOPPING)
+    }
+
+    /// Whether this report says its part is stopping on purpose.
+    pub fn is_stopping(&self) -> bool {
+        self.values
+            .iter()
+            .any(|value| value.key == Self::STATE && value.value == Self::STOPPING)
+    }
+
     /// The same with one more fact beside it.
     #[must_use]
     pub fn with(mut self, key: &str, value: impl ToString) -> Self {
@@ -1090,6 +1112,68 @@ impl Pause {
     /// it is resumed, or until the bus is made again at power-up.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+}
+
+/// What lamp-update is doing and last did (`update/status`, #2194), for the
+/// app's Lamp 2 page through lamp-cloud. Read from lamp-update's own records
+/// and where its round is, never kept anywhere else: `running` is the build
+/// the lamp runs, `now` one of [`UpdateStatus::NOW`], `last` the last round's
+/// outcome by its name (`up-to-date`, `switched`, `refused`, ...), the build
+/// it was about where it names one, and when. No reason text, which may
+/// carry paths. Said at each phase and again every minute, and stale three
+/// minutes after the last.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateStatus {
+    pub running: Option<UpdateBuild>,
+    pub now: String,
+    pub last: Option<UpdateResult>,
+}
+
+/// A build, by its sequence on the channel and its commit.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateBuild {
+    pub sequence: u64,
+    pub commit: String,
+}
+
+/// One round's end.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateResult {
+    pub outcome: String,
+    pub sequence: Option<u64>,
+    pub at_unix_ms: u64,
+}
+
+impl UpdateStatus {
+    pub const TYPE: &str = "lamp_msgs/UpdateStatus";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "update/status";
+    /// Between rounds; reading the channel; fetching and checking the new
+    /// build's files beside the old; waiting for a quiet moment and
+    /// restarting the parts; watching them for a minute after; putting the
+    /// previous build back and watching it (a rollback).
+    pub const NOW: [&str; 6] = [
+        "idle",
+        "checking",
+        "fetching",
+        "switching",
+        "watching",
+        "restoring",
+    ];
+    /// Said again at least this often while lamp-update runs.
+    pub const EVERY: Duration = Duration::from_secs(60);
+    /// A value older than this is stale: lamp-update stopped saying it (it
+    /// died mid-round, or stopped), and its `now` is not to be believed.
+    pub const LASTING: Duration = Duration::from_secs(180);
+
+    /// Said at each phase and kept, and said again every [`Self::EVERY`]:
+    /// a reader that comes late reads where the round is, and one that
+    /// finds it older than [`Self::LASTING`] knows it is stale.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(Self::EVERY)
+            .lasting(Self::LASTING)
     }
 }
 
@@ -1918,6 +2002,33 @@ mod tests {
         assert!(
             serde_json::from_str::<Light>("{\"on\":true,\"colour\":\"red\",\"level\":300}")
                 .is_err()
+        );
+    }
+
+    /// #2415's P3: a part that stops on purpose says so with one more fact,
+    /// `state` = `stopping`, on an `ok` report: no new field and no new
+    /// level, so a reader a version behind takes it as a well report and a
+    /// reader a version ahead reads an old report as not stopping.
+    #[test]
+    fn a_part_stopping_on_purpose_says_so_in_a_fact_an_older_reader_takes() {
+        let stopping = Diagnostic::stopping("voice-keys");
+        assert!(stopping.is_stopping());
+        assert_eq!(stopping.level, Level::Ok);
+        let text = "{\"level\":\"ok\",\"name\":\"voice-keys\",\"message\":\"stopped on purpose\",\
+                    \"values\":[{\"key\":\"state\",\"value\":\"stopping\"}]}";
+        round_trip(&stopping, text);
+        // The old shape, and any other fact, is not a stop.
+        let old: Diagnostic = serde_json::from_str(
+            "{\"level\":\"ok\",\"name\":\"voice-keys\",\"message\":\"\",\
+             \"values\":[{\"key\":\"uses\",\"value\":\"own\"}]}",
+        )
+        .unwrap();
+        assert!(!old.is_stopping());
+        assert!(!Diagnostic::ok("voice-keys").is_stopping());
+        assert!(
+            !Diagnostic::ok("voice-keys")
+                .with(Diagnostic::STATE, "running")
+                .is_stopping()
         );
     }
 

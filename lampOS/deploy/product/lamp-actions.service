@@ -17,6 +17,9 @@ Slice=lampos-parts.slice
 SupplementaryGroups=audio
 RuntimeDirectory=lampos-actions
 RuntimeDirectoryMode=0755
+# Kept across a restart (a crash's, an update's): its catalog stays in place, so the voice sees
+# no functions gone and back, and renews no session for a restart (#1588, El's P3).
+RuntimeDirectoryPreserve=restart
 # Private durable cap state, separate from the runtime socket directory.
 # The path does not turn LAMP_OUTPUT_CAPS on. It comes by environment, not --caps-dir: an
 # install takes this unit from the updater's build and the binary from the channel's newest,

@@ -2067,6 +2067,97 @@ mod tests {
         assert_eq!(People::open(path).unwrap().names(), vec!["A".to_owned()]);
     }
 
+    /// The people files kept as fixtures, one for each change of the file's
+    /// shape, each written by its day's build ([`write_a_people_fixture`]).
+    /// Every later build opens each with everyone in it, their faces known,
+    /// their yes to being named, their memory id and, where the file was
+    /// scored, how familiar each is and when that was, so an update never
+    /// leaves a lamp's known people behind or makes them strangers again
+    /// (the build row "Updates cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_people_file_opens_with_everyone_in_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let kept: [(&str, &str); 2] = [
+            (
+                "2026-10-21",
+                include_str!("../tests/fixtures/stores/people-2026-10-21.json"),
+            ),
+            // The same day's shape with a night scored, which the first lacks.
+            (
+                "2026-10-21-scored",
+                include_str!("../tests/fixtures/stores/people-2026-10-21-scored.json"),
+            ),
+        ];
+        for (day, text) in kept {
+            let path = file(&format!("kept-{day}"));
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            // With memory's stable ids on, as `LAMP_MEMORY_STABLE_ID=on` has it.
+            let people = People::open(path)
+                .unwrap_or_else(|error| panic!("{day}: {error:?}"))
+                .with_stable_ids(true);
+            assert_eq!(people.names(), ["A", "B"], "{day}");
+            let who = |seed: f32| people.who(&print(seed)).map(|(name, _)| name);
+            assert_eq!(
+                (who(0.3), who(1.7)),
+                (Some("A".into()), Some("B".into())),
+                "{day}"
+            );
+            assert_eq!(people.tellable(), ["A"], "{day}");
+            assert_eq!(
+                people.id_of("A").as_deref(),
+                Some("p-ca978112ca1bbdca"),
+                "{day}"
+            );
+            // Familiarity as kept, where the file has it.
+            let saved: serde_json::Value = serde_json::from_str(text).unwrap();
+            assert_eq!(
+                people.scored_at,
+                saved["scored_at_unix_s"].as_u64(),
+                "{day}"
+            );
+            for person in &people.people {
+                let kept = saved["people"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|kept| kept["name"] == person.name.as_str())
+                    .unwrap();
+                assert_eq!(
+                    person.familiar.map(f64::from),
+                    kept["familiar"].as_f64(),
+                    "{day}: {}",
+                    person.name
+                );
+            }
+        }
+    }
+
+    /// Writes this build's people file, with two people (one with two
+    /// prints), one's yes to being named to others, their memory ids and a
+    /// day of familiarity scored, to the path in `LAMP_EYES_PEOPLE_FIXTURE`.
+    /// Run by hand when the file's shape changes, keeping the ones kept.
+    #[test]
+    #[ignore = "writes a people fixture: run by hand with LAMP_EYES_PEOPLE_FIXTURE set"]
+    fn write_a_people_fixture() {
+        let target =
+            std::env::var_os("LAMP_EYES_PEOPLE_FIXTURE").expect("LAMP_EYES_PEOPLE_FIXTURE");
+        let path = file("fixture");
+        let mut people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        people
+            .remember("A", vec![print(0.3), print(0.31)], 1_760_000_000)
+            .unwrap();
+        people
+            .remember("B", vec![print(1.7)], 1_760_000_100)
+            .unwrap();
+        assert!(people.tell_visits("A", true).unwrap());
+        people.seen("A", 1_760_086_400);
+        // The first scoring only begins the day; the next night's writes.
+        people.score(1_760_090_000, 0).unwrap();
+        assert!(people.score(1_760_090_000 + 86_400, 0).unwrap());
+        std::fs::copy(&path, target).unwrap();
+    }
+
     #[test]
     fn nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file() {
         let path = file("forget");

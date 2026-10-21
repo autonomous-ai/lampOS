@@ -9,6 +9,7 @@ pub mod local_time;
 pub mod replay;
 pub mod runtime;
 mod speaking;
+mod unplug;
 
 pub use alive::{
     Alive, BODY_QUIET_US, Breath, DAYTIME_STALE_US, Drift, EYES_QUIET_US, HAND_FRESH_US, LEAN,

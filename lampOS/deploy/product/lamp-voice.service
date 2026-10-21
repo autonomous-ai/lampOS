@@ -24,10 +24,11 @@ Group=root
 Slice=lampos-voice.slice
 WorkingDirectory=/
 UMask=0077
-ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US
-# The lines recorded at build time in the lamp's own voice, loaded once at start (lampOS/docs/failure-notices.md): only
-# the Wi-Fi helper's no-Wi-Fi line is meant to be there (#1959). With no directory or no manifest every notice stays
-# silent, as before, and failure_notice_capability says why.
+ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US
+# The lines recorded in the lamp's own voice, loaded once at start (lampOS/docs/failure-notices.md): the offline line,
+# back online, the voice service's line and the Wi-Fi helper's no-Wi-Fi line, placed by lamp-update install from
+# deploy/product/models.json (#1844). With no directory or no manifest every notice stays silent, and
+# failure_notice_capability says why.
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20

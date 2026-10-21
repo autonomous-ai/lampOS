@@ -400,12 +400,52 @@ impl Records {
     /// One line in the log: what happened, and a sentence. Best effort: a
     /// full disk must not stop an update going back.
     pub fn log(&self, event: &str, line: &str) {
+        self.log_entry(serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line}));
+    }
+
+    /// A round's end in the log, marked as one and with the build it was
+    /// about: what `update/status` says as the last result, read back when
+    /// lamp-update starts again (#2194, `crate::status`).
+    pub fn log_round(&self, event: &str, line: &str, sequence: Option<u64>) {
+        self.log_entry(serde_json::json!({
+            "at_unix_ms": unix_ms(),
+            "event": event,
+            "line": line,
+            "round": true,
+            "sequence": sequence,
+        }));
+    }
+
+    /// The last round's end the log holds, newest file first: its event,
+    /// build and time. Lines a round did not write are passed over.
+    pub fn last_round(&self) -> Option<(String, Option<u64>, u64)> {
+        for name in ["log.jsonl", "log.jsonl.1"] {
+            let Ok(text) = fs::read_to_string(self.folder.join(name)) else {
+                continue;
+            };
+            let found = text.lines().rev().find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_str(line).ok()?;
+                (entry["round"] == true).then(|| {
+                    (
+                        entry["event"].as_str().unwrap_or_default().to_owned(),
+                        entry["sequence"].as_u64(),
+                        entry["at_unix_ms"].as_u64().unwrap_or(0),
+                    )
+                })
+            });
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+
+    fn log_entry(&self, entry: serde_json::Value) {
         let _ = self.make();
         let path = self.folder.join("log.jsonl");
         if fs::metadata(&path).is_ok_and(|found| found.len() > MOST_LOG_BYTES) {
             let _ = fs::rename(&path, self.folder.join("log.jsonl.1"));
         }
-        let entry = serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line});
         if let Ok(mut file) = OpenOptions::new()
             .append(true)
             .create(true)
@@ -598,5 +638,156 @@ mod tests {
         assert!(other.lock().is_err());
         drop(held);
         assert!(other.lock().is_ok());
+    }
+
+    /// lamp-update's own records as today's build writes them: every field
+    /// of the state and of a switch under way filled in.
+    fn todays_records() -> (super::State, super::Journal) {
+        use super::{Build, Journal, LinkBack, Refusal, SkillBack, State, Switching};
+        use crate::models::ModelBack;
+        let state = State {
+            installed: Some(Build {
+                sequence: 4576,
+                commit: "4f5e62507".into(),
+            }),
+            previous: Some(Build {
+                sequence: 4570,
+                commit: "d90cc8b8e".into(),
+            }),
+            refused: vec![Refusal {
+                sequence: 4573,
+                commit: "c902a95cf".into(),
+                why: "lamp-voice.service was not well within a minute".into(),
+                at_unix_ms: 1_760_000_000_000,
+            }],
+            made: vec!["/opt/lampOS/voice/".to_owned() + &"a".repeat(64)],
+            settings: [("/etc/lampOS/voice/second.json".to_owned(), "b".repeat(64))].into(),
+            settings_writing: [("/etc/lampOS/records.json".to_owned(), "c".repeat(64))].into(),
+            systemd_owed: true,
+            models: [(
+                "/opt/lampOS/eyes/models/face.onnx".to_owned(),
+                "d".repeat(64),
+            )]
+            .into(),
+            models_before: [(
+                "/opt/lampOS/eyes/models/face.onnx".to_owned(),
+                "e".repeat(64),
+            )]
+            .into(),
+            later: Default::default(),
+        };
+        let journal = Journal {
+            build: Build {
+                sequence: 4576,
+                commit: "4f5e62507".into(),
+            },
+            units: vec![Switching {
+                unit: "lamp-voice.service".into(),
+                was_active: true,
+                link: Some(LinkBack {
+                    path: "/opt/lampOS/voice/current".into(),
+                    build: "f".repeat(64),
+                }),
+            }],
+            models: vec![ModelBack {
+                path: "/opt/lampOS/eyes/models/face.onnx".into(),
+                sha256: Some("e".repeat(64)),
+                file: false,
+            }],
+            settings: true,
+            skills: vec![SkillBack {
+                path: "/var/lib/lampOS/skills/dance/skill.toml".into(),
+                before: Some("name = \"dance\"\n".into()),
+                wrote: "9".repeat(64),
+                made: Vec::new(),
+            }],
+        };
+        (state, journal)
+    }
+
+    /// Writes [`todays_records`] as this build saves them into the folder in
+    /// `LAMP_UPDATE_RECORDS_FIXTURE`, as `state.json` and `journal.json`.
+    /// Run by hand when either's shape changes, keeping the ones kept.
+    #[test]
+    #[ignore = "writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"]
+    fn write_records_fixtures() {
+        let folder =
+            std::env::var_os("LAMP_UPDATE_RECORDS_FIXTURE").expect("LAMP_UPDATE_RECORDS_FIXTURE");
+        let records = super::Records::new(folder.into());
+        let (state, journal) = todays_records();
+        records.save_state(&state).unwrap();
+        records.save_journal(&journal).unwrap();
+    }
+
+    /// The first thing a kept record holds that `read` doesn't: a key of an
+    /// object missing or different, by its path, an array of another length, or
+    /// another value. A key `read` has beyond the kept one is a later build's
+    /// addition, and passes: a kept day's test is never edited (#1505; the
+    /// reviewer on #2486).
+    fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Option<String> {
+        use serde_json::Value;
+        match (kept, read) {
+            (Value::Object(kept), Value::Object(read)) => kept.iter().find_map(|(key, value)| {
+                let path = format!("{path}.{key}");
+                match read.get(key) {
+                    Some(got) => missing(value, got, &path),
+                    None => Some(format!("{path}: not read")),
+                }
+            }),
+            (Value::Array(kept), Value::Array(read)) if kept.len() == read.len() => kept
+                .iter()
+                .zip(read)
+                .enumerate()
+                .find_map(|(i, (value, got))| missing(value, got, &format!("{path}[{i}]"))),
+            _ if kept == read => None,
+            _ => Some(format!("{path}: kept {kept}, read {read}")),
+        }
+    }
+
+    /// lamp-update's records kept as fixtures, each day's as its build saved
+    /// them ([`write_records_fixtures`]): every later lamp-update reads each
+    /// with every field as it was, so an update never loses what the one
+    /// before it knew of the lamp, and a switch it began can still be put
+    /// back (the build row "Updates cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_state_and_journal_reads_as_saved() {
+        let kept: [(&str, &[u8], &[u8]); 1] = [(
+            "2026-10-21",
+            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+            include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
+        )];
+        for (day, state_bytes, journal_bytes) in kept {
+            let folder = tempfile::tempdir().unwrap();
+            std::fs::write(folder.path().join("state.json"), state_bytes).unwrap();
+            std::fs::write(folder.path().join("journal.json"), journal_bytes).unwrap();
+            let records = super::Records::new(folder.path().to_owned());
+            let mut said = Vec::new();
+            let read = records
+                .state(&mut |line: &str| said.push(line.to_owned()))
+                .unwrap_or_else(|error| panic!("{day}: {error}"));
+            assert!(said.is_empty(), "{day}: {said:?}");
+            assert_eq!(
+                missing(
+                    &serde_json::from_slice(state_bytes).unwrap(),
+                    &serde_json::to_value(&read).unwrap(),
+                    "state",
+                ),
+                None,
+                "{day}"
+            );
+            let under_way = records
+                .journal()
+                .unwrap_or_else(|error| panic!("{day}: {error}"))
+                .unwrap_or_else(|| panic!("{day}: no switch under way"));
+            assert_eq!(
+                missing(
+                    &serde_json::from_slice(journal_bytes).unwrap(),
+                    &serde_json::to_value(&under_way).unwrap(),
+                    "journal",
+                ),
+                None,
+                "{day}"
+            );
+        }
     }
 }

@@ -102,7 +102,7 @@ nothing from the speaker or the microphone's driver.
 
 ## The rig
 
-`crates/audio/tests/steady_reference.rs`, no lamp in it:
+`crates/audio/tests/it/steady_reference.rs`, no lamp in it:
 
 - **The lamp's voice**: speech-like sound made in the test (a voice source
   at 205 Hz through moving formants, consonant noise, syllables, pauses), at
@@ -132,7 +132,7 @@ nothing lost); and where the echo sits as the canceller sees it.
 
 ## The two measures, before and after
 
-`cargo test --release -p lamp-audio --test steady_reference -- --include-ignored --nocapture`,
+`cargo test --release -p lamp-audio --test it steady_reference:: -- --include-ignored --nocapture`,
 on the M2 Max (macOS) and on its Linux ARM64 virtual machine, one run each,
 the same figures to the last digit on both (the rig is deterministic); 60 s
 scenes, the first 6 s not measured.
@@ -170,7 +170,7 @@ What it shows:
   and the person's level against it is lower. The rig shows the direction
   and the size of the effect, not the lamp's.
 
-The default tests (`cargo test -p lamp-audio --test steady_reference`,
+The default tests (`cargo test -p lamp-audio --test it steady_reference::`,
 7 s in a debug build) hold the findings without the canceller: as given the
 echo moves over more than 40 ms; steadied it is within 1 ms of where it is
 held for more than 70% of a 45 s scene (82% measured) and within one step
@@ -289,7 +289,7 @@ capture-clocked reference, as the lamp runs, through to its end.
   or `--as-given-reference` chooses one.
 
 Tested on recordings made in the tests as the voice makes them
-(`crates/audio/tests/replay.rs`): a capture-clocked one of 300 blocks, the
+(`crates/audio/tests/it/replay.rs`): a capture-clocked one of 300 blocks, the
 speaker 1,000 ppm fast and every seventh packet late, replays whole and
 gives the canceller's own output sample for sample; one with a reset in the
 middle, two segments, both exact; one whose events end in a cut-off line;

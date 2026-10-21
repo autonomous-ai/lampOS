@@ -1,0 +1,17 @@
+{
+  "phase": "near-closed",
+  "messages": 119,
+  "classified_after_2s": {
+    "unknown": 111
+  },
+  "sources": {
+    "missing": 111
+  },
+  "parse_errors": 0,
+  "mean_face_height": 0.1692629797297297,
+  "mesh_runs": 122,
+  "mesh_median_ms": 38.0,
+  "mesh_p90_ms": 39,
+  "eyes_median_px": 14.0,
+  "journal_exit": 0
+}

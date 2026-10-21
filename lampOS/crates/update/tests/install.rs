@@ -1156,7 +1156,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .iter()
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
-    assert_eq!(installed.len(), 8);
+    // Not feeling well came with the product after its lamp check (#1681).
+    assert_eq!(installed.len(), 10);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -1178,9 +1179,10 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The seven live skills still offer Dance alone.
+    // contribute functions. The nine live skills offer Dance and
+    // prepare_to_unplug, the latter hidden at run time unless LAMP_UNPLUG=on.
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 8);
+    assert_eq!(inventory.len(), 10);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -1196,12 +1198,12 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
             .lines()
             .last()
             .unwrap()
-            .starts_with("The skills here give the model 1 function (dance)."),
+            .starts_with("The skills here give the model 2 functions (dance, prepare_to_unplug)."),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 7);
+    assert_eq!(live.len(), 9);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     assert_eq!(
         lamp_skills::tools_file(&installed),
@@ -1621,14 +1623,19 @@ fn missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept() {
 /// on #811, 13:58).
 #[test]
 fn the_pinned_models_are_the_ones_their_parts_check() {
-    let models = install::models().unwrap();
-    assert_eq!(models.len(), 7);
+    let all = install::models().unwrap();
+    let (notices, models): (Vec<_>, Vec<_>) = all
+        .iter()
+        .partition(|model| model.path.starts_with(NOTICES));
+    assert_eq!((models.len(), notices.len()), (7, 5));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
-    for model in &models {
+    for model in &all {
         assert!(model.path.starts_with("/opt/lampOS/"), "{}", model.path);
-        assert!(model.url.starts_with(release), "{}", model.url);
         assert_eq!(model.sha256.len(), 64);
         assert!(model.bytes > 0);
+    }
+    for model in &models {
+        assert!(model.url.starts_with(release), "{}", model.url);
     }
     let wire = include_str!("../../turn-end-wire/src/lib.rs");
     let fast = include_str!("../../turn-end/src/fast.rs");
@@ -1652,6 +1659,51 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     assert!(
         include_str!("../../../deploy/product/lamp-name.service")
             .contains("--models /opt/lampOS/name/models")
+    );
+}
+
+/// Where the product's voice finds its recorded lines (#1844).
+const NOTICES: &str = "/opt/lampOS/voice/notices/";
+
+/// #1844 (lamp-06c1, 20 Oct): the product unit named a notice folder
+/// nothing filled, so the offline line and "back online" were silent. Now
+/// install places the four recordings and their manifest, from their own
+/// release, in the folder the product voice reads.
+#[test]
+fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them() {
+    let all = install::models().unwrap();
+    let release = "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/";
+    let mut placed: Vec<&str> = all
+        .iter()
+        .filter_map(|model| model.path.strip_prefix(NOTICES))
+        .collect();
+    placed.sort_unstable();
+    assert_eq!(
+        placed,
+        [
+            "back-online.en-US.wav",
+            "manifest.json",
+            "provider-unavailable.en-US.wav",
+            "voice-service-unreachable.en-US.wav",
+            "wifi-lost.en-US.wav",
+        ]
+    );
+    for model in all.iter().filter(|model| model.path.starts_with(NOTICES)) {
+        let file = model.path.strip_prefix(NOTICES).unwrap();
+        assert_eq!(model.url, format!("{release}{file}"));
+        assert!(model.archive.is_none(), "{file}");
+    }
+    let voice = include_str!("../../../deploy/product/lamp-voice.service");
+    let start = voice
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(
+        start.contains(&format!(
+            " --failure-notice-dir {} --failure-notice-language en-US",
+            NOTICES.trim_end_matches('/')
+        )),
+        "{start}"
     );
 }
 

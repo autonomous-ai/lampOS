@@ -716,6 +716,11 @@ fn one_move(
     let mut samples: Vec<Sample> = Vec::new();
     let mut last_seq = None;
     let mut met = None;
+    // When the body last said its joints anew, on the check's clock: one
+    // that stops during the move ends it `not_checked`, naming lamp-body,
+    // not a red fail for a head that may have moved (the reviewer on
+    // #1276).
+    let mut heard_at = began;
     while since(clock, began) < REACH_WITHIN {
         let share = ease(since(clock, began).as_secs_f64() / EASE.as_secs_f64());
         asker.ask(joint.offsets(target * share))?;
@@ -723,6 +728,7 @@ fn one_move(
             && last_seq != Some(seq)
         {
             last_seq = Some(seq);
+            heard_at = clock.now();
             samples.push(Sample {
                 at: since(clock, began),
                 position,
@@ -736,6 +742,7 @@ fn one_move(
         if let Some(why) = watch.interruption(bus) {
             return Err(why);
         }
+        stopped_saying(clock, heard_at)?;
         clock.pause(STEP);
     }
     // Let go the way it was asked: eased back. Each request is renewed
@@ -770,7 +777,11 @@ fn one_move(
         if let Some(why) = watch.interruption(bus) {
             return Err(why);
         }
-        if let Some((_, position, _)) = read(bus, joint) {
+        if let Some((seq, position, _)) = read(bus, joint) {
+            if last_seq != Some(seq) {
+                last_seq = Some(seq);
+                heard_at = clock.now();
+            }
             away = (position - start).abs();
             if away <= NEAR {
                 return Ok(Moved::Done {
@@ -780,9 +791,25 @@ fn one_move(
                 });
             }
         }
+        stopped_saying(clock, heard_at)?;
         clock.pause(STEP);
     }
     Ok(Moved::NotBack { goal, away })
+}
+
+/// `Err` naming lamp-body once nothing new has come on
+/// `body/joint_states` for [`listen::FAST_FRESH`] since `heard_at`: the
+/// body stopped during the move.
+fn stopped_saying(clock: &impl Clock, heard_at: Instant) -> Result<(), String> {
+    let quiet = since(clock, heard_at);
+    if quiet > listen::FAST_FRESH {
+        return Err(format!(
+            "lamp-body stopped publishing {} during the move (nothing new for {:.1} s)",
+            JointState::TOPIC,
+            quiet.as_secs_f64()
+        ));
+    }
+    Ok(())
 }
 
 pub struct HeadMove<'a> {
@@ -1216,6 +1243,8 @@ mod tests {
         FoldsLettingGoLast,
         /// Says its joints once and then never again, as a body stopped.
         Silent,
+        /// Stops saying its joints a few steps into the first move.
+        StopsMidMove,
     }
 
     /// A body on `bus` as lamp-52e6's: it takes requests on
@@ -1257,6 +1286,7 @@ mod tests {
             let (mut goal, mut position) = (rest, rest);
             let mut offsets = None::<(BodyOffsets, u64)>;
             let (mut deepest_roll, mut folding) = (0.0f64, false);
+            let mut moving_since: Option<u64> = None;
             let mut step = 0u64;
             while !stop.load(std::sync::atomic::Ordering::Relaxed) {
                 let stepped = steps.granted.load(std::sync::atomic::Ordering::SeqCst) > 0;
@@ -1290,6 +1320,9 @@ mod tests {
                             .saturating_sub(request.lease.issued_us)
                             / STEP.as_micros() as u64;
                         offsets = Some((request.offsets, step + lasts));
+                        if moving_since.is_none() && request.offsets.head_pitch.abs() > 0.0 {
+                            moving_since = Some(step);
+                        }
                     }
                 }
                 let now = lamp_ipc::monotonic_us();
@@ -1335,7 +1368,9 @@ mod tests {
                         .map(radians)
                         .to_vec(),
                 };
-                if step == 0 || !matches!(fake, Fake::Silent) {
+                let stopped = matches!(fake, Fake::StopsMidMove)
+                    && moving_since.is_some_and(|since| step > since + 5);
+                if step == 0 || !(matches!(fake, Fake::Silent) || stopped) {
                     joints.publish_json(now, &state).unwrap();
                 }
                 if step.is_multiple_of(10) {
@@ -1562,6 +1597,23 @@ mod tests {
                 .starts_with("stopped: lamp-body is not publishing body/joint_states (newest"),
             "{}",
             silent.reason
+        );
+    }
+
+    /// The reviewer on #1276: a body that stops saying its joints during a
+    /// move ends the check `not_checked`, naming lamp-body, not a red fail
+    /// for a head that was moving.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_body_that_stops_during_a_move_is_named_not_failed() {
+        let stopped = run_against(Fake::StopsMidMove, "midmove");
+        assert_eq!(stopped.verdict, Verdict::NotChecked, "{stopped:?}");
+        assert!(
+            stopped.reason.starts_with(
+                "stopped: lamp-body stopped publishing body/joint_states during the move"
+            ),
+            "{}",
+            stopped.reason
         );
     }
 }

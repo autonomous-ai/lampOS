@@ -251,9 +251,9 @@ not close MIC1 for privacy) and Controls with no privacy route. An older Ears
 reading a no-slide lease finds it invalid (a permit with unknown physical
 state, or an acquisition with no level) and stays closed.
 
-Tests: `crates/controls/tests/no_slide.rs`, the no-slide tests in
+Tests: `crates/controls/tests/it/no_slide.rs`, the no-slide tests in
 `crates/voice/tests/privacy_controls.rs` and `privacy_pipeline.rs`,
-`crates/msgs/tests/privacy.rs` and `controls.rs`, and Ears'
+`crates/msgs/tests/it/privacy.rs` and `controls.rs`, and Ears'
 `a_no_slide_lease_opens_capture_and_expires_at_its_observation` and
 `a_no_slide_observation_regression_is_refused`. The real worker's
 `the_real_worker_with_no_slide_grants_from_its_controller_alone`

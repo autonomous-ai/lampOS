@@ -68,6 +68,12 @@ refused (unknown fields are refused).
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
 | `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
 
+A person's own DeepSeek endpoint and key and Deepgram key, with
+`LAMP_OWN_KEYS=on`, go over the relay and over `deepgram_credential_file`
+at start: the voice unit's credentials `own_deepseek.key`,
+`own_deepseek.url` and `own_deepgram.key`, never fields here
+([own-keys.md](own-keys.md), #2094).
+
 OpenRouter's and DeepSeek's keys are not in this file: they are the voice
 unit's systemd credentials, `openrouter.key` and `deepseek.key` in its
 `CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below). With
@@ -536,6 +542,11 @@ order is kept. A written turn is the same from the chat on.
       "remember my violet umbrella is in the car" and "forget that" were
       answered in words, nothing kept or forgotten, while `recall`, which
       the memory note names, was called (the first builder on #1722, 00:34).
+    - any function a system or user message of the turn names as a whole
+      word (`a_note_names`): a note that says "call remember_my_face", such as
+      setup's who_you_are note or the name-told note, is given it at once.
+      Behind `more_functions`, on lamp-52e6 (row 10), DeepSeek called plain
+      `remember` for it and never closed the step, 2 tries of 3.
   - **Behind `more_functions`:** `forget_everything`, the faces', the time elsewhere
     (`the_time`), a mark for review, the stop of reports, and any skill
     function given on its own.

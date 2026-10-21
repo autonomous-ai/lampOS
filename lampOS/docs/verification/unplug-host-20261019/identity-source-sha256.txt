@@ -1,0 +1,4 @@
+4a0e374b1c8e9f3eecf9dbfe83cd6c076d1f4714e0f1c764dc888788ffbf49c2  lampOS/crates/skills/src/lib.rs
+bcddf1de3972777782260772c1f20957f28c2fa6f7123723427f2563422795fe  lampOS/crates/skills/src/main.rs
+909b12fa7f5d239e7c635b7a2ad08517adbf5ac28024fbda4cfc9cb97e70ee3d  lampOS/crates/skills/src/unplug.rs
+7061a5c6c378f01b4fe61cfc828b167b4646f95de939689cc4d1f1bae053db82  lampOS/crates/skills/tests/skills.rs

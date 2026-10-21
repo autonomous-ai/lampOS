@@ -243,6 +243,23 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    /// A login a later build kept, with fields this build doesn't know,
+    /// still reads as the fields it knows (#1505's rule), so a rollback
+    /// doesn't fall back to setup's older login.
+    #[test]
+    fn a_rotated_account_from_a_later_build_still_reads() {
+        let dir = std::path::PathBuf::from(format!("/tmp/lckl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("rotated.json");
+        let mut later = serde_json::to_value(sample()).unwrap();
+        later["mqtt_tls"] = serde_json::json!(true);
+        later["rotated_at_ms"] = serde_json::json!(1_760_000_000_000_u64);
+        std::fs::write(&path, serde_json::to_vec(&later).unwrap()).unwrap();
+        assert_eq!(kept(&path), Some(sample()));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn a_ping_reply_rotates_only_what_it_changes() {
         let account = sample();

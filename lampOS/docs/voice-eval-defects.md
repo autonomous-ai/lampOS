@@ -125,7 +125,7 @@ attempt under `attempts/`, including the exact reproduction command.
 - **Evidence:** host-only signal probe: a 200 Hz tone reaches ~0.97 speech
   probability and is admitted under the 6 x 0.80 start rule; white noise peaks
   near 0.77 and is not. Host numerics can differ from native ARM64.
-- **Reproduce:** `cargo test -p lamp-voice-eval --test fake_runtime signal_mode_uses_lamp_voice_vad_on_the_exact_cached_mix`
+- **Reproduce:** `cargo test -p lamp-voice-eval --test it fake_runtime::signal_mode_uses_lamp_voice_vad_on_the_exact_cached_mix`
 - **Expected:** notification beeps or music do not open a turn. Needs a physical
   check with real computer audio before acting on it.
 

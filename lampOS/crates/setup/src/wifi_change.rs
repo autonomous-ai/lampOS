@@ -292,7 +292,8 @@ pub const SAY_LOST: &str =
     "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again.";
 /// The voice's recording of [`SAY_LOST`], by the name the say service takes
 /// (`recording`), the failure notice `wifi_lost` in
-/// `/etc/lampOS/voice/notices` (`docs/failure-notices.md`).
+/// `/opt/lampOS/voice/notices`, placed by install (`docs/failure-notices.md`,
+/// #1844).
 pub const RECORDING_LOST: &str = "wifi_lost";
 /// [`SAY_LOST`] at most this often.
 pub const LOST_EVERY: Duration = Duration::from_secs(60);

@@ -4,7 +4,7 @@ use crate::engine::{Event, EventKind, FaceTarget};
 use lamp_bus::{Declaration, Kind, Message};
 use lamp_msgs::{
     AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, HumanFamiliar,
-    NameHeard, ScheduleDue, Speech, SuddenSound, Voice, VoiceState,
+    HumanSeems, NameHeard, ScheduleDue, SeemsKind, Speech, SuddenSound, Voice, VoiceState,
 };
 use std::{collections::BTreeSet, fmt};
 
@@ -39,7 +39,7 @@ impl InputSpec {
     }
 }
 
-pub const INPUTS: [InputSpec; 10] = [
+pub const INPUTS: [InputSpec; 11] = [
     InputSpec {
         topic: VoiceState::TOPIC,
         type_name: VoiceState::TYPE,
@@ -122,7 +122,20 @@ pub const INPUTS: [InputSpec; 10] = [
         source: "eyes",
         max_age_ms: 5_000,
     },
+    // How the near face seems (#1671): at most every 2 s, good for 5. Taken
+    // only with `LAMP_MOOD_SEEMS=on` ([`InputAdapter::with_seems`]).
+    InputSpec {
+        topic: HumanSeems::TOPIC,
+        type_name: HumanSeems::TYPE,
+        version: HumanSeems::VERSION,
+        kind: Kind::Latest,
+        source: "eyes",
+        max_age_ms: 5_000,
+    },
 ];
+
+/// The switch for how the near face seems as an input (#1671): `on` only.
+pub const SEEMS_ENVIRONMENT: &str = "LAMP_MOOD_SEEMS";
 
 /// Reasons contain no payload values or words and are safe to count. A failed
 /// source is optional: the runtime leaves the other inputs running.
@@ -231,6 +244,7 @@ enum Payload {
     Name(NameHeard),
     Schedule(ScheduleDue),
     Familiar(HumanFamiliar),
+    Seems(SeemsKind),
 }
 
 impl Payload {
@@ -258,6 +272,8 @@ pub struct InputAdapter {
     reminders: BTreeSet<(String, u64, u64)>,
     reminders_exhausted: bool,
     counts: InputCounts,
+    /// How the near face seems is taken (`LAMP_MOOD_SEEMS=on`).
+    seems: bool,
 }
 
 impl InputAdapter {
@@ -277,7 +293,16 @@ impl InputAdapter {
             reminders: BTreeSet::new(),
             reminders_exhausted: false,
             counts: InputCounts::default(),
+            seems: false,
         })
+    }
+
+    /// Take how the near face seems (#1671, `LAMP_MOOD_SEEMS=on`); without
+    /// it the runtime doesn't subscribe, and any message is ignored before
+    /// it is read.
+    pub fn with_seems(mut self, on: bool) -> Self {
+        self.seems = on;
+        self
     }
 
     pub fn counts(&self) -> InputCounts {
@@ -344,6 +369,9 @@ impl InputAdapter {
             .position(|spec| spec.topic == message.header.topic)
             .ok_or(InputError::UnknownTopic)?;
         let spec = INPUTS[index];
+        if spec.topic == HumanSeems::TOPIC && !self.seems {
+            return Ok(Vec::new());
+        }
         let (mut observed_us, mut valid_until_us) = envelope(message, spec, now_us, now_unix_ms)?;
         let payload = parse(message, index)?;
         if let Some(stamp) = payload.stamp() {
@@ -494,6 +522,10 @@ impl InputAdapter {
             Payload::Sudden(value) => value.short.then_some(EventKind::SuddenSound),
             Payload::Air(value) => Some(EventKind::Air(value.co2_ppm)),
             Payload::Familiar(value) => Some(EventKind::Familiar(value.level)),
+            // The kind only: the confidence was the reader's to judge.
+            Payload::Seems(kind) => Some(EventKind::Seems(
+                (kind != SeemsKind::Unsure).then_some(kind),
+            )),
             Payload::Name(value) => (value.score >= 0.9).then_some(EventKind::Name),
             Payload::Schedule(value) => {
                 if let Some(notice) = value.oldest {
@@ -672,6 +704,11 @@ fn parse(message: &Message, index: usize) -> Result<Payload, InputError> {
             let value: HumanFamiliar = message.parse().map_err(malformed)?;
             value.check().map_err(|_| InputError::InvalidPayload)?;
             Payload::Familiar(value)
+        }
+        10 => {
+            let value: HumanSeems = message.parse().map_err(malformed)?;
+            value.check().map_err(|_| InputError::InvalidPayload)?;
+            Payload::Seems(value.kind)
         }
         _ => return Err(InputError::UnknownTopic),
     })

@@ -36,6 +36,17 @@ one second to send its line. A second `lamp-actions` on the same directory
 is refused while the first answers. It cannot catch a signal; killed, it
 leaves the call it was in unanswered, and the voice tells its model so.
 
+The units keep its folder, `/run/lampos-actions`, across a restart: a
+crash's, an update's or `systemctl restart`
+(`RuntimeDirectoryPreserve=restart`, El on #1588). Since it cannot catch
+SIGTERM, a restart leaves `tools.json` where it is. The new process finds
+the old `call.sock` unanswered and replaces it, then writes `tools.json` and
+`ready` again before it serves. With the same names in the catalog, the
+voice reads the same set and renews no session. Before, a restart in a quiet
+room cost two reconnects: the catalog gone, then back. A stop and a later
+start still remove the folder, and the voice renews for the functions gone
+and back as before ([tools.md](tools.md)).
+
 Only what can be done now is offered. With no mixer given there are no
 volume actions; the light's are offered while the ring's owner is saying
 what it shows and for 15 s after (`light::LIGHT_GRACE`, below), and are
@@ -233,6 +244,13 @@ what can't be read is said so, and what can't be confirmed within 0.6 s is
 said so. A ring really gone drops out after the grace. A light never seen
 is never offered.
 
+A light call is answered once the ring says it shows the light. The ring
+looks at what is asked on every pass of its 2 ms loop and says it at once,
+and the executive reads that every 2 ms. So a call takes a few milliseconds:
+about 3 ms at the median on the Intel Mac, against about 55 ms before 19 Oct,
+when the ring looked every 50 ms and the executive every 15 ms (#1806;
+`lamp-voice`'s `light_call` test).
+
 ## The app's two calls (#1396)
 
 The Autonomous app's volume slider is answered through the executive too, so
@@ -286,7 +304,24 @@ a replacement must be newer. Removal must name the current token.
 
 The existing Schedule store commits the complete cap state before success.
 Added fields in schema 1 are tolerated; unknown enum values, unsupported
-schemas and invalid state are preserved and refused. A storage error makes
+schemas and invalid state are preserved and refused. A store from a later
+build (a higher `schema`, as after an update is put back) is kept as it is
+and the caps are held back while this build runs. Actions decides it at
+every start, so a build that was put back holds them back on each start
+until an update brings one that reads the store, which can be days. Actions
+starts and serves, says so in one journal line, and its health is a warning
+naming why. It still publishes an empty snapshot (revision 0) on
+`output/caps` each second, never committed, so a ring that starts with it
+takes the product's ceiling and isn't left dark. A ring still running from
+before keeps its last snapshot until those caps expire by wall time, since a
+lower revision can't loosen it. No ceiling is applied, so the mixer stays
+where it was, and every cap request is refused with code `held_back`. It
+never starts fresh caps over a later build's store (#1505; the first builder
+and Jarvis, 21 Oct). A later build's database container (a higher
+`user_version`) is set aside by the store itself, and the caps then begin
+empty: health warns, naming the kept file, until the next start. Actions
+looks for it once, at start, where Schedule looks on each report. Any other
+store it can't read still stops the start. A storage error makes
 later snapshots unavailable until reopen. Initialized time means 2020–2099;
 it is a sanity check, not proof of synchronization. Unknown time retains
 restored restrictions and refuses new caps; an explicit token removal works.
@@ -318,9 +353,9 @@ Linux-only and was not run on this Mac. Commands, from `lampOS`:
 
 ```sh
 cargo test --offline -p lamp-actions --all-targets -- --test-threads=1 --nocapture
-cargo test --offline -p lamp-schedule --test client -- --test-threads=1 --nocapture
+cargo test --offline -p lamp-schedule --test it client:: -- --test-threads=1 --nocapture
 cargo clippy --offline -p lamp-actions --all-targets -- -D warnings
-cargo clippy --offline -p lamp-schedule --lib --test client -- -D warnings
+cargo clippy --offline -p lamp-schedule --lib --test it -- -D warnings
 ```
 
 Both Clippy checks and scoped formatting passed. The timing fixture measured

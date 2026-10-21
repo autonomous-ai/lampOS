@@ -10,7 +10,7 @@ slump). With --give-way, a joint that pushes at its goal without moving for\n1.5
 did, a head or base joint that a hand stops and still pushes a second later makes the lamp
 slump (torque off on all five, held again 5 s later where it lies; after an overload, 120 s);
 a hand never ends the run, and a head roll or base found beyond 400 counts of home at start is
-taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does, while the arm\nwaits where it slumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding; with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and ignored, so a caller may always say them.\nPrints one JSON report when it ends.\n";
+taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and ignored, so a caller may always say them.\nPrints one JSON report when it ends.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -960,6 +960,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     };
     use std::{io::Write, os::unix::net::UnixDatagram};
 
+    let unplug = lamp_body::unplug::Adapter::from_environment()?;
     struct SignalMask(SigSet);
     impl Drop for SignalMask {
         fn drop(&mut self) {
@@ -1088,7 +1089,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         if latest.is_some_and(|(mood, _)| mood == lamp_body::gesture::Mood::Reading) {
             reading_at = Some(std::time::Instant::now());
         }
-        if paused.get() {
+        if paused.get() || unplug.as_ref().is_some_and(|unplug| unplug.latched()) {
             return Some((lamp_body::gesture::Mood::Resting, 0));
         }
         latest
@@ -1151,8 +1152,47 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let mut bus = lamp_body::bus_out::BusOut::from_environment(|why| eprintln!("lamp-body: {why}"));
     let notify = lamp_keeper::Notify::from_environment();
     let ready = std::cell::Cell::new(false);
+    // What the latched body's evidence last said, and when it was journalled.
+    let mut unplug_said: Option<(&str, std::time::Instant)> = None;
     let watch = |glimpse: &lamp_body::body::Glimpse| {
         step_said(&notify, &ready);
+        if let Some(unplug) = &unplug {
+            // A read missed or bad is no evidence either way: nothing is sampled.
+            if !glimpse.unplug_gap {
+                unplug.sample(glimpse.unplug_safe, glimpse.unplug_unsafe);
+            }
+            if unplug.latched() {
+                let now = std::time::Instant::now();
+                let why = match (glimpse.unplug_unsafe, glimpse.unplug_gap) {
+                    (Some(at), _) => lamp_body::unplug::UNPLUG_UNSAFE[usize::from(at)],
+                    (None, true) => "no evidence: a read missed or bad, or a goal unsent",
+                    (None, false) => "folded evidence",
+                };
+                // An unsafe step is said at once; a change between gaps and
+                // evidence at most once a second; the same again every 5 s.
+                let due = unplug_said.is_none_or(|(said, at)| {
+                    let since = now.duration_since(at);
+                    (said != why
+                        && (glimpse.unplug_unsafe.is_some()
+                            || since >= std::time::Duration::from_secs(1)))
+                        || since >= std::time::Duration::from_secs(5)
+                });
+                if due {
+                    eprintln!(
+                        "lamp-body: unplug step {}: {why}; head/base {:?} arm {:?} loads {:?}/{:?} temperatures {:?}/{:?} bad reads {:?}",
+                        glimpse.step,
+                        glimpse.positions,
+                        glimpse.arm_positions,
+                        glimpse.loads,
+                        glimpse.arm_loads,
+                        glimpse.temperatures,
+                        glimpse.arm_temperatures,
+                        glimpse.bad_reads,
+                    );
+                    unplug_said = Some((why, now));
+                }
+            }
+        }
         if let Some(bus) = bus.as_mut() {
             bus.paused = paused.get();
             bus.offer(glimpse);
@@ -1441,13 +1481,15 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 paused: false,
                 // Taken only while the pose is reading (`body.rs`).
                 toward: reading_toward.get(),
+                unplug: false,
             };
             // Read all the same, so that nothing kept from before the pause
             // is acted on after it.
             // A gesture is passed on to be dropped and said.
-            let asked = if paused.get() {
+            let asked = if paused.get() || unplug.as_ref().is_some_and(|unplug| unplug.latched()) {
                 lamp_body::body::Asked {
                     gesture: asked.gesture,
+                    unplug: unplug.as_ref().is_some_and(|unplug| unplug.latched()),
                     ..lamp_body::body::Asked::PAUSED
                 }
             } else {
@@ -1466,6 +1508,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             (asked, priority, source)
         },
         watch,
+        || unplug.as_ref().is_some_and(|unplug| unplug.latched()),
         || {
             if !cancelled {
                 cancelled = signal_fd
@@ -1480,6 +1523,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             Ok(cancelled)
         },
     );
+    if let Some(unplug) = &unplug {
+        unplug.stop();
+    }
     // Again for a body that stopped by itself; a second time is harmless.
     notify.stopping();
     if let Some(woke) = result.body.as_ref().and_then(|body| body.woke.as_ref()) {

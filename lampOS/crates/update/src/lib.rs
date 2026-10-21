@@ -24,6 +24,7 @@ pub mod publish;
 pub mod quiet;
 pub mod records;
 pub mod round;
+pub mod status;
 pub mod unit;
 pub mod world;
 

@@ -22,9 +22,10 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
-    RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
+    CameraClosed, Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level,
+    RoomActivity, RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
 };
+use serde::Serialize;
 use std::{io, time::Duration};
 
 /// Where the eyes read whether to publish. `on` only.
@@ -65,6 +66,8 @@ pub struct Ids {
     pub mouths: Option<speaking::Mouths>,
     /// The last look's ids, in the detector's order.
     last: Vec<u32>,
+    /// The last look's ids whose mouth read speaking.
+    talking: Vec<u32>,
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -110,6 +113,12 @@ impl Ids {
         self.last.clone_from(&ids);
         ids
     }
+
+    /// Where the face with this passing id is in the last look, in the
+    /// detector's order.
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        self.last.iter().position(|seen| *seen == id)
+    }
 }
 
 /// A face's box as fractions of the picture: (xmin, ymin, xmax, ymax).
@@ -141,9 +150,40 @@ pub fn message(
     ids: &mut Ids,
     now_us: u64,
 ) -> Faces {
+    message_observed(found, opens, filled, ids, now_us, None)
+}
+
+/// At most one numeric record, for the same largest detection the mesh uses.
+#[derive(Debug, Serialize)]
+pub struct MouthObservation {
+    pub at_us: u64,
+    pub filled: [usize; 2],
+    /// Unnormalized x, y, width, height in working-detector pixels.
+    pub face_box_px: [f32; 4],
+    pub face_count: usize,
+    #[serde(flatten)]
+    pub decision: speaking::MouthDiagnostic,
+}
+
+fn message_observed(
+    found: &[faces::Face],
+    opens: &[Option<f32>],
+    filled: (usize, usize),
+    ids: &mut Ids,
+    now_us: u64,
+    mut diagnostic: Option<&mut Option<MouthObservation>>,
+) -> Faces {
+    let largest = diagnostic.as_ref().and_then(|_| {
+        found
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.height.total_cmp(&b.1.height))
+            .map(|(index, _)| index)
+    });
     let (width, height) = (filled.0.max(1) as f32, filled.1.max(1) as f32);
     let boxes: Vec<[f32; 4]> = found.iter().map(|face| edges(face, filled)).collect();
     let numbers = ids.of(&boxes, now_us);
+    ids.talking.clear();
     let faces = found
         .iter()
         .zip(&boxes)
@@ -160,8 +200,26 @@ pub fn message(
             let to_the_right = face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0;
             let speaking = ids.mouths.as_mut().map(|mouths| {
                 let open = opens.get(index).copied().flatten();
-                mouths.judge(id, &face.marks, turn, open, now_us)
+                if largest == Some(index)
+                    && let Some(output) = diagnostic.as_deref_mut()
+                {
+                    let (result, decision) =
+                        mouths.judge_with_diagnostics(id, &face.marks, turn, open, now_us);
+                    *output = Some(MouthObservation {
+                        at_us: now_us,
+                        filled: [filled.0, filled.1],
+                        face_box_px: [face.x, face.y, face.width, face.height],
+                        face_count: found.len(),
+                        decision,
+                    });
+                    result
+                } else {
+                    mouths.judge(id, &face.marks, turn, open, now_us)
+                }
             });
+            if speaking.is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes) {
+                ids.talking.push(id);
+            }
             Face {
                 speaking,
                 id: format!("f{id}"),
@@ -230,9 +288,14 @@ pub fn health(camera: Camera, set_aside: usize, resets: u32) -> Diagnostic {
 pub struct BusOut {
     faces: Publisher,
     health: Publisher,
+    /// `eyes/camera_closed`: the receipt for a close the voice asked about
+    /// (#1802). Kept alive on every tick, open camera or not, so the voice
+    /// can see that these eyes give receipts before it asks for one.
+    closed: Publisher,
     ids: Ids,
     alive_at_us: u64,
     reported_at_us: Option<u64>,
+    mouth_diagnostics: bool,
     /// With `LAMP_PRESENCE=on`: whether anyone is at the lamp.
     presence: Option<Presence>,
     /// With `lamp-eyes --visits on`: how familiar the remembered person at
@@ -340,15 +403,19 @@ impl BusOut {
         faces.expires_after(Some(LASTS));
         let health =
             bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), SOURCE)?;
+        let closed =
+            bus.publisher_declared(CameraClosed::TOPIC, &CameraClosed::declaration(), SOURCE)?;
         Ok(Self {
             faces,
             health,
+            closed,
             ids: Ids {
                 mouths: speaking::from_environment(),
                 ..Ids::default()
             },
             alive_at_us: 0,
             reported_at_us: None,
+            mouth_diagnostics: false,
             presence: None,
             familiar: None,
             activity: None,
@@ -480,6 +547,16 @@ impl BusOut {
         }
     }
 
+    /// Diagnostics observe an already enabled judge; they never enable inference
+    /// or speaking publication. The existing nonblocking log relay owns output.
+    pub fn enable_mouth_diagnostics(&mut self) -> Result<(), &'static str> {
+        if self.ids.mouths.is_none() {
+            return Err("--mouth-diagnostics needs LAMP_EYES_SPEAKING=on");
+        }
+        self.mouth_diagnostics = true;
+        Ok(())
+    }
+
     /// One look: what the detector found in it.
     pub fn saw(
         &mut self,
@@ -488,7 +565,15 @@ impl BusOut {
         filled: (usize, usize),
         now_us: u64,
     ) {
-        let seen = message(found, opens, filled, &mut self.ids, now_us);
+        let mut diagnostic = None;
+        let seen = message_observed(
+            found,
+            opens,
+            filled,
+            &mut self.ids,
+            now_us,
+            self.mouth_diagnostics.then_some(&mut diagnostic),
+        );
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
         if let Some(presence) = self.presence.as_mut() {
@@ -510,6 +595,11 @@ impl BusOut {
         if let Some(activity) = self.activity.as_mut() {
             activity.judge.looked(now_us, &Look::all(found, filled));
         }
+        if let Some(diagnostic) = diagnostic
+            && let Ok(line) = serde_json::to_string(&diagnostic)
+        {
+            eprintln!("lamp-eyes: mouth diagnostic {line}");
+        }
     }
 
     /// The passing id the last look gave the face at `index` of what the
@@ -521,6 +611,17 @@ impl BusOut {
         self.ids.last.get(index).map(|id| format!("f{id}"))
     }
 
+    /// The passing ids that read speaking in the last look (none unless
+    /// speaking is judged), and the detector's index of a passing id in it:
+    /// for turning to the one the lamp answers (`crate::answered`).
+    pub fn talking(&self) -> &[u32] {
+        &self.ids.talking
+    }
+
+    pub fn index_of(&self, id: u32) -> Option<usize> {
+        self.ids.index_of(id)
+    }
+
     /// Call from the loop whether or not the camera is open: with it closed
     /// nothing is published, and this is what says the eyes are still there.
     /// With `LAMP_PRESENCE=on`, whether anyone is at the lamp is said from
@@ -530,6 +631,11 @@ impl BusOut {
             self.alive_at_us = now_us;
             let _ = self.faces.alive();
         }
+        // Every tick, not only when no look was published for a second: the
+        // looks keep the faces alive but never this, so with the camera open
+        // its entry outlived the lease and the voice saw no receipt-giving
+        // eyes (lamp-52e6, 21 October). Costs nothing until it is due.
+        let _ = self.closed.alive();
         if let Some(presence) = self.presence.as_mut() {
             // When the voice heard the words, by the host's monotonic clock,
             // never later than now: lines that waited are as old as they are.
@@ -568,6 +674,11 @@ impl BusOut {
                 eprintln!("lamp-eyes: {line}");
             }
         }
+    }
+
+    /// Say that the camera is shut for the close the voice asked about.
+    pub fn camera_closed(&mut self, receipt: CameraClosed, now_us: u64) {
+        let _ = self.closed.publish_json(now_us, &receipt);
     }
 
     /// Say how the eyes are. Call from the loop on every turn, whatever
@@ -732,6 +843,28 @@ mod tests {
         out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
         out.report(Camera::Open, 0, 0, 2_000_000);
+    }
+
+    #[test]
+    fn the_receipt_publisher_stays_alive_while_looks_keep_coming() {
+        let root = std::path::PathBuf::from(format!("/tmp/lec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // A short lease, so it is shown every 100 ms and outlived in 300.
+        let bus = Bus::new(&root)
+            .unwrap()
+            .lease(std::time::Duration::from_millis(300));
+        let mut out = BusOut::on(&bus).unwrap();
+        // The camera open: a look four times a second, each followed by a tick.
+        for look in 0..8u64 {
+            let at = 1_000_000 + look * 250_000;
+            out.saw(&[face(240.0, 120.0, 160.0, 200.0, 0.0)], &[], PICTURE, at);
+            out.tick(at + 1);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let sources = bus.publishers(CameraClosed::TOPIC).unwrap();
+        assert!(sources.iter().any(|source| source.name == SOURCE));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
@@ -1155,6 +1288,141 @@ mod tests {
     }
 
     #[test]
+    fn diagnostics_preserve_bus_bytes_and_exclude_identity_and_media() {
+        let mut off = Ids {
+            mouths: Some(speaking::Mouths::default()),
+            ..Ids::default()
+        };
+        let mut on = Ids {
+            mouths: Some(speaking::Mouths::default()),
+            ..Ids::default()
+        };
+        for look in 0..32u64 {
+            let looks = [
+                face(240.0, 120.0, 160.0, 200.0, 0.0),
+                face(40.0, 100.0, 120.0, 150.0, 0.0),
+            ];
+            let opens = [Some(if look % 3 == 0 { 0.04 } else { 0.0 }), None];
+            let expected = message(&looks, &opens, PICTURE, &mut off, look * 250_000);
+            let mut detail = None;
+            let actual = message_observed(
+                &looks,
+                &opens,
+                PICTURE,
+                &mut on,
+                look * 250_000,
+                Some(&mut detail),
+            );
+            assert_eq!(
+                serde_json::to_vec(&expected).unwrap(),
+                serde_json::to_vec(&actual).unwrap()
+            );
+            let detail = detail.unwrap();
+            assert_eq!(detail.face_box_px, [240.0, 120.0, 160.0, 200.0]);
+            assert_eq!(detail.face_count, 2);
+            let record = serde_json::to_value(&detail).unwrap();
+            let mut keys = record
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            keys.sort_unstable();
+            let mut allowed = [
+                "at_us",
+                "filled",
+                "face_box_px",
+                "face_count",
+                "eyes_px",
+                "window_mean_eyes_px",
+                "window_looks",
+                "window_span_us",
+                "turn_deg",
+                "jitter_rad",
+                "reason",
+                "mesh_current",
+                "mesh_window_looks",
+                "mouth_open",
+                "window_reset",
+                "speaking",
+            ];
+            allowed.sort_unstable();
+            assert_eq!(keys, allowed);
+            let speech = record["speaking"].as_object().unwrap();
+            assert!(
+                speech
+                    .keys()
+                    .all(|key| ["state", "score", "from"].contains(&key.as_str()))
+            );
+            assert!(serde_json::to_vec(&detail).unwrap().len() < 2_048);
+        }
+        let mut detail = None;
+        message_observed(&[], &[], PICTURE, &mut on, 9_000_000, Some(&mut detail));
+        assert!(detail.is_none(), "no face is not a judgement");
+        message_observed(
+            &[face(240.0, 120.0, 160.0, 200.0, 0.0)],
+            &[],
+            PICTURE,
+            &mut Ids::default(),
+            0,
+            Some(&mut detail),
+        );
+        assert!(detail.is_none(), "diagnostics never enable the judge");
+    }
+
+    #[test]
+    fn diagnostic_logging_is_off_by_default_and_cannot_enable_speaking() {
+        let root = std::path::PathBuf::from(format!("/tmp/led-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        let mut output = BusOut::on(&bus).unwrap();
+        assert!(!output.mouth_diagnostics);
+        output.ids.mouths = None;
+        assert!(output.enable_mouth_diagnostics().is_err());
+        assert!(!output.mouth_diagnostics);
+        output.ids.mouths = Some(speaking::Mouths::default());
+        assert!(output.enable_mouth_diagnostics().is_ok());
+        assert!(output.mouth_diagnostics);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Explicit host CPU measurement, not a timing gate or a device claim.
+    #[test]
+    #[ignore = "host diagnostic cost report; run explicitly with --nocapture"]
+    fn mouth_diagnostic_cost_report() {
+        use std::{hint::black_box, time::Instant};
+        let looks = [face(240.0, 120.0, 160.0, 200.0, 0.0)];
+        let n = 10_000u64;
+        for enabled in [false, true] {
+            let mut ids = Ids {
+                mouths: Some(speaking::Mouths::default()),
+                ..Ids::default()
+            };
+            let began = Instant::now();
+            let mut bytes = 0usize;
+            for look in 0..n {
+                let mut detail = None;
+                let seen = message_observed(
+                    &looks,
+                    &[Some(if look % 3 == 0 { 0.04 } else { 0.0 })],
+                    PICTURE,
+                    &mut ids,
+                    look * 250_000,
+                    enabled.then_some(&mut detail),
+                );
+                bytes += black_box(serde_json::to_vec(&seen).unwrap()).len();
+                if let Some(detail) = detail {
+                    bytes += black_box(serde_json::to_vec(&detail).unwrap()).len();
+                }
+            }
+            eprintln!(
+                "mouth diagnostic cost enabled={enabled} looks={n} mean_us={:.3} formatted_bytes={bytes}; host only, no inference or journal writes",
+                began.elapsed().as_secs_f64() * 1e6 / n as f64
+            );
+        }
+    }
+
+    #[test]
     fn speaking_is_said_only_when_asked_for() {
         let looks = [
             face(240.0, 120.0, 160.0, 200.0, 0.0),
@@ -1163,6 +1431,14 @@ mod tests {
         let mut off = Ids::default();
         let text = serde_json::to_string(&message(&looks, &[], PICTURE, &mut off, 0)).unwrap();
         assert!(!text.contains("speaking"), "{text}");
+        // Nobody reads speaking with it off, so nobody is turned to (#1810).
+        assert!(off.talking.is_empty());
+        // A passing id is found where the detector put its face (#2270).
+        let first = off.last[1];
+        let moved = [looks[1], looks[0]];
+        message(&moved, &[], PICTURE, &mut off, 100_000);
+        assert_eq!(off.index_of(first), Some(0));
+        assert_eq!(off.index_of(first + 100), None);
         let mut on = Ids {
             mouths: Some(speaking::Mouths::default()),
             ..Ids::default()
@@ -1177,6 +1453,8 @@ mod tests {
             }
             let text = serde_json::to_string(&seen).unwrap();
             assert_eq!(text.matches("\"speaking\":").count(), 2, "{text}");
+            // `unknown` is not speaking.
+            assert!(on.talking.is_empty());
         }
     }
 

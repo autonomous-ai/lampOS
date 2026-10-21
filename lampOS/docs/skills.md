@@ -165,16 +165,16 @@ must not leave a step silently undone)*.
 | `trigger.rearm` | no | `leaves` or `ends`, which mean the same: once each time it holds, and again only after it stopped. Without it, `present` runs at every message once `for` has passed, as often as `cooldown` lets it. Or a line, on a trigger with a `field` (#1021): `{ below = N, for = D }` (or `above`): once each time it holds, and again only after the trigger's field has been below N, by the messages of its topic, for D since the last chance; a dip that does not stay past the line does not count, however often the trigger stops and holds again (Stuffy air: `{ below = 1000, for = "10m" }` on a trigger above 1,200). A chance held back by a condition, the cooldown or the Policy is spent as one that ran, unless `wait` keeps one held back by a condition; one that comes in the quiet hours is kept (`[quiet]`): the line waits for the chance taken |
 | `trigger.cooldown` | no | Not again within this long of the last run. A run the Policy refused does not count |
 | `trigger.wait` | no | With `rearm` or `when = "appears"`, at most `1h`: a chance held back by a `[[while]]` condition (someone talking) is kept while the trigger still holds, for at most this long, and taken at the trigger's first message after every condition holds again: the lamp acts once the talk ends, within the same sitting, instead of giving up its turn (#1021). It began waiting when the chance came, or for a chance kept through the `[quiet]` hours, when they end; the trigger stopping (past its `gap`) ends it. Without it, a chance held back by a condition is spent. A chance held back by `absent_for` or the cooldown is spent either way |
-| `trigger.rise` | no | `{ by = N, within = D }` (#1684): the trigger holds only while its `field`'s newest reading is at least N (more than 0) above the lowest reading of its topic in the D before it (1 s to 1 h), the newest itself not among them. With `above`, that level must hold too (Smoky air, as designed: `above = 150`, `rise = { by = 100, within = "3m" }`); without it, any number does. Not with `equals`, `below` or `each`. It goes with `for`, `gap`, `rearm`, `cooldown`, `wait` and `[quiet]` as any trigger does. A message with no number in the field (`null`, as the air part sends a value its sensor does not know yet) is passed over as if it never came: it neither breaks the hold nor counts as one, and nothing is compared with it. With no reading in the D before (the topic silent that long, or the program just started or reloaded), nothing rose: a sensor that comes back high after a dropout longer than D is not a rise. A gap shorter than D is not a dropout: what came before it is still compared. A reading of 0 is a reading. The readings are kept for each trigger, at most 3,600 (past that the oldest goes, which can only make a rise smaller), and begin again at every reload *(chosen: an edit may change the field or the while)*. With the Policy asked, its answer finds the rise as the newest reading had it. Tests (`crates/skills/tests/skills.rs`, `a_rise_*`): 80 to 400 at once speaks once, after its `for`; 80 to 300 over 30 minutes (22 in any 3) never; haze at 130 and 170 by turns never; a 15 s puff to 300 never; 40 to 140 never (no level); 5 minutes of silence or of `null`, then 400, never; a second rise before 10 minutes under the rearm line never, one after it does, unless the cooldown holds |
+| `trigger.rise` | no | `{ by = N, within = D }` (#1684): the trigger holds only while its `field`'s newest reading is at least N (more than 0) above the lowest reading of its topic in the D before it (1 s to 1 h), the newest itself not among them. With `above`, that level must hold too (Smoky air, as designed: `above = 150`, `rise = { by = 100, within = "3m" }`); without it, any number does. Not with `equals`, `below` or `each`. It goes with `for`, `gap`, `rearm`, `cooldown`, `wait` and `[quiet]` as any trigger does. A message with no number in the field (`null`, as the air part sends a value its sensor does not know yet) is passed over as if it never came: it neither breaks the hold nor counts as one, and nothing is compared with it. With no reading in the D before (the topic silent that long, or the program just started or reloaded), nothing rose: a sensor that comes back high after a dropout longer than D is not a rise. A gap shorter than D is not a dropout: what came before it is still compared. A reading of 0 is a reading. The readings are kept for each trigger, at most 3,600 (past that the oldest goes, which can only make a rise smaller), and begin again at every reload *(chosen: an edit may change the field or the while)*. With the Policy asked, its answer finds the rise as the newest reading had it. Tests (`crates/skills/tests/it/skills.rs`, `a_rise_*`): 80 to 400 at once speaks once, after its `for`; 80 to 300 over 30 minutes (22 in any 3) never; haze at 130 and 170 by turns never; a 15 s puff to 300 never; 40 to 140 never (no level); 5 minutes of silence or of `null`, then 400, never; a second rise before 10 minutes under the rearm line never, one after it does, unless the cooldown holds |
 | `trigger.name` | no | What a step's `on` calls it: lowercase letters, digits and `_`, a different one for each trigger (#1021) |
 | `trigger.each` with `trigger.key` | no | `each` names a field that is a list, and `key` the field that names one of its items (`each = "settled"`, `key = "task"` on `tasks/status`). The `field` test is then of each item on its own, and `when` must be `appears`: a run for each item that holds where, in the trigger's last message, it did not or was not in the list. So an item new to the list that holds counts (every item of #1048's `settled` is first seen already settled), and so does one that leaves and comes back. What is there at the first message since the program started is not news: it only says what is there *(chosen: a restart must not tell everything again)*. At a reload the items begin again from the topic's value the program keeps, so what was there then is not news and the next message, the next change, is compared with it (the reviewer on #1042); with no value kept yet, the topic's first message only says what is there, as at the start. A missing list is an empty one. Each item's run is asked about on its own, and two in one message are two runs, in the items' order across the skill's triggers: by number when the key is a number (task 9 before task 10), else by text. Not with `near`, `absent_for`, `for`, `gap`, `rearm`, `cooldown` or `wait`, which are timed over the whole topic *(chosen)*. Nor in a skill with `[quiet]` or a dim `until = "ends"`: an item's run has no quiet hours and no end of its own, so quiet would be passed over and a held dim would keep the skill busy *(chosen, the reviewer on #1042)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), its answer starts the item's run only if that item is still in the list and holds |
 | `[[while]]` | no | Conditions that must also hold, all of them, on the newest value of each topic while that value lasts: a `topic` with `field` and one of `equals`, `not_equals` (anything else, #1140), `above` or `below`, or `humans/faces/tracked` with `present = true`; with `for`, it has also held that long, by the messages of its topic since this program started. `unknown = "holds"` (with a field's test, without `for` or `present`) makes it hold while its topic has said nothing yet, as on a lamp without the part that says it (#1677); a value that has run out still does not hold. It begins again after a value that expired, and when a reload changes the condition |
 | `[quiet]` | no | `from` and `to`, two different local times as `"HH:MM"` (`from = "22:00"`, `to = "08:00"`, past midnight when `to` comes first): from `from` up to `to`, the skill never starts itself (#1021). A chance that comes then is kept, as `wait` keeps one through a talk, and taken at the trigger's first message after `to`, while the trigger still holds; the trigger stopping (past its `gap`) spends it (Stuffy air, stuffy from 23:00 to 10:00: one droop at 08:00, the reviewer on #1066). A trigger with `when = "appears"` spends it: someone who came at 22:30 is not greeted at 08:00. The local time is the program's wall clock and its `--zone` or `--utc-offset-minutes`; without either the time of day is not known, and a skill with quiet hours never starts itself *(chosen: "never at night" holds when the night cannot be told)*. Only with a trigger |
-| `most_a_day` | no | How many times a local day the skill may start itself, 1 to 24 (#1685). Counted as the cooldown is: when a run is started, or asked of the Policy whatever it answers *(chosen: a no is not asked again at once)*. The day is the local date, by the same local time as `[quiet]`'s; with the local time not known, a stretch of 24 h of the program's own clock. Past it, the chance is spent. Only with a trigger, and not with `each` (an item's run is news, not a nudge). Tests (`crates/skills/tests/skills.rs`): `most_a_day_*`, `the_nudge_limits_*` |
+| `most_a_day` | no | How many times a local day the skill may start itself, 1 to 24 (#1685). Counted as the cooldown is: when a run is started, or asked of the Policy whatever it answers *(chosen: a no is not asked again at once)*. The day is the local date, by the same local time as `[quiet]`'s; with the local time not known, a stretch of 24 h of the program's own clock. Past it, the chance is spent. Only with a trigger, and not with `each` (an item's run is news, not a nudge). Tests (`crates/skills/tests/it/skills.rs`): `most_a_day_*`, `the_nudge_limits_*` |
 | `[active]` | no | `from` and `to` as `[quiet]`'s, the other way round (#1685): the skill starts itself only from `from` up to `to` (`from = "09:00"`, `to = "18:00"`; past midnight when `to` comes first). A chance outside them is kept as in the quiet hours, and taken at the trigger's first message once they begin, while the trigger still holds; `when = "appears"` spends it. With the local time not known, never. With `[quiet]` as well, both hold. Only with a trigger, not with `each`. Tests: `an_active_window_*` |
 | `[budget]` | no | `group`, a name of lowercase letters, digits and hyphens (at most 64), and `per_hour`, 1 to 6 (#1685): the skills that name the same group start themselves at most that many times in any hour between them, by the smallest `per_hour` any of them names (a member can only make its group quieter). Counted as `most_a_day` is. A member's chance while the hour is spent is kept as `[active]` keeps one, and taken once the hour's oldest run is an hour old. First come, first served: with the hour free, a member that was held back for it earlier than this one, and again within the last 2 minutes (`BUDGET_WAIT_LIVE_US`), goes first, and this one's chance is kept; so the first member in folder order never takes every hour (Rest your eyes, once an hour, would otherwise keep A sip of water waiting all day). A member past that 2 minutes is no longer waiting (its trigger ended, or something else holds it back) and holds nobody back. The waits are in memory, kept by group. A skill in no group is not held back. Stretch break and the four wellbeing skills (A sip of water, Rest your eyes, Stand up, Wind down) name `group = "wellbeing"`, `per_hour = 1` (#1685): on a product lamp, with none of the four installed, Stretch break is the only member and nothing changes for it. The runs are counted in memory from the program's start, among the skills loaded together. Tests: `a_shared_budget_*` |
-| `[rest]` | no | `after_ignored`, 1 to 5, and `within`, 10 s to 5 min (60 s without it) (#1685): after that many of the skill's runs in a row that nobody noticed, it does not start itself until the next local 06:00, or for 12 h with the local time not known; a run noticed begins the count again. Judged by the program from what the bus already says, not by the skill, so it needs no permission for it. From the run's start to `within` after, the run is noticed if a face in `humans/faces/tracked` is turned to the lamp (`facing`), the largest face moves 0.15 of the picture across or down from where it was as the run began, or a quarter of its height nearer or farther (leaning in, sitting back), anything is heard on `voice/heard` (only that something was said: the words are not kept), or the newest faces in that while show nobody (they got up). When the eyes say what the person at the desk is doing (`room/activity`, `LAMP_ACTIVITY=on`, #1678), their word counts too: `room/stood_up` in the while (they stood up and left), or `room/activity` saying something other than it said as the run began (looking up from the page, leaning in), is noticed, when the run began with the sitting's baseline in (before it, a baseline coming in mid-run could say `head_down` of someone who did nothing: the reviewer's P3 on #1938, `a_baseline_coming_in_mid_run_is_no_noticing`), and `away` is gone. Otherwise it was ignored: someone still in view, turned away, still and silent, the eyes saying the same all through. With the Policy asked, the while begins at the `say_now` that makes the run, so a run it said no to showed nothing and is not counted. With it, `lamp-skills` subscribes to `humans/faces/tracked`, `voice/heard`, `room/activity` and `room/stood_up`. Test (`crates/skills/tests/skills.rs`): `a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up`. The count and the rest are kept in memory: a restart begins them again. Only with a trigger, not with `each`. Tests: `a_skill_rests_*`, `a_run_noticed_*`, `with_the_policy_asked_only_a_run_made_*`, `asking_the_policy_a_hello_made_and_not_noticed_rests` |
-| `[stop]` | no | A function by which a person stops what the skill starts itself (#1685): `tool`, its name, as a `tool`'s (a lowercase letter, then at most 47 lowercase letters, digits and `_`; not the skill's own `tool`; one skill's, as a tool's name is, but for one shared by skills of one `[budget]` group: then it is one function for all of them, described with the first one's `about` in folder order, with a yes-or-no, `all`, beside `how`; called without `all`, it stops the one of them that started or was asked last, and with `all` (or before any of them has) every one, the words naming which, as "Done: none of the sip of water nudges until tomorrow morning." The four wellbeing skills share `wellbeing_nudges` so a session counts it once: a product session already declares 31 of its 32), and `about`, when the model calls it, 1 to 512 bytes with no control characters (`about = "When someone asks you to stop the stretch breaks, for today or for good, or to have them again."`). It is one function in the tools file, with one choice, `how`: `snooze`, nothing the skill starts itself until the next local 06:00 (12 h on with the local time not known); `off`, nothing until it is turned `on`; `on`, as before, a snooze or an off lifted. A chance that comes meanwhile is spent. What a person asks of the skill's own `tool` is not stopped. The model is answered with words to pass on, as a tool's say note: "Done: none of these until tomorrow morning. Tell them so in a few words."; another `how`, or none, is refused with "Say how: snooze, off or on." A snooze is in memory only, so a restart forgets it. `off` is kept with `--state-dir DIR` as one line in `DIR/off`, the skill's name and nothing else (no person, no time), written whole beside it, synced, and moved over it, the folder synced after, so a power cut leaves the old file or the new one whole and the move holds (the reviewer's P3), and read at the start, so off stays off across a restart; `on` takes the line away. A line that is not a skill's name is passed over; one of a skill not loaded is kept, for when it is put on again. The product's unit gives `--state-dir /var/lib/lampos-skills-state` (`StateDirectory=lampos-skills-state`, mode 0700, the folder #1732's daily journal shares). Without `--state-dir`, off lasts until the program stops, and the model is told "only until the lamp restarts". Counted against a session's 32 as any skill's function, and reached through `use_skill` with `LAMP_USE_SKILL=on`, its `how` as the call's `choice`; `lamp-skills list` counts it. Only with a trigger, not with `each`, whose items' runs are news *(chosen)*. Tests (`crates/skills/tests/skills.rs`): `a_skills_stop_*`, `off_is_kept_as_one_line_*`, `the_program_keeps_a_skill_off_across_a_restart`, `the_program_forgets_a_snooze_at_a_restart` |
+| `[rest]` | no | `after_ignored`, 1 to 5, and `within`, 10 s to 5 min (60 s without it) (#1685): after that many of the skill's runs in a row that nobody noticed, it does not start itself until the next local 06:00, or for 12 h with the local time not known; a run noticed begins the count again. Judged by the program from what the bus already says, not by the skill, so it needs no permission for it. From the run's start to `within` after, the run is noticed if a face in `humans/faces/tracked` is turned to the lamp (`facing`), the largest face moves 0.15 of the picture across or down from where it was as the run began, or a quarter of its height nearer or farther (leaning in, sitting back), anything is heard on `voice/heard` (only that something was said: the words are not kept), or the newest faces in that while show nobody (they got up). When the eyes say what the person at the desk is doing (`room/activity`, `LAMP_ACTIVITY=on`, #1678), their word counts too: `room/stood_up` in the while (they stood up and left), or `room/activity` saying something other than it said as the run began (looking up from the page, leaning in), is noticed, when the run began with the sitting's baseline in (before it, a baseline coming in mid-run could say `head_down` of someone who did nothing: the reviewer's P3 on #1938, `a_baseline_coming_in_mid_run_is_no_noticing`), and `away` is gone. Otherwise it was ignored: someone still in view, turned away, still and silent, the eyes saying the same all through. With the Policy asked, the while begins at the `say_now` that makes the run, so a run it said no to showed nothing and is not counted. With it, `lamp-skills` subscribes to `humans/faces/tracked`, `voice/heard`, `room/activity` and `room/stood_up`. Test (`crates/skills/tests/it/skills.rs`): `a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up`. The count and the rest are kept in memory: a restart begins them again. Only with a trigger, not with `each`. Tests: `a_skill_rests_*`, `a_run_noticed_*`, `with_the_policy_asked_only_a_run_made_*`, `asking_the_policy_a_hello_made_and_not_noticed_rests` |
+| `[stop]` | no | A function by which a person stops what the skill starts itself (#1685): `tool`, its name, as a `tool`'s (a lowercase letter, then at most 47 lowercase letters, digits and `_`; not the skill's own `tool`; one skill's, as a tool's name is, but for one shared by skills of one `[budget]` group: then it is one function for all of them, described with the first one's `about` in folder order, with a yes-or-no, `all`, beside `how`; called without `all`, it stops the one of them that started or was asked last, and with `all` (or before any of them has) every one, the words naming which, as "Done: none of the sip of water nudges until tomorrow morning." The four wellbeing skills share `wellbeing_nudges` so a session counts it once: a product session already declares 31 of its 32), and `about`, when the model calls it, 1 to 512 bytes with no control characters (`about = "When someone asks you to stop the stretch breaks, for today or for good, or to have them again."`). It is one function in the tools file, with one choice, `how`: `snooze`, nothing the skill starts itself until the next local 06:00 (12 h on with the local time not known); `off`, nothing until it is turned `on`; `on`, as before, a snooze or an off lifted. A chance that comes meanwhile is spent. What a person asks of the skill's own `tool` is not stopped. The model is answered with words to pass on, as a tool's say note: "Done: none of these until tomorrow morning. Tell them so in a few words."; another `how`, or none, is refused with "Say how: snooze, off or on." A snooze is in memory only, so a restart forgets it. `off` is kept with `--state-dir DIR` as one line in `DIR/off`, the skill's name and nothing else (no person, no time), written whole beside it, synced, and moved over it, the folder synced after, so a power cut leaves the old file or the new one whole and the move holds (the reviewer's P3), and read at the start, so off stays off across a restart; `on` takes the line away. A line that is not a skill's name is passed over; one of a skill not loaded is kept, for when it is put on again. The product's unit gives `--state-dir /var/lib/lampos-skills-state` (`StateDirectory=lampos-skills-state`, mode 0700, the folder #1732's daily journal shares). Without `--state-dir`, off lasts until the program stops, and the model is told "only until the lamp restarts". Counted against a session's 32 as any skill's function, and reached through `use_skill` with `LAMP_USE_SKILL=on`, its `how` as the call's `choice`; `lamp-skills list` counts it. Only with a trigger, not with `each`, whose items' runs are news *(chosen)*. Tests (`crates/skills/tests/it/skills.rs`): `a_skills_stop_*`, `off_is_kept_as_one_line_*`, `the_program_keeps_a_skill_off_across_a_restart`, `the_program_forgets_a_snooze_at_a_restart` |
 | `[ask] policy` | yes, with a trigger | The Policy's question asked before anything is done *(chosen: required, since every trigger is something the lamp starts itself)*. A tool's call is not asked about: a person asked for it |
 | `[[do]]` | at least one | The steps, in order. Within one table: body, then light, then say, then sound |
 | `do.body.look_at` | no | Only `"face"`. The largest face in view goes to the body's `gaze.sock` as the eyes send one (`{"face":{"x","y","size","turned":0}}`) |
@@ -300,7 +300,8 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] NAME
     lamp-skills list [--dir DIR]
-    lamp-skills pack [--out DIR] SKILL_DIR
+    lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
+    lamp-skills asked [--dir DIR] [--key-file PATH]
 
 (`install`, `remove`, `list` and `pack`: below, "Core and installable
 skills".)
@@ -328,6 +329,16 @@ skills".)
   each topic's newest value. A look uses only a list of faces whose lifespan
   still lasts; with none, the other steps run without it. Time comes from its own monotonic
   clock, read when a message arrives.
+- It waits on every topic's socket, the Policy's answers and its own wake
+  at once (`poll`), at most 250 ms. So a message, a tool call, a test's
+  skip or a run's end is taken as it comes, and each topic still gives one
+  message a pass. Before #2381 it waited on each topic in its turn, the
+  250 ms shared among them, and a tool call waited out a topic's turn:
+  about 49 ms each with three topics on the Intel Mac, against under 1 ms
+  after (#1806, `tests/it/call_wait.rs`). A socket that says an error or a
+  hang-up with nothing to read is left out for the rest of that pass, so
+  the loop doesn't spin on it, and a call or another topic's message still
+  ends the pass at once.
 - **The ask.** `LAMP_SKILLS_ASK` says how a run that a trigger starts is
   allowed (a tool's run is asked for by a person and never is):
   - `policy`: the Policy's gate (#958, `lamp-policy --gate`). The run's
@@ -465,7 +476,7 @@ skills".)
   takes a skip, so one sent while it waits up to 800 ms for a look call's
   body and light (`MADE_BEFORE_ANSWER`) is taken when that wait ends, in
   real time. So
-  `crates/skills/tests/skills.rs` skips where it would sit through a reload,
+  `crates/skills/tests/it/skills.rs` skips where it would sit through a reload,
   an absence, a slow Policy or a clip, and keeps every assertion: a skip
   stops just before a wait another part must see end in its own steps (the
   stand-in body's), and real time does the rest. Two program tests run on
@@ -900,9 +911,9 @@ and a skill that says neither is installable.
 
 | Skill | Kind | Why |
 |---|---|---|
-| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
+| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance, Prepare-to-unplug | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is not in the product's install (`install::NOT_PRODUCT_SKILLS`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
-| Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. Not in the product's install until its lamp check (`install::NOT_PRODUCT_SKILLS`) |
+| Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. In the product's install since its lamp check: row 8 on lamp-52e6 with the lead, 20 Oct 11:35 (`install::PRODUCT_SKILLS`) |
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Not in the product's install (`install::NOT_PRODUCT_SKILLS`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Not in the product's install yet (`NOT_PRODUCT_SKILLS`): not yet tried on a lamp, and three more functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
@@ -917,7 +928,7 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 2026-10-19".
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
-the product, eight folders with Bedtime and Morning disabled and the other seven enabled), and a core
+the product, nine folders with Bedtime and Morning disabled and the other eight enabled), and a core
 skill's file taken away by hand is written again at the next install. `lamp-skills remove`
 refuses it, and `lamp-skills install` refuses a folder or a package that
 says it is core, or that would take the place of a core skill on the lamp.
@@ -931,7 +942,8 @@ product's skills folder is root's; the part itself only reads it, under
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] NAME
     lamp-skills list [--dir DIR]
-    lamp-skills pack [--out DIR] SKILL_DIR
+    lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
+    lamp-skills asked [--dir DIR] [--key-file PATH]
 
 `--dir` is `/var/lib/lampOS/skills` without it, the product unit's own
 `--dir` (`deploy/product/lamp-skills.service`): installable skills live
@@ -978,32 +990,65 @@ it does not know).
 
 **The manage helper** (#1722, the first builder's 18:33). The one way a
 part that is not root changes the skills folder. `lamp-cloud`'s
-`skills.remove`, for the app's skills page ([cloud.md](cloud.md),
-"Removing a skill"), asks it instead of writing the folder: `lamp-cloud`
-talks to the network, and with `install` coming, write access there would
-let a network message put code on the lamp. So the folder stays root's,
+`skills.remove` and `skills.install`, for the app's skills page
+([cloud.md](cloud.md), "Removing a skill" and "Installing from the Skills
+Store"), ask it instead of writing the folder: `lamp-cloud` talks to the
+network, and write access there would let a network message put code on
+the lamp. So the folder stays root's,
 0755, and `lamp-cloud` stays `ProtectSystem=strict` with no writable path
 for it.
 
 - **What it is.** systemd holds a socket,
   `/run/lampos-skills-manage/manage.sock` (`deploy/product/lamp-skills-manage.socket`:
   root's, 0660, group `lampos`, `Accept=yes`, at most 4 connections), and for
-  each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills`
-  as root (`lamp-skills-manage@.service`), the connection its standard
-  input and output. It reads one line of at most 4 KiB, answers one line,
+  each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills
+  --key-file /etc/lampOS/update/key.pub` as root
+  (`lamp-skills-manage@.service`), the connection its standard input and
+  output. It reads one line of at most 4 KiB, answers one line,
   `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
-  skills folder writable, no network (`PrivateNetwork=yes`, Unix sockets
-  only), no capabilities, `NoNewPrivileges` and 60 s at most.
-- **It checks each request itself,** whoever connected: one request
-  taken is `{"remove": NAME}`, exactly that one key with a string, and it
-  runs `remove` above, which refuses a name that is not a skill's (1 to 64
-  lowercase letters, digits and hyphens: no `/`, `..`, NUL, hidden name or
-  more) and a core skill, under the folder's lock. It waits at most 4 s
-  for that lock (`ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s wait for its
-  answer), then refuses, `the lamp's skills can't be changed now`, with
-  nothing done. A skill renamed aside whose `.removed-NAME-PID` was not then
-  deleted is answered done (the next install deletes it); that folder's
-  path is in the journal only.
+  skills folder writable (`/etc`, the key with it, read-only), no
+  capabilities, `NoNewPrivileges` and 60 s at most.
+- **The Store's switch, in the helper too.** `LAMP_SKILLS_STORE=on`
+  (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is. The
+  helper reads it in its own environment, so a process that reaches the
+  socket past `lamp-cloud` installs nothing while the Store is off: an
+  install is refused with `lamp-cloud`'s own words, `not on this lamp:
+  skills.install` (`package::STORE_OFF`), and nothing is fetched. A remove
+  runs either way. Off, the unit has no network (`PrivateNetwork=yes`, Unix
+  sockets only). A drop-in turns the Store on,
+  `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`:
+  `Environment=LAMP_SKILLS_STORE=on`, `PrivateNetwork=no`, and
+  `RestrictAddressFamilies=` reset to `AF_UNIX AF_INET AF_INET6`, for the
+  fetch the helper makes itself (`lamp-cloud` passes the URL and fetches
+  nothing). systemd can't open the network for one request and not
+  another in one template unit, so with the Store on a remove runs with
+  the network too; the network for installs alone would need a unit and
+  socket of their own, not built.
+- **It checks each request itself,** whoever connected. Three are taken,
+  each exactly one key:
+  - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
+    name that is not a skill's (1 to 64 lowercase letters, digits and
+    hyphens: no `/`, `..`, NUL, hidden name or more) and a core skill,
+    under the folder's lock. A skill renamed aside whose
+    `.removed-NAME-PID` was not then deleted is answered done (the next
+    install deletes it); that folder's path is in the journal only.
+  - `{"install": {"url", "sha256", "name", "version"}}`, strings, all but
+    `url` optional (a Skills Store catalogue entry's fields): a package
+    fetched and installed only signed with the update channel's key, and
+    only with the Store's switch on ("From the Skills Store", below).
+  - `{"install_made": SHA256}`, 64 lowercase hex: a skill made here by
+    voice, put on at its person's yes (below). It needs no Store switch:
+    it fetches nothing.
+
+  Anything else is refused, `a request is one line, {"remove": NAME},
+  {"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
+  VERSION}}, all but url optional, or {"install_made": SHA256}`.
+
+  Each waits at most 4 s for the folder's lock (`ASKED_LOCK_WAIT`, under
+  `lamp-cloud`'s 5 s wait for a remove's answer; an install waits for it
+  only after its fetch, at most 25 s, and its checks, under the 40 s
+  `lamp-cloud` waits for an install), then refuses, `the lamp's skills
+  can't be changed now`, with nothing done.
 - **A skill made here, put on at its person's yes** (#1685; the lead, 20
   Oct 08:37 on #1711: a spoken yes bound to the package's SHA-256, the
   helper installing only those bytes, re-checked and capped). The voice
@@ -1030,11 +1075,6 @@ for it.
   `…never_takes_the_place_of_one_put_on_another_way`,
   `…whose_package_changed_does_not_go_on`,
   `…past_the_cap_or_not_made_here_does_not_go_on`.
-- Anything else is refused, `a request is one line, {"remove": NAME} or
-  {"install_made": SHA256}`. `install` is refused
-  (`install is not taken here yet: …`): it will be taken only for a package
-  from the update channel under its key's signature, once the channel
-  carries skills.
 - **Why this and not the others** (the least new surface):
   - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
     as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
@@ -1055,9 +1095,13 @@ for it.
   make the group, and is not done here.
 - **Not on a lamp yet.** The two units are in `deploy/product/` but not in
   `lamp-update`'s install list (`install::PRODUCT`); they go there after
-  their lamp check. Tested on a Mac only: `tests/package.rs` runs the real
-  program on a Unix socket and refuses a core skill and bad names on its
-  own; `lamp-cloud`'s tests go through the helper's code on a real socket.
+  their lamp check. Tested on a Mac only: `tests/it/package.rs` and
+  `tests/it/store.rs` run the real program on a Unix socket and refuse a core
+  skill, bad names, a URL that is not https, a Store that speaks no TLS,
+  and any install with the Store's switch off (unset, `off`, `ON`, empty;
+  nothing fetched, and a remove still runs) on its own; `tests/it/store.rs` sends the helper's own code every bad
+  package with nobody before it; `lamp-cloud`'s tests go through the
+  helper's code on a real socket.
 - **The voice can't remove a skill:** no function does, and whether one
   should is a separate decision.
 
@@ -1078,14 +1122,16 @@ for it.
   which gives every skill through one function, `use_skill`
   ([tools.md](tools.md), "Many skills").
 
-- **`pack`** makes a package of an installable skill folder, below.
+- **`pack`** makes a package of an installable skill folder, below; with
+  `--key-file`, the update channel's private key (as `lamp-update sign`
+  takes it), signed for the Skills Store.
 
 Nothing else is restarted. The running `lamp-skills` looks at its folder
 every 2 s, loads every skill again when one changed (cooldowns kept), and
 writes the skills' functions for the voice again (`tools.json`): an
 installed skill's tool reaches the model at the voice's next session, and a
 removed skill's dim held `until = "ends"` is given back, as at any reload.
-`crates/skills/tests/skills.rs` packs Desk tutor, installs it beside Dance
+`crates/skills/tests/it/skills.rs` packs Desk tutor, installs it beside Dance
 on a running program, sees `check_my_work` come into `tools.json` within
 one look, removes it, sees it go, and checks the program was never
 restarted and that Dance can't be removed.
@@ -1174,17 +1220,98 @@ digits, `-`, `_` and `.`, none beginning with a dot (no `..`, no
 `._NAME`); at most 512 files and 16 MiB. Then the skill is loaded and moved
 in as from a folder.
 
-**The signature: a place, not checked.** `lamp-skill.sig`, beside the
-manifest, is reserved for the Store's signature over the manifest's exact
-bytes, which name every file's SHA-256. Signing is in the backlog: a
-package may carry the file, nothing checks it, and every install says so
-(`its signature not checked: signing is not built yet`, or `it carries no
-signature, and none is checked yet`). There is no fetch from a network:
-`install` takes a local file.
+**The signature.** `lamp-skill.sig`, beside the manifest, is one line of
+JSON, `{"key": FINGERPRINT, "signature": BASE64}`: Ed25519 over the
+manifest's exact bytes, which name every file's size and SHA-256, so it
+covers every byte of the skill. `key` is the fingerprint of the key that
+signed it as `lamp-update` gives one (the first 16 hex of its SHA-256), so
+a package signed with another key is told apart from a changed one.
+`lamp-skills pack --key-file PRIVATE` writes it. An install by hand
+(`lamp-skills install PACKAGE.tar`, root at the lamp) is not held to it
+and says so (`its signature not checked: a package installed by hand from
+a file`, or `it carries no signature: …`); a package from the Skills Store
+is installed only with it.
 
-Not built yet: the Store itself (a catalogue, review, publishing, a
-download); the signature's check and the key it would be checked with; the
-app's "My skills" page (`list` is text for a person); turning a skill off
+**From the Skills Store** (#1722, the first builder's 21:51, 18:33 and
+22:23). The app sends `skills.install` with a catalogue entry,
+`{"name", "version", "sha256", "url"}` ([cloud.md](cloud.md), "Installing
+from the Skills Store"); `lamp-cloud` passes it to the manage helper,
+which runs `lamp_skills::package::install_from_url`. In order, with
+nothing written before the last step:
+
+1. **The request.** `url` is `https://`, a host, at most 2048 bytes of
+   printable ASCII with no space and no user; `sha256` 64 lowercase hex;
+   `name` a skill's name; `version` `MAJOR.MINOR.PATCH`. `http://`,
+   `file://` and anything else is refused unfetched.
+2. **The key.** The update channel's public key, `/etc/lampOS/update/key.pub`
+   (`package::STORE_KEY`, the unit's `--key-file`), read as `lamp-update`
+   reads it. With none, nothing is fetched. **Pending:** whether the Store
+   signs with the update channel's own key or a key of its own is the
+   first builder's to say (asked at 21:5x on #1722). The update channel's
+   is the default, as "only signed packages from the update channel" says;
+   the path is one constant and one unit line.
+3. **The fetch.** By `lamp-update`'s own HTTPS client (rustls, the web's
+   roots): one GET, at most 5 redirects, each only to https (a redirect to
+   `http://` or `file://` is refused), into memory, at most 18 MiB (a
+   larger `Content-Length` is refused unread, a body without one is cut at
+   the bound), within 25 s (10 s to connect, 10 s for any read to make
+   progress).
+4. **The hash.** With `sha256`, the bytes must have it: checked before the
+   tar is read.
+5. **The signature,** once the tar is read in memory (its entries, with the
+   bounds below) and before the manifest is parsed or a file compared with
+   it: `lamp-skill.sig` must be there, name the channel's key, and be its
+   signature over `lamp-skill.json`'s exact bytes. Unsigned, signed with
+   another key, a signature that is not one, or a manifest changed by a
+   byte: refused.
+6. **The package,** as any install checks it (above): plain files only (a
+   link, hard or symbolic, a device or a fifo refuses it), one folder, no
+   `..`, no absolute path, no hidden name, at most 4 parts a path, 512
+   files and 16 MiB, every file's size and SHA-256 as the manifest says.
+   With `name` and `version`, the manifest must say the same.
+7. **The install,** under the folder's lock, as `install` does (waited
+   for at most 4 s, `ASKED_LOCK_WAIT`, then `the lamp's skills can't be
+   changed now` with nothing written): put
+   together in `.install-NAME-PID`, where the running program does not
+   look, loaded with every check a load makes, refused if it says `kind =
+   "core"`, if a core skill on the lamp has its name, or another skill its
+   function, or if it is **older than the installed one** (below); then
+   renamed into place (an installed one of the same name is replaced
+   whole, the old renamed aside first). The running `lamp-skills` loads it
+   within 2 s.
+
+**Never an older version.** A Store package replaces an installed skill
+only at the same version (a reinstall) or a newer one, so an old package
+the channel once signed can't be replayed onto a lamp. Versions are
+`MAJOR.MINOR.PATCH` (the loader and the manifest take nothing else, and
+every skill in `lampOS/skills/` says `1.0.0`), compared as three numbers,
+part by part: `1.10.0` is newer than `1.9.0`. An older one is refused under
+the folder's lock with the folder as it was: `not installed: desk-tutor
+1.10.0 is on this lamp, and this package is the older 1.2.3: a skill is
+never put back to an older version`. An installed one whose version can't
+be ordered (none, or not `MAJOR.MINOR.PATCH`, a folder changed by hand) is
+refused too, since the package might be older: `… its version can't be
+compared with 2.0.0: remove it first, then install this one`. Refusing is
+the safe side; allowing would let any signed package over it. An install
+by hand from a file (root at the lamp) is not held to this, as it is not
+held to the signature, so root can still put an older one back.
+
+The answer is `install`'s line (`installed desk-tutor 1.0.0 (installable)
+from its package, N files, …; signed with the update channel's key
+FINGERPRINT. It may use: …`), and `lamp-cloud` replies with `skills.list`
+read after it. The helper journals each request and its answer.
+
+**What the Store's catalogue is expected to be** (for the backend, which
+posts its endpoint layout on #1722): a list of entries, each `name`,
+`version`, `sha256` (of the package's bytes) and `url` (https, a plain
+GET, redirects to https allowed); the list signed with the same key as
+the packages, Ed25519 over its exact bytes, as `lamp-update`'s envelope
+signs a build's manifest. `skills.catalog`, which fetches and checks the
+list, is not built: an entry from it goes to `skills.install` as it is.
+
+Not built yet: the Store's server (a catalogue, review, publishing) and
+`skills.catalog`; the app's "My skills" page (`list` is text for a
+person); turning a skill off
 without removing it, core ones among them; a test that #1667's
 `PRODUCT_SKILLS` are exactly the core skills, once both are on `lamp-voice`.
 A skill's functions past a session's 32 are #1668's (`LAMP_USE_SKILL=on`,
@@ -1304,7 +1431,7 @@ Tests:
   - nothing kept without the checker.
 - `agent_tasks::tests::a_skill_to_make_is_handed_over_as_its_brief_and_said_back_as_its_request`.
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
-- `crates/skills/tests/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
+- `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
 ## V1's moves and emotions: what we take
 
@@ -1468,7 +1595,7 @@ in [Bedtime and Morning](bedtime-morning.md).
 | Light out when you leave (#1677, the owner, 19 Oct 07:2x, a core skill) | `room/presence` says nobody for 10 minutes (`nobody_s` above 599), while the voice rests | The light shown goes out over 30 s, as falling asleep, asked of the ring with a fade; given back the moment someone is seen or heard, or the eyes stop looking. Once each time the desk is left; never from 23:00 to 06:00; never speaks of it ([presence.md](presence.md)) | New: the presence topic, the `out` step and the ring's fade were added for it. Not in the product yet (`install::NOT_PRODUCT_SKILLS`, off with the eyes' `LAMP_PRESENCE` until its lamp check). Its cases are written by a script; it has not run on a lamp |
 | Guard mode (#1685, the first builder's design, 19 Oct 12:08; installable) | Its tool, `keep_watch(turn)`, when the person asks out loud ("keep an eye on things while I'm out") | A faint blue mark on the ring while on; once the desk is empty, one text on `messages/out` when a visit ends, at most one in 10 minutes ("Someone was at your desk at 14:31, for about 2 minutes."), known or not and never a name; ends on "stop" or the asker's own face back; with the privacy switch closed, one line and quiet ([guard-mode.md](guard-mode.md)) | New: the watch (`[watch]`), the `messages` and `known_faces` permissions, `--known-file` and `messages/out` were added for it. Not in the product (`NOT_PRODUCT_SKILLS`). Its cases are written by a script; it has not run on a lamp |
 
-| Not feeling well (#1681) | `lamp/health`'s `level` is `error` for 30 s (`gap` 10 s), or, a second `[[trigger]]`, its `quiet_ms` is above 299999 (a part that said `ok` once this boot and has been unheard for 5 minutes, [health.md](health.md); `gap` 10 s), while the voice rests | Droops once (`sleepy`) and its light goes pale and low (`white` at 2, breathing every 10 s down to 1, steady without the ring's `LAMP_LIGHT_REQUESTS=on`) until what ran it ends (10 s after its last `error`, or the quiet part heard again) or `lamp/health` expires (15 s); once each time (`rearm = "ends"`); talking when the 30 s come, it waits for the talk to end (`wait = "1h"`), and does nothing if the error ended first; never from 22:00 to 08:00 (an error held through the night droops once at 08:00); never speaks of it, never red or blinking. `stale` and `warn` do nothing, nor a part restarting for a few seconds or one never heard from. A part that errs and then stops is one droop (its `error` keeps it out of `quiet_ms`). Each trigger holds its own light: an `error` in one part and a different part stopped, at once, droop twice (the runner holds a light for each trigger; one droop for both is not built) | The error trigger needs no code; `quiet_ms` is `lamp-health`'s; a colour held `until = "ends"` was added to `lamp-skills` for its pale breath. Not in the product yet (`install::NOT_PRODUCT_SKILLS`). Its cases are written by a script (`lamp/health` every 5 s); it has not run on a lamp, and its 30 s, 10 s and 5 minutes are not measured against real failures. Whether the pale breath reads as unwell, not as off, is for a person at the lamp |
+| Not feeling well (#1681) | `lamp/health`'s `level` is `error` for 30 s (`gap` 10 s), or, a second `[[trigger]]`, its `quiet_ms` is above 299999 (a part that said `ok` once this boot and has been unheard for 5 minutes, [health.md](health.md); `gap` 10 s), while the voice rests | Droops once (`sleepy`) and its light goes pale and low (`white` at 2, breathing every 10 s down to 1, steady without the ring's `LAMP_LIGHT_REQUESTS=on`) until what ran it ends (10 s after its last `error`, or the quiet part heard again) or `lamp/health` expires (15 s); once each time (`rearm = "ends"`); talking when the 30 s come, it waits for the talk to end (`wait = "1h"`), and does nothing if the error ended first; never from 22:00 to 08:00 (an error held through the night droops once at 08:00); never speaks of it, never red or blinking. `stale` and `warn` do nothing, nor a part restarting for a few seconds or one never heard from. A part that errs and then stops is one droop (its `error` keeps it out of `quiet_ms`). Each trigger holds its own light: an `error` in one part and a different part stopped, at once, droop twice (the runner holds a light for each trigger; one droop for both is not built) | The error trigger needs no code; `quiet_ms` is `lamp-health`'s; a colour held `until = "ends"` was added to `lamp-skills` for its pale breath. In the product since its lamp check, row 8 on lamp-52e6 with the lead (20 Oct 11:35; `install::PRODUCT_SKILLS`). Its cases are written by a script (`lamp/health` every 5 s). On lamp-52e6 it drooped once, slowly, 301 s after the eyes were stopped by hand, its light went pale and low, and it came back 10.8 s after they started; the lead read it as a little unwell, not broken. Its 30 s, 10 s and 5 minutes are not measured against real failures |
 | A sip of water (#1685, installable) | Someone at the desk 90 minutes (Stretch break's sitting: `near = 0.14`, `gap` 2 minutes), 10:00 to 17:00, while the voice rests | Turns to them and its light breathes once, a slow cool blue for 6 s; once a sitting, three a day; never a word (a spoken one is the person's own reminder) | New |
 | Rest your eyes (#1685, installable) | Someone at the desk 45 minutes, 09:00 to 20:00, while the voice rests | A small `curious` tilt and its light a shade softer while it tilts; once an hour, four a day; the lamp sees faces, not screens, so screen time is time at the desk | New |
 | Stand up (#1685, installable) | Stretch break's sitting held 100 minutes, 08:00 to 20:00, while the voice rests | Turns to them with a small `curious` tilt; once a sitting, twice a day; never a word about posture | New |
@@ -1494,6 +1621,22 @@ five by 2026-10-19.
 ## Later
 
 Permissions are built (above, "Core and installable skills"): each skill
-declares what it reads and uses, and the program holds it to that. Signing
-and its check, review and the store: before anything is published. The
-package has the signature's place already (`lamp-skill.sig`), unchecked.
+declares what it reads and uses, and the program holds it to that. A
+package's signature and the Store's install are built ("From the Skills
+Store"); the catalogue, review and the Store's server: before anything is
+published.
+
+## Core skill: prepare to unplug (#1674)
+
+`skills/prepare-unplug` is tool-only (`prepare_to_unplug`) with `kind = "core"`.
+It declares body, speech and its four completion/latch topic reads. These grants
+are checked both while loading and at the dedicated runtime boundaries, using
+the existing captured-grant lifetime for admitted runs (see [unplug.md](unplug.md)).
+Both names are reserved for this operation: the loader, runtime admission and bus request
+boundary reject aliases before folding can be requested. Its only step is
+`body = { prepare_unplug = true }`; triggers, extra steps, choice and flag are
+refused so a readiness statement cannot run as an ordinary early `say`. The
+initial response is explicitly not readiness. A bounded background run waits
+for body, Expression and actual ring receipts; Voice guards the separate
+completion statement. Installed with the product, hidden while `LAMP_UNPLUG` is
+off. See [the lifecycle, timing and physical proof](unplug.md).

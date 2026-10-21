@@ -24,8 +24,8 @@ It is its own process. With it gone nothing else on the lamp changes, and
 a part reports whether or not anybody listens. The skill Not feeling well
 (#1681, [skills.md](skills.md)) reads `lamp/health`'s `level`: `error` for
 30 s, and the lamp droops once and dims a shade until it ends, or until
-`lamp/health` has said nothing for its 15 s. It is not in the product's
-install yet (`install::NOT_PRODUCT_SKILLS`).
+`lamp/health` has said nothing for its 15 s. It comes with the product
+since its lamp check, row 8 on lamp-52e6 (20 Oct; `install::PRODUCT_SKILLS`).
 
 The voice can say which part is unwell, when asked (#1681). Behind
 `LAMP_HEALTH_FACTS=on` in the voice's unit (off unless set;
@@ -144,6 +144,19 @@ time go in, a `Health` comes out):
   front of the seconds: `stopped: elbow is too warm; not heard from for
   9 s`. A body that stopped itself and said why is not made milder by its
   silence, and what it last said is usually why it is silent.
+- **Stopping on purpose** (#2415's P3). A part that stops on purpose says
+  so: an `ok` report with the fact `state` = `stopping`
+  (`Diagnostic::stopping`), sent once. The part is forgotten: it is no
+  longer listed, never goes stale and never counts in `quiet_ms`, so a
+  planned stop leaves no droop. Its next report tracks it again, from
+  nothing: it counts in `quiet_ms` again only once it has said `ok`. A
+  part that goes quiet without saying it (a crash) is stale and counts as
+  before. It is a fact, not a field or a level: a `lamp-health` from
+  before reads it as one more `ok` report. A forgotten part named with
+  `--expect` would be missing again; none of those says `stopping` today.
+  Who says it: the voice, for `voice-keys`, when own keys are turned off
+  (the second worker's start with `LAMP_OWN_KEYS` off) and when it drops
+  the second worker (#960) with the switch on ([own-keys.md](own-keys.md)).
 - **Missing.** A name given with `--expect` that has never reported is in
   `missing`, in the order given. A part that reported once is never missing
   again, however long ago: it is stale.
@@ -171,7 +184,8 @@ time go in, a `Health` comes out):
   `lamp/health` is what it was before the field. A part never heard from
   (missing at boot) or never `ok` does not count; nor does one whose last
   word was `error`, which keeps that level while quiet and is said by the
-  lamp's `error` already. A part restarting for a few seconds is in it
+  lamp's `error` already, nor one that said it is stopping (above). A
+  part restarting for a few seconds is in it
   only for those seconds. It is for a part that came up well and then
   stopped: Not feeling well droops at 5 minutes of it
   ([skills.md](skills.md)). It is an age, so it is no news on its own
