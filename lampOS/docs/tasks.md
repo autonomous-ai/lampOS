@@ -1620,6 +1620,23 @@ never have asked or taken an answer on a lamp).
   `a_sign_ins_news_is_told_at_the_first_pause_without_the_switch`,
   `with_the_switch_on_a_sign_ins_news_goes_ahead_of_a_tasks` (as on
   product lamps) and `a_sign_ins_news_is_put_first`.
+- **A question not heard whole is asked again** (the 21 Oct lamp-75c9
+  rerun's (3), #2602): a sign-in's question is kept as told once it's
+  heard whole, not when it's taken to be told. The news follows it (`sign_in::AskAgain`) and
+  offers it again 30 s after it was taken (`ASK_AGAIN_AFTER`) if its turn
+  wasn't heard whole and the tasks part still says `asking`. It's then told
+  at the next pause like any sign-in news. That's at most three tellings
+  in all (`ASKED_MOST`), and none once it was heard whole. On lamp-75c9,
+  talk in the room cut the question short a second after it began
+  (`user_interrupted`), it was never told again, and the person's yes was
+  refused as `not_told`. After a voice restart, a question still asked and
+  never heard whole is offered again, and one heard isn't (the
+  reviewer-lead's P3s on #2702). A question told the last time is let go
+  once its wait has passed. The journal says `the
+  sign-in's question (sign-in-<id>-asking) was not heard whole: offered
+  again`. Tests: `a_sign_ins_question_cut_short_is_offered_again_until_heard_whole`
+  (the news thread against a stand-in tasks part) and
+  `a_question_not_heard_whole_is_due_again_a_few_times_at_most`.
 - **The question heard:** once the question's turn was heard whole
   (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
   sign-in's id and that turn's number, the same number the worker's tools
