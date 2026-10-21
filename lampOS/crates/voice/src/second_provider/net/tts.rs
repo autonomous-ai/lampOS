@@ -748,8 +748,14 @@ impl Tts {
         }
         let from = Instant::now();
         let opened = open_socket(socket, CONNECT).await;
-        if matches!(opened, Err(Error::Status(429))) {
-            self.pause(request, &Error::Status(429));
+        // A 429 at the upgrade pauses the sockets; a 400, 404 or 422 there
+        // refuses the model, as its 4400, 4404 or 4422 close does, so the
+        // open ahead isn't tried again on every answer (the Reviewer's P3
+        // on #2658).
+        match &opened {
+            Err(error @ Error::Status(429)) => self.pause(request, error),
+            Err(error @ Error::Status(400 | 404 | 422)) => self.refuse(request, error),
+            _ => {}
         }
         let Ok(mut ahead) = self.ahead.lock() else {
             return;
@@ -1821,6 +1827,25 @@ mod tests {
         ahead.open_ahead_on(7, &local_socket(&address)).await;
         assert!(!ahead.opens_ahead(), "paused after the 429 ahead");
         assert!(ahead.refused.lock().unwrap().is_none());
+    }
+
+    /// The Reviewer's P3 on #2658: a 400 at `stream-input`'s upgrade, opened
+    /// ahead, refuses the socket's model as its 4400 close does, so no open
+    /// ahead is tried again on the next answers; nothing is paused.
+    #[tokio::test]
+    async fn a_400_at_the_upgrade_ahead_refuses_the_model() {
+        const REFUSED_HEAD: &str = "HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n";
+        let (address, accepted) = upgrade_answering(Some(REFUSED_HEAD)).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        assert!(tts.opens_ahead());
+        tts.open_ahead_on(9, &local_socket(&address)).await;
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            tts.refused.lock().unwrap().as_deref(),
+            Some(tts.socket_model())
+        );
+        assert!(!tts.opens_ahead(), "refused: not tried again");
+        assert!(tts.paused_until.lock().unwrap().is_none(), "not paused");
     }
 
     /// `LAMP_SECOND_SPEECH_SOCKET` (#2135's row): the socket opened ahead
