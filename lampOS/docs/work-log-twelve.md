@@ -500,3 +500,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   #2449 on c0a4 with the person: never held; journal line + replay test
   pushed as c07632f17, retest when ARM64 is in.
 - 21 Oct evening: #2616 (gap hold, 12 s from the answer end, told only) merged after c0a4 Mac passes with a screen face; #2563 (forget_person) merged; #2588 (journal by scope) and #2619 (by name only) open; c0a4 gaze measured 750,543 into lamp.env; #1693 first piece claimed.
+- 21 Oct night: #2648 (LAMP_MEMORY_EVENTS) merged; #2652 (quiet-held switch reaches the worker) merged; #2672 (held line kept out, grants nothing) read clean; #2658 (dialogue socket) P2 closed; c0a4 Mac runs: #2527 A/B 2300 ms held, first audio not later; #2672 held line journalled nowhere; #2648 event_days 2026-10-24 stored.
