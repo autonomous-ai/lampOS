@@ -2038,11 +2038,20 @@ after a take-over, but now for every turn:
   is there: the eyes' newest fresh look has a face turned to the lamp (read
   whatever the rule's form), the line was said close to the lamp or to it
   from close, or its words call it, or the hearing began at the line's
-  start: no later than `attention::NAME_AT_THE_START_US` (0.7 s) into the
-  line's sound, which opens with the voice's pre-roll (about 0.25 s), or
-  up to `NAME_BEFORE_US` before it. "Lamp" in "Hey Lamp, …" begins about
-  0.5 s in; a passing mention comes a few words in ("I left the lamp on…",
-  about 1.15 s; #829 scene 2's three). The first builder at 03:54 on #1722:
+  start: no later than `attention::NAME_AT_THE_START_US` (1.3 s) into the
+  line's sound, which opens with the voice's pre-roll (0.3 s,
+  `activity::PRE_ROLL_BLOCKS`, each block dated when it was read), or up
+  to `NAME_BEFORE_US` before it. A hearing is dated from when it began,
+  the time `lamp-name` said it less its `ago_ms`, never from when it was
+  said (up to 0.8 s later, `said.rs`'s `LONGEST`); but `lamp-name`'s
+  began is when its score reached the bar, as the name ends and a little
+  after. The first builder at 09:12 on #1722 (b0802): "Hey Lamp, good
+  morning!", played at 08:06:33.988, was heard from about 08:06:35.05,
+  about 1.06 s on, and was dropped at 0.7 s. A passing mention's hearing
+  begins a few words in ("Yes, the lamp looked at me…", about 1.55 s;
+  #829 scene 2's three). The journal's drop line says where the hearing
+  began ("began N ms into the line"), which is what the bound is set
+  from. The first builder at 03:54 on #1722:
   lamp-4ace's played tests b0333 and b0413 each lost their first four day
   lines, "Hey Lamp, good morning!" heard at 1.000 (`began_ms_ago=480`) with
   its words written "Mainland. Good morning.". The 18:20 shape's words were

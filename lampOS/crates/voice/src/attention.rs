@@ -788,15 +788,29 @@ const NAMED: &str = "its name was heard in the room's sound";
 /// With `LAMP_NAME_SECOND_SIGN=on`, a hearing of the name that began no
 /// later than this into the line's sound (from [`NAME_BEFORE_US`] before
 /// it) is the name at the line's start, a call ("Hey Lamp, …", "Lamp, …"),
-/// and is its own second sign ([`Attention::weigh_the_name`]). The line's
-/// sound opens with the voice's pre-roll, about 0.25 s before the speech:
-/// "Lamp" in "Hey Lamp, …" begins about 0.5 s in. A passing mention comes
-/// a few words into the line ("I left the lamp on…", "Yes, the lamp
-/// looked at me…"), from about 0.9 s in. On lamp-4ace on 2026-10-21 at
-/// 03:38 "Hey Lamp, good morning!", heard at 1.000, its words written
-/// "Mainland. Good morning.", was dropped without it (the first builder at
-/// 03:54 on #1722).
-pub const NAME_AT_THE_START_US: u64 = 700_000;
+/// and is its own second sign ([`Attention::weigh_the_name`]). Both times
+/// are the voice's: the line's sound opens with its first block, the
+/// detector's pre-roll (`activity::PRE_ROLL_BLOCKS`, 0.3 s, dated when each
+/// block was read), and a hearing is dated from when it began, the time
+/// `lamp-name` said it less its `ago_ms`, never from when it was said
+/// (`lamp-name` says one once its score falls, up to 0.8 s on). But
+/// `lamp-name`'s "began" is when its score reached the bar, which is as the
+/// name ends and a little after, not as the name is first said. On
+/// lamp-4ace on 2026-10-21 at 08:06 (b0802) "Hey Lamp, good morning!",
+/// played at 08:06:33.988, was heard from about 08:06:35.05, about 1.06 s
+/// on, and was dropped with 0.7 s here (the first builder at 09:12 on
+/// #1722). Taking the line's sound as opening when it was played (the
+/// pre-roll against the speaker's and the detector's delays, not
+/// measured), "Lamp" ends about 0.8 s in at 0.3 s a word, so the hearing
+/// began about a quarter of a second after the name's end. A passing mention
+/// comes a few words in ("Yes, the lamp looked at me…", "I left the lamp
+/// on…"), its hearing from about 1.55 s in. On 03:38 the same greeting,
+/// its words written "Mainland. Good morning.", was dropped without the
+/// sign at all (the first builder at 03:54 on #1722).
+// ponytail: one played greeting measured, between it and the earliest
+// passing mention; set it again from the journal's "began … ms into the
+// line" once more played tests are read.
+pub const NAME_AT_THE_START_US: u64 = 1_300_000;
 
 /// A tap on the lamp's head (#711, `docs/creature.md` "Touch") counts as a
 /// call for a request that begins no longer than this after it: the tap
@@ -4620,12 +4634,12 @@ mod tests {
             }
             assert!(!dropped(began - NAME_BEFORE_US, true, going_on));
         }
-        // A line begun at 10.0 s, the name heard 1.0 s in (mid-line), cut
+        // A line begun at 10.0 s, the name heard 1.6 s in (mid-line), cut
         // and continued at 11.8 s: the hearing is still mid-line, dropped.
         let mut attention = Attention::default();
         attention.ask_a_second_sign_of_the_name(true);
         attention.began_at(1, 1, began);
-        attention.name_heard_scored(began + 1_000_000, 0.95);
+        attention.name_heard_scored(began + 1_600_000, 0.95);
         attention.continued_at(2, 1, began + 1_800_000);
         assert!(attention.weigh_the_name(None));
     }
