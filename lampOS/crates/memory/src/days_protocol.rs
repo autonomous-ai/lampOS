@@ -323,6 +323,14 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             submit,
         } => {
             let person = one(person)?;
+            // Ids it no longer has (a forget since) are passed over and
+            // counted, never the end refused for them (#2176 row 13).
+            let (source_ids, unknown) = store.known_sources(&person, &source_ids)?;
+            if unknown > 0 {
+                eprintln!(
+                    "lamp-memory: conversation_end named {unknown} source(s) it no longer has; ended with the rest"
+                );
+            }
             if submit {
                 store.validate_conversation_submission(
                     &person,
@@ -582,6 +590,56 @@ mod tests {
                 json!({"ok":true,"id":id}).to_string()
             );
         }
+    }
+
+    /// #2176 row 13 (the first builder, 18:20): a conversation's end that
+    /// names an exchange this store no longer has (a forget since) goes on
+    /// with the rest, prepared or submitted, rather than being refused; one
+    /// with nothing left it has is refused as before.
+    #[test]
+    fn a_conversation_end_passes_over_sources_it_no_longer_has() {
+        let (_scratch, mut store) = Scratch::new("end-unknown");
+        for heard in ["one", "two"] {
+            let line = json!({"op":"append","at_unix_ms":NOW,"heard":heard}).to_string();
+            assert!(answer(&mut store, line.as_bytes(), NOW).wrote);
+        }
+        let ended = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let prepared = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"talk","source_ids":[1,999,2]}),
+        );
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        assert_eq!(prepared["input"]["source_ids"], json!([1, 2]));
+        let submitted = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"later","source_ids":[999,2],"submit":true}),
+        );
+        assert_eq!(submitted["ok"], true, "{submitted}");
+        let nothing = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"gone","source_ids":[998,999]}),
+        );
+        assert_eq!(nothing["ok"], false, "{nothing}");
+        // Another person's exchange is refused as before, never passed over
+        // as if it were forgotten (the reviewer-lead's P3 on #2226). Each
+        // person's records are numbered apart: their third is an id the
+        // room's scope never had.
+        let mut theirs = Value::Null;
+        for heard in ["a", "b", "c"] {
+            let line =
+                json!({"op":"append","person":"p-0123456789abcdef","at_unix_ms":NOW,"heard":heard});
+            theirs =
+                serde_json::from_str(&answer(&mut store, line.to_string().as_bytes(), NOW).line)
+                    .unwrap();
+        }
+        assert_eq!(theirs["id"], 3, "{theirs}");
+        let foreign = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"foreign","source_ids":[1, 3]}),
+        );
+        assert_eq!(foreign["ok"], false, "{foreign}");
     }
 
     #[test]
