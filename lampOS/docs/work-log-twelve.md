@@ -487,3 +487,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   function and is told no note). #2226: the reviewer-lead's P1 (my fold had
   undone #2443's thread pin) rebuilt on lamp-voice as `04bc8d040`, P3s in.
   #2063 folded. Status table to the first builder; free: twelve.
+- #2063 merged into #1712; its worktree removed.
