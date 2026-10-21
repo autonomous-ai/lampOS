@@ -1821,7 +1821,10 @@ impl Engine {
                 // The down line rendered by a person's first line too, not
                 // only after a turn: a lamp started while the relay is down
                 // has it for that line (lamp-52e6, #1195's run of 21 Oct).
-                // Once only; a turn's chat begins after the line ends.
+                // Once only; a turn's chat begins after the line ends, but a line
+                // said over the lamp's voice begins here too, and a short line
+                // can end before a slow relay's render does: once a start, the
+                // render can overlap a turn.
                 if let Some(down) = &self.shared.down {
                     down.render(&self.shared.services);
                 }

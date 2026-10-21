@@ -357,8 +357,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   (`DOWN_LINE_EVERY`; the journal: `said it can't think right now`). The
   line is said once by this route's own voice as the first spoken line
   begins (before its chat, #1195's run on lamp-52e6, 21 Oct: the first turn
-  after a start was silent otherwise), or after a turn is out, never beside a
-  turn's own chat and speech, while the relay answers, and
+  after a start was silent otherwise), or after a turn is out, while the
+  relay answers. The first can overlap one turn once a start: a line said
+  over the lamp's voice also begins one, and a short line can end before a
+  slow relay's render does. It is
   kept in memory (at most 4 s), so it can still be said when the chat no
   longer answers. A render that fails is journaled (`the down line could
   not be said`) and tried again after the next turn. A minute counts from
