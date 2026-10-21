@@ -1003,6 +1003,18 @@ for it.
   another in one template unit, so with the Store on a remove runs with
   the network too; the network for installs alone would need a unit and
   socket of their own, not built.
+- **Only two parts may ask** (the reviewer's P3 on #2429): before reading
+  the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
+  `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
+  install) and `lamp-voice` (a made skill's spoken yes, #1685), each at
+  the system's place for it, are answered. Any other part in the group
+  `lampos` gets `only the app's link and the voice may change the lamp's
+  skills`, as the keys helper does (#2167; `package::from_an_asker`,
+  `only_lamp_cloud_and_the_voice_may_ask_the_manage_helper`). The tests that
+  drive `lamp-skills asked` over a socket pair of their own set
+  `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
+  sets, and the helper says so in the journal each time it lets a peer
+  through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).
 - **It checks each request itself,** whoever connected. Two are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
@@ -1043,9 +1055,14 @@ for it.
   `lampos` may ask for a remove, never of a core skill. A group of
   `lamp-cloud`'s own would narrow that; it needs `lamp-update install` to
   make the group, and is not done here.
-- **Not on a lamp yet.** The two units are in `deploy/product/` but not in
-  `lamp-update`'s install list (`install::PRODUCT`); they go there after
-  their lamp check. Tested on a Mac only: `tests/it/package.rs` and
+- **On a lamp by `lamp-update install`** (#1685, for a made skill's spoken
+  yes): the two units are in its install list (`install::PRODUCT`), the
+  socket enabled and the template never, since systemd starts one for each
+  connection (`the_skills_manage_socket_is_enabled_and_its_template_is_not`).
+  A round never adds a unit (updates.md), so a lamp installed before #2429
+  (lamp-0c89 too) has the helper only after `sudo lamp-update install …`
+  once; until then a remove and a made skill's yes are refused there.
+  Not yet tried on a lamp. Tested on a Mac: `tests/it/package.rs` and
   `tests/it/store.rs` run the real program on a Unix socket and refuse a core
   skill, bad names, a URL that is not https, a Store that speaks no TLS,
   and any install with the Store's switch off (unset, `off`, `ON`, empty;

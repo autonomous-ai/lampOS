@@ -639,6 +639,7 @@ fn the_real_helper_refuses_on_its_own() {
         let (mut ours, theirs) = UnixStream::pair().unwrap();
         let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
         command.env_remove(package::STORE_SWITCH);
+        command.env(package::ANY_ASKER, "on");
         if let Some(store) = store {
             command.env(package::STORE_SWITCH, store);
         }
