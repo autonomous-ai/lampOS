@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for steps.sh with no lamp: stand-ins for lamp-body-measure, lamp-body,
-# lamp-body-mood, lamp-controls, lamp-selftest and systemctl, and a folder standing for /.
+# lamp-body-mood, lamp-controls, lamp-selftest, systemctl and setpriv, and a folder standing for /.
 # Run: lampOS/deploy/factory/steps-test.sh
 set -uo pipefail
 
@@ -38,10 +38,12 @@ echo "$text"
 while [[ $# -gt 0 ]]; do [[ $1 == --write ]] && printf '%s\n%s\n' "$comment" "$text" >"$2"; shift; done
 EOF
 # The body: the lines lamp-body says, at its full stand at 100% (unless
-# FAKE_NO_STAND), then held until SIGTERM eases it back.
+# FAKE_NO_STAND), then held until SIGTERM eases it back, taking
+# FAKE_FOLD_SECONDS to fold.
 cat >"$T/bin/body" <<'EOF'
 #!/usr/bin/env bash
 echo "body $*" >>"$FAKE_LOG"
+echo "body-pid $$" >>"$FAKE_LOG"
 let_go=no
 [[ " $* " == *" --let-go-at-stop on "* ]] && let_go=yes
 share=0
@@ -52,8 +54,17 @@ if [[ $share == 100 && -z ${FAKE_NO_STAND:-} ]]; then
 else
   echo "lamp-body: step 781 Resting goals [1772, 2054, 2033] positions [1772, 2054, 2033] loads [0, 0, 0] stand 0.30 arm goals [2180, 2167] positions [2138, 2120] loads [180, 200] warmth [39, 38]"
 fi
-trap 'echo "body eased back" >>"$FAKE_LOG"; [[ $let_go == yes ]] && touch "$FAKE_LOG.let-go"; exit 0' TERM
+trap 'echo "body eased back" >>"$FAKE_LOG"; sleep "${FAKE_FOLD_SECONDS:-0}"; echo "body folded" >>"$FAKE_LOG"; [[ $let_go == yes ]] && touch "$FAKE_LOG.let-go"; exit 0' TERM
 while :; do sleep 0.1; done
+EOF
+# setpriv (util-linux, not on macOS): its pid and flags, then it execs the
+# command after --, as setpriv does.
+cat >"$T/bin/setpriv" <<'EOF'
+#!/usr/bin/env bash
+echo "setpriv $$ $*" >>"$FAKE_LOG"
+while [[ $# -gt 0 && $1 != -- ]]; do shift; done
+shift
+exec "$@"
 EOF
 cat >"$T/bin/mood" <<'EOF'
 #!/usr/bin/env bash
@@ -276,6 +287,39 @@ kill -INT -- -"$script"
 wait "$script"; status=$?
 took=$(($(date +%s) - started))
 check "Ctrl-C mid-stand eases the arm back at once and stops the steps" '[[ $status == 130 && $took -le 3 ]] && grep -q "^body eased back" "$T/log" && grep -q "the arm was eased back" "$T/out" && [[ $(grep -c "^body --device" "$T/log") == 1 ]] && [[ ! -e $T/root/$ENV ]] && [[ ! -e $T/root/etc/lampOS/update/key.pub ]]'
+
+# A stop mid-stand, with the body run as its user as on the lamp (#2541's
+# P2): setpriv execs the body, so the SIGTERM reaches the body itself, and the
+# body is given its fold (3 s here) to end by itself, not killed at 2 s as
+# runuser kills its child.
+lamp; set -m
+ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=30 \
+  CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl \
+  SETPRIV=$T/bin/setpriv AS_BODY_USER=1 FAKE_FOLD_SECONDS=3 \
+  FAKE_LOG=$T/log ASK_ANSWER=y bash "$STEPS" --unit-id lamp-test --body-user "$(id -un)" --write --update-key "$KEYFILE" </dev/null >"$T/out" 2>&1 &
+script=$!
+set +m
+for _ in $(seq 100); do grep -q "^mood" "$T/log" && break; sleep 0.1; done
+started=$(date +%s)
+kill -INT -- -"$script"
+wait "$script"; status=$?
+took=$(($(date +%s) - started))
+check "the stand's body runs under setpriv as its user, the body itself the process started" 'grep -q "^setpriv [0-9]* --reuid=$(id -un) --regid=$(id -g) --init-groups -- $T/bin/body --device" "$T/log" && [[ $(grep "^setpriv .* $T/bin/body " "$T/log" | cut -d" " -f2) == $(grep "^body-pid" "$T/log" | cut -d" " -f2) ]]'
+check "a stop waits for the body to fold and end by itself, not killed at 2 s" '[[ $status == 130 && $took -ge 3 && $took -le 6 ]] && grep -q "^body folded" "$T/log" && ! grep -q "WARNING" "$T/out" && grep -q "the arm was eased back" "$T/out"'
+# A body that does not end within STOP_WAIT is killed, and said so loudly.
+lamp; set -m
+ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=30 \
+  CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl \
+  STOP_WAIT=1 FAKE_FOLD_SECONDS=5 \
+  FAKE_LOG=$T/log ASK_ANSWER=y bash "$STEPS" --unit-id lamp-test --write --update-key "$KEYFILE" </dev/null >"$T/out" 2>&1 &
+script=$!
+set +m
+for _ in $(seq 100); do grep -q "^mood" "$T/log" && break; sleep 0.1; done
+started=$(date +%s)
+kill -INT -- -"$script"
+wait "$script"; status=$?
+took=$(($(date +%s) - started))
+check "a body still running past STOP_WAIT is killed, and the person told" '[[ $status == 130 && $took -le 3 ]] && grep -q "did not fold and end within 1 s of SIGTERM: it is killed now" "$T/out" && grep -q "the arm was not eased back" "$T/out" && ! grep -q "the arm was eased back" "$T/out" && ! grep -q "^body folded" "$T/log"'
 
 # Ctrl-C while the body is left alone: lamp-expression is started again.
 lamp; set -m

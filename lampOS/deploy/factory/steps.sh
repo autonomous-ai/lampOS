@@ -24,17 +24,19 @@
 #            [--body-user lampos] [--pins /etc/lampOS/controls/controls-pins.json]
 #
 # Ctrl-C (or SIGTERM) during a stand eases the arm back, as a stand's own end
-# does, and stops the steps.
+# does, waits for the body to fold and end, and stops the steps.
 #
 # The binaries are the installed ones; the body needs --let-go-at-stop (#1776).
 # For a test, MEASURE_BIN, BODY_BIN, MOOD_BIN, CONTROLS_BIN, SELFTEST_BIN,
-# SYSTEMCTL, JQ and ETC_ROOT (a folder standing for /) replace them;
+# SYSTEMCTL, JQ, SETPRIV and ETC_ROOT (a folder standing for /) replace them;
 # STAND_WAIT is the seconds a stand is given (34), HEAD_STAND_WAIT the
-# seconds the running body is given to stand before the self-test (9), and
-# QUIET_WAIT the seconds waited after lamp-expression stops (61).
+# seconds the running body is given to stand before the self-test (9),
+# QUIET_WAIT the seconds waited after lamp-expression stops (61), STOP_WAIT
+# the seconds a stopped body is given to fold and end (12), and
+# AS_BODY_USER=1 runs the body as --body-user under ETC_ROOT too.
 set -uo pipefail
 
-usage() { sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; }
 
 ROOT=${ETC_ROOT:-}
 MEASURE_BIN=${MEASURE_BIN:-/opt/lampOS/body/current/lamp-body-measure}
@@ -43,6 +45,10 @@ MOOD_BIN=${MOOD_BIN:-/opt/lampOS/body/current/lamp-body-mood}
 STAND_WAIT=${STAND_WAIT:-34}
 HEAD_STAND_WAIT=${HEAD_STAND_WAIT:-9}
 QUIET_WAIT=${QUIET_WAIT:-61}
+# A body told SIGTERM eases the arm back and folds, up to about 6 s; twice
+# that is waited before it is called stuck.
+STOP_WAIT=${STOP_WAIT:-12}
+SETPRIV=${SETPRIV:-setpriv}
 CONTROLS_BIN=${CONTROLS_BIN:-/opt/lampOS/controls/current/lamp-controls}
 SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -68,6 +74,11 @@ done
 [[ -n $UNIT_ID ]] || { echo "factory: --unit-id is required" >&2; exit 2; }
 [[ $FROM =~ ^[1-4]$ ]] || { echo "factory: --from takes 1 to 4" >&2; exit 2; }
 [[ $TO =~ ^[1-4]$ && $TO -ge $FROM ]] || { echo "factory: --to takes $FROM to 4" >&2; exit 2; }
+# On the lamp, as root, the body and its tools run as the body's user; under
+# a test's ETC_ROOT, or not as root, as is.
+if [[ -z ${AS_BODY_USER:-} ]]; then
+  AS_BODY_USER=$([[ -z $ROOT && $(id -u) == 0 ]] && echo 1 || echo 0)
+fi
 
 LAMP_ENV=$ROOT/etc/lampOS/body/lamp.env
 KEY_PUB=$ROOT/etc/lampOS/update/key.pub
@@ -89,22 +100,44 @@ ask() {
   [[ $answer == y || $answer == Y ]] || { fail "not ready for: $1"; return 1; }
 }
 
-# Run as the body's user on the lamp; as is under a test's ETC_ROOT.
+# Run as the body's user on the lamp; as is under a test's ETC_ROOT. setpriv
+# execs the command, so it is the process started, and a signal sent to it
+# reaches it; runuser forwards SIGTERM, then kills its child 2 s later, which
+# would cut a fold short (#2541). --init-groups keeps the user's groups
+# (dialout, for the servo port).
 as_body() {
-  if [[ -n $ROOT || $(id -u) != 0 ]]; then "$@"; else runuser -u "$BODY_USER" -- "$@"; fi
+  if [[ $AS_BODY_USER == 1 ]]; then
+    "$SETPRIV" --reuid="$BODY_USER" --regid="$(id -g "$BODY_USER")" --init-groups -- "$@"
+  else
+    "$@"
+  fi
 }
 
 # The body run by hand for a stand, while it runs. A non-interactive shell's
 # background job ignores SIGINT, so Ctrl-C reaches only this script: it
 # sends the body SIGTERM, which eases the arm back (the reviewer on #1744).
+# The body is then left to fold and end by itself, STOP_WAIT at most, in
+# pauses the traps can cut short; killed while folding it would leave the arm
+# held part-way down (#2541), so it is killed only past that, and said so.
 STAND_PID=''
+EASED='was eased back'
 ease_back() {
   [[ -n $STAND_PID ]] || return 0
-  kill -TERM "$STAND_PID" 2>/dev/null
-  wait "$STAND_PID" 2>/dev/null
+  local pid=$STAND_PID tenths=0
+  kill -TERM "$pid" 2>/dev/null
+  while kill -0 "$pid" 2>/dev/null && ((tenths < STOP_WAIT * 10)); do
+    pause 0.1
+    tenths=$((tenths + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "factory: WARNING: the body did not fold and end within $STOP_WAIT s of SIGTERM: it is killed now, and the arm may be held where it is; keep a hand on it and take the power off" >&2
+    kill -KILL "$pid" 2>/dev/null
+    EASED='was not eased back (see the warning above)'
+  fi
+  wait "$pid" 2>/dev/null
   STAND_PID=''
 }
-trap 'ease_back; echo "factory: stopped; the arm was eased back and no step after it was run" >&2; exit 130' INT TERM
+trap 'ease_back; echo "factory: stopped; the arm $EASED and no step after it was run" >&2; exit 130' INT TERM
 # lamp-controls is stopped while the touch step reads its lines; it is
 # started again however the step or the script ends.
 CONTROLS_STOPPED=0
@@ -142,7 +175,7 @@ STAND_LOG=''
 body_once() {
   local share=$1 poses=$2 dir log pid body
   dir=$(mktemp -d "${ROOT:-}/tmp/factory-stand.XXXXXX") || return 1
-  [[ -z $ROOT && $(id -u) == 0 ]] && chown "$BODY_USER" "$dir"
+  [[ $AS_BODY_USER == 1 ]] && chown "$BODY_USER" "$dir"
   log=$dir/body.log
   STAND_LOG=$log
   body=("$BODY_BIN" --device "$DEVICE" --unit-id "$UNIT_ID" --lock-directory "$LOCKS"
@@ -158,10 +191,12 @@ body_once() {
   else
     body+=(--wake off)
   fi
-  [[ -z $ROOT && $(id -u) == 0 ]] && body=(runuser -u "$BODY_USER" -- "${body[@]}")
+  [[ $AS_BODY_USER == 1 ]] &&
+    body=("$SETPRIV" --reuid="$BODY_USER" --regid="$(id -g "$BODY_USER")" --init-groups -- "${body[@]}")
   # Started as itself, never through a function: "as_body ... &" would make
   # $! a subshell, and SIGTERM to it would leave the body running, arm up.
-  # runuser passes SIGTERM on to the body.
+  # setpriv execs the body, so $! is the body itself, and SIGTERM reaches it
+  # with nothing to kill it before it has folded (as_body says why not runuser).
   "${body[@]}" >"$log" 2>&1 &
   pid=$!
   STAND_PID=$pid
