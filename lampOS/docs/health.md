@@ -33,11 +33,14 @@ The voice can say which part is unwell, when asked (#1681). Behind
 `lamp/health`'s kept value every 5 s, outside any turn, and tells the
 model one short line beside what a person is saying to the lamp:
 "(For you to know, not to answer: not working right in you now: camera,
-arm and head. Say so only if someone asks how you are or what's wrong;
-never bring it up yourself.)" The parts are named by `show::known_as`
+arm and head. Say so only if someone asks how you are or what's wrong,
+and then name each of them; never bring it up yourself.)" "and then name
+each of them" is there only with more than one part: told two, "how are
+you?" named only the first. The parts are named by `show::known_as`
 (below), and those the self-test found failed by its own names
-(`parts::part_known_as`, "the SD card" said as "SD card"); at most four,
-then "and N more". A part counts when it has been `error` for 30 s, or
+(`parts::part_known_as`, "the SD card" said as "SD card", a possessive
+name keeping its "the": `voice_route` is "the voice's connection"); at
+most four, then "and N more". A part counts when it has been `error` for 30 s, or
 `stale` for 5 minutes while `quiet_ms` is 5 minutes or more. It is told
 once a session for each set of parts; when the set empties after it was
 told, the session is told "all your parts are working again". Nothing is
