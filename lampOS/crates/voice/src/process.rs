@@ -1292,6 +1292,7 @@ fn second_route_worker_environment(
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
+        crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
@@ -1749,6 +1750,8 @@ mod tests {
                     "https://relay.example.invalid/deepseek"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
+                } else if name == crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT {
+                    "eleven_flash_v2_5"
                 } else if name == crate::second_config::KEY_TERMS_ENV {
                     "Hanoi"
                 } else if name == crate::local_time::PLACE_ENVIRONMENT {
@@ -1889,6 +1892,7 @@ mod tests {
                     "LAMP_SECOND_SPEAKING_FACE=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_SPEECH_SOCKET=on",
+                    "LAMP_SECOND_SPEECH_SOCKET_MODEL=eleven_flash_v2_5",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",

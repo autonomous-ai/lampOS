@@ -188,6 +188,13 @@ pub(crate) struct SocketRequest {
     pub value: String,
 }
 
+/// How long a speech socket waits for text before ElevenLabs closes it, in
+/// seconds: it is opened as the chat is asked, before the answer exists,
+/// and an answer whose first piece took past the default 20 s was closed
+/// with 1008 `input_timeout_exceeded` (the backend on #2135, 21 Oct 17:4x).
+/// ElevenLabs takes up to 180.
+pub const SOCKET_INACTIVITY_S: u32 = 60;
+
 pub(crate) fn socket_request(
     base_url: &str,
     key: &str,
@@ -219,7 +226,7 @@ pub(crate) fn socket_request(
     };
     Ok(SocketRequest {
         url: format!(
-            "wss://{root}/text-to-speech/{id}/stream-input?model_id={model}&output_format=pcm_24000"
+            "wss://{root}/text-to-speech/{id}/stream-input?model_id={model}&output_format=pcm_24000&inactivity_timeout={SOCKET_INACTIVITY_S}"
         ),
         header,
         value,
@@ -270,6 +277,23 @@ pub(crate) fn socket_answer(text: &str) -> Option<SocketAnswer> {
     };
     let last = message.get("isFinal").and_then(Value::as_bool) == Some(true);
     (last || !audio.is_empty()).then_some(SocketAnswer { audio, last })
+}
+
+/// What the service said in a speech socket's message that isn't one of its
+/// answers, for the journal: ElevenLabs' `error` and `message`, as when it
+/// closes an idle socket (`input_timeout_exceeded`), cut to 160 characters.
+/// `None` for a message with neither. Never the answer's words: the service
+/// sends none in an error.
+pub(crate) fn socket_error(text: &str) -> Option<String> {
+    let message: Value = serde_json::from_str(text).ok()?;
+    let error = message.get("error").and_then(Value::as_str);
+    let said = message.get("message").and_then(Value::as_str);
+    let told = match (error, said) {
+        (Some(error), Some(said)) => format!("{error}: {said}"),
+        (Some(one), None) | (None, Some(one)) => one.to_owned(),
+        (None, None) => return None,
+    };
+    Some(told.chars().take(160).collect())
 }
 
 /// The provider's API root: OpenAI's `/v1`, or ElevenLabs' (on the
@@ -417,6 +441,19 @@ pub struct Tts {
     /// The speech socket opened ahead for a request
     /// (`LAMP_SECOND_SPEECH_SOCKET=on`, [`Tts::open_ahead`]).
     ahead: Mutex<Option<Ahead>>,
+    /// The speech socket's own model (`LAMP_SECOND_SPEECH_SOCKET_MODEL`);
+    /// absent, [`ELEVENLABS_MODEL`]: `stream-input` refuses
+    /// `eleven_v4_turbo`, which HTTP serves (53 of 53 refused on lamp-4ace
+    /// on 21 Oct, the backend on #2135).
+    socket_model: Option<String>,
+    /// The request whose socket opened: every piece of its answer is said
+    /// in the socket's model, those over HTTP too, so one answer keeps one
+    /// voice.
+    socketed: Mutex<Option<u64>>,
+    /// A socket model the service refused (a 44xx close): no socket is
+    /// opened ahead for it again until the voice starts again, since a
+    /// refused model is refused on every try.
+    refused: Mutex<Option<String>>,
 }
 
 /// A speech socket, ElevenLabs' `stream-input`.
@@ -442,6 +479,9 @@ impl Tts {
     pub fn new(config: &SecondConfig) -> Result<Self> {
         Ok(Self {
             model: config.tts_model.clone(),
+            socket_model: std::env::var(crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT)
+                .ok()
+                .filter(|model| !model.trim().is_empty()),
             ..Self::with(
                 config.tts_provider,
                 &config.tts_base_url,
@@ -469,7 +509,56 @@ impl Tts {
             warming: AtomicBool::new(false),
             tally: Arc::default(),
             ahead: Mutex::new(None),
+            socket_model: None,
+            socketed: Mutex::new(None),
+            refused: Mutex::new(None),
         })
+    }
+
+    /// Whether a socket is opened ahead: ElevenLabs only, and not for a
+    /// model the service refused.
+    fn opens_ahead(&self) -> bool {
+        self.provider == TtsProvider::ElevenLabs
+            && !self
+                .refused
+                .lock()
+                .is_ok_and(|refused| refused.as_deref() == Some(self.socket_model()))
+    }
+
+    /// The speech socket's model: the one set, or [`ELEVENLABS_MODEL`].
+    fn socket_model(&self) -> &str {
+        self.socket_model.as_deref().unwrap_or(ELEVENLABS_MODEL)
+    }
+
+    /// The model a piece of `turn`'s answer is said in over HTTP: the
+    /// socket's when its socket opened, so the answer keeps one voice;
+    /// otherwise the route's.
+    fn model_for(&self, turn: Option<Turn>) -> Option<&str> {
+        let socketed = turn.is_some_and(|turn| {
+            self.socketed
+                .lock()
+                .is_ok_and(|socketed| *socketed == Some(turn.request))
+        });
+        if socketed {
+            Some(self.socket_model())
+        } else {
+            self.model.as_deref()
+        }
+    }
+
+    /// The service refused the socket's model (`error`, a 44xx close): no
+    /// socket is opened ahead for it again, said once.
+    fn refuse(&self, request: u64, error: &Error) {
+        let model = self.socket_model().to_owned();
+        let Ok(mut refused) = self.refused.lock() else {
+            return;
+        };
+        if refused.as_deref() != Some(model.as_str()) {
+            eprintln!(
+                "lamp-voice second: request {request}: the speech socket refused {model} ({error}): no socket is opened ahead for it again until the voice starts again"
+            );
+            *refused = Some(model);
+        }
     }
 
     /// With `LAMP_SECOND_SPEECH_SOCKET=on`, a speech socket opened now for
@@ -478,14 +567,14 @@ impl Tts {
     /// opened before, for an older request, is closed. Nothing on failure:
     /// the pieces go over HTTP as before.
     pub async fn open_ahead(&self, request: u64) {
-        if self.provider != TtsProvider::ElevenLabs {
+        if !self.opens_ahead() {
             return;
         }
         let Ok(socket) = socket_request(
             &self.base_url,
             &self.key,
             self.voice.as_deref(),
-            self.model.as_deref(),
+            Some(self.socket_model()),
         ) else {
             return;
         };
@@ -512,6 +601,9 @@ impl Tts {
                     from.elapsed().as_millis()
                 );
                 *ahead = Some(Ahead::Open(request, Box::new(socket), Instant::now()));
+                if let Ok(mut socketed) = self.socketed.lock() {
+                    *socketed = Some(request);
+                }
             }
             Err(error) => {
                 eprintln!(
@@ -551,10 +643,17 @@ impl Tts {
         };
         let sent = Instant::now();
         for message in [piece, socket_end()] {
-            socket
+            if socket
                 .send(Frame::Text(message.to_string().into()))
                 .await
-                .map_err(|_| Error::Transport("speech socket"))?;
+                .is_err()
+            {
+                // Closed before the piece went: its close, if it came, says
+                // why (a refused model closes within a second of the open).
+                return Err(closed_why(&mut socket)
+                    .await
+                    .unwrap_or(Error::Transport("speech socket")));
+            }
         }
         // Not `used`: that says the kept HTTP connection went lately, for
         // `warm` (the reviewer's P3 on #2209).
@@ -683,10 +782,15 @@ impl Tts {
             match self.speak_on(socket, opened, text, turn).await {
                 Ok(Some(stream)) => return Ok(stream),
                 Ok(None) => return Ok(TtsStream::default()),
-                Err(error) => eprintln!(
-                    "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
-                    turn.request
-                ),
+                Err(error) => {
+                    eprintln!(
+                        "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
+                        turn.request
+                    );
+                    if matches!(error, Error::Status(400..=499)) {
+                        self.refuse(turn.request, &error);
+                    }
+                }
             }
         }
         let Some(request) = request(
@@ -694,7 +798,7 @@ impl Tts {
             &self.base_url,
             &self.key,
             self.voice.as_deref(),
-            self.model.as_deref(),
+            self.model_for(turn),
             text,
         )?
         else {
@@ -940,11 +1044,23 @@ async fn socket_audio(socket: &mut Socket) -> Result<Option<Vec<u8>>> {
             .await
             .map_err(|_| Error::Timeout("speech socket"))?;
         match message {
-            None | Some(Ok(Frame::Close(_))) => return Ok(None),
+            None => return Ok(None),
+            Some(Ok(Frame::Close(frame))) => return closed(frame.as_ref()),
             Some(Err(_)) => return Err(Error::Transport("speech socket")),
             Some(Ok(Frame::Text(text))) => {
-                let answer =
-                    socket_answer(text.as_str()).ok_or(Error::Protocol("speech socket answer"))?;
+                let Some(answer) = socket_answer(text.as_str()) else {
+                    // The service's own words before it closes, said; its
+                    // close then says how it ended.
+                    match socket_error(text.as_str()) {
+                        Some(said) => {
+                            eprintln!(
+                                "lamp-voice second: the speech socket's service said: {said}"
+                            );
+                            continue;
+                        }
+                        None => return Err(Error::Protocol("speech socket answer")),
+                    }
+                };
                 if !answer.audio.is_empty() {
                     if answer.last {
                         let _ = socket.close(None).await;
@@ -957,6 +1073,38 @@ async fn socket_audio(socket: &mut Socket) -> Result<Option<Vec<u8>>> {
                 }
             }
             Some(Ok(_)) => {}
+        }
+    }
+}
+
+/// A speech socket's close, said with its code and reason: one in 4400 to
+/// 4499 is the service's refusal passed on by the relay as 4000 plus its
+/// HTTP status (the backend on #2135: "4400 `unsupported_model`"), told as
+/// that status; any other is the socket's end.
+fn closed(
+    frame: Option<&tokio_tungstenite::tungstenite::protocol::CloseFrame>,
+) -> Result<Option<Vec<u8>>> {
+    let Some(frame) = frame else {
+        return Ok(None);
+    };
+    let code = u16::from(frame.code);
+    let reason: String = frame.reason.chars().take(160).collect();
+    eprintln!("lamp-voice second: the speech socket was closed: {code} \"{reason}\"");
+    match code {
+        4400..=4499 => Err(Error::Status(code - 4000)),
+        _ => Ok(None),
+    }
+}
+
+/// Why `socket` closed, when its close came: read for at most a moment
+/// after a send failed.
+async fn closed_why(socket: &mut Socket) -> Option<Error> {
+    let until = tokio::time::Instant::now() + Duration::from_millis(200);
+    loop {
+        match tokio::time::timeout_at(until, socket.next()).await {
+            Ok(Some(Ok(Frame::Close(frame)))) => return closed(frame.as_ref()).err(),
+            Ok(Some(Ok(_))) => {}
+            _ => return None,
         }
     }
 }
@@ -1181,6 +1329,16 @@ mod tests {
                     let _ = ws.close(None).await;
                     return read;
                 }
+                // "close:CODE:REASON": closed as the relay passes a refusal.
+                if let Some(rest) = answer.strip_prefix("close:") {
+                    let (code, reason) = rest.split_once(':').unwrap();
+                    let frame = tokio_tungstenite::tungstenite::protocol::CloseFrame {
+                        code: code.parse::<u16>().unwrap().into(),
+                        reason: reason.to_owned().into(),
+                    };
+                    let _ = ws.close(Some(frame)).await;
+                    return read;
+                }
                 if answer == "hang" {
                     std::future::pending::<()>().await;
                 }
@@ -1273,6 +1431,83 @@ mod tests {
             from.elapsed()
         );
         assert_eq!(asked.lock().unwrap().len(), 1);
+    }
+
+    /// #2135 (lamp-4ace, 21 Oct 17:00–17:19): the relay accepts the socket,
+    /// then passes ElevenLabs' refusal of the model as close 4400. The piece
+    /// goes over HTTP, the close's code and reason are read, and no socket
+    /// is opened ahead for that model again (53 of 53 were refused there).
+    #[tokio::test]
+    async fn a_refused_model_closes_the_socket_and_no_socket_is_opened_for_it_again() {
+        let (address, server) =
+            socket_serving(vec!["close:4400:ElevenLabs 400: unsupported_model"]).await;
+        let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        assert!(tts.opens_ahead());
+        tts.open_ahead_on(8, &local_socket(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 8).await, [10, 12]);
+        assert_eq!(served(server).await.len(), 3);
+        assert_eq!(asked.lock().unwrap().len(), 1, "the piece over HTTP");
+        assert_eq!(
+            tts.refused.lock().unwrap().as_deref(),
+            Some("eleven_flash_v2_5")
+        );
+        assert!(!tts.opens_ahead(), "refused: never asked again");
+        // Another model, set for the socket, may be asked.
+        let other = Tts {
+            socket_model: Some("eleven_turbo_v2_5".to_owned()),
+            ..Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap()
+        };
+        *other.refused.lock().unwrap() = Some("eleven_flash_v2_5".to_owned());
+        assert!(other.opens_ahead());
+    }
+
+    /// ElevenLabs says why before it closes an idle socket (a JSON error,
+    /// then close 1008): read and said, the piece goes over HTTP, and the
+    /// model isn't refused, since an idle close is no refusal.
+    #[tokio::test]
+    async fn a_service_error_before_the_close_is_read_and_the_piece_goes_over_http() {
+        let (address, server) = socket_serving(vec![
+            r#"{"message":"Have not received a new text input within the timeout of 20 seconds","error":"input_timeout_exceeded","code":1008}"#,
+            "close:1008:input timeout",
+        ])
+        .await;
+        let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        tts.open_ahead_on(13, &local_socket(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 13).await, [10, 12]);
+        assert_eq!(served(server).await.len(), 3);
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert!(tts.refused.lock().unwrap().is_none());
+        assert_eq!(
+            socket_error(r#"{"message":"Have not received a new text input","error":"input_timeout_exceeded"}"#)
+                .as_deref(),
+            Some("input_timeout_exceeded: Have not received a new text input")
+        );
+        assert_eq!(socket_error(r#"{"audio":null,"isFinal":true}"#), None);
+    }
+
+    /// One answer keeps one voice: every piece of an answer whose socket
+    /// opened is said in the socket's model, those over HTTP too; another
+    /// request's in the route's model.
+    #[tokio::test]
+    async fn every_piece_of_a_socketed_answer_is_said_in_the_sockets_model() {
+        let (address, _server) = socket_serving(vec!["hang"]).await;
+        let tts = Tts {
+            model: Some("eleven_v4_turbo".to_owned()),
+            ..Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap()
+        };
+        assert_eq!(tts.model_for(Some(turn(7))), Some("eleven_v4_turbo"));
+        tts.open_ahead_on(7, &local_socket(&address)).await;
+        assert_eq!(tts.model_for(Some(turn(7))), Some("eleven_flash_v2_5"));
+        assert_eq!(tts.model_for(Some(turn(8))), Some("eleven_v4_turbo"));
+        assert_eq!(tts.model_for(None), Some("eleven_v4_turbo"));
+        let set = Tts {
+            socket_model: Some("eleven_turbo_v2_5".to_owned()),
+            ..Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap()
+        };
+        *set.socketed.lock().unwrap() = Some(9);
+        assert_eq!(set.model_for(Some(turn(9))), Some("eleven_turbo_v2_5"));
     }
 
     /// A piece that finds its socket still opening goes over HTTP and
@@ -1581,7 +1816,7 @@ mod tests {
         assert_eq!(
             proxied.url,
             format!(
-                "{}/v1/ws/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream-input?model_id=eleven_v4_turbo&output_format=pcm_24000",
+                "{}/v1/ws/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream-input?model_id=eleven_v4_turbo&output_format=pcm_24000&inactivity_timeout=60",
                 PROXY.replacen("https://", "wss://", 1)
             )
         );
@@ -1593,7 +1828,7 @@ mod tests {
             socket_request("https://api.elevenlabs.io/v1/", "k", Some("Ngan"), None).unwrap();
         assert_eq!(
             direct.url,
-            "wss://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000"
+            "wss://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000&inactivity_timeout=60"
         );
         assert_eq!((direct.header, direct.value.as_str()), ("xi-api-key", "k"));
         for (voice, model) in [(Some("a/b"), None), (None, Some("m&x")), (None, Some(""))] {
