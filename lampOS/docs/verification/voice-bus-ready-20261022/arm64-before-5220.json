@@ -1,0 +1,31 @@
+{
+  "run": 39639887119,
+  "head": "b87b3e91ad04b5811fe441efa118773d33416630",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T17:11:05.0600200Z      Summary [ 162.767s] 9752 tests run: 9752 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.358,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.443,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.508,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.321,
+      "binary": "lamp-voice",
+      "test": "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics"
+    }
+  ]
+}

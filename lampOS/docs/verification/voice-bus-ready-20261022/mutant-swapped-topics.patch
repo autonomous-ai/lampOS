@@ -1,0 +1,13 @@
+--- a/lampOS/crates/voice/src/bus_out.rs
++++ b/lampOS/crates/voice/src/bus_out.rs
+@@ -993,8 +993,8 @@
+             onboarding: None,
+             last_onboarding: None,
+             state: bus.publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), SOURCE)?,
+-            heard: bus.publisher_declared(heard, &Speech::declaration(), SOURCE)?,
+-            said: bus.publisher_declared(said, &Speech::declaration(), SOURCE)?,
++            heard: bus.publisher_declared(said, &Speech::declaration(), SOURCE)?,
++            said: bus.publisher_declared(heard, &Speech::declaration(), SOURCE)?,
+             health: bus.publisher_declared(
+                 lamp_msgs::Diagnostic::TOPIC,
+                 &lamp_msgs::Diagnostic::declaration(),

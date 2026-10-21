@@ -1,0 +1,197 @@
+{
+  "base": "789f1f609c49537175365e17a10b2e6eefda9eed",
+  "rows": [
+    {
+      "test": "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "run": 1,
+      "label": "before-state-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.345506,
+      "stdout": "before-state-1.stdout",
+      "stderr": "before-state-1.stderr"
+    },
+    {
+      "test": "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "run": 1,
+      "label": "before-speech-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.351973,
+      "stdout": "before-speech-1.stdout",
+      "stderr": "before-speech-1.stderr"
+    },
+    {
+      "test": "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "run": 1,
+      "label": "before-calls-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.389865,
+      "stdout": "before-calls-1.stdout",
+      "stderr": "before-calls-1.stderr"
+    },
+    {
+      "test": "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "run": 1,
+      "label": "before-room-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.474394,
+      "stdout": "before-room-1.stdout",
+      "stderr": "before-room-1.stderr"
+    },
+    {
+      "test": "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "run": 2,
+      "label": "before-state-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.540706,
+      "stdout": "before-state-2.stdout",
+      "stderr": "before-state-2.stderr"
+    },
+    {
+      "test": "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "run": 2,
+      "label": "before-speech-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.348942,
+      "stdout": "before-speech-2.stdout",
+      "stderr": "before-speech-2.stderr"
+    },
+    {
+      "test": "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "run": 2,
+      "label": "before-calls-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.391474,
+      "stdout": "before-calls-2.stdout",
+      "stderr": "before-calls-2.stderr"
+    },
+    {
+      "test": "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "run": 2,
+      "label": "before-room-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.475865,
+      "stdout": "before-room-2.stdout",
+      "stderr": "before-room-2.stderr"
+    },
+    {
+      "test": "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "run": 3,
+      "label": "before-state-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.534082,
+      "stdout": "before-state-3.stdout",
+      "stderr": "before-state-3.stderr"
+    },
+    {
+      "test": "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "run": 3,
+      "label": "before-speech-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.351118,
+      "stdout": "before-speech-3.stdout",
+      "stderr": "before-speech-3.stderr"
+    },
+    {
+      "test": "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "run": 3,
+      "label": "before-calls-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.392915,
+      "stdout": "before-calls-3.stdout",
+      "stderr": "before-calls-3.stderr"
+    },
+    {
+      "test": "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "run": 3,
+      "label": "before-room-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+        "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.472784,
+      "stdout": "before-room-3.stdout",
+      "stderr": "before-room-3.stderr"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "base": "789f1f609c49537175365e17a10b2e6eefda9eed",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "measurement": "One exact test per compiled libtest process, serial. Wall time includes process launch, execution, cleanup and output capture; compilation excluded. Three runs before and after at the same base.",
+  "targets": "Repeated exact-process targets: state <0.4 s, speech <0.15 s, function-call filtering <0.2 s, room <0.3 s; combined <1.05 s. Retain first use and repeats. Subscribe completes before first synchronous publication/discovery; remove only 250 ms startup padding. Preserve all original 30/100 ms event drains, WAIT=500 ms, semantic timestamps, exact assertions and the separate actual silence/lease scenario."
+}

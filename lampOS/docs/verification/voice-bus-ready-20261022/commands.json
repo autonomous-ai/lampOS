@@ -1,0 +1,701 @@
+[
+  {
+    "label": "before-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 83.381748,
+    "stdout": "before-compile.stdout",
+    "stderr": "before-compile.stderr"
+  },
+  {
+    "label": "before-state-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.345506,
+    "stdout": "before-state-1.stdout",
+    "stderr": "before-state-1.stderr"
+  },
+  {
+    "label": "before-speech-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.351973,
+    "stdout": "before-speech-1.stdout",
+    "stderr": "before-speech-1.stderr"
+  },
+  {
+    "label": "before-calls-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.389865,
+    "stdout": "before-calls-1.stdout",
+    "stderr": "before-calls-1.stderr"
+  },
+  {
+    "label": "before-room-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.474394,
+    "stdout": "before-room-1.stdout",
+    "stderr": "before-room-1.stderr"
+  },
+  {
+    "label": "before-state-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.540706,
+    "stdout": "before-state-2.stdout",
+    "stderr": "before-state-2.stderr"
+  },
+  {
+    "label": "before-speech-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.348942,
+    "stdout": "before-speech-2.stdout",
+    "stderr": "before-speech-2.stderr"
+  },
+  {
+    "label": "before-calls-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.391474,
+    "stdout": "before-calls-2.stdout",
+    "stderr": "before-calls-2.stderr"
+  },
+  {
+    "label": "before-room-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.475865,
+    "stdout": "before-room-2.stdout",
+    "stderr": "before-room-2.stderr"
+  },
+  {
+    "label": "before-state-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.534082,
+    "stdout": "before-state-3.stdout",
+    "stderr": "before-state-3.stderr"
+  },
+  {
+    "label": "before-speech-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.351118,
+    "stdout": "before-speech-3.stdout",
+    "stderr": "before-speech-3.stderr"
+  },
+  {
+    "label": "before-calls-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.392915,
+    "stdout": "before-calls-3.stdout",
+    "stderr": "before-calls-3.stderr"
+  },
+  {
+    "label": "before-room-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.472784,
+    "stdout": "before-room-3.stdout",
+    "stderr": "before-room-3.stderr"
+  },
+  {
+    "label": "after-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 66.745153,
+    "stdout": "after-compile.stdout",
+    "stderr": "after-compile.stderr"
+  },
+  {
+    "label": "after-state-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.084152,
+    "stdout": "after-state-1.stdout",
+    "stderr": "after-state-1.stderr"
+  },
+  {
+    "label": "after-speech-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.092675,
+    "stdout": "after-speech-1.stdout",
+    "stderr": "after-speech-1.stderr"
+  },
+  {
+    "label": "after-calls-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.130277,
+    "stdout": "after-calls-1.stdout",
+    "stderr": "after-calls-1.stderr"
+  },
+  {
+    "label": "after-room-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.216478,
+    "stdout": "after-room-1.stdout",
+    "stderr": "after-room-1.stderr"
+  },
+  {
+    "label": "after-state-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.281001,
+    "stdout": "after-state-2.stdout",
+    "stderr": "after-state-2.stderr"
+  },
+  {
+    "label": "after-speech-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.091593,
+    "stdout": "after-speech-2.stdout",
+    "stderr": "after-speech-2.stderr"
+  },
+  {
+    "label": "after-calls-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.128086,
+    "stdout": "after-calls-2.stdout",
+    "stderr": "after-calls-2.stderr"
+  },
+  {
+    "label": "after-room-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.213743,
+    "stdout": "after-room-2.stdout",
+    "stderr": "after-room-2.stderr"
+  },
+  {
+    "label": "after-state-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.284156,
+    "stdout": "after-state-3.stdout",
+    "stderr": "after-state-3.stderr"
+  },
+  {
+    "label": "after-speech-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.090344,
+    "stdout": "after-speech-3.stdout",
+    "stderr": "after-speech-3.stderr"
+  },
+  {
+    "label": "after-calls-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.129858,
+    "stdout": "after-calls-3.stdout",
+    "stderr": "after-calls-3.stderr"
+  },
+  {
+    "label": "after-room-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.213586,
+    "stdout": "after-room-3.stdout",
+    "stderr": "after-room-3.stderr"
+  },
+  {
+    "label": "mutant-late-repeat-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 66.307379,
+    "stdout": "mutant-late-repeat-compile.stdout",
+    "stderr": "mutant-late-repeat-compile.stderr"
+  },
+  {
+    "label": "mutant-late-repeat-state",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 2.170086,
+    "stdout": "mutant-late-repeat-state.stdout",
+    "stderr": "mutant-late-repeat-state.stderr"
+  },
+  {
+    "label": "mutant-late-repeat-room",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 0.214543,
+    "stdout": "mutant-late-repeat-room.stdout",
+    "stderr": "mutant-late-repeat-room.stderr"
+  },
+  {
+    "label": "mutant-swapped-topics-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 66.789891,
+    "stdout": "mutant-swapped-topics-compile.stdout",
+    "stderr": "mutant-swapped-topics-compile.stderr"
+  },
+  {
+    "label": "mutant-swapped-topics-speech",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 1.860488,
+    "stdout": "mutant-swapped-topics-speech.stdout",
+    "stderr": "mutant-swapped-topics-speech.stderr"
+  },
+  {
+    "label": "mutant-unfiltered-calls-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 67.90627,
+    "stdout": "mutant-unfiltered-calls-compile.stdout",
+    "stderr": "mutant-unfiltered-calls-compile.stderr"
+  },
+  {
+    "label": "mutant-unfiltered-calls-calls",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4",
+      "bus_out::tests::a_function_call_written_as_words_is_never_published_as_said",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 1.929924,
+    "stdout": "mutant-unfiltered-calls-calls.stdout",
+    "stderr": "mutant-unfiltered-calls-calls.stderr"
+  },
+  {
+    "label": "gate-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 10.475463,
+    "stdout": "gate-fmt.stdout",
+    "stderr": "gate-fmt.stderr"
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-voice-eval",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 80.284167,
+    "stdout": "gate-clippy.stdout",
+    "stderr": "gate-clippy.stderr"
+  },
+  {
+    "label": "gate-voice-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--",
+      "--test-threads=1"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 559.36454,
+    "stdout": "gate-voice-tests.stdout",
+    "stderr": "gate-voice-tests.stderr"
+  },
+  {
+    "label": "gate-dependent-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice-eval"
+    ],
+    "expected_exit": 0,
+    "exit_code": 101,
+    "wall_s": 362.917341,
+    "stdout": "gate-dependent-tests.stdout",
+    "stderr": "gate-dependent-tests.stderr"
+  },
+  {
+    "label": "comparison-base-skills-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 51.33271,
+    "stdout": "comparison-base-skills-compile.stdout",
+    "stderr": "comparison-base-skills-compile.stderr"
+  },
+  {
+    "label": "comparison-base-skills-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-80478c4d88f6de85",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.277068,
+    "stdout": "comparison-base-skills-1.stdout",
+    "stderr": "comparison-base-skills-1.stderr"
+  },
+  {
+    "label": "comparison-base-skills-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-80478c4d88f6de85",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.421345,
+    "stdout": "comparison-base-skills-2.stdout",
+    "stderr": "comparison-base-skills-2.stderr"
+  },
+  {
+    "label": "comparison-base-skills-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-80478c4d88f6de85",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.427886,
+    "stdout": "comparison-base-skills-3.stdout",
+    "stderr": "comparison-base-skills-3.stderr"
+  },
+  {
+    "label": "gate-dependent-tests-retry",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice-eval"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 753.13476,
+    "stdout": "gate-dependent-tests-retry.stdout",
+    "stderr": "gate-dependent-tests-retry.stderr"
+  },
+  {
+    "label": "gate-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 58.909237,
+    "stdout": "gate-build.stdout",
+    "stderr": "gate-build.stderr"
+  },
+  {
+    "label": "gate-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.072284,
+    "stdout": "gate-diff.stdout",
+    "stderr": "gate-diff.stderr"
+  }
+]

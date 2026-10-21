@@ -409,6 +409,14 @@ said the voice says once a second that it is alive on them. Before it did,
 their subscribers were told "no publisher is alive" before and after
 every sentence.
 
+The four Voice bus fixtures for state cadence, heard/said routing, function
+call filtering and room cadence subscribe before their first publication.
+Subscription has bound and named the socket when it returns; first delivery
+scans synchronously, so these fixtures need no startup delay for the 200 ms
+rescan interval. Their original timestamps, exact event assertions, 30/100 ms
+drains and 500 ms receive bound remain. The separate silence/lease scenario
+still uses its real waits.
+
 The eyes publish `humans/faces/tracked` the same way
 (`crates/eyes/src/bus_out.rs`): with each look while the camera is open,
 the faces in view, each with a passing id, its box as fractions of the

@@ -1,0 +1,108 @@
+=== mutant-late-repeat-compile | exit 0 | 66.307379 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice#lamp-voice@0.1.0","manifest_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_voice","src_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 06s
+=== end mutant-late-repeat-compile ===
+=== mutant-late-repeat-state | exit 101 | 2.170086 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second ... FAILED
+
+failures:
+
+failures:
+    bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.25s
+
+--- stderr ---
+
+thread 'bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second' (686648377) panicked at crates/voice/src/bus_out.rs:1722:9:
+assertion `left == right` failed
+  left: [(Resting, 0), (Listening, 600000), (Thinking, 1000000), (Speaking, 1100000)]
+ right: [(Resting, 0), (Listening, 600000), (Thinking, 1000000), (Speaking, 1100000), (Speaking, 2100000)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-late-repeat-state ===
+=== mutant-late-repeat-room | exit 101 | 0.214543 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag ... FAILED
+
+failures:
+
+failures:
+    bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.19s
+
+--- stderr ---
+
+thread 'bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag' (686648477) panicked at crates/voice/src/bus_out.rs:2196:9:
+assertion `left == right` failed
+  left: [Unknown, Busy, Quiet]
+ right: [Unknown, Busy, Busy, Quiet]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-late-repeat-room ===
+=== mutant-swapped-topics-compile | exit 0 | 66.789891 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice#lamp-voice@0.1.0","manifest_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_voice","src_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 06s
+=== end mutant-swapped-topics-compile ===
+=== mutant-swapped-topics-speech | exit 101 | 1.860488 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics ... FAILED
+
+failures:
+
+failures:
+    bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.01s
+
+--- stderr ---
+
+thread 'bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics' (686657357) panicked at crates/voice/src/bus_out.rs:2097:9:
+assertion `left == right` failed
+  left: ("Black.", Some(7))
+ right: ("Hm.", None)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-swapped-topics-speech ===
+=== mutant-unfiltered-calls-compile | exit 0 | 67.906270 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice#lamp-voice@0.1.0","manifest_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_voice","src_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 07s
+=== end mutant-unfiltered-calls-compile ===
+=== mutant-unfiltered-calls-calls | exit 101 | 1.929924 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::a_function_call_written_as_words_is_never_published_as_said ... FAILED
+
+failures:
+
+failures:
+    bus_out::tests::a_function_call_written_as_words_is_never_published_as_said
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.11s
+
+--- stderr ---
+
+thread 'bus_out::tests::a_function_call_written_as_words_is_never_published_as_said' (686666899) panicked at crates/voice/src/bus_out.rs:2126:9:
+assertion `left == right` failed
+  left: [(Some(1), "not_for_me"), (Some(1), " Sure."), (Some(2), "Yes?"), (Some(2), " not_for"), (Some(2), "_me{}"), (Some(2), " Noon.")]
+ right: [(Some(2), "Yes?"), (Some(2), " Noon.")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-unfiltered-calls-calls ===

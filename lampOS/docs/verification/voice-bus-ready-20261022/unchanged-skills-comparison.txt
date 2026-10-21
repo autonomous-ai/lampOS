@@ -1,0 +1,501 @@
+=== comparison-base-skills-compile | exit 0 | 51.332710 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/skills/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_skills","src_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/skills/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-80478c4d88f6de85"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-80478c4d88f6de85","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/turn-owner)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/gemini)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/near-call)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/camera)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/ring)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/audio)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/controls)
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/update)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 51.20s
+=== end comparison-base-skills-compile ===
+=== comparison-base-skills-1 | exit 0 | 2.277068 s ===
+--- stdout ---
+
+running 129 tests
+test clock::tests::a_skip_past_the_most_is_refused ... ok
+test addon::tests::a_proposal_that_fails_its_check_is_not_sent_or_counted ... ok
+test addon::tests::proposals_are_numbered_in_order_and_spaced_per_add_on ... ok
+test daily::tests::moment_rejects_unset_clock_and_observes_the_local_midnight ... ok
+test addon::tests::an_add_on_has_twenty_an_hour_and_all_have_four_says ... ok
+test daily::tests::synchronization_is_required_even_for_a_plausible_wall_clock ... ok
+test daily::tests::window_remainders_keep_milliseconds_and_cross_midnight_exactly ... ok
+test daily::tests::windows_have_exact_half_open_and_overnight_boundaries ... ok
+test daily::tests::windows_refuse_ambiguous_or_malformed_times ... ok
+test glow::tests::a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer ... ok
+test daily::tests::a_second_owner_is_refused_until_the_first_is_dropped ... ok
+test glow::tests::a_light_off_or_not_known_asks_nothing ... ok
+test daily::tests::a_window_remainder_uses_the_trusted_sample_without_forecasting_dst ... ok
+test daily::tests::unique_temporaries_do_not_overwrite_or_remove_other_files ... ok
+test clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time ... ok
+test daily::tests::added_fields_keep_known_days_and_maximum_length_keys_survive_a_save ... ok
+test glow::tests::a_step_asks_for_its_colour_at_its_level_or_the_lights_and_a_dim_steps_down ... ok
+test glow::tests::at_the_dimmest_level_the_evening_asks_nothing ... ok
+test glow::tests::every_evening_ask_is_at_least_one_level_under_the_persons_light ... ok
+test daily::tests::unsafe_files_and_replacement_outside_the_owner_are_refused ... ok
+test glow::tests::over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour ... ok
+test daily::tests::failed_directory_sync_never_grants_a_claim_or_rolls_back_installed_evidence ... ok
+test daily::tests::malformed_newer_or_duplicate_state_is_never_replaced ... ok
+test limits::tests::end_is_exclusive_and_unknown_time_creates_no_cap ... ok
+test daily::tests::new_york_dst_gap_does_not_invent_a_window_and_repeated_hour_claims_once ... ok
+test daily::tests::legacy_high_water_migrates_conservatively_only_after_a_new_claim ... ok
+test known::tests::the_tellable_file_gives_the_names_who_said_yes ... ok
+test limits::tests::spring_and_autumn_windows_end_in_local_time ... ok
+test daily::tests::the_full_supported_calendar_and_all_maximum_keys_fit_without_eviction ... ok
+test limits::tests::rejected_batches_preserve_the_accepted_definitions_and_generation ... ok
+test known::tests::the_known_file_gives_the_name_only_while_fresh_and_plain ... ok
+test daily::tests::key_and_file_bounds_never_evict_existing_days ... ok
+test package::tests::a_store_package_is_never_older_than_what_it_replaces ... ok
+test package::tests::only_a_runs_own_folder_names_are_taken_for_what_it_left ... ok
+test package::tests::only_lamp_cloud_and_the_voice_may_ask_the_manage_helper ... ok
+test package::tests::the_askers_cgroups_are_their_product_units_slices ... ok
+test limits::tests::the_final_cap_boundary_refuses_a_revoked_put_but_keeps_exact_token_cleanup ... ok
+test routine::tests::a_completion_keeps_its_captured_definition_generation ... ok
+test limits::tests::window_end_removes_only_its_owned_token_and_entry_uses_private_put ... ok
+test daily::tests::current_bitmap_values_and_duplicate_keys_are_refused_without_repair ... ok
+test glow::tests::nothing_is_asked_without_a_taker_or_a_light_to_dim_and_nothing_given_back ... ok
+test package::tests::a_file_swapped_after_its_folder_was_listed_is_not_read ... ok
+test glow::tests::a_long_name_is_cut_to_a_source_the_ring_takes ... ok
+test routine::tests::a_queued_completion_cannot_extend_the_original_deadline ... ok
+test limits::tests::restart_recovers_the_exact_token_and_unknown_or_older_time_keeps_it ... ok
+test limits::tests::reload_while_caps_get_is_held_fences_both_put_and_remove ... ok
+test glow::tests::a_ring_that_starts_during_a_run_is_asked_from_the_next_step ... ok
+test daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart ... ok
+test limits::tests::unsynchronized_plausible_time_cannot_create_or_expire_a_window_cap ... ok
+test glow::tests::a_light_outranked_is_said_at_the_give_back_by_what ... ok
+test daily::tests::pre_rename_failures_preserve_bytes_and_poison_the_owner_without_consuming_a_day ... ok
+test glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back ... ok
+test routine::tests::a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode ... ok
+test routine::tests::a_thread_captured_before_reload_cannot_start_old_work ... ok
+test routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window ... ok
+test routine::tests::a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch ... ok
+test routine::tests::a_foreign_completion_neither_confirms_nor_renews_a_pending_wake ... ok
+test routine::tests::a_rest_ended_in_a_turn_does_not_settle_again ... ok
+test routine::tests::a_rest_ended_for_anything_but_a_sound_does_not_settle_again ... ok
+test routine::tests::a_terminal_receipt_before_the_last_renewal_still_ends_the_episode ... ok
+test routine::tests::an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier ... ok
+test routine::tests::a_trusted_outside_window_sample_cancels_rest_immediately ... ok
+test glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played ... ok
+test routine::tests::an_untrusted_clock_cannot_start_rest_or_wake_an_admitted_rest ... ok
+test routine::tests::changed_expression_does_not_rebind_rest_during_clock_loss ... ok
+test routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence ... ok
+test routine::tests::an_unchanged_definition_cannot_retain_pending_admission_or_wake ... ok
+test routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended ... ok
+test routine::tests::clock_loss_does_not_renew_without_fresh_matching_expression_evidence ... ok
+test routine::tests::missing_receipts_cannot_extend_an_issued_rest_lease ... ok
+test routine::tests::clock_loss_cancels_pending_admission_and_wake_even_with_a_fresh_ack ... ok
+test routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline ... ok
+test routine::tests::an_edited_disabled_or_removed_owner_cannot_keep_its_rest ... ok
+test routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable ... ok
+test routine::tests::only_a_completed_wake_allows_its_following_sound ... ok
+test tests::a_body_ask_says_who_asks_only_with_the_switch ... ok
+test tests::a_dotted_field_reads_inside_an_object ... ok
+test tests::a_rise_is_over_the_lowest_reading_of_its_while_before ... ok
+test routine::tests::reload_cancels_pending_admission_and_a_late_ack_cannot_restore_it ... ok
+test unplug::tests::failure_wins_over_still_live_asleep_receipts ... ok
+test tests::a_say_from_names_where_the_voice_keeps_the_words ... ok
+test routine::tests::a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after ... ok
+test unplug::tests::readiness_requires_all_three_matching_fresh_receipts ... ok
+test routine::tests::no_rest_tonight_no_greeting ... ok
+test unplug::tests::stay_minutes_default_to_ten ... ok
+test visits::tests::a_length_is_said_as_a_person_says_it ... ok
+test unplug::tests::ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request ... ok
+test visits::tests::a_spell_only_a_voice_showed_is_told_as_heard_not_seen ... ok
+test visits::tests::a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no ... ok
+test unplug::tests::repeated_calls_keep_the_original_latch ... ok
+test routine::tests::unrelated_reload_retains_admitted_rest_but_invalidates_old_run_authority ... ok
+test visits::tests::spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept ... ok
+test visits::tests::a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who ... ok
+test visits::tests::a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length ... ok
+test visits::tests::a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came ... ok
+test visits::tests::who_was_heres_words_have_only_their_own_slots ... ok
+test visits::tests::with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when ... ok
+test watch::tests::a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing ... ok
+test watch::tests::a_reload_never_turns_a_watch_on_and_a_changed_or_removed_one_is_off ... ok
+test watch::tests::a_pause_lasts_until_asked_or_its_most ... ok
+test unplug::tests::a_cancel_needs_the_bodys_fresh_matching_folding_or_ready ... ok
+test routine::tests::clock_loss_keeps_admitted_rest_only_until_the_last_trusted_window_end ... ok
+test watch::tests::a_watchs_words_have_only_their_own_slots ... ok
+test watch::tests::a_second_visit_within_ten_minutes_is_not_texted ... ok
+test watch::tests::a_text_says_known_or_not_and_never_a_name ... ok
+test watch::tests::nothing_is_taken_until_the_ring_first_shows_its_mark ... ok
+test watch::tests::it_ends_by_itself_at_its_most ... ok
+test watch::tests::the_local_minute_is_the_wall_clock_east_of_utc ... ok
+test unplug::tests::never_mind_is_refused_unless_a_latch_is_in_force ... ok
+test routine::tests::wake_uses_the_admitted_episode_and_cancellation_stops_renewal ... ok
+test watch::tests::the_topics_are_the_messages_own ... ok
+test watch::tests::a_visit_gives_one_text_with_its_time_and_length ... ok
+test watch::tests::the_face_of_the_person_who_asked_ends_it ... ok
+test watch::tests::the_watch_words_are_guard_modes_and_what_the_lamp_said_before ... ok
+test watch::tests::off_when_asked_gives_the_mark_back ... ok
+test watch::tests::while_its_mark_is_not_shown_nothing_about_the_desk_is_taken ... ok
+test watch::tests::it_is_never_on_by_itself ... ok
+test watch::tests::with_the_switch_closed_nothing_about_the_desk_is_taken ... ok
+test watch::tests::the_persons_light_pauses_it_until_they_ask_again ... ok
+test routine::tests::published_rest_and_wake_leases_end_at_the_window_if_skills_stalls ... ok
+test watch::tests::the_privacy_switch_closed_gives_one_line_each_closing ... ok
+test routine::tests::completion_cannot_cross_an_owner_window_or_clock_change ... ok
+test routine::tests::leaving_the_night_window_ends_the_resettling ... ok
+test visits::tests::who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte ... ok
+test routine::tests::stale_or_missing_faces_do_not_settle_again ... ok
+test routine::tests::a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again ... ok
+test routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once ... ok
+test routine::tests::a_sound_with_a_face_in_view_does_not_settle_again ... ok
+test routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night ... ok
+
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s
+
+--- stderr ---
+lamp-skills: skill:desk-tutor's light is outranked by skill:stretch-break
+lamp-skills: skill:desk-tutor's light is outranked by person
+lamp-skills: skill:routine: Expression ended its rest for a turn; someone is up, so it does not settle again
+lamp-skills: skill:routine: Expression ended its rest, not for a sound; it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the voice took a turn; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the night window ended; it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: a face is in view; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (2 of 3)
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (3 of 3)
+lamp-skills: skill:routine: woke at a night sound; it has settled again 3 times tonight and stays awake
+=== end comparison-base-skills-1 ===
+=== comparison-base-skills-2 | exit 0 | 1.421345 s ===
+--- stdout ---
+
+running 129 tests
+test clock::tests::a_skip_past_the_most_is_refused ... ok
+test addon::tests::proposals_are_numbered_in_order_and_spaced_per_add_on ... ok
+test addon::tests::a_proposal_that_fails_its_check_is_not_sent_or_counted ... ok
+test daily::tests::moment_rejects_unset_clock_and_observes_the_local_midnight ... ok
+test daily::tests::synchronization_is_required_even_for_a_plausible_wall_clock ... ok
+test addon::tests::an_add_on_has_twenty_an_hour_and_all_have_four_says ... ok
+test daily::tests::window_remainders_keep_milliseconds_and_cross_midnight_exactly ... ok
+test daily::tests::windows_have_exact_half_open_and_overnight_boundaries ... ok
+test daily::tests::windows_refuse_ambiguous_or_malformed_times ... ok
+test glow::tests::a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer ... ok
+test daily::tests::a_window_remainder_uses_the_trusted_sample_without_forecasting_dst ... ok
+test glow::tests::a_light_off_or_not_known_asks_nothing ... ok
+test daily::tests::a_second_owner_is_refused_until_the_first_is_dropped ... ok
+test daily::tests::unique_temporaries_do_not_overwrite_or_remove_other_files ... ok
+test clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time ... ok
+test daily::tests::added_fields_keep_known_days_and_maximum_length_keys_survive_a_save ... ok
+test glow::tests::a_step_asks_for_its_colour_at_its_level_or_the_lights_and_a_dim_steps_down ... ok
+test glow::tests::at_the_dimmest_level_the_evening_asks_nothing ... ok
+test glow::tests::every_evening_ask_is_at_least_one_level_under_the_persons_light ... ok
+test daily::tests::failed_directory_sync_never_grants_a_claim_or_rolls_back_installed_evidence ... ok
+test glow::tests::over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour ... ok
+test daily::tests::malformed_newer_or_duplicate_state_is_never_replaced ... ok
+test daily::tests::unsafe_files_and_replacement_outside_the_owner_are_refused ... ok
+test limits::tests::end_is_exclusive_and_unknown_time_creates_no_cap ... ok
+test daily::tests::legacy_high_water_migrates_conservatively_only_after_a_new_claim ... ok
+test daily::tests::new_york_dst_gap_does_not_invent_a_window_and_repeated_hour_claims_once ... ok
+test daily::tests::the_full_supported_calendar_and_all_maximum_keys_fit_without_eviction ... ok
+test limits::tests::spring_and_autumn_windows_end_in_local_time ... ok
+test known::tests::the_tellable_file_gives_the_names_who_said_yes ... ok
+test known::tests::the_known_file_gives_the_name_only_while_fresh_and_plain ... ok
+test daily::tests::key_and_file_bounds_never_evict_existing_days ... ok
+test limits::tests::rejected_batches_preserve_the_accepted_definitions_and_generation ... ok
+test package::tests::a_store_package_is_never_older_than_what_it_replaces ... ok
+test package::tests::only_a_runs_own_folder_names_are_taken_for_what_it_left ... ok
+test package::tests::only_lamp_cloud_and_the_voice_may_ask_the_manage_helper ... ok
+test package::tests::the_askers_cgroups_are_their_product_units_slices ... ok
+test routine::tests::a_completion_keeps_its_captured_definition_generation ... ok
+test daily::tests::current_bitmap_values_and_duplicate_keys_are_refused_without_repair ... ok
+test limits::tests::the_final_cap_boundary_refuses_a_revoked_put_but_keeps_exact_token_cleanup ... ok
+test glow::tests::nothing_is_asked_without_a_taker_or_a_light_to_dim_and_nothing_given_back ... ok
+test limits::tests::window_end_removes_only_its_owned_token_and_entry_uses_private_put ... ok
+test glow::tests::a_long_name_is_cut_to_a_source_the_ring_takes ... ok
+test limits::tests::restart_recovers_the_exact_token_and_unknown_or_older_time_keeps_it ... ok
+test routine::tests::a_queued_completion_cannot_extend_the_original_deadline ... ok
+test limits::tests::reload_while_caps_get_is_held_fences_both_put_and_remove ... ok
+test package::tests::a_file_swapped_after_its_folder_was_listed_is_not_read ... ok
+test glow::tests::a_ring_that_starts_during_a_run_is_asked_from_the_next_step ... ok
+test daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart ... ok
+test glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back ... ok
+test daily::tests::pre_rename_failures_preserve_bytes_and_poison_the_owner_without_consuming_a_day ... ok
+test glow::tests::a_light_outranked_is_said_at_the_give_back_by_what ... ok
+test limits::tests::unsynchronized_plausible_time_cannot_create_or_expire_a_window_cap ... ok
+test routine::tests::a_thread_captured_before_reload_cannot_start_old_work ... ok
+test routine::tests::a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode ... ok
+test routine::tests::a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch ... ok
+test routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window ... ok
+test routine::tests::a_rest_ended_for_anything_but_a_sound_does_not_settle_again ... ok
+test routine::tests::a_foreign_completion_neither_confirms_nor_renews_a_pending_wake ... ok
+test routine::tests::a_rest_ended_in_a_turn_does_not_settle_again ... ok
+test routine::tests::a_terminal_receipt_before_the_last_renewal_still_ends_the_episode ... ok
+test routine::tests::an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier ... ok
+test routine::tests::a_trusted_outside_window_sample_cancels_rest_immediately ... ok
+test routine::tests::an_untrusted_clock_cannot_start_rest_or_wake_an_admitted_rest ... ok
+test routine::tests::changed_expression_does_not_rebind_rest_during_clock_loss ... ok
+test glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played ... ok
+test routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence ... ok
+test routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended ... ok
+test routine::tests::an_unchanged_definition_cannot_retain_pending_admission_or_wake ... ok
+test routine::tests::clock_loss_does_not_renew_without_fresh_matching_expression_evidence ... ok
+test routine::tests::clock_loss_cancels_pending_admission_and_wake_even_with_a_fresh_ack ... ok
+test routine::tests::missing_receipts_cannot_extend_an_issued_rest_lease ... ok
+test routine::tests::an_edited_disabled_or_removed_owner_cannot_keep_its_rest ... ok
+test routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline ... ok
+test routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable ... ok
+test tests::a_body_ask_says_who_asks_only_with_the_switch ... ok
+test tests::a_dotted_field_reads_inside_an_object ... ok
+test tests::a_rise_is_over_the_lowest_reading_of_its_while_before ... ok
+test routine::tests::only_a_completed_wake_allows_its_following_sound ... ok
+test routine::tests::reload_cancels_pending_admission_and_a_late_ack_cannot_restore_it ... ok
+test unplug::tests::failure_wins_over_still_live_asleep_receipts ... ok
+test tests::a_say_from_names_where_the_voice_keeps_the_words ... ok
+test routine::tests::no_rest_tonight_no_greeting ... ok
+test unplug::tests::readiness_requires_all_three_matching_fresh_receipts ... ok
+test routine::tests::a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after ... ok
+test unplug::tests::stay_minutes_default_to_ten ... ok
+test routine::tests::unrelated_reload_retains_admitted_rest_but_invalidates_old_run_authority ... ok
+test unplug::tests::ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request ... ok
+test visits::tests::a_length_is_said_as_a_person_says_it ... ok
+test visits::tests::a_spell_only_a_voice_showed_is_told_as_heard_not_seen ... ok
+test visits::tests::a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no ... ok
+test unplug::tests::repeated_calls_keep_the_original_latch ... ok
+test visits::tests::a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length ... ok
+test visits::tests::a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who ... ok
+test visits::tests::a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came ... ok
+test visits::tests::spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept ... ok
+test visits::tests::who_was_heres_words_have_only_their_own_slots ... ok
+test routine::tests::clock_loss_keeps_admitted_rest_only_until_the_last_trusted_window_end ... ok
+test watch::tests::a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing ... ok
+test watch::tests::a_reload_never_turns_a_watch_on_and_a_changed_or_removed_one_is_off ... ok
+test watch::tests::a_pause_lasts_until_asked_or_its_most ... ok
+test visits::tests::with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when ... ok
+test watch::tests::a_watchs_words_have_only_their_own_slots ... ok
+test unplug::tests::a_cancel_needs_the_bodys_fresh_matching_folding_or_ready ... ok
+test watch::tests::a_second_visit_within_ten_minutes_is_not_texted ... ok
+test watch::tests::a_text_says_known_or_not_and_never_a_name ... ok
+test watch::tests::nothing_is_taken_until_the_ring_first_shows_its_mark ... ok
+test watch::tests::it_ends_by_itself_at_its_most ... ok
+test watch::tests::the_local_minute_is_the_wall_clock_east_of_utc ... ok
+test routine::tests::wake_uses_the_admitted_episode_and_cancellation_stops_renewal ... ok
+test unplug::tests::never_mind_is_refused_unless_a_latch_is_in_force ... ok
+test watch::tests::the_topics_are_the_messages_own ... ok
+test watch::tests::the_face_of_the_person_who_asked_ends_it ... ok
+test watch::tests::a_visit_gives_one_text_with_its_time_and_length ... ok
+test watch::tests::the_watch_words_are_guard_modes_and_what_the_lamp_said_before ... ok
+test watch::tests::off_when_asked_gives_the_mark_back ... ok
+test watch::tests::while_its_mark_is_not_shown_nothing_about_the_desk_is_taken ... ok
+test routine::tests::published_rest_and_wake_leases_end_at_the_window_if_skills_stalls ... ok
+test watch::tests::it_is_never_on_by_itself ... ok
+test watch::tests::with_the_switch_closed_nothing_about_the_desk_is_taken ... ok
+test watch::tests::the_persons_light_pauses_it_until_they_ask_again ... ok
+test watch::tests::the_privacy_switch_closed_gives_one_line_each_closing ... ok
+test routine::tests::completion_cannot_cross_an_owner_window_or_clock_change ... ok
+test routine::tests::leaving_the_night_window_ends_the_resettling ... ok
+test visits::tests::who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte ... ok
+test routine::tests::stale_or_missing_faces_do_not_settle_again ... ok
+test routine::tests::a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again ... ok
+test routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once ... ok
+test routine::tests::a_sound_with_a_face_in_view_does_not_settle_again ... ok
+test routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night ... ok
+
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s
+
+--- stderr ---
+lamp-skills: skill:desk-tutor's light is outranked by skill:stretch-break
+lamp-skills: skill:desk-tutor's light is outranked by person
+lamp-skills: skill:routine: Expression ended its rest, not for a sound; it does not settle again
+lamp-skills: skill:routine: Expression ended its rest for a turn; someone is up, so it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the voice took a turn; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the night window ended; it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: a face is in view; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (2 of 3)
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (3 of 3)
+lamp-skills: skill:routine: woke at a night sound; it has settled again 3 times tonight and stays awake
+=== end comparison-base-skills-2 ===
+=== comparison-base-skills-3 | exit 0 | 1.427886 s ===
+--- stdout ---
+
+running 129 tests
+test clock::tests::a_skip_past_the_most_is_refused ... ok
+test daily::tests::moment_rejects_unset_clock_and_observes_the_local_midnight ... ok
+test addon::tests::proposals_are_numbered_in_order_and_spaced_per_add_on ... ok
+test addon::tests::a_proposal_that_fails_its_check_is_not_sent_or_counted ... ok
+test addon::tests::an_add_on_has_twenty_an_hour_and_all_have_four_says ... ok
+test daily::tests::synchronization_is_required_even_for_a_plausible_wall_clock ... ok
+test daily::tests::window_remainders_keep_milliseconds_and_cross_midnight_exactly ... ok
+test daily::tests::windows_have_exact_half_open_and_overnight_boundaries ... ok
+test daily::tests::windows_refuse_ambiguous_or_malformed_times ... ok
+test glow::tests::a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer ... ok
+test daily::tests::a_window_remainder_uses_the_trusted_sample_without_forecasting_dst ... ok
+test glow::tests::a_light_off_or_not_known_asks_nothing ... ok
+test daily::tests::a_second_owner_is_refused_until_the_first_is_dropped ... ok
+test daily::tests::unique_temporaries_do_not_overwrite_or_remove_other_files ... ok
+test clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time ... ok
+test daily::tests::unsafe_files_and_replacement_outside_the_owner_are_refused ... ok
+test glow::tests::a_step_asks_for_its_colour_at_its_level_or_the_lights_and_a_dim_steps_down ... ok
+test glow::tests::at_the_dimmest_level_the_evening_asks_nothing ... ok
+test glow::tests::every_evening_ask_is_at_least_one_level_under_the_persons_light ... ok
+test daily::tests::added_fields_keep_known_days_and_maximum_length_keys_survive_a_save ... ok
+test glow::tests::over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour ... ok
+test daily::tests::failed_directory_sync_never_grants_a_claim_or_rolls_back_installed_evidence ... ok
+test daily::tests::malformed_newer_or_duplicate_state_is_never_replaced ... ok
+test limits::tests::end_is_exclusive_and_unknown_time_creates_no_cap ... ok
+test daily::tests::new_york_dst_gap_does_not_invent_a_window_and_repeated_hour_claims_once ... ok
+test daily::tests::legacy_high_water_migrates_conservatively_only_after_a_new_claim ... ok
+test known::tests::the_tellable_file_gives_the_names_who_said_yes ... ok
+test limits::tests::spring_and_autumn_windows_end_in_local_time ... ok
+test daily::tests::the_full_supported_calendar_and_all_maximum_keys_fit_without_eviction ... ok
+test limits::tests::rejected_batches_preserve_the_accepted_definitions_and_generation ... ok
+test known::tests::the_known_file_gives_the_name_only_while_fresh_and_plain ... ok
+test daily::tests::key_and_file_bounds_never_evict_existing_days ... ok
+test package::tests::a_store_package_is_never_older_than_what_it_replaces ... ok
+test package::tests::only_a_runs_own_folder_names_are_taken_for_what_it_left ... ok
+test package::tests::only_lamp_cloud_and_the_voice_may_ask_the_manage_helper ... ok
+test package::tests::the_askers_cgroups_are_their_product_units_slices ... ok
+test routine::tests::a_completion_keeps_its_captured_definition_generation ... ok
+test limits::tests::the_final_cap_boundary_refuses_a_revoked_put_but_keeps_exact_token_cleanup ... ok
+test daily::tests::current_bitmap_values_and_duplicate_keys_are_refused_without_repair ... ok
+test limits::tests::window_end_removes_only_its_owned_token_and_entry_uses_private_put ... ok
+test glow::tests::nothing_is_asked_without_a_taker_or_a_light_to_dim_and_nothing_given_back ... ok
+test package::tests::a_file_swapped_after_its_folder_was_listed_is_not_read ... ok
+test glow::tests::a_ring_that_starts_during_a_run_is_asked_from_the_next_step ... ok
+test limits::tests::reload_while_caps_get_is_held_fences_both_put_and_remove ... ok
+test routine::tests::a_queued_completion_cannot_extend_the_original_deadline ... ok
+test glow::tests::a_long_name_is_cut_to_a_source_the_ring_takes ... ok
+test limits::tests::restart_recovers_the_exact_token_and_unknown_or_older_time_keeps_it ... ok
+test daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart ... ok
+test glow::tests::a_light_outranked_is_said_at_the_give_back_by_what ... ok
+test glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back ... ok
+test daily::tests::pre_rename_failures_preserve_bytes_and_poison_the_owner_without_consuming_a_day ... ok
+test limits::tests::unsynchronized_plausible_time_cannot_create_or_expire_a_window_cap ... ok
+test routine::tests::a_thread_captured_before_reload_cannot_start_old_work ... ok
+test routine::tests::a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode ... ok
+test routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window ... ok
+test routine::tests::a_foreign_completion_neither_confirms_nor_renews_a_pending_wake ... ok
+test routine::tests::a_terminal_receipt_before_the_last_renewal_still_ends_the_episode ... ok
+test routine::tests::a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch ... ok
+test routine::tests::a_rest_ended_in_a_turn_does_not_settle_again ... ok
+test routine::tests::a_rest_ended_for_anything_but_a_sound_does_not_settle_again ... ok
+test routine::tests::a_trusted_outside_window_sample_cancels_rest_immediately ... ok
+test routine::tests::an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier ... ok
+test routine::tests::changed_expression_does_not_rebind_rest_during_clock_loss ... ok
+test routine::tests::an_untrusted_clock_cannot_start_rest_or_wake_an_admitted_rest ... ok
+test glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played ... ok
+test routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence ... ok
+test routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended ... ok
+test routine::tests::an_unchanged_definition_cannot_retain_pending_admission_or_wake ... ok
+test routine::tests::clock_loss_does_not_renew_without_fresh_matching_expression_evidence ... ok
+test routine::tests::clock_loss_cancels_pending_admission_and_wake_even_with_a_fresh_ack ... ok
+test routine::tests::missing_receipts_cannot_extend_an_issued_rest_lease ... ok
+test routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline ... ok
+test routine::tests::an_edited_disabled_or_removed_owner_cannot_keep_its_rest ... ok
+test routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable ... ok
+test tests::a_body_ask_says_who_asks_only_with_the_switch ... ok
+test tests::a_dotted_field_reads_inside_an_object ... ok
+test tests::a_rise_is_over_the_lowest_reading_of_its_while_before ... ok
+test routine::tests::reload_cancels_pending_admission_and_a_late_ack_cannot_restore_it ... ok
+test routine::tests::only_a_completed_wake_allows_its_following_sound ... ok
+test unplug::tests::failure_wins_over_still_live_asleep_receipts ... ok
+test routine::tests::a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after ... ok
+test tests::a_say_from_names_where_the_voice_keeps_the_words ... ok
+test unplug::tests::readiness_requires_all_three_matching_fresh_receipts ... ok
+test routine::tests::no_rest_tonight_no_greeting ... ok
+test unplug::tests::stay_minutes_default_to_ten ... ok
+test routine::tests::unrelated_reload_retains_admitted_rest_but_invalidates_old_run_authority ... ok
+test visits::tests::a_length_is_said_as_a_person_says_it ... ok
+test unplug::tests::ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request ... ok
+test visits::tests::a_spell_only_a_voice_showed_is_told_as_heard_not_seen ... ok
+test unplug::tests::repeated_calls_keep_the_original_latch ... ok
+test visits::tests::a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no ... ok
+test visits::tests::a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length ... ok
+test visits::tests::a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who ... ok
+test visits::tests::a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came ... ok
+test visits::tests::spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept ... ok
+test visits::tests::who_was_heres_words_have_only_their_own_slots ... ok
+test watch::tests::a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing ... ok
+test watch::tests::a_reload_never_turns_a_watch_on_and_a_changed_or_removed_one_is_off ... ok
+test visits::tests::with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when ... ok
+test watch::tests::a_pause_lasts_until_asked_or_its_most ... ok
+test routine::tests::wake_uses_the_admitted_episode_and_cancellation_stops_renewal ... ok
+test watch::tests::a_second_visit_within_ten_minutes_is_not_texted ... ok
+test watch::tests::a_text_says_known_or_not_and_never_a_name ... ok
+test unplug::tests::a_cancel_needs_the_bodys_fresh_matching_folding_or_ready ... ok
+test routine::tests::clock_loss_keeps_admitted_rest_only_until_the_last_trusted_window_end ... ok
+test watch::tests::a_watchs_words_have_only_their_own_slots ... ok
+test watch::tests::nothing_is_taken_until_the_ring_first_shows_its_mark ... ok
+test unplug::tests::never_mind_is_refused_unless_a_latch_is_in_force ... ok
+test watch::tests::the_local_minute_is_the_wall_clock_east_of_utc ... ok
+test watch::tests::it_ends_by_itself_at_its_most ... ok
+test watch::tests::the_topics_are_the_messages_own ... ok
+test watch::tests::the_watch_words_are_guard_modes_and_what_the_lamp_said_before ... ok
+test watch::tests::the_face_of_the_person_who_asked_ends_it ... ok
+test watch::tests::a_visit_gives_one_text_with_its_time_and_length ... ok
+test watch::tests::off_when_asked_gives_the_mark_back ... ok
+test watch::tests::while_its_mark_is_not_shown_nothing_about_the_desk_is_taken ... ok
+test watch::tests::the_persons_light_pauses_it_until_they_ask_again ... ok
+test watch::tests::it_is_never_on_by_itself ... ok
+test watch::tests::with_the_switch_closed_nothing_about_the_desk_is_taken ... ok
+test routine::tests::published_rest_and_wake_leases_end_at_the_window_if_skills_stalls ... ok
+test watch::tests::the_privacy_switch_closed_gives_one_line_each_closing ... ok
+test routine::tests::completion_cannot_cross_an_owner_window_or_clock_change ... ok
+test routine::tests::leaving_the_night_window_ends_the_resettling ... ok
+test visits::tests::who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte ... ok
+test routine::tests::stale_or_missing_faces_do_not_settle_again ... ok
+test routine::tests::a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again ... ok
+test routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once ... ok
+test routine::tests::a_sound_with_a_face_in_view_does_not_settle_again ... ok
+test routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night ... ok
+
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.41s
+
+--- stderr ---
+lamp-skills: skill:desk-tutor's light is outranked by skill:stretch-break
+lamp-skills: skill:desk-tutor's light is outranked by person
+lamp-skills: skill:routine: Expression ended its rest for a turn; someone is up, so it does not settle again
+lamp-skills: skill:routine: Expression ended its rest, not for a sound; it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the voice took a turn; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: the night window ended; it does not settle again
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: a face is in view; someone is up, so the night's rest ends
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (1 of 3)
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (2 of 3)
+lamp-skills: skill:routine: woke at a night sound; it settles again once the voice has rested 30 s with no face in view
+lamp-skills: skill:routine: woke at a night sound; the voice has rested 30 s again and no face is in view, so it settles again (3 of 3)
+lamp-skills: skill:routine: woke at a night sound; it has settled again 3 times tonight and stays awake
+=== end comparison-base-skills-3 ===

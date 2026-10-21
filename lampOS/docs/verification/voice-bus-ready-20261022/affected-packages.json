@@ -1,0 +1,23 @@
+{
+  "touched": "lamp-voice",
+  "included_edges": [
+    "dependencies",
+    "dev-dependencies",
+    "build-dependencies",
+    "all target sections"
+  ],
+  "transitive_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ]
+}

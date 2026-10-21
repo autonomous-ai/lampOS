@@ -1,0 +1,20 @@
+--- a/lampOS/crates/voice/src/bus_out.rs
++++ b/lampOS/crates/voice/src/bus_out.rs
+@@ -106,7 +106,7 @@
+     pub fn tell(&mut self, room: crate::room_told::Room, now_us: u64) {
+         if self
+             .last
+-            .is_some_and(|(told, at)| told == room && now_us.saturating_sub(at) < REPEAT_US)
++            .is_some_and(|(told, at)| told == room && now_us.saturating_sub(at) <= REPEAT_US)
+         {
+             return;
+         }
+@@ -1074,7 +1074,7 @@
+         };
+         if self
+             .last
+-            .is_some_and(|(told, at)| told == state && now_us.saturating_sub(at) < REPEAT_US)
++            .is_some_and(|(told, at)| told == state && now_us.saturating_sub(at) <= REPEAT_US)
+         {
+             return;
+         }
