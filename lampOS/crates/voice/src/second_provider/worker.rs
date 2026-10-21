@@ -1617,6 +1617,7 @@ pub fn serve(
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
+    let making_skills = tools.tasks.as_ref().is_some_and(|place| place.make_skill);
     let declines = tools.decline;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
@@ -1921,9 +1922,22 @@ pub fn serve(
         }));
     }
     // A hand-over waiting for its yes, with the tasks part (#1712).
+    // And a made skill waiting for its yes to be put on (`crate::made_skill`).
     if has_tasks {
-        engine = engine.noting_a_task_waiting(Arc::new(|request| {
-            crate::agent_tasks::pending_note(request, Instant::now())
+        engine = engine.noting_a_task_waiting(Arc::new(move |request| {
+            crate::agent_tasks::pending_note(request, Instant::now()).or_else(|| {
+                making_skills
+                    .then(|| {
+                        let now_unix_ms = SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_or(0, |since| since.as_millis() as u64);
+                        crate::made_skill::waiting_note(
+                            std::path::Path::new(crate::made_skill::DIRECTORY),
+                            now_unix_ms,
+                        )
+                    })
+                    .flatten()
+            })
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full

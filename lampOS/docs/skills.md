@@ -1241,23 +1241,48 @@ happens:
    - each is kept with its SHA-256 and what it asks to use (`made.json`);
    - the same hand-over read again gives back the kept one, not checked
      again.
-6. **Told.** The lamp says what it would do (the card's description), what
-   it would use ("its light and whether it is talking"), and, word for
-   word: "I've made it; putting it on needs a yes from the team first."
+6. **Told, and asked.** The lamp says what it would do (the card's
+   description) and what it would use ("its light and whether it is
+   talking"), then asks, word for word: "Shall I put it on the lamp?"
    - The files are never read out.
    - A skill not kept is told plainly why ("it asks to use more than the
      light and the head, which a made skill can't").
+   - The ask is kept beside the package (`offered_at_unix_ms` in
+     `made.json`, `made_skill::asked`) when the news is heard whole at the
+     lamp, or given in a text, never when it is read: the lamp tells it
+     later, at a good moment. The news is told in the voice's own process,
+     and the yes comes to the worker that runs the call.
+7. **Put on at a spoken yes** (the lead, 20 Oct 08:37 on #1711: a spoken
+   yes bound to the SHA-256, an exception to the 18:33 "only signed
+   packages" ruling for a skill made here alone; the app doesn't confirm
+   too). On the person's yes the model calls `put_on_made_skill`
+   (`made_skill::put_on`):
+   - only a yes said out loud counts (`heard`): a typed one, or one the lamp
+     wrote, puts nothing on;
+   - only a plain yes (the words heard in the line, as the held forget's,
+     `known_faces::plain_agreement`): "No, not yet" the model took for a
+     yes puts nothing on;
+   - only the newest ask, within 120 s of its being heard (`PUT_ON_WITHIN`,
+     as a hand-over's yes);
+   - the voice sends the manage helper that skill's SHA-256 alone
+     (`{"install_made": SHA256}`, "The manage helper" above), which
+     installs only those bytes, held again to this cap;
+   - on the second route, while one waits, each request is told so
+     (`made_skill::waiting_note`), since the route keeps words, not calls;
+   - the person hears that it's on, that it couldn't be put on (also with
+     no helper to ask), or, with no answer from a helper asked within 8 s,
+     that it is being put on;
+   - never without `LAMP_MAKE_SKILL`, whatever the model calls.
+   Tests: `made_skill::tests` (the ask's window, the spoken and plain
+   yes, no helper, the helper's refusal and silence; `task_news::tests`: no
+   ask until the news is heard), and
+   `made::a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper` (the
+   voice's call through the real helper).
 
 **Open, for the lead:**
-- **Putting a made skill on the lamp.** An unsigned package made by an
-  agent goes against the 18:33 ruling, "only signed packages from the
-  update channel". The SHA-256 kept is what such a yes would be bound to,
-  so what the person heard is what would go on, and nothing can widen
-  after it.
-- Whether the spoken yes is enough, or the app confirms too.
 - Harness sign-in on home lamps.
 
-Removing a made skill by voice comes with putting one on.
+Removing a made skill by voice is still to come.
 
 Tests:
 - `made_skill::tests`:

@@ -592,6 +592,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     ];
     if place.make_skill {
         tools.push(crate::made_skill::tool(default));
+        tools.push(crate::made_skill::put_on_tool());
     }
     tools
 }
@@ -1201,7 +1202,11 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
 }
 
 pub fn is_tool(name: &str) -> bool {
-    name == START || name == CONFIRM || name == CHECK || name == crate::made_skill::MAKE
+    name == START
+        || name == CONFIRM
+        || name == CHECK
+        || name == crate::made_skill::MAKE
+        || name == crate::made_skill::PUT_ON
 }
 
 /// What the tasks part is reached by.
@@ -1717,6 +1722,30 @@ fn run_for(
                 None
             };
             check(place, only, &crate::task_news::told_file(), left())
+        }
+        // A made skill put on at the person's spoken yes (`crate::made_skill`):
+        // never without its switch, whatever the model calls.
+        crate::made_skill::PUT_ON if place.make_skill => {
+            let now_unix_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            // The words heard in the line, which must be a plain yes.
+            let said = heard.then(|| {
+                crate::thread::THREAD
+                    .lock()
+                    .ok()
+                    .and_then(|thread| thread.heard_for(request, Instant::now()))
+                    .unwrap_or_default()
+            });
+            (
+                crate::made_skill::put_on(
+                    std::path::Path::new(crate::made_skill::DIRECTORY),
+                    std::path::Path::new(crate::made_skill::MANAGE_SOCKET),
+                    said.as_deref(),
+                    now_unix_ms,
+                ),
+                true,
+            )
         }
         _ => (crate::tools::unavailable(), false),
     }
@@ -3330,6 +3359,9 @@ pub(crate) mod tests {
             ..without.clone()
         };
         assert!(names(&making).contains(&crate::made_skill::MAKE.to_owned()));
+        assert!(names(&making).contains(&crate::made_skill::PUT_ON.to_owned()));
+        assert!(!names(&without).contains(&crate::made_skill::PUT_ON.to_owned()));
+        assert!(is_tool(crate::made_skill::PUT_ON));
         assert!(is_tool(crate::made_skill::MAKE));
         let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
         let seen = tasks_part(
@@ -3363,6 +3395,18 @@ pub(crate) mod tests {
             PEER_WAIT,
         );
         assert_eq!(off, crate::tools::unavailable());
+        let (off, _) = run(
+            &without,
+            &call(crate::made_skill::PUT_ON, json!({})),
+            2,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(
+            off,
+            crate::tools::unavailable(),
+            "put on: never without its switch"
+        );
         let (told, _) = run(
             &making,
             &call(crate::made_skill::MAKE, json!({ "request": request })),

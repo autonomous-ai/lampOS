@@ -1212,15 +1212,31 @@ pub fn exchange(socket: &Path, line: &Value, deadline: Duration) -> Option<Value
 pub const MAX_TASKS_ANSWER_BYTES: u64 = 65_536;
 
 pub fn exchange_up_to(socket: &Path, line: &Value, deadline: Duration, most: u64) -> Option<Value> {
+    // A local socket connects at once or not at all: there is no wait to
+    // bound here that the deadlines below do not bound.
+    exchange_on(UnixStream::connect(socket).ok()?, line, deadline, most)
+}
+
+/// [`exchange`], told apart: `None` for a socket that can't be connected
+/// to (none there, or nobody listening), `Some(None)` for one connected to
+/// that gave no answer in time.
+pub fn reached(socket: &Path, line: &Value, deadline: Duration) -> Option<Option<Value>> {
+    let stream = UnixStream::connect(socket).ok()?;
+    Some(exchange_on(stream, line, deadline, MAX_ANSWER_BYTES))
+}
+
+fn exchange_on(
+    mut stream: UnixStream,
+    line: &Value,
+    deadline: Duration,
+    most: u64,
+) -> Option<Value> {
     let started = Instant::now();
     let left = || {
         deadline
             .checked_sub(started.elapsed())
             .filter(|left| !left.is_zero())
     };
-    // A local socket connects at once or not at all: there is no wait to
-    // bound here that the deadlines below do not bound.
-    let mut stream = UnixStream::connect(socket).ok()?;
     stream.set_write_timeout(Some(left()?)).ok()?;
     let mut out = serde_json::to_vec(line).ok()?;
     out.push(b'\n');

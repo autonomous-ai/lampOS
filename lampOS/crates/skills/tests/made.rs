@@ -319,3 +319,44 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
         "{replaced}"
     );
 }
+
+/// End to end: the lamp makes a skill, asks to put it on, and on a spoken
+/// yes the voice's `put_on` asks the real manage helper, which puts that
+/// package on. The helper's socket is the one the voice dials.
+#[test]
+fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
+    assert_eq!(
+        lamp_voice::made_skill::MANAGE_SOCKET,
+        package::MANAGE_SOCKET
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", 1_000).unwrap();
+    let socket = dir.path().join("manage.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let (served, helper_made) = (skills.clone(), keeping.directory.clone());
+    let helper = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        asked_helper(
+            &served,
+            &helper_made,
+            std::time::Duration::from_secs(2),
+            &stream,
+            &stream,
+        )
+        .unwrap()
+    });
+    let told = lamp_voice::made_skill::put_on_within(
+        &keeping.directory,
+        &socket,
+        Some("Yes, please."),
+        2_000,
+        std::time::Duration::from_secs(60),
+    );
+    assert!(helper.join().unwrap(), "the helper put it on");
+    assert_eq!(told["put_on"], "evening-dim", "{told}");
+    assert!(skills.join("evening-dim").join("skill.toml").is_file());
+}
