@@ -265,6 +265,56 @@ impl AddonDecision {
     }
 }
 
+/// An add-on's say, past the judge's rules, put to the policy (#2530 part
+/// 2, `addon/ask`): written only by the add-ons' judge (`lamp-addons`), and
+/// answered by a [`crate::Decision`] with `about` `addon` naming the
+/// `proposal`. It carries no words: the note stays with the judge, and the
+/// decision model is shown only why and how sure, as a skill's ask is.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AddonAsk {
+    /// The proposal this asks about ([`AddonProposal::proposal`]).
+    pub proposal: u64,
+    /// The add-on, as `lamp-skills` named it.
+    pub addon: String,
+    /// One of [`ADDON_WHYS`].
+    pub why: String,
+    /// How sure the add-on said it was, 0 to 1.
+    pub sure: f32,
+}
+
+impl AddonAsk {
+    pub const TYPE: &str = "lamp_msgs/AddonAsk";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "addon/ask";
+    /// The `about` of the decision that answers it.
+    pub const ABOUT: &str = "addon";
+
+    /// Each is a message of its own, answered once.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        let invalid = |why: &str| Err(Invalid(why.into()));
+        if self.proposal == 0 {
+            return invalid("an add-on's ask names its proposal");
+        }
+        if self.addon.is_empty()
+            || self.addon.len() > 64
+            || self.addon.chars().any(char::is_control)
+        {
+            return invalid("an add-on's name is 1 to 64 bytes on one line");
+        }
+        if !ADDON_WHYS.contains(&self.why.as_str()) {
+            return invalid("an add-on's why is one of ADDON_WHYS");
+        }
+        if !(0.0..=1.0).contains(&self.sure) {
+            return invalid("sure is from 0 to 1");
+        }
+        Ok(())
+    }
+}
+
 /// A kept add-on's nudge of Mood (`mood/nudge`, #2530): written only by the
 /// add-ons' judge (`lamp-addons`), read only by Mood. It moves energy both
 /// ways and warmth up only, each by [`ADDON_MOOD_AT_MOST`] at most,
@@ -324,6 +374,7 @@ pub fn addon_topics() -> Vec<(&'static str, Declaration)> {
         (AddonProposal::TOPIC, AddonProposal::declaration()),
         (AddonDecision::TOPIC, AddonDecision::declaration()),
         (MoodNudge::TOPIC, MoodNudge::declaration()),
+        (AddonAsk::TOPIC, AddonAsk::declaration()),
     ]
 }
 
@@ -625,6 +676,43 @@ mod tests {
         assert_eq!(
             crate::declaration_of(MoodNudge::TOPIC),
             Some(MoodNudge::declaration())
+        );
+    }
+
+    #[test]
+    fn an_add_ons_ask_carries_no_words_and_is_checked() {
+        let ask = AddonAsk {
+            proposal: 7,
+            addon: "music-mood".into(),
+            why: "music".into(),
+            sure: 0.7,
+        };
+        assert_eq!(ask.check(), Ok(()));
+        let json = serde_json::to_value(&ask).unwrap();
+        assert!(json.get("note").is_none());
+        for wrong in [
+            AddonAsk {
+                proposal: 0,
+                ..ask.clone()
+            },
+            AddonAsk {
+                why: "because".into(),
+                ..ask.clone()
+            },
+            AddonAsk {
+                sure: 1.5,
+                ..ask.clone()
+            },
+            AddonAsk {
+                addon: String::new(),
+                ..ask.clone()
+            },
+        ] {
+            assert!(wrong.check().is_err(), "{wrong:?}");
+        }
+        assert_eq!(
+            crate::declaration_of(AddonAsk::TOPIC),
+            Some(AddonAsk::declaration())
         );
     }
 }

@@ -215,6 +215,7 @@ impl Place {
             task: Some(task.into()),
             arrival: None,
             ask: None,
+            proposal: None,
         };
         self.decisions.publish_json(0, &decision).unwrap();
     }

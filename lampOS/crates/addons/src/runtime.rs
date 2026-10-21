@@ -2,14 +2,17 @@
 //! lamp is doing, judges each proposal by [`crate::rules`], and asks the ring
 //! for a kept light ([`crate::carry`]). Every proposal's verdict goes to the
 //! journal, one line each, with why. A kept mood is said to `lamp-mood` as a
-//! nudge on `mood/nudge`, which it holds inside its own bounds.
+//! nudge on `mood/nudge`, which it holds inside its own bounds. A say past
+//! the rules is put to the policy on `addon/ask` (#2530 part 2) and kept or
+//! dropped by its answer on `policy/decisions`, `by` `jev`.
 use crate::carry;
-use crate::rules::{Judge, Verdict};
+use crate::rules::{Drop, Judge, Verdict};
 use crate::situation::{TOPICS, Watcher};
 use lamp_bus::{Bus, Message, Publisher, Subscriber};
 use lamp_msgs::{
-    AddonDecision, AddonProposal, ExpressionRestState, Light, LightRequest, MicrophonePrivacy,
-    MoodNudge, MoodState, OnboardingPending, Pause, RoomState, VoiceMute, VoiceState,
+    AddonAsk, AddonDecision, AddonProposal, Decision, ExpressionRestState, Light, LightRequest,
+    MicrophonePrivacy, MoodNudge, MoodState, OnboardingPending, Pause, RoomState, VoiceMute,
+    VoiceState,
 };
 use std::{
     io,
@@ -34,6 +37,8 @@ pub struct Config {
     /// The claims' clock: the host's boot, or a test's.
     pub clock_id: Option<String>,
     pub run_for: Option<Duration>,
+    /// A shorter quiet before a say, for tests only (`--say-quiet-ms`).
+    pub say_quiet: Option<Duration>,
 }
 
 /// What it did, said when it stops.
@@ -77,6 +82,10 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         &AddonDecision::declaration(),
         "addons",
     )?;
+    let mut asks = bus.publisher_declared(AddonAsk::TOPIC, &AddonAsk::declaration(), "addons")?;
+    let mut answers = bus.subscribe(Decision::TOPIC, "addons")?;
+    // The say put to the policy, while it waits for an answer.
+    let mut asked: Option<AddonProposal> = None;
     let mut watcher = Watcher::new(lamp_ipc::monotonic_us()).on_clock(&clock_id);
     // What was there before it started: the kept values of each topic.
     for topic in TOPICS {
@@ -84,7 +93,9 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             take(&mut watcher, &message, lamp_ipc::monotonic_us());
         }
     }
-    let mut judge = Judge::default();
+    let mut judge = config.say_quiet.map_or_else(Judge::default, |quiet| {
+        Judge::with_say_quiet(quiet.as_micros() as u64)
+    });
     let mut report = Report::default();
     eprintln!("lamp-addons: judging addon/proposal; a kept light is asked of the ring at Idle");
     let began = Instant::now();
@@ -97,6 +108,60 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             while let Some(message) = subscriber.recv(Duration::ZERO)? {
                 take(&mut watcher, &message, lamp_ipc::monotonic_us());
             }
+        }
+        while let Some(message) = answers.recv(Duration::ZERO)? {
+            let Some(pending) = &asked else { continue };
+            // Only the policy writes decisions; only one about this say counts.
+            let Ok(answer) = message.parse::<Decision>() else {
+                continue;
+            };
+            if message.header.source != "policy"
+                || answer.about != AddonAsk::ABOUT
+                || answer.proposal != Some(pending.proposal)
+            {
+                continue;
+            }
+            let now_us = lamp_ipc::monotonic_us();
+            if let Some(verdict) = judge.answered(
+                pending,
+                answer.choice == "say_now",
+                answer.shadow,
+                &watcher.situation(now_us),
+                now_us,
+            ) {
+                let why = match verdict {
+                    Verdict::Kept => {
+                        report.kept += 1;
+                        "the policy said to say it now; the voice does not take an add-on's say yet (#2530)".to_owned()
+                    }
+                    Verdict::Dropped(drop) => {
+                        report.dropped += 1;
+                        drop.why().to_owned()
+                    }
+                    Verdict::Ask => continue,
+                };
+                // A deadline passed is the rules' drop, whatever was answered.
+                let by = match verdict {
+                    Verdict::Dropped(Drop::Late | Drop::PolicySilent) => "rule",
+                    _ => "jev",
+                };
+                write(&mut decisions, pending, verdict, by, &why, now_us);
+                asked = None;
+            }
+        }
+        let now_us = lamp_ipc::monotonic_us();
+        if let Some((proposal, drop)) = judge.lapsed(now_us)
+            && let Some(pending) = asked.take_if(|pending| pending.proposal == proposal)
+        {
+            report.dropped += 1;
+            write(
+                &mut decisions,
+                &pending,
+                Verdict::Dropped(drop),
+                "rule",
+                drop.why(),
+                now_us,
+            );
         }
         let Some(message) = proposals.recv(PASS)? else {
             continue;
@@ -121,6 +186,41 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         let age_us = now_us.saturating_sub(message.header.at_us);
         let situation = watcher.situation(now_us);
         let verdict = judge.judge(&proposal, age_us, &situation, now_us);
+        if verdict == Verdict::Ask {
+            let ask = AddonAsk {
+                proposal: proposal.proposal,
+                addon: proposal.addon.clone(),
+                why: proposal.why.clone(),
+                sure: proposal.sure,
+            };
+            match asks.publish_json(now_us, &ask) {
+                Ok(_) => {
+                    eprintln!(
+                        "lamp-addons: asked the policy about {} say #{}",
+                        proposal.addon, proposal.proposal
+                    );
+                    asked = Some(proposal);
+                }
+                Err(error) => {
+                    eprintln!(
+                        "lamp-addons: the ask about #{} not written: {error}",
+                        proposal.proposal
+                    );
+                    judge.lapsed(u64::MAX);
+                    report.dropped += 1;
+                    let verdict = Verdict::Dropped(Drop::PolicySilent);
+                    write(
+                        &mut decisions,
+                        &proposal,
+                        verdict,
+                        "rule",
+                        Drop::PolicySilent.why(),
+                        now_us,
+                    );
+                }
+            }
+            continue;
+        }
         let why = decide(
             &proposal,
             verdict,
@@ -134,27 +234,52 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             },
             &mut report,
         );
-        let decision = AddonDecision {
-            proposal: proposal.proposal,
-            addon: proposal.addon.clone(),
-            act: proposal.act.clone(),
-            choice: if verdict == Verdict::Kept {
-                "kept"
-            } else {
-                "dropped"
-            }
-            .into(),
-            by: "rule".into(),
-            why: why.chars().take(200).collect(),
-        };
-        if let Err(error) = decisions.publish_json(now_us, &decision) {
-            eprintln!(
-                "lamp-addons: the decision on #{} not written: {error}",
-                proposal.proposal
-            );
-        }
+        write(&mut decisions, &proposal, verdict, "rule", &why, now_us);
     }
     Ok(report)
+}
+
+/// One verdict said on `addon/decision`, `by` the rules or the policy.
+fn write(
+    decisions: &mut Publisher,
+    proposal: &AddonProposal,
+    verdict: Verdict,
+    by: &str,
+    why: &str,
+    now_us: u64,
+) {
+    if let Verdict::Dropped(_) = verdict
+        && by == "jev"
+    {
+        eprintln!(
+            "lamp-addons: dropped {} say #{}: {why}",
+            proposal.addon, proposal.proposal
+        );
+    } else if by == "jev" {
+        eprintln!(
+            "lamp-addons: kept {} say #{}: {why}",
+            proposal.addon, proposal.proposal
+        );
+    }
+    let decision = AddonDecision {
+        proposal: proposal.proposal,
+        addon: proposal.addon.clone(),
+        act: proposal.act.clone(),
+        choice: if verdict == Verdict::Kept {
+            "kept"
+        } else {
+            "dropped"
+        }
+        .into(),
+        by: by.into(),
+        why: why.chars().take(200).collect(),
+    };
+    if let Err(error) = decisions.publish_json(now_us, &decision) {
+        eprintln!(
+            "lamp-addons: the decision on #{} not written: {error}",
+            proposal.proposal
+        );
+    }
 }
 
 /// Where a kept act goes: the ring's requests, and Mood's nudges; and
@@ -178,6 +303,8 @@ fn decide(
 ) -> String {
     let named = format!("{} {} #{}", proposal.addon, proposal.act, proposal.proposal);
     match verdict {
+        // Put to the policy before this is reached.
+        Verdict::Ask => "asked of the policy".into(),
         Verdict::Dropped(drop) => {
             report.dropped += 1;
             eprintln!("lamp-addons: dropped {named}: {}", drop.why());

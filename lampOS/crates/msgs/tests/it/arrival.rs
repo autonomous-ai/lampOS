@@ -88,6 +88,7 @@ fn a_hello_decision_names_its_arrival_and_every_other_decision_is_written_as_bef
         task: None,
         arrival: None,
         ask: None,
+        proposal: None,
     };
     // The bytes the attention and progress decisions had before the field.
     assert_eq!(

@@ -244,6 +244,7 @@ fn a_progress_decision_names_its_work_and_an_attention_one_is_written_as_before(
         task: None,
         arrival: None,
         ask: None,
+        proposal: None,
     };
     // Without a task the bytes are the ones written before the field was.
     assert_eq!(

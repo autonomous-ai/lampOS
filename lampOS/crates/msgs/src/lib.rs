@@ -1427,6 +1427,11 @@ pub struct Decision {
     /// (`SkillAsk::ask`). Not there for any other decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ask: Option<u64>,
+    /// The add-on's say this answers (#2530 part 2): the number
+    /// `addon/ask` gave it (`AddonAsk::proposal`), with `about` `addon`.
+    /// Not there for any other decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<u64>,
 }
 
 impl Decision {
@@ -2295,6 +2300,7 @@ mod tests {
             task: None,
             arrival: None,
             ask: None,
+            proposal: None,
         };
         // The answers are written by the question's name, in the order of
         // the names.

@@ -560,6 +560,7 @@ impl Moment {
             task: None,
             arrival: None,
             ask: Some(context.ask),
+            proposal: None,
         };
         let line = Line {
             at_unix_ms: unix_ms,

@@ -48,6 +48,8 @@ pub struct Watcher {
     /// a restarted voice, which may say no mute any more.
     voice_boot: Option<String>,
     voice_resting: Option<Reading<bool>>,
+    /// Since when the voice has rested, while it still does.
+    resting_since_us: Option<u64>,
     room_quiet: Option<Reading<bool>>,
     /// The newest light a person set this boot, if any, and when, on the
     /// boot's clock (its message's own time, so one read at the judge's
@@ -132,7 +134,16 @@ impl Watcher {
         if self.voice_boot.as_deref() != Some(boot) {
             self.voice_boot = Some(boot.to_owned());
         }
-        self.voice_resting = Some(Reading::new(voice.state == Voice::Resting, at_us));
+        let resting = voice.state == Voice::Resting;
+        self.voice_resting = Some(Reading::new(resting, at_us));
+        // Since when it rests: its first resting word after anything else,
+        // or after the judge began reading (taken the cautious way, as if
+        // it had just spoken).
+        self.resting_since_us = match (resting, self.resting_since_us) {
+            (true, Some(since)) => Some(since),
+            (true, None) => Some(at_us),
+            (false, _) => None,
+        };
     }
 
     /// `room/state`: only `quiet` is quiet; `unknown` is not.
@@ -202,6 +213,7 @@ impl Watcher {
             },
             onboarding: self.setting_up,
             voice_resting: self.voice_resting,
+            resting_since_us: self.resting_since_us,
             room_quiet: self.room_quiet,
             persons_light: match (&self.persons, &self.shown) {
                 (Some(_), _) if now_us < self.glow_until_us => true,
@@ -467,6 +479,21 @@ mod tests {
             invitations: Vec::new(),
         });
         assert!(!watcher.situation(0).onboarding);
+    }
+
+    /// Since when the voice rests: from its first resting word after
+    /// anything else, kept while it rests, and gone once it doesn't.
+    #[test]
+    fn the_voice_rests_since_its_first_resting_word() {
+        let mut watcher = Watcher::default();
+        let state = |state| VoiceState { state };
+        watcher.voice(&state(Voice::Resting), 1, "v");
+        watcher.voice(&state(Voice::Resting), 5, "v");
+        assert_eq!(watcher.situation(5).resting_since_us, Some(1));
+        watcher.voice(&state(Voice::Speaking), 6, "v");
+        assert_eq!(watcher.situation(6).resting_since_us, None);
+        watcher.voice(&state(Voice::Resting), 9, "v");
+        assert_eq!(watcher.situation(9).resting_since_us, Some(9));
     }
 
     #[test]
