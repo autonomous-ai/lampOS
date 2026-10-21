@@ -197,9 +197,12 @@ voice's own hello is off, as lamp-4ace now has it too.
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
-eight folders are installed, with seven enabled. Welcome back, Reminders,
-Task news, Onboarding, Stretch break, Stuffy air and Dance keep their enabled
-defaults.
+nine folders are installed, with eight enabled. Welcome back, Reminders,
+Task news, Onboarding, Stretch break, Stuffy air, Dance and Not feeling well
+keep their enabled defaults. Not feeling well (#1681) came with the product
+after its lamp check, row 8 on lamp-52e6 with the lead (20 Oct 11:35): one
+slow droop for a failed part, and the light back after; it adds no
+function.
 Bedtime and Morning is included with `enabled = false`, awaiting its lamp
 comparison (#1672); it adds no active trigger or advertised tool. Each
 folder is installed whole but for its `tests/`. The voice's own paths still
@@ -228,8 +231,7 @@ from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
 the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
-lamp check; and Not feeling well (#1681), the droop and dim on
-`lamp/health`'s `error`, until its lamp check; and Smoky air and Dusty air
+lamp check; and Smoky air and Dusty air
 (#1684), the air's sudden smoke and an hour of dust, until they are
 measured for false alarms on real traces. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
@@ -1060,8 +1062,8 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
   lamp has run the product unit with them yet, and Reminders and Task news
   have not run as skills on any lamp.
-- Bedtime and Morning (#1672): the seventh installed skill is disabled.
-  Host installation tests check that only six skills are active, the new
+- Bedtime and Morning (#1672): an installed skill that is disabled.
+  Host installation tests check that only eight skills are active, the new
   skill is absent from the live catalog, and the Skills and Actions units
   declare their private durable paths without enabling any new switch.
   The directories' creation by systemd and the routine's behavior on a lamp
