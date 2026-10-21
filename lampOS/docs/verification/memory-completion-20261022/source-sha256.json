@@ -1,0 +1,6 @@
+{
+  "lampOS/crates/memory/tests/it/voice_people.rs": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+  "lampOS/crates/memory/tests/it/health.rs": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+  "lampOS/crates/memory/src/health.rs": "96d86dc1a63db94e582b690d9a4ee5e3216b27f9478ab1bf4b2fc4a87767a8f7",
+  "lampOS/crates/voice/src/remember.rs": "4ad486994e1a10a649ac1c858a547383444070c58f85ad49a4350930c70ef3b3"
+}

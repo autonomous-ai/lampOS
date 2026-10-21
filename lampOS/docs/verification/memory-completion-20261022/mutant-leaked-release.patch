@@ -1,0 +1,11 @@
+--- a/lampOS/crates/memory/tests/it/voice_people.rs
++++ b/lampOS/crates/memory/tests/it/voice_people.rs
+@@ -763,7 +763,7 @@
+         Some(&minh),
+     );
+     assert!(!ok, "{told}");
+-    drop(release_after_timeout);
++    std::mem::forget(release_after_timeout);
+     // Committed all the same.
+     let rules = listed(&client, &minh);
+     assert_eq!(rules.len(), 1, "{rules:?}");

@@ -113,7 +113,12 @@ impl Fixture {
 impl Drop for Fixture {
     fn drop(&mut self) {
         self.stop.stop();
-        self.worker.take().unwrap().join().unwrap();
+        let joined = self.worker.take().unwrap().join();
+        // A fixture watchdog may already have failed the worker. Still join
+        // it, but do not turn an existing assertion unwind into an abort.
+        if !std::thread::panicking() {
+            joined.unwrap();
+        }
         fs::remove_dir_all(&self.root).unwrap();
     }
 }
@@ -706,6 +711,7 @@ fn days_store_never_links_another_persons_rule() {
 struct LateRuleAck<M> {
     store: M,
     held: bool,
+    released: Receiver<()>,
 }
 
 impl<M: Memory> Memory for LateRuleAck<M> {
@@ -719,7 +725,11 @@ impl<M: Memory> Memory for LateRuleAck<M> {
                 .is_some_and(|p| p.starts_with("r-"))
         {
             self.held = true;
-            std::thread::sleep(Duration::from_millis(1_700));
+            assert_eq!(
+                self.released.recv_timeout(Duration::from_secs(10)),
+                Err(mpsc::RecvTimeoutError::Disconnected),
+                "the held rule acknowledgement was not released before the fixture watchdog"
+            );
         }
         answer
     }
@@ -730,13 +740,18 @@ impl<M: Memory> Memory for LateRuleAck<M> {
 /// unlinked, so forgetting the rule leaves nothing of it to recall.
 #[test]
 fn days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled() {
+    let (release, released) = mpsc::channel();
     let fixture = Fixture::new(|options, now| LateRuleAck {
         store: Traced {
             store: Days::open(options, now).unwrap(),
             trace: mpsc::channel().0,
         },
         held: false,
+        released,
     });
+    // Declared after the fixture so an assertion unwind releases the worker
+    // before Fixture::drop joins it. Disconnection also releases normal use.
+    let release_after_timeout = release;
     let minh = person_id("Minh");
     let client = DaysClient::new(fixture.socket.clone()).unwrap();
     let (told, ok) = client.rule_for(
@@ -748,6 +763,7 @@ fn days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journal
         Some(&minh),
     );
     assert!(!ok, "{told}");
+    drop(release_after_timeout);
     // Committed all the same.
     let rules = listed(&client, &minh);
     assert_eq!(rules.len(), 1, "{rules:?}");

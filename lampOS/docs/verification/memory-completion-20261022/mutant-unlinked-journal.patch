@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -3455,7 +3455,7 @@
+             self.lost.fetch_add(1, Ordering::Relaxed);
+             return false;
+         };
+-        if context.journal_inhibited || context.uncertain_writes != 0 {
++        if false {
+             self.lost.fetch_add(1, Ordering::Relaxed);
+             context.held_back = context.held_back.saturating_add(1);
+             let said = context.held_back_line();

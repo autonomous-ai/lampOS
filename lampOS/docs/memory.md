@@ -174,6 +174,18 @@ Neither observation acknowledges Event delivery, a flushed downstream log,
 publisher cleanup or worker exit. A controller must account for those real
 participants separately before advancing time or claiming evidence.
 
+The newer-database set-aside fixture uses that explicit schedule too. It
+still receives a real warning report naming the kept file, checks its
+original bytes and completes a memory write; a controller acknowledgement
+alone cannot satisfy it. The rule-acknowledgement fixture holds the real
+store's committed answer until Voice's original 1.5-second call returns
+unsuccessfully, then releases it immediately. Its release token also drops
+before the fixture joins its worker during an assertion unwind. A ten-second
+host watchdog fails a stuck fixture; it is not the release condition.
+Joining a failed worker propagates its failure on the normal path and
+avoids a second panic during an existing assertion unwind. Rule listing,
+unlinked-journal rejection, forgetting and empty recall checks remain.
+
 ## Forgets told on the bus (`memory/forgot`)
 
 With `--bus-root`, each `forget_all` that was done is told on

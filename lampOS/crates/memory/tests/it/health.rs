@@ -713,7 +713,9 @@ fn a_newer_database_is_set_aside_and_health_says_so_while_memory_serves() {
         .unwrap();
     let original = fs::read(store.join(DATABASE)).unwrap();
     let mut reports = scratch.subscribe();
-    let mut process = Process::start(&scratch, true, true, false);
+    // Step the existing report schedule, then require the actual set-aside
+    // report; a controller acknowledgement is not the health observation.
+    let mut process = Process::start_controlled(&scratch, true, true, false);
     process.ready(&scratch);
     process.logged("it is set aside as memory-days.sqlite3.newer-db2-");
     let report = report_when(&mut reports, |report| {

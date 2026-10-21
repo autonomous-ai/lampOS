@@ -1,0 +1,12 @@
+--- a/lampOS/crates/memory/tests/it/voice_people.rs
++++ b/lampOS/crates/memory/tests/it/voice_people.rs
+@@ -751,7 +751,8 @@
+     });
+     // Declared after the fixture so an assertion unwind releases the worker
+     // before Fixture::drop joins it. Disconnection also releases normal use.
+-    let release_after_timeout = release;
++    drop(release);
++    let release_after_timeout = ();
+     let minh = person_id("Minh");
+     let client = DaysClient::new(fixture.socket.clone()).unwrap();
+     let (told, ok) = client.rule_for(

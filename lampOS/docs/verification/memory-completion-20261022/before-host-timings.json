@@ -1,0 +1,101 @@
+{
+  "base": "4efcf4eb0cda0ef730d30658572f49da7592a0b8",
+  "rows": [
+    {
+      "test": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "run": 1,
+      "label": "before-health-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.388316,
+      "stdout": "before-health-1.stdout",
+      "stderr": "before-health-1.stderr"
+    },
+    {
+      "test": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "run": 1,
+      "label": "before-late-rule-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.80864,
+      "stdout": "before-late-rule-1.stdout",
+      "stderr": "before-late-rule-1.stderr"
+    },
+    {
+      "test": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "run": 2,
+      "label": "before-health-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 1.095228,
+      "stdout": "before-health-2.stdout",
+      "stderr": "before-health-2.stderr"
+    },
+    {
+      "test": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "run": 2,
+      "label": "before-late-rule-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.749616,
+      "stdout": "before-late-rule-2.stdout",
+      "stderr": "before-late-rule-2.stderr"
+    },
+    {
+      "test": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "run": 3,
+      "label": "before-health-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 1.093809,
+      "stdout": "before-health-3.stdout",
+      "stderr": "before-health-3.stderr"
+    },
+    {
+      "test": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "run": 3,
+      "label": "before-late-rule-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629",
+        "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.749481,
+      "stdout": "before-late-rule-3.stdout",
+      "stderr": "before-late-rule-3.stderr"
+    }
+  ]
+}

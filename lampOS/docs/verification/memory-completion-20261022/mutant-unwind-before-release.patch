@@ -1,0 +1,10 @@
+--- a/lampOS/crates/memory/tests/it/voice_people.rs
++++ b/lampOS/crates/memory/tests/it/voice_people.rs
+@@ -763,6 +763,7 @@
+         Some(&minh),
+     );
+     assert!(!ok, "{told}");
++    assert!(std::hint::black_box(false), "controlled unwind before release");
+     drop(release_after_timeout);
+     // Committed all the same.
+     let rules = listed(&client, &minh);

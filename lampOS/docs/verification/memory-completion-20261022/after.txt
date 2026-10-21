@@ -1,0 +1,74 @@
+=== after-compile | exit 0 | 3.671371 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-memory-20261022/lampOS/crates/memory#lamp-memory@0.1.0","manifest_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-28e6009048c20629","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-memory-20261022/lampOS/crates/memory)
+    Finished `test` profile [unoptimized] target(s) in 3.59s
+=== end after-compile ===
+=== after-health-1 | exit 0 | 2.422018 s ===
+--- stdout ---
+
+running 1 test
+test health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 1.65s
+
+--- stderr ---
+=== end after-health-1 ===
+=== after-late-rule-1 | exit 0 | 2.502752 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.49s
+
+--- stderr ---
+lamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=1 not_journalled=1
+lamp-voice provider: memory journal stopped until a fresh worker: why=rule_forgotten
+=== end after-late-rule-1 ===
+=== after-health-2 | exit 0 | 1.046182 s ===
+--- stdout ---
+
+running 1 test
+test health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 1.03s
+
+--- stderr ---
+=== end after-health-2 ===
+=== after-late-rule-2 | exit 0 | 2.487739 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.47s
+
+--- stderr ---
+lamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=1 not_journalled=1
+lamp-voice provider: memory journal stopped until a fresh worker: why=rule_forgotten
+=== end after-late-rule-2 ===
+=== after-health-3 | exit 0 | 1.055995 s ===
+--- stdout ---
+
+running 1 test
+test health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 1.04s
+
+--- stderr ---
+=== end after-health-3 ===
+=== after-late-rule-3 | exit 0 | 2.480766 s ===
+--- stdout ---
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.46s
+
+--- stderr ---
+lamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=1 not_journalled=1
+lamp-voice provider: memory journal stopped until a fresh worker: why=rule_forgotten
+=== end after-late-rule-3 ===

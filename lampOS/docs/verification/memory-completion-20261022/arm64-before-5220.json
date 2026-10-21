@@ -1,0 +1,19 @@
+{
+  "run": 39639887119,
+  "head": "b87b3e91ad04b5811fe441efa118773d33416630",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T17:11:05.0600200Z      Summary [ 162.767s] 9752 tests run: 9752 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 1.014,
+      "binary": "lamp-memory::it",
+      "test": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.731,
+      "binary": "lamp-memory::it",
+      "test": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled"
+    }
+  ]
+}
