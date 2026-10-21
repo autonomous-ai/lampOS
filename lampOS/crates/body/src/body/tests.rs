@@ -2340,6 +2340,7 @@ fn gesture_run(
                 still: false,
                 paused: false,
                 unplug: false,
+                held_by_test: false,
                 asleep: false,
                 woken: false,
             }
@@ -2411,6 +2412,7 @@ fn expression_run_with(
             still: false,
             paused: false,
             unplug: false,
+            held_by_test: false,
             asleep: false,
             woken: false,
         },
@@ -2572,6 +2574,7 @@ fn speaking_run_with(
             still: false,
             paused: false,
             unplug: false,
+            held_by_test: false,
             asleep: false,
             woken: false,
         },
@@ -3379,6 +3382,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             still: false,
             paused: false,
             unplug: false,
+            held_by_test: false,
             asleep: false,
             woken: false,
         },
@@ -3441,6 +3445,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             still: false,
             paused: false,
             unplug: false,
+            held_by_test: false,
             asleep: false,
             woken: false,
         },
@@ -3521,6 +3526,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 still: false,
                 paused: false,
                 unplug: false,
+                held_by_test: false,
                 asleep: false,
                 woken: false,
             }
@@ -3940,6 +3946,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     still: false,
                     paused: false,
                     unplug: false,
+                    held_by_test: false,
                     asleep: false,
                     woken: false,
                 }
@@ -4015,6 +4022,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 still: false,
                 paused: false,
                 unplug: false,
+                held_by_test: false,
                 asleep: false,
                 woken: false,
             }
@@ -4097,6 +4105,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 asleep: false,
                 woken: false,
                 unplug: false,
+                held_by_test: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6296,6 +6305,7 @@ fn called_run(
                 still: false,
                 paused: false,
                 unplug: false,
+                held_by_test: false,
                 asleep: false,
                 woken: false,
             }
@@ -10681,6 +10691,137 @@ fn a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp() {
     }
 }
 
+/// One step of a run under the test input's hand (`--hold-from`): whether
+/// it held the head, the gesture, the three goals and the arm's.
+type HeldStep = (bool, Option<&'static str>, [u16; 3], [u16; 2]);
+
+/// A folded lamp asked a skill's stretch at a second; the test input
+/// (`Asked::held_by_test`) holds the head over `held`, no hand on any servo.
+fn held_from_test_input_run(
+    held: Option<(Duration, Duration)>,
+    ask_at: Duration,
+) -> (
+    BodyReport,
+    Vec<(&'static str, &'static str)>,
+    Vec<HeldStep>,
+    Lamp,
+) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let time = clock.time.clone();
+    let holding = Rc::new(Cell::new(false));
+    let told = holding.clone();
+    let mut asked = false;
+    let (mut fates, mut seen) = (Vec::new(), Vec::new());
+    let report = run_arbitrated(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            give_way: Some(GiveWay::Return),
+            arbitration: true,
+            ..gesture_limits()
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            let due = !asked && now >= ask_at;
+            asked |= due;
+            let held = held.is_some_and(|(from, until)| now >= from && now < until);
+            holding.set(held);
+            let asked = Asked {
+                gesture: due.then_some(&crate::clips::STRETCHING),
+                held_by_test: held,
+                ..Asked::default()
+            };
+            (asked, Priority::Skill)
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            seen.push((
+                told.get(),
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.arm_goals,
+            ));
+        },
+    );
+    (report, fates, seen, lamp)
+}
+
+/// `--hold-from` (#2668): the test input's hand coming mid-stretch ends it
+/// as a hand on the head does, `ended: by a hand`, eased out, the head's
+/// pitch kept where it was and moved on from there once it lets go, and no
+/// torque written or servo given way; without the input the stretch plays
+/// out the same as ever.
+#[test]
+fn a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out() {
+    let ms = Duration::from_millis;
+    let (free, free_fates, played, free_lamp) = held_from_test_input_run(None, ms(1_000));
+    assert_eq!(
+        free_fates,
+        [("stretching", "taken: it was folded and stood up for it")]
+    );
+    let (report, fates, seen, lamp) =
+        held_from_test_input_run(Some((ms(6_000), ms(10_000))), ms(1_000));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(
+        fates,
+        [
+            ("stretching", "taken: it was folded and stood up for it"),
+            ("stretching", crate::moves::ENDED_BY_HAND),
+        ]
+    );
+    let first = seen.iter().position(|step| step.0).unwrap();
+    let last = seen.iter().rposition(|step| step.0).unwrap();
+    // The same as without it until the hand, and played until then.
+    assert_eq!(seen[..first], played[..first]);
+    assert_eq!(seen[first - 1].1, Some("stretching"));
+    assert!(seen[first..].iter().all(|step| step.1.is_none()));
+    // The head's pitch held where it was, all the hold.
+    let pitch = seen[first - 1].2[0];
+    assert!(seen[first..=last].iter().all(|step| step.2[0] == pitch));
+    // Eased out, not snapped back: the arm's change a step grows and
+    // shrinks by a few counts; the head moves on from where it was held.
+    for joint in 0..2 {
+        let change: Vec<f32> = seen[first - 2..first + 20]
+            .windows(2)
+            .map(|pair| f32::from(pair[1].3[joint]) - f32::from(pair[0].3[joint]))
+            .collect();
+        for pair in change.windows(2) {
+            assert!((pair[1] - pair[0]).abs() <= 4.0, "{joint}: {change:?}");
+        }
+    }
+    for pair in seen[last - 1..last + 20].windows(2) {
+        assert!(pair[1].2[0].abs_diff(pair[0].2[0]) <= 4, "{seen:?}");
+    }
+    // No servo gave way and no torque was written for it.
+    assert_eq!(report.released_by_hand, [0; 3]);
+    assert_eq!(report.torque_writes, free.torque_writes);
+    let torque = |lamp: &Lamp| {
+        lamp.registers
+            .iter()
+            .filter(|(_, address, _)| *address == 40)
+            .count()
+    };
+    assert_eq!(torque(&lamp), torque(&free_lamp));
+    assert!(lamp.servos.iter().all(|servo| servo.torque == 1));
+}
+
+/// The test input's hand on the head while the stretch still waits for the
+/// lamp to stand drops it as held, and it never begins.
+#[test]
+fn a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input() {
+    let ms = Duration::from_millis;
+    let (report, fates, _, _) = held_from_test_input_run(Some((ms(3_000), ms(10_000))), ms(1_000));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures, 0, "{fates:?}");
+    assert_eq!(fates, [("stretching", "dropped: held by a hand")]);
+}
+
 /// A skill's move asked while a hand holds the lamp is dropped, naming
 /// the hand.
 #[test]
@@ -11521,6 +11662,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
         || Some((Mood::Resting, 0)),
         || Asked {
             unplug: true,
+            held_by_test: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -11549,6 +11691,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
         || Some((Mood::Resting, 0)),
         || Asked {
             unplug: true,
+            held_by_test: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -11585,6 +11728,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
             } else {
                 Asked {
                     unplug: true,
+                    held_by_test: false,
                     ..Asked::default()
                 }
             }
@@ -11643,6 +11787,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
             let late = asked_time.get() >= turn;
             Asked {
                 unplug: true,
+                held_by_test: false,
                 seen: late.then_some(Seen {
                     face: Some(crate::gaze::Sight {
                         x: 0.8,
@@ -11695,6 +11840,7 @@ fn unplug_ready_survives_a_bad_read() {
         || Some((Mood::Resting, 0)),
         || Asked {
             unplug: true,
+            held_by_test: false,
             ..Asked::default()
         },
         |glimpse| {
@@ -11831,6 +11977,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
         || Some((Mood::Resting, 0)),
         || Asked {
             unplug: true,
+            held_by_test: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -11885,6 +12032,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                 let latched = at >= Duration::from_secs(8) && at < Duration::from_secs(16);
                 Asked {
                     unplug: latched,
+                    held_by_test: false,
                     paused: paused && at >= Duration::from_secs(16),
                     ..Asked::default()
                 }

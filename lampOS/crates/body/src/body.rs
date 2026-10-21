@@ -359,6 +359,13 @@ pub struct Asked {
     pub toward: Option<f32>,
     /// A latched unplug request: fold now and accept no new motion.
     pub unplug: bool,
+    /// The head's pitch is held by a hand, from a test input
+    /// (`lamp-body --hold-from`, off in every product unit), not from the
+    /// servo: the hand rules apply as when that joint gave way to a push
+    /// (a skill's or idle gesture playing ends `ended: by a hand`, one
+    /// waiting or asked is dropped as held), and the joint's goal stays
+    /// where it is, without the give-way path, torque or a read judged.
+    pub held_by_test: bool,
 }
 
 impl Asked {
@@ -377,6 +384,7 @@ impl Asked {
         woken: false,
         toward: None,
         unplug: false,
+        held_by_test: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -395,6 +403,7 @@ impl Asked {
         woken: false,
         toward: None,
         unplug: false,
+        held_by_test: false,
     };
 }
 
@@ -2962,6 +2971,7 @@ pub(crate) fn run_looking(
         woken: false,
         toward: None,
         unplug: false,
+        held_by_test: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -4112,6 +4122,9 @@ fn run_on<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        // A hand from the test input (`--hold-from`) holds through anything
+        // that replaces what is asked, as a real hand would.
+        let test_held = asked_now.held_by_test;
         let latched_now = asked_now.unplug || bus.runtime.recovery_inhibited();
         // A matching "never mind" cleared the latch: it stands as when spoken
         // to, through the ordinary guarded rise. A keeper pause still wins.
@@ -4233,7 +4246,8 @@ fn run_on<P: PortIo, R: Runtime>(
             slumped = false;
         }
         // A hand holds a joint where it gave way: a gesture is not begun.
-        let in_hand_now = easing.iter().any(|left| *left > 0);
+        // Or the test input says a hand holds the head (`--hold-from`).
+        let in_hand_now = easing.iter().any(|left| *left > 0) || test_held;
         // An unprompted gesture, a skill's or idle life's, is an invitation:
         // whatever `--arbitration`, it ends the moment a conversation begins
         // or a hand comes on the lamp, and eases out as one ended for a
@@ -4464,7 +4478,8 @@ fn run_on<P: PortIo, R: Runtime>(
             && (playing.is_none() || idling)
             && !asked_now.still
             && easing == [0; 3]
-            && in_hand == [0; 3];
+            && in_hand == [0; 3]
+            && !test_held;
         if !quiet {
             idle_due = None;
             if idling {
@@ -4941,6 +4956,15 @@ fn run_on<P: PortIo, R: Runtime>(
         }
         for (index, offset) in offsets.into_iter().enumerate() {
             if blind {
+                continue;
+            }
+            // Held from the test input (`--hold-from`): the head's pitch
+            // keeps the goal it has, as a hand's hold pins it, and is asked
+            // nothing. Its command is kept under that goal, so that once
+            // the input lets go it moves on from there, not from before.
+            if index == 0 && test_held {
+                velocity[0] = 0.0;
+                commanded[0] = f32::from(goals[0]) - gesture_now[0];
                 continue;
             }
             if held[index] {
