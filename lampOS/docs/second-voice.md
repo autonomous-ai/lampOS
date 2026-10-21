@@ -110,6 +110,17 @@ Rules the loader keeps (`load_from_path`):
 - A credential path must be absolute and the file not empty. Its trailing
   line ending is dropped. A key is never shown by `Debug`, and no error
   carries a key, a URL or a server's words.
+- A service that refuses a request (any status but 2xx) is named in the
+  journal by its codes alone, read from the first 4 KiB of its answer
+  within 1 s: Google's `error.status` and `error.details[].reason`,
+  OpenAI's `error.code` and `error.type` (DeepSeek and OpenRouter answer
+  in that form). A value counts only if it reads as a code: one case,
+  letters, digits and `_`, `.` or `-`, at most 40 characters; at most
+  four. `lamp-voice second: a service answered HTTP 400 (INVALID_ARGUMENT,
+  API_KEY_INVALID)`, or `… HTTP 502, naming no code`. The caller's own
+  line follows, as before (`… failed: service answered HTTP 400`). It is
+  for telling a key from a model or a request when Gemini's chat answered
+  400 ten times out of ten on 21 Oct.
 - Every URL must be `https://` with a host, at most 2,048 bytes, with no
   `?`, `#` or `@`. HTTP redirects are not followed.
 
