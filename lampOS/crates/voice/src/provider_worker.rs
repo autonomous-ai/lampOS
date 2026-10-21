@@ -6539,9 +6539,13 @@ pub(crate) mod tests {
     /// #1675's Live part: with `LAMP_LIVE_SCOPED_SESSION`, a line admitted
     /// for B is not sent into a session opened for A; it fails as not
     /// delivered and the session is due again, for B. Without the switch it
-    /// is sent, as before.
+    /// is sent, as before. The test has the process's thread and room to
+    /// itself and puts the ones before back at its end, a failed assertion
+    /// included, so the person it sets at the lamp is not left there for a
+    /// later test (the reviewer's P3 on #2411).
     #[test]
     fn a_line_for_someone_else_known_is_not_sent_into_their_session() {
+        let _room = spoken_to::OwnRoom::fresh();
         let a = crate::remember::person_id("ScopedAnn");
         let b = crate::remember::person_id("ScopedBob");
         for scoped in [false, true] {
