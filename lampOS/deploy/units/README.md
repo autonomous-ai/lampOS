@@ -59,6 +59,18 @@ start, and the journal says why. It never turns torque off to get a read. A
 lamp's own folder made from these templates needs one of the two files
 ([body.md](../../docs/body.md)).
 
+`lamp-first-stand.service` gives a seated lamp its first stand, confirmed at
+the lamp (#2396, [body.md](../../docs/body.md), "The first stand of a moved
+lamp"):
+- Once someone is near, the lamp asks for a touch through the voice's say
+  service. This is why the generic voice unit sets `LAMP_SAY=on`.
+- A touch held 1 s is the yes. On a yes, the unit stops `lamp-body`, stands
+  the arm as the factory's steps do, writes `/etc/lampOS/body/lamp.env`, and
+  starts the body again.
+- It runs as root, and runs the body and its read as `@LAMP_USER@`.
+- With `lamp.env` there it does nothing. It stays active, whatever became of
+  the stand.
+
 `lamp-body.service` is `Type=notify` with `WatchdogSec=5`: the body says
 when it is ready and that its loop is alive. The others are `Type=simple`
 until each calls the keeper's helper; then each becomes `Type=notify` with

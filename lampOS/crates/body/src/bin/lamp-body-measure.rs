@@ -5,7 +5,7 @@
 use lamp_body::calibration::UnitId;
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n";
+const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. --gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n\nlamp-body-measure first-stand --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --body-user USER [--bus-root DIR] [--presence-file FILE] [--say-socket FILE] [--lamp-env FILE] [--record FILE]\n\nA seated lamp's first stand, confirmed at the lamp (lamp_body::first_stand, #2396): once someone is near\nit asks through the voice's say service, and a touch on the head or a button held a second is the yes;\nthen the body is stopped, the arm stood at 30% and 100% as the factory's steps stand it, this arm's\nstand written into --lamp-env (/etc/lampOS/body/lamp.env), and the body started again. A second touch\nwhile it moves stops it, and nothing is written. Nothing moves without the yes. As root.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -124,8 +124,88 @@ fn measured_at() -> String {
     )
 }
 
+/// `first-stand`'s options, with the product's paths where none is given.
+fn first_stand_options(
+    args: impl IntoIterator<Item = OsString>,
+) -> Result<lamp_body::first_stand::Options, &'static str> {
+    let mut args = args.into_iter();
+    let mut values = std::collections::BTreeMap::new();
+    while let Some(key) = args.next() {
+        let key = key
+            .into_string()
+            .map_err(|_| "every option must be UTF-8")?;
+        let value = args.next().ok_or("every option requires a value")?;
+        let value = value
+            .into_string()
+            .map_err(|_| "every value must be UTF-8")?;
+        if !matches!(
+            key.as_str(),
+            "--device"
+                | "--unit-id"
+                | "--lock-directory"
+                | "--body-user"
+                | "--bus-root"
+                | "--presence-file"
+                | "--say-socket"
+                | "--lamp-env"
+                | "--record"
+        ) || values.insert(key, value).is_some()
+        {
+            return Err("unknown or duplicate option");
+        }
+    }
+    let mut take = |key: &str, default: Option<&str>| {
+        values
+            .remove(key)
+            .or_else(|| default.map(str::to_owned))
+            .ok_or("--device, --unit-id, --lock-directory and --body-user are required")
+    };
+    let unit_id = take("--unit-id", None)?;
+    UnitId::new(&unit_id).map_err(|_| "invalid explicit unit ID")?;
+    let exe = std::env::current_exe().map_err(|_| "cannot find this program's own path")?;
+    let options = lamp_body::first_stand::Options {
+        unit_id,
+        device: take("--device", None)?.into(),
+        lock_directory: take("--lock-directory", None)?.into(),
+        body_user: take("--body-user", None)?,
+        bus_root: take("--bus-root", Some("/run/lampos-bus"))?.into(),
+        presence_file: take("--presence-file", Some("/run/lampos-eyes/present"))?.into(),
+        say_socket: take("--say-socket", Some("/run/lampos-say/say.sock"))?.into(),
+        lamp_env: take("--lamp-env", Some("/etc/lampOS/body/lamp.env"))?.into(),
+        record: take("--record", Some("/var/lib/lampos-body/first-stand.json"))?.into(),
+        body: exe.with_file_name("lamp-body"),
+        measure: exe,
+    };
+    if ![
+        &options.device,
+        &options.lock_directory,
+        &options.bus_root,
+        &options.presence_file,
+        &options.say_socket,
+        &options.lamp_env,
+        &options.record,
+    ]
+    .into_iter()
+    .all(|path| bounded(path))
+    {
+        return Err("paths must be bounded absolute UTF-8 paths without parent traversal");
+    }
+    Ok(options)
+}
+
 fn main() -> std::process::ExitCode {
-    let arguments = match parse(std::env::args_os().skip(1)) {
+    let mut args = std::env::args_os().skip(1).peekable();
+    if args.peek().is_some_and(|first| first == "first-stand") {
+        args.next();
+        return match first_stand_options(args) {
+            Err(error) => {
+                eprintln!("{error}\n{USAGE}");
+                std::process::ExitCode::from(2)
+            }
+            Ok(options) => first_stand(&options),
+        };
+    }
+    let arguments = match parse(args) {
         Ok(None) => {
             print!("{USAGE}");
             return std::process::ExitCode::SUCCESS;
@@ -143,6 +223,23 @@ fn main() -> std::process::ExitCode {
             std::process::ExitCode::FAILURE
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+fn first_stand(options: &lamp_body::first_stand::Options) -> std::process::ExitCode {
+    match lamp_body::first_stand::run(options) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("lamp-first-stand: {error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn first_stand(_: &lamp_body::first_stand::Options) -> std::process::ExitCode {
+    eprintln!("lamp-body-measure: first-stand is Linux only");
+    std::process::ExitCode::FAILURE
 }
 
 /// The poses from a rest read, printed, and written when asked.

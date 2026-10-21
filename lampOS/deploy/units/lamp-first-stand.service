@@ -1,0 +1,32 @@
+# lampOS body: the first stand of a lamp moved from V1, confirmed at the lamp (#2396; the first
+# builder on #1711, 21 Oct). Its body runs seated (lamp-body-measure.service) until a person beside
+# it says yes. Once someone is near, the lamp asks through the voice's say service: "I'd like to
+# stretch for the first time. Touch the top of my head when you're ready." A touch on the head or a
+# button held a second is the yes. lamp-body is then stopped, the arm stood at 30% and 100% as the
+# factory's steps stand it, this arm's stand written into /etc/lampOS/body/lamp.env, and lamp-body
+# started again on it. A second touch while it moves stops it, and nothing is written. Nothing moves
+# without the yes: two asks at most, ten minutes apart; then a person asks again by removing
+# /var/lib/lampos-body/first-stand.json and restarting this unit (lamp_body::first_stand).
+# With lamp.env there it does nothing. It ends well whatever became of the stand, and stays active
+# (RemainAfterExit), so the keeper does not wait on it. Root: it stops and starts lamp-body; the
+# body and its read run as @LAMP_USER@ (runuser), as the servo port's owner requires.
+[Unit]
+Description=lampOS body: the first stand, asked at the lamp and confirmed by a touch
+ConditionHost=@UNIT_ID@
+PartOf=lampos.target
+After=lamp-body.service lamp-voice.service lamp-controls.service lamp-eyes.service
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+User=root
+Slice=lampos-parts.slice
+WorkingDirectory=/
+ExecStart=/opt/lampOS/body/@BODY_SHA256@/lamp-body-measure first-stand --device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ --body-user @LAMP_USER@
+Restart=on-failure
+RestartSec=60s
+StandardInput=null
+SyslogIdentifier=lamp-first-stand
+
+[Install]
+WantedBy=lampos.target

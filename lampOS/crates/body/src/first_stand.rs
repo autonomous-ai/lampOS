@@ -1,0 +1,822 @@
+//! The first stand of a lamp moved from V1, confirmed at the lamp (#2396;
+//! the first builder on #1711, 21 Oct 15:0x).
+//!
+//! A moved lamp starts seated (`poses::seated_lamp_env`): its body holds the
+//! head and base and never the arm, until a person beside it says yes. This
+//! is how they say it:
+//!
+//! - **The ask.** Once someone is seen near the lamp (the eyes' presence
+//!   file, a face at least [`NEAR_SHARE`] of the picture's height for
+//!   [`NEAR_FOR_US`]), the lamp says [`ASK`] through the voice's say
+//!   service, which says it only once the room has been quiet for its
+//!   usual 15 s.
+//! - **The yes.** A deliberate touch on the head pads or a button, held
+//!   [`HOLD_US`], begun after the ask began: a pad already touched when the
+//!   ask begins counts only once it has been let go and touched again
+//!   ([`Touches`], from `controls/state`).
+//! - **The stand.** The factory's: lamp-body stopped, a rest read, the arm
+//!   stood at 30% and then 100% by a body run by hand, and this arm's stand
+//!   written into `lamp.env` as `deploy/factory/steps.sh` writes it. A second
+//!   touch while it moves stops it where it is: the body is sent SIGTERM,
+//!   eases back and lets go, and nothing is written.
+//! - **No yes.** Nothing moves without a touch within [`ANSWER_US`]. The lamp
+//!   asks once more at the next quiet time someone is near, at least
+//!   [`ASK_AGAIN_AFTER_US`] later, and then waits: it never stands on its own.
+//!   A person asks again by removing the record and restarting the unit.
+//! - **Recorded.** [`Record`] in the body's state folder: how many asks, the
+//!   outcome, when, and the stand's shoulder and elbow, the factory step's
+//!   fields, for the app and Migrate's rollback to read.
+//!
+//! Nothing is asked in the first [`SETTLE`] after the run starts.
+//! Whatever happens the body is started again at the end, on the confirmed
+//! poses if they were written and seated otherwise, and the run ends well:
+//! a lamp that stays seated is safe, and its unit stays active.
+use serde::{Deserialize, Serialize};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    time::Duration,
+};
+
+/// What the lamp says, the first builder's words.
+pub const ASK: &str =
+    "I'd like to stretch for the first time. Touch the top of my head when you're ready.";
+/// The say service's skill name for it.
+pub const SKILL: &str = "first-stand";
+/// The near face's height as a share of the picture's: someone at arm's
+/// length or closer (lamp-a63e, a person seated at the desk: 0.245).
+pub const NEAR_SHARE: f32 = 0.12;
+/// Someone is near for this long before the lamp asks: not a person passing.
+pub const NEAR_FOR_US: u64 = 5_000_000;
+/// A presence file older than this is no one there (the eyes keep it fresh
+/// several times a second while there is a face).
+pub const PRESENCE_FRESH_US: u64 = 2_000_000;
+/// The yes: a touch held this long.
+pub const HOLD_US: u64 = 1_000_000;
+/// How long the lamp waits for the yes after the ask.
+pub const ANSWER_US: u64 = 120_000_000;
+/// The asks, and the least time between them.
+pub const MOST_ASKS: u32 = 2;
+pub const ASK_AGAIN_AFTER_US: u64 = 600_000_000;
+/// How long the say service may keep the ask waiting for its quiet.
+pub const SAY_EXPIRES_MS: u64 = 120_000;
+/// The body run by hand: started for this long before it is told to stand,
+/// and given this long to stand and settle (steps.sh's pause 4 and
+/// STAND_WAIT).
+pub const BODY_STARTS: Duration = Duration::from_secs(4);
+pub const STAND_WAIT: Duration = Duration::from_secs(34);
+/// Nothing is asked this soon after the run starts: an update's check that
+/// every part is running (45 s, V1's `software-update`, from activation)
+/// never meets the body stopped for a stand.
+pub const SETTLE: Duration = Duration::from_secs(120);
+/// How often the touch is looked at.
+pub const LOOK_EVERY: Duration = Duration::from_millis(100);
+
+/// The yes, or the stop, from what `controls/state` says of the head pads
+/// and buttons. Nothing counts until the hands have been seen off them, so a
+/// pad touched before the ask began is not a yes.
+#[derive(Debug, Clone)]
+pub struct Touches {
+    hold_us: u64,
+    armed: bool,
+    since_us: Option<u64>,
+}
+
+impl Touches {
+    pub fn new(hold_us: u64) -> Self {
+        Self {
+            hold_us,
+            armed: false,
+            since_us: None,
+        }
+    }
+
+    /// Whether a touch has now been held long enough. `touched` is None
+    /// while the controls' state is not known: no touch, and not a release.
+    pub fn observe(&mut self, touched: Option<bool>, now_us: u64) -> bool {
+        match touched {
+            None => {
+                self.since_us = None;
+                false
+            }
+            Some(false) => {
+                self.armed = true;
+                self.since_us = None;
+                false
+            }
+            Some(true) if self.armed => {
+                let since = *self.since_us.get_or_insert(now_us);
+                now_us.saturating_sub(since) >= self.hold_us
+            }
+            Some(true) => false,
+        }
+    }
+}
+
+/// Whether the head pads or a button are touched, from `controls/state`'s
+/// payload; None when it cannot be read or the controls are not ready.
+pub fn touched(state: &lamp_msgs::ControlsState) -> Option<bool> {
+    state
+        .ready
+        .then(|| state.head_active || state.buttons.iter().any(|button| button.pressed))
+}
+
+/// Whether the presence file says someone is near: its one number, the near
+/// face's height as a share of the picture's, written within
+/// [`PRESENCE_FRESH_US`].
+pub fn near(text: &str, age_us: u64) -> bool {
+    age_us <= PRESENCE_FRESH_US
+        && text
+            .trim()
+            .parse::<f32>()
+            .is_ok_and(|share| share >= NEAR_SHARE)
+}
+
+/// Where the arm stopped standing, from the body's lines: the last one at
+/// its full stand (`stand 0.95` to `1.00`), `arm goals [..] positions
+/// [SHOULDER, ELBOW]`, as `steps.sh`'s `stood_at` reads it.
+pub fn stood_at(log: &str) -> Option<(u16, u16)> {
+    log.lines()
+        .rev()
+        .filter(|line| {
+            line.split("stand ").skip(1).any(|after| {
+                let share = after.get(..4).unwrap_or("");
+                share == "1.00"
+                    || (share.starts_with("0.9")
+                        && share
+                            .as_bytes()
+                            .get(3)
+                            .is_some_and(|d| (b'5'..=b'9').contains(d)))
+            })
+        })
+        .find_map(|line| {
+            let after = line.split("arm goals [").nth(1)?;
+            let after = after.split("] positions [").nth(1)?;
+            let inside = after.split(']').next()?;
+            let mut parts = inside.split(',').map(|part| part.trim().parse::<u16>());
+            match (parts.next(), parts.next(), parts.next()) {
+                (Some(Ok(shoulder)), Some(Ok(elbow)), None) => Some((shoulder, elbow)),
+                _ => None,
+            }
+        })
+}
+
+/// The rest read's `lamp.env` with this arm's stand: `--stand P,R,Y,S,E`
+/// given this arm's shoulder and elbow, and the comment saying so, as
+/// `steps.sh` writes it.
+pub fn confirmed_lamp_env(read: &str, shoulder: u16, elbow: u16) -> Option<String> {
+    const FOUND: &str =
+        "# home, folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw.";
+    const STOOD: &str = "# home, folded-arm: found at rest. stand: this arm's, stood at 100% at the lamp's first stand, confirmed by a touch, with this lamp's roll and yaw.";
+    let mut stood = false;
+    let lines: Vec<String> = read
+        .lines()
+        .map(|line| {
+            if let Some(rest) = line.strip_prefix(FOUND) {
+                return format!("{STOOD}{rest}");
+            }
+            let Some((before, after)) = line.split_once("--stand ") else {
+                return line.to_owned();
+            };
+            let (value, rest) = after.split_once(' ').unwrap_or((after, ""));
+            let fields: Vec<&str> = value.split(',').collect();
+            if fields.len() != 5 || fields.iter().any(|f| f.parse::<u16>().is_err()) {
+                return line.to_owned();
+            }
+            stood = true;
+            let space = if rest.is_empty() { "" } else { " " };
+            format!(
+                "{before}--stand {},{},{},{shoulder},{elbow}{space}{rest}",
+                fields[0], fields[1], fields[2]
+            )
+        })
+        .collect();
+    stood.then(|| lines.join("\n") + "\n")
+}
+
+/// What became of the first stand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    /// Asked, and no yes came in time.
+    NoAnswer,
+    /// It stood and `lamp.env` was written.
+    Stood,
+    /// A second touch stopped it; nothing was written.
+    Stopped,
+    /// The body or the read failed; nothing was written.
+    Failed,
+}
+
+/// The record in the body's state folder.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Record {
+    pub asks: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<Outcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_unix_ms: Option<u64>,
+    /// When the last ask was said, for the wait before the next.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asked_at_unix_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shoulder: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elbow: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<String>,
+}
+
+impl Record {
+    pub fn read(path: &Path) -> Record {
+        fs::read(path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn write(&self, path: &Path) -> io::Result<()> {
+        let new = path.with_extension("json.new");
+        fs::write(&new, serde_json::to_vec_pretty(self)?)?;
+        fs::rename(&new, path)
+    }
+
+    /// Whether the lamp may ask now, `now_unix_ms`: never once it has
+    /// stood or been stopped, never after [`MOST_ASKS`], and not within
+    /// [`ASK_AGAIN_AFTER_US`] of the last ask.
+    pub fn may_ask(&self, now_unix_ms: u64) -> bool {
+        !matches!(self.outcome, Some(Outcome::Stood | Outcome::Stopped))
+            && self.asks < MOST_ASKS
+            && self
+                .asked_at_unix_ms
+                .is_none_or(|at| now_unix_ms.saturating_sub(at) >= ASK_AGAIN_AFTER_US / 1_000)
+    }
+}
+
+/// Where the run finds and puts things.
+#[derive(Debug, Clone)]
+pub struct Options {
+    pub unit_id: String,
+    pub device: PathBuf,
+    pub lock_directory: PathBuf,
+    pub body_user: String,
+    pub bus_root: PathBuf,
+    pub presence_file: PathBuf,
+    pub say_socket: PathBuf,
+    pub lamp_env: PathBuf,
+    pub record: PathBuf,
+    /// lamp-body and lamp-body-measure, in the body's folder.
+    pub body: PathBuf,
+    pub measure: PathBuf,
+}
+
+#[cfg(target_os = "linux")]
+pub use run::run;
+
+#[cfg(target_os = "linux")]
+mod run {
+    use super::*;
+    use std::{
+        io::{BufRead, BufReader, Write},
+        os::unix::{fs::PermissionsExt, net::UnixDatagram, net::UnixStream},
+        process::{Child, Command, Stdio},
+        sync::mpsc,
+        thread,
+        time::{Instant, SystemTime, UNIX_EPOCH},
+    };
+
+    fn unix_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64)
+    }
+
+    fn say(line: &str) {
+        eprintln!("lamp-first-stand: {line}");
+    }
+
+    /// The touch now, from the bus's kept `controls/state`.
+    fn touch_now(bus: &lamp_bus::Bus) -> Option<bool> {
+        let message = bus.latest(lamp_msgs::ControlsState::TOPIC).ok().flatten()?;
+        if message.expired {
+            return None;
+        }
+        touched(&message.parse::<lamp_msgs::ControlsState>().ok()?)
+    }
+
+    fn near_now(options: &Options) -> bool {
+        let Ok(meta) = fs::metadata(&options.presence_file) else {
+            return false;
+        };
+        let age_us = meta
+            .modified()
+            .ok()
+            .and_then(|at| at.elapsed().ok())
+            .map_or(u64::MAX, |age| age.as_micros() as u64);
+        fs::read_to_string(&options.presence_file).is_ok_and(|text| near(&text, age_us))
+    }
+
+    /// Wait until someone has been near for [`NEAR_FOR_US`].
+    fn wait_for_someone(options: &Options) {
+        let mut since: Option<Instant> = None;
+        loop {
+            if near_now(options) {
+                let at = *since.get_or_insert_with(Instant::now);
+                if at.elapsed() >= Duration::from_micros(NEAR_FOR_US) {
+                    return;
+                }
+            } else {
+                since = None;
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+    }
+
+    /// What the say service said of the ask: `begun`, then its outcome.
+    enum Said {
+        Begun,
+        Outcome(String),
+    }
+
+    fn ask(options: &Options) -> io::Result<mpsc::Receiver<Said>> {
+        let mut stream = UnixStream::connect(&options.say_socket)?;
+        let line = serde_json::json!({"skill": SKILL, "text": ASK, "priority": 5,
+            "expires_in_ms": SAY_EXPIRES_MS});
+        stream.write_all(format!("{line}\n").as_bytes())?;
+        let (tell, told) = mpsc::channel();
+        thread::spawn(move || {
+            for line in BufReader::new(stream).lines() {
+                let Ok(line) = line else { break };
+                let value: serde_json::Value =
+                    serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
+                let said = match (value["event"].as_str(), value["outcome"].as_str()) {
+                    (Some("begun"), _) => Said::Begun,
+                    (_, Some(outcome)) => Said::Outcome(outcome.to_owned()),
+                    _ => continue,
+                };
+                let last = matches!(said, Said::Outcome(_));
+                if tell.send(said).is_err() || last {
+                    break;
+                }
+            }
+        });
+        Ok(told)
+    }
+
+    /// One ask and its answer: Some(true) for a yes, Some(false) when it
+    /// was said and no yes came, None when it was not said (asked again
+    /// later, not counted).
+    fn ask_and_wait(options: &Options, bus: &lamp_bus::Bus) -> Option<bool> {
+        let told = match ask(options) {
+            Ok(told) => told,
+            Err(error) => {
+                say(&format!(
+                    "the voice's say service is not there ({error}); asked again in a minute"
+                ));
+                return None;
+            }
+        };
+        let mut touches = Touches::new(HOLD_US);
+        let mut begun: Option<Instant> = None;
+        let mut spoken = false;
+        let started = Instant::now();
+        loop {
+            match told.try_recv() {
+                Ok(Said::Begun) => {
+                    begun.get_or_insert_with(Instant::now);
+                }
+                Ok(Said::Outcome(outcome)) if outcome == "spoken" => spoken = true,
+                Ok(Said::Outcome(outcome)) => {
+                    if begun.is_none() {
+                        say(&format!(
+                            "the ask was not said: {outcome}; asked again later"
+                        ));
+                        return None;
+                    }
+                }
+                Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => {}
+            }
+            let Some(at) = begun else {
+                if started.elapsed() > Duration::from_millis(SAY_EXPIRES_MS + 10_000) {
+                    say("the ask was never begun; asked again later");
+                    return None;
+                }
+                thread::sleep(LOOK_EVERY);
+                continue;
+            };
+            let now_us = at.elapsed().as_micros() as u64;
+            if touches.observe(touch_now(bus), now_us) {
+                say("yes: a touch held a second");
+                return Some(true);
+            }
+            if now_us >= ANSWER_US {
+                say(&format!(
+                    "no touch within {} s{}; nothing moves",
+                    ANSWER_US / 1_000_000,
+                    if spoken {
+                        ""
+                    } else {
+                        " (the ask was begun and not finished)"
+                    }
+                ));
+                return Some(false);
+            }
+            thread::sleep(LOOK_EVERY);
+        }
+    }
+
+    fn systemctl(verb: &str, unit: &str) -> io::Result<()> {
+        let status = Command::new("systemctl").args([verb, unit]).status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(io::Error::other(format!(
+                "systemctl {verb} {unit}: {status}"
+            )))
+        }
+    }
+
+    fn as_body(options: &Options, program: &Path) -> Command {
+        let mut command = Command::new("runuser");
+        command.args(["-u", &options.body_user, "--"]).arg(program);
+        command
+    }
+
+    fn rest_read(options: &Options, file: &Path) -> io::Result<(bool, String)> {
+        let output = as_body(options, &options.measure)
+            .arg("--device")
+            .arg(&options.device)
+            .args(["--unit-id", &options.unit_id])
+            .arg("--lock-directory")
+            .arg(&options.lock_directory)
+            .arg("--write")
+            .arg(file)
+            .output()?;
+        let said = String::from_utf8_lossy(&output.stdout).into_owned()
+            + &String::from_utf8_lossy(&output.stderr);
+        eprint!("{said}");
+        Ok((output.status.success(), said))
+    }
+
+    /// How a run of the body by hand ended.
+    enum Ran {
+        Done,
+        Stopped,
+    }
+
+    fn ease_back(child: &mut Child) {
+        let _ = nix::sys::signal::kill(
+            nix::unistd::Pid::from_raw(child.id() as i32),
+            nix::sys::signal::Signal::SIGTERM,
+        );
+        let _ = child.wait();
+    }
+
+    /// `steps.sh`'s `body_once`: the body on a private mood socket; with a
+    /// share, told "listening" once and given [`STAND_WAIT`], then SIGTERM
+    /// eases it back and lets it go. A touch while it runs stops it.
+    fn body_once(
+        options: &Options,
+        bus: &lamp_bus::Bus,
+        dir: &Path,
+        share: Option<(u8, &str)>,
+        stop: &mut Touches,
+    ) -> io::Result<Ran> {
+        let log = fs::File::create(dir.join("body.log"))?;
+        let mood = dir.join("mood.sock");
+        let mut command = as_body(options, &options.body);
+        command
+            .arg("--device")
+            .arg(&options.device)
+            .args(["--unit-id", &options.unit_id])
+            .arg("--lock-directory")
+            .arg(&options.lock_directory)
+            .arg("--mood-socket")
+            .arg(&mood)
+            .args([
+                "--reach",
+                "150,15,1,250",
+                "--speed",
+                "120",
+                "--servo-speed",
+                "1000",
+                "--servo-acceleration",
+                "60",
+                "--force-limit",
+                "600",
+                "--rest-glance",
+                "off",
+                "--look-at-name",
+                "off",
+                "--let-go-at-stop",
+                "on",
+            ]);
+        match share {
+            Some((share, poses)) => {
+                command.args([
+                    "--wake",
+                    "on",
+                    "--stand-share",
+                    &share.to_string(),
+                    "--stand-seconds",
+                    "6",
+                    "--awake-seconds",
+                    "20",
+                    "--idle",
+                    "off",
+                ]);
+                command.args(poses.split_whitespace());
+            }
+            None => {
+                command.args(["--wake", "off"]);
+            }
+        }
+        let mut child = command
+            .stdin(Stdio::null())
+            .stdout(log.try_clone()?)
+            .stderr(log)
+            .spawn()?;
+        let began = Instant::now();
+        let mut told = share.is_none();
+        let until = BODY_STARTS
+            + if share.is_some() {
+                STAND_WAIT
+            } else {
+                Duration::ZERO
+            };
+        while began.elapsed() < until {
+            if child.try_wait()?.is_some() {
+                return Err(io::Error::other(
+                    "the body ended by itself (its lines are in body.log)",
+                ));
+            }
+            if share.is_some() && stop.observe(touch_now(bus), began.elapsed().as_micros() as u64) {
+                say("a touch while it moved: stopped, easing back");
+                ease_back(&mut child);
+                return Ok(Ran::Stopped);
+            }
+            if !told && began.elapsed() >= BODY_STARTS {
+                UnixDatagram::unbound()?.send_to(br#"{"mood":"listening","level":128}"#, &mood)?;
+                told = true;
+            }
+            thread::sleep(LOOK_EVERY);
+        }
+        ease_back(&mut child);
+        Ok(Ran::Done)
+    }
+
+    /// The stand, from a stopped body to a written `lamp.env`.
+    fn stand(options: &Options, bus: &lamp_bus::Bus, record: &mut Record) -> io::Result<Outcome> {
+        let dir = std::env::temp_dir().join(format!("first-stand.{}", std::process::id()));
+        fs::create_dir_all(&dir)?;
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
+        Command::new("chown")
+            .arg(&options.body_user)
+            .arg(&dir)
+            .status()?;
+        let read = dir.join("lamp.env");
+        let (read_ok, said) = rest_read(options, &read)?;
+        // A stop needs the yes let go first, then a new touch.
+        let mut stop = Touches::new(0);
+        if !read_ok {
+            if !said.contains("has torque on") {
+                return Err(io::Error::other("lamp-body-measure refused the rest read"));
+            }
+            say("the lamp is held, torque on: letting it go where it lies");
+            body_once(options, bus, &dir, None, &mut stop)?;
+            let _ = fs::remove_file(&read);
+            if !rest_read(options, &read)?.0 {
+                return Err(io::Error::other(
+                    "lamp-body-measure still refused after the lamp was let go",
+                ));
+            }
+        }
+        let text = fs::read_to_string(&read)?;
+        let poses = text
+            .lines()
+            .find_map(|line| line.strip_prefix("BODY_POSES=\"")?.strip_suffix('"'))
+            .ok_or_else(|| io::Error::other("the read gave no BODY_POSES"))?
+            .to_owned();
+        for share in [30, 100] {
+            say(&format!("standing at {share}%"));
+            if let Ran::Stopped = body_once(options, bus, &dir, Some((share, &poses)), &mut stop)? {
+                return Ok(Outcome::Stopped);
+            }
+        }
+        let log = fs::read_to_string(dir.join("body.log"))?;
+        let (shoulder, elbow) = stood_at(&log)
+            .ok_or_else(|| io::Error::other("the arm did not reach its full stand"))?;
+        say(&format!(
+            "this arm stands at shoulder {shoulder}, elbow {elbow}"
+        ));
+        let confirmed = confirmed_lamp_env(&text, shoulder, elbow)
+            .ok_or_else(|| io::Error::other("the read gave no --stand"))?;
+        if let Some(parent) = options.lamp_env.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let new = options.lamp_env.with_extension("env.new");
+        fs::write(&new, confirmed)?;
+        fs::set_permissions(&new, fs::Permissions::from_mode(0o644))?;
+        // Never over a lamp.env written meanwhile.
+        fs::hard_link(&new, &options.lamp_env)?;
+        fs::remove_file(&new)?;
+        let _ = fs::remove_dir_all(&dir);
+        (record.shoulder, record.elbow) = (Some(shoulder), Some(elbow));
+        say(&format!("wrote {}", options.lamp_env.display()));
+        Ok(Outcome::Stood)
+    }
+
+    fn finish(options: &Options, record: &mut Record, outcome: Outcome, why: Option<String>) {
+        record.outcome = Some(outcome);
+        record.at_unix_ms = Some(unix_ms());
+        record.why = why;
+        if let Err(error) = record.write(&options.record) {
+            say(&format!(
+                "could not write {}: {error}",
+                options.record.display()
+            ));
+        }
+    }
+
+    /// The whole first stand. Ends well whatever became of it; an error is
+    /// only a fault of its own (the bus or the record cannot be opened).
+    pub fn run(options: &Options) -> io::Result<()> {
+        if options.lamp_env.exists() {
+            say("the first stand is confirmed already; nothing to ask");
+            return Ok(());
+        }
+        let bus = lamp_bus::Bus::new(&options.bus_root)?;
+        let mut record = Record::read(&options.record);
+        if record.may_ask(unix_ms()) {
+            thread::sleep(SETTLE);
+        }
+        loop {
+            if !record.may_ask(unix_ms()) {
+                if matches!(record.outcome, Some(Outcome::Stood | Outcome::Stopped))
+                    || record.asks >= MOST_ASKS
+                {
+                    say(&format!(
+                        "not asking again ({:?} after {} asks): a person asks again by removing {} and restarting this unit",
+                        record.outcome,
+                        record.asks,
+                        options.record.display()
+                    ));
+                    return Ok(());
+                }
+                thread::sleep(Duration::from_secs(30));
+                continue;
+            }
+            wait_for_someone(options);
+            match ask_and_wait(options, &bus) {
+                None => thread::sleep(Duration::from_secs(60)),
+                Some(false) => {
+                    record.asks += 1;
+                    record.asked_at_unix_ms = Some(unix_ms());
+                    finish(options, &mut record, Outcome::NoAnswer, None);
+                }
+                Some(true) => {
+                    record.asks += 1;
+                    record.asked_at_unix_ms = Some(unix_ms());
+                    break;
+                }
+            }
+        }
+        if let Err(error) = systemctl("stop", "lamp-body.service") {
+            finish(
+                options,
+                &mut record,
+                Outcome::Failed,
+                Some(error.to_string()),
+            );
+            return Ok(());
+        }
+        let (outcome, why) = match stand(options, &bus, &mut record) {
+            Ok(outcome) => (outcome, None),
+            Err(error) => {
+                say(&format!("the stand failed: {error}; the lamp stays seated"));
+                (Outcome::Failed, Some(error.to_string()))
+            }
+        };
+        finish(options, &mut record, outcome, why);
+        if let Err(error) = systemctl("start", "lamp-body.service") {
+            say(&format!("could not start lamp-body again: {error}"));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_touch_held_a_second_after_a_release_is_the_yes() {
+        let mut touches = Touches::new(HOLD_US);
+        // Touched when the ask began: not a yes, however long.
+        assert!(!touches.observe(Some(true), 0));
+        assert!(!touches.observe(Some(true), 5_000_000));
+        // Let go, touched again: a yes once held a second.
+        assert!(!touches.observe(Some(false), 5_100_000));
+        assert!(!touches.observe(Some(true), 6_000_000));
+        assert!(!touches.observe(Some(true), 6_900_000));
+        assert!(touches.observe(Some(true), 7_000_000));
+    }
+
+    #[test]
+    fn a_brush_is_not_the_yes_and_an_unknown_state_breaks_a_hold() {
+        let mut touches = Touches::new(HOLD_US);
+        assert!(!touches.observe(Some(false), 0));
+        assert!(!touches.observe(Some(true), 100_000));
+        assert!(!touches.observe(Some(false), 400_000));
+        assert!(!touches.observe(Some(true), 500_000));
+        assert!(!touches.observe(None, 1_000_000));
+        assert!(!touches.observe(Some(true), 1_600_000));
+        assert!(!touches.observe(Some(true), 2_500_000));
+        assert!(touches.observe(Some(true), 2_600_000));
+    }
+
+    #[test]
+    fn the_stop_is_any_new_touch_after_the_yes_is_let_go() {
+        let mut stop = Touches::new(0);
+        // The yes still held as the stand begins.
+        assert!(!stop.observe(Some(true), 0));
+        assert!(!stop.observe(Some(false), 200_000));
+        assert!(stop.observe(Some(true), 300_000));
+    }
+
+    #[test]
+    fn near_is_a_fresh_face_big_enough() {
+        assert!(near("0.245\n", 100_000));
+        assert!(!near("0.05\n", 100_000));
+        assert!(!near("0.245\n", PRESENCE_FRESH_US + 1));
+        assert!(!near("", 0));
+    }
+
+    #[test]
+    fn the_stand_is_read_from_the_last_full_stand_line() {
+        let log = "\
+lamp-body: stand 0.50 arm goals [2400, 2400] positions [2300, 2310]
+lamp-body: stand 1.00 arm goals [2633, 2603] positions [2630, 2601]
+lamp-body: stand 0.97 arm goals [2633, 2603] positions [2629, 2600]
+lamp-body: stand 0.80 arm goals [2500, 2500] positions [2490, 2495]
+";
+        assert_eq!(stood_at(log), Some((2629, 2600)));
+        assert_eq!(
+            stood_at("lamp-body: stand 0.90 arm goals [1, 2] positions [3, 4]"),
+            None
+        );
+    }
+
+    #[test]
+    fn the_confirmed_file_has_this_arms_stand_and_says_so() {
+        let read = "# home, folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw. pitch-window: the default, checked.\nBODY_POSES=\"--home 1916,2049,2041 --folded-arm 2046,2046 --stand 1772,2049,2041,2633,2603 --pitch-window 1740,2030 --torque on\"\n";
+        let confirmed = confirmed_lamp_env(read, 2629, 2600).unwrap();
+        assert!(confirmed.contains("--stand 1772,2049,2041,2629,2600 --pitch-window"));
+        assert!(
+            confirmed.contains("confirmed by a touch, with this lamp's roll and yaw. pitch-window")
+        );
+        assert_eq!(
+            confirmed_lamp_env("BODY_POSES=\"--home 1,2,3\"\n", 1, 2),
+            None
+        );
+    }
+
+    #[test]
+    fn the_lamp_asks_twice_at_most_ten_minutes_apart_and_never_after_a_stand() {
+        let mut record = Record::default();
+        assert!(record.may_ask(0));
+        record.asks = 1;
+        record.asked_at_unix_ms = Some(1_000);
+        record.outcome = Some(Outcome::NoAnswer);
+        assert!(!record.may_ask(1_000 + 599_999));
+        assert!(record.may_ask(1_000 + 600_000));
+        record.asks = 2;
+        assert!(!record.may_ask(u64::MAX));
+        let stood = Record {
+            outcome: Some(Outcome::Stood),
+            ..Record::default()
+        };
+        assert!(!stood.may_ask(0));
+        let failed = Record {
+            asks: 1,
+            outcome: Some(Outcome::Failed),
+            ..Record::default()
+        };
+        assert!(failed.may_ask(0));
+    }
+
+    #[test]
+    fn the_record_says_its_outcome_in_words() {
+        let record = Record {
+            asks: 1,
+            outcome: Some(Outcome::Stood),
+            at_unix_ms: Some(5),
+            shoulder: Some(2629),
+            elbow: Some(2600),
+            ..Record::default()
+        };
+        let text = serde_json::to_string(&record).unwrap();
+        assert!(text.contains(r#""outcome":"stood""#), "{text}");
+        assert_eq!(serde_json::from_str::<Record>(&text).unwrap(), record);
+    }
+}

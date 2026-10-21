@@ -37,6 +37,7 @@ pub mod clips;
 pub mod cog;
 pub mod command;
 pub mod control;
+pub mod first_stand;
 pub mod gaze;
 pub mod gesture;
 pub mod idle;
