@@ -150,6 +150,10 @@ const REFUSAL_WAIT: Duration = Duration::from_secs(1);
 /// The most codes, and the longest, [`refusal_codes`] keeps.
 const MOST_CODES: usize = 4;
 const CODE_CHARS: usize = 40;
+/// More digits than this and it's taken for a key, not a code: DeepSeek's
+/// and Deepgram's keys are hex in one case, and no service's code has more
+/// than a few (the reviewer on #2397).
+const CODE_DIGITS: usize = 4;
 
 /// A refusal's body, up to [`REFUSAL_BYTES`] or [`REFUSAL_WAIT`], whichever
 /// comes first; empty if it breaks.
@@ -171,9 +175,10 @@ async fn refusal_head(mut response: reqwest::Response) -> Vec<u8> {
 /// The codes a refusal names: Google's `error.status` and each
 /// `error.details[].reason`, OpenAI's `error.code` and `error.type`. A
 /// value is kept only when it reads as a code, in one case, of letters,
-/// digits and `_`, `.` or `-`, at most [`CODE_CHARS`], so that no server's
-/// words reach the journal, nor a mixed-case string as most keys are; at
-/// most [`MOST_CODES`].
+/// digits and `_`, `.` or `-`, at most [`CODE_CHARS`] and at most
+/// [`CODE_DIGITS`] digits, so that no server's words reach the journal, nor
+/// a string shaped like a key (mixed case, or many digits); at most
+/// [`MOST_CODES`].
 fn refusal_codes(body: &[u8]) -> Vec<String> {
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
         return Vec::new();
@@ -199,7 +204,8 @@ fn refusal_codes(body: &[u8]) -> Vec<String> {
             && code
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
-            && one_case;
+            && one_case
+            && code.chars().filter(|c| c.is_ascii_digit()).count() <= CODE_DIGITS;
         if a_code && !codes.iter().any(|kept| kept == code) && codes.len() < MOST_CODES {
             codes.push(code.to_owned());
         }
@@ -361,6 +367,11 @@ mod tests {
         // none is a code.
         let words = br#"{"error":{"status":"the key sk-ab12 was refused","code":"sk3XyZ9qLm2PwR8tVb7N","type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","details":[{"reason":42}]}}"#;
         assert!(refusal_codes(words).is_empty());
+        // Keys in one case, as DeepSeek's and Deepgram's are: too many digits.
+        let deepseek_like = br#"{"error":{"code":"sk-0123456789abcdef0123456789abcdef"}}"#;
+        assert!(refusal_codes(deepseek_like).is_empty());
+        let hex_40 = br#"{"error":{"status":"0123456789abcdef0123456789abcdef01234567"}}"#;
+        assert!(refusal_codes(hex_40).is_empty());
         // Not JSON, or JSON without an error.
         assert!(refusal_codes(b"<html>Bad Gateway</html>").is_empty());
         assert!(refusal_codes(br#"{"status":0,"message":"no"}"#).is_empty());

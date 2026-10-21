@@ -115,8 +115,9 @@ Rules the loader keeps (`load_from_path`):
   within 1 s: Google's `error.status` and `error.details[].reason`,
   OpenAI's `error.code` and `error.type` (DeepSeek and OpenRouter answer
   in that form). A value counts only if it reads as a code: one case,
-  letters, digits and `_`, `.` or `-`, at most 40 characters; at most
-  four. `lamp-voice second: a service answered HTTP 400 (INVALID_ARGUMENT,
+  letters, digits and `_`, `.` or `-`, at most 40 characters and at most
+  4 digits (a key in one case, as DeepSeek's and Deepgram's are, has
+  more); at most four. `lamp-voice second: a service answered HTTP 400 (INVALID_ARGUMENT,
   API_KEY_INVALID)`, or `… HTTP 502, naming no code`. The caller's own
   line follows, as before (`… failed: service answered HTTP 400`). It is
   for telling a key from a model or a request when Gemini's chat answered
