@@ -35,7 +35,7 @@ completion. The old v1 plan bytes are retained; no historical hash is rewritten.
 The existing canary failures remain, with additional focused occurrence tests
 covering cancellation during or between generations and stale retirement.
 
-`crates/voice-eval/tests/canary_plan.rs` covers valid plans without named
+`crates/voice-eval/tests/it/canary_plan.rs` covers valid plans without named
 canary scenarios, a reduced caller catalog/custom profiles/deadline, and the
 identity attached to every result. Historical compatibility is also checked
 by running `lamp-voice-eval self-test --plan HISTORICAL_PLAN.json` with an

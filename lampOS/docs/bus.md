@@ -358,7 +358,7 @@ of each, and its kind and period as a declaration, are in
 | `body/joint_states` | Each joint: where it is, how fast, how loaded (ROS's `JointState`) | latched | Body | 10 to 20 a second |
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
 | `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
-| `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; nothing reads it yet | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
+| `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; Mood reads its kind with `LAMP_MOOD_SEEMS=on` (#1671, mood.md) | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
 | `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
@@ -439,7 +439,7 @@ that owns it:
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
 | `light/outranked` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | `lamp-skills`, a run's own subscription: the run says what was over its light in its journal and at its give-back ([skills.md](skills.md)) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
-| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`'s `level` and `quiet_ms`, not in the product yet, [skills.md](skills.md)) |
+| `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`'s `level` and `quiet_ms`, [skills.md](skills.md)) |
 
 The policy also reads `voice/heard`, `voice/said`, `voice/state` and
 `humans/faces/tracked`.

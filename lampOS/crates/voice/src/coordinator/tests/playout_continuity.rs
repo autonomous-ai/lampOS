@@ -9,7 +9,7 @@ use crate::options::PlayoutStart;
 use crate::provider_worker::{FailedStage, Fault};
 use lamp_audio::playout::{Continuity, OpenedBy};
 
-const REPLIES: &str = include_str!("../../../../audio/tests/playout_continuity/replies.tsv");
+const REPLIES: &str = include_str!("../../../../audio/tests/it/playout_continuity/replies.tsv");
 const SLOT_US: u64 = 10_000;
 
 struct Recorded {

@@ -809,3 +809,241 @@ fn a_ring_live_at_the_stop_is_not_dated_before_it() {
         .expect("ring exit recorded");
     assert_eq!(exit["exited_before_stop"], false, "{exit}");
 }
+
+/// One tick of the ring's restart, held to the loop's bound: it only looks
+/// at the startup thread, never waits on it (#1620).
+fn restart_tick_at(rig: &mut Rig, trace: &mut SessionState, at_us: impl FnMut() -> u64) -> bool {
+    let started = Instant::now();
+    let adopted = rig
+        .ring
+        .restart_tick_with_clock(|event| record(trace, event), at_us)
+        .unwrap();
+    let took = started.elapsed();
+    assert!(
+        took < Duration::from_millis(50),
+        "restart tick took {took:?}"
+    );
+    adopted
+}
+
+/// #1620: a ring that faults is started again, off the loop, 2 s after the
+/// fault and once its process has gone; it takes the current authority, and
+/// a stop after it is clean, with the restarted ring's black-write receipt.
+#[test]
+fn a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean() {
+    use crate::process::ring_startup_tests::{ChildFixture, await_exit};
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, _peers) = fixture_with_command(&directory, "exit 0");
+    // The fake ring ends, cleanly, once its stop file is there.
+    let fixture =
+        ChildFixture::with_command("while [ ! -e \"$3.stop\" ]; do sleep 0.01; done; exit 0");
+    let stop_file = fixture.directory.path.join("ring.stop");
+    let boot = new_boot().unwrap();
+    let mut first = None;
+    rig.ring = OptionalRing::spawn(
+        &fixture.executable,
+        &fixture.directory.path,
+        boot,
+        &[],
+        || {
+            if first.is_none() {
+                first = fixture.connect_peer();
+                if let Some(peer) = &mut first {
+                    peer.control.send(WorkerEvent::Ready)?;
+                }
+            }
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert!(rig.ring.is_active());
+    let (_, first_boot, _) = fixture.identity().unwrap();
+    // A run of late writes past 2 s: the worker reports the fault.
+    rig.ring.disable(
+        "ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms",
+    );
+    assert!(matches!(
+        first.as_mut().unwrap().control.receive().unwrap(),
+        Some(Control::Stop)
+    ));
+    let fault_at = rig.ring.stop_requested_at(0);
+    fs::write(&stop_file, b"").unwrap();
+    await_exit(rig.ring.iter_mut().next().unwrap());
+    let mut trace = SessionState::default();
+    rig.ring.poll_cleanup(&mut trace).unwrap();
+    fs::remove_file(&stop_file).unwrap();
+    // Not before 2 s after the fault.
+    assert!(!restart_tick_at(&mut rig, &mut trace, || fault_at
+        + optional_ring::RESTART_SPACING_US
+        - 1));
+    assert!(!trace.iter().any(|e| e["kind"] == "ring_restart"));
+    assert!(!rig.ring.off_for_good());
+    assert!(!restart_tick_at(&mut rig, &mut trace, || fault_at
+        + optional_ring::RESTART_SPACING_US));
+    let restart = trace.iter().find(|e| e["kind"] == "ring_restart").unwrap();
+    assert_eq!(
+        (restart["attempt"].as_u64(), restart["of"].as_u64()),
+        (Some(1), Some(3))
+    );
+    // The startup runs on its thread while the loop goes on; the test is
+    // the restarted child's peer, as the real worker would be.
+    let mut second = None;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let adopted = loop {
+        assert!(Instant::now() < deadline, "the ring never came back");
+        if second.is_none()
+            && let Some((_, boot, _)) = fixture.identity()
+            && boot != first_boot
+        {
+            second = fixture.connect_peer();
+            if let Some(peer) = &mut second {
+                peer.control.send(WorkerEvent::Ready).unwrap();
+            }
+        }
+        if restart_tick_at(&mut rig, &mut trace, lamp_ipc::monotonic_us) {
+            break true;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    };
+    assert!(adopted && rig.ring.is_active());
+    // Live again, so a stop does not date its exit before it (#1961).
+    assert!(!rig.ring.exit_observed());
+    assert!(trace.iter().any(|e| e["kind"] == "ring_restarted"));
+    let mut second = second.unwrap();
+    // The current authority reaches it, the privacy switch's included.
+    let mut owner = Controller::new(new_boot().unwrap(), now());
+    owner
+        .set_microphone_permission(now(), lamp_turn_owner::Permission::Denied)
+        .unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    rig.ring.publish(snapshot);
+    assert_eq!(drain_authority(&mut second), snapshot);
+    // A stop now finds a live ring, which writes its black and ends.
+    // The peer outlives the stop, as the other fixtures' peers do.
+    let second = std::sync::Arc::new(std::sync::Mutex::new(second));
+    let peer = second.clone();
+    let stop = stop_file.clone();
+    rig.ring.iter_mut().next().unwrap().on_stop(move || {
+        let mut second = peer.lock().unwrap();
+        assert!(matches!(second.control.receive()?, Some(Control::Stop)));
+        let at = lamp_ipc::monotonic_us();
+        second.control.send(WorkerEvent::Ring {
+            report: RingFeedback::Blanked {
+                reason: RingBlankReason::Shutdown,
+                write_started_at_us: at,
+                write_finished_at_us: at,
+            },
+        })?;
+        fs::write(&stop, b"")
+    });
+    rig.shutdown(&mut trace).unwrap();
+    assert!(trace.iter().any(|e| e["kind"] == "ring_shutdown_write"));
+    drop(second);
+    fs::remove_file(&stop_file).unwrap();
+}
+
+/// #1620 (the reviewer's P3 on #1981): a stop that comes while the restart's
+/// startup is still under way waits for it, then stops the ring it started
+/// like any other: Ok, with that ring's black-write receipt.
+#[test]
+fn a_stop_during_a_restart_waits_for_it_and_ends_clean() {
+    use crate::process::ring_startup_tests::{ChildFixture, await_exit};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, _peers) = fixture_with_command(&directory, "exit 0");
+    let fixture = Arc::new(ChildFixture::with_command(
+        "while [ ! -e \"$3.stop\" ]; do sleep 0.01; done; exit 0",
+    ));
+    let stop_file = fixture.directory.path.join("ring.stop");
+    let mut first = None;
+    rig.ring = OptionalRing::spawn(
+        &fixture.executable,
+        &fixture.directory.path,
+        new_boot().unwrap(),
+        &[],
+        || {
+            if first.is_none() {
+                first = fixture.connect_peer();
+                if let Some(peer) = &mut first {
+                    peer.control.send(WorkerEvent::Ready)?;
+                }
+            }
+            Ok(())
+        },
+    )
+    .unwrap();
+    let (_, first_boot, _) = fixture.identity().unwrap();
+    rig.ring.disable(
+        "ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms",
+    );
+    let fault_at = rig.ring.stop_requested_at(0);
+    fs::write(&stop_file, b"").unwrap();
+    await_exit(rig.ring.iter_mut().next().unwrap());
+    let mut trace = SessionState::default();
+    rig.ring.poll_cleanup(&mut trace).unwrap();
+    fs::remove_file(&stop_file).unwrap();
+    assert!(!restart_tick_at(&mut rig, &mut trace, || fault_at
+        + optional_ring::RESTART_SPACING_US));
+    // The restarted ring's peer says Ready only once the stop has begun:
+    // until then its startup cannot finish, so the stop lands mid-restart.
+    let stopping = Arc::new(AtomicBool::new(false));
+    let peer = {
+        let (fixture, stopping, stop_file) = (fixture.clone(), stopping.clone(), stop_file.clone());
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut second = loop {
+                assert!(
+                    Instant::now() < deadline,
+                    "the restarted ring never started"
+                );
+                if stopping.load(Ordering::Acquire)
+                    && let Some((_, boot, _)) = fixture.identity()
+                    && boot != first_boot
+                    && let Some(peer) = fixture.connect_peer()
+                {
+                    break peer;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            };
+            // Slow to be ready, as a loaded lamp's ring can be.
+            std::thread::sleep(Duration::from_millis(100));
+            second.control.send(WorkerEvent::Ready).unwrap();
+            loop {
+                assert!(
+                    Instant::now() < deadline,
+                    "no stop reached the restarted ring"
+                );
+                if let Some(Control::Stop) = second.control.receive().unwrap() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            let at = lamp_ipc::monotonic_us();
+            second
+                .control
+                .send(WorkerEvent::Ring {
+                    report: RingFeedback::Blanked {
+                        reason: RingBlankReason::Shutdown,
+                        write_started_at_us: at,
+                        write_finished_at_us: at,
+                    },
+                })
+                .unwrap();
+            fs::write(&stop_file, b"").unwrap();
+            second
+        })
+    };
+    assert!(
+        rig.ring.restart_pending(),
+        "the restart finished before the stop"
+    );
+    stopping.store(true, Ordering::Release);
+    rig.shutdown(&mut trace).unwrap();
+    assert!(trace.iter().any(|e| e["kind"] == "ring_restarted"));
+    assert!(trace.iter().any(|e| e["kind"] == "ring_shutdown_write"));
+    drop(peer.join().unwrap());
+    fs::remove_file(&stop_file).unwrap();
+}

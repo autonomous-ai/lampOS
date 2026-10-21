@@ -1155,7 +1155,7 @@ a gap of 250 ms, silence heard).
   It fails with the hold taken out.
 - `turn_taking::tests::speech_in_a_listening_gap_yields_only_with_the_switch`
   and `duplex::tests::speech_in_the_lamps_own_silence_is_over_it_only_with_the_switch`.
-- `tests/evidence.rs`'s `a_pause_in_a_reply_is_said_to_be_silent_at_the_echo`:
+- `tests/it/evidence.rs`'s `a_pause_in_a_reply_is_said_to_be_silent_at_the_echo`:
   through the real canceller. It fails with the new field left unset.
 
 **What it may cost, and isn't shown yet:**

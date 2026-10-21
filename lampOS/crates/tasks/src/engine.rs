@@ -4407,6 +4407,71 @@ mod tests {
         assert_eq!(engine.state.schema, OLDEST_SCHEMA);
     }
 
+    /// The states kept as fixtures, one for each change of the state's
+    /// shape, each written by its day's build ([`write_a_state_fixture`]).
+    /// Every later build reads each with its tasks as they were, so an
+    /// update never leaves a lamp's tasks behind (the build row "Updates
+    /// cover the whole lamp, V3 to V5"). Opened as an update's restart opens
+    /// it, the same boot later, and after a reboot (the reviewer-lead's P3 on
+    /// #2420).
+    #[test]
+    fn each_kept_state_reads_with_its_tasks() {
+        let kept: [(&str, &[u8]); 1] = [(
+            "2026-10-21",
+            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+        )];
+        let rebooted = Clock {
+            boot_id: "later-boot".into(),
+            monotonic_ms: 50,
+        };
+        for (day, bytes) in kept {
+            for (how, opened) in [("later", clock(1_000)), ("rebooted", rebooted.clone())] {
+                let day = format!("{day}, {how}");
+                let memory = Memory::default();
+                memory.0.borrow_mut().bytes = Some(bytes.to_vec());
+                let engine =
+                    Engine::open(memory, targets(), "f".repeat(32).as_str(), RESTART, &opened)
+                        .unwrap_or_else(|error| panic!("{day}: {error}"));
+                assert_eq!(engine.store_id(), STORE, "{day}: the same store");
+                assert_eq!(engine.set_aside(), None, "{day}: nothing set aside");
+                // The one still queued when its session ended is invalidated,
+                // as at any restart; the others are as they were written.
+                assert_eq!(
+                    [1, 2, 3].map(|id| dispatch(&engine, id)),
+                    [
+                        DispatchState::Accepted,
+                        DispatchState::Uncertain,
+                        DispatchState::Invalidated
+                    ],
+                    "{day}"
+                );
+                let speech = engine.state.tasks[0].observations[0].speech.as_ref();
+                assert_eq!(
+                    speech.map(|speech| speech.text.as_str()),
+                    Some("The agent reports that its review is available."),
+                    "{day}"
+                );
+            }
+        }
+    }
+
+    /// Writes this build's state, with a task told, one running and one
+    /// still queued, to the path in `LAMP_TASKS_STATE_FIXTURE`. Run by hand
+    /// when the state's shape changes, keeping the fixtures already kept:
+    /// each is read by every later build's
+    /// [`each_kept_state_reads_with_its_tasks`].
+    #[test]
+    #[ignore = "writes a state fixture: run by hand with LAMP_TASKS_STATE_FIXTURE set"]
+    fn write_a_state_fixture() {
+        let path = std::env::var_os("LAMP_TASKS_STATE_FIXTURE").expect("LAMP_TASKS_STATE_FIXTURE");
+        let (mut engine, memory) = opened();
+        let told_id = told(&mut engine, "idle", 100);
+        let running_id = accepted(&mut engine, 200);
+        let queued_id = queued(&mut engine, 400);
+        assert_eq!((told_id, running_id, queued_id), (1, 2, 3));
+        std::fs::write(path, memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
+    }
+
     /// Requests stay strict: a request this build has no `op` for is
     /// refused, as before (#1505 relaxes the stored state only).
     #[test]

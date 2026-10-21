@@ -199,6 +199,9 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "stuffy-air",
     "dance",
     "bedtime-morning",
+    // A failed part shown as a creature a little unwell (#1681): row 8 on
+    // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
+    "not-feeling-well",
 ];
 
 /// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
@@ -245,11 +248,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
          until its scores are measured in an empty room and a busy one: a sway at people's talk \
          would read as a machine",
-    ),
-    (
-        "not-feeling-well",
-        "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
-         read as a lamp a little unwell, not a status light, is for the lamp check",
     ),
     // #1679's three core skills, built and not yet tried on a lamp: each
     // comes with the product once lamp-4ace has played it with a person.
@@ -380,6 +378,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("dance", "SKILL.md"),
     skill_file!("bedtime-morning", "skill.toml"),
     skill_file!("bedtime-morning", "SKILL.md"),
+    skill_file!("not-feeling-well", "skill.toml"),
+    skill_file!("not-feeling-well", "SKILL.md"),
 ];
 
 /// Setup's two settings (docs/setup.md, "On a lamp"), written only with

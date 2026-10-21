@@ -16,7 +16,7 @@ const DATABASE: &str = "tasks.sqlite3";
 const INITIALIZING: &str = ".tasks.sqlite3.init";
 
 /// A spawn and a test letting go of a store take turns (#1569 row 43, row
-/// 27's case: schedule's `tests/runtime.rs`, update's `tests/round.rs`). A
+/// 27's case: schedule's `tests/it/runtime.rs`, update's `tests/round.rs`). A
 /// child spawned by one test thread holds a copy of every descriptor, a
 /// store's directory lock among them, until its exec closes them, and
 /// `spawn` returns only after that. A store let go of and opened again in

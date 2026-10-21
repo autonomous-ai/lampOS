@@ -145,7 +145,7 @@ one, a limit on the hello holding no news, an answer after a rule kept;
 `a_yes_that_comes_back_into_a_room_now_busy_is_held_by_not_while_talking`:
 asked in a quiet room, the answer coming back into a busy or unknown one
 is a `wait`),
-and `crates/policy/tests/progress.rs`
+and `crates/policy/tests/it/progress.rs`
 (`with_rules_a_kept_rule_holds_progress_news_and_no_model_is_asked`, on a
 bus, with the typed `news.never`; without `--rules` nothing listens to the
 topic). Not shown on a lamp.
@@ -355,7 +355,7 @@ choices differ (`attention_next_differs`) and the start line says
 of it on lamp-4ace, with the lines where the choices differ read by hand,
 says whether it goes live. The full refit still needs the day's answers
 in conversation labelled as well (#873's `lamp-policy-replay --again …
---labels … --refit`). Test: `tests/policy.rs`,
+--labels … --refit`). Test: `tests/it/policy.rs`,
 `with_attention_next_a_second_judgement_is_written_beside_and_nothing_published_changes`,
 and `attention::tests::the_next_judgement_raises_a_reply_to_the_lamp_in_conversation_only`.
 
@@ -394,7 +394,7 @@ decision carries no `follows_lamp`, so the voice reads its `stay_quiet` as
 the plain one; `--agreement` counts a following `stay_quiet` as a
 disagreement, so no such kind is named. Only the single asker: with
 `judges` the switch does nothing. The start line says `rule_decides=N`.
-Off unless set. Tests: `tests/policy.rs`,
+Off unless set. Tests: `tests/it/policy.rs`,
 `a_kind_the_rule_decides_is_not_asked_and_others_are` and
 `a_rule_decision_leaves_the_models_health_as_it_was`; `main.rs`,
 `the_rule_decides_kinds_are_read_and_a_speaking_kind_is_refused`.
@@ -428,7 +428,7 @@ volume from 75% to 95% for eleven hours; this decision, in the same second,
 was `stay_quiet` (p = 0.235). Of lamp-4ace's 3,698 attention decisions from
 13 to 16 October, 99.5% were made within 2 s (the first builder, #800).
 Accepted on lamp-4ace on 16 October at 07:25 with the voice of #908
-(`holds.sh`, `twopeople829.sh`). Test: `tests/program.rs`,
+(`holds.sh`, `twopeople829.sh`). Test: `tests/it/program.rs`,
 `with_act_attention_the_attention_decision_is_published_for_real`.
 
 What is published on `policy/decisions`:
@@ -1309,7 +1309,7 @@ once fitted to its own, on the same halves; a run without answers not
 fitted; labels of one kind, on every line or on a model's answered ones,
 not fitted and given no counts; the weights found from examples drawn from known ones; the same
 halves every time) and
-`crates/policy/tests/replay_program.rs` (the program against a service
+`crates/policy/tests/it/replay_program.rs` (the program against a service
 played on this machine: two models asked in turn, the state sent equal to
 the day's, and none of what was heard in its output).
 
@@ -1498,11 +1498,11 @@ Tests:
   closed kept connection and unanswered, then answered on a new one.
 - `crates/policy/src/replay/tests.rs`,
   `a_picture_that_went_is_counted_and_both_askings_are_counted_on_the_same_lines`.
-- `crates/policy/tests/pictures.rs`: the two askings against a played
+- `crates/policy/tests/it/pictures.rs`: the two askings against a played
   service, only one with the picture and the header, the line without the
   picture, nothing asked with no frame, and the thread passing over what
   comes while it asks.
-- `crates/policy/tests/program.rs`,
+- `crates/policy/tests/it/program.rs`,
   `with_images_the_question_is_asked_again_with_the_eyes_frame_beside_the_decision`:
   the program itself, the decision published as before and the picture's
   line beside it.
@@ -1669,8 +1669,8 @@ The diagnostics add `progress_decided`, `progress_by_rule`,
 made in its directory), no second judge or thread is made, and the
 diagnostics carry `decided`, `by_rule` and `shadow` only, as before
 (`without_the_switch_the_tasks_topic_is_not_listened_to_and_the_report_is_as_before`,
-`crates/policy/tests/progress.rs`). An attention decision's bytes on the bus
-are those it had (`crates/msgs/tests/tasks.rs`).
+`crates/policy/tests/it/progress.rs`). An attention decision's bytes on the bus
+are those it had (`crates/msgs/tests/it/tasks.rs`).
 
 **Measured on the development Mac** (Apple M2 Max, macOS 26.6.2, release
 build, other sessions running: load average 14 to 20), with
@@ -1742,7 +1742,7 @@ when the lamp speaks first, and until now it decided nothing. **Off unless
 `"shadow":true`, and the diagnostics carry no `progress_acts`, as on the
 branch before (`a_change_is_asked_about_once_decided_in_shadow_and_written_down_with_its_state`);
 with it, `acting_a_say_now_goes_out_for_real_while_the_attention_question_stays_shadow`
-(`crates/policy/tests/progress.rs`) shows `shadow: false` for progress and
+(`crates/policy/tests/it/progress.rs`) shows `shadow: false` for progress and
 `true` for attention. The chain from a change on `tasks/status` to one note
 offered by the voice runs with this crate's own loop and a stand-in judge in
 `crates/voice/tests/progress_news.rs`.
@@ -1841,7 +1841,7 @@ lamp or by it:
   after any tool ran (the second route), is not told.
 
 The policy reads `voice/turn` only with the switch on. Tested with a replay
-of a busy office at the rig's scale (`tests/hello.rs`,
+of a busy office at the rig's scale (`tests/it/hello.rs`,
 `in_a_busy_office_a_hello_comes_at_a_lull_and_never_over_talk`): a quiet of
 400 ms, the room talking about every 350 ms; someone who comes back while
 it talks is waited by the rule, and one who comes back at the lull, 300 ms
@@ -1993,7 +1993,7 @@ The diagnostics add `skill_asks` (asks taken), and `moment_decided`,
 `moment_said`, `moment_held_talking` and `moment_late`, with `--gate` only
 (and `moment_held_rule` with `--rules`), and the start line `gate=true`. Without `--gate` the topic is not listened to.
 Run only one hello: with a skill greeting through the gate, the voice's
-own (`LAMP_SPEAK_FIRST`) is to be off. Test: `tests/hello.rs`,
+own (`LAMP_SPEAK_FIRST`) is to be off. Test: `tests/it/hello.rs`,
 `with_the_gate_a_skills_ask_is_decided_by_its_question_and_names_the_ask`
 (a hello asked with 42 minutes away and 3 seconds there, `say_now` acting
 with `ask` and no `arrival`; the next held by `greeted_recently` with no
@@ -2005,7 +2005,7 @@ unprompted while the voice listens `wait` by the rule with no model asked;
 rule's four reasons to keep quiet and that not known is not no), and
 without the switch nothing listens to `skills/ask`.
 
-**Kept rules, tested** (#813, `--rules`): `crates/policy/tests/hello.rs`,
+**Kept rules, tested** (#813, `--rules`): `crates/policy/tests/it/hello.rs`,
 `with_rules_a_kept_rule_holds_the_hello_and_the_skills_asks_and_no_model_is_asked`
 (on a bus: with `quiet` kept, an arrival is `wait` by the rule with guard
 `kept_rule` and no model asked, and a skill's `news` too; the rule
@@ -2022,7 +2022,7 @@ switch a rule holds nothing); `moment.rs`'s
 `say_now` or `wait`, the probability, the two answers, `by`, `took_ms`,
 `shadow` (`false` only with `--act hello`) and `arrival`, the number
 `voice/arrival` gave. The new optional `arrival` field is left out of every
-other decision, whose bytes are as they were (`crates/msgs/tests/arrival.rs`).
+other decision, whose bytes are as they were (`crates/msgs/tests/it/arrival.rs`).
 The log gets a line in `decisions-YYYY-MM-DD.jsonl` with the context, the
 state shown, the answers, the judgement and any `guard`, `failed` or
 `usage`; the journal one line with no words:
@@ -2040,7 +2040,7 @@ not count. The decisions are as they were; only that count is new.
 **Without the switch** `voice/arrival` is not subscribed to, no judge or
 thread is made, and the start line, decisions and diagnostics are as they
 were (`without_the_switch_arrivals_are_not_listened_to_and_the_report_is_as_before`,
-`crates/policy/tests/hello.rs`, which also covers shadow, acting and the
+`crates/policy/tests/it/hello.rs`, which also covers shadow, acting and the
 twenty minutes, talking, and a failed model).
 
 **How long it takes** is in [speaking-first.md](speaking-first.md#asking-the-policy-752):

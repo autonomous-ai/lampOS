@@ -1,0 +1,21 @@
+# lampOS a person's own keys (#2094, lampOS/docs/own-keys.md): the socket lamp-cloud asks root's
+# keys helper on, to check, keep or remove a person's own DeepSeek or Deepgram key, or say whose
+# each service uses. The group lets lampos processes connect; the helper then answers only a peer
+# in lamp-cloud.service (by SO_PEERCRED and its cgroup), since every part runs as lampos. Nothing
+# reaches it unless lamp-cloud has LAMP_OWN_KEYS=on.
+[Unit]
+Description=lampOS own keys: the socket lamp-cloud asks on
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+
+[Socket]
+ListenStream=/run/lampos-setup-keys/keys.sock
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+Accept=yes
+MaxConnections=4
+
+[Install]
+WantedBy=lampos.target

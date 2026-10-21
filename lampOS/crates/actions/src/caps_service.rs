@@ -140,7 +140,10 @@ fn failure(error: caps::Error) -> Value {
 }
 
 pub struct Service {
-    controller: caps::Controller,
+    /// None while the caps are held back ([`Service::held_back`]).
+    controller: Option<caps::Controller>,
+    held_back: Option<String>,
+    kept_aside: Option<String>,
     bus: Bus,
     publisher: Publisher,
     clock_id: String,
@@ -180,8 +183,36 @@ impl Service {
         if sample.at_us == 0 {
             return Err(io::Error::other("cap clock must be a host monotonic time"));
         }
-        let controller =
-            caps::Controller::open(&config.directory, sample.unix_ms).map_err(io::Error::other)?;
+        // A store a later build wrote is kept as it is and the caps are off
+        // for this run, never fresh defaults: a lamp put back from an update
+        // keeps the person's mute and volume as they were (the first builder
+        // and Jarvis, 21 Oct). The ring is still given an empty snapshot each
+        // second, so it has the product's ceiling, not none.
+        let (controller, held_back) = match caps::Controller::open(
+            &config.directory,
+            sample.unix_ms,
+        ) {
+            Ok(controller) => (Some(controller), None),
+            Err(error) => match error.newer() {
+                Some(schema) => (
+                    None,
+                    Some(format!(
+                        "output caps are off: their store is from a later build (schema {schema}), kept as it is"
+                    )),
+                ),
+                None => return Err(io::Error::other(error)),
+            },
+        };
+        // A later build's database is set aside by the store, and the caps
+        // begin empty: said, as Schedule says it, while the kept one is there.
+        let kept_aside = lamp_schedule::store::kept_aside(&config.directory)
+            .ok()
+            .flatten()
+            .map(|name| {
+                format!(
+                    "output caps began empty: a store from a later build is kept aside as {name}"
+                )
+            });
         let bus = Bus::new(&config.bus_root)?;
         let publisher = bus.publisher_declared(
             OutputCaps::TOPIC,
@@ -190,6 +221,8 @@ impl Service {
         )?;
         Ok(Self {
             controller,
+            held_back,
+            kept_aside,
             bus,
             publisher,
             clock_id: clock_id.into(),
@@ -203,6 +236,25 @@ impl Service {
             published: false,
             failed: false,
         })
+    }
+
+    /// The caps' state: there whenever they are not held back, the only time
+    /// requests reach it.
+    fn controller(&mut self) -> &mut caps::Controller {
+        self.controller
+            .as_mut()
+            .expect("output caps have their state whenever they are not held back")
+    }
+
+    /// Why the caps are off for this run, when their store is from a later
+    /// build: then the snapshot is empty and every request is refused.
+    pub fn held_back(&self) -> Option<&str> {
+        self.held_back.as_deref()
+    }
+
+    /// Why the caps began empty, while a later build's store is kept aside.
+    pub fn kept_aside(&self) -> Option<&str> {
+        self.kept_aside.as_deref()
     }
 
     pub fn ready(&self) -> bool {
@@ -343,10 +395,17 @@ impl Service {
             return Ok(());
         }
         self.looked_at = Some(now.at_us);
-        let snapshot = self.controller.expire(now.unix_ms).map_err(|error| {
-            self.failed = true;
-            io::Error::other(error)
-        })?;
+        let snapshot = match self.controller.as_mut() {
+            Some(controller) => controller.expire(now.unix_ms).map_err(|error| {
+                self.failed = true;
+                io::Error::other(error)
+            })?,
+            None => caps::Snapshot {
+                revision: 0,
+                active: Vec::new(),
+                effective: caps::Effective::default(),
+            },
+        };
         self.sync(snapshot, sound);
         self.looked_at = Some((self.clock)().at_us);
         Ok(())
@@ -357,6 +416,9 @@ impl Service {
     pub fn answer<M: Mixer>(&mut self, line: &[u8], sound: &mut Option<Volume<M>>) -> Value {
         if self.failed {
             return failure(caps::Error::RecoveryRequired);
+        }
+        if let Some(why) = &self.held_back {
+            return json!({"ok":false,"accepted":false,"code":"held_back","error":why});
         }
         if line.len() > 8192 {
             return failure(caps::Error::Invalid("cap request is too large"));
@@ -371,12 +433,12 @@ impl Service {
         };
         let now = (self.clock)();
         let accepted = match request {
-            Request::Put { cap } => self.controller.put(cap, now.unix_ms),
+            Request::Put { cap } => self.controller().put(cap, now.unix_ms),
             Request::Remove { source, token } => {
-                self.controller.remove(&source, &token, now.unix_ms)
+                self.controller().remove(&source, &token, now.unix_ms)
             }
             Request::Get {} => {
-                return match self.controller.snapshot() {
+                return match self.controller().snapshot() {
                     Ok(snapshot) => {
                         json!({"ok":true,"snapshot":{"revision":snapshot.revision,"active":snapshot.active,"effective":effective(snapshot.effective)}})
                     }
@@ -386,7 +448,7 @@ impl Service {
         };
         match accepted {
             Ok(accepted) => {
-                let snapshot = match self.controller.snapshot() {
+                let snapshot = match self.controller().snapshot() {
                     Ok(snapshot) => snapshot,
                     Err(error) => {
                         self.failed = true;
@@ -465,6 +527,93 @@ mod tests {
             self.raw.store(level, Ordering::SeqCst);
             Ok(())
         }
+    }
+
+    /// A caps store a later build wrote (the first builder and Jarvis, 21
+    /// Oct, for "Updates cover the whole lamp, V3 to V5"): the caps are off
+    /// for this run, said why. The ring is still given an empty snapshot, so
+    /// it has the product's ceiling (Jarvis's P2 on #2425), the mixer is left
+    /// as it was, requests are refused as `held_back`, and the store is kept
+    /// byte for byte. A store that can't be read at all still stops the start.
+    #[test]
+    fn a_store_from_a_later_build_holds_the_caps_off_and_is_kept_as_it_is() {
+        let root = tempfile::Builder::new().prefix("ac-").tempdir().unwrap();
+        let config = Config {
+            directory: root.path().join("caps"),
+            bus_root: root.path().join("bus"),
+        };
+        drop(caps::Controller::open(&config.directory, Some(WALL)).unwrap());
+        let later = b"{\"schema\":2,\"entirely_new_state\":true}";
+        let store = |bytes: &[u8]| {
+            lamp_schedule::store::Store::open(&config.directory)
+                .unwrap()
+                .commit(bytes)
+                .unwrap()
+        };
+        store(later);
+        let clock = || Moment {
+            at_us: 1_000_000,
+            unix_ms: Some(WALL),
+        };
+        let mut service = Service::with_clock(&config, "fixture-host", clock)
+            .expect("a later build's store does not stop the start");
+        let why = service.held_back().unwrap().to_owned();
+        assert!(why.contains("from a later build (schema 2)"), "{why}");
+        let mixer = Shared::at(80);
+        let mut sound = Some(Volume::new(mixer.clone(), 100));
+        service.tick(&mut sound).unwrap();
+        assert!(service.ready());
+        let snapshot: OutputCaps = service
+            .bus
+            .latest(OutputCaps::TOPIC)
+            .unwrap()
+            .expect("an empty snapshot for the ring")
+            .parse()
+            .unwrap();
+        assert_eq!((snapshot.revision, snapshot.entries.len()), (0, 0));
+        assert_eq!(
+            mixer.writes.load(Ordering::SeqCst),
+            0,
+            "the mixer is left alone"
+        );
+        let answer = service.answer(br#"{"op":"caps_get"}"#, &mut sound);
+        assert_eq!(
+            (answer["code"].as_str(), answer["error"].as_str()),
+            (Some("held_back"), Some(why.as_str()))
+        );
+        let kept = lamp_schedule::store::Store::open(&config.directory)
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(kept.as_deref(), Some(&later[..]));
+        store(b"{");
+        assert!(Service::with_clock(&config, "fixture-host", clock).is_err());
+    }
+
+    /// A later build's database is set aside by the store itself, and the
+    /// caps begin empty: said while the kept one is there, as Schedule says
+    /// it (Jarvis's P3 on #2425).
+    #[test]
+    fn caps_begun_beside_a_kept_aside_store_say_so() {
+        let root = tempfile::Builder::new().prefix("ac-").tempdir().unwrap();
+        let config = Config {
+            directory: root.path().join("caps"),
+            bus_root: root.path().join("bus"),
+        };
+        drop(caps::Controller::open(&config.directory, Some(WALL)).unwrap());
+        let clock = || Moment {
+            at_us: 1_000_000,
+            unix_ms: Some(WALL),
+        };
+        let service = Service::with_clock(&config, "fixture-host", clock).unwrap();
+        assert_eq!(service.kept_aside(), None);
+        drop(service);
+        let kept = "schedule.sqlite3.newer-db2-1800000000";
+        std::fs::write(config.directory.join(kept), b"").unwrap();
+        let service = Service::with_clock(&config, "fixture-host", clock).unwrap();
+        assert_eq!(service.held_back(), None);
+        let why = service.kept_aside().unwrap();
+        assert!(why.ends_with(kept), "{why}");
     }
 
     struct Bench {

@@ -213,7 +213,7 @@ inside heard-always's own scope.
 
 ## Verified, and not
 
-Host, `crates/audio/tests/notice.rs`, 7 tests: an exact load; every
+Host, `crates/audio/tests/it/notice.rs`, 7 tests: an exact load; every
 manifest-level failure; test assets refused in production; one faulty asset
 refusing only itself; format, length and silence checks at both bounds; a
 linked asset; malformed names and text.
@@ -301,8 +301,8 @@ cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib options:: -- --test-threads=1
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib playback:: -- --test-threads=1
 cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --lib fixture_provider:: -- --test-threads=1
-cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-audio --test notice -- --test-threads=1
-cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --test process --test privacy_state -- --test-threads=1
+cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-audio --test it notice:: -- --test-threads=1
+cargo test --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --test it -- process:: privacy_state:: --test-threads=1
 cargo build --release --locked --offline -j2 --target aarch64-unknown-linux-gnu -p lamp-voice --bin lamp-voice
 ```
 

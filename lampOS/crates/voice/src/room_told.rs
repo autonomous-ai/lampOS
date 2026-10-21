@@ -1061,6 +1061,38 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A room file a later build wrote (#1505's rule): a field this build
+    /// doesn't know is read past and the room taken back; a room it doesn't
+    /// know is not taken, said in one line, and the room starts as on a
+    /// lamp's first start.
+    #[test]
+    fn a_room_file_from_a_later_build_is_taken_back_or_said() {
+        let dir = std::env::temp_dir().join(format!("lamp-room-later-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("room.json");
+        let mut room = RoomTold::new();
+        assert_eq!(room.at(0), Room::Unknown);
+        assert_eq!(room.at(301 * S), Room::Quiet);
+        let mut later = serde_json::to_value(room.kept(BOOT, 301 * S)).unwrap();
+        later["seats"] = serde_json::json!(2);
+        std::fs::write(&path, later.to_string()).unwrap();
+        let mut after = RoomTold::new();
+        assert_eq!(
+            take_back_from(&path, &mut after, BOOT, 320 * S).as_deref(),
+            Some("the room as it was 19 s ago: quiet")
+        );
+        later["room"] = serde_json::json!("lively");
+        std::fs::write(&path, later.to_string()).unwrap();
+        let mut fresh = RoomTold::new();
+        let line = take_back_from(&path, &mut fresh, BOOT, 330 * S).unwrap();
+        assert!(line.starts_with("the room's file is not one"), "{line}");
+        assert_eq!(
+            fresh.kept(BOOT, 330 * S),
+            RoomTold::new().kept(BOOT, 330 * S)
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     /// The reviewer on #1487: the room is kept under the machine's boot.
     /// Two workers started one after the other in one boot read the same
     /// boot, so the second takes back the room the first kept. The voice's

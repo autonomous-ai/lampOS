@@ -2,10 +2,11 @@
 
 The product installer includes the [core skill](../skills/bedtime-morning/skill.toml)
 at `/var/lib/lampOS/skills/bedtime-morning/`, disabled with `enabled = false`.
-It copies `skill.toml` and `SKILL.md`, excluding `tests/`: eight product skills
-are installed and seven are enabled. Desk tutor, Desk tutor marks, Light out,
-Not feeling well, Light scenes, Point the light and Light show remain outside
-the product install (`install::NOT_PRODUCT_SKILLS`). Bedtime's
+It copies `skill.toml` and `SKILL.md`, excluding `tests/`: nine product skills
+are installed and eight are enabled (Not feeling well came with the product
+after its lamp check, #1681). Desk tutor, Desk tutor marks, Light out, Light
+scenes, Point the light and Light show remain outside the product install
+(`install::NOT_PRODUCT_SKILLS`). Bedtime's
 hours, movements, sound and ceilings are authored defaults awaiting a lamp
 comparison. Host validation does not authorize an installation or establish
 physical, optical or acoustic behavior.
@@ -330,6 +331,14 @@ host boot, publisher session, sequence, monotonic stamp and durable
 revision. Wrong identities, stale or future observations, lower revisions,
 and conflicting equal revisions cannot loosen a limit. Failed intake stays
 on the enabled, dark path rather than reverting to unrestricted output.
+When Actions holds its caps back because their store is from a later build
+(`actions.md`), it still publishes an empty snapshot each second, so a ring
+that starts with it takes the product's ceiling rather than staying dark.
+That isn't a failed intake: the snapshot is valid, and the caps are off for
+as long as that build runs, which can be days if an update stays put back.
+A ring dark all that time would be worse than one without night limits, and
+Actions' health says why. A ring still running from before keeps its last
+snapshot until those caps expire.
 
 The ring retains an accepted snapshot through bus silence. Initialized wall
 time can expire an individual cap. Unknown or implausible wall time, a cached

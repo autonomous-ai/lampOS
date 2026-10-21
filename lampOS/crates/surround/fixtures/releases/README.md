@@ -1,7 +1,7 @@
 # Release fixtures
 
-The integration tests in `tests/release.rs`, `tests/selection.rs`, and
-`tests/worker.rs` share
+The integration tests in `tests/it/release.rs`, `tests/it/selection.rs`, and
+`tests/it/worker.rs` share
 `support.rs`, which creates an isolated TUF repository
 from text at runtime. Its Ed25519 signing seeds are the public test values
 `[1; 32]` and `[2; 32]`. They are not production keys. Targets contain short

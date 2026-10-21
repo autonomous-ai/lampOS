@@ -21,6 +21,7 @@ lamp-gemini = { path = "../gemini" }
 lamp-turn-end-wire = { path = "../turn-end-wire" }
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
+# This home's near-call bar, measured by onboarding (#1803).
 lamp-near-call = { path = "../near-call" }
 lamp-voice-processes = { path = "../voice-processes" }
 lamp-controls = { path = "../controls" }

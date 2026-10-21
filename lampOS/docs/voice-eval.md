@@ -192,7 +192,7 @@ Rules:
 - Live physical sessions need the cue kinds proposed in
   [the cue contract](voice-eval-directed-cues.md#proposed-readiness-cues).
   Without them a physical `next_turn_ready` step is `trigger_unavailable`.
-  With the proposed lamp-voice cue sink, `tests/physical_loopback.rs` runs a
+  With the proposed lamp-voice cue sink, `tests/it/physical_loopback.rs` runs a
   physical follow-up through the real relay on those cues.
 - Existing plans keep their `turn_completed` triggers and hashes.
 
@@ -211,7 +211,7 @@ Rules:
   - an audit case showing a zero-delay `turn_completed` trigger starts inside
     the reopen window.
 - `events::tests` covers trace and cue parsing; `cue_tests` covers sequencing.
-- `tests/next_turn_ready.rs` covers plan rules and the fake runtime end to end.
+- `tests/it/next_turn_ready.rs` covers plan rules and the fake runtime end to end.
 
 ### Final dispatch check (`MAIN-023`, `MAIN-025`, `MAIN-030`)
 
@@ -254,10 +254,10 @@ also ends live scheduling as a protocol stop, because the lost line may have
 been a cue or the session's end.
 
 **Tests.**
-- `tests/final_dispatch.rs` uses the real backend, a local pipe transport and
+- `tests/it/final_dispatch.rs` uses the real backend, a local pipe transport and
   a recording-only player.
-- Root's review regressions are `tests/audit_final_dispatch.rs` and
-  `tests/audit_runner_dispatch.rs`.
+- Root's review regressions are `tests/it/audit_final_dispatch.rs` and
+  `tests/it/audit_runner_dispatch.rs`.
 - The runner's scripted cases are in `runner::occurrence_tests`.
 
 ### Terminal provider failure (`MAIN-009`, provisional field names)
@@ -278,7 +278,7 @@ A `turn_completed` cue or `turn_finished` trace record with outcome
 - **Runner.** A failed terminal never satisfies a completion trigger. A step
   waiting on it is recorded as `provider_unavailable`, and nothing is played.
 - **Schema.** Field names follow the main agent's description and will be
-  aligned with its frozen producer schema. Tests: `tests/provider_failed.rs` and
+  aligned with its frozen producer schema. Tests: `tests/it/provider_failed.rs` and
   the runner's `a_provider_failure_is_never_a_completion_trigger_and_is_reported`.
 
 ### Relay framing and cleanup
@@ -308,7 +308,7 @@ ends, the relay stops the runtime and reports it rather than leaving the
 microphone and speaker in an unattended session. After a normal exit, any process
 still in the group is killed and reported as `stray_processes_stopped` (evidence,
 not an invalid trace). The runner kills its transport, room recorder and players
-if it fails between session start and finish. Tests: `tests/relay_hardening.rs`,
+if it fails between session start and finish. Tests: `tests/it/relay_hardening.rs`,
 `physical::framing` and `physical::mac::relay_reader_tests`.
 
 ## Evaluation rules
@@ -387,8 +387,8 @@ reason, and nothing is adapted from other metadata. Pre-AEC capture is
 ALSA-resampled 16 kHz, not capsule PCM. Accepted render is 24 kHz audio that
 ALSA accepted, which is not proof of audibility.
 
-Tests: `tests/recording_import.rs`, which uses root's real receipt examples
-with digests adapted to generated WAVs, and `tests/target_audio.rs`, which
+Tests: `tests/it/recording_import.rs`, which uses root's real receipt examples
+with digests adapted to generated WAVs, and `tests/it/target_audio.rs`, which
 uses directories written by lamp-voice's `Recorder`.
 
 A `user_interrupted` cancellation is caused by a later turn's admission stamped
@@ -700,7 +700,7 @@ stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
 - **Tests:** `src/cost.rs` (each line, each price, the three forms of a chat
   answer's tokens, Live's 34 requests read as `score` reads them, and each
   route's answered lines alike in both), `src/voice_lines.rs` (which Live
-  lines are requests) and `tests/cost.rs` (the command as it is run).
+  lines are requests) and `tests/it/cost.rs` (the command as it is run).
 
 ## Whether the end of speech worked: `endpoint`
 

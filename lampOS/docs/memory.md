@@ -544,7 +544,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   - **Off:** the function and every request are as before.
   - Tests: `remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version`
     (the requests, the clamp, the function, the switch off) and
-    `crates/memory/tests/days_recall.rs` (the store: the drink order, common
+    `crates/memory/tests/it/days_recall.rs` (the store: the drink order, common
     words only, a keyword beside them, an accented word matching its
     common fold, 7 to 1 finding three days ago and
     not nine, a kept thing by span, bad spans, and without the option the
@@ -1045,7 +1045,7 @@ round trip not measured on the host. During it what is said is not heard,
 which is why it happens only between turns. Not shown: a lamp run.
 
 Not shown: anything on a lamp. The host test
-`crates/memory/tests/voice_people.rs` plays two known people and the room
+`crates/memory/tests/it/voice_people.rs` plays two known people and the room
 against the real store in both modes: each is answered from their own and
 the room's, never from the other's, their exchanges are journalled and
 found in their own scope only, and one forgetting leaves the other's.
@@ -1160,7 +1160,7 @@ facts stay `remember`.
 - The exchange in which a rule was kept, forgotten or listed stays out of
   the journal, like `remember` and `forget`.
 
-Host test: `crates/memory/tests/voice_people.rs`
+Host test: `crates/memory/tests/it/voice_people.rs`
 (`days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten`)
 keeps Minh's rule through the real Days store, tells it in Minh's next
 session and never in Sam's or the room's, lists it, does not return it
@@ -1301,7 +1301,7 @@ and the provider worker with the scripted provider and a memory on a
 socket. On a lamp: the played run above, once. A power cut was imitated by cutting
 a file short. Moving the socket to its path after binding it has run on macOS and in
 that emulated Linux run. Times, on that Mac through the socket with thirty days of 200 exchanges
-(`tests/timing.rs`): `append` 19 ms, `recall` by words 15 ms, by day or newest
+(`tests/it/timing.rs`): `append` 19 ms, `recall` by words 15 ms, by day or newest
 under 1 ms, `forget_last` 50 ms. None is known for the lamp.
 
 The opt-in implementation's host results and current limitations are in
@@ -1386,6 +1386,42 @@ house, so the owner's first words begin with "remember my face".
 
 Off, a turn is told and kept as before, for the person the session was opened
 for.
+
+### A known face lost for a moment
+
+A request's scope is the known face fresh as it is admitted, and the eyes'
+known file is fresh for 3 s after they last see the face. So on lamp-4ace on
+20 October at 12:13, someone known who was lost for a moment mid-conversation
+had their next line's memory calls go to the room's scope (#2176 row 5b).
+
+With `LAMP_FACE_GAP_HOLD=on` (off unless set), on the Second route, the face
+cache (`memory_scope::FaceCache::replace_seen`) keeps that known face through
+a gap, only while all of these hold:
+- **The eyes see no face at all:** their newest unexpired look
+  (`humans/faces/tracked`) is empty. A hand across or a step out of the
+  picture holds; a head turned away is usually still a face in their look,
+  so it doesn't. Any face in view may be someone else's, and no look is not
+  knowing, so either holds nothing.
+- **The lamp was just talking with them:** it answered a turn of theirs
+  aloud within the gap (`FaceCache::answered`, at a turn's end when its own
+  answer's audio went). A line left unclear, judged not for the lamp
+  (`not_for_me`), held or given up marks no one. So someone who gets up and
+  goes isn't held for whoever speaks next from out of the picture, unless
+  they go within 8 s of the lamp's last answer to them: that window is
+  still held, and only told-only held lines (no `recall` or `search`) would
+  close it (the reviewers' P2 on #2265, the first builder's call). On the
+  first exchange there is no answer yet, so a face lost before it ends is
+  the room's.
+- **Within the gap:** up to 8 s (`GAP`) past the face's last fresh
+  sighting, which is the known file's 3 s freshness, so up to about 11 s
+  after the eyes last saw it, and up to 8 s past the lamp's last answer to
+  them, whichever ends first. Holding never renews it.
+
+A different known face is theirs at once, and a privacy change revokes a held
+face as it does a fresh one. The exchange itself already stays with the person
+counted at the lamp (`known_faces::Presence`, 30 s); this keeps the memory
+calls with them too. Without a bus root for the eyes' looks, nothing is held.
+The Live route is not covered.
 
 ### Live route session scope
 

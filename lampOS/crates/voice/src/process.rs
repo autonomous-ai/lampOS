@@ -923,6 +923,10 @@ fn worker_command(
             role,
             var(crate::attention::NEAR_CALIBRATED_ENVIRONMENT).as_deref(),
         ))
+        .envs(face_gap_worker_environment(
+            role,
+            var(crate::memory_scope::GAP_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -1115,6 +1119,16 @@ fn near_calibrated_worker_environment(
         .then_some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on"))
 }
 
+// A known face's held gap (#2176 row 5b), to the one route whose memory
+// scope holds it: the second's, the exact `on`.
+fn face_gap_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::memory_scope::GAP_ENVIRONMENT, "on"))
+}
+
 // The echo evidence's skip (#705), to the one worker that runs it: capture.
 fn quiet_evidence_worker_environment(
     role: &str,
@@ -1230,6 +1244,7 @@ fn second_route_worker_environment(
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
+        crate::second_config::OWN_KEYS_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
@@ -1269,6 +1284,7 @@ mod tests {
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
+            crate::second_config::OWN_KEYS_ENV,
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
@@ -1622,6 +1638,7 @@ mod tests {
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
+                    crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
@@ -1668,6 +1685,7 @@ mod tests {
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
+                    || name == crate::second_config::OWN_KEYS_ENV
                 {
                     "on"
                 } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
@@ -1734,6 +1752,7 @@ mod tests {
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_EYES_SPEAKING=on",
+                    "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",
@@ -1749,6 +1768,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",

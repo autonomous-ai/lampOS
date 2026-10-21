@@ -39,6 +39,17 @@ tar = { version = "0.4", default-features = false }
 # (src/package.rs), whose values differ between Linux, its ARM64 build and
 # macOS. Constants only: no unsafe code.
 libc = "0.2"
+# A package from the Skills Store (src/package.rs, `install_from_url`): its
+# signature checked with Ed25519 against the update channel's key, and the
+# package fetched over HTTPS by lamp-update's own client (only https, at most
+# five redirects, each to https, within a bound). The same versions as
+# lamp-update's, so nothing new is built.
+lamp-update = { path = "../update" }
+ring = "0.17"
+base64 = "0.22"
+# The main loop's one wait on every topic's socket and its wake pipe
+# (`poll`, `pipe`), safe calls, as the voice's controls make (#1806).
+rustix = { version = "=1.1.5", features = ["pipe", "fs", "event"] }
 
 [dev-dependencies]
 tempfile = "3"

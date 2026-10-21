@@ -26,7 +26,8 @@ lamp-local-time = { path = "../local-time" }
 lamp-update = { path = "../update" }
 serde.workspace = true
 serde_json.workspace = true
-rustix = { version = "=1.1.5", features = ["fs", "process", "system"] }
+# `net`: the keys helper's peer, by SO_PEERCRED (src/keys.rs, #2094).
+rustix = { version = "=1.1.5", features = ["fs", "net", "process", "system"] }
 # The same HTTP stack as lamp-surround: one small server, one thread.
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
 # `signal` and `macros`: a stop ends serving as its end does (src/main.rs).
@@ -34,6 +35,10 @@ tokio = { version = "1", features = ["rt", "net", "time", "signal", "macros"] }
 # V1's TLS reach of the Internet when ping is blocked. The same features as
 # lamp-gemini and lamp-policy, so one rustls is built for all of them.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# The one check of a person's own key against its service (src/keys.rs, #2094),
+# as lamp-cloud's ping asks the backend.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+webpki-roots = "1"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

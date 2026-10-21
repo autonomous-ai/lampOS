@@ -116,6 +116,7 @@ fn request_of(command: &ProviderInput) -> u64 {
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
         | ProviderInput::Paused { request, .. }
+        | ProviderInput::CountOnly { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -585,6 +586,9 @@ pub(super) fn dropped_if_gone(
         "status":status.to_string(),"active":active}),
     )?;
     *second = None;
+    // The worker's `voice-keys` part went with it, on purpose: lamp-health
+    // forgets it rather than count it quiet (#2415's P3).
+    crate::second_provider::worker::own_key_dropped_from_environment();
     Ok(active)
 }
 

@@ -1,6 +1,6 @@
 //! The `voiced_9s` signal of `tests/fixtures/README.md` and ONNX Runtime's
 //! probability for it with the pinned model. The worker's installation
-//! self-check classifies it; `tests/parity.rs` checks both against the fixture.
+//! self-check classifies it; `tests/it/parity.rs` checks both against the fixture.
 
 /// ONNX Runtime 1.31.0's probability for [`voiced`].
 pub const VOICED_PROBABILITY: f32 = 0.968_532_3;

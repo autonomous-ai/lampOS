@@ -552,20 +552,24 @@ fn share(waits: &mut [Duration], p: f64) -> Duration {
 
 /// How long the lamp's action waits from the model's call to its run, on
 /// this route as `serve` builds it, with the turn's decision on the bus
-/// before the call and with none (the wait's 2 s cap): `n` spoken turns,
-/// each asking for the light, timed from the gate's call to the runner's.
-async fn waits(decided: bool, n: u64) -> Vec<Duration> {
+/// before the call and with none (the wait's `cap`, the lamp's 2 s or a
+/// test's shorter one): `n` spoken turns, each asking for the light, timed
+/// from the gate's call to the runner's.
+async fn waits(decided: bool, n: u64, cap: Duration) -> Vec<Duration> {
     let mut bench = Bench::new(if decided { "wd" } else { "wn" });
     let lines: Vec<String> = (0..n).map(|turn| format!("The light, {turn}.")).collect();
     let lines: Vec<(&str, bool)> = lines.iter().map(|line| (line.as_str(), true)).collect();
     let script = light_turns(&lines);
-    let desk = Arc::new(Desk::new(
-        bench.decided(),
-        bench.settings(),
-        false,
-        Arc::new(|_| Turn::default()),
-        crate::second_provider::worker::answered_here(None),
-    ));
+    let desk = Arc::new(
+        Desk::new(
+            bench.decided(),
+            bench.settings(),
+            false,
+            Arc::new(|_| Turn::default()),
+            crate::second_provider::worker::answered_here(None),
+        )
+        .with_cap(cap),
+    );
     let called: Arc<Mutex<Vec<Instant>>> = Arc::default();
     let ran: Arc<Mutex<Vec<Instant>>> = Arc::default();
     let gate = desk.gate();
@@ -593,7 +597,7 @@ async fn waits(decided: bool, n: u64) -> Vec<Duration> {
             bench.decide(request, "answer");
         }
         spoken(&mut engine, request);
-        let labels = turn_within(&mut engine, crate::policy_holds::WAIT * 2).await;
+        let labels = turn_within(&mut engine, cap + Duration::from_secs(2)).await;
         assert!(
             labels
                 .last()
@@ -612,19 +616,21 @@ async fn waits(decided: bool, n: u64) -> Vec<Duration> {
 }
 
 /// The wait with the decision there: well under one look of the gate's
-/// (20 ms) past the call, on this machine; with none, the 2 s cap and at
-/// most one look more.
+/// (20 ms) past the call, on this machine; with none, the cap and at most
+/// one look more. The lamp's cap is `policy_holds::WAIT` (2 s); with none,
+/// the test gives the gate `CAP`, so as not to wait the lamp's out twice
+/// (#1806).
 #[tokio::test]
 async fn an_action_waits_no_longer_than_its_decision_takes_or_the_cap() {
-    let mut decided = waits(true, 8).await;
+    const CAP: Duration = Duration::from_millis(300);
+    let mut decided = waits(true, 8, crate::policy_holds::WAIT).await;
     assert!(
         share(&mut decided, 1.0) < Duration::from_millis(100),
         "{decided:?}"
     );
-    let mut none = waits(false, 2).await;
+    let mut none = waits(false, 2, CAP).await;
     assert!(
-        share(&mut none, 0.0) >= crate::policy_holds::WAIT
-            && share(&mut none, 1.0) < crate::policy_holds::WAIT + Duration::from_millis(100),
+        share(&mut none, 0.0) >= CAP && share(&mut none, 1.0) < CAP + Duration::from_millis(100),
         "{none:?}"
     );
 }
@@ -636,7 +642,7 @@ async fn an_action_waits_no_longer_than_its_decision_takes_or_the_cap() {
 #[ignore = "a measurement: 20 s of waits"]
 async fn measure_the_wait_from_the_call_to_its_run() {
     for (decided, n) in [(true, 40), (false, 10)] {
-        let mut waits = waits(decided, n).await;
+        let mut waits = waits(decided, n, crate::policy_holds::WAIT).await;
         let ms = |wait: Duration| wait.as_secs_f64() * 1_000.0;
         let median = ms(share(&mut waits, 0.5));
         let p90 = ms(share(&mut waits, 0.9));

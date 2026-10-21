@@ -15,7 +15,9 @@
 //! Off unless `LAMP_ONBOARDING=on` and `LAMP_ONBOARDING_FILE` names an
 //! absolute path: then nothing here runs, no function is declared and no
 //! file is read or written.
+pub(crate) mod giving_way;
 pub(crate) mod hardware;
+pub(crate) mod near;
 pub(crate) mod privacy;
 pub(crate) mod storage;
 
@@ -90,17 +92,19 @@ pub enum Step {
     Touch,
     Privacy,
     GivingWay,
+    RoomSounds,
     Preferences,
 }
 
 impl Step {
-    pub const ALL: [Step; 7] = [
+    pub const ALL: [Step; 8] = [
         Step::WhereYouSit,
         Step::WhoYouAre,
         Step::HowYouSound,
         Step::Touch,
         Step::Privacy,
         Step::GivingWay,
+        Step::RoomSounds,
         Step::Preferences,
     ];
 
@@ -112,6 +116,7 @@ impl Step {
             Step::Touch => "touch",
             Step::Privacy => "privacy",
             Step::GivingWay => "giving_way",
+            Step::RoomSounds => ROOM_SOUNDS,
             Step::Preferences => "preferences",
         }
     }
@@ -121,10 +126,10 @@ impl Step {
     }
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
-    /// is passed over until its part can be measured from here: hearing
-    /// (fourth, #753), the privacy switch (third, #795), and whether the
-    /// body gives way (fifth, #780). Touch needs Controls' head pads on the
-    /// bus as well ([`Onboarding::step_available`]).
+    /// is passed over until its part can be measured from here. Privacy,
+    /// how they sound (#1803) and giving way (#1800) have their own
+    /// availability; touch needs Controls' head pads on the bus as well
+    /// ([`Onboarding::step_available`]).
     fn available(self) -> bool {
         matches!(
             self,
@@ -136,7 +141,11 @@ impl Step {
     /// it was skipped.
     fn reportable(self, outcome: Outcome) -> bool {
         match self {
-            Step::WhereYouSit | Step::Touch | Step::Privacy => outcome == Outcome::Skipped,
+            Step::WhereYouSit
+            | Step::Touch
+            | Step::Privacy
+            | Step::HowYouSound
+            | Step::GivingWay => outcome == Outcome::Skipped,
             _ => outcome != Outcome::NotAvailable,
         }
     }
@@ -149,6 +158,7 @@ impl Step {
             Step::WhoYouAre => WHO_NOTE,
             Step::Touch if again => TOUCH_OFFER,
             Step::Touch => TOUCH_NOTE,
+            Step::RoomSounds => ROOM_SOUNDS_NOTE,
             Step::Preferences => PREFERENCES_NOTE,
             // PLACEHOLDER (#841): each owner words its own step's note,
             // opening with "one more thing I can do now" for the re-offer.
@@ -168,7 +178,7 @@ impl Step {
         }
     }
 
-    /// Only the future GivingWay step may request a completion movement.
+    /// Only the GivingWay step may request a completion movement.
     /// Other onboarding steps stay physically still (the owner's #841 decision).
     fn gesture(self) -> &'static str {
         match self {
@@ -190,11 +200,25 @@ pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. 
 pub const SIT_DONE: &str =
     "(Now you can see them well where they sit. Tell them so in a few words.)";
 pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
-pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Then call setup_step with step \"who_you_are\": done, skipped if they would rather not, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)";
 pub const WHO_NUDGE: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
 pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
 pub const WHO_AGAIN: &str =
     "(That was not their name. Ask them once more, in a few words, what you should call them.)";
+/// The room sounds step (#1722 item 1): asked only on a lamp with no
+/// privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`), where music and
+/// laughter are off until a yes. A yes (`done`) is kept as [`ROOM_SOUNDS_PATH`]
+/// for lamp-ears; no (`skipped`) or silence (`failed`) keeps only the step's
+/// outcome, so it is asked once and stays off.
+pub const ROOM_SOUNDS: &str = "room_sounds";
+/// Outside the voice's 0700 folder, so that lamp-ears (`lampos`) can read
+/// it: `deploy/product/lampos.conf` makes the folder 0750 root:lampos.
+pub const ROOM_SOUNDS_PATH: &str = "/var/lib/lampOS/consent/room-sounds.json";
+/// The group, by name in `/etc/group`, that may read [`ROOM_SOUNDS_PATH`].
+pub const ROOM_SOUNDS_GROUP: &str = "lampos";
+/// The only value of `LAMP_PRIVACY_CONTROLS` that offers the step.
+pub const NO_SLIDE: &str = "no-slide";
+pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
 pub const TOUCH_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)";
 pub const TOUCH_OFFER: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)";
 pub const TOUCH_REMIND: &str = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)";
@@ -268,19 +292,40 @@ pub struct Progress {
     /// Redo's durable tombstone precedes deletion of any old checkpoint.
     #[serde(default)]
     pub privacy_discard_pending: bool,
+    /// Near-call prompts committed this setup/redo, before each is published
+    /// (#1803): at most `lamp_near_call::MOST_PROMPTS`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub near_call_prompts: u8,
+    /// The accepted near-call tries so far: numbers only, never sound.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub near_call_tries: Vec<lamp_near_call::Try>,
+    /// Prompts for the step's sentence part committed this setup/redo,
+    /// before each is published: at most [`near::SENTENCE_PROMPTS`]. Only
+    /// the count: nothing of the sentence is kept.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub sentence_prompts: u8,
+    /// Giving-way invitations committed this setup/redo, before each is
+    /// published (#1800): at most two, so a rebuilt walk cannot ask again.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub giving_way_tries: u8,
+}
+
+fn is_zero(value: &u8) -> bool {
+    *value == 0
 }
 
 impl Progress {
     /// The storage executor accepts only the bounded onboarding schema.
     pub(crate) fn check(&self) -> io::Result<()> {
         let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid onboarding progress");
-        if self.steps.len() > Step::ALL.len() || self.privacy_invitation_tries > 2 {
+        if self.privacy_invitation_tries > 2 || self.giving_way_tries > giving_way::MOST_TRIES {
             return Err(invalid());
         }
-        for (name, kept) in &self.steps {
-            if Step::named(name).is_none() {
-                return Err(invalid());
-            }
+        // A step this build doesn't know (a later build's, rolled back) is
+        // read past and kept as it is, never a refused file: the walk goes
+        // on with the steps it knows (#2110). The file's 16 KiB bound holds
+        // how many there may be.
+        for kept in self.steps.values() {
             if let Some(frame) = kept.framing
                 && (!(0.0..=1.0).contains(&frame.size)
                     || !(-1.0..=1.0).contains(&frame.x)
@@ -288,6 +333,22 @@ impl Progress {
             {
                 return Err(invalid());
             }
+        }
+        // Persisted samples are validated on every load and commit (#1803).
+        let tries = &self.near_call_tries;
+        if usize::from(self.near_call_prompts) > lamp_near_call::MOST_PROMPTS
+            || tries.len() > lamp_near_call::TRIES
+            || tries.len() > usize::from(self.near_call_prompts)
+            || !tries.iter().all(near::valid_try)
+            || self.sentence_prompts > near::SENTENCE_PROMPTS
+            // The step is done by its sentence part, which asked at least
+            // once; the name part's bar is its own file.
+            || self
+                .steps
+                .get(Step::HowYouSound.name())
+                .is_some_and(|kept| kept.outcome == Outcome::Done && self.sentence_prompts == 0)
+        {
+            return Err(invalid());
         }
         if self.privacy_done_attempt.is_some()
             && !self
@@ -347,6 +408,9 @@ struct PrivacyOffer {
     claimed: bool,
     persisted: bool,
     offered_us: u64,
+    /// When its words were taken: the invitation begins, and a close from
+    /// then on is the person's answer (the lead's 52e6 run, 21 October).
+    claimed_us: u64,
     bound: Option<(BootId, u64)>,
 }
 
@@ -385,6 +449,13 @@ fn fresh_token() -> io::Result<u64> {
 // Only the voice's own teardown is verified; the eyes close the camera on
 // their own permit timeout, which this step does not observe (#1802).
 const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+/// The invitation's note: one sentence, about 3-5 s spoken, so the person
+/// can act before the lamp is done talking (the lead's 52e6 run, 21 October).
+fn privacy_invitation(location: &str) -> String {
+    format!(
+        "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: turn it off, then on again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
+    )
+}
 const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
 
 pub struct Onboarding {
@@ -436,6 +507,13 @@ pub struct Onboarding {
     /// "touch" is not available.
     touches: Option<lamp_bus::Subscriber>,
     privacy_flow: PrivacyFlow,
+    near: near::NearFlow,
+    giving: giving_way::GivingWayFlow,
+    /// Unix milliseconds, for evidence dated by the bus (tests set their own).
+    unix_clock: fn() -> u64,
+    /// A lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
+    /// only then is the room sounds step offered.
+    no_slide: bool,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -482,6 +560,11 @@ pub fn switched_on(switch: Option<&str>, file: Option<&str>) -> Option<PathBuf> 
         .filter(|path| path.is_absolute() && path.file_name().is_some())
 }
 
+/// A lamp with no privacy slide: `LAMP_PRIVACY_CONTROLS` exactly `no-slide`.
+pub fn no_slide(privacy_controls: Option<&str>) -> bool {
+    privacy_controls == Some(NO_SLIDE)
+}
+
 pub fn mailbox_of(file: &Path) -> PathBuf {
     let mut name = file.as_os_str().to_owned();
     name.push(".told");
@@ -510,6 +593,11 @@ impl Onboarding {
                 .ok()
             });
         }
+        walk.no_slide = no_slide(
+            std::env::var(crate::privacy_bus::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        );
         Some(walk)
     }
 
@@ -542,6 +630,10 @@ impl Onboarding {
             available: Step::available,
             gesture: None,
             privacy_flow: PrivacyFlow::default(),
+            near: near::NearFlow::default(),
+            giving: giving_way::GivingWayFlow::default(),
+            unix_clock: unix_ms,
+            no_slide: false,
             looked: None,
             felt: None,
             goals: None,
@@ -582,6 +674,9 @@ impl Onboarding {
             progress: file.clone(),
             checkpoint: file.parent().unwrap().join("privacy-pending.json"),
             mailbox: mailbox_of(&file),
+            near_call: file.parent().unwrap().join("near-call.json"),
+            room_sounds: file.parent().unwrap().join("room-sounds.json"),
+            room_sounds_group: None,
         })
         .unwrap();
         let mut walk = Self::with_storage(file, owner.client());
@@ -608,6 +703,8 @@ impl Onboarding {
         self.privacy_flow.offer = None;
         self.privacy_flow.attempt = None;
         self.privacy_flow.pending_result = None;
+        self.forget_near();
+        self.forget_giving();
         self.owed = None;
         self.gesture = None;
     }
@@ -669,6 +766,8 @@ impl Onboarding {
             self.privacy_flow.attempt = None;
             self.privacy_flow.pending_result = None;
             self.privacy_flow.loaded = false;
+            self.forget_near();
+            self.forget_giving();
             self.checkpoint_bytes = None;
         }
         if !snapshot.ready {
@@ -710,6 +809,7 @@ impl Onboarding {
                 self.erase_on_commit = false;
             }
         }
+        self.near_stored(snapshot.epoch, snapshot.revision, now_us);
         self.checkpoint_bytes = snapshot.checkpoint;
         if let Some((revision, lines)) = snapshot.mailbox {
             if self.mailbox_revision != Some((snapshot.epoch, revision)) {
@@ -849,10 +949,14 @@ impl Onboarding {
     }
 
     /// Whether this voice has the step now: privacy only with a verified
-    /// location and receipts, touch only with Controls' touches to read.
+    /// location and receipts, how they sound only with the near-call path,
+    /// touch only with Controls' touches to read.
     fn step_available(&self, step: Step) -> bool {
         match step {
             Step::Privacy => self.privacy_available(),
+            Step::HowYouSound => self.near_available(),
+            Step::RoomSounds => self.no_slide,
+            Step::GivingWay => self.giving_way_available(),
             Step::Touch => (self.available)(step) && self.touches.is_some(),
             _ => (self.available)(step),
         }
@@ -907,24 +1011,50 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
-        Some(format!(
-            "(Say this short invitation completely before they act: the physical privacy switch {location} closes both microphones and camera. Invite them to close it, then open it again. Explain before they close it that you cannot hear or see them while it is closed. Do not claim success or ask a tool to mark privacy done.)"
-        ))
+        offer.claimed_us = now_us;
+        Some(privacy_invitation(location))
     }
 
+    /// Arms the attempt as the invitation's turn begins, not when it ends:
+    /// a close while the lamp is still saying it counts, and the mute stops
+    /// the words as any physical mute does (the lead's 52e6 run, 21 October).
     pub(crate) fn bind_privacy_invitation(
         &mut self,
         token: u64,
         voice_boot: BootId,
         turn: u64,
     ) -> bool {
-        let Some(offer) = self.privacy_flow.offer.as_mut() else {
+        let Some(offer) = self.privacy_flow.offer.as_ref() else {
             return false;
         };
         if offer.token != token || !offer.claimed || offer.bound.is_some() || turn == 0 {
             return false;
         }
-        offer.bound = Some((voice_boot, turn));
+        let began_us = offer.claimed_us;
+        let armed = self.privacy_flow.context.as_ref().and_then(|context| {
+            self.privacy_open_receipt(began_us).map(|baseline| {
+                privacy::Attempt::arm(
+                    context.epoch.clone(),
+                    privacy::Invitation {
+                        voice_boot,
+                        turn,
+                        delivered_at_us: began_us,
+                    },
+                    baseline,
+                    began_us,
+                )
+            })
+        });
+        let Some(Ok(attempt)) = armed else {
+            self.retry_privacy(began_us);
+            return false;
+        };
+        self.privacy_flow.attempt = Some(attempt);
+        if let Some(offer) = self.privacy_flow.offer.as_mut() {
+            offer.bound = Some((voice_boot, turn));
+        }
+        self.records
+            .push(json!({"kind":"onboarding_privacy_armed","turn":turn,"at_us":began_us}));
         true
     }
 
@@ -956,8 +1086,11 @@ impl Onboarding {
         }
     }
 
-    /// Called only on the existing attributable whole-turn playback result.
-    /// Admission, first audio and model text never arm a physical attempt.
+    /// Called on the existing attributable whole-turn playback result. The
+    /// attempt was armed as the turn began; an invitation not heard whole
+    /// (cut off, a playback gap, no audio) drops it and is offered again
+    /// within the two-try budget. A physical mute while it is said never
+    /// gets here: that cycle ends with the close as its candidate.
     pub(crate) fn privacy_invitation_finished(
         &mut self,
         voice_boot: BootId,
@@ -968,32 +1101,18 @@ impl Onboarding {
         if self.privacy_invitation_binding() != Some((voice_boot, turn)) {
             return;
         }
+        self.privacy_flow.offer = None;
         if !delivered_whole {
-            self.retry_privacy(now_us);
-            return;
-        }
-        let armed = self.privacy_flow.context.as_ref().and_then(|context| {
-            self.privacy_open_receipt(now_us).map(|baseline| {
-                privacy::Attempt::arm(
-                    context.epoch.clone(),
-                    privacy::Invitation {
-                        voice_boot,
-                        turn,
-                        delivered_at_us: now_us,
-                    },
-                    baseline,
-                    now_us,
-                )
-            })
-        });
-        match armed {
-            Some(Ok(attempt)) => {
-                self.privacy_flow.attempt = Some(attempt);
-                self.privacy_flow.offer = None;
-                self.records
-                    .push(json!({"kind":"onboarding_privacy_armed","turn":turn,"at_us":now_us}));
+            // Nothing of an armed attempt was persisted: dropping it is enough.
+            if self
+                .privacy_flow
+                .attempt
+                .as_ref()
+                .is_some_and(|attempt| attempt.phase() == privacy::Phase::Armed)
+            {
+                self.privacy_flow.attempt = None;
             }
-            _ => self.retry_privacy(now_us),
+            self.retry_privacy(now_us);
         }
     }
 
@@ -1020,8 +1139,8 @@ impl Onboarding {
         let early = acquisition.physical.stamp.at_us <= attempt.delivered_at_us();
         match attempt.observe_close(acquisition, now_us) {
             Ok(()) => Some(privacy::Checkpoint::new(attempt, self.privacy_path())),
-            // A slide read just before the invitation's end was processed is
-            // the person acting early, not a failed check: offer it again.
+            // A slide read just before the invitation began is the person
+            // acting early, not a failed check: offer it again.
             Err(_) if early => {
                 self.privacy_flow.erase_pending = true;
                 self.retry_privacy(now_us);
@@ -1225,6 +1344,7 @@ impl Onboarding {
             claimed: false,
             persisted: false,
             offered_us: now_us,
+            claimed_us: now_us,
             bound: None,
         });
         if let Some(led) = self.led.as_mut() {
@@ -1233,6 +1353,56 @@ impl Onboarding {
         self.records.push(
             json!({"kind":"onboarding_step","step":"privacy","state":"offered","at_us":now_us}),
         );
+    }
+
+    /// The one pending invitation, of whichever measured step is led.
+    pub(crate) fn pending(&self) -> lamp_msgs::OnboardingPending {
+        match self.near_pending().or_else(|| self.giving_pending()) {
+            Some(offer) => lamp_msgs::OnboardingPending {
+                invitations: vec![offer],
+            },
+            None => self.privacy_pending(),
+        }
+    }
+
+    pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
+        if self.near_pending().is_some() {
+            self.take_near_invitation(token, now_us)
+        } else if self.giving_pending().is_some() {
+            self.take_giving_invitation(token, now_us)
+        } else {
+            self.take_privacy_invitation(token, now_us)
+        }
+    }
+
+    pub(crate) fn bind_invitation(&mut self, token: u64, voice_boot: BootId, turn: u64) -> bool {
+        self.bind_near_invitation(token, voice_boot, turn)
+            || self.bind_giving_invitation(token, voice_boot, turn)
+            || self.bind_privacy_invitation(token, voice_boot, turn)
+    }
+
+    pub(crate) fn invitation_binding(&self) -> Option<(BootId, u64)> {
+        self.near_binding()
+            .or_else(|| self.giving_binding())
+            .or_else(|| self.privacy_invitation_binding())
+    }
+
+    pub(crate) fn invitation_refused(&mut self, token: u64, now_us: u64) {
+        self.near_invitation_refused(token, now_us);
+        self.giving_invitation_refused(token, now_us);
+        self.privacy_invitation_refused(token, now_us);
+    }
+
+    pub(crate) fn invitation_finished(
+        &mut self,
+        voice_boot: BootId,
+        turn: u64,
+        delivered_whole: bool,
+        now_us: u64,
+    ) {
+        self.near_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+        self.giving_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+        self.privacy_invitation_finished(voice_boot, turn, delivered_whole, now_us);
     }
 
     pub fn kept(&self) -> &Progress {
@@ -1413,6 +1583,9 @@ impl Onboarding {
         }
         if paused {
             self.invalidate_privacy(privacy::Invalidation::FenceFailure);
+            self.invalidate_near();
+            // Giving way under the pause is not available: offered later.
+            self.giving_way_paused(now_us);
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
             self.nudge_record(false, now_us);
@@ -1426,6 +1599,9 @@ impl Onboarding {
             self.privacy_flow.no_receipt_since = None;
             self.privacy_flow.waited_out = false;
         }
+        // A try is judged on its own evidence, whatever storage is doing.
+        self.near_judge(now_us);
+        self.giving_judge(now_us);
         if !self.storage_idle() {
             return None;
         }
@@ -1484,6 +1660,14 @@ impl Onboarding {
                 }
             }
             self.privacy_tick(now_us, quiet_us, can_speak, face.is_some());
+            return None;
+        }
+        if step == Step::HowYouSound {
+            self.near_tick(now_us, quiet_us, can_speak, face.is_some());
+            return None;
+        }
+        if step == Step::GivingWay {
+            self.giving_tick(now_us, quiet_us, can_speak, face.is_some());
             return None;
         }
         let gone = self
@@ -1735,6 +1919,9 @@ impl Onboarding {
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
                 self.storage_failed = false;
                 self.invalidate_privacy(privacy::Invalidation::Redo);
+                self.forget_near();
+                self.near.generation = 0;
+                self.redo_giving();
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
@@ -1775,6 +1962,15 @@ impl Onboarding {
                 if step == Step::Privacy {
                     self.invalidate_privacy(privacy::Invalidation::Redo);
                     self.privacy_flow.pending_result = Some((outcome, None));
+                } else if step == Step::HowYouSound {
+                    // A skip leaves any earlier bar as it is; late evidence
+                    // and a late write of this walk are dropped.
+                    self.invalidate_near();
+                    self.finish(step, outcome, None, now_us);
+                } else if step == Step::GivingWay {
+                    // Late evidence of this walk's try is dropped.
+                    self.forget_giving();
+                    self.finish(step, outcome, None, now_us);
                 } else {
                     self.finish(step, outcome, None, now_us);
                 }
@@ -1927,8 +2123,10 @@ pub fn tools() -> Vec<Tool> {
                           to lead has ended: done, skipped because they asked to skip it, or failed. If \
                           they want to skip the rest, call it skipped for the step you are on. Then go on \
                           talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit, touch and privacy can only be skipped; the runner requires \
-                          physical evidence: seeing them, feeling their touch, the switch's receipt."
+                          where_you_sit, how_you_sound, touch, privacy and giving_way can only be \
+                          skipped; the runner requires physical evidence: seeing them, hearing their \
+                          call, feeling their touch, the switch's receipt, the body giving way. \
+                          room_sounds is done only after a clear yes."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -1970,6 +2168,18 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 (Some(Step::Privacy), Some(_)) => {
                     return (
                         json!({"error":"Privacy is completed only by the physical switch closing the microphones and reopening. You can only skip it if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::HowYouSound), Some(_)) => {
+                    return (
+                        json!({"error":"How they call you is learned only from their calls heard from their seat. You can only skip it if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::GivingWay), Some(_)) => {
+                    return (
+                        json!({"error":"Giving way is done only when the body feels a hand move its head and let go. You can only skip it if they ask."}),
                         true,
                     );
                 }
@@ -2175,7 +2385,7 @@ mod tests {
         }
         report(&room.walk, "preferences", "done");
         assert_eq!(room.wait(120 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         // Kept across a restart: nothing is asked again.
         let mut again = Room {
@@ -2200,7 +2410,7 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
         report(&room.walk, "preferences", "skipped");
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         // "Lamp, let's redo the setup."
         let redo = ToolCall {
             id: "c".into(),
@@ -2346,13 +2556,22 @@ mod tests {
     #[test]
     fn completed_setup_steps_do_not_move_the_body() {
         let mut room = walked("gesture");
-        assert_eq!(room.walk.kept().steps.len(), 7);
+        assert_eq!(room.walk.kept().steps.len(), 8);
         assert_eq!(room.walk.take_gesture(), None);
     }
 
     #[test]
     fn a_step_that_was_not_available_is_offered_once_a_day_when_it_is() {
-        let room = walked("offer");
+        // Every placeholder now has its own measure; preferences stands in
+        // for a step a first voice lacked and a later one has.
+        let without = |step: Step| step != Step::Preferences && Step::available(step);
+        let mut room = Room::new("offer");
+        room.walk.available = without;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::NotAvailable));
         // The same voice: nothing more is offered.
         let mut same = Room {
             walk: Onboarding::at(room.walk.file.clone()),
@@ -2361,8 +2580,9 @@ mod tests {
             still: true,
             body_on_bus: false,
         };
+        same.walk.available = without;
         assert_eq!(same.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
-        // A later voice that has hearing: offered, after the walk.
+        // A later voice that has it: offered, after the walk.
         let mut later = Room {
             walk: Onboarding::at(room.walk.file.clone()),
             at: 0,
@@ -2370,9 +2590,7 @@ mod tests {
             still: true,
             body_on_bus: false,
         };
-        later.walk.available =
-            |step| step != Step::Touch && step != Step::Privacy && step != Step::GivingWay;
-        assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [ONE_MORE_NOTE]);
+        assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert!(later.walk.leading());
         // Led to its end like any step, while it is being led.
         assert_eq!(later.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
@@ -2382,7 +2600,7 @@ mod tests {
         assert!(!later.walk.leading());
         assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
         assert_eq!(
-            later.outcome(Step::HowYouSound),
+            later.outcome(Step::Preferences),
             Some(Outcome::NotAvailable)
         );
         // A day later it is offered again, and done it is kept.
@@ -2390,13 +2608,13 @@ mod tests {
             .walk
             .desired
             .steps
-            .get_mut("how_you_sound")
+            .get_mut("preferences")
             .unwrap()
             .offered_at_unix_s = Some(unix_ms() / 1_000 - OFFER_EVERY_S);
-        assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [ONE_MORE_NOTE]);
-        report(&later.walk, "how_you_sound", "done");
+        assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        report(&later.walk, "preferences", "done");
         assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(later.outcome(Step::HowYouSound), Some(Outcome::Done));
+        assert_eq!(later.outcome(Step::Preferences), Some(Outcome::Done));
         assert_eq!(later.walk.take_gesture(), None);
     }
 
@@ -2907,6 +3125,137 @@ mod tests {
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
     }
 
+    fn room_sounds_file(room: &Room) -> PathBuf {
+        room.walk.file.parent().unwrap().join("room-sounds.json")
+    }
+
+    /// A no-slide lamp's walk up to the room sounds question.
+    fn asked_room_sounds(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.no_slide = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [ROOM_SOUNDS_NOTE]);
+        room
+    }
+
+    #[test]
+    fn room_sounds_is_offered_only_on_a_lamp_with_no_slide() {
+        assert!(no_slide(Some("no-slide")));
+        for value in [None, Some("on"), Some("off"), Some(""), Some("no-slide ")] {
+            assert!(!no_slide(value), "{value:?}");
+        }
+        // A slide lamp, or the switch unset: passed over unspoken.
+        let room = walked("room-sounds-slide");
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::NotAvailable));
+        assert!(!room_sounds_file(&room).exists());
+        assert!(
+            ROOM_SOUNDS_NOTE.contains("the lamp notices music and laughter, nothing is recorded")
+        );
+    }
+
+    #[test]
+    fn a_yes_to_room_sounds_is_kept_once_and_redo_wipes_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let mut room = asked_room_sounds("room-sounds-yes");
+        report(&room.walk, "room_sounds", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        let path = room_sounds_file(&room);
+        let kept: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let at = room.walk.kept().steps["room_sounds"].at_unix_s;
+        assert_eq!(
+            kept,
+            json!({"version":1,"room_sounds":"yes","at_unix_s":at})
+        );
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        // A walk rebuilt (a restart, a mute) does not ask again.
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(path.exists());
+        // "Let's redo the setup": the yes goes with every other outcome.
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        assert_eq!(again.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert!(again.walk.kept().steps.is_empty());
+        assert!(!path.exists());
+    }
+
+    /// Roll-back safety (#2110): a progress file with a step a later build
+    /// added loads here; the known steps are intact, the walk does not ask
+    /// them again, and the unknown one is kept as it was.
+    #[test]
+    fn a_step_this_build_does_not_know_is_read_past_and_kept() {
+        let mut room = asked_room_sounds("unknown-step");
+        report(&room.walk, "room_sounds", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let file = room.walk.file.clone();
+        let mut written: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        written["steps"]["a_later_step"] = json!({"outcome":"done","at_unix_s":9});
+        std::fs::write(&file, serde_json::to_vec(&written).unwrap()).unwrap();
+        let known = room.walk.kept().steps.clone();
+        let mut again = Room {
+            walk: Onboarding::at(file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        let loaded = again.walk.kept().steps.clone();
+        for (name, kept) in &known {
+            assert_eq!(loaded.get(name), Some(kept), "{name}");
+        }
+        assert_eq!(loaded["a_later_step"].outcome, Outcome::Done);
+        assert_eq!(loaded.len(), known.len() + 1);
+    }
+
+    #[test]
+    fn no_or_silence_to_room_sounds_leaves_it_off_and_is_not_asked_again() {
+        // No: skipped, kept as an outcome only.
+        let mut room = asked_room_sounds("room-sounds-no");
+        report(&room.walk, "room_sounds", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::Skipped));
+        assert!(!room_sounds_file(&room).exists());
+        // Silence: failed after ninety seconds and a quiet room.
+        let mut room = asked_room_sounds("room-sounds-silence");
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::RoomSounds), Some(Outcome::Failed));
+        assert!(!room_sounds_file(&room).exists());
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.no_slide = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room_sounds_file(&again).exists());
+    }
+
     #[test]
     fn the_nearest_face_is_its_framing() {
         let face = |xmin: f32, ymin: f32, side: f32| lamp_msgs::Face {
@@ -2930,5 +3279,9 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod giving_way_flow_tests;
+#[cfg(test)]
+mod near_flow_tests;
 #[cfg(test)]
 mod privacy_flow_tests;

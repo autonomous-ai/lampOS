@@ -217,7 +217,7 @@ byte/frame/time caps, full queue, stalled/failing writer and incomplete finaliza
 The writer stall/fault hooks exist only in test builds.
 
 ```sh
-cargo test -p lamp-voice --test diagnostics --locked --offline
+cargo test -p lamp-voice --test it --locked --offline diagnostics::
 cargo test -p lamp-voice --lib diagnostics::tests --locked --offline
 cargo clippy -p lamp-voice --all-targets --locked --offline -- -D warnings
 ```

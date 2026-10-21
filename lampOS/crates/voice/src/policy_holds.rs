@@ -269,13 +269,26 @@ pub fn gate(
     waited: Duration,
     on_a_reply: bool,
 ) -> Gate {
+    gate_within(verdict, name_heard, waited, on_a_reply, WAIT)
+}
+
+/// As [`gate`], waiting at most `cap` for the turn's verdict. The lamp's is
+/// [`WAIT`]; a test gives a shorter one so as not to wait the lamp's out
+/// (#1806).
+pub fn gate_within(
+    verdict: Option<Verdict>,
+    name_heard: bool,
+    waited: Duration,
+    on_a_reply: bool,
+    cap: Duration,
+) -> Gate {
     match verdict {
         _ if name_heard => Gate::Run,
         Some(Verdict::StayQuiet) => Gate::Hold,
         Some(Verdict::StayQuietFollowing) if on_a_reply => Gate::Run,
         Some(Verdict::StayQuietFollowing) => Gate::Hold,
         Some(Verdict::TakenUp) => Gate::Run,
-        None if waited < WAIT => Gate::Wait,
+        None if waited < cap => Gate::Wait,
         None => Gate::Run,
     }
 }

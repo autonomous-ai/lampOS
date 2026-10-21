@@ -23,7 +23,7 @@ counts as seen; a spell only a voice showed is tested in `visits.rs`
 or voice (`nobody_s` back from the value that said nobody), so "1 min" is
 the 119 s of faces. The record's lines and a stretch the lamp could not see
 are tested on their own in `crates/skills/src/visits.rs`, and the local time
-of day in `crates/skills/tests/skills.rs`
+of day in `crates/skills/tests/it/skills.rs`
 (`a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules`).
 Whether the model answers in a few kind words, without guessing who, is for
 a lamp (#1685).

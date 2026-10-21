@@ -1554,6 +1554,8 @@ impl Rig {
         Ok(())
     }
     fn shutdown(&mut self, trace: &mut SessionState) -> io::Result<()> {
+        // A ring being started again is stopped like any other (#1620).
+        let _ = self.ring.settle_restart(trace);
         let grace = if self.diagnostic_directory.is_some() {
             DIAGNOSTIC_SHUTDOWN_GRACE
         } else {
@@ -3103,6 +3105,7 @@ fn flush_provider_input_with(
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
             | ProviderInput::Paused { request, .. }
+            | ProviderInput::CountOnly { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -4302,6 +4305,13 @@ thread_local! {
     /// memory id, in place of the eyes' file.
     static TEST_TONE_PERSON: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's near-call try (#1803), in place of onboarding's own.
+    static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
+        const { std::cell::RefCell::new(None) };
+    /// A loop test's open sentence window (#1803), in the scenario's
+    /// monotonic microseconds, in place of onboarding's own.
+    static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// A line's tone told, in the session record and on the bus: with its
@@ -4324,6 +4334,43 @@ fn tell_tone(
         out.tell(monotonic_us(), &told);
     }
     Ok(())
+}
+
+/// Whether onboarding's near-call step holds the reply to the utterance
+/// whose speech began at `began_us`, at `at_us` (#1803): its try window is
+/// open and the lamp's name was heard as it began, so it is the person
+/// calling the lamp for the measurement, and the lamp's answer would spoil
+/// the try. Nothing outside the step is held.
+fn near_call_window(
+    onboarding: Option<&crate::onboarding::Onboarding>,
+    began_us: Option<u64>,
+    at_us: u64,
+) -> bool {
+    let Some(began_us) = began_us else {
+        return false;
+    };
+    #[cfg(test)]
+    if let Some(held) = TEST_NEAR.with(|near| {
+        near.borrow()
+            .as_ref()
+            .map(|flow| flow.holds_reply(began_us, at_us))
+    }) {
+        return held;
+    }
+    onboarding.is_some_and(|walk| walk.near_holds_reply(began_us, at_us))
+}
+
+/// Whether the sentence part's window of onboarding's `how_you_sound` is
+/// open at `at_us` (#1803): a line that ends in it is the person's sentence.
+/// Unlike a name in the near-call window, its End goes on, so the words
+/// come back; its answer is held (the turn ends as its words arrive, or as
+/// its first answer audio does), and the words are counted, never kept.
+fn sentence_window(onboarding: Option<&crate::onboarding::Onboarding>, at_us: u64) -> bool {
+    #[cfg(test)]
+    if let Some((from, to)) = TEST_SENTENCE_WINDOW.with(std::cell::Cell::get) {
+        return (from..to).contains(&at_us);
+    }
+    onboarding.is_some_and(|walk| walk.sentence_window(at_us))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4543,6 +4590,17 @@ fn conversation_with_gate(
     // (`LAMP_SHORT_SOUNDS`): until it is answered the lamp does not ponder
     // it, and the room and the provider do not count it as talk.
     let mut sound_turn: Option<u64> = None;
+    // A call heard during the near-call step's try window (#1803): it ends
+    // unanswered, however long it runs past the window, if it is no more
+    // than a call.
+    let mut near_call_turn: Option<u64> = None;
+    // The turn whose line began in the sentence window (#1803): marked
+    // count-only to the provider, its words are counted for onboarding and
+    // kept nowhere, and its answer is neither played, published nor kept.
+    let mut sentence_turn: Option<u64> = None;
+    // Its words as they come, in memory only, until the last piece: on
+    // Live they come in pieces, all of which are counted.
+    let mut sentence_heard: Option<String> = None;
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -4596,6 +4654,20 @@ fn conversation_with_gate(
         })
     });
     let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
+    // The near-call step's evidence (#1803): `name/heard`, `ears/level` and
+    // `voice/state`, drained without waiting. Without the bus the step is
+    // unavailable.
+    let mut onboarding_ears = onboarding
+        .as_ref()
+        .and_then(|_| crate::onboarding::near::Ears::from_environment());
+    // The giving-way step's evidence (#1800): `body/hand` and
+    // `body/joint_states`, drained without waiting.
+    let mut onboarding_feel = onboarding
+        .as_ref()
+        .and_then(|_| crate::onboarding::giving_way::Feel::from_environment());
+    // The inputs the walk's steps need, last recorded (`onboarding_inputs`,
+    // row 10 on lamp-52e6): says, bus, ears, body, feel, storage.
+    let mut onboarding_inputs: Option<(bool, bool, bool, bool, bool, bool)> = None;
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
     #[cfg(test)]
@@ -5244,6 +5316,9 @@ fn conversation_with_gate(
                             }
                             PrivacyState::Muted => {
                                 let observed_at_us = monotonic_us();
+                                // The camera is told no first, before any
+                                // record (#1802).
+                                tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy event)");
                                 record(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
@@ -5273,6 +5348,7 @@ fn conversation_with_gate(
             match privacy_state {
                 PrivacyState::Muted => {
                     let at_us = monotonic_us();
+                    tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy gate)");
                     record(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
@@ -5313,6 +5389,51 @@ fn conversation_with_gate(
                     says.is_some() && bus_out.is_some() && !trace.onboarding_privacy_disabled
                 }),
             );
+        }
+        if let Some(walk) = onboarding.as_mut() {
+            // Which input keeps a step not_available, once per change:
+            // booleans only, no paths (row 10 on lamp-52e6).
+            let inputs = (
+                says.is_some(),
+                bus_out.is_some(),
+                onboarding_ears.is_some(),
+                body_link.is_some(),
+                onboarding_feel.is_some(),
+                !trace.onboarding_privacy_disabled,
+            );
+            if onboarding_inputs != Some(inputs) {
+                record(
+                    trace,
+                    json!({"kind":"onboarding_inputs","says":inputs.0,"bus":inputs.1,"ears":inputs.2,
+                        "body":inputs.3,"feel":inputs.4,"storage":inputs.5,"at_us":monotonic_us()}),
+                )?;
+                onboarding_inputs = Some(inputs);
+            }
+            walk.set_near_available(
+                says.is_some()
+                    && bus_out.is_some()
+                    && onboarding_ears.is_some()
+                    && !trace.onboarding_privacy_disabled,
+            );
+            if let Some(ears) = onboarding_ears.as_mut() {
+                for seen in ears.take(monotonic_us()) {
+                    walk.near_seen(seen);
+                }
+            }
+            // No body to give way: the step is not available.
+            walk.set_giving_way_available(
+                says.is_some()
+                    && bus_out.is_some()
+                    && body_link.is_some()
+                    && onboarding_feel.is_some()
+                    && !trace.onboarding_privacy_disabled,
+            );
+            if let Some(feel) = onboarding_feel.as_mut() {
+                let now_us = monotonic_us();
+                for felt in feel.take(now_us) {
+                    walk.giving_way_felt(felt, now_us);
+                }
+            }
         }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
@@ -5445,6 +5566,16 @@ fn conversation_with_gate(
                 // No provider, optional presentation, filesystem or trace call
                 // precedes speaker revocation. Capture is next for mute.
                 let publish = rig.publish_hand_revocation(snapshot);
+                // The camera is next after the speaker and before any
+                // record (#1802).
+                if muted {
+                    let exit = if asleep {
+                        "head sleep"
+                    } else {
+                        "software mute"
+                    };
+                    tell_eyes_no(eyes_link.as_mut(), exit);
+                }
                 submission_draining = admission.draining();
                 look_wanted = None;
                 answer_opening = None;
@@ -5754,6 +5885,20 @@ fn conversation_with_gate(
                     {
                         return Err(io::Error::other("invalid provider audio frame").into());
                     }
+                    // An answer to the sentence whose words have not come
+                    // back first (Gemini Live) ends before it is played.
+                    if sentence_turn == Some(request)
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                        speaker_pending = None;
+                        provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
+                    }
                     if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == request) {
                         if current.pcm.len() + samples.len() > MAX_REPLY_SAMPLES {
                             return Err(io::Error::other(
@@ -5907,6 +6052,59 @@ fn conversation_with_gate(
                             trace,
                             json!({"kind":"look_note_dropped","turn":request,"why":why,"at_us":monotonic_us()}),
                         )?;
+                    }
+                }
+                // Onboarding's sentence (#1803): every piece of its words is
+                // gathered in memory and only their count goes to onboarding,
+                // once the last piece is in. None of them, and nothing of the
+                // model's answer to it, is published, put in the trace or
+                // played: the answer ends as soon as it shows, or as the
+                // words are in.
+                ProviderOutput::Transcript {
+                    request,
+                    text,
+                    finished,
+                } if (request.is_none() && sentence_heard.is_some())
+                    || (request.is_some() && request == sentence_turn) =>
+                {
+                    let done = match request {
+                        Some(_) => true,
+                        None => {
+                            let heard = sentence_heard.as_mut().expect("guarded");
+                            // ponytail: past 4 KiB a line's words are not
+                            // counted; a sentence is far shorter.
+                            if heard.len() + text.len() <= 4_096 {
+                                heard.push_str(&text);
+                            }
+                            finished
+                        }
+                    };
+                    if request.is_none()
+                        && finished
+                        && let Some(heard) = sentence_heard.take()
+                    {
+                        let words = crate::wait_words::words_in(&heard);
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_words(words);
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_words","turn":sentence_turn,
+                                "words":words,"at_us":monotonic_us()}),
+                        )?;
+                    }
+                    if done
+                        && let Some(turn) = sentence_turn
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == turn)
+                    {
+                        cancel_reply(owner, reply, trace, "onboarding_sentence")?;
+                        speaker_pending = None;
+                        provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
                     }
                 }
                 ProviderOutput::Transcript {
@@ -6737,6 +6935,21 @@ fn conversation_with_gate(
                     }),
                 step => step,
             };
+            // An utterance ending in the near-call window is held too, even
+            // if no block of it was (#1803); but only a call: one with more
+            // said than the name ("can we skip this?") goes on as any other.
+            if matches!(step, AdmissionStep::End(_)) {
+                if near_call_window(
+                    onboarding.as_ref(),
+                    speech_levels.front().map(|(at, _)| *at),
+                    monotonic_us(),
+                ) {
+                    near_call_turn = reply.as_ref().map(|current| current.owner.turn());
+                }
+                if speech_levels.len() > usize::from(crate::activity::CALL_SPEECH_BLOCKS) {
+                    near_call_turn = None;
+                }
+            }
             match step {
                 AdmissionStep::None => {}
                 AdmissionStep::Rejected(rejection) => record_input_rejection(trace, rejection)?,
@@ -7377,6 +7590,9 @@ fn conversation_with_gate(
                         &mut stop_cut,
                         provider_session,
                     );
+                    // A line begun in onboarding's sentence window is the
+                    // sentence (#1803): count-only from its Start.
+                    let count_only = sentence_window(onboarding.as_ref(), monotonic_us());
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -7390,6 +7606,7 @@ fn conversation_with_gate(
                         stop_untold.take_for(provider_session, monotonic_us()),
                         heard_of_cut,
                         follows_on,
+                        count_only,
                         rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
@@ -7408,6 +7625,12 @@ fn conversation_with_gate(
                     if let Some(current) = reply.as_ref() {
                         second_look.request_began(current.owner.turn(), monotonic_us());
                     }
+                    // Words heard from now are this line's: counted only
+                    // when it is the sentence.
+                    if count_only {
+                        sentence_turn = reply.as_ref().map(|current| current.owner.turn());
+                    }
+                    sentence_heard = count_only.then(String::new);
                     // The sound just before a turn began is the turn's.
                     turn_blocks.extend(loose_blocks.drain(..).map(|(_, level)| level));
                 }
@@ -7416,6 +7639,13 @@ fn conversation_with_gate(
                         return Err(io::Error::other("speech continuation lost its owner").into());
                     };
                     let turn = current.owner.turn();
+                    if near_call_window(
+                        onboarding.as_ref(),
+                        speech_levels.front().map(|(at, _)| *at),
+                        monotonic_us(),
+                    ) {
+                        near_call_turn = Some(turn);
+                    }
                     let mut resumed = None;
                     if early.as_ref().is_some_and(|early| early.holds(turn)) {
                         // The end was sent early: nothing more goes to the
@@ -7536,6 +7766,7 @@ fn conversation_with_gate(
                                     opening,
                                     provider_session,
                                     rig.cut_keeps_name,
+                                    sentence_heard.is_some(),
                                     rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
@@ -7546,6 +7777,10 @@ fn conversation_with_gate(
                                 }
                                 if let Some(current) = reply.as_ref() {
                                     second_look.request_began(current.owner.turn(), monotonic_us());
+                                }
+                                if sentence_heard.is_some() {
+                                    sentence_turn =
+                                        reply.as_ref().map(|current| current.owner.turn());
                                 }
                             }
                             None => {
@@ -7585,40 +7820,54 @@ fn conversation_with_gate(
                 }
                 AdmissionStep::End(audio)
                     if reply.as_ref().is_some_and(|current| {
-                        crate::not_speech::dropped(
-                            speech_levels.len(),
-                            took_over_turn == Some(current.owner.turn()),
-                            crate::not_speech::own_words_ago(
-                                last_spoke_us,
-                                stopped_at_us,
-                                monotonic_us(),
-                            ),
-                            said_close(&speech_levels, &loud_blocks, &rise),
-                            short_sounds,
-                            room.busy(),
-                            crate::not_speech::just_stopped(
-                                stopped_at_us,
-                                last_spoke_us,
-                                monotonic_us(),
-                            ),
-                        )
+                        near_call_turn == Some(current.owner.turn())
+                            || crate::not_speech::dropped(
+                                speech_levels.len(),
+                                took_over_turn == Some(current.owner.turn()),
+                                crate::not_speech::own_words_ago(
+                                    last_spoke_us,
+                                    stopped_at_us,
+                                    monotonic_us(),
+                                ),
+                                said_close(&speech_levels, &loud_blocks, &rise),
+                                short_sounds,
+                                room.busy(),
+                                crate::not_speech::just_stopped(
+                                    stopped_at_us,
+                                    last_spoke_us,
+                                    monotonic_us(),
+                                ),
+                            )
                     }) =>
                 {
-                    // A sound, not something said. It is not sent on as a
-                    // finished question: the turn ends here, unanswered.
+                    // A sound, not something said, or the person calling the
+                    // lamp's name for the near-call step (#1803). It is not
+                    // sent on as a finished question: the turn ends here,
+                    // unanswered.
+                    let near_call = reply
+                        .as_ref()
+                        .is_some_and(|current| near_call_turn == Some(current.owner.turn()));
                     if let Some(current) = reply.as_ref() {
                         let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,
                                 "last_block_host_read_us":audio.captured_at_us,
                                 "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
-                                "acoustic_speech_end":null,
-                                "not_speech":{"speech_blocks":speech_levels.len(),"fewer_than":crate::not_speech::SCRAP_BLOCKS,
-                                    "said_close":said_close(&speech_levels, &loud_blocks, &rise),
-                                    "last_blocks":last_blocks(&judged_blocks)}});
-                        if crate::not_speech::just_stopped(
-                            stopped_at_us,
-                            last_spoke_us,
-                            monotonic_us(),
-                        ) {
+                                "acoustic_speech_end":null});
+                        if near_call {
+                            endpoint_record["onboarding_near_call"] = json!(
+                                "held: the name alone, heard in the near-call step's try window, so the lamp does not answer it"
+                            );
+                        } else {
+                            endpoint_record["not_speech"] = json!({"speech_blocks":speech_levels.len(),"fewer_than":crate::not_speech::SCRAP_BLOCKS,
+                                "said_close":said_close(&speech_levels, &loud_blocks, &rise),
+                                "last_blocks":last_blocks(&judged_blocks)});
+                        }
+                        if !near_call
+                            && crate::not_speech::just_stopped(
+                                stopped_at_us,
+                                last_spoke_us,
+                                monotonic_us(),
+                            )
+                        {
                             endpoint_record["not_speech"]["after_stop"] = json!(true);
                             eprintln!(
                                 "lamp-voice: a short sound just after the lamp was stopped is not taken as a request"
@@ -7645,7 +7894,16 @@ fn conversation_with_gate(
                     if let Some(stop) = reply.as_ref().and_then(|current| current.told_stop) {
                         stop_untold.given_back(stop);
                     }
-                    cancel_reply(owner, reply, trace, "not_speech")?;
+                    cancel_reply(
+                        owner,
+                        reply,
+                        trace,
+                        if near_call {
+                            "onboarding_near_call"
+                        } else {
+                            "not_speech"
+                        },
+                    )?;
                     speaker_pending = None;
                     provider_queue.clear();
                     snapshot = owner.snapshot(now())?;
@@ -7657,6 +7915,26 @@ fn conversation_with_gate(
                         .as_mut()
                         .ok_or_else(|| io::Error::other("speech end lost its owner"))?;
                     let input_end_us = audio.captured_at_us;
+                    // The sentence's line ending (begun in its window,
+                    // count-only): its speech and the room microphone's
+                    // largest rise during it, numbers only. Onboarding takes it if it ends in the
+                    // window too.
+                    if sentence_turn == Some(current.owner.turn()) {
+                        let turn = current.owner.turn();
+                        let speech_ms =
+                            speech_levels.len() as u64 * u64::from(lamp_audio::BLOCK_MS);
+                        let rise_db = speech_levels
+                            .front()
+                            .and_then(|(began, _)| rise.most_since(*began));
+                        if let Some(walk) = onboarding.as_mut() {
+                            walk.sentence_line(speech_ms, rise_db, monotonic_us());
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_sentence_line","turn":turn,
+                                "speech_ms":speech_ms,"rise_db":rise_db,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     // The lamp is sure the person has finished. A request
                     // whose end went early sends nothing more: what it
                     // waited for was this moment, and from here its answer
@@ -8039,7 +8317,7 @@ fn conversation_with_gate(
             current.answer_say(&speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
-                    walk.privacy_invitation_finished(
+                    walk.invitation_finished(
                         current.owner.boot(),
                         turn,
                         current.heard_whole(&speaker_pending, snapshot),
@@ -8207,6 +8485,7 @@ fn conversation_with_gate(
                 clock,
             );
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
+            bus.set_ring_off(rig.ring.off_for_good());
             bus.report(cloud.available(), clock, trace.mic_at_start);
         }
         if let Some(mic) = mic_out.as_mut() {
@@ -8943,13 +9222,13 @@ fn conversation_with_gate(
             if let Some(polls) = trace.onboarding_test_polls.as_ref() {
                 polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
-            if let Some((boot, turn)) = walk.privacy_invitation_binding()
+            if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
                     .as_ref()
                     .map(|current| (current.owner.boot(), current.owner.turn()))
                     != Some((boot, turn))
             {
-                walk.privacy_invitation_finished(boot, turn, false, monotonic_us());
+                walk.invitation_finished(boot, turn, false, monotonic_us());
                 onboarding_invitation_turn = None;
             }
             let can_speak = reply.is_none()
@@ -8971,7 +9250,7 @@ fn conversation_with_gate(
                 face,
                 still,
             );
-            let pending = walk.privacy_pending();
+            let pending = walk.pending();
             if let Some(bus) = bus_out.as_mut() {
                 bus.onboarding_pending(&pending, monotonic_us());
             }
@@ -8981,7 +9260,7 @@ fn conversation_with_gate(
                 && let Some(ticket) = says.take_onboarding(offer.invitation, monotonic_us())
             {
                 if let (Some(words), Some(provider_session)) = (
-                    walk.take_privacy_invitation(offer.invitation, monotonic_us()),
+                    walk.take_invitation(offer.invitation, monotonic_us()),
                     unasked_session(&cloud, paused),
                 ) {
                     snapshot = commit_written_turn(
@@ -8990,7 +9269,15 @@ fn conversation_with_gate(
                         &mut provider_queue,
                         &words,
                         false,
-                        "onboarding_privacy_invitation",
+                        match offer.step {
+                            lamp_msgs::OnboardingStep::Privacy => "onboarding_privacy_invitation",
+                            lamp_msgs::OnboardingStep::HowYouSound => "onboarding_near_call_prompt",
+                            lamp_msgs::OnboardingStep::GivingWay => {
+                                "onboarding_giving_way_invitation"
+                            }
+                            // Only read, never offered by this voice.
+                            lamp_msgs::OnboardingStep::Unknown => "onboarding_invitation",
+                        },
                         provider_session,
                         rig.playout_start,
                         trace,
@@ -8998,7 +9285,7 @@ fn conversation_with_gate(
                     )?;
                     if let Some(current) = reply.as_ref() {
                         let bound = (current.owner.boot(), current.owner.turn());
-                        if walk.bind_privacy_invitation(offer.invitation, bound.0, bound.1) {
+                        if walk.bind_invitation(offer.invitation, bound.0, bound.1) {
                             onboarding_invitation_turn = Some(bound);
                         }
                     }
@@ -9008,7 +9295,7 @@ fn conversation_with_gate(
                     ticket.answer(crate::say::Outcome::Refused(
                         "onboarding invitation is no longer eligible".into(),
                     ));
-                    walk.privacy_invitation_refused(offer.invitation, monotonic_us());
+                    walk.invitation_refused(offer.invitation, monotonic_us());
                 }
             }
             for line in walk.take_records() {
@@ -10310,6 +10597,15 @@ fn eyes_look_with_the_microphone(
     Ok(())
 }
 
+/// A mute ends the cycle: the eyes are told no at once rather than left to
+/// close on their 1.5 s without a yes (#1802), and the journal marks it.
+/// One datagram, never waited on; no eyes is nothing to tell.
+fn tell_eyes_no(eyes: Option<&mut crate::body_link::EyesLink>, exit: &str) {
+    if eyes.is_some_and(|eyes| eyes.close()) {
+        eprintln!("lamp-voice: the eyes are told no at once: {exit}");
+    }
+}
+
 /// The eyes asked for a full look's still, once a turn (#836): whether
 /// they were asked now.
 fn ask_for_still(
@@ -10860,6 +11156,9 @@ fn commit_admitted_input(
     heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
     // Begun soon after the lamp's words finished (`crate::follows_on`).
     follows_on: bool,
+    // Begun in onboarding's sentence window (#1803): its Start is followed
+    // at once by `CountOnly`, before any of its sound.
+    count_only: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -10925,6 +11224,12 @@ fn commit_admitted_input(
         over_the_lamps_voice,
         heard_of_cut,
     });
+    if count_only {
+        provider_queue.push_back(ProviderInput::CountOnly {
+            request: turn.turn(),
+            privacy_generation: snapshot.microphone_generation(),
+        });
+    }
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -10951,8 +11256,9 @@ fn commit_admitted_input(
         handed: 0,
     };
     // One candidate's audio, already bounded by the admission's hold. The
-    // standard hold's prefix fits the standing bound as it always has.
-    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2);
+    // standard hold's prefix fits the standing bound as it always has, and
+    // the sentence's `CountOnly` has a slot of its own.
+    let bound = PROVIDER_QUEUE_BOUND.max(prefix.len() + 2) + usize::from(count_only);
     for audio in prefix {
         queue_input(
             provider_queue,
@@ -11243,6 +11549,8 @@ fn continue_after_early_end(
     opening: Vec<ObservedAudio>,
     provider_session: u64,
     cut_keeps_name: bool,
+    // The sentence going on (#1803): count-only, as its first part was.
+    count_only: bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -11281,6 +11589,12 @@ fn continue_after_early_end(
         over_the_lamps_voice: false,
         heard_of_cut: None,
     });
+    if count_only {
+        provider_queue.push_back(ProviderInput::CountOnly {
+            request: turn.turn(),
+            privacy_generation: snapshot.microphone_generation(),
+        });
+    }
     let mut current = Reply {
         owner: turn,
         cloud: CloudRequest::new(provider_session)?,
@@ -11307,7 +11621,7 @@ fn continue_after_early_end(
         handed: 0,
     };
     // At most a pre-roll, as a new candidate's opening is.
-    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2);
+    let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + usize::from(count_only);
     for audio in opening {
         queue_input(
             provider_queue,
@@ -11328,7 +11642,8 @@ fn early_end_json(sent: &early_end::Sent, at_us: u64) -> Value {
 }
 
 /// Presentation failure disables only the optional ring. Cleanup is observed
-/// in bounded slices; no wait, restart or hardware write runs on this path.
+/// in bounded slices; no wait or hardware write runs on this path, and a
+/// restart after a fault runs on a thread of its own (#1620).
 fn service_optional_ring(
     rig: &mut Rig,
     choreography: &mut Option<RingChoreographer>,
@@ -11351,7 +11666,17 @@ fn service_optional_ring(
     if !rig.ring.is_active() {
         *choreography = None;
     }
-    rig.ring.poll_cleanup(trace)
+    rig.ring.poll_cleanup(trace)?;
+    // A ring started again after a fault (#1620) begins afresh: a new
+    // choreography, and no request of the old one outstanding.
+    if rig.ring.restart_tick(trace)? {
+        *choreography = rig
+            .ring_channel_ceiling
+            .map(RingChoreographer::new)
+            .transpose()?;
+        *ring_trace = RingTrace::default();
+    }
+    Ok(())
 }
 
 /// After a ring fault: whether the choreography started afresh. A late write

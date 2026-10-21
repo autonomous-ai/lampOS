@@ -68,12 +68,13 @@ profile's exclusion:
   `coordinator::tests::early_end` and `coordinator::tests::pilot_faults` on
   2026-10-16, below);
 - one single test that took 4 s or more outside those, named exactly:
-  `lamp-health::program`'s
-  `between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone`
+  `lamp-health::it`'s (one binary since #1806)
+  `program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone`
   (`lamp-actions::server`'s light test and `lamp-memory::health`'s
   `the_environment_alone_does_not_enable_reporting_or_create_bus_data` left
   on 2026-10-17, below);
-- two tests of `lamp-skills::skills`, named exactly, that run the real
+- two tests of `lamp-skills::it`'s `skills::` (one binary since #1806),
+  named exactly, that run the real
   program on the host's clock by design (#1806, Seventh's choice on
   2026-10-19): `asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait`
   (the production 2.5 s give-up, and the late answer after it passed over)
@@ -82,7 +83,7 @@ profile's exclusion:
   and 3.6 s on ARM64. The reading pose's checks of a skill's definition,
   which need no clock, are a test of their own outside the group,
   `a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes`;
-- one more of `lamp-skills::skills`, named exactly,
+- one more of `lamp-skills::it`'s `skills::`, named exactly,
   `asking_the_policy_a_hello_made_and_not_noticed_rests` (#1829, the
   reviewer's P3 on 2026-10-19): it skips the program's clock for the run
   itself, but waits up to 20 s of real time for the program to start and
@@ -100,7 +101,7 @@ profile's exclusion:
   2026-10-20 the wake is judged by that pass (a wake ignored: about 176 ms,
   every run). The 2 ms tick's count can still fall short beside busy cores
   and syncs together (26, 30 and 74 passes in 3 of 25 runs);
-- two more of `lamp-skills::skills`, named exactly, that start the real
+- two more of `lamp-skills::it`'s `skills::`, named exactly, that start the real
   program twice on the host's clock, a restart between, and wait 800 ms of
   real time for a nudge that must not come (#1837):
   `the_program_keeps_a_skill_off_across_a_restart` and
@@ -142,7 +143,7 @@ and runs everything.
 Once most of the group had moved onto test clocks, 9 tests were left, and 8
 once memory's env-alone test leaves too (#1283). They wait on the real clock
 by design: `capture_hold_worker` plays the production capture loop in real
-10 ms ticks, `lamp-health::program`'s test runs the real program's 5 s
+10 ms ticks, `lamp-health`'s `program` test runs the real program's 5 s
 period against the bus's real 3 s lease, and `endpoint_fixture_reaps` needs
 the real 1.5 s grace before a kill. A test clock in the capture loop was
 rejected: it is the lamp's most sensitive path, for about 18 s a night (the
@@ -596,7 +597,7 @@ test under parallel build load (load average about 25), no failure.
 The reviewer's full serial gate on #844 failed six Expression tests on
 stale inputs (joints 1,263 ms and 2,301 ms old at the step):
 `real_service_subscribes_to_exactly_one_complete_voice_protocol`
-(`tests/rest_replay.rs`), and in `tests/runtime.rs`
+(`tests/it/rest_replay.rs`), and in `tests/runtime.rs`
 `enabled_output_uses_a_new_session_and_expires_after_input_loss`,
 `paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed`,
 `without_a_pause_said_expression_asks_exactly_as_before` and the two
@@ -1527,7 +1528,7 @@ the move fails it.
 The Policy says how it is on the bus once a second (`Diagnostic`, from
 `second()`), and in the same look it looks again for its decisions'
 publisher and for a part listening for the lamp's name. The judges rig
-(`tests/judges.rs`) waited for the next of those reports after publishing
+(`tests/it/judges.rs`) waited for the next of those reports after publishing
 its cues, so each of its seven tests waited about a second. Several of the
 `policy`, `hello` and `progress` tests wait for a report, too.
 

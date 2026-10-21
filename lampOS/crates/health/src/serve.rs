@@ -475,7 +475,9 @@ impl Serve<'_> {
                 continue;
             };
             match self.parts.take(&report, Instant::now()) {
-                Taken::Kept => {
+                // A part forgotten changes the lamp's health as a kept
+                // report does: it is worked out again and published.
+                Taken::Kept | Taken::Forgotten => {
                     self.totals.reports += 1;
                     kept = true;
                 }

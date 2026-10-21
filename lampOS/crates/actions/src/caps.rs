@@ -131,6 +131,17 @@ pub enum Error {
     RecoveryRequired,
 }
 
+impl Error {
+    /// The store's `schema` when a later build wrote it: a store this build
+    /// keeps as it is and does not read (`Service::start`).
+    pub fn newer(&self) -> Option<u32> {
+        match self {
+            Self::Schema(schema) if *schema > SCHEMA => Some(*schema),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

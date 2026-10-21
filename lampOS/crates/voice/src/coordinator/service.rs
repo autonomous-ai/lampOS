@@ -26,8 +26,25 @@ pub(super) fn supervise(
             .join("privacy-pending.json"),
         mailbox: crate::onboarding::mailbox_of(&progress),
         progress,
+        // Fourth's consumer reads this fixed path (#753); only setup writes it.
+        near_call: PathBuf::from(lamp_near_call::FILE),
+        room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
+        room_sounds_group: room_sounds_group(),
     });
     supervise_with_checkpoint(trace, cues, termination, paths.as_ref(), wait, active)
+}
+
+/// [`crate::onboarding::ROOM_SOUNDS_GROUP`]'s id. Not known: the yes is
+/// root's alone (0600), which lamp-ears reads as no, said once here.
+fn room_sounds_group() -> Option<u32> {
+    let name = crate::onboarding::ROOM_SOUNDS_GROUP;
+    let id = std::fs::read_to_string("/etc/group")
+        .ok()
+        .and_then(|groups| crate::say::group_id(&groups, name));
+    if id.is_none() {
+        eprintln!("lamp-voice: the group {name:?} is not known; a room sounds yes is root's alone");
+    }
+    id
 }
 
 pub(super) fn storage_failed(trace: &mut SessionState, error: impl std::fmt::Display) {
@@ -258,17 +275,24 @@ mod tests {
         crate::onboarding::storage::Paths {
             progress: checkpoint.with_file_name("progress.json"),
             mailbox: checkpoint.with_file_name("progress.told"),
+            near_call: checkpoint.with_file_name("near-call.json"),
+            room_sounds: checkpoint.with_file_name("room-sounds.json"),
+            room_sounds_group: None,
             checkpoint: checkpoint.to_path_buf(),
         }
     }
+    /// Until the storage is idle, its last outcome taken in. Idle is read
+    /// first and the outcome after it: the other order missed a failure
+    /// that finished between the two snapshots, so the flag it sets was
+    /// never set (#1569 row 55).
     fn storage_idle(trace: &mut SessionState) {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
-            poll_storage(trace);
             let done = trace
                 .onboarding_storage
                 .as_ref()
                 .is_none_or(|store| !store.client().snapshot().unwrap().busy);
+            poll_storage(trace);
             if done {
                 break;
             }

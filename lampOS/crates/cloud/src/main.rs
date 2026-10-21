@@ -168,8 +168,12 @@ fn main() -> ExitCode {
         skills: skills::on_from_environment().then(skills::Places::product),
         // Names and the zone after setup (#1959): only with LAMP_SETTINGS_CHANGE=on too.
         // The Wi-Fi too only with LAMP_SETTINGS_WIFI=on (#1959's second piece).
+        // A person's own keys only with LAMP_OWN_KEYS=on (#2094).
         changes: lamp_cloud::settings::on_from_environment().then(|| {
-            lamp_cloud::settings::Changes::product(lamp_cloud::settings::wifi_on_from_environment())
+            lamp_cloud::settings::Changes::product(
+                lamp_cloud::settings::wifi_on_from_environment(),
+                lamp_cloud::settings::keys_on_from_environment(),
+            )
         }),
         // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
         photos: lamp_cloud::photos::Place::from_environment(),
@@ -177,6 +181,14 @@ fn main() -> ExitCode {
         faces: lamp_cloud::faces::Eyes::from_environment(),
         // The lamp's timers and reminders for the app (#2195): only with LAMP_APP_SCHEDULE=on.
         schedule: lamp_cloud::schedule::from_environment(),
+        // The lamp's software update for the app (#2194): only with LAMP_APP_UPDATE=on.
+        update_page: lamp_cloud::update::from_environment(),
+        // A restart from the app, asked of the keeper (#2193): only with LAMP_APP_RESTART=on.
+        restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on"))
+        .then(|| lamp_keeper::restart::SOCKET.into()),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -204,6 +216,8 @@ fn main() -> ExitCode {
         photos: None,
         faces: None,
         schedule: None,
+        update_page: false,
+        restart: None,
     };
     runtime.block_on(async move {
         let looks = async move {

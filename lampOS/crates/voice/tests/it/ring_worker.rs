@@ -28,6 +28,11 @@ struct Writes {
     frames: Vec<EncodedFrame>,
     fail_at: Vec<usize>,
     late_first: bool,
+    /// Writes, by their place, that return over the budget, with how long
+    /// each took (#1620).
+    late_at: Vec<(usize, u64)>,
+    /// How long the last write took.
+    last_us: u64,
 }
 #[derive(Clone)]
 struct Sink(Arc<Mutex<Writes>>);
@@ -36,14 +41,21 @@ impl FrameSink for Sink {
         let mut writes = self.0.lock().unwrap();
         writes.frames.push(frame.clone());
         let call = writes.frames.len();
-        if writes.late_first && call == 1 {
-            // Over lamp_ring::WRITE_BUDGET_US, as a bus held by SD/MMC re-tuning.
-            thread::sleep(Duration::from_millis(15));
-        }
+        // Over lamp_ring::WRITE_BUDGET_US, as a bus held by SD/MMC re-tuning.
+        // Said through the sink's seam, not slept, so host load cannot
+        // change it.
+        writes.last_us = match writes.late_at.iter().find(|(at, _)| *at == call) {
+            Some(&(_, us)) => us,
+            None if writes.late_first && call == 1 => 13_180,
+            None => 100,
+        };
         if writes.fail_at.contains(&call) {
             return Err(io::Error::other(format!("injected write {call}")));
         }
         Ok(())
+    }
+    fn simulated_elapsed_us(&self) -> Option<u64> {
+        Some(self.0.lock().unwrap().last_us)
     }
 }
 
@@ -524,11 +536,81 @@ fn late_startup_black_write_is_reported_once_on_stderr() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "child failed: {stderr}");
     assert_eq!(
-        stderr.matches("came back over its 10000 us budget").count(),
+        stderr.matches("lamp-voice ring: SPI write ").count(),
         1,
         "stderr: {stderr}"
     );
-    assert!(stderr.contains("(1 so far)"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("lamp-voice ring: SPI write 13180 us, over 10000 us, late for 13 ms"),
+        "stderr: {stderr}"
+    );
+}
+
+/// #1620: an SD/MMC re-tune, 0.3 s of late writes in a row, is late frames
+/// kept, and the cues go on.
+#[test]
+fn an_sd_mmc_retune_of_late_writes_is_kept_and_the_ring_goes_on() {
+    let mut rig = Rig::start(&[]);
+    rig.ready();
+    rig.writes.lock().unwrap().late_at = (2..=16).map(|call| (call, 20_000)).collect();
+    let (mut controller, owner) = conversation(rig.boot);
+    for _ in 0..16 {
+        present(&rig, frame(&mut controller, owner, 200_000));
+    }
+    assert_eq!(rig.colored(), 16);
+    rig.control(Control::Stop);
+    assert!(matches!(
+        rig.event(),
+        WorkerEvent::Ring {
+            report: RingFeedback::Blanked {
+                reason: RingBlankReason::Shutdown,
+                ..
+            }
+        }
+    ));
+    rig.finish().unwrap();
+}
+
+/// #1620: a run of late writes lasting 2 s ends the worker with a fault;
+/// the one the voice starts after it writes its black first, and then the
+/// state's light again.
+#[test]
+fn a_late_run_past_two_seconds_faults_and_a_ring_started_again_writes_black_then_the_light() {
+    let mut rig = Rig::start(&[]);
+    rig.ready();
+    // A late write, then one held 2.1 s: the run lasts past 2 s.
+    rig.writes.lock().unwrap().late_at = vec![(2, 13_180), (3, 2_100_000), (4, 13_180)];
+    let (mut controller, owner) = conversation(rig.boot);
+    present(&rig, frame(&mut controller, owner, 200_000));
+    let second = frame(&mut controller, owner, 200_000);
+    rig.control(Control::Authority {
+        snapshot: second.snapshot,
+    });
+    rig.frame(second);
+    let WorkerEvent::Fault { code } = rig.event() else {
+        panic!("expected the ring's fault");
+    };
+    assert!(code.contains("late for 2100 ms"), "fault: {code}");
+    assert!(rig.finish().is_err());
+    // The restart: a fresh worker on the same strip.
+    let mut again = Rig::start(&[]);
+    again.ready();
+    let (mut controller, owner) = conversation(again.boot);
+    present(&again, frame(&mut controller, owner, 200_000));
+    let frames = again.writes.lock().unwrap().frames.clone();
+    assert_eq!(frames[0], EncodedFrame::black());
+    assert_ne!(frames[1], EncodedFrame::black());
+    again.control(Control::Stop);
+    assert!(matches!(
+        again.event(),
+        WorkerEvent::Ring {
+            report: RingFeedback::Blanked {
+                reason: RingBlankReason::Shutdown,
+                ..
+            }
+        }
+    ));
+    again.finish().unwrap();
 }
 
 #[test]

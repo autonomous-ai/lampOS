@@ -45,6 +45,23 @@ pub const WIFI_SOCKET: &str = "/run/lampos-setup-wifi/wifi.sock";
 /// for the old one, and the radio's restarts and the broker's checks.
 pub const WIFI_WAIT: Duration = Duration::from_secs(180);
 
+/// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`KEYS_KINDS`]: a
+/// person's own DeepSeek and Deepgram keys (#2094, `docs/own-keys.md`).
+pub const KEYS_ENVIRONMENT: &str = "LAMP_OWN_KEYS";
+
+/// A key checked and kept (`{"service", "key"[, "base_url"][, "request_id"]}`),
+/// removed (`{"service"[, "request_id"]}`), or whose each service uses.
+pub const KEYS_KINDS: [&str; 3] = ["keys.set", "keys.remove", "keys.get"];
+
+/// The keys helper's socket (`deploy/product/lamp-setup-keys.socket`).
+pub const KEYS_SOCKET: &str = "/run/lampos-setup-keys/keys.sock";
+
+/// How long the keys helper is waited on: its one check (5 s) and a write.
+pub const KEYS_WAIT: Duration = Duration::from_secs(15);
+
+/// The longest key passed on, in bytes: the helper's own bound.
+const KEY_MOST: usize = 512;
+
 /// The longest `request_id` echoed back, in bytes.
 const REQUEST_ID_MOST: usize = 64;
 
@@ -80,6 +97,71 @@ pub fn wifi_gates(cloud: Option<&str>, change: Option<&str>, wifi: Option<&str>)
     gates(cloud, change) && wifi == Some("on")
 }
 
+/// Whether [`KEYS_KINDS`] are taken: [`gates`] and `LAMP_OWN_KEYS=on` too.
+pub fn keys_gates(cloud: Option<&str>, change: Option<&str>, keys: Option<&str>) -> bool {
+    gates(cloud, change) && keys == Some("on")
+}
+
+/// [`keys_gates`] as the environment says.
+pub fn keys_on_from_environment() -> bool {
+    keys_gates(
+        std::env::var("LAMP_CLOUD").ok().as_deref(),
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+        std::env::var(KEYS_ENVIRONMENT).ok().as_deref(),
+    )
+}
+
+/// The app's `request_id`, if it gave one: 1 to 64 printable characters.
+fn request_id(data: &Value) -> Result<Option<String>, String> {
+    match data.get("request_id") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(id))
+            if !id.is_empty()
+                && id.len() <= REQUEST_ID_MOST
+                && id.bytes().all(|b| b.is_ascii_graphic()) =>
+        {
+            Ok(Some(id.clone()))
+        }
+        Some(_) => Err("request_id must be 1 to 64 printable characters".into()),
+    }
+}
+
+/// The keys helper's request line for `kind` with the app's `data`, and the
+/// app's `request_id`; or why not. The helper checks the key and the
+/// endpoint itself; here only their shape. No error holds a value.
+pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), String> {
+    let request_id = request_id(data)?;
+    let service = || {
+        data.get("service")
+            .and_then(Value::as_str)
+            .filter(|service| matches!(*service, "deepseek" | "deepgram"))
+            .ok_or("service must be deepseek or deepgram")
+    };
+    let line = match kind {
+        "keys.set" => {
+            let key = data
+                .get("key")
+                .and_then(Value::as_str)
+                .filter(|key| key.len() <= KEY_MOST)
+                .ok_or("key must be text")?;
+            let base_url = match data.get("base_url") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(url)) if url.len() <= 2_048 => Some(url.as_str()),
+                Some(_) => return Err("base_url must be text".into()),
+            };
+            let mut line = json!({"set": service()?, "key": key});
+            if let Some(url) = base_url {
+                line["base_url"] = json!(url);
+            }
+            line
+        }
+        "keys.remove" => json!({"remove": service()?}),
+        "keys.get" => json!({"which": true}),
+        _ => return Err(crate::wire::not_here(kind)),
+    };
+    Ok((line.to_string(), request_id))
+}
+
 /// [`wifi_gates`] as the environment says.
 pub fn wifi_on_from_environment() -> bool {
     wifi_gates(
@@ -104,17 +186,7 @@ pub fn wifi_line(data: &Value, broker: &str) -> Result<(String, Option<String>),
         .and_then(Value::as_str)
         .filter(|password| password.len() <= TEXT_MOST)
         .ok_or("password must be text")?;
-    let request_id = match data.get("request_id") {
-        None | Some(Value::Null) => None,
-        Some(Value::String(id))
-            if !id.is_empty()
-                && id.len() <= REQUEST_ID_MOST
-                && id.bytes().all(|b| b.is_ascii_graphic()) =>
-        {
-            Some(id.clone())
-        }
-        Some(_) => return Err("request_id must be 1 to 64 printable characters".into()),
-    };
+    let request_id = request_id(data)?;
     if broker.is_empty() {
         return Err("the lamp is not on its broker".into());
     }
@@ -171,6 +243,48 @@ pub fn ask(socket: &std::path::Path, line: &str, wait: Duration) -> Result<Optio
     result(&reply)
 }
 
+/// The keys helper over its socket, as [`ask`], with the failure's code:
+/// the helper's own (`refused`, `unreached`, `bad_field`, `not_allowed`),
+/// or `unavailable` when it isn't there or doesn't answer.
+pub fn ask_keys(
+    socket: &std::path::Path,
+    line: &str,
+    wait: Duration,
+) -> (Result<Option<Value>, String>, Option<String>) {
+    let unavailable = |why: &str| (Err(why.to_owned()), Some("unavailable".to_owned()));
+    let Ok(mut stream) = UnixStream::connect(socket) else {
+        return unavailable("the lamp's keys are not running");
+    };
+    if stream
+        .set_read_timeout(Some(wait))
+        .and_then(|()| stream.set_write_timeout(Some(wait)))
+        .and_then(|()| stream.write_all(format!("{line}\n").as_bytes()))
+        .is_err()
+    {
+        return unavailable("the lamp's keys are not running");
+    }
+    let mut reply = String::new();
+    if BufReader::new(stream.take(4_096))
+        .read_line(&mut reply)
+        .is_err()
+        || reply.is_empty()
+    {
+        return unavailable("the lamp's keys did not answer in time");
+    }
+    let Ok(reply) = serde_json::from_str::<Value>(reply.trim()) else {
+        return unavailable("the lamp's keys did not answer in time");
+    };
+    if let Some(data) = reply.get("done") {
+        return (Ok(Some(data.clone())), None);
+    }
+    let why = reply.get("refused").and_then(Value::as_str);
+    let code = reply.get("code").and_then(Value::as_str);
+    match (why, code) {
+        (Some(why), Some(code)) => (Err(why.to_owned()), Some(code.to_owned())),
+        _ => unavailable("the lamp's keys did not answer in time"),
+    }
+}
+
 /// A change's result, waiting to be said.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Outcome {
@@ -178,6 +292,8 @@ pub struct Outcome {
     pub result: Result<Option<Value>, String>,
     /// The app's own id for the request, said back in `data.request_id`.
     pub request_id: Option<String>,
+    /// A failure's code, said in `data.code` (the keys' kinds, #2094).
+    pub code: Option<String>,
 }
 
 impl Outcome {
@@ -185,12 +301,17 @@ impl Outcome {
     /// with the request's id in `data` if it had one.
     pub fn reply(&self, identity: &crate::wire::Identity, now: &str) -> Value {
         let mut reply = identity.data(now, &self.kind, &self.result);
-        if let Some(id) = &self.request_id {
+        let added = [
+            ("request_id", self.request_id.as_ref()),
+            ("code", self.code.as_ref().filter(|_| self.result.is_err())),
+        ];
+        for (field, value) in added {
+            let Some(value) = value else { continue };
             let data = reply
                 .as_object_mut()
                 .map(|reply| reply.entry("data").or_insert_with(|| json!({})));
             if let Some(Value::Object(data)) = data {
-                data.insert("request_id".into(), json!(id));
+                data.insert(field.into(), json!(value));
             }
         }
         reply
@@ -204,10 +325,14 @@ pub struct Changes {
     pub wait: Duration,
     /// The Wi-Fi helper's socket and wait, with `LAMP_SETTINGS_WIFI=on`.
     pub wifi: Option<(PathBuf, Duration)>,
+    /// The keys helper's socket and wait, with `LAMP_OWN_KEYS=on` (#2094).
+    pub keys: Option<(PathBuf, Duration)>,
     /// The broker the lamp is on now, `host:port`, for the Wi-Fi helper.
     broker: Mutex<String>,
     /// A Wi-Fi change is under way: a second is refused at once.
     wifi_busy: Arc<AtomicBool>,
+    /// A keys request is under way: a second fails `busy` (#2094).
+    keys_busy: Arc<AtomicBool>,
     done: Arc<Mutex<Vec<Outcome>>>,
 }
 
@@ -222,23 +347,91 @@ impl Changes {
         wait: Duration,
         wifi: Option<(PathBuf, Duration)>,
     ) -> Arc<Self> {
+        Self::with_helpers(socket, wait, wifi, None)
+    }
+
+    /// With the Wi-Fi helper's and the keys helper's sockets and waits, or none.
+    pub fn with_helpers(
+        socket: impl Into<PathBuf>,
+        wait: Duration,
+        wifi: Option<(PathBuf, Duration)>,
+        keys: Option<(PathBuf, Duration)>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             socket: socket.into(),
             wait,
             wifi,
+            keys,
             broker: Mutex::default(),
             wifi_busy: Arc::default(),
+            keys_busy: Arc::default(),
             done: Arc::default(),
         })
     }
 
-    /// The product's: the helpers' sockets, the Wi-Fi's only when `wifi`.
-    pub fn product(wifi: bool) -> Arc<Self> {
-        Self::with_wifi(
+    /// The product's: the helpers' sockets, the Wi-Fi's only when `wifi`,
+    /// the keys' only when `keys`.
+    pub fn product(wifi: bool, keys: bool) -> Arc<Self> {
+        Self::with_helpers(
             SOCKET,
             WAIT,
             wifi.then(|| (PathBuf::from(WIFI_SOCKET), WIFI_WAIT)),
+            keys.then(|| (PathBuf::from(KEYS_SOCKET), KEYS_WAIT)),
         )
+    }
+
+    /// Whether [`KEYS_KINDS`] are taken.
+    pub fn keys_on(&self) -> bool {
+        self.keys.is_some()
+    }
+
+    /// Asks the keys helper for the app's `data` on a thread of its own.
+    /// Only a lamp without the switch is refused at once ("not on this
+    /// lamp"); every other request is acked `starting` and its result
+    /// follows, a failure with its code (#2094, the contract on #2094 at
+    /// 11:1x): `bad_field` and `busy` at once, the helper's after. The key
+    /// goes into the helper's line, nowhere else.
+    pub fn start_keys(&self, kind: &str, data: &Value) -> Result<(), String> {
+        let (socket, wait) = self
+            .keys
+            .clone()
+            .ok_or_else(|| crate::wire::not_here(kind))?;
+        let request_id = request_id(data).ok().flatten();
+        let fail = |why: String, code: &str| {
+            if let Ok(mut done) = self.done.lock() {
+                done.push(Outcome {
+                    kind: kind.to_owned(),
+                    result: Err(why),
+                    request_id: request_id.clone(),
+                    code: Some(code.into()),
+                });
+            }
+        };
+        let line = match keys_line(kind, data) {
+            Ok((line, _)) => line,
+            Err(why) => {
+                fail(why, "bad_field");
+                return Ok(());
+            }
+        };
+        if self.keys_busy.swap(true, Ordering::AcqRel) {
+            fail("a key change is already under way".into(), "busy");
+            return Ok(());
+        }
+        let (done, busy, kind) = (self.done.clone(), self.keys_busy.clone(), kind.to_owned());
+        std::thread::spawn(move || {
+            let (result, code) = ask_keys(&socket, &line, wait);
+            busy.store(false, Ordering::Release);
+            if let Ok(mut done) = done.lock() {
+                done.push(Outcome {
+                    kind,
+                    result,
+                    request_id,
+                    code,
+                });
+            }
+        });
+        Ok(())
     }
 
     /// Whether `wifi.set` is taken.
@@ -280,6 +473,7 @@ impl Changes {
                     kind: WIFI_KIND.into(),
                     result,
                     request_id,
+                    code: None,
                 });
             }
         });
@@ -311,6 +505,7 @@ impl Changes {
                     kind,
                     result,
                     request_id: None,
+                    code: None,
                 });
             }
         });
@@ -334,6 +529,182 @@ pub fn display_name(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    /// #2094, the contract on #2094 (11:1x): every keys request but one on
+    /// a lamp without the switch gets a result, a failure with its code
+    /// (`bad_field`, `busy`, `unavailable`) or the helper's answer, and the
+    /// app's `request_id` back on `keys.remove` and `keys.get` too.
+    #[test]
+    fn every_keys_request_gets_a_coded_result_with_its_id() {
+        let wait_for = |changes: &Changes, count: usize| {
+            let started = Instant::now();
+            let mut got = Vec::new();
+            while got.len() < count && started.elapsed() < Duration::from_secs(5) {
+                got.extend(changes.take());
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            got
+        };
+        let identity = identity();
+        // Nothing listening: unavailable.
+        let gone = std::env::temp_dir().join(format!("lco-{}-keys-gone.sock", std::process::id()));
+        let _ = std::fs::remove_file(&gone);
+        let changes = Changes::with_helpers(
+            "/nowhere.sock",
+            Duration::from_secs(1),
+            None,
+            Some((gone, Duration::from_secs(1))),
+        );
+        changes
+            .start_keys("keys.get", &json!({"request_id": "g-1"}))
+            .unwrap();
+        let got = wait_for(&changes, 1);
+        let reply = got[0].reply(&identity, "t");
+        assert_eq!(reply["status"], "failure");
+        assert_eq!(reply["error"], "the lamp's keys are not running");
+        assert_eq!(
+            reply["data"],
+            json!({"request_id": "g-1", "code": "unavailable"})
+        );
+        // A bad field: a result at once, with no helper asked.
+        changes
+            .start_keys(
+                "keys.set",
+                &json!({"service": "openai", "key": "sk-planted", "request_id": "s-1"}),
+            )
+            .unwrap();
+        let reply = changes.take()[0].reply(&identity, "t");
+        assert_eq!(reply["error"], "service must be deepseek or deepgram");
+        assert_eq!(
+            reply["data"],
+            json!({"request_id": "s-1", "code": "bad_field"})
+        );
+        assert!(!reply.to_string().contains("sk-planted"));
+        // A helper that answers: remove and get say the id back on success,
+        // with no code; a second request while one is under way is busy.
+        let socket = std::env::temp_dir().join(format!("lco-{}-keys-ok.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let (release, held) = std::sync::mpsc::channel::<()>();
+        let helper = std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            for (at, answer) in [
+                r#"{"done":{"service":"deepgram","uses":"lamp"}}"#,
+                r#"{"done":{"deepseek":"lamp","deepgram":"lamp","since":{"deepseek":null,"deepgram":null},"deepseek_host":null}}"#,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                if at == 0 {
+                    held.recv().unwrap();
+                }
+                stream.write_all(format!("{answer}\n").as_bytes()).unwrap();
+            }
+        });
+        let changes = Changes::with_helpers(
+            "/nowhere.sock",
+            Duration::from_secs(1),
+            None,
+            Some((socket.clone(), Duration::from_secs(5))),
+        );
+        changes
+            .start_keys(
+                "keys.remove",
+                &json!({"service": "deepgram", "request_id": "r-1"}),
+            )
+            .unwrap();
+        changes
+            .start_keys("keys.get", &json!({"request_id": "busy-1"}))
+            .unwrap();
+        let busy = changes.take();
+        assert_eq!(busy.len(), 1);
+        let reply = busy[0].reply(&identity, "t");
+        assert_eq!(reply["error"], "a key change is already under way");
+        assert_eq!(
+            reply["data"],
+            json!({"request_id": "busy-1", "code": "busy"})
+        );
+        release.send(()).unwrap();
+        let removed = wait_for(&changes, 1)[0].reply(&identity, "t");
+        assert_eq!(removed["status"], "success");
+        assert_eq!(
+            removed["data"],
+            json!({"service": "deepgram", "uses": "lamp", "request_id": "r-1"})
+        );
+        changes
+            .start_keys("keys.get", &json!({"request_id": "g-2"}))
+            .unwrap();
+        let got = wait_for(&changes, 1)[0].reply(&identity, "t");
+        assert_eq!(got["status"], "success");
+        assert_eq!(got["data"]["request_id"], "g-2");
+        assert_eq!(got["data"]["deepseek"], "lamp");
+        helper.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// #2094: the keys' kinds only with all three switches; their lines
+    /// carry the key to the helper alone, and no refusal holds one.
+    #[test]
+    fn own_keys_need_their_switch_and_their_lines_hold_only_what_the_helper_reads() {
+        assert!(keys_gates(Some("on"), Some("on"), Some("on")));
+        for (cloud, change, keys) in [
+            (Some("on"), Some("on"), None),
+            (Some("on"), None, Some("on")),
+            (None, Some("on"), Some("on")),
+            (Some("on"), Some("on"), Some("1")),
+        ] {
+            assert!(!keys_gates(cloud, change, keys));
+        }
+        let off = Changes::new("/nowhere.sock", Duration::from_secs(1));
+        assert!(!off.keys_on());
+        assert_eq!(
+            off.start_keys(
+                "keys.set",
+                &json!({"service": "deepseek", "key": "sk-planted"})
+            ),
+            Err("not on this lamp: keys.set".into())
+        );
+        let (line, id) = keys_line(
+            "keys.set",
+            &json!({"service": "deepseek", "key": "sk-planted", "base_url": "https://x.invalid", "request_id": "r1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"set": "deepseek", "key": "sk-planted", "base_url": "https://x.invalid"})
+        );
+        assert_eq!(id.as_deref(), Some("r1"));
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "deepgram"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"deepgram"}"#
+        );
+        assert_eq!(
+            keys_line("keys.get", &json!({})).unwrap().0,
+            r#"{"which":true}"#
+        );
+        for (kind, data) in [
+            (
+                "keys.set",
+                json!({"service": "openai", "key": "sk-planted"}),
+            ),
+            ("keys.set", json!({"service": "deepseek", "key": 7})),
+            (
+                "keys.set",
+                json!({"service": "deepseek", "key": "sk-planted", "base_url": 1}),
+            ),
+            ("keys.remove", json!({})),
+        ] {
+            let why = keys_line(kind, &data).unwrap_err();
+            assert!(!why.contains("sk-planted"), "{why}");
+        }
+    }
     use super::*;
     use crate::answer::{answer, tests::Fake};
     use crate::online::reply;
@@ -680,6 +1051,7 @@ mod tests {
             kind: WIFI_KIND.into(),
             result: Err("wrong WiFi password: the router rejected the key; the lamp is back on its old Wi-Fi".into()),
             request_id: Some("r-7".into()),
+            code: None,
         }
         .reply(&identity(), "t");
         assert_eq!(failed["status"], "failure");

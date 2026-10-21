@@ -103,6 +103,24 @@ pub trait Lamp {
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
         None
     }
+
+    /// Whether the app may read the lamp's software update
+    /// (`LAMP_APP_UPDATE=on`, #2194, `crate::update`).
+    fn update_page(&self) -> bool {
+        false
+    }
+
+    /// lamp-update's kept `update/status`, if it has said one.
+    fn update_status(&self) -> Option<lamp_bus::Message> {
+        None
+    }
+
+    /// Asks the keeper to restart the lamp (`system.reboot`, #2193): its
+    /// answer, given before the lamp goes down, or why not. Only with
+    /// `LAMP_APP_RESTART=on`.
+    fn restart(&mut self) -> Result<Value, String> {
+        Err(not_here("system.reboot"))
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -197,6 +215,15 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             changes.start_wifi(data)?;
             Ok(None)
         }
+        // A person's own keys (#2094), with LAMP_OWN_KEYS=on too: to root's
+        // keys helper, which checks each once before it keeps it.
+        kind if crate::settings::KEYS_KINDS.contains(&kind)
+            && lamp.changes().is_some_and(|c| c.keys_on()) =>
+        {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            changes.start_keys(kind, data)?;
+            Ok(None)
+        }
         kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
@@ -237,6 +264,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::remove(&places, data).map(Some)
         }
+        // A package from the Skills Store, from a URL (#1722), with
+        // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
+        // installs it only signed with the update channel's key.
+        "skills.install" if lamp.skills().is_some_and(|places| places.store) => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::install(&places, data).map(Some)
+        }
+        // The lamp's software update, for the app's Lamp 2 page (#2194):
+        // only with `LAMP_APP_UPDATE=on`.
+        "update.status" if lamp.update_page() => crate::update::status(lamp.update_status()),
+        // A restart from the app (#2193): asked of the keeper, never done
+        // here; the keeper answers first and refuses under an update.
+        "system.reboot" => lamp.restart().map(Some),
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -533,6 +573,26 @@ pub mod tests {
         let after = answer(&mut lamp, "skills.remove", &json!({"name": "tutor"}))
             .unwrap()
             .unwrap();
+        // The Store's switch off, with the page's on: an install is a kind
+        // this lamp lacks, and nothing is asked of the helper.
+        lamp.skills.as_mut().unwrap().store = false;
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "skills.install",
+                &json!({"url": "https://store.example/x.tar"})
+            ),
+            Err("not on this lamp: skills.install".to_owned())
+        );
+        lamp.skills.as_mut().unwrap().store = true;
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "skills.install",
+                &json!({"url": "http://x/y.tar"})
+            ),
+            Err(lamp_skills::package::NOT_A_STORE_URL.to_owned())
+        );
         assert_eq!(after["skills"].as_array().unwrap().len(), 1);
         assert_eq!(after["skills"][0]["name"], "dance");
         // Off, removing is refused as any kind this lamp lacks.

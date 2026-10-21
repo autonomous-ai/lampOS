@@ -36,7 +36,7 @@ lamp-turn-end-wire = { path = "../turn-end-wire" }
 # makes from them is what the skill made from the recording they came from.
 lamp-skills = { path = "../skills" }
 # The Policy's copies of the voice's bars, held equal to the voice's own
-# (tests/pinned_copies.rs, Fourth on #1510).
+# (tests/it/pinned_copies.rs, Fourth on #1510).
 lamp-policy = { path = "../policy" }
-# The head's breath and the ring's, held to one (tests/one_breath.rs, #1670).
+# The head's breath and the ring's, held to one (tests/it/one_breath.rs, #1670).
 lamp-expression = { path = "../expression" }

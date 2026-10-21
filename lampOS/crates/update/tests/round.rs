@@ -305,7 +305,8 @@ fn controls_unit(build: &str) -> String {
 /// every file the other tests have open, a records' lock among them: that
 /// lock, let go by its test and taken again, is then "another lamp-update
 /// is at work". A test that starts a process holds `FORKS` to write until
-/// it has started; each take of the lock holds it to read.
+/// it has started, and so does a round on Linux, which can start one
+/// itself ([`rounding`]); each take of the lock holds it to read.
 static FORKS: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
 fn no_fork() -> std::sync::RwLockReadGuard<'static, ()> {
@@ -320,6 +321,21 @@ fn forking() -> std::sync::RwLockWriteGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// What a round holds. A round can start `lamp-skills list` (its skills
+/// check), so on Linux, where a child holds the other tests' files from its
+/// start to its exec, it holds `FORKS` to write (#1569 row 57: 5 of 12 runs
+/// in the image failed on the lock without it). macOS starts a child in one
+/// step, so there a round only holds it to read, as a take of the lock does.
+#[cfg(target_os = "linux")]
+fn rounding() -> std::sync::RwLockWriteGuard<'static, ()> {
+    forking()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn rounding() -> std::sync::RwLockReadGuard<'static, ()> {
+    no_fork()
+}
+
 /// A lamp made of files, its channel, and the rest of its world.
 struct Lamp {
     _folder: tempfile::TempDir,
@@ -332,6 +348,8 @@ struct Lamp {
     talking: Option<Talk>,
     free: u64,
     said: Vec<String>,
+    /// The phases the round said, for `update/status` (#2194).
+    phases: Vec<&'static str>,
     config: Config,
 }
 
@@ -443,6 +461,7 @@ impl Lamp {
             talking: None,
             free: 10_000_000_000,
             said: Vec::new(),
+            phases: Vec::new(),
             config,
         }
     }
@@ -512,7 +531,7 @@ impl Lamp {
     }
 
     fn round(&mut self) -> Outcome {
-        let _no_fork = no_fork();
+        let _rounding = rounding();
         let clock = FakeClock(Rc::clone(&self.now));
         let talking = self.talking.take().unwrap_or_else(|| Box::new(|_| false));
         let mut ears = FakeEars {
@@ -523,6 +542,8 @@ impl Lamp {
         let disk = FakeDisk(self.free);
         let said = &mut self.said;
         let mut say = |line: &str| said.push(line.to_owned());
+        let phases = &mut self.phases;
+        let mut phase = |now: &'static str| phases.push(now);
         let mut world = World {
             channel: &mut self.channel,
             systemd: &mut self.systemd,
@@ -530,6 +551,7 @@ impl Lamp {
             disk: &disk,
             clock: &clock,
             say: &mut say,
+            phase: &mut phase,
         };
         let outcome = round(&self.config, &mut world);
         self.talking = Some(ears.talking);
@@ -651,6 +673,11 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
     build_two(&mut lamp);
     let started = lamp.now.get();
     assert_eq!(lamp.round(), Outcome::Switched(2));
+    // `update/status`'s phases, in order (#2194).
+    assert_eq!(
+        lamp.phases,
+        ["checking", "fetching", "switching", "watching"]
+    );
 
     let (old, new) = (sha("voice 1"), sha("voice 2"));
     // The new folder beside the old one: the new voice and worker, and the
@@ -704,6 +731,22 @@ fn a_new_build_is_installed_beside_the_old_and_switched() {
     // The same build again: nothing to do.
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.calls().len(), 2);
+}
+
+/// #2194: a round with nothing to change says only that it checked, and a
+/// round without `apply` says no phase at all.
+#[test]
+fn a_round_with_nothing_to_change_only_checks() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    lamp.phases.clear();
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.phases, ["checking"]);
+    lamp.phases.clear();
+    lamp.config.apply = false;
+    lamp.round();
+    assert!(lamp.phases.is_empty(), "{:?}", lamp.phases);
 }
 
 #[test]
@@ -783,6 +826,9 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
     );
     let before = lamp.lamp_files();
     let outcome = lamp.round();
+    // `update/status` says the put-back as its own phase, not as the
+    // forward watch (the reviewer-lead on #2271).
+    assert_eq!(lamp.phases.last(), Some(&"restoring"), "{:?}", lamp.phases);
     let Outcome::RolledBack {
         sequence,
         why,
@@ -1680,12 +1726,14 @@ fn a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail() {
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert_eq!(lamp.skills_link(), sha(&checks));
     assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+    let forking = forking();
     let listed =
         std::process::Command::new(lamp.root.join("opt/lampOS/skills/current/lamp-skills"))
             .args(["list", "--dir"])
             .arg(lamp.root.join("var/lib/lampOS/skills"))
             .output()
             .unwrap();
+    drop(forking);
     let listed = String::from_utf8(listed.stdout).unwrap();
     assert!(!listed.contains("not loaded"), "{listed}");
     assert!(
@@ -1751,12 +1799,14 @@ impl Lamp {
 
     /// What `lamp-skills list` of the running build says of the folder.
     fn listed(&self) -> String {
+        let forking = forking();
         let listed =
             std::process::Command::new(self.root.join("opt/lampOS/skills/current/lamp-skills"))
                 .args(["list", "--dir"])
                 .arg(self.root.join(PRODUCT_SKILLS))
                 .output()
                 .unwrap();
+        drop(forking);
         String::from_utf8(listed.stdout).unwrap()
     }
 }
@@ -2364,7 +2414,8 @@ impl Lamp {
     /// The new lamp-update confirming itself, as the build `running` from:
     /// only after a dry round has read and checked the channel's manifest.
     fn confirm(&mut self, running: &str) -> own::Confirm {
-        let _no_fork = no_fork();
+        // Its dry round can start `lamp-skills list` too.
+        let _rounding = rounding();
         let clock = FakeClock(Rc::clone(&self.now));
         let mut ears = FakeEars {
             now: Rc::clone(&self.now),
@@ -2381,6 +2432,7 @@ impl Lamp {
             disk: &disk,
             clock: &clock,
             say: &mut say,
+            phase: &mut |_| {},
         };
         own::confirm(&self.config, &mut world, Some(running)).unwrap()
     }

@@ -86,16 +86,20 @@ lamp says so.
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
-| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
+| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
+| `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SKILLS_STORE=on` ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the update channel's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without `LAMP_SKILLS_STORE`, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder); the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms"} \| null, "stale"}`, from lamp-update's kept `update/status`; `unknown` and nulls before lamp-update has said anything. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
+| `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
+| `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of the keeper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the keeper has taken it, before the lamp goes down, or `failure` with the keeper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
-| anything else (`add_channel`, the other `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+| anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### The light: V1's colours on this lamp's
 
@@ -121,7 +125,7 @@ is the same light. Two differences from V1 the page should know:
   `device_id`, `mqtt_endpoint`, `mqtt_port`, `mqtt_username`,
   `mqtt_password`, `fa_channel`, `fd_channel` and `llm_base_url`, as the
   app's setup request sends them. Setup writes it (#1401, `setup.md`), and
-  `tests/setup.rs` reads the product's own setup settings and setup's own
+  `tests/it/setup.rs` reads the product's own setup settings and setup's own
   writer, so the unit's path and the fields can't drift from setup's. The
   voice's key stays in `/etc/lampOS/voice/credential`.
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
@@ -165,6 +169,24 @@ is the same light. Two differences from V1 the page should know:
   the person's later choice on them) and removes
   `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
   with the rest of the person's data.
+
+## A restart from the app (#2193, `system.reboot`)
+
+Off unless `LAMP_APP_RESTART=on`. `lamp-cloud` restarts nothing itself: it
+sends the keeper's one request, `{"restart":"lamp"}`, on
+`/run/lampos-keeper-restart/restart.sock` (`lamp-keeper-restart.socket`,
+root's, group `lampos`) and waits at most 2 s for its one line back, as for
+the eyes' answer to a photo. The keeper (`lamp-keeper restart-asked`,
+[keeper.md](keeper.md), "A restart asked from the app") refuses while an
+update installs, and otherwise answers first and restarts `lampos.target`
+3 s later, once the voice is quiet, so the app's `success` leaves before
+`lamp-cloud` is stopped with the rest of the lamp. A keeper not there is
+"the lamp's keeper is not running". Pinned in `tests/app_contract.rs`, with
+a stand-in keeper that answers with the keeper's own code.
+
+Whether the app's "restart" should reboot the machine, as V1's does, is
+the first builder's answer on #2193; until then it restarts the lamp's
+parts.
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
@@ -286,7 +308,7 @@ list as names and `waiting` only, an empty one, and the eyes' error
 refused; a remove's name checked, and each forget answer said; memory's id
 the voice's, asked for the person and their rules, and `forgotten` only
 when both were done; both asked over the sockets, and nobody answering
-said. `tests/app_contract.rs` pins what the page reads of both (`memory`,
+said. `tests/it/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
 (`commanded`).
@@ -307,19 +329,46 @@ words then pass through the broker to the app, where before they left the
 lamp only to the voice's model. Tests: `app_contract.rs`'s
 `schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without`.
 
-## The skills page (#1722, `skills.list`, `skills.remove`)
+## The lamp's software update (#2194, `update.status`)
+
+Off unless `LAMP_APP_UPDATE=on` in lamp-cloud's unit. lamp-update says on
+the bus, as a kept value, `update/status` (`lamp_msgs::UpdateStatus`,
+`lamp_update::status`): the build its records say the lamp runs, what its
+round is doing now (`checking` the channel, `fetching` and checking the new
+build's files beside the old, `switching` at a quiet moment, `watching` the
+parts for a minute after, `restoring` while a rollback puts the previous
+build back and watches it, `idle` between rounds), and how the last round
+ended, by the outcome's name (`up-to-date`, `switched`, `refused`,
+`rolled-back`, `failed`, ...) and the build it was about. It carries no reason
+text, which may name paths. lamp-cloud answers from that value and never
+reads lamp-update's records, which stay root's alone (0700). Before
+lamp-update has said anything, `now` is `unknown`. Only a round that acts
+(`--apply on`) says it. The last result is read back from lamp-update's own
+log when it starts, so a restart, a reboot or its own switch never says it
+as none. The value is said again every minute and lasts three: `stale` is
+true when lamp-update stopped saying it (it died mid-round), and its `now` is
+then not to be believed. Tests: `app_contract.rs`'s
+`the_software_update_is_answered_from_lamp_updates_status`, and
+`lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
+
+## The skills page (#1722, `skills.list`, `skills.remove`, `skills.install`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
-home screen of apps. Two of its four kinds are built: `skills.list`, read
-only, and `skills.remove` ("Removing a skill" below); `catalog` and
-`install` come once the update channel carries skills, and are refused as
-kinds this lamp lacks until then.
+home screen of apps. Three of its four kinds are built: `skills.list`, read
+only, `skills.remove` ("Removing a skill" below) and, behind a switch of
+its own, `skills.install` ("Installing from the Skills Store" below);
+`catalog` comes with the Store's server, and is refused as a kind this lamp
+lacks until then.
 
 **The switch.** `LAMP_SKILLS_PAGE=on`, with `LAMP_CLOUD=on`; off unless
 set. Without it the kind is answered as any this lamp lacks, `not on this
 lamp: skills.list` (and `not on this lamp: skills.remove`), and the app
 shows no Skills row. Its envelope is V1's, as `reports.*`'s.
+`skills.install` needs `LAMP_SKILLS_STORE=on` as well; without it, `not on
+this lamp: skills.install`. The manage helper checks the same switch in
+its own environment and refuses with the same words ([skills.md](skills.md),
+"The manage helper").
 
 **Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
 (the product unit's `--dir`), with `lamp-skills`' own loader
@@ -405,7 +454,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `lamp_state` | knows what the lamp itself is doing | — | any other topic (`voice/state`, `lamp/health`, …) |
   | `actions` | uses the lamp's own controls | — | `actions` not empty |
 
-`tests/skills_contract.rs` pins the reply's fields by name and type, in
+`tests/it/skills_contract.rs` pins the reply's fields by name and type, in
 V1's envelope through JSON, from `Real` over `lampOS/skills/`, and the
 refusal's exact words without the switch.
 
@@ -502,6 +551,66 @@ should ever remove one is a separate decision, not taken.
   and the next `lamp-update install` writes it back. Taking "core" from
   `lamp-update`'s list of shipped names instead would close it; not done
   here.
+
+### Installing from the Skills Store (`skills.install`)
+
+`{"name": "desk-tutor", "version": "1.0.0", "sha256": "…", "url":
+"https://…/desk-tutor-1.0.0.tar"}`, a Skills Store catalogue entry (the
+first builder's 22:23 on #1722), sent by the app when the person taps Add;
+`url` alone is taken too. Only with `LAMP_SKILLS_STORE=on` beside the
+page's two switches: listing and removing change nothing new on the lamp,
+and an install puts new code there, so the page can be on while the Store,
+its server and its key are not. Without it, `not on this lamp:
+skills.install`. `lamp-cloud` is not the only gate: root's manage helper
+reads `LAMP_SKILLS_STORE` in its own environment (its unit's drop-in,
+which also gives it the network for the fetch) and, off, refuses an
+install with the same words whoever asked, while a remove still runs.
+
+- **What `lamp-cloud` does: checks the shape and passes it on.** An
+  https URL (`url must be an https URL of at most 2048 characters, with no
+  spaces, no user and nothing but plain ASCII`), a SHA-256 as 64 lowercase
+  hex, a skill's name, `MAJOR.MINOR.PATCH`, each refused in plain words
+  before anything is asked, and nothing the app sent is said back. Then
+  `{"install": {...}}` goes to the manage helper over its socket, as a
+  remove does, and `lamp-cloud` waits at most 40 s. It writes nothing and
+  fetches nothing: a network message never puts code on the lamp through
+  it (the first builder, 18:33).
+- **What the helper does** ([skills.md](skills.md), "From the Skills
+  Store"): checks the request again; reads the update channel's key
+  (`/etc/lampOS/update/key.pub`); fetches the package itself over HTTPS
+  (redirects only to https, at most 18 MiB, within 25 s); checks the
+  entry's `sha256` against the bytes; checks `lamp-skill.sig` against the
+  key before the manifest is read; checks the package as any install does
+  (plain files, no `..`, no absolute path, no link, the size and file
+  bounds, each file's SHA-256), and its name and version against the
+  entry's; then installs it under the folder's lock (waited for at most 4
+  s, `ASKED_LOCK_WAIT`, as a remove's, then `the lamp's skills can't be
+  changed now` with nothing written), loaded first and
+  renamed into place, never core, never over a core skill and never older
+  than the version installed (the same is a reinstall; `not installed:
+  desk-tutor 1.10.0 is on this lamp, and this package is the older 1.2.3:
+  a skill is never put back to an older version`). Nothing is written
+  before that last step.
+- **The key: pending the first builder's word.** The update channel's own
+  key, as "only signed packages from the update channel" says, unless the
+  Store gets one of its own (asked on #1722 at 21:5x). One constant
+  (`lamp_skills::package::STORE_KEY`) and the helper unit's `--key-file`.
+- **The reply** is `skills.list`'s, read after the install, as a remove's.
+  A refusal is the helper's words on one line (at most 300 bytes), for
+  example `not installed: it carries no lamp-skill.sig: …` or `not
+  installed: lamp-skill.sig does not match lamp-skill.json: the package
+  was changed after it was signed`. A helper that can't be reached is `the
+  lamp's skills can't be changed now`.
+- **How long, and what waits.** The fetch's 25 s at most, then the checks,
+  the folder's lock (at most 4 s) and the install, under the 40 s
+  `lamp-cloud` waits (a constant assert holds 25 s + 4 s under it). An
+  install can't fit in a remove's 5 s, so it has its own wait. `lamp-cloud` answers one command at a time, so the
+  app's other commands wait behind an install; the broker's keepalive (60
+  s, a lost link noticed at about 90 s) outlasts it. An answer of
+  `starting` at once and `success` or `failure` after, as V1's
+  `timezone.set`, would free it, and is not built. Not yet timed on a lamp.
+- **Not built:** `skills.catalog` (the signed list the entries come from);
+  the voice installing a skill.
 
 ## Health and crash reports (#1683, step 1)
 
@@ -889,6 +998,20 @@ hotspot's `/wifi` page), so this one is new. Off unless
   password through to the lamp and never stores or logs it** (the backend's
   side, to be confirmed by them).
 
+### A person's own keys (`keys.*`, #2094)
+
+Off unless `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` and
+`LAMP_CLOUD=on`. `lamp-cloud` hands one line (`{"set", "key", "base_url"?}`,
+`{"remove"}` or `{"which": true}`) to root's keys helper on
+`/run/lampos-setup-keys/keys.sock`, on a thread of its own, waiting 15 s at
+most (the helper's one check is 5 s). The helper answers only a peer in
+`lamp-cloud.service` at `/lampos.slice/lampos-parts.slice/`, by its cgroup, since every part runs as `lampos`. The
+key goes from the app's message into the helper's line and the key's file,
+and nowhere else: never a reply, an error or a journal line. **The backend
+passes the key through to the lamp and never stores or logs it** (the
+backend's side, to be confirmed by them). The rest is in
+[own-keys.md](own-keys.md).
+
 ## Not yet known, for the backend (#1396)
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
@@ -929,7 +1052,7 @@ taken once across a restart, a new boot starting again); the drop-in's
 line; the lists against the product's units; `reports.get` and
 `reports.set` with and without the switch; and against the test broker, a
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
-sent again after a dropped connection. `tests/report_contract.rs` pins the
+sent again after a dropped connection. `tests/it/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
 One release forward (#2052): a choice it can't read (cut short, garbage,
 empty, no boolean `share`, spoiled while running) is off, kept whole and
@@ -956,7 +1079,7 @@ folder beside it untouched; a link left as it is; a folder that can't be
 changed leaving the skill whole; no helper, or one answering nonsense,
 removing nothing; and off, `not on this lamp: skills.remove`. Each remove
 goes through the manage helper's own code on a real Unix socket on a short
-`/tmp` path. `tests/skills_contract.rs` pins the fields as sent, and
+`/tmp` path. `tests/it/skills_contract.rs` pins the fields as sent, and
 removes Desk tutor from a copy of `lampOS/skills/` through `Real`, the
 socket and the envelope.
 
@@ -967,7 +1090,7 @@ the helper; the ack `starting` within 100 ms while a stand-in helper takes
 answers; through the test broker, `starting` then `success` on `fd_channel`;
 and `host.device_name` from the helper's file, the host's name without one.
 
-`tests/app_contract.rs` holds the fields the Autonomous app's device page
+`tests/it/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,
 `network.private_ip` and `host.hostname` of `system.info`; `volume`, `raw`
 and `max_volume` of `volume.get` and `volume.set`; `muted`,

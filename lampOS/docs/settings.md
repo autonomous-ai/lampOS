@@ -82,7 +82,7 @@ does not own mixer volume, so it needs a separately assigned reader.
 Measured on Third's Intel Mac only (macOS 26.6.2, Rust 1.96.0), never on a
 lamp. `lamp-settings`' tests pass, also in parallel (three runs of three).
 `save_round_trip_latency_on_this_machine` (ignored by default; run it with
-`cargo test --release -p lamp-settings --test runtime -- --ignored --nocapture`)
+`cargo test --release -p lamp-settings --test it runtime:: -- --ignored --nocapture`)
 times 100 saves from the client's send through the durable save to its
 confirmed reply: first about 30 ms, p50 about 30 ms, p95 about 34 ms, worst
 61 ms, against the 250 ms target. A lamp's SD card can stall far longer (#784

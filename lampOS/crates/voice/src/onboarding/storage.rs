@@ -21,6 +21,12 @@ pub(crate) struct Paths {
     pub progress: PathBuf,
     pub checkpoint: PathBuf,
     pub mailbox: PathBuf,
+    /// This home's near-call bar (`lamp_near_call::FILE` in the product).
+    pub near_call: PathBuf,
+    /// The room sounds yes for lamp-ears ([`super::ROOM_SOUNDS_PATH`] on a
+    /// lamp), and the group that may read it: `None` keeps it root's alone.
+    pub room_sounds: PathBuf,
+    pub room_sounds_group: Option<u32>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Tag {
@@ -51,6 +57,8 @@ enum Operation {
     Closed(privacy::Checkpoint),
     Invalidate(Option<Progress>),
     Mailbox,
+    /// Keep a measured bar, or remove any bar when the measurement made none.
+    NearCall(Option<lamp_near_call::Calibrated>),
 }
 struct Job {
     tag: Tag,
@@ -234,6 +242,21 @@ impl Client {
         Ok(())
     }
 
+    /// The near-call file is written on this worker only: its synchronous
+    /// write and fsync never run on the interaction loop (#1803).
+    pub(crate) fn near_call(
+        &self,
+        calibrated: Option<lamp_near_call::Calibrated>,
+    ) -> io::Result<Submit> {
+        if calibrated.as_ref().is_some_and(|kept| !kept.fits()) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "near-call bar does not fit its tries",
+            ));
+        }
+        self.submit(Operation::NearCall(calibrated), false)
+    }
+
     pub(crate) fn read_mailbox(&self) -> io::Result<Submit> {
         self.submit(Operation::Mailbox, false)
     }
@@ -313,7 +336,12 @@ impl ServiceStorage {
         mut before: Box<dyn FnMut(Tag) -> io::Result<()> + Send>,
         profile: Box<dyn FnOnce() -> Option<String> + Send>,
     ) -> io::Result<Self> {
-        for path in [&paths.progress, &paths.checkpoint, &paths.mailbox] {
+        for path in [
+            &paths.progress,
+            &paths.checkpoint,
+            &paths.mailbox,
+            &paths.near_call,
+        ] {
             if !path.is_absolute() || path.file_name().is_none() {
                 return Err(io::Error::other("storage paths must be absolute files"));
             }
@@ -413,13 +441,22 @@ fn read_bounded(path: &Path, max: usize) -> io::Result<Option<Vec<u8>>> {
     }
     Ok(Some(bytes))
 }
-fn atomic_progress(path: &Path, progress: &Progress) -> io::Result<()> {
+fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
+    let path = &paths.progress;
     progress.check()?;
     let bytes = serde_json::to_vec(progress).map_err(io::Error::other)?;
     if bytes.len() > MAX_PROGRESS {
         return Err(io::Error::other("progress exceeds bound"));
     }
+    // Whether the progress this write replaces already held the yes: the
+    // record is written only by the write that first keeps it, so a forget
+    // that removed it is not undone by a later write.
+    let was_yes = read_bounded(path, MAX_PROGRESS)
+        .ok()
+        .flatten()
+        .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok())
+        .is_some_and(|before| kept_yes(&before).is_some());
     let next = path.with_extension("storage-next");
     let mut file = fs::OpenOptions::new()
         .create_new(true)
@@ -434,8 +471,75 @@ fn atomic_progress(path: &Path, progress: &Progress) -> io::Result<()> {
     })();
     if result.is_err() {
         let _ = fs::remove_file(next);
+        return result;
     }
-    result
+    room_sounds(paths, progress, !was_yes)
+}
+
+/// When `room_sounds`'s kept outcome is a yes (`done`), the time it was kept.
+fn kept_yes(progress: &Progress) -> Option<u64> {
+    progress
+        .steps
+        .get(super::ROOM_SOUNDS)
+        .filter(|kept| kept.outcome == super::Outcome::Done)
+        .map(|kept| kept.at_unix_s)
+}
+
+/// The room sounds answer for lamp-ears (`docs/onboarding.md`), from the
+/// progress just written or read: removed unless the step's kept outcome is
+/// a yes (`done`); written, when `new` (the write that first keeps the
+/// yes), whole, 0640 and the reader group's (0600 with no group). Never
+/// written again from the progress: a forget of everything removes it for
+/// good (`remember.rs`). Only the answer and its time, never words or sound.
+fn room_sounds(paths: &Paths, progress: &Progress, new: bool) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let path = &paths.room_sounds;
+    let Some(at) = kept_yes(progress) else {
+        return match fs::remove_file(path) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        };
+    };
+    if !new {
+        return Ok(());
+    }
+    let folder = path
+        .parent()
+        .ok_or_else(|| io::Error::other("room sounds has no folder"))?;
+    let bytes =
+        serde_json::to_vec(&serde_json::json!({"version":1,"room_sounds":"yes","at_unix_s":at}))
+            .map_err(io::Error::other)?;
+    let next = path.with_extension("storage-next");
+    let _ = fs::remove_file(&next);
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&next)?;
+        // The voice's UMask=0077 would leave it 0600: set after create.
+        let mode = if paths.room_sounds_group.is_some() {
+            0o640
+        } else {
+            0o600
+        };
+        file.set_permissions(fs::Permissions::from_mode(mode))?;
+        if let Some(group) = paths.room_sounds_group {
+            std::os::unix::fs::fchown(&file, None, Some(group))?;
+        }
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        fs::rename(&next, path)?;
+        fs::File::open(folder)?.sync_all()
+    })();
+    // Not kept is no to lamp-ears, the safe side; the progress stands.
+    if let Err(error) = result {
+        let _ = fs::remove_file(next);
+        eprintln!(
+            "lamp-voice: the room sounds yes was not kept at {}: {error}",
+            path.display()
+        );
+    }
+    Ok(())
 }
 fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
     let mut update = Update::default();
@@ -454,11 +558,12 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
                 .transpose()?
                 .unwrap_or_default();
             progress.check()?;
+            room_sounds(paths, &progress, false)?;
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
         Operation::Commit(progress, erase) => {
-            atomic_progress(&paths.progress, &progress)?;
+            atomic_progress(paths, &progress)?;
             if erase {
                 privacy::discard_checkpoint(&paths.checkpoint)?;
                 update.checkpoint = Some(None);
@@ -481,10 +586,10 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
             };
             progress.check()?;
             progress.privacy_discard_pending = true;
-            atomic_progress(&paths.progress, &progress)?;
+            atomic_progress(paths, &progress)?;
             privacy::discard_checkpoint(&paths.checkpoint)?;
             progress.privacy_discard_pending = false;
-            atomic_progress(&paths.progress, &progress)?;
+            atomic_progress(paths, &progress)?;
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
@@ -516,6 +621,14 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
             }
             update.mailbox = Some(text);
         }
+        Operation::NearCall(Some(calibrated)) => {
+            lamp_near_call::write(&paths.near_call, &calibrated)?;
+        }
+        Operation::NearCall(None) => match fs::remove_file(&paths.near_call) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        },
     }
     Ok(update)
 }
@@ -538,6 +651,9 @@ mod tests {
                 progress: self.0.join("progress.json"),
                 checkpoint: self.0.join("privacy-pending.json"),
                 mailbox: self.0.join("progress.told"),
+                near_call: self.0.join("near-call.json"),
+                room_sounds: self.0.join("room-sounds.json"),
+                room_sounds_group: None,
             }
         }
     }
@@ -619,6 +735,57 @@ mod tests {
         .unwrap();
         attempt.observe_close(sample(2, 200, true), 200).unwrap();
         privacy::Checkpoint::new(attempt, paths.checkpoint.clone())
+    }
+
+    /// The yes for lamp-ears (#2110): 0640 and the reader group's, written
+    /// by the write that first keeps it; a removal (a forget of everything)
+    /// is not undone by a later write or start; a progress without the yes
+    /// removes it.
+    #[test]
+    fn the_room_sounds_yes_is_group_readable_and_a_forget_stays_forgotten() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let files = Files::new();
+        let mut paths = files.paths();
+        // A group this test may give a file to: its own.
+        let group = fs::metadata(&files.0).unwrap().gid();
+        paths.room_sounds_group = Some(group);
+        let yes = |at_unix_s| {
+            let mut progress = Progress::default();
+            progress.steps.insert(
+                super::super::ROOM_SOUNDS.into(),
+                super::super::Kept {
+                    outcome: super::super::Outcome::Done,
+                    at_unix_s,
+                    framing: None,
+                    offered_at_unix_s: None,
+                },
+            );
+            progress
+        };
+        let progress = yes(7);
+        execute(&paths, Operation::Commit(progress.clone(), false)).unwrap();
+        let kept = fs::metadata(&paths.room_sounds).unwrap();
+        assert_eq!(kept.permissions().mode() & 0o777, 0o640);
+        assert_eq!(kept.gid(), group);
+        assert_eq!(
+            fs::read(&paths.room_sounds).unwrap(),
+            br#"{"at_unix_s":7,"room_sounds":"yes","version":1}"#
+        );
+        fs::remove_file(&paths.room_sounds).unwrap();
+        execute(&paths, Operation::Commit(progress, false)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(!paths.room_sounds.exists());
+        // No group known: root's alone.
+        paths.room_sounds_group = None;
+        execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
+        execute(&paths, Operation::Commit(yes(8), false)).unwrap();
+        let mode = fs::metadata(&paths.room_sounds)
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+        execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
+        assert!(!paths.room_sounds.exists());
     }
 
     #[test]
@@ -827,6 +994,47 @@ mod tests {
         let mut next = ServiceStorage::start(paths).unwrap();
         assert!(idle(&next.client()).progress.unwrap().steps.is_empty());
         next.finish(Duration::from_secs(2)).unwrap();
+    }
+
+    #[test]
+    fn the_near_call_bar_is_written_or_removed_only_on_the_worker() {
+        let files = Files::new();
+        let paths = files.paths();
+        let caller = thread::current().id();
+        let mut owner = ServiceStorage::start_with_hook(
+            paths.clone(),
+            Box::new(move |_| {
+                assert_ne!(thread::current().id(), caller);
+                Ok(())
+            }),
+        )
+        .unwrap();
+        let client = owner.client();
+        idle(&client);
+        let tries = [22.4, 25.0, 23.1].map(|rise_db| lamp_near_call::Try {
+            rise_db,
+            score: 0.98,
+        });
+        let bar = lamp_near_call::Calibrated::of(tries.to_vec(), 7).unwrap();
+        // A bar its tries don't make is refused before it reaches the worker.
+        let edited = lamp_near_call::Calibrated {
+            near_rise_db: 30.0,
+            ..bar.clone()
+        };
+        assert!(client.near_call(Some(edited)).is_err());
+        assert!(matches!(
+            client.near_call(Some(bar)).unwrap(),
+            Submit::Queued(_)
+        ));
+        assert!(idle(&client).failed.is_none());
+        assert_eq!(lamp_near_call::read(&paths.near_call), Some(19.4));
+        assert!(matches!(client.near_call(None).unwrap(), Submit::Queued(_)));
+        idle(&client);
+        assert!(!paths.near_call.exists());
+        // Removing what is not there is no failure.
+        client.near_call(None).unwrap();
+        assert!(idle(&client).failed.is_none());
+        owner.finish(Duration::from_secs(2)).unwrap();
     }
 
     #[test]

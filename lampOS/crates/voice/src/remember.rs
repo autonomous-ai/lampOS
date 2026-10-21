@@ -1635,6 +1635,9 @@ pub struct DaysClient {
     forget_about: AtomicBool,
     /// [`ROOM_NOT_ASKER_ENVIRONMENT`], read when the client is made (#2176).
     room_not_asker: AtomicBool,
+    /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
+    /// removed by any forget of everything (#2110).
+    room_sounds: PathBuf,
     /// The conversation the writer is in: whose, and the exchanges of it
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
@@ -2114,6 +2117,7 @@ impl DaysClient {
             room_not_asker: AtomicBool::new(
                 std::env::var(ROOM_NOT_ASKER_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
+            room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
             current,
             hand_ons,
             early,
@@ -2471,6 +2475,21 @@ impl DaysClient {
                     .is_none_or(|answer| answer["ok"] != true)
                 {
                     return (gone(), false);
+                }
+            }
+            // And the household's yes to music and laughter: "a forget or
+            // the reset wipes it" (the lead on #2110), whoever asked.
+            if call.name == FORGET_EVERYTHING {
+                match std::fs::remove_file(&self.room_sounds) {
+                    Ok(()) => eprintln!(
+                        "lamp-voice provider: forget everything removed {}",
+                        self.room_sounds.display()
+                    ),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => eprintln!(
+                        "lamp-voice provider: forget everything could not remove {}: {error}",
+                        self.room_sounds.display()
+                    ),
                 }
             }
             let ids = if call.name == REMEMBER && told["remembered"] == true {
@@ -4245,6 +4264,11 @@ mod tests {
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
+        // The household's room sounds yes goes with it (#2110).
+        let consent = socket.with_extension("room-sounds.json");
+        std::fs::write(&consent, b"{}").unwrap();
+        let mut client = client;
+        client.room_sounds = consent.clone();
         let (told, _) = client.run_at(
             &call(FORGET_EVERYTHING, json!({})),
             FIRST_READ,
@@ -4253,6 +4277,7 @@ mod tests {
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
+        assert!(!consent.exists());
         let read = served.join().unwrap();
         assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
         drop(client);
@@ -5404,6 +5429,7 @@ mod tests {
         client.context = Arc::new(Mutex::new(context));
         client.threads = AtomicBool::new(false);
         client.forget_all = AtomicBool::new(false);
+        client.room_sounds = PathBuf::from("/unused-no-io");
         (client, work)
     }
 
@@ -7016,6 +7042,7 @@ mod tests {
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
+            room_sounds: PathBuf::from("/unused-no-io"),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,
@@ -7169,6 +7196,7 @@ mod tests {
             lost: Arc::new(AtomicU64::new(0)),
             threads: AtomicBool::new(false),
             room_not_asker: AtomicBool::new(false),
+            room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),

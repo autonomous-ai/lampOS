@@ -1,0 +1,31 @@
+# lampOS a person's own keys (#2094, lampOS/docs/own-keys.md): one request from lamp-cloud on
+# lamp-setup-keys.socket, as standard input and output. A peer outside lamp-cloud.service is
+# refused before its line is read. A key is checked with one request to its service (5 s, no
+# redirect) and kept only if it works, root's, 0600, in the folder the voice loads whole; then the
+# voice is restarted once the lamp is quiet (45 s, an update's rule), waiting at most 30 minutes.
+# A key is never journalled.
+[Unit]
+Description=lampOS own keys: one request
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+User=root
+ExecStart=/opt/lampOS/setup/current/lamp-setup keys --folder /etc/lampOS/voice/own --bus-root /run/lampos-bus --enable
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+SyslogIdentifier=lamp-setup-keys
+RuntimeMaxSec=35min
+NoNewPrivileges=yes
+ProtectSystem=strict
+# The keys' folder, made 0700 if it is missing, is the one place it writes; the bus, read to
+# judge quiet.
+ConfigurationDirectory=lampOS/voice/own
+ConfigurationDirectoryMode=0700
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+# The network for the key's one check (AF_INET, AF_INET6); AF_UNIX for systemctl and the bus.
+# Not PrivateNetwork, unlike the names' helper.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

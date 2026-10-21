@@ -8,10 +8,17 @@
 //!
 //! A package is a tar of one skill's folder and a manifest, `lamp-skill.json`,
 //! naming the format, the skill, its version and every file with its size
-//! and SHA-256, each checked before anything is installed. A signature has
-//! a reserved place, `lamp-skill.sig`, and is NOT checked: signing is in
-//! the backlog. There is no fetch from a network: a package is a local file.
+//! and SHA-256, each checked before anything is installed, and a signature,
+//! `lamp-skill.sig`: Ed25519 over `lamp-skill.json`'s exact bytes. A package
+//! installed by hand from a file on the lamp is not held to its signature;
+//! one from the Skills Store, fetched from a URL by root's manage helper
+//! ([`install_from_url`], `docs/skills.md`, "From the Skills Store"), is
+//! installed only when it is signed with the update channel's key
+//! ([`STORE_KEY`]), checked before anything is written.
 use super::{Skill, SkillKind, load, load_each, plain_name, version_ok};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use lamp_update::fetch::Channel;
+use ring::signature::{ED25519, Ed25519KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -27,17 +34,48 @@ use std::{
 pub const FORMAT: u32 = 1;
 /// The manifest's name at the top of a package.
 pub const MANIFEST: &str = "lamp-skill.json";
-/// Reserved for the Store's signature over `lamp-skill.json`'s exact bytes.
-/// Signing is in the backlog: a package may carry this file, and nothing
-/// checks it yet, which every install says.
+/// The Store's signature over `lamp-skill.json`'s exact bytes, one line of
+/// JSON, `{"key": FINGERPRINT, "signature": BASE64}` ([`signature_for`]): the
+/// key's fingerprint as `lamp-update` gives it (16 hex), so a package signed
+/// with another key is told apart from a changed one, and the 64 bytes of
+/// the Ed25519 signature. The manifest names every file with its SHA-256,
+/// so the signature covers every byte of the skill.
 pub const SIGNATURE: &str = "lamp-skill.sig";
+/// The key a package from the Skills Store must be signed with: the update
+/// channel's own (`lamp-update install` checks a build's manifest with it),
+/// so only what the channel's owner signed is put on a lamp from a URL (the
+/// first builder's 18:33 on #1722: "only signed packages from the update
+/// channel"). One place, to change it if the Store gets a key of its own.
+pub const STORE_KEY: &str = "/etc/lampOS/update/key.pub";
+/// The Store's switch, `on` or off: `lamp-cloud` answers `skills.install`
+/// only with it, and the manage helper itself takes an `install` only with
+/// it in its own environment (`lamp-skills-manage@.service`'s drop-in), so
+/// a process that reaches its socket past `lamp-cloud` installs nothing
+/// while the Store is off. A remove needs no switch of its own.
+pub const STORE_SWITCH: &str = "LAMP_SKILLS_STORE";
+/// What an install is told while the Store's switch is off, by
+/// `lamp-cloud` and by the manage helper alike.
+pub const STORE_OFF: &str = "not on this lamp: skills.install";
+
+/// Whether the Store's switch ([`STORE_SWITCH`]) is on: `on` only.
+pub fn store_switched_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+/// The longest a package's URL may be.
+pub const MOST_URL: usize = 2_048;
+/// The longest a package is fetched for, redirects among it. A Store
+/// package is at most [`MOST_PACKAGE_BYTES`], 18 MB: about 1 MB/s at least.
+/// `lamp-cloud` waits a little longer for the helper's answer.
+pub const FETCH_WITHIN: Duration = Duration::from_secs(25);
+/// The most bytes of a signature file: its JSON is under 150.
+const MOST_SIGNATURE_BYTES: usize = 1_024;
 /// The most files a skill may have, its tests among them.
 pub const MOST_FILES: usize = 512;
 /// The most bytes a skill's files may come to (the largest of the lamp's
 /// own, Stuffy air with its recordings, is about 1.4 MB).
 pub const MOST_BYTES: u64 = 16 * 1024 * 1024;
 /// A package's own size at most: its files and the tar's headers.
-const MOST_PACKAGE_BYTES: u64 = MOST_BYTES + 2 * 1024 * 1024;
+pub const MOST_PACKAGE_BYTES: u64 = MOST_BYTES + 2 * 1024 * 1024;
 /// The most parts a file's path in a skill may have (`tests/CASE/FILE`).
 const MOST_DEPTH: usize = 4;
 /// The most functions a session is given, the voice's own and the actions
@@ -69,12 +107,86 @@ pub struct Entry {
 pub type Files = BTreeMap<String, Vec<u8>>;
 
 /// A package read and checked: its manifest, the skill's files, each as the
-/// manifest says, and the signature it carries, if any, unchecked.
+/// manifest says, the signature it carries, if any, and the fingerprint of
+/// the key it was checked against, when it was.
 #[derive(Debug)]
 pub struct Package {
     pub manifest: Manifest,
     pub files: Files,
     pub signature: Option<Vec<u8>>,
+    pub signed_by: Option<String>,
+}
+
+/// `lamp-skill.sig`'s one line.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Signed {
+    key: String,
+    signature: String,
+}
+
+/// What `lamp-skill.sig` holds for these manifest bytes, signed with `key`:
+/// what the Store's side writes into a package (`lamp-skills pack
+/// --key-file`).
+pub fn signature_for(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, String> {
+    use ring::signature::KeyPair;
+    let public: [u8; 32] = key
+        .public_key()
+        .as_ref()
+        .try_into()
+        .map_err(|_| "the key's public half is not 32 bytes".to_owned())?;
+    let signed = Signed {
+        key: lamp_update::manifest::fingerprint(&public),
+        signature: STANDARD.encode(key.sign(manifest).as_ref()),
+    };
+    let mut bytes = serde_json::to_vec(&signed).map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+/// Whether `signature`, a package's `lamp-skill.sig`, is `key`'s over the
+/// `manifest` bytes: the key's fingerprint, or why not. Asked before the
+/// manifest is even read, so nothing a package says is taken before its
+/// signature is known to be the channel's.
+pub fn check_signature(
+    manifest: &[u8],
+    signature: Option<&[u8]>,
+    key: &[u8; 32],
+) -> Result<String, String> {
+    let ours = lamp_update::manifest::fingerprint(key);
+    let signature = signature.ok_or(format!(
+        "it carries no {SIGNATURE}: a package from the Skills Store must be signed with the update \
+         channel's key ({ours})"
+    ))?;
+    if signature.len() > MOST_SIGNATURE_BYTES {
+        return Err(format!("{SIGNATURE} is too large to be a signature"));
+    }
+    let signed: Signed = serde_json::from_slice(signature)
+        .map_err(|_| format!("{SIGNATURE} is not a signature: {{\"key\", \"signature\"}}"))?;
+    if signed.key != ours {
+        // Said back only when it is a fingerprint's shape: nothing else a
+        // package carries is echoed.
+        let theirs =
+            if signed.key.len() == 16 && signed.key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                signed.key.as_str()
+            } else {
+                "that is not a key's fingerprint"
+            };
+        return Err(format!(
+            "signed with key {theirs}, and this lamp takes skills signed with the update channel's key {ours}"
+        ));
+    }
+    let raw = STANDARD
+        .decode(&signed.signature)
+        .map_err(|_| format!("{SIGNATURE}: the signature is not base64"))?;
+    UnparsedPublicKey::new(&ED25519, key)
+        .verify(manifest, &raw)
+        .map_err(|_| {
+            format!(
+                "{SIGNATURE} does not match {MANIFEST}: the package was changed after it was signed"
+            )
+        })?;
+    Ok(ours)
 }
 
 /// Lowercase hex of `bytes`' SHA-256.
@@ -227,6 +339,17 @@ fn append(builder: &mut tar::Builder<Vec<u8>>, path: &str, bytes: &[u8]) -> Resu
 /// (a core skill comes with the lamp, never as a package). The package is
 /// read back and checked as an install checks it.
 pub fn pack(dir: &Path, out: &Path) -> Result<PathBuf, String> {
+    pack_signed(dir, out, None)
+}
+
+/// [`pack`], and with `key`, the manifest signed ([`signature_for`]) into
+/// `lamp-skill.sig`: a package the Skills Store can carry, when `key` is the
+/// update channel's private key. It is read back and its signature checked.
+pub fn pack_signed(
+    dir: &Path,
+    out: &Path,
+    key: Option<&Ed25519KeyPair>,
+) -> Result<PathBuf, String> {
     let skill = load(dir).map_err(|why| format!("not packed: {why}"))?;
     if skill.kind == SkillKind::Core {
         return Err(format!(
@@ -258,6 +381,9 @@ pub fn pack(dir: &Path, out: &Path) -> Result<PathBuf, String> {
     json.push(b'\n');
     let mut builder = tar::Builder::new(Vec::new());
     append(&mut builder, MANIFEST, &json)?;
+    if let Some(key) = key {
+        append(&mut builder, SIGNATURE, &signature_for(&json, key)?)?;
+    }
     for (path, bytes) in &files {
         append(&mut builder, &format!("{}/{path}", skill.name), bytes)?;
     }
@@ -269,15 +395,25 @@ pub fn pack(dir: &Path, out: &Path) -> Result<PathBuf, String> {
     fs::write(&part, &bytes)
         .and_then(|()| fs::rename(&part, &path))
         .map_err(|error| format!("{}: {error}", path.display()))?;
-    read_package(&path)
+    let read = read_package(&path)
         .map_err(|why| format!("{}: packed, then not read back: {why}", path.display()))?;
+    if let Some(key) = key {
+        use ring::signature::KeyPair;
+        let public: [u8; 32] = key
+            .public_key()
+            .as_ref()
+            .try_into()
+            .map_err(|_| "the key's public half is not 32 bytes".to_owned())?;
+        check_signature(&json, read.signature.as_deref(), &public)
+            .map_err(|why| format!("{}: packed, then its signature: {why}", path.display()))?;
+    }
     Ok(path)
 }
 
 /// The package at `path`, read and checked: a plain tar of a manifest, an
-/// optional signature (kept, not checked) and one skill's folder of plain
-/// files, every one of them in the manifest with its size and SHA-256, and
-/// no other.
+/// optional signature (kept, not checked: a file installed by hand) and one
+/// skill's folder of plain files, every one of them in the manifest with its
+/// size and SHA-256, and no other.
 pub fn read_package(path: &Path) -> Result<Package, String> {
     let meta = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
     if !meta.is_file() {
@@ -294,18 +430,15 @@ pub fn read_package(path: &Path) -> Result<Package, String> {
             .read_to_end(&mut bytes)
             .map_err(|error| error.to_string())
     })?;
-    if bytes.len() as u64 > MOST_PACKAGE_BYTES {
-        return Err(format!(
-            "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
-        ));
-    }
-    package_of(&bytes)
+    read_package_bytes(&bytes, None)
 }
 
-/// A package read from its `bytes` and checked, as [`read_package`] does a
-/// file's: the made-skill install hashes the bytes it was given a yes for,
-/// then reads these same bytes, so nothing is read twice ([`install_made`]).
-pub fn package_of(bytes: &[u8]) -> Result<Package, String> {
+/// A package from its bytes, read in memory and checked as [`read_package`]
+/// checks it, with nothing written anywhere. With `key`, its signature must
+/// be that key's over the manifest's exact bytes ([`check_signature`]),
+/// checked once the tar is read and before the manifest is parsed or any
+/// file is compared with it.
+pub fn read_package_bytes(bytes: &[u8], key: Option<&[u8; 32]>) -> Result<Package, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
@@ -386,6 +519,10 @@ pub fn package_of(bytes: &[u8]) -> Result<Package, String> {
         }
     }
     let manifest = manifest.ok_or(format!("no {MANIFEST}: not a skill's package"))?;
+    let signed_by = match key {
+        Some(key) => Some(check_signature(&manifest, signature.as_deref(), key)?),
+        None => None,
+    };
     let manifest: Manifest =
         serde_json::from_slice(&manifest).map_err(|error| format!("{MANIFEST}: {error}"))?;
     if manifest.format != FORMAT {
@@ -438,6 +575,7 @@ pub fn package_of(bytes: &[u8]) -> Result<Package, String> {
         manifest,
         files,
         signature,
+        signed_by,
     })
 }
 
@@ -455,6 +593,36 @@ fn version_of(dir: &Path) -> Option<String> {
         .get("version")
         .and_then(toml::Value::as_str)
         .map(str::to_owned)
+}
+
+/// A `MAJOR.MINOR.PATCH` version ([`version_ok`]) as three numbers to
+/// order by, or none.
+fn version_order(version: &str) -> Option<(u64, u64, u64)> {
+    if !version_ok(version) {
+        return None;
+    }
+    let mut parts = version.split('.').map(|part| part.parse::<u64>().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
+}
+
+/// Why a Store package at `version` may not replace the skill `name`
+/// installed at `installed`, or none when it may: it is the same version
+/// or a newer one. A version that can't be ordered (none, or not
+/// `MAJOR.MINOR.PATCH`) is refused, since the package may be the older:
+/// the person removes the installed one first, and then installs.
+fn older_refused(name: &str, installed: Option<&str>, version: &str) -> Option<String> {
+    let said = installed.unwrap_or("with no version");
+    match (version_order(version), installed.and_then(version_order)) {
+        (Some(new), Some(old)) if new >= old => None,
+        (Some(_), Some(_)) => Some(format!(
+            "{name} {said} is on this lamp, and this package is the older {version}: \
+             a skill is never put back to an older version"
+        )),
+        _ => Some(format!(
+            "{name} {said} is on this lamp, and its version can't be compared with {version}: \
+             remove it first, then install this one"
+        )),
+    }
 }
 
 fn toml_of(dir: &Path) -> Option<toml::Table> {
@@ -501,7 +669,8 @@ fn locked(skills: &Path) -> Result<fs::File, String> {
 
 /// [`locked`], but waiting at most `wait` for another run to give the
 /// folder back: then [`BUSY`]. The manage helper waits this way, so it never
-/// goes on with a remove after its asker has stopped waiting for it.
+/// goes on with a remove or an install after its asker has stopped waiting
+/// for it.
 fn locked_within(skills: &Path, wait: Duration) -> Result<fs::File, String> {
     let folder =
         fs::File::open(skills).map_err(|error| format!("{}: {error}", skills.display()))?;
@@ -533,8 +702,10 @@ fn locked_within(skills: &Path, wait: Duration) -> Result<fs::File, String> {
 pub const BUSY: &str = "the lamp's skills can't be changed now";
 
 /// The longest the manage helper waits for the skills folder's lock, under
-/// `lamp-cloud`'s 5 s wait for its answer, so a remove is done, or refused,
-/// while `lamp-cloud` still waits for it, never after.
+/// `lamp-cloud`'s 5 s wait for a remove's answer, so a remove is done, or
+/// refused, while `lamp-cloud` still waits for it, never after. An install
+/// waits as long once its package is fetched and checked: with
+/// [`FETCH_WITHIN`], under `lamp-cloud`'s 40 s wait for an install.
 pub const ASKED_LOCK_WAIT: Duration = Duration::from_secs(4);
 
 /// Whether `name` is what [`hidden_place`] names: `.install-NAME-PID` or
@@ -652,7 +823,7 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
         let files = std::mem::take(&mut package.files);
         (package.manifest.name.clone(), files, Some(package))
     };
-    installed(skills, name, files, package, swept)
+    put_in(skills, &swept, &name, &files, package.as_ref())
 }
 
 /// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
@@ -712,7 +883,8 @@ pub fn install_made(
             "not installed: {file} is not what was said: its SHA-256 has changed"
         ));
     }
-    let mut package = package_of(&bytes).map_err(|why| format!("not installed: {file}: {why}"))?;
+    let mut package =
+        read_package_bytes(&bytes, None).map_err(|why| format!("not installed: {file}: {why}"))?;
     let card = |name: &str| {
         package
             .files
@@ -749,7 +921,7 @@ pub fn install_made(
     let files = std::mem::take(&mut package.files);
     // What binds these bytes is the person's yes, by their SHA-256, not a
     // signature (the reviewer's P3 on #2414).
-    installed(skills, name, files, Some(package), swept).map(|said| {
+    put_in(skills, &swept, &name, &files, Some(&package)).map(|said| {
         said.replace(
             NO_SIGNATURE,
             &format!(
@@ -761,7 +933,7 @@ pub fn install_made(
 }
 
 /// What an install's done line says of a package with no signature.
-const NO_SIGNATURE: &str = "it carries no signature, and none is checked yet: signing is not built";
+const NO_SIGNATURE: &str = "it carries no signature: a package installed by hand from a file";
 
 /// Whether a skill's `SKILL.md` says it was made on this lamp by voice
 /// (`made: here` in its front matter, `lamp_voice::made_skill`).
@@ -769,16 +941,17 @@ fn made_here(card: &str) -> bool {
     card.lines().any(|line| line.trim() == "made: here")
 }
 
-/// `files`, the skill `name`, put together beside the live skills, loaded
-/// and moved in ([`moved_in`]), with the folder held by the caller and what
-/// it [`swept`] said after.
-fn installed(
+/// The skill `name` of these `files` put together beside the live skills,
+/// loaded and moved in ([`moved_in`]), with the skills folder [`locked`] by
+/// the caller and what a killed run left `swept`.
+fn put_in(
     skills: &Path,
-    name: String,
-    files: Files,
-    package: Option<Package>,
-    swept: Vec<String>,
+    swept: &[String],
+    name: &str,
+    files: &Files,
+    package: Option<&Package>,
 ) -> Result<String, String> {
+    let name = name.to_owned();
     if !skill_name_ok(&name) {
         return Err(format!(
             "not installed: {name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
@@ -791,7 +964,7 @@ fn installed(
             fs::remove_dir_all(&staged).map_err(failed)?;
         }
         let folder = staged.join(&name);
-        for (path, bytes) in &files {
+        for (path, bytes) in files {
             let at = folder.join(path);
             if let Some(parent) = at.parent() {
                 fs::create_dir_all(parent).map_err(failed)?;
@@ -800,7 +973,7 @@ fn installed(
         }
         fs::create_dir_all(&folder).map_err(failed)?;
         open_to_parts(&folder).map_err(failed)?;
-        moved_in(skills, &name, &folder, files.len(), package.as_ref())
+        moved_in(skills, &name, &folder, files.len(), package)
     })();
     let _ = fs::remove_dir_all(&staged);
     if swept.is_empty() {
@@ -859,6 +1032,16 @@ fn moved_in(
         }
         Ok(_) => Some(version_of(&target)),
     };
+    // A package from the Store never puts an older version over a newer
+    // one: an old package the channel once signed can't be replayed onto a
+    // lamp (the reviewer-lead on #1983). The same version is a reinstall.
+    if let Some(package) = package
+        && package.signed_by.is_some()
+        && let Some(installed) = &replaced
+        && let Some(why) = older_refused(name, installed.as_deref(), &package.manifest.version)
+    {
+        return Err(format!("not installed: {why}"));
+    }
     // A function is one skill's: one that takes another's name would take
     // it from the model, a core skill's first ([`load_each`]).
     if let Some(tool) = &skill.tool
@@ -900,10 +1083,12 @@ fn moved_in(
         None => format!("from its folder, {count} files"),
         Some(package) => format!(
             "from its package, {count} files, each one's size and sha256 as {MANIFEST} says; {}",
-            if package.signature.is_some() {
-                "its signature not checked: signing is not built yet"
-            } else {
-                NO_SIGNATURE
+            match (&package.signed_by, package.signature.is_some()) {
+                (Some(key), _) => format!("signed with the update channel's key {key}"),
+                (None, true) => {
+                    "its signature not checked: a package installed by hand from a file".to_owned()
+                }
+                (None, false) => NO_SIGNATURE.to_owned(),
             }
         ),
     };
@@ -974,6 +1159,212 @@ fn taken_off(skills: &Path, name: &str, wait: Option<Duration>) -> Result<Option
         .map(|error| format!("{} was not deleted: {error}", old.display())))
 }
 
+/// What is said of a URL that is not one a package is fetched from: the URL
+/// is not said back.
+pub const NOT_A_STORE_URL: &str = "url must be an https URL of at most 2048 characters, \
+    with no spaces, no user and nothing but plain ASCII";
+/// What is said of a `sha256` that is not one.
+pub const NOT_A_SHA256: &str = "sha256 must be 64 lowercase hex characters";
+
+/// Whether `url` is one a package is fetched from: `https://`, a host, at
+/// most [`MOST_URL`] bytes of printable ASCII with no space and no user
+/// (`@` before the path). Nothing else, `file://` and `http://` least of
+/// all, is fetched, and the fetch follows a redirect only to https.
+pub fn store_url_ok(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let authority = rest.split('/').next().unwrap_or_default();
+    url.len() <= MOST_URL
+        && !authority.is_empty()
+        && !authority.contains('@')
+        && url.bytes().all(|byte| byte.is_ascii_graphic())
+}
+
+/// A package asked for from the Skills Store: its URL, and what the
+/// catalogue's entry says of it (the first builder's 22:23 on #1722: the
+/// catalogue is a signed list of entries `{name, version, sha256, url}`),
+/// each checked against what is fetched. `skills.catalog` will hand an
+/// entry straight to an install; a bare URL is taken too.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Asked<'a> {
+    pub url: &'a str,
+    /// The SHA-256 of the package's bytes, checked before they are read.
+    pub sha256: Option<&'a str>,
+    /// The skill's name and version, checked against its manifest.
+    pub name: Option<&'a str>,
+    pub version: Option<&'a str>,
+}
+
+/// What is said of a `name` that is not a skill's.
+pub const NOT_A_NAME: &str =
+    "name must be a skill's name: 1 to 64 lowercase letters, digits and hyphens";
+/// What is said of a `version` that is not one.
+pub const NOT_A_VERSION: &str = "version must be MAJOR.MINOR.PATCH";
+
+impl<'a> Asked<'a> {
+    /// A request's fields, `{"url", "sha256", "name", "version"}`, every one
+    /// a string and all but `url` optional, nothing else: or none.
+    pub fn from_json(asked: &'a serde_json::Value) -> Option<Self> {
+        let asked = asked.as_object()?;
+        if !asked
+            .keys()
+            .all(|key| matches!(key.as_str(), "url" | "sha256" | "name" | "version"))
+        {
+            return None;
+        }
+        let text = |key: &str| match asked.get(key) {
+            None => Some(None),
+            Some(value) => value.as_str().map(Some),
+        };
+        Some(Self {
+            url: asked.get("url")?.as_str()?,
+            sha256: text("sha256")?,
+            name: text("name")?,
+            version: text("version")?,
+        })
+    }
+
+    /// Why it is not one a package is fetched for, if it is not.
+    pub fn refused(&self) -> Option<&'static str> {
+        if !store_url_ok(self.url) {
+            Some(NOT_A_STORE_URL)
+        } else if self.sha256.is_some_and(|sha256| !sha256_ok(sha256)) {
+            Some(NOT_A_SHA256)
+        } else if self.name.is_some_and(|name| !skill_name_ok(name)) {
+            Some(NOT_A_NAME)
+        } else if self.version.is_some_and(|version| !version_ok(version)) {
+            Some(NOT_A_VERSION)
+        } else {
+            None
+        }
+    }
+
+    /// The request as the manage helper takes it, `{"install": {...}}`.
+    pub fn request(&self) -> serde_json::Value {
+        let mut fields = serde_json::Map::new();
+        fields.insert("url".into(), self.url.into());
+        for (key, value) in [
+            ("sha256", self.sha256),
+            ("name", self.name),
+            ("version", self.version),
+        ] {
+            if let Some(value) = value {
+                fields.insert(key.into(), value.into());
+            }
+        }
+        serde_json::json!({ "install": fields })
+    }
+}
+
+/// Whether `text` is a SHA-256 as this program writes one.
+pub fn sha256_ok(text: &str) -> bool {
+    text.len() == 64
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// The update channel's public key from `key_file`, as `lamp-update` reads
+/// it.
+pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
+    let text = fs::read_to_string(key_file).map_err(|error| {
+        format!(
+            "the update channel's key ({}) can't be read: {error}",
+            key_file.display()
+        )
+    })?;
+    lamp_update::manifest::read_public_key(&text).map_err(|why| {
+        format!(
+            "the update channel's key ({}): {}",
+            key_file.display(),
+            why.0
+        )
+    })
+}
+
+/// Installs the package at `url`, from the Skills Store, in `skills`, and
+/// says what was done. Only as [`asked`] takes it, from root's manage
+/// helper; `lamp-cloud` passes the URL and writes nothing.
+///
+/// In order, and nothing is written before the last step: the URL must be
+/// https ([`store_url_ok`]); the package is fetched through `channel` into
+/// memory, at most [`MOST_PACKAGE_BYTES`], within [`FETCH_WITHIN`]; its
+/// bytes must have `sha256` when one is given; its signature must be the
+/// update channel's key's ([`STORE_KEY`]) over its manifest, checked before
+/// the manifest is read; its files, their paths (no `..`, no absolute path,
+/// no hidden name, at most four parts), sizes, count and kinds (no link, no
+/// device) as [`read_package_bytes`] checks them. Then it is installed as
+/// any package is ([`install`]'s own steps, under the folder's lock, waited
+/// for at most `lock_wait`, [`ASKED_LOCK_WAIT`] on the lamp, then [`BUSY`]
+/// with nothing written): put
+/// together where the running program does not look, loaded with every
+/// check a load makes, refused when it is core, when a core skill has its
+/// name or another skill its function, and only then renamed into place.
+pub fn install_from_url(
+    skills: &Path,
+    asked: &Asked<'_>,
+    key_file: &Path,
+    channel: &mut dyn Channel,
+    lock_wait: Duration,
+) -> Result<String, String> {
+    if let Some(why) = asked.refused() {
+        return Err(format!("not installed: {why}"));
+    }
+    let (url, sha256) = (asked.url, asked.sha256);
+    if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
+        return Err(format!("no skills folder at {}", skills.display()));
+    }
+    let key = store_key(key_file).map_err(|why| format!("not installed: {why}"))?;
+    let mut bytes = Vec::new();
+    channel
+        .fetch(url, MOST_PACKAGE_BYTES, &mut bytes)
+        .map_err(|why| format!("not installed: the package was not fetched: {why}"))?;
+    if let Some(sha256) = sha256
+        && sha256_hex(&bytes) != sha256
+    {
+        return Err(
+            "not installed: the package's sha256 is not the one asked for: it was changed or damaged"
+                .to_owned(),
+        );
+    }
+    let mut package =
+        read_package_bytes(&bytes, Some(&key)).map_err(|why| format!("not installed: {why}"))?;
+    drop(bytes);
+    // What the catalogue's entry said, against what the channel signed.
+    if let Some(name) = asked.name
+        && name != package.manifest.name
+    {
+        return Err(format!(
+            "not installed: the package is {}, not the {name} asked for",
+            package.manifest.name
+        ));
+    }
+    if let Some(version) = asked.version
+        && version != package.manifest.version
+    {
+        return Err(format!(
+            "not installed: the package is {} {}, not the version {version} asked for",
+            package.manifest.name, package.manifest.version
+        ));
+    }
+    // Waited for at most lock_wait, as a remove is: past it, BUSY with
+    // nothing written.
+    let _held = locked_within(skills, lock_wait)?;
+    let swept = swept(skills);
+    let files = std::mem::take(&mut package.files);
+    let name = package.manifest.name.clone();
+    put_in(skills, &swept, &name, &files, Some(&package))
+}
+
+/// The Skills Store's side of the manage helper: where its key is, and how
+/// a package is fetched (`lamp_update::fetch::Web` on a lamp, a local
+/// server in the tests).
+pub struct Store<'a> {
+    pub key_file: PathBuf,
+    pub channel: &'a mut dyn Channel,
+}
+
 /// Where the manage helper listens on a product lamp
 /// (`deploy/product/lamp-skills-manage.socket`): root's socket, which only
 /// the group `lampos` may connect to. systemd holds it and starts
@@ -984,25 +1375,38 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// The most bytes of a request to [`asked`].
 pub const ASKED_MOST: u64 = 4_096;
 
+/// What the manage helper says of a line that is no request.
+pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
+    {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
+    or {\"install_made\": SHA256}";
+
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
-/// `{"refused": WHY}`; true when it was done. The one request taken is
-/// `{"remove": NAME}`, a skill taken off by [`remove`], which checks it
-/// itself, whoever asked: a name that is not a skill's and a core skill are
-/// refused here, not only by the asker (`lamp-cloud`'s `skills.remove`,
-/// #1722). It waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
-/// shorter only in a test) for the folder, then refuses
-/// with [`BUSY`] having done nothing; a skill renamed aside whose old folder
-/// was not deleted is answered done, that folder's path in the journal only.
-/// `{"install_made": SHA256}` puts on a skill made here by voice, from the
-/// voice's made-skills folder `made`, at its person's spoken yes
-/// ([`install_made`]). `install` is not taken: it will be, for a package
-/// from the update channel under its key's signature alone, once the
-/// channel carries skills.
+/// `{"refused": WHY}`; true when it was done. Each is checked here, whoever
+/// asked, not only by the asker (`lamp-cloud`'s `skills.remove` and
+/// `skills.install`, #1722):
+/// - `{"remove": NAME}`, a skill taken off by [`remove`]'s steps: a name
+///   that is not a skill's and a core skill are refused; a skill renamed
+///   aside whose old folder was not deleted is answered done, that
+///   folder's path in the journal only;
+/// - `{"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
+///   VERSION}}`, all but `url` optional (a catalogue entry's fields,
+///   [`Asked`]), a package from the Skills Store installed by
+///   [`install_from_url`]: only
+///   over https, only signed with the update channel's key, never core.
+///   Without a `store`, refused;
+/// - `{"install_made": SHA256}`, a skill made here by voice put on from the
+///   voice's made-skills folder `made`, at its person's spoken yes
+///   ([`install_made`]).
+///
+/// Each waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
+/// shorter only in a test) for the folder, then refuses with [`BUSY`]
+/// having done nothing.
 pub fn asked(
     skills: &Path,
     made: &Path,
     lock_wait: Duration,
+    store: Option<Store<'_>>,
     input: impl Read,
     mut output: impl io::Write,
 ) -> io::Result<bool> {
@@ -1017,7 +1421,8 @@ pub fn asked(
             .filter(|asked| asked.len() == 1)
             .and_then(|asked| asked.get(key))
     };
-    let done = match (only("remove"), only("install")) {
+    let install = only("install").and_then(Asked::from_json);
+    let done = match (only("remove"), install) {
         _ if only("install_made").is_some() => match only("install_made") {
             Some(serde_json::Value::String(sha256)) => {
                 install_made(skills, made, sha256, lock_wait)
@@ -1034,14 +1439,13 @@ pub fn asked(
                 removed_said(name)
             })
         }
-        (_, Some(_)) => Err(
-            "install is not taken here yet: only a package from the update channel, under its key's \
-             signature, will be"
-                .to_owned(),
-        ),
-        _ => Err(
-            "a request is one line, {\"remove\": NAME} or {\"install_made\": SHA256}".to_owned(),
-        ),
+        (_, Some(asked)) => match store {
+            Some(store) => {
+                install_from_url(skills, &asked, &store.key_file, store.channel, lock_wait)
+            }
+            None => Err(STORE_OFF.to_owned()),
+        },
+        _ => Err(NOT_A_REQUEST.to_owned()),
     };
     let answer = match &done {
         Ok(said) => serde_json::json!({ "done": said }),
@@ -1183,6 +1587,33 @@ mod tests {
             ".lamp-skills.lock",
         ] {
             assert!(!left_by_a_run(name), "{name}");
+        }
+    }
+
+    /// Versions are ordered as numbers, part by part (`1.10.0` after
+    /// `1.9.0`); the same is a reinstall; one that can't be ordered is
+    /// refused.
+    #[test]
+    fn a_store_package_is_never_older_than_what_it_replaces() {
+        for (installed, version) in [
+            ("1.0.0", "1.0.0"),
+            ("1.0.0", "1.0.1"),
+            ("1.9.0", "1.10.0"),
+            ("0.9.9", "1.0.0"),
+        ] {
+            assert_eq!(older_refused("tutor", Some(installed), version), None);
+        }
+        for (installed, version) in [
+            ("1.0.1", "1.0.0"),
+            ("1.10.0", "1.9.0"),
+            ("2.0.0", "1.99.99"),
+        ] {
+            let why = older_refused("tutor", Some(installed), version).unwrap();
+            assert!(why.contains("never put back to an older version"), "{why}");
+        }
+        for installed in [None, Some("1.0"), Some("v1.0.0"), Some("01.0.0")] {
+            let why = older_refused("tutor", installed, "1.0.0").unwrap();
+            assert!(why.contains("can't be compared"), "{why}");
         }
     }
 }

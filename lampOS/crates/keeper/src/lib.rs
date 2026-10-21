@@ -8,6 +8,7 @@ mod keep;
 mod notify;
 pub mod package;
 pub mod profile;
+pub mod restart;
 pub mod units;
 
 pub use keep::{Done, Keeper, NAME, PartState, Rules, STATE, VOICE, WINDOW};

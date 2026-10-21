@@ -707,7 +707,11 @@ is found is its home and there is nothing to wake to):
   of 172 at most. 40 is a little under that at its fastest: 580 counts take
   about 22 s, so with the head's wake after it the lamp is up inside 90 s.
   Every step all five are read: a changed status byte, another joint moving
-  more than 30 counts, the shoulder over its `--arm-load` for six steps,
+  more than 30 counts for ten reads in a row (one read off is not taken
+  as a move, and a hold never asks for it), the held head, base or elbow
+  over its own load bound (the run's, `load`: 240, 150, 220 for the head's
+  pitch, roll and the base; the elbow's `--arm-load`) for six steps, the
+  shoulder over its `--arm-load` for six steps,
   more than 160 from its goal for half a second, or stopping farther than
   80 from folded once its goal is there, or a wire failing for half a
   second ends the run, holding all five where they are. The report says
@@ -837,6 +841,10 @@ With `--gaze-socket PATH` and `--gaze YAW,PITCH` the body takes where a face
 is from `lamp-eyes` ([eyes.md](eyes.md)) on that socket: one datagram a look,
 `{"face":{"x":..,"y":..,"size":..,"turned":..}}` or `{"face":null}`. Anything
 else is ignored, and only the newest waiting counts.
+
+Which face that is, is the eyes' choice: the largest near one, or, with
+`LAMP_TURN_TO_ANSWERED=on` in the eyes' unit, the one seen asking while the
+lamp answers it ([eyes.md](eyes.md), "Turning to the one it answers").
 
 A skill's look (`lamp-skills`, "look at the face") comes on the same socket
 in the same shape, and the body cannot tell it from the eyes' own: it is
@@ -2185,7 +2193,12 @@ does: lamp-52e6's base turned 38 counts by a hand on 2026-10-15 read 120,
 under the 220 that bound is. And while a joint that gave way is held, its
 load and tracking are judged over a second instead of 120 ms and half a
 second, since that is what a hand moving or holding it looks like: still
-in the hand a second on, it gives way again where it is. On lamp-52e6 the
+in the hand a second on, it gives way again where it is. Each step that
+still reads the hand (its load over the bound, or the joint moved off where
+it was put) keeps it held at least a second more, so one quiet read in
+between is not the hand gone: on lamp-52e6 on 2026-10-19 a base held gently
+read 172 to 196 with quieter reads between, was sent home into the hand
+every two seconds, and the person felt it stiffen and jerk (#1115). On lamp-52e6 the
 same morning, before this, a hand tilting the head took it 45 counts past
 where it had given way and the run ended on tracking, and the third such
 end in ten minutes left the lamp without a body. Under `--give-way` the
@@ -2264,7 +2277,8 @@ the one `--overload release` makes ("Letting go under overload"):
   floor, or more than 11 counts (about a degree) from where it stopped.
   Then the lamp lets go as under overload: torque off on all five, the
   lamp slumps, nothing is written for 5 s, then every joint is held
-  where it lies and the head and the base are brought home slowly. V1
+  where it lies, a shoulder left up over a fallen elbow is lowered, and
+  the head and the base are brought home slowly, as after an overload. V1
   rested 120 s here too, its `retry_s`, which is for a servo cooling
   from overload; a hand is not heat, and a lamp limp for two minutes
   after a push reads as broken, where a creature pushed hard flops and
@@ -2397,11 +2411,38 @@ under 0.3 s; a hand holding a joint reads 94 to 100%
   to 100 on the way, and one that stops within 50 counts of home is woken
   where it settles, the run then starting from there with its home moved
   by as much (`home` in the report). The wake's record is in `released`
-  (`woke`), not in the start's `woke`. The arm is not lifted by that. It stays where it
-  slumped until a mood or a person in front of the lamp next asks it to
-  stand, and then rises by the ordinary way up from where it is, if that
-  is on the way between folded and stood up; if not, the lamp runs folded
-  and says why (`standing_refused`), as at start.
+  (`woke`), not in the start's `woke`. Before that, a shoulder left up
+  over an elbow that fell folded (how a standing lamp slumps: on
+  lamp-52e6 on 2026-10-16 the elbow fell from 2,595 to 2,080 in the rest
+  and the shoulder stayed at 2,650) is lowered onto its folded count
+  exactly as after a power cut ("Waking"), whether or not `--wake` was
+  given, the head, the base and the elbow held where they lie; `lowered` in the
+  report is then that one. The lamp is then folded: it counts as folded
+  (`standing 0.00` on the bus, no `stand 1.00` in the journal while it is
+  let go or taken up), its head is brought to its folded home, and the
+  next mood other than rest, or a person in front of it, stands it by the
+  ordinary way up with every check that way has. Without this, that run
+  on lamp-52e6 refused to stand for good and sat 15 minutes with its
+  shoulder up and its elbow down, its head pushing at a home that does
+  not fit that arm, until a restart. Every step of this lowering (some
+  22 s) is a step of the run and is watched, so systemd hears from the
+  body each step (`WatchdogSec=5`); at start the same lowering comes
+  before READY=1, when the watchdog is not yet armed. The read of the
+  arm's torque before it, if it fails, is tried again for half a
+  second, as any read of the run. A lowering that fails holds every joint where it is
+  and ends the run, and the whole lamp is then let go (torque off), as at
+  start. A stop asked during this lowering (SIGTERM, some 22 s) does neither:
+  it holds every joint where it is with torque on, the shoulder part way
+  down over a folded elbow, and the next start lowers it the rest of the
+  way (`--wake`, "Waking"). The held joints' loads during it are kept with the
+  run's peaks (`peak_load`, and the elbow's in `arm_peak_load`), so a run
+  shows how near they came to their bounds. After a hand's slump (`--limp on`), a hand that stops it (a load or a tracking), presses the held head, base or elbow over its load bound for as long as the run allows (a load), or moves one more than its tracking bound for as many reads in a row as the run allows (a drift; a single read off is not a hand and is never held to), makes the lamp let
+  go again instead (after an overload the same stop ends the run), and the step that does so writes no goal first: the
+  arm is never sent toward the pose it stood in before the slump. Otherwise the arm is not lifted by that: it stays where
+  it slumped until a mood or a person in front of the lamp next asks it
+  to stand, and then rises by the ordinary way up from where it is, if
+  that is on the way between folded and stood up; if not, the lamp runs
+  folded and says why (`standing_refused`), as at start.
 - **A second time within ten minutes** of the first, it lets go as before
   and the run ends there, torque off (`overload` in the report): a joint
   that keeps fighting should be looked at, not tried again.
