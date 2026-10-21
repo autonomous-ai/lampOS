@@ -27,6 +27,10 @@ struct Script {
     first_event_after: Option<Duration>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
+    /// This sentence's first audio waits for the test to release it.
+    speech_hold: Mutex<Option<(&'static str, tokio::sync::oneshot::Receiver<()>)>>,
+    /// Each sentence whose speech packet is ready, before it is yielded.
+    speech_ready: Option<mpsc::UnboundedSender<String>>,
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
     /// Held by every live stream: dropped streams let go of it.
@@ -186,11 +190,26 @@ impl Services for Script {
         } else {
             0
         };
+        let hold = {
+            let mut held = self.speech_hold.lock().unwrap();
+            if held.as_ref().is_some_and(|(sentence, _)| *sentence == text) {
+                held.take().map(|(_, release)| release)
+            } else {
+                None
+            }
+        };
+        let ready = self.speech_ready.clone();
         stream::once(async move {
+            if let Some(release) = hold {
+                let _ = release.await;
+            }
             tokio::time::sleep(Duration::from_millis(delay)).await;
             if text.contains("FAIL") {
                 Err(net::Error::Status(503))
             } else {
+                if let Some(ready) = ready {
+                    let _ = ready.send(text.clone());
+                }
                 Ok(vec![text.len() as i16; 1_500])
             }
         })
@@ -377,6 +396,170 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
 }
 
 const SAID: usize = ANNOUNCEMENT.len();
+
+#[tokio::test(start_paused = true)]
+async fn a_slow_second_speech_piece_keeps_order_until_release_or_retirement() {
+    for retire in [false, true] {
+        let (mut release, held) = tokio::sync::oneshot::channel();
+        let (ready, mut speech_ready) = mpsc::unbounded_channel();
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [vec![
+                    text("Yes. Let me explain. Third piece."),
+                    Ok(ChatEvent::Done),
+                ]]
+                .into(),
+            ),
+            speech_hold: Mutex::new(Some(("Let me explain.", held))),
+            speech_ready: Some(ready),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false);
+        engine.submit(written(1, "Explain in three pieces."));
+
+        let mut events = Vec::new();
+        // The first packet must be delivered without releasing the second.
+        // This is the paused runtime's clock, not an acoustic latency limit.
+        tokio::time::timeout(Duration::from_millis(50), async {
+            loop {
+                let event = engine.next().await;
+                let waiting_for_second = matches!(
+                    &event,
+                    ProviderOutput::Transcript { request: Some(1), text, finished: false }
+                        if text == " Let me explain."
+                );
+                events.push(event);
+                if waiting_for_second {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("the first piece is delivered while the second is held");
+        let first_samples: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                ProviderOutput::Audio { samples, .. } => Some(samples.as_slice()),
+                _ => None,
+            })
+            .flatten()
+            .copied()
+            .collect();
+        assert_eq!(first_samples, vec![4; 1_500]);
+
+        // The third packet really is ready; absence of output below is not
+        // explained by another slow service or by serial speech requests.
+        let mut ready = Vec::new();
+        for _ in 0..2 {
+            ready.push(
+                tokio::time::timeout(Duration::from_millis(50), speech_ready.recv())
+                    .await
+                    .expect("the first and third pieces are ready")
+                    .unwrap(),
+            );
+        }
+        ready.sort();
+        assert_eq!(ready, ["Third piece.", "Yes."]);
+        assert!(script.speech_hold.lock().unwrap().is_none());
+        assert!(!release.is_closed());
+        // Match the reported slow piece's scale without waiting in real
+        // time. Neither later audio/text nor either completion may pass it.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(2_970), engine.next())
+                .await
+                .is_err(),
+            "a ready third piece and completion must wait for the second"
+        );
+
+        if retire {
+            engine.retire_through(1);
+            tokio::time::timeout(Duration::from_millis(50), release.closed())
+                .await
+                .expect("retirement drops the held speech stream");
+            assert!(release.send(()).is_err());
+            assert!(engine.try_output().is_none());
+            assert!(matches!(
+                speech_ready.try_recv(),
+                Err(mpsc::error::TryRecvError::Empty)
+            ));
+            continue;
+        }
+
+        release.send(()).unwrap();
+        loop {
+            let event = tokio::time::timeout(Duration::from_millis(50), engine.next())
+                .await
+                .expect("release completes the second and third pieces");
+            let complete = matches!(&event, ProviderOutput::TurnComplete { .. });
+            events.push(event);
+            if complete {
+                break;
+            }
+        }
+        assert_eq!(speech_ready.try_recv().unwrap(), "Let me explain.");
+        assert!(matches!(
+            speech_ready.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+
+        let mut sequence = 0;
+        let labels: Vec<_> = events
+            .into_iter()
+            .map(|event| match event {
+                ProviderOutput::Started { request: 1, .. } => "started".to_owned(),
+                ProviderOutput::Transcript {
+                    request: Some(1),
+                    text,
+                    finished,
+                } => {
+                    format!("said:{finished}:{text}")
+                }
+                ProviderOutput::Audio {
+                    request: 1,
+                    sequence: actual,
+                    samples,
+                    source_frames,
+                    source_offset,
+                    ..
+                } => {
+                    sequence += 1;
+                    assert_eq!(actual, sequence);
+                    assert_eq!((source_frames, source_offset), (samples.len(), 0));
+                    assert!(samples.iter().all(|sample| *sample == samples[0]));
+                    format!("audio:{}:{}", samples[0], samples.len())
+                }
+                ProviderOutput::GenerationComplete { request: 1 } => "generated".into(),
+                ProviderOutput::Stages { .. } => "stages".into(),
+                ProviderOutput::TurnComplete {
+                    request: 1,
+                    idle: true,
+                } => "complete".into(),
+                other => panic!("unexpected output: {other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            labels,
+            [
+                "started",
+                "said:false:Yes.",
+                "audio:4:960",
+                "audio:4:540",
+                "said:false: Let me explain.",
+                "audio:15:960",
+                "audio:15:540",
+                "said:false: Third piece.",
+                "audio:12:960",
+                "audio:12:540",
+                "said:true:",
+                "generated",
+                "stages",
+                "complete",
+            ]
+        );
+        assert!(engine.try_output().is_none());
+    }
+}
 
 #[tokio::test]
 async fn a_spoken_turn_is_heard_then_said_sentence_by_sentence_in_order() {
