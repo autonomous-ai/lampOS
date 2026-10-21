@@ -6,9 +6,9 @@ software only when the first builder copied binaries to it over SSH from
 the office Mac (`~/lamp-4ace-v2-deploy-20261012/*_deploy.sh`). This is the
 simplest version that works end to end ("wide first, deep later"):
 
-- CI signs and publishes every tested build of `lamp-voice` as a GitHub
-  release (a proposal below: the workflow is the first builder's, and the
-  key is the owner's to make).
+- CI can sign and publish a tested push of `lamp-voice` as a GitHub
+  release. Publication is disabled until the owner supplies the real key
+  and explicitly enables the workflow below.
 - `lamp-update` (`crates/update`), its own process with its own unit and
   records, learns of a newer build, fetches what changed, checks the
   signature and every SHA-256, installs each part beside the old one,
@@ -79,132 +79,267 @@ and a new one only gets its name once it is whole.
   It stays the deeper design: once updates work end to end, its pieces can
   replace these one at a time.
 
-## Publishing (a proposal)
+## Publishing (built; activation is the owner's)
 
-**A GitHub release for every tested build of `lamp-voice`, and one release
-that is the channel's head.**
+`.github/workflows/lampos-arm64.yml` has a `publish` job after the successful
+`arm64` job. It uses `.github/scripts/lampos-publish.py` and the tested
+artifact's own `lamp-update manifest`, `public-key`, `sign` and `check`.
+There is no second updater or signing implementation. Publication is **off
+by default**: the helper requires repository variable
+**`LAMPOS_UPDATE_PUBLISH` to be exactly lowercase `on`**. Only a push to
+`autonomous-ai/lampOS`'s `lamp-voice` can publish; pull requests and manual
+runs cannot. [Actions string comparisons ignore case](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#operators),
+so `ON` can enter the cold-build and protected publication job paths, but
+the helper rejects it before executing an artifact binary.
 
-- After the ARM64 job has built and tested a push of `lamp-voice`, a second
-  job makes a manifest of every `lamp-*` binary (with its SHA-256 and size,
-  checked against CI's `SHA256SUMS`), every unit of every lamp's own
-  folder (`deploy/<lamp>/`, a folder with a `LAMP.md`), and the product
-  skills (`--skills lampOS/skills`, below: "The product's skills"), signs it,
-  and publishes the binaries, the units (as `<lamp>.<unit>`), the product
-  skills (`lamp-product-skills`), the manifest and the signed envelope as
-  release `lampos-lamp-voice-<run number>`: a
-  prerelease, never "Latest", which this repository's other releases use.
-- It then replaces the one asset of release `lampos-lamp-voice`, the
-  channel's head: `lampos-manifest.json`, the signed envelope of that
-  newest build. A lamp polls only that file, every 15 minutes:
-  `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/lampos-manifest.json`.
-  It answers with a redirect, as every release download does; neither the
-  API, its hourly limit nor a token is involved. One file, so the manifest and its
-  signature are never read from two builds; while it is being replaced a
-  lamp may find nothing, and nothing changes.
-- The sequence is the workflow's run number, which only goes up. A lamp
-  takes a build only if its sequence is greater than the one it runs.
-- `min_updater` (#1680), when set, is the oldest updater that can apply the
-  build. It's a level, `manifest::UPDATER` in `lamp-update` (5 now: 2 reads
-  `models`, 3 reads `settings`, 4 reads `image`, and 5 reads `reset_plan`),
-  raised whenever the updater learns to apply something an older one can't. It
-  isn't the sequence, because a binary doesn't know its CI run number. It
-  sits in the manifest's signed bytes like every other field. Left out
-  (`lamp-update manifest` without `--min-updater`), it isn't written, and
-  the manifest is byte for byte what an updater before the field reads.
-  `lamp-update manifest --min-updater N` refuses a build that carries no
-  `lamp-update`, and an `N` above its own `UPDATER`, which is the carried
-  updater's level because the build's own `lamp-update` makes the manifest.
-  So a channel never names an updater no lamp could reach.
-- The signature: Ed25519 over the manifest's exact bytes, with `ring`
-  0.17.14, which the workspace already has through rustls (no new crate
-  is fetched; `base64` 0.22.1 is already there through lamp-gemini and
-  lamp-expression).
-- The key: made once by the owner, off the repository, never by a builder:
-  `openssl genpkey -algorithm ed25519 -outform DER | base64`. That one line
-  is the repository secret **`LAMPOS_UPDATE_KEY`**. Its public half,
-  `lamp-update public-key --key-file FILE`, goes to each lamp at setup as
-  `/etc/lampOS/update/key.pub`. Nothing in the repository holds either.
-- Why not the alternatives: CI's artifacts need a token, are zipped and
-  last a week. A moving release with the binaries in it would let a lamp
-  read a manifest of one build and a binary of the next. TUF (above) is
-  the deeper design. Whole-image A/B updates (RAUC) wait for the board's
-  boot and partitions to be qualified.
-- What it costs: about 147 MB of assets for each push of `lamp-voice`
-  (31 binaries; run 144 of 2026-10-14). The prune step below keeps the
-  newest 30 builds.
+### The build and its identity
 
-The proposed job, for `.github/workflows/lampos-arm64.yml` (not changed by
-this task):
+- The job checks out that run's `github.sha` and downloads
+  `lampos-arm64-<github.sha>` from the same run. No artifact from another
+  run, branch, pull request or manual input is accepted. The manifest's
+  commit is that SHA and its sequence is `github.run_number`.
+- A run eligible to publish under that exact event/ref/repository/variable
+  gate builds cold: it skips cache restore and the step that restores
+  cached source times. A separate step first refuses an existing
+  `lampOS/target`, including a dangling symlink, then runs the unchanged
+  source-times helper against the absent target. This only records fresh
+  checkout times for the cache saved afterward; it cannot reuse a cached
+  binary or timestamp record. The save keeps the upstream commit-keyed
+  policy, with the same explicit key when restore produced no output.
+  Pull requests, manual runs and publication-disabled pushes keep their
+  existing cached behavior. This cold build is the reviewable default for
+  signing candidates, not an activation or an owner configuration change;
+  its extra compilation time belongs in the publication cadence decision.
+- Artifact packaging uses the current workspace's `cargo metadata` and
+  successful build's JSON `compiler-artifact` records, never a glob over
+  the restored target cache. Every current `lamp-*` binary target and both
+  selected examples must have a matching record and a nonempty, executable
+  regular file at its expected release path. Missing targets, duplicate or
+  conflicting export paths, and incomplete build logs refuse packaging.
+  Cargo's `fresh: true` record is an intentional validated cache hit for a
+  current target; an unrelated cached executable has no such record and is
+  excluded. A future feature-gated binary must be enabled in this build or
+  packaging fails rather than using an older executable with its name.
+- The example asset `schedule_check` belongs to `lamp-schedule`, and
+  `replay_cost` explicitly belongs to `lamp-expression` (the planner-cost
+  tool documented in [expression.md](expression.md)). Both are built into
+  `target/lampos-artifact-examples`, with separate successful build records.
+  The workspace still builds the controls example also named `replay_cost`;
+  its shared output cannot supply the CI artifact. The exporter creates
+  a new artifact directory and hashes every copied file, so a retired or
+  renamed cached binary cannot acquire a checksum under the current SHA.
+  After artifact export/upload and before cache save, the job discards
+  only `lampOS/target/lampos-artifact-examples`, under the same condition
+  as cache save. The retained CI artifact remains complete, including both
+  examples and their checksums. The isolated example target therefore
+  rebuilds on later runs; it no longer increases the saved cache's size.
+- Before executing the artifact, the helper requires a flat, regular-file
+  inventory and a complete `SHA256SUMS`: no missing, extra, duplicate or
+  mismatched file. This includes development binaries and CI examples
+  that will not be published: an excluded file with a bad checksum still
+  refuses the run before any artifact executable can run.
+- The helper then strictly reads the same checkout's
+  [`deploy/package-binaries.json`](../deploy/package-binaries.json), from
+  [#2481](https://github.com/autonomous-ai/lampOS/pull/2481). It requires
+  the four named lists, safe binary names, no duplicate membership and a
+  classification for every artifact binary. Malformed JSON, unknown
+  groups or a missing classification refuse publication; the `_comment`
+  field cannot classify a binary. Listed optional tools absent from the
+  artifact need not be published. Only `core`, `optional` and
+  `provisioning` binaries are copied into private staging; `development`
+  and both CI examples are excluded. The provisioning tools remain
+  because the updater carries `lamp-body-measure` and `lamp-body-mood`
+  beside Body when present. This is the packager's existing classification,
+  not a second binary list. CI also retains its classification check
+  immediately after the workspace build.
+- Staging gets a new `SHA256SUMS` covering exactly those retained binaries.
+  Every copied binary is checked against its original verified hash before
+  `lamp-update`'s private copy is made executable. The original CI artifact,
+  its full checksum list and its modes remain unchanged. The existing
+  manifest command includes the retained binaries, product skills
+  (`--skills lampOS/skills`, below), and supported units in each
+  `deploy/<lamp>/` folder with a `LAMP.md`. Units are named `<lamp>.<unit>`
+  and skills `lamp-product-skills`. These come from the same checkout;
+  binaries are never rebuilt in the publication job.
+- The immutable prerelease is `lampos-lamp-voice-<run number>`, targeted at
+  the exact SHA and never marked Latest. It contains those retained
+  binaries and their regenerated `SHA256SUMS`, generated units/skills,
+  `manifest.json` and `lampos-manifest.json`. Development binaries and
+  examples enter neither the manifest nor the release. Every release
+  checksum has its target; generated units and skills are covered by the
+  signed manifest. All manifest hashes and sizes must match the staged files,
+  and every uploaded asset is downloaded and hashed again before the
+  channel can change. Missing or extra assets refuse promotion.
+- An existing immutable tag or release refuses the run, including a retry
+  after a partial upload. Nothing overwrites or prunes releases, tags or
+  retained envelopes. An owner inspects an incomplete release before
+  deciding how to recover; a newer push gets a new sequence.
 
-```yaml
-  publish:
-    name: lampOS — sign and publish lamp-voice's build for the lamps
-    needs: arm64
-    if: github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
-    runs-on: ubuntu-22.04-arm
-    timeout-minutes: 20
-    permissions:
-      contents: write
-    concurrency:
-      group: lampos-publish-lamp-voice
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            lampOS/deploy
-            lampOS/skills
-      - uses: actions/download-artifact@v4
-        with:
-          name: lampos-arm64-${{ github.sha }}
-          path: build
-      - name: manifest
-        run: |
-          chmod +x build/lamp-*
-          build/lamp-update manifest --binaries build --deploy lampOS/deploy --skills lampOS/skills \
-            --channel lamp-voice --sequence ${{ github.run_number }} --commit ${{ github.sha }} \
-            --files-url "https://github.com/${{ github.repository }}/releases/download/lampos-lamp-voice-${{ github.run_number }}/"
-      - name: sign
-        env:
-          LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
-        run: |
-          test -n "$LAMPOS_UPDATE_KEY" || { echo "LAMPOS_UPDATE_KEY is not set: nothing is published"; exit 1; }
-          umask 077
-          printf '%s\n' "$LAMPOS_UPDATE_KEY" > "$RUNNER_TEMP/update.key"
-          build/lamp-update sign --key-file "$RUNNER_TEMP/update.key" \
-            --manifest build/manifest.json --out build/lampos-manifest.json
-          rm -f "$RUNNER_TEMP/update.key"
-      - name: publish the build, then make it the channel's head
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          tag="lampos-lamp-voice-${{ github.run_number }}"
-          gh release create "$tag" --repo "$REPO" --target "${{ github.sha }}" \
-            --title "lampOS lamp-voice build ${{ github.run_number }}" \
-            --notes "Built and tested from ${{ github.sha }}. Lamps take it through lampos-lamp-voice (lampOS/docs/updates.md)." \
-            --prerelease --latest=false \
-            build/lamp-* build/manifest.json build/lampos-manifest.json build/SHA256SUMS
-          gh release view lampos-lamp-voice --repo "$REPO" >/dev/null 2>&1 ||
-            gh release create lampos-lamp-voice --repo "$REPO" --target "${{ github.sha }}" \
-              --title "lampOS lamp-voice: the newest build" \
-              --notes "The signed manifest of the newest build of lamp-voice (lampOS/docs/updates.md)." \
-              --prerelease --latest=false
-          gh release upload lampos-lamp-voice build/lampos-manifest.json --repo "$REPO" --clobber
-      - name: keep the newest 30 builds
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          gh release list --repo "$REPO" --limit 300 --json tagName -q '.[].tagName' |
-            grep -E '^lampos-lamp-voice-[0-9]+$' | sort -t- -k4 -n | head -n -30 |
-            xargs -r -n1 gh release delete --repo "$REPO" --cleanup-tag --yes
-```
+### Cadence, storage and retention
 
-`build/lamp-*` takes the binaries, the units and the product skills together
-(each unit asset begins with its lamp's name). Artifacts lose the files' modes, hence the
-`chmod`. A re-run of the same run has the same run number, its tag exists
-and the job fails without moving the head.
+Once enabled, each successful eligible `lamp-voice` push attempts a new
+release; there is no nightly batching or rollout percentage. The default
+900-second poll observes the latest signed channel head, so a lamp can
+skip intermediate builds. Applying still depends on its apply switches,
+installed parts, quiet period and refusal/rollback checks; publication
+does not promise that every lamp installs each merge within 15 minutes.
+
+The Actions artifact expires after **seven days**. Immutable GitHub build
+releases, tags, retained previous envelopes and incomplete uploads have
+**no automatic expiry or pruning** here. The publisher lists the release
+history on each attempt, so API work also grows with retained history.
+Before activation, the owner must choose an acceptable cadence and a
+separate retention/cleanup policy. This change enables neither cleanup
+nor publication, and it does not implement the earlier proposed 30-build
+retention limit.
+
+For a measured size baseline, [ARM64 run 39543873384](https://github.com/autonomous-ai/lampOS/actions/runs/39543873384)
+at `f41a24c185` produced 49 CI files: **300,709,350 bytes** uncompressed,
+**111,046,340 bytes** in the downloaded archive. Applying the merged
+classification to that inventory retains **30 binaries totaling
+214,974,504 bytes** (about 215 MB), omitting 16 development binaries and
+two examples. That retained binary total excludes regenerated checksums,
+units, skills and signed manifests; it is **not a complete release size**.
+At 20–40 publications per day with that binary payload, retained binaries
+alone add about **4.3–8.6 GB per day**, or **129–258 GB over 30 days**,
+before those generated assets and envelope history. Actual totals must
+be measured on the build selected for activation; the public host record
+keeps the measured inventory identity.
+
+### The key and verified channel
+
+The job names the GitHub environment **`lampos-update-publish`**. Before
+provisioning the real key, the owner must create and protect that
+environment: choose **Selected branches and tags**, add a **Branch** rule
+for exactly **`lamp-voice`**, and allow no tag, wildcard or pull-request-ref
+rule. Store the key only as that environment's **`LAMPOS_UPDATE_KEY`**
+secret, with no repository or organization secret copy. A repository-wide
+secret would be available to other workflows on builder branches. The
+owner may also require their approval for each deployment through the
+environment's required-reviewer policy. The workflow does not create
+these protection rules; GitHub can automatically create an environment
+without them when a job references a missing name. Keep publication off
+until the owner has verified the environment's configuration. See
+[GitHub's environment setup](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+
+The owner makes the real Ed25519 PKCS#8 key outside the repository, puts
+its base64 form in that environment secret, and provisions its public
+half (`lamp-update public-key --key-file FILE`) to lamps as
+`/etc/lampOS/update/key.pub`. Keep **`LAMPOS_UPDATE_PUBLISH` as a repository
+variable**: the build and publication gates must decide before the
+environment starts. This PR provisions no environment, secret or variable.
+
+Within this workflow, only the gated publication step references the
+environment secret. The helper writes it outside the upload folder in a
+0600 temporary file, removes it in `finally` after signing, and excludes it
+from child-process environments and command arguments. Each child command
+has a 600-second timeout. Command timeouts and handled `SIGINT`/`SIGTERM`
+unwind through the same cleanup, but cancellation can interrupt cleanup
+before it finishes. `SIGKILL` or a lost runner cannot execute it, so the
+ephemeral runner's disposal remains the final boundary. No real key is
+created or included here.
+
+Signing and verification use the existing `lampos-update/1` envelope:
+Ed25519 over the exact manifest bytes, schema 1. The helper verifies both
+its candidate and the existing head with the artifact's `lamp-update
+check --apply off`, using a local file channel, the derived public key and
+a disposable root. It seeds only that scratch root with the decoded
+sequence: the updater checks the signature, schema and channel **before**
+its installed-sequence equality shortcut. The helper requires the exact
+`up to date: build N` result and an unchanged root, including file bytes,
+modes, directories and symlink targets. No lamp, bus, unit or
+manifest-named download is involved in this verification.
+
+The channel release is `lampos-lamp-voice`. Its canonical asset remains
+`lampos-manifest.json`, polled by lamps every 15 minutes at
+`https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/lampos-manifest.json`.
+A public release download needs no lamp token. The signed `files_url`
+points to the immutable build release, so an envelope cannot pick up a
+later build's binary.
+
+A successful release/tag listing must establish the channel's state;
+authentication, network, malformed API responses and unverifiable heads
+all refuse publication. A missing channel requires the separate explicit
+repository variable **`LAMPOS_UPDATE_BOOTSTRAP=on`**. Set it only for the
+first channel, then turn it off. An existing tag without a release or a
+release without its canonical envelope requires owner repair, even with
+bootstrap enabled. Before activation, the owner must also check that the
+workflow run-number namespace is greater than sequences already installed
+on the intended lamps, including local trial sequences; this job cannot
+infer device state. Renaming/replacing the workflow or resetting its
+sequence namespace requires the same review.
+
+For an existing verified head, the candidate sequence must be strictly
+greater. The helper rechecks the head after the immutable upload and again
+before promotion. A shared concurrency group prevents two instances of
+this job from promoting together; the sequence guard is still necessary
+because [Actions concurrency ordering](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+is not build order. Other publishers must remain disabled; GitHub offers
+no compare-and-swap operation across release assets.
+
+### Promotion and recovery
+
+The helper uploads the candidate envelope under the unique name
+`lampos-manifest-staged-<run number>.json` on the channel release, then
+downloads and hashes it. Preparation, immutable-build upload and staging
+failures leave an existing canonical head untouched. It never uses
+[`gh release upload --clobber`](https://cli.github.com/manual/gh_release_upload),
+which can remove the old asset before a failed replacement upload.
+
+After staging succeeds, [release-asset rename](https://docs.github.com/en/rest/releases/assets#update-a-release-asset)
+retains the previous canonical asset as
+`lampos-manifest-previous-<run number>-<asset ID>.json`, then renames the
+candidate to `lampos-manifest.json` and downloads/verifies the new head.
+**The two renames are not atomic.** A lamp may briefly find no canonical
+envelope and leave its build unchanged. A promotion or confirmation
+failure attempts to put the retained previous asset back, including when
+an API response was lost after a rename actually happened. If restoration
+also fails, the job fails with the release and retained asset IDs for
+owner repair. An interrupted or externally changed channel can therefore
+remain without a canonical envelope; the helper does not claim an atomic
+replacement or guaranteed recovery from a lost runner. The old bytes are
+retained and no automatic deletion follows.
+
+`min_updater` remains a signed level, not the build sequence:
+`manifest::UPDATER` is 5 (2 reads models, 3 settings, 4 image, 5 reset plans).
+This workflow uses ordinary part/skill manifests, without model, settings,
+image or reset-plan inputs, and does not enable any lamp extension switch. The existing
+manifest CLI can specify `--min-updater N`; it refuses a level above the
+carried updater or a build without `lamp-update`.
+
+### Verification and ownership
+
+The workflow runs `.github/scripts/lampos-publish-test.py` with all
+external commands simulated, and `.github/scripts/lampos-publish-cli-test.py`
+against the just-built updater with a disposable test key, local files
+and simulated GitHub. These cover checksums, upload inventory/readback,
+sequence races, refusal paths, both promotion renames and failed
+restoration; the CLI rehearsal checks the actual publisher/verification
+contract. They do not publish or use the real secret.
+
+`.github/scripts/lampos-publish-artifact-test.py` also checks the artifact
+inventory and checksum coverage. Its real offline Cargo regression builds
+a binary, renames its current target while keeping the retired executable
+in the cache, and proves the old file is excluded. It also checks current
+`fresh: true` cache hits and the selected example's separate build output.
+
+The [21 October host record](verification/update-release-host-20261021.json)
+records the simulated failure tests, real updater CLI tests, and the
+artifact provenance checks passing, plus the exact-checkout updater,
+workflow lint and syntax checks. It preserves
+commands and log hashes; native ARM64 results qualify their published head
+separately.
+
+This delivers #1812's host workflow and documentation scope under the
+[lead's direction](https://github.com/autonomous-ai/lampOS/issues/1812#issuecomment-6305700703).
+The owner decides when to provision the real key, resolve the sequence
+namespace and bootstrap choice, and activate publication. Migrate owns the
+wider update path afterward; the separate Tests/Migrate whole-lamp row
+remains theirs. Local test-key part updates and updater-only self-recovery
+shown below do not prove real-key internet delivery or an attended body
+switch. Those lamp acceptance runs and restoration remain coordinated
+with the lamp's owner after activation. No such run was performed by this
+workflow change.
 
 ## On the lamp
 
@@ -720,7 +855,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 4. A manifest
+before the field climbs first. The current `UPDATER` is 5. A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -796,8 +931,10 @@ A build can carry the product's settings and tmpfiles (`apply.rs`,
 (`install::SETTINGS` and `lampos.conf`, `install::product_settings`), but
 for the product skills' files under `/var/lib/lampOS/skills/`: those are
 `lamp-product-skills`', placed by the round and judged by the skills
-guard, so one file never has two writers at the switch. It also raises
-`min_updater` to 3 (`manifest::SETTINGS_UPDATER`). The current `UPDATER` is 4.
+guard, so one file never has two writers at the switch. Settings alone need
+`min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
+the reset plan described below and therefore raises the floor to 5
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 5.
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -1438,8 +1575,9 @@ test does (#1512):
   [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s acceptance
   checks. That issue records the owner's deferral of publishing and the
   real key until about 20 November; the local trials do not complete them.
-- CI publishing: the job above remains a proposal. Test keys used by the
-  lamp trials are not the real signing key.
+- Real CI publication: the job above is implemented but disabled until
+  the owner activates it. Offline rehearsal and the lamp trials use test
+  keys; neither is evidence of a release signed with the real key.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
