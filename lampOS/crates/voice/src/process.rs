@@ -1288,6 +1288,9 @@ fn second_route_worker_environment(
         crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
+        // Read by the speech-to-text stream in this worker (#2527): without
+        // it here the worker never saw the switch (lamp-c0a4's A/B).
+        crate::second_provider::net::QUIET_HELD_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
@@ -1757,6 +1760,7 @@ mod tests {
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
@@ -1883,6 +1887,7 @@ mod tests {
                     "LAMP_SECOND_MEMORY_HITS=on",
                     "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_PREPARED=on",
+                    "LAMP_SECOND_QUIET_HELD=on",
                     "LAMP_SECOND_SAID_ONCE=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SKILL_LOOK=on",
