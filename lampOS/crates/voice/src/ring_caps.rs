@@ -262,6 +262,23 @@ mod tests {
         assert_eq!(caps.ceiling(0, WALL), 0);
     }
 
+    /// Actions holding its caps back (a store from a later build) publishes
+    /// an empty snapshot at revision 0 each second. A ring that starts with
+    /// it takes the product's ceiling, not dark. A ring still holding a later
+    /// revision keeps it until its caps expire by wall time (Jarvis and the
+    /// reviewer on #2434).
+    #[test]
+    fn a_held_back_empty_snapshot_lights_a_starting_ring_and_leaves_a_running_one() {
+        let mut starting = Caps::new(HOST);
+        assert!(starting.accept(&message(&snapshot(0, 1, 100, None)), 100, WALL));
+        assert_eq!(starting.ceiling(120, WALL), 120);
+        let mut running = Caps::new(HOST);
+        assert!(running.accept(&message(&snapshot(3, 1, 100, Some(12))), 100, WALL));
+        assert!(!running.accept(&message(&snapshot(0, 2, 200, None)), 200, WALL));
+        assert_eq!(running.ceiling(120, WALL), 12);
+        assert_eq!(running.ceiling(120, WALL + 60_000), 120);
+    }
+
     #[test]
     fn invalid_stale_future_and_mismatched_snapshots_never_loosen() {
         let mut caps = Caps::new(HOST);

@@ -332,8 +332,13 @@ revision. Wrong identities, stale or future observations, lower revisions,
 and conflicting equal revisions cannot loosen a limit. Failed intake stays
 on the enabled, dark path rather than reverting to unrestricted output.
 When Actions holds its caps back because their store is from a later build
-(`actions.md`), it still publishes an empty snapshot each second, so the
-ring takes the product's ceiling rather than staying dark.
+(`actions.md`), it still publishes an empty snapshot each second, so a ring
+that starts with it takes the product's ceiling rather than staying dark.
+That isn't a failed intake: the snapshot is valid, and the caps are off for
+as long as that build runs, which can be days if an update stays put back.
+A ring dark all that time would be worse than one without night limits, and
+Actions' health says why. A ring still running from before keeps its last
+snapshot until those caps expire.
 
 The ring retains an accepted snapshot through bus silence. Initialized wall
 time can expire an individual cap. Unknown or implausible wall time, a cached

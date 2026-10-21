@@ -306,17 +306,22 @@ The existing Schedule store commits the complete cap state before success.
 Added fields in schema 1 are tolerated; unknown enum values, unsupported
 schemas and invalid state are preserved and refused. A store from a later
 build (a higher `schema`, as after an update is put back) is kept as it is
-and the caps are held back for that run: Actions starts and serves, says
-so in one journal line, and its health is a warning naming why. It still
-publishes an empty snapshot on `output/caps` each second, never committed,
-so the ring takes the product's ceiling and isn't left dark. No ceiling is
-applied, so the mixer stays where it was, and every cap request is refused
-with code `held_back`. It never starts fresh caps over a later build's
-store (#1505; the first builder and Jarvis, 21 Oct). A later build's
-database container (a higher `user_version`) is set aside by the store
-itself, and the caps then begin empty: health warns, naming the kept file,
-while it is there, as Schedule does. Any other store it can't read still
-stops the start. A storage error makes
+and the caps are held back while this build runs. Actions decides it at
+every start, so a build that was put back holds them back on each start
+until an update brings one that reads the store, which can be days. Actions
+starts and serves, says so in one journal line, and its health is a warning
+naming why. It still publishes an empty snapshot (revision 0) on
+`output/caps` each second, never committed, so a ring that starts with it
+takes the product's ceiling and isn't left dark. A ring still running from
+before keeps its last snapshot until those caps expire by wall time, since a
+lower revision can't loosen it. No ceiling is applied, so the mixer stays
+where it was, and every cap request is refused with code `held_back`. It
+never starts fresh caps over a later build's store (#1505; the first builder
+and Jarvis, 21 Oct). A later build's database container (a higher
+`user_version`) is set aside by the store itself, and the caps then begin
+empty: health warns, naming the kept file, until the next start. Actions
+looks for it once, at start, where Schedule looks on each report. Any other
+store it can't read still stops the start. A storage error makes
 later snapshots unavailable until reopen. Initialized time means 2020–2099;
 it is a sanity check, not proof of synchronization. Unknown time retains
 restored restrictions and refuses new caps; an explicit token removal works.
