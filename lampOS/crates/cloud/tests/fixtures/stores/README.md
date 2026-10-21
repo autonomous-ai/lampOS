@@ -1,0 +1,27 @@
+# Stores as earlier builds wrote them
+
+Each `reports-<day>/` here is the reports' records as the builds of its day
+wrote them:
+
+- `setup.json`: setup's answer (`/etc/lampOS/setup/reports.json`), written by
+  lamp-setup's ignored `write_a_reports_answer_fixture`
+  (`LAMP_SETUP_REPORTS_FIXTURE`, `crates/setup/tests/it/serve.rs`);
+- `own.json`: lamp-cloud's own record of the person's choice, a yes from the
+  app;
+- `queue/`: the queue's `state.json` and one crash waiting, `1.json`;
+- `exits/`: the unit's exit note the crash was taken from, as `exit-note`
+  writes it in `/run/lampos-exits`, which an update keeps (a reboot doesn't).
+
+The last three come from `src/reports.rs`'s ignored `write_a_reports_fixture`
+(`LAMP_CLOUD_REPORTS_FIXTURE`), which takes the crash as a lamp does: from the
+exit note, through `new_notes`. Every later build must read each folder as it
+was kept, as `src/reports.rs`'s
+`each_kept_reports_record_reads_as_it_was_kept` checks: the yes stands, with
+who gave it, the crash waits to be sent, nothing set aside, and the note isn't
+taken again in the same boot. So an update never turns a person's reports
+off, drops what waits or sends a crash twice. The device, build and crash are
+made up.
+
+- **Never edit or delete one.** Each records what a lamp may still hold.
+- **When a record's shape changes,** write the new day's folder with both
+  writers, add it to the test's list, and keep the old ones.
