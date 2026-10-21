@@ -359,3 +359,12 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - **P3s:** the stop restore is one radio try in practice; a confirm with an id is refused when the set had none.
   - The first builder agreed (03:15) and asked El to fold it.
 - **#2675:** lamp-voice moved twice and conflicted, each time on the played README's list of scripts. Rebased as `1a0d2e9cb`; the range-diff is that hunk only. Gates are clean and CI is running.
+
+## 22 Oct, 03:4x–04:1x: #2686 re-read; part 2 merged
+
+- **#2686:** El folded the P2 (`reload` after any `hold` error and when the old network never came back, tries 1 s apart, a part-way-failure test) and both P3s, as `3718dabf34`. My re-read found no new finding.
+- **#2675 (2c)** merged as `8826f0bf2`, on the first builder's word after one more rebase (`cc33e1ea1`, `=`; #2649, #2686 and #2725 had touched the second route's code). **#2530 part 2 is in:** 2a `849c0829f`, 2b `97ce33ce3`, 2c `8826f0bf2`, all switches off.
+- **Open, for the morning:**
+  - `addon-say.sh` on 4ace (the first builder's);
+  - the full path on 75c9 with `blue-lamp2.sh`, on lamp-voice's ARM64 build of `8826f0bf2`;
+  - #2640's light-set-off case, which needs my person's yes.
