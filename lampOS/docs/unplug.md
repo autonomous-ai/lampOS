@@ -65,7 +65,12 @@ power. An ordinary bedtime request belongs to the bedtime skill.
    `LAMP_UNPLUG=on` (and no other worker), as it does each worker's switches.
    There is no second ring writer and no synthetic privacy/mute event.
 6. Skills requires all three fresh, matching receipts before asking Voice for
-   “My arm is folded. You can unplug me now.” The request carries
+   the skill's `ready` line, “My arm is folded. You can unplug me now.”
+   Every line it says is the skill's own, in `skills/prepare-unplug/skill.toml`'s
+   `[unplug]` (`ready`, `failed`, `stay`, `timeout`, `check`), read only
+   with its core grant (#940, the first move of "Everything is a skill",
+   21 Oct). A file from before `[unplug]` says the words lamp-skills kept
+   before, for this release only, and the journal says so. The request carries
    `unplug_request`; Voice keeps that completion guard while the reply is
    queued or under way. An ordinary tool answer or an old asleep frame is
    never readiness. Privacy, playback ownership and the voice's own gates
