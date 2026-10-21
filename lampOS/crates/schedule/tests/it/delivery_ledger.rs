@@ -1455,8 +1455,12 @@ fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
             .map(|entry| entry["view"].clone())
             .collect();
         assert_eq!(
-            serde_json::to_value(&views).unwrap(),
-            Value::Array(kept_views),
+            missing(
+                &Value::Array(kept_views),
+                &serde_json::to_value(&views).unwrap(),
+                "entries",
+            ),
+            None,
             "{day}"
         );
         let stages: Vec<(bool, bool)> = views
@@ -1475,6 +1479,31 @@ fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
                 .is_some(),
             "{day}"
         );
+    }
+}
+
+/// The first thing a kept record holds that `read` doesn't: a key of an
+/// object missing or different, by its path, an array of another length, or
+/// another value. A key `read` has beyond the kept one is a later build's
+/// addition, and passes: a kept day's test is never edited (#1505; the
+/// reviewer on #2486).
+fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Option<String> {
+    use serde_json::Value;
+    match (kept, read) {
+        (Value::Object(kept), Value::Object(read)) => kept.iter().find_map(|(key, value)| {
+            let path = format!("{path}.{key}");
+            match read.get(key) {
+                Some(got) => missing(value, got, &path),
+                None => Some(format!("{path}: not read")),
+            }
+        }),
+        (Value::Array(kept), Value::Array(read)) if kept.len() == read.len() => kept
+            .iter()
+            .zip(read)
+            .enumerate()
+            .find_map(|(i, (value, got))| missing(value, got, &format!("{path}[{i}]"))),
+        _ if kept == read => None,
+        _ => Some(format!("{path}: kept {kept}, read {read}")),
     }
 }
 

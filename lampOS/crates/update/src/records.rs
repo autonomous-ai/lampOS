@@ -719,6 +719,31 @@ mod tests {
         records.save_journal(&journal).unwrap();
     }
 
+    /// The first thing a kept record holds that `read` doesn't: a key of an
+    /// object missing or different, by its path, an array of another length, or
+    /// another value. A key `read` has beyond the kept one is a later build's
+    /// addition, and passes: a kept day's test is never edited (#1505; the
+    /// reviewer on #2486).
+    fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Option<String> {
+        use serde_json::Value;
+        match (kept, read) {
+            (Value::Object(kept), Value::Object(read)) => kept.iter().find_map(|(key, value)| {
+                let path = format!("{path}.{key}");
+                match read.get(key) {
+                    Some(got) => missing(value, got, &path),
+                    None => Some(format!("{path}: not read")),
+                }
+            }),
+            (Value::Array(kept), Value::Array(read)) if kept.len() == read.len() => kept
+                .iter()
+                .zip(read)
+                .enumerate()
+                .find_map(|(i, (value, got))| missing(value, got, &format!("{path}[{i}]"))),
+            _ if kept == read => None,
+            _ => Some(format!("{path}: kept {kept}, read {read}")),
+        }
+    }
+
     /// lamp-update's records kept as fixtures, each day's as its build saved
     /// them ([`write_records_fixtures`]): every later lamp-update reads each
     /// with every field as it was, so an update never loses what the one
@@ -731,7 +756,6 @@ mod tests {
             include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
             include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
         )];
-        let (state, journal) = todays_records();
         for (day, state_bytes, journal_bytes) in kept {
             let folder = tempfile::tempdir().unwrap();
             std::fs::write(folder.path().join("state.json"), state_bytes).unwrap();
@@ -743,23 +767,12 @@ mod tests {
                 .unwrap_or_else(|error| panic!("{day}: {error}"));
             assert!(said.is_empty(), "{day}: {said:?}");
             assert_eq!(
-                (&read.installed, &read.previous, &read.refused, &read.made),
-                (
-                    &state.installed,
-                    &state.previous,
-                    &state.refused,
-                    &state.made
+                missing(
+                    &serde_json::from_slice(state_bytes).unwrap(),
+                    &serde_json::to_value(&read).unwrap(),
+                    "state",
                 ),
-                "{day}"
-            );
-            assert_eq!(
-                (&read.settings, &read.settings_writing, read.systemd_owed),
-                (&state.settings, &state.settings_writing, state.systemd_owed),
-                "{day}"
-            );
-            assert_eq!(
-                (&read.models, &read.models_before),
-                (&state.models, &state.models_before),
+                None,
                 "{day}"
             );
             let under_way = records
@@ -767,13 +780,12 @@ mod tests {
                 .unwrap_or_else(|error| panic!("{day}: {error}"))
                 .unwrap_or_else(|| panic!("{day}: no switch under way"));
             assert_eq!(
-                (&under_way.build, &under_way.units, under_way.settings),
-                (&journal.build, &journal.units, journal.settings),
-                "{day}"
-            );
-            assert_eq!(
-                (&under_way.models, &under_way.skills),
-                (&journal.models, &journal.skills),
+                missing(
+                    &serde_json::from_slice(journal_bytes).unwrap(),
+                    &serde_json::to_value(&under_way).unwrap(),
+                    "journal",
+                ),
+                None,
                 "{day}"
             );
         }
