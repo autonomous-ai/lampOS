@@ -1,6 +1,6 @@
 # A asks and leaves; B, whom the lamp also knows, sits at the desk for
 # three minutes: the text says someone known, never a name, and the watch
-# goes on.
+# goes on. The head turns to them once as they come (#2562).
 clock = "14:20"
 
 [[call_tool]]
@@ -25,6 +25,11 @@ at = "842s"
 [[expect]]
 at = "4s"
 call = "light"
+
+[[expect]]
+at = "661500ms"
+call = "body.gaze"
+args = { look_at = "face" }
 
 [[expect]]
 at = "859s"

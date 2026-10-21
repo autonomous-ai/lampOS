@@ -922,7 +922,10 @@ fn serve(
         unplug: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
-            watches: Watches::default(),
+            // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562).
+            watches: Watches::hearing(watch::switched_on(
+                std::env::var(watch::SOUNDS_ENVIRONMENT).ok().as_deref(),
+            )),
             marks: HashMap::new(),
             texts: None,
             known_file: options.known_file.clone(),
@@ -1104,10 +1107,22 @@ fn serve(
                 if let Some(tools) = tools {
                     write_tools(tools, &engine);
                 }
+                // The ears' room sounds for a watch only with
+                // LAMP_GUARD_SOUNDS=on (#2562): nothing is listened to for
+                // it without, unless another skill reads them.
+                let sounds = runner.watching.borrow().watches.sounds
+                    || engine.skills().iter().any(|skill| {
+                        skill.watch.is_none()
+                            && skill
+                                .reads()
+                                .iter()
+                                .any(|(topic, _)| topic == watch::SOUNDS)
+                    });
                 let topics: Vec<_> = engine
                     .topics()
                     .into_iter()
                     .filter(|topic| topic != lamp_skills::LOCAL_CLOCK_TOPIC)
+                    .filter(|topic| sounds || topic != watch::SOUNDS)
                     .collect();
                 subscribers
                     .retain(|subscriber| topics.iter().any(|topic| topic == subscriber.topic()));
@@ -1765,7 +1780,98 @@ fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
                     None => {}
                 }
             }
+            // One look to an arrival (#2562): the body's gaze, as a look at
+            // a face sends it; then it rests.
+            Out::Gaze(call) => {
+                if let Some(why) = may.refuses(&call) {
+                    eprintln!("lamp-skills: skill:{skill}: refused its turn: {why}");
+                    continue;
+                }
+                let how = make(&call, &runner.sockets_for(&skill), &runner.bus, None);
+                said(out, how);
+            }
+            // "I'm off guard", aloud, on a thread of its own: the say
+            // service answers once it has been said, and the loop never
+            // waits on it.
+            Out::Say(words) => {
+                let call = Call::Words(words.clone());
+                if let Some(why) = may.refuses(&call) {
+                    eprintln!("lamp-skills: skill:{skill}: refused its words: {why}");
+                    continue;
+                }
+                let (path, asker, line) = (
+                    runner.sockets.say.clone(),
+                    skill.clone(),
+                    words.words.clone(),
+                );
+                std::thread::spawn(move || {
+                    let outcome = say(&path, "say", &asker, words.ask(), &[], || {});
+                    eprintln!("lamp-skills: skill:{asker}: {outcome}");
+                });
+                said(out, format!("say: asked of the voice: {line}"));
+            }
             Out::Said(why) => said(out, why),
+        }
+    }
+}
+
+/// The privacy switch as the voice last said it, told to the watches
+/// first: closed, every watch is off, and none goes on (#2562).
+fn privacy_now(watching: &mut Watching, runner: &Runner) -> Outs {
+    let closed = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY)
+        .is_some_and(|privacy| privacy["physical_muted"] == json!(true));
+    watching.watches.privacy(closed)
+}
+
+/// `guard.on` or `guard.off` from the owner's app, through lamp-cloud and
+/// the call socket, which took it only from lamp-cloud's unit and with
+/// `LAMP_GUARD_FROM_APP=on` (#2562): committed first, then turned, the app
+/// told how, and what the watch does done. Held to lamp-cloud's deadline
+/// again first ([`watch::let_go`]): the op may have waited in the loop too,
+/// and one let go turns nothing.
+fn app_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+    let late = watch::let_go(
+        &name,
+        args[watch::DEADLINE].as_u64(),
+        lamp_ipc::monotonic_us(),
+    );
+    if !admission.commit() {
+        eprintln!("lamp-skills: {name} from the app not done: lamp-cloud gave up");
+        return;
+    }
+    if let Some(why) = late {
+        eprintln!("lamp-skills: {why}");
+        let _ = reply.send(json!({ "error": why }));
+        return;
+    }
+    let mut watching = runner.watching.borrow_mut();
+    let outs = privacy_now(&mut watching, runner);
+    watched(outs, &mut watching, out, runner);
+    let marks = can_mark(runner);
+    match watching
+        .watches
+        .from_app(name == watch::APP_ON, clock::now_us(), marks)
+    {
+        Ok((answer, outs)) => {
+            let _ = reply.send(answer);
+            publish(
+                out,
+                SkillEvent {
+                    skill: watch::GUARD.into(),
+                    stage: SkillStage::Triggered,
+                    why: format!("the owner's app asked {name}"),
+                    allowed: None,
+                },
+            );
+            let outs = outs
+                .into_iter()
+                .map(|did| (watch::GUARD.to_owned(), did))
+                .collect();
+            watched(outs, &mut watching, out, runner);
+        }
+        Err(why) => {
+            eprintln!("lamp-skills: {name} from the app refused: {why}");
+            let _ = reply.send(json!({ "error": why }));
         }
     }
 }
@@ -1779,6 +1885,8 @@ fn watch_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runn
         return;
     }
     let mut watching = runner.watching.borrow_mut();
+    let outs = privacy_now(&mut watching, runner);
+    watched(outs, &mut watching, out, runner);
     let asker = watching.known_file.as_deref().and_then(known_now);
     let marks = can_mark(runner);
     match watching
@@ -1821,9 +1929,7 @@ fn watch_look(out: &mut Publisher, runner: &Runner) {
     outs.extend(watching.watches.tick(now_us));
     let known = watching.known_file.as_deref().and_then(known_now);
     outs.extend(watching.watches.known(known.as_deref(), now_us, minute));
-    let closed = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY)
-        .is_some_and(|privacy| privacy["physical_muted"] == json!(true));
-    outs.extend(watching.watches.privacy(closed, now_us));
+    outs.extend(privacy_now(&mut watching, runner));
     watched(outs, &mut watching, out, runner);
 }
 
@@ -2298,6 +2404,11 @@ fn tool_call(
     if name == lamp_skills::unplug::STAY_TOOL {
         return stay_call((name, args, reply, admission), engine, runner);
     }
+    // The owner's app's guard.on or guard.off (#2562): only ever from the
+    // call socket's `guard` op, which no tool's call can name.
+    if name == watch::APP_ON || name == watch::APP_OFF {
+        return app_call((name, args, reply, admission), out, runner);
+    }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
@@ -2542,9 +2653,68 @@ fn keep_tools(dir: &Path, asks: &Waking<ToolAsk>, engine: &Engine) -> io::Result
     Ok(())
 }
 
+/// The call socket's `guard` op (#2562):
+/// `{"op":"guard","turn":"on"|"off","deadline_us":...}`, the owner's app's
+/// ask through lamp-cloud. Taken only with `LAMP_GUARD_FROM_APP=on` in this
+/// program's own environment, only from lamp-cloud's unit
+/// ([`from_the_app`]), and only before lamp-cloud stops waiting
+/// ([`watch::let_go`]): this socket answers one connection at a time, so
+/// the op may have waited behind a voice call. The name the main loop is
+/// given, or why not.
+fn app_turn(call: &serde_json::Value, stream: &UnixStream) -> Result<String, String> {
+    if !watch::switched_on(std::env::var(watch::FROM_APP_ENVIRONMENT).ok().as_deref()) {
+        return Err(format!(
+            "guard mode from the app is not on: {} is not on",
+            watch::FROM_APP_ENVIRONMENT
+        ));
+    }
+    if !from_the_app(stream) {
+        return Err(watch::NOT_THE_APP.into());
+    }
+    let name = match call["turn"].as_str() {
+        Some(watch::ON) => watch::APP_ON,
+        Some(watch::OFF) => watch::APP_OFF,
+        _ => return Err("turn is \"on\" or \"off\"".into()),
+    };
+    // On the host's shared clock, as lamp-cloud stamped it: not this
+    // program's test clock.
+    match watch::let_go(
+        name,
+        call[watch::DEADLINE].as_u64(),
+        lamp_ipc::monotonic_us(),
+    ) {
+        Some(why) => Err(why),
+        None => Ok(name.into()),
+    }
+}
+
+/// Whether the peer on `stream` is lamp-cloud, by its credentials
+/// (`SO_PEERCRED`) and its cgroup ([`watch::from_the_app`]), as the manage
+/// helper tells its askers; or, with `LAMP_SKILLS_ANY_ASKER=on` in this
+/// program's own environment (never the peer's, and no unit sets it), any
+/// peer: for the tests that drive the socket alone. Peer credentials are
+/// read on Linux only; elsewhere no peer is lamp-cloud.
+fn from_the_app(stream: &UnixStream) -> bool {
+    if std::env::var(lamp_skills::package::ANY_ASKER).as_deref() == Ok("on") {
+        return true;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        rustix::net::sockopt::socket_peercred(stream).is_ok_and(|peer| {
+            std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+                .is_ok_and(|cgroup| watch::from_the_app(&cgroup))
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = stream;
+        false
+    }
+}
+
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
-/// answering.
+/// answering. And the owner's app's `{"op":"guard","turn":...}` ([`app_turn`]).
 fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
@@ -2562,17 +2732,32 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
                 let call: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
-                let result = (call["op"] == "call")
-                    .then(|| call["name"].as_str())
-                    .flatten()
+                // A tool's call never names the app's kinds: those come by
+                // the `guard` op alone, held to its checks.
+                let mut args = call["args"].clone();
+                let name = match call["op"].as_str() {
+                    Some("guard") => match app_turn(&call, &stream) {
+                        Ok(name) => {
+                            // The deadline goes on to the main loop, which
+                            // holds the op to it again before turning.
+                            args = json!({ watch::DEADLINE: call[watch::DEADLINE] });
+                            Some(name)
+                        }
+                        Err(why) => {
+                            eprintln!("lamp-skills: guard from the app refused: {why}");
+                            return writeln!(&stream, "{}", json!({"ok": false, "error": why}));
+                        }
+                    },
+                    Some("call") => call["name"]
+                        .as_str()
+                        .filter(|name| *name != watch::APP_ON && *name != watch::APP_OFF)
+                        .map(str::to_owned),
+                    _ => None,
+                };
+                let result = name
                     .filter(|name| {
-                        asks.send((
-                            (*name).to_owned(),
-                            call["args"].clone(),
-                            reply,
-                            admission.clone(),
-                        ))
-                        .is_ok()
+                        asks.send((name.clone(), args.clone(), reply, admission.clone()))
+                            .is_ok()
                     })
                     .and_then(|_| match told.recv_timeout(TOOL_TIMEOUT) {
                         Ok(result) => Some(result),

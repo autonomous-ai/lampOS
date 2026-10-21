@@ -1,7 +1,8 @@
 # On, the desk empty from 49 s; the switch closed from 380 s to 500 s while
 # room/presence still says someone at 400-470 s (a presence the eyes would
-# not give, reviewer-two's P3 on #1807): its one line, and no visit. Open
-# again, someone at 700-770 s: that visit is texted, once.
+# not give, reviewer-two's P3 on #1807): the switch ends it (#2562), its
+# mark given back with one text, and no visit. Open again, someone at
+# 700-770 s: nothing, since it is off until asked again.
 clock = "14:20"
 
 [[call_tool]]
@@ -15,11 +16,9 @@ call = "light"
 
 [[expect]]
 at = "380250ms"
-call = "text"
-args = { text = "I can't see right now, the privacy switch is closed." }
+call = "ends"
 
 [[expect]]
-at = "770s"
-within = "2s"
+at = "380250ms"
 call = "text"
-args = { text = "Someone was at your desk at 14:31, for about a minute." }
+args = { text = "Guard is off: the privacy switch is closed." }

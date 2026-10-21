@@ -1,5 +1,6 @@
-# A, whose face the eyes know, asks and leaves; back at 14:40, known two
-# seconds later: the watch ends and its mark is given back. No text.
+# A, whose face the eyes know, asks and leaves; back at 14:40, the head
+# turns to them as they come (#2562); known two seconds later, the watch
+# ends, its mark is given back and "I'm off guard" is said aloud. No text.
 clock = "14:20"
 
 [[call_tool]]
@@ -26,5 +27,15 @@ at = "4s"
 call = "light"
 
 [[expect]]
+at = "1200500ms"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
 at = "1202s"
 call = "ends"
+
+[[expect]]
+at = "1202s"
+call = "say"
+args = { text = "I'm off guard." }

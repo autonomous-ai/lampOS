@@ -300,6 +300,8 @@ fn the_worker_publishes_scores_then_unavailable_and_the_pump_rechecks_authority(
                         speech: 0.1,
                         music: 0.9,
                         laughter: 0.0,
+                        door: 0.0,
+                        footsteps: 0.0,
                     })
                 }),
                 |classified| sent.send(classified).unwrap(),
@@ -365,6 +367,8 @@ fn a_window_the_lamp_spoke_into_is_its_own_and_the_next_is_unknown() {
                         speech: 0.1,
                         music: 0.9,
                         laughter: 0.0,
+                        door: 0.0,
+                        footsteps: 0.0,
                     })
                 }),
                 |classified| sent.send(classified).unwrap(),

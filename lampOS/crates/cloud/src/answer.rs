@@ -118,6 +118,12 @@ pub trait Lamp {
         None
     }
 
+    /// lamp-skills' call socket, for guard mode from the owner's app
+    /// (`LAMP_GUARD_FROM_APP=on`, #2562, `crate::guard`).
+    fn guard(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -291,6 +297,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "skills.remove" if lamp.skills().is_some() => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::remove(&places, data).map(Some)
+        }
+        // Guard mode on or off from the owner's app (#2562), as
+        // `skills.remove` goes: handed to lamp-skills' call socket, which
+        // holds it to the watch's own rules, its mark among them.
+        "guard.on" | "guard.off" if lamp.guard().is_some() => {
+            let socket = lamp.guard().ok_or_else(|| not_here(kind))?;
+            crate::guard::turn(&socket, kind)
         }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
@@ -688,6 +701,9 @@ pub mod tests {
             "face.enroll",
             "led.state.set",
             "system.reboot",
+            // Without LAMP_GUARD_FROM_APP=on (#2562).
+            "guard.on",
+            "guard.off",
         ] {
             assert_eq!(
                 answer(&mut lamp, kind, &Value::Null),

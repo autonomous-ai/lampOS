@@ -89,6 +89,9 @@ pub struct Real {
     /// The keeper's restart socket, with `LAMP_APP_RESTART=on` (#2193,
     /// `system.reboot`).
     pub restart: Option<PathBuf>,
+    /// lamp-skills' call socket, for guard mode from the owner's app, with
+    /// `LAMP_GUARD_FROM_APP=on` (#2562, `crate::guard`).
+    pub guard: Option<PathBuf>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -584,6 +587,10 @@ impl Lamp for Real {
         self.update_page
     }
 
+    fn guard(&self) -> Option<PathBuf> {
+        self.guard.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -791,6 +798,7 @@ mod tests {
             schedule: None,
             update_page: false,
             restart: None,
+            guard: None,
         };
         let level = Volume {
             volume: 35,
@@ -918,6 +926,7 @@ mod tests {
             schedule: None,
             update_page: false,
             restart: None,
+            guard: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.

@@ -1379,9 +1379,13 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// connect, but is refused before its line is read (the reviewer's P3 on
 /// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
 pub const ASKERS: [&str; 2] = [
-    "/lampos.slice/lampos-parts.slice/lamp-cloud.service",
+    APP_LINK,
     "/lampos.slice/lampos-voice.slice/lamp-voice.service",
 ];
+/// `lamp-cloud`, the owner's app's link, where the system's manager puts
+/// it: also the only peer whose `guard.on` and `guard.off` lamp-skills'
+/// call socket takes (#2562, `watch::from_the_app`).
+pub const APP_LINK: &str = "/lampos.slice/lampos-parts.slice/lamp-cloud.service";
 
 /// The refusal to any other peer.
 pub const NOT_AN_ASKER: &str = "only the app's link and the voice may change the lamp's skills";
@@ -1390,6 +1394,12 @@ pub const NOT_AN_ASKER: &str = "only the app's link and the voice may change the
 /// [`ASKERS`] (or a cgroup under one): the unified hierarchy's line
 /// (`0::…`), or systemd's own on a hybrid one (`…:name=systemd:…`).
 pub fn from_an_asker(cgroup: &str) -> bool {
+    from_one_of(cgroup, &ASKERS)
+}
+
+/// Whether `/proc/<pid>/cgroup`'s text puts the process in one of `units`
+/// (or a cgroup under one), as [`from_an_asker`] reads it.
+pub fn from_one_of(cgroup: &str, units: &[&str]) -> bool {
     cgroup.lines().any(|line| {
         let mut fields = line.splitn(3, ':');
         let (Some(_), Some(controllers), Some(path)) =
@@ -1398,7 +1408,7 @@ pub fn from_an_asker(cgroup: &str) -> bool {
             return false;
         };
         (controllers.is_empty() || controllers == "name=systemd")
-            && ASKERS.iter().any(|asker| {
+            && units.iter().any(|asker| {
                 path.strip_prefix(asker)
                     .is_some_and(|below| below.is_empty() || below.starts_with('/'))
             })
@@ -1407,8 +1417,9 @@ pub fn from_an_asker(cgroup: &str) -> bool {
 
 /// In the helper's own environment (its unit's, never the peer's), `on`
 /// lets any peer ask: only for the tests that drive `lamp-skills asked` over
-/// a socket pair of their own. No unit sets it, and `lamp-update`'s
-/// product unit has no way to.
+/// a socket pair of their own, and those that drive the running program's
+/// `guard` op on its call socket (#2562). No unit sets it, and
+/// `lamp-update`'s product unit has no way to.
 pub const ANY_ASKER: &str = "LAMP_SKILLS_ANY_ASKER";
 
 /// Whether the peer on standard input (the socket systemd hands over) is

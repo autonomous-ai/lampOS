@@ -21,15 +21,19 @@ about = "on: the person at the lamp asked you out loud to keep an eye on things 
 one_of = ["on", "off"]
 
 # What it may read and use, and nothing more: who is at the lamp (counts and
-# times), the faces' sizes, what was heard (it turns on only just after
-# someone spoke), the privacy switch; whether a face is known, never whose;
-# one short text out; and the light only for its faint mark. No picture, no
-# body, no sound.
+# times), the faces' sizes and places, what was heard (it turns on only just
+# after someone spoke), the privacy switch; the ears' scores for a door,
+# footsteps and speech, with LAMP_GUARD_SOUNDS=on (#2562); whether a face is
+# known, never whose; one short text out; the light only for its faint mark;
+# the body only for one turn of the head to an arrival; and its voice only
+# for "I'm off guard". No picture, no recording.
 [permissions]
-topics = ["room/presence", "humans/faces/tracked", "voice/heard", "voice/privacy"]
+topics = ["room/presence", "humans/faces/tracked", "voice/heard", "voice/privacy", "ears/classes"]
 light = true
 messages = true
 known_faces = true
+body = true
+speak = true
 
 [watch]
 every = "10m"                           # at most one text in ten minutes
@@ -38,7 +42,7 @@ asked_within = "30s"                    # on only when someone spoke at the lamp
 # among its whole words, so the model's call after talk of something else is
 # refused (the peer read on #1807).
 if_heard = ["keep an eye", "keep watch", "watch my desk", "watch the desk", "guard", "look after my desk", "while i'm out", "while i am out", "while i'm away", "while i am away"]
-most = "12h"                            # it ends by itself twelve hours after it was asked, with one text that it has stopped
+most = "12h"                            # it ends by itself twelve hours after it was asked, with one text: "I'm off guard"
 mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign; while the ring shows something else over it, it counts nothing
 
 # What it says (#940): its own words. {who}, {at}, {long}, {time} and
@@ -52,10 +56,16 @@ off = "Say in one short line that you've stopped keeping an eye on things."
 was_off = "You weren't keeping an eye on things. Say so in one short line."
 not_asked = "I keep an eye on things only when someone asks me out loud, at the lamp."
 no_mark = "I can't show that I'm keeping an eye on things just now, so I won't do it."
-blind = "I can't see right now, the privacy switch is closed."
+closed = "The privacy switch is closed, so I can't see: I won't keep an eye on things."
+paused_from_app = "Guard is paused while your light is off: ask at the lamp for it to go on."
+blind = "Guard is off: the privacy switch is closed."
 paused = "I've paused watching while your light is off."
-stopped = "I've stopped keeping an eye on things."
+off_guard = "I'm off guard."
+stopped = "I'm off guard: it's been {hours}."
+an_hour = "an hour"
+hours = "{hours} hours"
 visit = "{who} was at your desk{at}, {long}."
+came_in = "{who} came in{at} and was here {long}."
 known = "Someone you've introduced me to"
 unknown = "Someone I don't know"
 someone = "Someone"

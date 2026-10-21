@@ -189,6 +189,8 @@ fn main() -> ExitCode {
             .as_deref()
             == Some("on"))
         .then(|| lamp_keeper::restart::SOCKET.into()),
+        // Guard mode on and off from the owner's app (#2562): only with LAMP_GUARD_FROM_APP=on.
+        guard: lamp_cloud::guard::from_environment(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -218,6 +220,7 @@ fn main() -> ExitCode {
         schedule: None,
         update_page: false,
         restart: None,
+        guard: None,
     };
     runtime.block_on(async move {
         let looks = async move {

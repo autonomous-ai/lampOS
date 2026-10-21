@@ -1,0 +1,24 @@
+# #2562: asked at 14:20 and the desk empty from 49 s; a door at 14:31
+# (660 s), then a face the lamp does not know 8.5 s after, who stays at the
+# desk until 739 s: one arrival. The head turns to the face once, and one
+# text when they go says they came in, from the door.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "668500ms"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "760s"
+call = "text"
+args = { text = "Someone I don't know came in at 14:31 and was here for about 2 minutes." }
