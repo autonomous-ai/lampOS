@@ -72,6 +72,10 @@ Four more you can run on their own:
   handed over (the stand-in's `new`), the answer read (its `show`), told,
   and heard whole (not cut short, with both events in the lamp's words).
   `TASKS=` works as for `ask-again.sh`. Nothing reaches a real calendar.
+- `email.sh LABEL FIXTURE`, the same for email: "Hey Lamp, did I get any
+  email from the office today?", with the stand-in answering with two
+  made-up messages. Both scripts set their ask, the stand-in's answer and
+  two words of it, and run `account-ask.sh`.
 
 ## What it needs
 
