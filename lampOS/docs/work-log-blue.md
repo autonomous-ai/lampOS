@@ -350,3 +350,12 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - Fixed: the add-on proposes a `mood`. Folded as `6eb4a9666`.
   - The whole workspace ran locally: 200 targets passed. lamp-audio's bounded-work timing test and lamp-records' `public_tree_pipeline…` failed under the workspace's load, and both pass alone.
   - Noted in memory: a lamp-skills load-rule change gets the whole workspace's tests.
+
+## 22 Oct, 03:0x–03:1x: a peer read of #2686; #2675 rebased twice
+
+- **First builder (03:06):** peer-read El's #2686, #2617's six Wi-Fi follow-ups, on `1460c6fd88`. Five of the six match the ask.
+  - **P2, follow-up 6:** when the app didn't confirm and the old file can't be written, `hold` sends `REMOVE_NETWORK all` first. Any later refusal or timeout leaves wpa_supplicant with no network, and nothing reloads the live file. The lamp is off both networks until a reboot.
+  - **Fix suggested:** send `RECONFIGURE` on error, wait between tries, and add a part-way-failure test.
+  - **P3s:** the stop restore is one radio try in practice; a confirm with an id is refused when the set had none.
+  - The first builder agreed (03:15) and asked El to fold it.
+- **#2675:** lamp-voice moved twice and conflicted, each time on the played README's list of scripts. Rebased as `1a0d2e9cb`; the range-diff is that hunk only. Gates are clean and CI is running.
