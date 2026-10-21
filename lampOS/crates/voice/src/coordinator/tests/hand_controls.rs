@@ -1619,11 +1619,24 @@ fn a_tap_while_muted_gets_the_asleep_face_once() {
             .filter(|row| row["kind"] == "head_tap_muted_face")
             .count()
     };
-    answer_muted_tap(Some(&mut face), &Observation::default(), false, &mut trace).unwrap();
-    answer_muted_tap(Some(&mut face), &tap, true, &mut trace).unwrap();
+    answer_muted_tap(
+        Some(&mut face),
+        &Observation::default(),
+        false,
+        false,
+        &mut trace,
+    )
+    .unwrap();
+    answer_muted_tap(Some(&mut face), &tap, true, false, &mut trace).unwrap();
     assert_eq!(faces(&trace), 0, "no tap, or the tap that wakes it");
-    answer_muted_tap(Some(&mut face), &tap, false, &mut trace).unwrap();
-    answer_muted_tap(Some(&mut face), &tap, false, &mut trace).unwrap();
+    answer_muted_tap(Some(&mut face), &tap, false, true, &mut trace).unwrap();
+    assert_eq!(
+        (faces(&trace), starts.get()),
+        (0, 0),
+        "not over a hand's sleep's face (#1362)"
+    );
+    answer_muted_tap(Some(&mut face), &tap, false, false, &mut trace).unwrap();
+    answer_muted_tap(Some(&mut face), &tap, false, false, &mut trace).unwrap();
     assert_eq!((faces(&trace), starts.get()), (1, 1), "one at a time");
     face.stop();
     // The slide closed with the software mute open is still muted: the tap
@@ -1649,6 +1662,7 @@ fn a_tap_while_muted_gets_the_asleep_face_once() {
         Some(&mut face),
         &tap,
         may_hear(true, Some(PrivacyState::Muted)),
+        false,
         &mut slid,
     )
     .unwrap();
@@ -1723,6 +1737,170 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
          100 ms after the tap's last reading, as under qemu: see above)"
     );
     assert_eq!(faces_for(PrivacyState::Allowed), 0, "the slide open");
+}
+
+/// #1362: the muted wait's own closures, for a lamp a hand put to sleep,
+/// as the privacy wait calls them. The sleep's face begins at the first
+/// look, said once in the trace. With the privacy slide's route, the slide
+/// read closed leaves the ring black and closed by the time the wait goes
+/// on, so the slide's indication, started after it, is the one writer; no
+/// face begins again in that wait, even once the slide opens.
+#[test]
+fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
+    use crate::privacy::PrivacyState;
+    use crate::ring_asleep::{Asleep, SleepFace, TapFace};
+    use crate::service_privacy::WaitOutcome;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    /// A ring that says whether a face has it open.
+    struct Opened(Arc<AtomicBool>);
+    impl lamp_ring::FrameSink for Opened {
+        fn write_frame(&mut self, _: &lamp_ring::EncodedFrame) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    impl Drop for Opened {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+    let directory =
+        std::env::temp_dir().join(format!("lamp-voice-sleep-face-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&directory);
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let controls = RefCell::new(Some(
+        HandControls::with_test_asleep("test-hand-clock", monotonic_us(), &record).unwrap(),
+    ));
+    let reminders = RefCell::new(None);
+    let open = Arc::new(AtomicBool::new(false));
+    let starts = std::cell::Cell::new(0);
+    // A face that opens the ring at once, so the test sees it open.
+    let face = SleepFace::new(
+        || {
+            starts.set(starts.get() + 1);
+            let flag = open.clone();
+            Some(Asleep::tapped_for(
+                move || {
+                    flag.store(true, Ordering::SeqCst);
+                    lamp_ring::asleep::AsleepRing::new(Opened(flag))
+                },
+                lamp_ring::ChannelCeiling::new(24).unwrap(),
+                Duration::from_secs(30),
+            ))
+        },
+        true,
+    );
+    let mut trace = SessionState::default();
+    let mut closed_when_told = None;
+    let outcome = muted_wait_pulsing(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<TapFace<fn() -> Option<Asleep>>>,
+        Some(face),
+        None,
+        None,
+        None,
+        |on_state, gate| {
+            let boot = crate::process::new_boot().unwrap();
+            on_state(PrivacyState::Allowed, boot, 1)?;
+            for _ in 0..3 {
+                gate()?;
+            }
+            let until = Instant::now() + Duration::from_secs(2);
+            while !open.load(Ordering::SeqCst) && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            assert!(open.load(Ordering::SeqCst), "the sleep's face has the ring");
+            on_state(PrivacyState::Muted, boot, 2)?;
+            closed_when_told = Some(!open.load(Ordering::SeqCst));
+            for _ in 0..3 {
+                gate()?;
+            }
+            on_state(PrivacyState::Allowed, boot, 3)?;
+            gate()?;
+            Ok(WaitOutcome::Stopped)
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Stopped);
+    assert_eq!(
+        closed_when_told,
+        Some(true),
+        "closed before the slide's own"
+    );
+    let faces = trace
+        .iter()
+        .filter(|row| row["kind"] == "head_sleep_face")
+        .count();
+    assert_eq!((faces, starts.get()), (1, 1));
+    // A plain mute, the person's or the app's, is no hand's sleep: no face
+    // (the reviewer's P3 on #2460).
+    let controls = RefCell::new(Some(
+        HandControls::with_test_muted(
+            "test-hand-clock",
+            monotonic_us(),
+            &directory.join("muted.json"),
+        )
+        .unwrap(),
+    ));
+    let plain_starts = std::cell::Cell::new(0);
+    let face = SleepFace::new(
+        || {
+            plain_starts.set(plain_starts.get() + 1);
+            None
+        },
+        true,
+    );
+    let mut trace = SessionState::default();
+    let outcome = muted_wait_pulsing(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<TapFace<fn() -> Option<Asleep>>>,
+        Some(face),
+        None,
+        None,
+        None,
+        |on_state, gate| {
+            on_state(
+                PrivacyState::Allowed,
+                crate::process::new_boot().unwrap(),
+                1,
+            )?;
+            for _ in 0..3 {
+                assert!(!gate()?, "still muted");
+            }
+            Ok(WaitOutcome::Stopped)
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Stopped);
+    assert_eq!(plain_starts.get(), 0);
+    assert!(trace.iter().all(|row| row["kind"] != "head_sleep_face"));
+    let _ = fs::remove_dir_all(&directory);
+    // Shown, and yielding to a closing slide only on the route, where the
+    // slide's indication is the ring's other writer.
+    for (head_touch, asleep_on, privacy_controls, shown) in [
+        (true, false, false, Some(false)),
+        (true, false, true, Some(true)),
+        (true, true, true, Some(true)),
+        (true, true, false, None),
+        (false, false, false, None),
+        (false, false, true, None),
+    ] {
+        assert_eq!(
+            sleep_face_allowed(head_touch, asleep_on, privacy_controls),
+            shown,
+            "{head_touch} {asleep_on} {privacy_controls}"
+        );
+    }
 }
 
 /// #1371, and the reviewer and Jarvis on #1376: the muted wait's own
