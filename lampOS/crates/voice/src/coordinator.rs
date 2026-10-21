@@ -4669,38 +4669,13 @@ fn tone_line_over(
     person: Option<&str>,
     trace: &mut SessionState,
 ) -> Result<()> {
-    let ToneHeld {
-        reading: pending,
-        later,
-    } = held;
-    let held_turn = pending.as_ref().map(TonePending::turn);
-    if let Some(held) = pending.as_mut()
-        && heard_in.is_some_and(|turn| held.turns.contains(&turn))
-    {
-        held.heard(line, heard_in == Some(held.turn()));
-    } else if let (Some(turn), Some(held_turn)) = (heard_in, held_turn)
-        && turn > held_turn
-    {
-        // A later line's words, before its End: kept for its reading, which
-        // may yet go on from the one waiting, so that one isn't told for
-        // them.
-        let words = later.get_or_insert_with(|| (turn, String::new()));
-        if words.0 == turn && words.1.len() + line.len() < TONE_LINE_BYTES {
-            words.1.push_str(line);
-        }
-    } else if let Some(held) = pending.as_mut() {
-        // Words of no lamp line, or an older one's: not its own, so its own
-        // are taken as not coming. It is told as it falls due, never here,
-        // so a line that still goes on from it is taken in once (the
-        // reviewer-lead's P3 on #2670).
-        held.worded = true;
-    }
+    held.heard(line, heard_in);
     let Some(forget) = crate::voice_tone::forgets(line) else {
         return Ok(());
     };
     // A forget is kept: a line that goes on puts back no baseline from
     // before it.
-    if let Some(held) = pending.as_mut() {
+    if let Some(held) = held.reading.as_mut() {
         held.before = None;
     }
     let all = forget == crate::voice_tone::Forget::All;
@@ -4726,6 +4701,41 @@ fn tone_line_over(
 struct ToneHeld {
     reading: Option<TonePending>,
     later: Option<(u64, String)>,
+}
+
+impl ToneHeld {
+    /// The person's line `line`, heard while `heard_in` was the lamp's line:
+    /// the waiting reading's own words, a later line's kept for its
+    /// reading, or another's, after which its own are taken as not coming.
+    /// Nothing is told here.
+    fn heard(&mut self, line: &str, heard_in: Option<u64>) {
+        let ToneHeld {
+            reading: pending,
+            later,
+        } = self;
+        let held_turn = pending.as_ref().map(TonePending::turn);
+        if let Some(held) = pending.as_mut()
+            && heard_in.is_some_and(|turn| held.turns.contains(&turn))
+        {
+            held.heard(line, heard_in == Some(held.turn()));
+        } else if let (Some(turn), Some(held_turn)) = (heard_in, held_turn)
+            && turn > held_turn
+        {
+            // A later line's words, before its End: kept for its reading,
+            // which may yet go on from the one waiting, so that one isn't
+            // told for them.
+            let words = later.get_or_insert_with(|| (turn, String::new()));
+            if words.0 == turn && words.1.len() + line.len() < TONE_LINE_BYTES {
+                words.1.push_str(line);
+            }
+        } else if let Some(held) = pending.as_mut() {
+            // Words of no lamp line, or an older one's: not its own, so its
+            // own are taken as not coming. It is told as it falls due, never
+            // here, so a line that still goes on from it is taken in once
+            // (the reviewer-lead's P3 on #2670).
+            held.worded = true;
+        }
+    }
 }
 
 /// A line's reading, waiting to be told: until its words come, and for

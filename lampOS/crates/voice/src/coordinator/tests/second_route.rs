@@ -2940,6 +2940,60 @@ fn a_line_that_goes_on_from_the_one_before_is_read_and_told_once() {
     );
 }
 
+/// Words of no lamp line, or an older one's, never tell the reading waiting
+/// (the reviewer-lead's P3 on #2670): its own words are then taken as not
+/// coming, and it is told only as it falls due, never while a line goes on
+/// from it. A later line's words are kept for that line, and leave it
+/// waiting for its own.
+#[test]
+fn words_of_no_line_or_an_older_one_leave_the_reading_waiting() {
+    let waiting = || ToneHeld {
+        reading: Some(TonePending {
+            turns: vec![3],
+            reading: crate::voice_tone::Reading {
+                arousal: -0.5,
+                sure: 1.0,
+            },
+            ended_us: 1_000_000,
+            words: None,
+            worded: false,
+            before: None,
+        }),
+        later: None,
+    };
+    // A line that goes on from the one before: the meter has kept it, and
+    // the next line's first speech came within the window.
+    let mut going_on = crate::voice_tone::ToneMeter::default();
+    let block = vec![1_000i16; 160];
+    going_on.speech_block(0, &block, true);
+    let _ = going_on.finish(10_000);
+    going_on.speech_block(500_000, &block, true);
+    assert!(going_on.going_on());
+    let past = 1_000_000 + crate::voice_tone::GOES_ON_US;
+    for heard_in in [None, Some(2)] {
+        let mut held = waiting();
+        held.heard("someone else", heard_in);
+        let pending = held.reading.as_ref().expect("still waiting");
+        assert!(pending.worded && pending.words.is_none(), "{heard_in:?}");
+        // Not while a line goes on from it, even past the window; then as
+        // it falls due, with no line kept to go on.
+        assert!(!pending.due(past, Some(&going_on)), "{heard_in:?}");
+        assert!(pending.due(past, None), "{heard_in:?}");
+    }
+    // A later line's words: kept for it, and the reading still waits for
+    // its own.
+    let mut held = waiting();
+    held.heard("the next one", Some(4));
+    let pending = held.reading.as_ref().unwrap();
+    assert!(!pending.worded && !pending.due(past, None));
+    assert_eq!(held.later, Some((4, "the next one".to_owned())));
+    // Its own words: kept, and it falls due.
+    held.heard("its own", Some(3));
+    let pending = held.reading.as_ref().unwrap();
+    assert_eq!(pending.words.as_deref(), Some("its own"));
+    assert!(pending.due(past, None));
+}
+
 /// A known person's lines are read against their own baseline, and their
 /// words asking the lamp to forget their face let it go: the line after
 /// starts their baseline again.
