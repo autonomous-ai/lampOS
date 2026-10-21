@@ -80,6 +80,7 @@ The owner's desk. Most of these ride on a few sessions: the owner at the desk, t
 | `lamp-eyes` `LAMP_PRESENCE_VOICE` | #1677 | The night's empty-room rerun, `by=voice` counted without and with it: no `someone` from chatter, and a "Hey Lamp" from out of view still brings the light back. | nothing (a night) | lamp-voice |
 | ~~`LAMP_SELFTEST_SPEAKER`~~ | #895, #968 | ~~The self-test's speaker check on this lamp~~: done, shown on lamp-52e6 (43.4 dB median echo); struck at the lead's 13:0x on #1722. | nothing | #1712 |
 | #1870: the Policy, Schedule and Skills take `--zone system` | #1870 | This lamp's own units installed, each part's start line naming the system zone; then the merge. | nothing | lamp-voice |
+| `LAMP_TASKS_SIGN_IN` (Eighth), a sign-in question not heard whole | #2702 | `tools/played/ask-again.sh LABEL FIXTURE`, with a stand-in Harness (no real sign-in): "Hey Lamp, please sign the lamp in", talk played over the question's first second, then PASS for each of: cut short, `offered again` about 30 s after it was taken, `question told in request N` (heard whole), `answered yes` and `signed in`. | nothing (played) | lamp-voice |
 
 ## lamp-52e6 (Fifth)
 

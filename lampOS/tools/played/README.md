@@ -31,6 +31,14 @@ Two more you can run on their own:
   lamp to forget the three names.
 - `twopeople829.sh ROUNDS LABEL`, about 4 minutes a round: the two-person
   scenes alone.
+- `ask-again.sh LABEL FIXTURE`, about 3 minutes (#2702): a sign-in's
+  question cut short is asked again 30 s later, then heard whole, and the
+  yes after it is taken. It uses a stand-in Harness, so nothing signs in for
+  real: FIXTURE is an ARM64 `lamp-tasks-harness-fixture` from a lampOS
+  ARM64 run's artifact. It puts it in as lamp-tasks' Harness, with
+  `--sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN=on`, through
+  `/run` drop-ins that it removes when it ends. It prints PASS or FAIL for
+  each step, and hand-overs fail while it runs.
 
 ## What it needs
 
