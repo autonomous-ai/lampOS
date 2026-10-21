@@ -605,6 +605,7 @@ mod tests {
             log: String::new(),
             storage_fault,
             wrote,
+            forgot: None,
         }
     }
 

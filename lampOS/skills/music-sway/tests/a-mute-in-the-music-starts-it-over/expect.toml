@@ -1,0 +1,10 @@
+# From 10:00, music (0.85) for 12 s, then 10 s of `unavailable` (a mute: no
+# scores), then music again: the mute is longer than the 5 s gap, so the
+# 20 s start over from 22 s and the one sway is at 42 s, not 20 s.
+clock = "10:00"
+
+[[expect]]
+at = "42s"
+within = "1s"
+call = "body.move"
+args = { move = "sway" }

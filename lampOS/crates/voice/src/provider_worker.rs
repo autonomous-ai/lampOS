@@ -179,6 +179,19 @@ pub struct Files {
     /// second route's model (`--messages`, `LAMP_MESSAGES`,
     /// [`crate::messages`], #1673). Only the second route's worker answers.
     pub messages: bool,
+    /// Whether the second route's rule leaves alone a reply that answers
+    /// nothing the lamp asked, said over its answer (`--others-answer`,
+    /// `LAMP_OTHERS_ANSWER`, [`crate::others_answer`], #2136).
+    pub others_answer: bool,
+    /// Whether, in a busy room, the second route's rule lets a line out as
+    /// the conversation going on only from the one the lamp answered
+    /// (`--going-on-same-one`, `LAMP_GOING_ON_SAME_ONE`,
+    /// [`crate::going_on_same_one`], #2191).
+    pub going_on_same_one: bool,
+    /// Whether the second route holds an answer's hand-on to memory until
+    /// it is known how much of it was heard (`--said-as-heard`,
+    /// `LAMP_SAID_AS_HEARD`, [`crate::said_as_heard`]).
+    pub said_as_heard: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -335,6 +348,9 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     let (holding_answer, flags) = crate::holding_answer::take(flags);
     let (messages, flags) = crate::messages::take(flags);
+    let (others_answer, flags) = crate::others_answer::take(flags);
+    let (going_on_same_one, flags) = crate::going_on_same_one::take(flags);
+    let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     let (scoped_session, flags) = crate::scoped_session::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
@@ -384,6 +400,9 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         misheard_hum,
         holding_answer,
         messages,
+        others_answer,
+        going_on_same_one,
+        said_as_heard,
         scoped_session,
     };
     Ok((continuation, sight, files, visual))
@@ -546,6 +565,12 @@ pub enum ProviderInput {
         /// wire when false.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         over_the_lamps_voice: bool,
+        /// With `LAMP_SAID_AS_HEARD=on`, the reply this line cut, or the one
+        /// the Stop before it cut: its request and how much of it was played
+        /// ([`crate::said_as_heard::HeardOfCut`]). The second route then keeps
+        /// only those words of it as the lamp's. Left off the wire otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
     },
     Audio {
         request: u64,
@@ -605,6 +630,14 @@ pub enum ProviderInput {
         /// note, if they are open and this worker was told where it is.
         #[serde(default)]
         look: bool,
+        /// The turn goes on with a skill's search a person asked for on the
+        /// second route: its newest look's turn, or the look's note
+        /// (`coordinator::look_note`). A skill's look asked in it is taken,
+        /// though the lamp wrote it (`LAMP_SECOND_SKILL_LOOK`); every other
+        /// turn the lamp wrote takes none. Sent only when true, so the wire
+        /// is as before for every other turn and on the Live route.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        search: bool,
     },
     /// A due occurrence whose durable identity is owned by the coordinator's
     /// consumer. The provider receives data, never permission to run tools.
@@ -659,6 +692,16 @@ impl ProviderInput {
         }
     }
 }
+/// A skill's call that asked a search's look (`ProviderOutput::LookAsked`'s
+/// `call`): its function's name as the model called it (the skill's own, or
+/// `use_skill`) and its arguments.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchCall {
+    pub name: String,
+    pub args: serde_json::Value,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderOutput {
@@ -725,6 +768,31 @@ pub enum ProviderOutput {
         request: u64,
         session: u64,
         dropped: Option<String>,
+        /// A skill's look on the second route: a search the person asked
+        /// for, which may go on in the lamp's own turns after it
+        /// (`ProviderInput::Written`'s `search`). Never for the route's own
+        /// look call (`take_a_look`), nor on the Live route. Sent only when
+        /// true, so the wire is as before for every other look.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        search: bool,
+        /// With `search`, the skill's call that asked the look, as the model
+        /// made it: the coordinator walks a search on with the same call
+        /// and the next place (`LAMP_SECOND_LOOK_WALK`,
+        /// `coordinator::look_note`). Sent only when there is one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        call: Option<SearchCall>,
+    },
+    /// The answer to a look's turn (`Written` with `look`) on the second
+    /// route ended with nothing called in any round
+    /// (`LAMP_SECOND_LOOK_NOTE`): the coordinator may note a skill's search
+    /// once that it can call for the next place. With
+    /// `LAMP_SECOND_LOOK_WALK`, a search's note turn (`Written` with
+    /// `search`) left so is told too, and the coordinator walks the search
+    /// on. Sent before the request's idle `TurnComplete`; no input or
+    /// speech is granted by it.
+    LookNoCall {
+        request: u64,
+        session: u64,
     },
     /// `check_agent_task` answered `request` with a finished task's news, and
     /// the answer reached the model (#1390): the coordinator puts its `key` on
@@ -1099,6 +1167,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
@@ -1769,7 +1838,7 @@ async fn serve_with_visual<C: Connect>(
                     if dropped.is_none() {
                         look_owed_until = Some(Instant::now() + LOOK_OWED_AT_MOST);
                     }
-                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped }));
+                    output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped, search: false, call: None }));
                 }
                 for news in desk.news_answered() {
                     output.push_back(Outbound::Output(news));
@@ -2320,7 +2389,13 @@ async fn serve_with_visual<C: Connect>(
                     // Link status goes first; it still needs capacity like
                     // every other packet.
                     let queue = if urgent.is_empty() { &mut output } else { &mut urgent };
-                    let Some(front)=queue.front() else {break;};
+                    let Some(front)=queue.front_mut() else {break;};
+                    // A sign-in's code and account never leave this worker
+                    // in its words (#1676).
+                    if let Outbound::Output(event) = front {
+                        crate::sign_in::leaving(event);
+                    }
+                    let front = &*front;
                     if intake.output_flow.try_send(|| channels.data.send(front))? {
                         // The lamp's own news is news once its sound has been
                         // handed on, owner-checked and credited (#829, #918):
@@ -2756,6 +2831,7 @@ async fn serve_with_visual<C: Connect>(
                         return Err(io::Error::other("availability escaped the provider control plane").into());
                     },
                     Ok(Notice::Ready {session,context,attempts,elapsed,after})=>{
+                        sign_in_connected(session, context);
                         let elapsed_us = elapsed.as_micros().try_into().unwrap_or(u64::MAX);
                         match (after, typed) {
                             (Some(error), true)=>urgent.push_back(Outbound::Status(ProviderStatus::Recovered {
@@ -3794,6 +3870,9 @@ fn service_link<C: Connect>(
     if let Some(clock) = clock {
         clock.tick()?;
         if let Some(update) = provider.poll_link() {
+            if let lamp_gemini::LinkUpdateKind::Ready { context, .. } = update.kind {
+                sign_in_connected(update.session, context);
+            }
             pending.observe(clock.convert(update)?, monotonic_us())?;
         }
         pending.try_send(send)
@@ -3873,6 +3952,15 @@ fn forward_reminder(
     forward_origin(event, output, output_sequence, discards, false)
 }
 
+/// A Live connection made: one resumed goes on with the same conversation,
+/// and so keeps a sign-in's code and account if the one before it heard
+/// them; a fresh one heard nothing (the reviewer's P2 on #2137: a GoAway
+/// resumes about every 10 minutes, under a new session number).
+fn sign_in_connected(session: SessionId, context: Context) {
+    let resumed = matches!(context, Context::Resumed | Context::ResumedBeforeLatest);
+    crate::sign_in::connected(session.get(), resumed);
+}
+
 fn forward_origin(
     event: Event,
     output: &mut VecDeque<Outbound>,
@@ -3927,25 +4015,43 @@ fn forward_origin(
             text,
             finished,
         } => {
+            // A sign-in's code and account are never kept or sent (#1676),
+            // nor anything a session that heard them says after.
+            let text =
+                crate::sign_in::leaving_live(lineage.request.get(), lineage.session.get(), text);
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
                 thread.lamp(lineage.request.get(), &text, std::time::Instant::now());
             }
             push_text(&mut push, Some(lineage.request.get()), text, finished)
         }
         Event::UncorrelatedInputTranscript { text, finished, .. } => {
+            // While a sign-in's code or account is kept, the line leaves
+            // whole, at its end (#1676).
+            let text = crate::sign_in::person_piece(&text, finished);
+            if text.is_empty() && !finished {
+                return Ok(());
+            }
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
                 thread.person(&text, finished, std::time::Instant::now());
             }
             push_text(&mut push, None, text, finished);
         }
         Event::ModelText { .. } | Event::VoiceActivity { .. } => {}
-        Event::GenerationComplete { lineage } => push(ProviderOutput::GenerationComplete {
-            request: lineage.request.get(),
-        }),
-        Event::Interrupted { lineage } => push(ProviderOutput::Interrupted {
-            request: lineage.request.get(),
-        }),
+        Event::GenerationComplete { lineage } => {
+            // A sign-in's request heard in this session, words or none.
+            crate::sign_in::in_session(lineage.request.get(), lineage.session.get());
+            push(ProviderOutput::GenerationComplete {
+                request: lineage.request.get(),
+            })
+        }
+        Event::Interrupted { lineage } => {
+            crate::sign_in::in_session(lineage.request.get(), lineage.session.get());
+            push(ProviderOutput::Interrupted {
+                request: lineage.request.get(),
+            })
+        }
         Event::TurnComplete { lineage, idle } => {
+            crate::sign_in::in_session(lineage.request.get(), lineage.session.get());
             if idle {
                 crate::remember::finished(lineage.request.get());
             }
@@ -5507,6 +5613,7 @@ impl InputHandoff {
                 }
             }
             ProviderInput::Written {
+                request: written,
                 session,
                 text,
                 look,
@@ -5515,7 +5622,11 @@ impl InputHandoff {
                 if self.submitted.is_some() {
                     return Err(io::Error::other("provider input already started").into());
                 }
+                // A sign-in's news marks its request (#1676).
+                crate::sign_in::written(written, &text);
                 let expected = SessionId::new(session)?;
+                // Its note goes into this session, said or not (#1676).
+                crate::sign_in::in_session(written, expected.get());
                 // A look with the eyes shut is said to be one: the model is
                 // not left to describe a picture it was not given.
                 let picture = look
@@ -5933,7 +6044,7 @@ pub(crate) mod seen_in_tests {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     mod holding_answer;
     mod reminders;
     mod resend;
@@ -6149,6 +6260,130 @@ mod tests {
             "sent {} us after the send",
             line.sent_us - sent_at
         );
+    }
+
+    /// #2137's redesign, step 5, on Live, with Jarvis's planted run: the
+    /// lamp's words in a request marked as a sign-in's leave as one line
+    /// however they were split. Every later request in the session that
+    /// heard it leaves as the held line, since the session can say the code
+    /// again ("Sorry, what was the code?"), and in a connection resumed
+    /// from it, until a fresh one; a request cut before its first word
+    /// holds its session too. The person's words, in three-word pieces, are held to their line's end
+    /// and leave whole, scrubbed, before the thread keeps them or they are
+    /// sent.
+    #[test]
+    fn the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        crate::sign_in::forget();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        crate::sign_in::keep_said_for_test("48213907", "planted-jarvis@example.invalid");
+        crate::sign_in::mark(23);
+        let session = lamp_gemini::SessionId::new(7).unwrap();
+        let lineage = |session: u64, request| lamp_gemini::Lineage {
+            session: lamp_gemini::SessionId::new(session).unwrap(),
+            request: RequestId::new(request).unwrap(),
+        };
+        let lamp =
+            |session: u64, request: u64, text: &str, finished: bool| Event::OutputTranscript {
+                lineage: lineage(session, request),
+                text: text.into(),
+                finished,
+            };
+        let person = |text: &str, finished: bool| Event::UncorrelatedInputTranscript {
+            session,
+            text: text.into(),
+            finished,
+        };
+        let mut output = VecDeque::new();
+        let mut discards = DiscardLog::default();
+        for event in [
+            lamp(7, 23, "Your code is 4 8 2", false),
+            lamp(7, 23, "1, 3 9 0 7.", true),
+            person("four eight two", false),
+            person(" one, planted dash", false),
+            person(" jarvis", true),
+            // Unmarked, in the session that heard the code.
+            lamp(7, 26, "Sorry, the code was 4 8", false),
+            lamp(7, 26, " 2 1, 3 9 0 7.", true),
+            lamp(7, 31, "You are planted dash jarvis.", true),
+        ] {
+            forward(event, &mut output, &mut 0, &mut discards).unwrap();
+        }
+        // Resumed after a GoAway, under a new number: the same conversation,
+        // so still held (the reviewer's P2 on #2137).
+        sign_in_connected(lamp_gemini::SessionId::new(8).unwrap(), Context::Resumed);
+        forward(
+            lamp(8, 40, "The code was 4 8 2 1, 3 9 0 7.", true),
+            &mut output,
+            &mut 0,
+            &mut discards,
+        )
+        .unwrap();
+        // A fresh connection never heard it.
+        sign_in_connected(lamp_gemini::SessionId::new(9).unwrap(), Context::Fresh);
+        forward(
+            lamp(9, 41, "It's 10 past 4.", true),
+            &mut output,
+            &mut 0,
+            &mut discards,
+        )
+        .unwrap();
+        // A marked request cut before its first word still holds its session.
+        crate::sign_in::mark(42);
+        forward(
+            Event::TurnComplete {
+                lineage: lineage(9, 42),
+                idle: true,
+            },
+            &mut output,
+            &mut 0,
+            &mut discards,
+        )
+        .unwrap();
+        forward(
+            lamp(9, 43, "Your code is 4 8 2 1.", true),
+            &mut output,
+            &mut 0,
+            &mut discards,
+        )
+        .unwrap();
+        let sent: Vec<(Option<u64>, String)> = output
+            .into_iter()
+            .filter_map(|item| match item {
+                Outbound::Output(ProviderOutput::Transcript { request, text, .. }) => {
+                    Some((request, text))
+                }
+                _ => None,
+            })
+            .collect();
+        let held = crate::sign_in::HELD_LINE.to_owned();
+        assert_eq!(
+            sent,
+            [
+                (Some(23), crate::sign_in::SAID_LINE.to_owned()),
+                (Some(23), String::new()),
+                (None, "a sign-in code, their account".to_owned()),
+                (Some(26), held.clone()),
+                (Some(26), String::new()),
+                (Some(31), held.clone()),
+                (Some(40), held.clone()),
+                (Some(41), "It's 10 past 4.".to_owned()),
+                (Some(43), held),
+            ]
+        );
+        // Nor does the thread's file keep them, joined or apart.
+        let kept = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .save(std::time::Instant::now(), std::time::SystemTime::now())
+            .unwrap_or_default();
+        assert!(kept.contains("their account"), "{kept}");
+        for planted in ["4 8", "4821", "four eight", "jarvis", "planted"] {
+            assert!(!kept.contains(planted), "{planted}: {kept}");
+        }
+        crate::sign_in::forget();
     }
 
     #[test]
@@ -6529,6 +6764,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 
@@ -6584,9 +6820,13 @@ mod tests {
     /// #1675's Live part: with `LAMP_LIVE_SCOPED_SESSION`, a line admitted
     /// for B is not sent into a session opened for A; it fails as not
     /// delivered and the session is due again, for B. Without the switch it
-    /// is sent, as before.
+    /// is sent, as before. The test has the process's thread and room to
+    /// itself and puts the ones before back at its end, a failed assertion
+    /// included, so the person it sets at the lamp is not left there for a
+    /// later test (the reviewer's P3 on #2411).
     #[test]
     fn a_line_for_someone_else_known_is_not_sent_into_their_session() {
+        let _room = spoken_to::OwnRoom::fresh();
         let a = crate::remember::person_id("ScopedAnn");
         let b = crate::remember::person_id("ScopedBob");
         for scoped in [false, true] {
@@ -6725,6 +6965,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             }
         ));
         for field in ["request", "session", "privacy_generation"] {
@@ -6749,6 +6990,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         // Without `LAMP_CUT_KEEPS_NAME` the coordinator never sets it, and
         // the line on the worker's socket is the one it always was.
@@ -6767,6 +7009,45 @@ mod tests {
         ));
     }
 
+    /// `LAMP_SAID_AS_HEARD`: a Start that cut a reply says how much of it
+    /// was played, and one that cut nothing is written as it always was.
+    #[test]
+    fn a_start_says_how_much_of_the_reply_it_cut_was_played_only_when_told() {
+        let start = |heard_of_cut| ProviderInput::Start {
+            request: 5,
+            session: 7,
+            privacy_generation: 2,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: true,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: true,
+            heard_of_cut,
+        };
+        let plain = serde_json::to_string(&start(None)).unwrap();
+        assert!(!plain.contains("heard_of_cut"), "{plain}");
+        let cut = crate::said_as_heard::HeardOfCut {
+            request: 4,
+            samples: 36_000,
+        };
+        let said = serde_json::to_value(start(Some(cut))).unwrap();
+        assert_eq!(
+            said["heard_of_cut"],
+            serde_json::json!({"request": 4, "samples": 36_000})
+        );
+        assert!(matches!(
+            serde_json::from_value::<ProviderInput>(said.clone()).unwrap(),
+            ProviderInput::Start {
+                heard_of_cut: Some(read),
+                ..
+            } if read == cut
+        ));
+        let mut odd = said;
+        odd["heard_of_cut"]["played"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ProviderInput>(odd).is_err());
+    }
+
     /// A request that goes on from one ended early says so on the wire;
     /// every other Start is written exactly as it was before the flag, and
     /// a Start written without it reads as not going on from anything.
@@ -6782,6 +7063,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         assert_eq!(
             serde_json::to_string(&plain).unwrap(),
@@ -6797,6 +7079,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         let written = serde_json::to_value(&cut_off).unwrap();
         assert_eq!(written["continues_cut_off"], true);
@@ -6817,6 +7100,7 @@ mod tests {
             after_stop: true,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
         assert_eq!(serde_json::to_value(&stopped).unwrap()["after_stop"], true);
         let old =
@@ -7011,6 +7295,7 @@ mod tests {
                         after_stop: false,
                         follows_on: false,
                         over_the_lamps_voice: false,
+                        heard_of_cut: None,
                     },
                     NOW,
                     &sink
@@ -7132,6 +7417,7 @@ mod tests {
                                 after_stop: false,
                                 follows_on: false,
                                 over_the_lamps_voice: false,
+                                heard_of_cut: None,
                             })?;
                         }
                         Ok(control)
@@ -7194,6 +7480,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             assert_eq!(rig.tick(NOW).unwrap(), ControlDrain::Empty);
@@ -7269,6 +7556,7 @@ mod tests {
                                     after_stop: false,
                                     follows_on: false,
                                     over_the_lamps_voice: false,
+                                    heard_of_cut: None,
                                 },
                                 ProviderInput::Audio {
                                     request: new.turn(),
@@ -7414,6 +7702,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             rig.parent
@@ -7519,6 +7808,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         let error = rig.tick(NOW).unwrap_err();
@@ -7646,6 +7936,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             },
             ProviderInput::Audio {
                 request: next.turn(),
@@ -8468,7 +8759,7 @@ mod tests {
     /// again freely by the test's thread while it holds it (#1422: a test
     /// that read the lamp's question from the thread failed 1 in 3 parallel
     /// runs, when another test's rig wrote its own lines between).
-    pub(super) struct OneThread {
+    pub(crate) struct OneThread {
         /// The lock itself, on the first hold of a thread's test.
         _lock: Option<std::sync::MutexGuard<'static, ()>>,
     }
@@ -8481,7 +8772,7 @@ mod tests {
     }
 
     /// The lock, or another hold on it if this thread has it already.
-    pub(super) fn one_thread() -> OneThread {
+    pub(crate) fn one_thread() -> OneThread {
         let held = HELD.with(|held| held.replace(held.get() + 1));
         OneThread {
             _lock: (held == 0).then(|| {
@@ -8890,6 +9181,7 @@ mod tests {
                     after_stop,
                     follows_on,
                     over_the_lamps_voice,
+                    heard_of_cut: None,
                 })
                 .unwrap();
             self.parent
@@ -9436,6 +9728,8 @@ mod tests {
                 needs: None,
                 staff_note: noted,
                 make_skill: false,
+                named_only: false,
+                sign_in: false,
             }),
             ..Default::default()
         });
@@ -9581,6 +9875,8 @@ mod tests {
                 needs: None,
                 staff_note: true,
                 make_skill: false,
+                named_only: false,
+                sign_in: false,
             }),
             ..Default::default()
         });
@@ -10380,6 +10676,7 @@ mod tests {
                         request,
                         session,
                         dropped,
+                        ..
                     } => break (request, session, dropped),
                     _ => continue,
                 }
@@ -10857,6 +11154,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         };
 
         first.service.send(resumable()).await;
@@ -10939,6 +11237,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
                 NOW,
                 &provider,
@@ -11052,6 +11351,62 @@ mod tests {
             assert!(matches!(actual, Notice::TurnLost { stage, .. } if stage == expected));
             provider.shutdown();
         }
+    }
+
+    /// The reviewer's P2 on #2137, on the lamp's own path: a coordinated
+    /// worker's Live connection resumed under a new session number keeps a
+    /// sign-in's hold, since Gemini goes on with the same conversation.
+    #[test]
+    fn a_resumed_connection_keeps_a_sign_ins_hold() {
+        // The sign-in's state is the process's: held for the whole test,
+        // outside the runtime.
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        crate::sign_in::forget();
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(resumed_keeps_the_hold());
+        crate::sign_in::forget();
+    }
+
+    async fn resumed_keeps_the_hold() {
+        use crate::provider_link::{LinkContext, ProviderLinkState};
+        use lamp_gemini::testing::next_dial;
+        let (mut provider, mut dials, mut clock, mut pending) = memory_provider(quick_policy());
+        let mut first = next_dial(&mut dials).await;
+        first.service.accept().await;
+        memory_link(&mut provider, &mut clock, &mut pending).await;
+        crate::sign_in::mark(23);
+        crate::sign_in::in_session(23, first.session.get());
+        let request = RequestId::new(1).unwrap();
+        provider.try_start(request).unwrap();
+        next_notice(&mut provider, true).await.unwrap();
+        provider.try_end(request).unwrap();
+        first.service.receive().await;
+        first.service.receive().await;
+        first.service.send(resumable()).await;
+        first.service.close(1012, "going away").await;
+        memory_link(&mut provider, &mut clock, &mut pending).await;
+        let mut second = next_dial(&mut dials).await;
+        assert!(second.resumed);
+        second.service.accept().await;
+        let ready = memory_link(&mut provider, &mut clock, &mut pending).await;
+        assert!(matches!(
+            ready.state,
+            ProviderLinkState::Ready {
+                context: LinkContext::Resumed,
+                ..
+            }
+        ));
+        assert_ne!(second.session.get(), first.session.get());
+        assert_eq!(
+            crate::sign_in::held_session_for_test(),
+            Some(second.session.get())
+        );
+        provider.shutdown();
     }
 
     #[tokio::test]
@@ -11417,6 +11772,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         assert!(
@@ -11751,6 +12107,7 @@ mod tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
                 NOW,
                 &provider,
@@ -11827,6 +12184,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         rig.parent
@@ -12030,6 +12388,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         let message = rig.exit().await.0.unwrap_err().to_string();
@@ -12584,6 +12943,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         rig.parent
@@ -13320,6 +13680,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             },
             ProviderInput::Audio {
                 request: next,
@@ -13465,6 +13826,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         assert!(matches!(
@@ -13656,6 +14018,7 @@ mod tests {
                         after_stop: false,
                         follows_on: false,
                         over_the_lamps_voice: false,
+                        heard_of_cut: None,
                     })
                     .unwrap();
                 loop {

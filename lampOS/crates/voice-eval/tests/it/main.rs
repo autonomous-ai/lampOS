@@ -13,6 +13,7 @@ mod endpoint;
 mod evaluator;
 mod fake_runtime;
 mod final_dispatch;
+mod motion_voice;
 mod next_turn_ready;
 mod one_breath;
 mod physical_loopback;

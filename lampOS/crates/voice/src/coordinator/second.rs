@@ -974,6 +974,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 
@@ -1495,6 +1496,7 @@ mod tests {
                     end_silence_blocks: None,
                     early_end_blocks: None,
                     early_finalize: false,
+                    open_name: false,
                     faint_level: None,
                     speaker,
                     capture,
@@ -1607,6 +1609,7 @@ mod tests {
             privacy_generation: 1,
             text: crate::holding_answer::NOTE.into(),
             look: false,
+            search: false,
         }
     }
 

@@ -179,7 +179,8 @@ One part, read by every behaviour (to build):
    The sway's bar is measured on a lamp with nothing moving by
    `tools/joys-scores.sh music` (#1669): an empty room, a track and a line
    over it, scored against the bar, and the sways the skill would have asked
-   for, replayed offline from the bus.
+   for, replayed offline from the bus. With `KEEP_DIR`, the sound scores
+   alone are kept, for a replay of other bars over them (#2399).
 
 ## What the best companions teach (research, 2026-10-14)
 

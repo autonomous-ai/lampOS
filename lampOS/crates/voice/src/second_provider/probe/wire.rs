@@ -41,6 +41,23 @@
 //! `net.ipv4.tcp_slow_start_after_idle` is 0; their difference is what that
 //! setting would buy. Each request has its own changing part, as turns do.
 //!
+//! With `--sizes` (#2135; the first builder on #1722, 20 Oct 16:30), each
+//! target is asked the lamp's request three ways instead of `lamp` and
+//! `small` ([`Size::SIZES`]): as it is, given only the functions
+//! `LAMP_SECOND_FEW_TOOLS=on` gives a first round, and with its character
+//! cut in half ([`half`]). Each size's medians, then each smaller one's less
+//! the lamp's, say whether trimming the first request brings DeepSeek's
+//! first token sooner. Every run on connections of their own begins on the
+//! next size ([`kind_order`]), so the prompt cache favours none.
+//!
+//! With `--socket` (#2135's row; the first builder on #1722, 20 Oct 10:37),
+//! each run asks each target for a piece on a kept HTTP connection, as the
+//! route sends its pieces, and the same piece on ElevenLabs' speech socket
+//! (`stream-input`, under the relay's `/ws/`) opened [`SOCKET_AHEAD`] before
+//! it, as the route would open one while the chat thinks: the socket's
+//! connect, TLS and upgrade, then each piece's first audio and end, and the
+//! socket's medians less the connection's.
+//!
 //! With `--speech` (#1934, 08:36), the route's speech instead of its chat:
 //! a piece an answer's first sentence long ([`PIECES`]), asked of
 //! ElevenLabs as `Tts` asks it, through the relay (`tts_base_url`, which is
@@ -58,7 +75,9 @@
 //! `hosted.deepseek_model` with thinking off. It prints counts and
 //! milliseconds only: never the words asked or answered, a key, a host or a
 //! URL.
-use super::super::net::{self, Chat, Declare, Message, SpeechRequest, speech_request};
+use super::super::net::{
+    self, Chat, Declare, Message, SocketRequest, SpeechRequest, on_elevenlabs, speech_request,
+};
 use super::{cache, percentile};
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, SecondConfig, TtsProvider, unit_credential,
@@ -72,6 +91,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio_tungstenite::tungstenite;
 
 /// To connect, and for the answer to say anything more: the route's bounds
 /// (`net::CONNECT`, `net::STALL`).
@@ -82,34 +102,66 @@ const MOST_ANSWER: usize = 1 << 20;
 /// The small request's system message.
 pub const SMALL: &str = "You are a desk lamp. Answer in one short sentence.";
 
-/// Which of the two requests.
+/// Which request: the two `--wire` asks, or with `--sizes` the lamp's
+/// three.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Size {
     Lamp,
     Small,
+    /// The lamp's, given only the few functions `LAMP_SECOND_FEW_TOOLS=on`
+    /// gives a spoken turn's first round (`worker::few_tools`).
+    Few,
+    /// The lamp's, with its character cut to the first half ([`half`]).
+    Half,
 }
 
 impl Size {
     pub const ALL: [Self; 2] = [Self::Lamp, Self::Small];
+    /// `--sizes` (#2135, the first builder on #1722 at 16:30): whether a
+    /// smaller first round brings DeepSeek's first token sooner, before
+    /// anyone trims one.
+    pub const SIZES: [Self; 3] = [Self::Lamp, Self::Few, Self::Half];
 
     pub fn name(self) -> &'static str {
         match self {
             Self::Lamp => "lamp",
             Self::Small => "small",
+            Self::Few => "few",
+            Self::Half => "half",
         }
     }
 
     /// The request's messages in `run`: a spoken turn's, with its own
-    /// changing part each run, or one short line.
+    /// changing part each run (its character halved for `Half`), or one
+    /// short line.
     pub fn messages(self, character: &str, run: u32) -> Vec<Message> {
-        match self {
-            Self::Lamp => vec![
+        let turn = |character: &str| {
+            vec![
                 Message::system(format!("{character}\n\n{}", cache::changing(run))),
                 Message::user(cache::QUESTION),
-            ],
+            ]
+        };
+        match self {
+            Self::Lamp | Self::Few => turn(character),
+            Self::Half => turn(half(character)),
             Self::Small => vec![Message::system(SMALL), Message::user(cache::QUESTION)],
         }
     }
+}
+
+/// The first half of `character`, by characters, ended at the last line
+/// break before its middle, else the last space, else its middle.
+pub fn half(character: &str) -> &str {
+    let middle = character
+        .char_indices()
+        .nth(character.chars().count() / 2)
+        .map_or(character.len(), |(at, _)| at);
+    let first = &character[..middle];
+    let end = first
+        .rfind('\n')
+        .or_else(|| first.rfind(' '))
+        .unwrap_or(middle);
+    character[..end].trim_end()
 }
 
 /// Each request on one kept connection (`--kept`): the first, which makes
@@ -220,14 +272,6 @@ fn piece(
     )
     .map_err(io::Error::other)?
     .ok_or_else(|| io::Error::other("nothing to speak"))
-}
-
-/// Whether `url` is on ElevenLabs' own API, not the relay.
-fn on_elevenlabs(url: &reqwest::Url) -> bool {
-    url.host_str().is_some_and(|host| {
-        let host = host.to_ascii_lowercase();
-        host == "elevenlabs.io" || host.ends_with(".elevenlabs.io")
-    })
 }
 
 /// One request's times, in ms: the connection's steps, then from the
@@ -805,17 +849,24 @@ struct Prepared {
     tls: Arc<rustls::ClientConfig>,
 }
 
-/// How `--wire` asks: on one kept connection (`--kept`), and the route's
-/// speech instead of its chat (`--speech`).
+/// How `--wire` asks: on one kept connection (`--kept`), the route's speech
+/// instead of its chat (`--speech`), a piece on a kept connection beside
+/// the same on a speech socket opened ahead (`--socket`), or the lamp's
+/// request in its three sizes (`--sizes`, [`Size::SIZES`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mode {
     pub kept: bool,
     pub speech: bool,
+    pub socket: bool,
+    pub sizes: bool,
 }
 
-/// The probe, as `lamp-voice probe-cascade … --wire [--kept] [--speech]`
+/// The probe, as `lamp-voice probe-cascade … --wire [--kept] [--speech]` or `--wire --socket`
 /// runs it.
 pub fn run(provider_config: &Path, second_config: &Path, runs: u32, mode: Mode) -> io::Result<()> {
+    if mode.socket {
+        return run_socket(second_config, runs);
+    }
     let prepared = prepare(provider_config, second_config, runs, mode)?;
     if mode.kept {
         run_kept(&prepared, runs)
@@ -853,19 +904,21 @@ fn prepare(
             credentials.as_deref(),
             runs,
             &how("each target and size"),
+            mode.sizes,
         )?
     };
     Ok(Prepared { targets, tls })
 }
 
 /// The chat's targets, the relay and DeepSeek's own API, each asked the
-/// lamp's request and the small one.
+/// lamp's request and the small one, or with `sizes` the lamp's three.
 fn chat_targets(
     provider_config: &Path,
     config: &SecondConfig,
     credentials: Option<&OsStr>,
     runs: u32,
     how: &str,
+    sizes: bool,
 ) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character: Arc<str> = provider.instruction(false)?.into();
@@ -875,18 +928,14 @@ fn chat_targets(
     let declared = super::tools::functions(Some(actions));
     let count = declared.len();
     let all: Declare = Arc::new(move || declared.clone());
-    let none: Declare = Arc::new(Vec::new);
     let model = &config.hosted.deepseek_model;
+    let asked: &[Size] = if sizes { &Size::SIZES } else { &Size::ALL };
     let kinds = |base: &str, key: &str| -> io::Result<Vec<Kind>> {
-        Size::ALL
-            .into_iter()
+        asked
+            .iter()
+            .copied()
             .map(|size| {
-                let declare = match size {
-                    Size::Lamp => all.clone(),
-                    Size::Small => none.clone(),
-                };
-                let chat = Chat::deepseek_at(base, model, key, declare, false)
-                    .map_err(io::Error::other)?;
+                let chat = size_chat(base, model, key, &all, size)?;
                 let character = character.clone();
                 Ok(Kind {
                     before: "",
@@ -919,6 +968,27 @@ fn chat_targets(
     Ok(targets)
 }
 
+/// The chat `size` is asked on: every function in `all` but for `small`,
+/// which has none, and for `few` only those `LAMP_SECOND_FEW_TOOLS=on`
+/// gives a first round (`worker::few_tools`).
+pub fn size_chat(
+    base: &str,
+    model: &str,
+    key: &str,
+    all: &Declare,
+    size: Size,
+) -> io::Result<Chat> {
+    let declare: Declare = match size {
+        Size::Small => Arc::new(Vec::new),
+        Size::Lamp | Size::Few | Size::Half => all.clone(),
+    };
+    let chat = Chat::deepseek_at(base, model, key, declare, false).map_err(io::Error::other)?;
+    if size == Size::Few {
+        chat.narrowing(Arc::new(crate::second_provider::worker::few_tools));
+    }
+    Ok(chat)
+}
+
 /// The speech's targets: the route's own (`tts_base_url`: the relay,
 /// unless that is ElevenLabs' own API) and, with an
 /// [`ELEVENLABS_CREDENTIAL`] unit credential, ElevenLabs' own API, each
@@ -941,11 +1011,15 @@ fn speech_targets(
         .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned());
     // The kind, and whether it is on ElevenLabs' own API.
     let kind = |base: &str, key: &str| -> io::Result<(Kind, bool)> {
+        // ElevenLabs' own API by the route's own rule, so the probe and the
+        // route agree on where the request goes (the reviewer on #2119).
+        let own = on_elevenlabs(base);
         let (base, key) = (base.to_owned(), key.to_owned());
         let (voice, model) = (config.tts_voice.clone(), model.clone());
         let request =
             move |run: u32| Wired::speech(piece(&base, &key, voice.as_deref(), &model, run)?);
-        let own = on_elevenlabs(&request(0)?.url);
+        // A voice or URL the route can't ask with fails here, before any run.
+        request(0)?;
         let kind = Kind {
             before: "speech ",
             after: String::new(),
@@ -977,6 +1051,13 @@ fn speech_targets(
     Ok(targets)
 }
 
+/// The order run `run` asks `kinds` kinds in: each run begins on the next,
+/// so none is always asked first or after the same one, as the service's
+/// prompt cache holds what a request before it shared.
+pub fn kind_order(run: u32, kinds: usize) -> impl Iterator<Item = usize> {
+    (0..kinds).map(move |step| (step + run as usize) % kinds)
+}
+
 /// Each request on a connection of its own.
 fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
     let Prepared { targets, tls } = prepared;
@@ -986,7 +1067,7 @@ fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
         .map(|_| (0..kinds).map(|_| Kept::default()).collect())
         .collect();
     for run in 1..=runs {
-        for index in 0..kinds {
+        for index in kind_order(run, kinds) {
             for ((name, kinds), kept) in targets.iter().zip(&mut kept) {
                 let kind = &kinds[index];
                 let label = kind.named("", &format!("target={name}"));
@@ -1028,7 +1109,39 @@ fn run_cold(prepared: &Prepared, runs: u32) -> io::Result<()> {
             );
         }
     }
+    // With `--sizes`, what each smaller request saves against the lamp's,
+    // on each target (negative is sooner).
+    for line in less_than_lamp(targets, &kept) {
+        println!("{line}");
+    }
     Ok(())
+}
+
+/// Each target's `few` and `half` medians less its `lamp`'s, when it was
+/// asked the lamp's three sizes.
+fn less_than_lamp(targets: &[(&'static str, Vec<Kind>)], kept: &[Vec<Kept>]) -> Vec<String> {
+    let mut lines = Vec::new();
+    for ((name, kinds), kept) in targets.iter().zip(kept) {
+        let at = |size: Size| {
+            kinds
+                .iter()
+                .position(|kind| kind.after == format!(" size={}", size.name()))
+        };
+        let Some(lamp) = at(Size::Lamp) else {
+            continue;
+        };
+        for size in [Size::Few, Size::Half] {
+            if let Some(index) = at(size) {
+                lines.push(less(
+                    &format!("target={name} {}-less-lamp", size.name()),
+                    &kept[index],
+                    &kept[lamp],
+                    Reading::Events,
+                ));
+            }
+        }
+    }
+    lines
 }
 
 /// What became of one arm's request on a kept connection ([`kept_arms`]).
@@ -1186,6 +1299,321 @@ fn run_kept(prepared: &Prepared, runs: u32) -> io::Result<()> {
                 );
             }
         }
+    }
+    Ok(())
+}
+
+/// How long `--socket`'s socket waits open before its piece: about the
+/// chat's time to the answer's first piece on lamp-4ace (910 + 121 ms, the
+/// first builder's split on #1722, 19 Oct 23:39), as the route would open it
+/// while the chat thinks.
+pub const SOCKET_AHEAD: Duration = Duration::from_secs(1);
+
+/// A step of a speech socket that failed, by its name and kind only: an
+/// error's own words may name the host. A refusal before the upgrade says
+/// its HTTP status.
+fn socket_step(name: &'static str) -> impl Fn(tungstenite::Error) -> io::Error {
+    move |error| match error {
+        tungstenite::Error::Http(response) => {
+            io::Error::other(format!("{name}: answered {}", response.status().as_u16()))
+        }
+        tungstenite::Error::Io(error) => step(name)(error),
+        other => io::Error::other(format!("{name}: {}", socket_kind(&other))),
+    }
+}
+
+/// A websocket error's kind, without its words.
+fn socket_kind(error: &tungstenite::Error) -> &'static str {
+    match error {
+        tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed => "closed",
+        tungstenite::Error::Protocol(_) => "protocol",
+        tungstenite::Error::Capacity(_) => "capacity",
+        tungstenite::Error::Tls(_) => "tls",
+        tungstenite::Error::Url(_) => "url",
+        _ => "other",
+    }
+}
+
+/// One piece on a speech socket opened `ahead` of it, as the route would
+/// open one while the chat thinks: the name looked up, the connect and TLS
+/// timed as `--wire` times them, the upgrade in `send`, then from the
+/// piece's last byte its first audio and the end of its audio. A `wss` URL;
+/// `ws` only in tests.
+pub(crate) fn socket_arm(
+    socket: &SocketRequest,
+    text: &str,
+    tls: Option<Arc<rustls::ClientConfig>>,
+    ahead: Duration,
+) -> io::Result<Times> {
+    use tungstenite::{Message as Frame, client::IntoClientRequest, http::HeaderValue};
+    let https = socket
+        .url
+        .replacen("wss://", "https://", 1)
+        .replacen("ws://", "http://", 1);
+    let url = reqwest::Url::parse(&https).map_err(|_| io::Error::other("url"))?;
+    let mut times = Times::default();
+    let connection = Connection::open(&url, tls, &mut times)?;
+    let mut request = socket
+        .url
+        .as_str()
+        .into_client_request()
+        .map_err(|_| io::Error::other("socket: request"))?;
+    request.headers_mut().insert(
+        socket.header,
+        HeaderValue::from_str(&socket.value).map_err(|_| io::Error::other("socket: key"))?,
+    );
+    let from = Instant::now();
+    let (mut ws, response) =
+        tungstenite::client::client(request, connection.stream).map_err(|error| match error {
+            tungstenite::HandshakeError::Failure(error) => socket_step("upgrade")(error),
+            tungstenite::HandshakeError::Interrupted(_) => io::Error::other("upgrade: interrupted"),
+        })?;
+    times.send = ms(from);
+    times.answer.status = response.status().as_u16();
+    let send = |ws: &mut tungstenite::WebSocket<Box<dyn ReadWrite>>, message: Value| {
+        ws.send(Frame::Text(message.to_string().into()))
+            .map_err(socket_step("send"))
+    };
+    send(&mut ws, net::socket_opening())?;
+    std::thread::sleep(ahead);
+    let piece = net::socket_piece(text).ok_or_else(|| io::Error::other("nothing to speak"))?;
+    send(&mut ws, piece)?;
+    let written = Instant::now();
+    send(&mut ws, net::socket_end())?;
+    loop {
+        match ws.read().map_err(socket_step("answer"))? {
+            Frame::Text(message) => {
+                // An answer that isn't one is the service's own words: told
+                // by its kind only.
+                let answer = net::socket_answer(message.as_str())
+                    .ok_or_else(|| io::Error::other("answer: refused"))?;
+                if !answer.audio.is_empty() {
+                    times.answer.audio.get_or_insert(ms(written));
+                    times.answer.audio_bytes += answer.audio.len();
+                    if times.answer.audio_bytes > MOST_ANSWER {
+                        return Err(io::Error::other("answer too long"));
+                    }
+                }
+                if answer.last {
+                    break;
+                }
+            }
+            Frame::Close(frame) => {
+                if times.answer.audio.is_none() {
+                    let code = frame.map_or(0, |frame| u16::from(frame.code));
+                    return Err(io::Error::other(format!("answer: closed {code}")));
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+    times.answer.done = ms(written);
+    times.answer.kept = true;
+    let _ = ws.close(None);
+    Ok(times)
+}
+
+/// One piece on a kept HTTP connection, as the route sends its pieces: the
+/// connection made with `first`, then `timed` sent on it and timed.
+pub fn http_kept(
+    first: &Wired,
+    timed: &Wired,
+    tls: Option<Arc<rustls::ClientConfig>>,
+) -> io::Result<Times> {
+    let mut connected = Times::default();
+    let mut connection = Connection::open(&first.url, tls, &mut connected)?;
+    let (_, answer) = connection.post(first, true)?;
+    if answer.status != 200 || !answer.kept {
+        return Err(io::Error::other(format!(
+            "first: answered {}{}",
+            answer.status,
+            if answer.kept { "" } else { ", not kept" }
+        )));
+    }
+    let (send, answer) = connection.post(timed, true)?;
+    if answer.status != 200 {
+        return Err(io::Error::other(format!("answered {}", answer.status)));
+    }
+    Ok(Times {
+        send,
+        answer,
+        ..Times::default()
+    })
+}
+
+/// A speech socket's run line: its opening's steps, the upgrade, then its
+/// piece's first audio and end, for a piece of `bytes`.
+pub fn socket_shown(times: &Times, bytes: usize) -> String {
+    let a = &times.answer;
+    format!(
+        "bytes={bytes} status={} dns_ms={} tcp_ms={} tls_ms={} upgrade_ms={} first_audio_ms={} done_ms={} audio_bytes={}",
+        a.status,
+        times.dns,
+        times.tcp,
+        times.tls,
+        times.send,
+        shown(a.audio),
+        a.done,
+        a.audio_bytes
+    )
+}
+
+impl Kept {
+    /// A speech socket's summary line, after `label` (`send` holds the
+    /// upgrade).
+    pub fn socket_summary(&self, label: &str) -> String {
+        let show = |values: &[u64], p| shown(percentile(values, p));
+        format!(
+            "wire {label} runs={} failed={} tcp_p50_ms={} tls_p50_ms={} upgrade_p50_ms={} \
+             upgrade_p90_ms={} first_audio_p50_ms={} first_audio_p90_ms={} done_p50_ms={} \
+             audio_bytes_p50={}",
+            self.done.len() as u32 + self.failed,
+            self.failed,
+            show(&self.tcp, 50),
+            show(&self.tls, 50),
+            show(&self.send, 50),
+            show(&self.send, 90),
+            show(&self.audio, 50),
+            show(&self.audio, 90),
+            show(&self.done, 50),
+            show(&self.audio_bytes, 50),
+        )
+    }
+}
+
+/// A speech socket's medians less a kept HTTP connection's, for the same
+/// pieces: what the socket saves a piece once it's open.
+pub fn socket_less_http(label: &str, socket: &Kept, http: &Kept) -> String {
+    let less = |a: &[u64], b: &[u64]| match (percentile(a, 50), percentile(b, 50)) {
+        (Some(a), Some(b)) => format!("{:+}", i128::from(a) - i128::from(b)),
+        _ => "none".to_owned(),
+    };
+    format!(
+        "wire {label} first_audio_ms={} done_ms={}",
+        less(&socket.audio, &http.audio),
+        less(&socket.done, &http.done)
+    )
+}
+
+/// `--wire --socket`: each run, each target, one piece on a kept HTTP
+/// connection as the route sends them, and another of the same length on a
+/// speech socket opened [`SOCKET_AHEAD`] before it, the two in turn first.
+fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
+    let config = crate::second_config::load_from_path(second_config)?
+        .with_environment(|name| std::env::var_os(name))?;
+    let credentials = std::env::var_os(CREDENTIALS_ENV);
+    let tls = Arc::new(net::tls().map_err(io::Error::other)?);
+    if config.tts_provider != TtsProvider::ElevenLabs {
+        println!(
+            "wire socket: left out: the route's speech is OpenAI's, and only ElevenLabs' is timed"
+        );
+        return Ok(());
+    }
+    let model = config
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned());
+    let voice = config.tts_voice.as_deref();
+    let mut targets: Vec<(&'static str, String, String)> = Vec::new();
+    if on_elevenlabs(&config.tts_base_url) {
+        println!(
+            "wire socket target=relay: left out: the route's speech goes to ElevenLabs' own API"
+        );
+        targets.push((
+            "direct",
+            config.tts_base_url.clone(),
+            config.tts_key.expose().to_owned(),
+        ));
+    } else {
+        targets.push((
+            "relay",
+            config.tts_base_url.clone(),
+            config.tts_key.expose().to_owned(),
+        ));
+        match unit_credential(credentials.as_deref(), ELEVENLABS_CREDENTIAL) {
+            Ok(key) => targets.push((
+                "direct",
+                ELEVENLABS_BASE_URL.to_owned(),
+                key.expose().to_owned(),
+            )),
+            Err(error) => println!("wire socket target=direct: left out: {error}"),
+        }
+    }
+    println!(
+        "wire socket: ElevenLabs' {model}, {runs} runs; each a piece on a kept HTTP connection and the same piece on a speech socket opened {} ms before it",
+        SOCKET_AHEAD.as_millis()
+    );
+    // Target, then the HTTP piece and the socket's.
+    let mut kept: Vec<[Kept; 2]> = targets.iter().map(|_| Default::default()).collect();
+    for run in 1..=runs {
+        for ((name, base, key), kept) in targets.iter().zip(&mut kept) {
+            // Neither arm is always second, nor asks the piece just made: the
+            // order alternates, and the socket's piece is another of the
+            // same length (the reviewer's P3 on #2161).
+            let text = PIECES[(run as usize + 2) % PIECES.len()];
+            let first = Wired::speech(piece(base, key, voice, &model, run + 1)?)?;
+            let timed = Wired::speech(piece(base, key, voice, &model, run)?)?;
+            let socket =
+                net::socket_request(base, key, voice, Some(&model)).map_err(io::Error::other)?;
+            let bytes = net::socket_piece(text).map_or(0, |piece| piece.to_string().len());
+            for socket_now in [run % 2 == 0, run % 2 == 1] {
+                if socket_now {
+                    match socket_arm(&socket, text, Some(tls.clone()), SOCKET_AHEAD) {
+                        Ok(times) => {
+                            println!(
+                                "wire socket target={name} run={run} {}",
+                                socket_shown(&times, bytes)
+                            );
+                            kept[1].keep(&times);
+                        }
+                        Err(error) => {
+                            println!("wire socket target={name} run={run} failed: {error}");
+                            kept[1].failed += 1;
+                        }
+                    }
+                    continue;
+                }
+                match http_kept(&first, &timed, Some(tls.clone())) {
+                    Ok(times) => {
+                        println!(
+                            "wire socket http target={name} run={run} {}",
+                            times.shown(timed.body.len(), Reading::Audio)
+                        );
+                        kept[0].bytes = timed.body.len();
+                        kept[0].keep(&times);
+                    }
+                    Err(error) => {
+                        println!("wire socket http target={name} run={run} failed: {error}");
+                        kept[0].failed += 1;
+                    }
+                }
+            }
+        }
+    }
+    for ((name, ..), kept) in targets.iter().zip(&kept) {
+        println!(
+            "{}",
+            kept[0].summary(&format!("socket http target={name}"), Reading::Audio)
+        );
+        println!(
+            "{}",
+            kept[1].socket_summary(&format!("socket target={name}"))
+        );
+        println!(
+            "{}",
+            socket_less_http(
+                &format!("socket-less-http target={name}"),
+                &kept[1],
+                &kept[0]
+            )
+        );
+    }
+    if let [relay, direct] = kept.as_slice() {
+        println!(
+            "{}",
+            socket_less_http("socket relay-less-direct", &relay[1], &direct[1])
+        );
     }
     Ok(())
 }
@@ -1604,6 +2032,110 @@ mod tests {
         assert_eq!(body["messages"][0]["content"], SMALL);
     }
 
+    /// `--sizes` (#2135): the lamp's request three ways, the same but for
+    /// what is asked. `few` is given only what `LAMP_SECOND_FEW_TOOLS=on`
+    /// gives a first round, `more_functions` among them; `half` has the
+    /// first half of the character and every function.
+    #[test]
+    fn the_lamps_three_sizes_differ_only_in_their_functions_or_character() {
+        let declared = cache::functions();
+        let count = declared.len();
+        let all: Declare = Arc::new(move || declared.clone());
+        let base = "https://relay.example.invalid/api/v1/ai/v1/deepseek";
+        let chat = |size| size_chat(base, "deepseek-flash", "k", &all, size).unwrap();
+        let (lamp, few, half_chat) = (chat(Size::Lamp), chat(Size::Few), chat(Size::Half));
+        let character = "First line of the character.\nSecond line, a little longer.\nThird.";
+        let names = |body: &Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .map(|tools| {
+                    tools
+                        .iter()
+                        .filter_map(|tool| tool["function"]["name"].as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let (_, _, lamp) = lamp.wire(&Size::Lamp.messages(character, 2));
+        let (_, _, few) = few.wire(&Size::Few.messages(character, 2));
+        let (_, _, halved) = half_chat.wire(&Size::Half.messages(character, 2));
+        assert_eq!(names(&lamp).len(), count);
+        assert_eq!(names(&halved), names(&lamp));
+        let few_names = names(&few);
+        assert!(few_names.len() < count, "{few_names:?}");
+        assert!(
+            few_names.iter().any(|name| name == "more_functions"),
+            "{few_names:?}"
+        );
+        assert_eq!(few["messages"], lamp["messages"]);
+        let system = |body: &Value| body["messages"][0]["content"].as_str().unwrap().to_owned();
+        assert!(system(&lamp).starts_with(character));
+        assert!(system(&halved).starts_with("First line of the character.\n\nRequest 2 "));
+        assert_eq!(halved["messages"][1], lamp["messages"][1]);
+        assert!(serde_json::to_vec(&few).unwrap().len() < serde_json::to_vec(&lamp).unwrap().len());
+    }
+
+    /// The character's first half ends at a line break before its middle,
+    /// else a space, else its middle; and a cut is never inside a
+    /// character.
+    #[test]
+    fn half_the_character_ends_at_a_line_or_a_word() {
+        assert_eq!(half("one two\nthree four five six"), "one two");
+        assert_eq!(half("one two three four"), "one two");
+        assert_eq!(half("abcdefgh"), "abcd");
+        assert_eq!(half("đèn đèn\nđèn đèn đèn"), "đèn đèn");
+        assert_eq!(half(""), "");
+    }
+
+    /// Each run begins on the next kind: over as many runs as kinds, each
+    /// is asked first once, and every run asks each once.
+    #[test]
+    fn each_run_begins_on_the_next_kind() {
+        let firsts: Vec<usize> = (1..=3)
+            .map(|run| kind_order(run, 3).next().unwrap())
+            .collect();
+        assert_eq!(firsts, [1, 2, 0]);
+        for run in 1..=5 {
+            let mut asked: Vec<usize> = kind_order(run, 3).collect();
+            asked.sort_unstable();
+            assert_eq!(asked, [0, 1, 2], "run {run}");
+        }
+        assert_eq!(kind_order(4, 2).collect::<Vec<_>>(), [0, 1]);
+    }
+
+    /// With `--sizes`, each target's `few` and `half` medians less its
+    /// `lamp`'s; without them, no line.
+    #[test]
+    fn each_smaller_size_is_told_less_the_lamps() {
+        let kind = |size: Size| Kind {
+            before: "",
+            after: format!(" size={}", size.name()),
+            reading: Reading::Events,
+            request: Box::new(|_| Err(io::Error::other("not asked"))),
+        };
+        let kept = |first_event: u64| Kept {
+            first_byte: vec![first_event.saturating_sub(10)],
+            first_event: vec![first_event],
+            words: vec![first_event + 5],
+            ..Kept::default()
+        };
+        let targets = vec![(
+            "relay",
+            vec![kind(Size::Lamp), kind(Size::Few), kind(Size::Half)],
+        )];
+        let lines = less_than_lamp(&targets, &[vec![kept(1600), kept(1300), kept(1500)]]);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(
+            lines[0].starts_with("wire target=relay few-less-lamp "),
+            "{}",
+            lines[0]
+        );
+        assert!(lines[0].contains(" first_event_ms=-300"), "{}", lines[0]);
+        assert!(lines[1].contains("half-less-lamp") && lines[1].contains(" first_event_ms=-100"));
+        let plain = vec![("relay", vec![kind(Size::Lamp), kind(Size::Small)])];
+        assert!(less_than_lamp(&plain, &[vec![kept(1), kept(1)]]).is_empty());
+    }
+
     #[test]
     fn the_summary_gives_each_steps_median_and_the_relays_extra() {
         let times = |tcp, first_byte| Times {
@@ -1729,7 +2261,7 @@ mod tests {
             relay.url.as_str(),
             "https://relay.example.invalid/api/v1/ai/v1/elevenlabs/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?output_format=pcm_24000"
         );
-        assert!(!on_elevenlabs(&relay.url));
+        assert!(!on_elevenlabs("https://relay.example.invalid/api/v1/ai/v1"));
         assert_eq!(
             (relay.header, relay.value.as_str(), relay.reading),
             ("xi-api-key", "k", Reading::Audio)
@@ -1747,7 +2279,16 @@ mod tests {
             "{}",
             direct.url
         );
-        assert!(on_elevenlabs(&direct.url));
+        assert!(on_elevenlabs(ELEVENLABS_BASE_URL));
+        // Another host of ElevenLabs' is the relay's to the route, so to
+        // the probe too (the reviewer on #2119).
+        assert!(!on_elevenlabs("https://foo.elevenlabs.io/v1"));
+        let other = piece("https://foo.elevenlabs.io/v1", "k", None, "m", 0).unwrap();
+        assert!(
+            other.url.contains("/elevenlabs/text-to-speech/"),
+            "{}",
+            other.url
+        );
         let body: Value = serde_json::from_slice(&direct.body).unwrap();
         assert_eq!(body["text"], PIECES[1], "run 5 is run 1's piece again");
         for text in PIECES {
@@ -1871,5 +2412,202 @@ mod tests {
         assert!(line.contains(" runs=2 failed=0 "), "{line}");
         assert!(line.contains(" first_byte_p50_ms=400 "), "{line}");
         assert!(line.ends_with(" closed=1"), "{line}");
+    }
+
+    /// A local speech socket: it takes the upgrade only with `key` in its
+    /// `authorization`, reads the opening, the piece and the end, then
+    /// answers `answers` (each a message's text), `pause` apart. Gives its
+    /// port, and on join the three messages it read.
+    fn socket_serving(
+        key: &'static str,
+        answers: Vec<String>,
+        pause: Duration,
+    ) -> (u16, std::thread::JoinHandle<Vec<Value>>) {
+        use tungstenite::{
+            Message as Frame,
+            handshake::server::{Callback, ErrorResponse, Request, Response},
+        };
+        /// Takes the upgrade only with the key in `authorization`.
+        struct KeyCheck(&'static str);
+        impl Callback for KeyCheck {
+            fn on_request(
+                self,
+                request: &Request,
+                response: Response,
+            ) -> Result<Response, ErrorResponse> {
+                let told = request
+                    .headers()
+                    .get("authorization")
+                    .and_then(|value| value.to_str().ok());
+                if told == Some(self.0) {
+                    Ok(response)
+                } else {
+                    let mut refused = ErrorResponse::new(None);
+                    *refused.status_mut() = tungstenite::http::StatusCode::UNAUTHORIZED;
+                    Err(refused)
+                }
+            }
+        }
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            let Ok(mut ws) = tungstenite::accept_hdr(socket, KeyCheck(key)) else {
+                return Vec::new();
+            };
+            let mut read = Vec::new();
+            while read.len() < 3 {
+                match ws.read().unwrap() {
+                    Frame::Text(text) => read.push(serde_json::from_str(text.as_str()).unwrap()),
+                    _ => continue,
+                }
+            }
+            for answer in answers {
+                std::thread::sleep(pause);
+                if answer == "close 4001" {
+                    let frame = tungstenite::protocol::CloseFrame {
+                        code: 4001.into(),
+                        reason: "".into(),
+                    };
+                    let _ = ws.close(Some(frame));
+                    let _ = ws.flush();
+                    break;
+                }
+                ws.send(Frame::Text(answer.into())).unwrap();
+            }
+            read
+        });
+        (port, server)
+    }
+
+    fn local_socket(port: u16, key: &str) -> SocketRequest {
+        SocketRequest {
+            url: format!(
+                "ws://127.0.0.1:{port}/v1/text-to-speech/abc/stream-input?model_id=m&output_format=pcm_24000"
+            ),
+            header: "authorization",
+            value: key.to_owned(),
+        }
+    }
+
+    /// `--socket`: the socket is opened with its key, told the voice's
+    /// settings, the piece made at once, and the end; the piece is timed from
+    /// its last byte to its first audio and its end, and its audio counted.
+    #[test]
+    fn a_piece_on_a_speech_socket_is_timed_to_its_first_audio_and_end() {
+        let answers = vec![
+            r#"{"audio":"AQIDBA==","isFinal":false}"#.to_owned(),
+            r#"{"audio":"BQYHCAkK","isFinal":false}"#.to_owned(),
+            r#"{"audio":null,"isFinal":true}"#.to_owned(),
+        ];
+        let (port, server) = socket_serving("Bearer k", answers, Duration::from_millis(30));
+        let times = socket_arm(
+            &local_socket(port, "Bearer k"),
+            PIECES[0],
+            None,
+            Duration::ZERO,
+        )
+        .unwrap();
+        let read = server.join().unwrap();
+        assert_eq!(read[0], net::socket_opening());
+        assert_eq!(read[1], net::socket_piece(PIECES[0]).unwrap());
+        assert_eq!(read[2], net::socket_end());
+        let answer = times.answer;
+        assert_eq!((answer.status, answer.audio_bytes), (101, 4 + 6));
+        let first = answer.audio.unwrap();
+        assert!(first >= 25, "{answer:?}");
+        assert!(answer.done >= first + 50, "to the last: {answer:?}");
+        let shown = socket_shown(&times, 47);
+        assert!(shown.starts_with("bytes=47 status=101 dns_ms="), "{shown}");
+        assert!(
+            shown.contains(" upgrade_ms=") && shown.ends_with(" audio_bytes=10"),
+            "{shown}"
+        );
+    }
+
+    /// A socket refused at the upgrade says its status; one closed before
+    /// any audio says its close code; neither is timed. Words the service
+    /// sends that aren't an answer are told by their kind only.
+    #[test]
+    fn a_refused_speech_socket_says_how_without_the_services_words() {
+        let (port, server) = socket_serving("Bearer k", Vec::new(), Duration::ZERO);
+        let error = socket_arm(
+            &local_socket(port, "Bearer no"),
+            PIECES[0],
+            None,
+            Duration::ZERO,
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "upgrade: answered 401");
+        server.join().unwrap();
+        let (port, server) =
+            socket_serving("Bearer k", vec!["close 4001".to_owned()], Duration::ZERO);
+        let error = socket_arm(
+            &local_socket(port, "Bearer k"),
+            PIECES[0],
+            None,
+            Duration::ZERO,
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "answer: closed 4001");
+        server.join().unwrap();
+        let (port, server) = socket_serving(
+            "Bearer k",
+            vec![
+                r#"{"message":"quota exceeded for user@example.invalid","error":"quota"}"#
+                    .to_owned(),
+            ],
+            Duration::ZERO,
+        );
+        let error = socket_arm(
+            &local_socket(port, "Bearer k"),
+            PIECES[0],
+            None,
+            Duration::ZERO,
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "answer: refused");
+        server.join().unwrap();
+    }
+
+    /// `--socket`'s lines: the socket's medians with its upgrade, and what
+    /// it saves a piece against a kept connection.
+    #[test]
+    fn the_sockets_summary_gives_its_opening_and_what_it_saves() {
+        let times = |upgrade, audio| Times {
+            tcp: 40,
+            tls: 50,
+            send: upgrade,
+            answer: Answer {
+                status: 101,
+                audio: Some(audio),
+                done: audio + 300,
+                audio_bytes: 96_000,
+                kept: true,
+                ..Answer::default()
+            },
+            ..Times::default()
+        };
+        let (mut socket, mut http) = (Kept::default(), Kept::default());
+        for (upgrade, audio) in [(300, 380), (320, 400), (310, 390)] {
+            socket.keep(&times(upgrade, audio));
+            http.keep(&times(0, audio + 40));
+        }
+        socket.failed = 1;
+        let line = socket.socket_summary("socket target=relay");
+        assert!(
+            line.starts_with(
+                "wire socket target=relay runs=4 failed=1 tcp_p50_ms=40 tls_p50_ms=50 upgrade_p50_ms=310 upgrade_p90_ms=320 first_audio_p50_ms=390 "
+            ),
+            "{line}"
+        );
+        assert_eq!(
+            socket_less_http("socket-less-http target=relay", &socket, &http),
+            "wire socket-less-http target=relay first_audio_ms=-40 done_ms=-40"
+        );
+        assert_eq!(
+            socket_less_http("socket-less-http target=relay", &socket, &Kept::default()),
+            "wire socket-less-http target=relay first_audio_ms=none done_ms=none"
+        );
     }
 }

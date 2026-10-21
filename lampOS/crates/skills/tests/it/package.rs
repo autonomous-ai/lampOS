@@ -990,6 +990,7 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     let mut answer = Vec::new();
     let ok = package::asked(
         &skills,
+        &skills.join("no-made"),
         WAIT,
         None,
         &b"{\"remove\": \"desk-tutor\"}\n"[..],

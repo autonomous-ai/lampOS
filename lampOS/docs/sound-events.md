@@ -4,7 +4,7 @@ Status: the first builder accepted this topic and model direction on
 [19 October at 09:02](https://github.com/autonomous-ai/lampOS/issues/1669#issuecomment-6258073073).
 Third reviewed the typed contract on 19 October. A publisher now exists in
 Ears behind `LAMP_EARS_CLASSES=on`, off unless set and only with
-`LAMP_PRIVACY_CONTROLS=on` (see "The publisher behind LAMP_EARS_CLASSES"
+`LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with a stored yes (see "The publisher behind LAMP_EARS_CLASSES"
 below). Third's privacy read of its two-second retention found no P1 or P2
 (19 October); its scores still need the empty-room and busy-room
 measurement, and the owner's word, before any unit sets it.
@@ -136,6 +136,34 @@ lamp playback, music with vocals, instrumental music and laughter as separate
 labelled conditions. Training/calibration and held-out evaluation recordings
 must not overlap. A zero observation duration is unmeasured, not zero false rate.
 
+**Off the lamp** (#1669): `cargo run --release -p lamp-ears --example
+score_wav -- yamnet.onnx FILE.wav...` scores 16 kHz mono files through this
+publisher's own frontend and pinned model, every 500 ms, and says per file how
+many windows clear Music sway's and Laugh glance's bars and how long music
+holds. It is the model on the file's own sound, with no room or microphone, so
+a lamp run's numbers are read against it, never replaced by it. On 21 October,
+three free-to-use tracks (solo piano, a jazz vocal, an upbeat instrumental)
+held music over 0.6 for 57 to 59 s of 60. A spoken line over the upbeat track
+dropped it under 0.6 in a few windows, never past Music sway's 5 s gap.
+Nine free-to-use laughs peaked at 0.00 to 0.61 on `Laughter`, which tops the
+whole laughing family (Giggle, Snicker, Belly laugh, Chuckle) in every one. A
+laugh lands high in one 0.96 s window and rarely in two, so only one of them
+ever held two windows in a row over 0.3. In 16.8 minutes of people talking
+(a read article, two conversations, an interview), laughter never went over
+0.09. So Laugh glance takes **one window over 0.3**, no longer two over 0.5:
+5 of the 9 laughs, and none of the talk (the tables are on #1669).
+
+**Through a lamp's microphone** (lamp-52e6, #2399, 21 Oct, `tools/joys-scores.sh`
+with `KEEP_DIR`, from a speaker beside the lamp in a talking office): laughs
+score about five times lower, 0.04 to 0.15, and nothing else (music, a line
+over it, the office) went over 0.015 in 2,430 windows. So Laugh glance now
+takes **one window over 0.05**: 2 of the 5 laughs, none of the rest. Music
+reads as off the lamp in spells (up to 0.98) but dips under 0.6 between
+phrases. Music sway's 0.6 for 20 s with a 5 s gap swayed once on piano and
+on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
+upbeat track whose 60 s held under the bar too often. Each skill keeps one
+case made of that run's own scores.
+
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads
 `scores.music` and does nothing without this topic.
@@ -153,8 +181,12 @@ counts. It does not export score payloads or make them behavioral evidence.
 
 `lamp-ears` with `LAMP_EARS_CLASSES=on` (exactly `on`) and
 `LAMP_PRIVACY_CONTROLS=on` publishes `ears/classes`
-(`crates/ears/src/classes.rs`). With the switch on and privacy controls off,
-one journal line says no classifier runs, and none does. Off, nothing below
+(`crates/ears/src/classes.rs`), and with `no-slide` only when the person's
+yes to room sounds is stored (`room_sounds_yes`, read at the start and
+every 2 s while it runs, so a forget stops it;
+[privacy-switch.md](privacy-switch.md)). With the switch on and privacy
+controls off, or `no-slide` without the yes, one journal line says no
+classifier runs, and none does. Off, nothing below
 exists: no queue, thread or model.
 
 **Model.** `LAMP_EARS_CLASSES_MODEL` is the absolute path to `yamnet.onnx`,

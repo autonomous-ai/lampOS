@@ -39,26 +39,69 @@ pub fn enabled(classes: Option<&str>) -> bool {
     classes == Some("on")
 }
 
-/// Whether the classifier starts, from its switch (`LAMP_EARS_CLASSES`) and
-/// the privacy route (`LAMP_PRIVACY_CONTROLS`).
+/// Whether the classifier starts, from its switch (`LAMP_EARS_CLASSES`),
+/// the privacy route (`LAMP_PRIVACY_CONTROLS`) and, on a lamp with no slide,
+/// the person's stored yes to room sounds ([`room_sounds_yes`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Start {
     /// The switch is not exactly `on`: nothing to say.
     Off,
-    /// The switch is on, but not on a lamp with a slide (`on`): with
-    /// `no-slide` it never runs (the reviewer's P2 on #2086), said once.
+    /// The switch is on, but the route is neither `on` (a lamp with a
+    /// slide) nor `no-slide`: it never runs, said once.
     NotOnThisRoute,
+    /// The switch is on, on a lamp with no slide, and no yes is stored
+    /// (the lead's decision, First on #1722 at 07:33): said once.
+    NoYes,
     /// It starts.
     Start,
 }
 
-/// [`Start`] for `classes` and `route`.
-pub fn start(classes: Option<&str>, route: Option<&str>) -> Start {
-    match (enabled(classes), crate::privacy::slide(route)) {
-        (false, _) => Start::Off,
-        (true, false) => Start::NotOnThisRoute,
-        (true, true) => Start::Start,
+/// [`Start`] for `classes` and `route`; `yes` is asked only on a lamp with
+/// no slide, with the switch on.
+pub fn start(classes: Option<&str>, route: Option<&str>, yes: impl FnOnce() -> bool) -> Start {
+    if !enabled(classes) {
+        Start::Off
+    } else if crate::privacy::slide(route) {
+        Start::Start
+    } else if route != Some("no-slide") {
+        Start::NotOnThisRoute
+    } else if yes() {
+        Start::Start
+    } else {
+        Start::NoYes
     }
+}
+
+/// Where the voice's onboarding keeps the person's yes to room sounds
+/// (Seventh's #2110: `root:lampos` 0640 in a 0750 folder lamp-ears can
+/// traverse): `{"room_sounds":"yes", ...}`, present only
+/// while the yes stands; "no", silence, a redo, a forget and the reset
+/// remove it.
+pub const ROOM_SOUNDS_FILE: &str = "/var/lib/lampOS/consent/room-sounds.json";
+/// How often a running classifier looks at the yes again, so a forget or a
+/// redo of setup stops it within this, not at the next start (Third's P2 on
+/// #2109).
+pub const YES_EVERY_US: u64 = 2_000_000;
+const ROOM_SOUNDS_MOST_BYTES: u64 = 4096;
+
+/// Whether `path` holds a yes: a JSON object whose `room_sounds` is exactly
+/// `"yes"`. Missing, unreadable, over 4096 bytes, not JSON, or anything
+/// else is no; `version` and other fields are not read.
+pub fn room_sounds_yes(path: &Path) -> bool {
+    let Ok(file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut text = String::new();
+    if file
+        .take(ROOM_SOUNDS_MOST_BYTES + 1)
+        .read_to_string(&mut text)
+        .is_err()
+        || text.len() as u64 > ROOM_SOUNDS_MOST_BYTES
+    {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(&text)
+        .is_ok_and(|value| value.get("room_sounds").and_then(|v| v.as_str()) == Some("yes"))
 }
 
 /// Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
@@ -615,7 +658,9 @@ impl Status {
 
 /// The worker thread's loop. `score` is `None` for a model that failed its
 /// pins: then no block is retained and the topic says `invalid_model`.
-/// Ends on `stop` or when capture drops its [`Handoff`].
+/// Ends on `stop`, when capture drops its [`Handoff`], or when `yes`, asked
+/// every [`YES_EVERY_US`], no longer holds: then the window is dropped and
+/// the topic says `privacy` before the thread ends.
 pub fn serve(
     intake: Intake,
     gate: &PublicationGate,
@@ -623,6 +668,7 @@ pub fn serve(
     mut now: impl FnMut() -> u64,
     mut score: Option<impl FnMut(&[f32]) -> Result<SoundScores, String>>,
     mut send: impl FnMut(Classified),
+    mut yes: impl FnMut() -> bool,
 ) {
     let frontend = Frontend::new();
     let mut window = Window::default();
@@ -636,9 +682,19 @@ pub fn serve(
         scored: false,
     };
     let mut heard_us = now();
+    let mut asked_us = heard_us;
     while !stop.load(Ordering::Acquire) {
         let received = intake.receiver.recv_timeout(Duration::from_millis(20));
         let at = now();
+        if at.saturating_sub(asked_us) >= YES_EVERY_US {
+            asked_us = at;
+            if !yes() {
+                window.purge();
+                status.reason = SoundUnavailable::Privacy;
+                status.send(at, &mut send);
+                return;
+            }
+        }
         match received {
             Ok(block) if score.is_some() => {
                 heard_us = at;

@@ -20,7 +20,7 @@ body = true
 [trigger]
 topic = "ears/classes"
 field = "scores.music"    # YAMNet's music score, 0 to 1; an unavailable message has none and never holds
-above = 0.6               # provisional: no threshold is measured yet (sound-events.md); the lamp check sets it
+above = 0.6               # through lamp-52e6's microphone (#2399, 21 Oct): piano and a jazz vocal from a speaker beside it swayed once, 60 s and 22 s in; an upbeat track whose 60 s held under the bar too often, an empty office and talk over it never did
 for = "20s"               # music that goes on, not a ringtone or a clip from a video
 gap = "5s"                # a quiet bar or a missed score does not end the music
 rearm = { below = 0.3, for = "5m" }  # once a piece of music; again only after five minutes without it

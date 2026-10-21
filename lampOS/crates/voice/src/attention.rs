@@ -678,6 +678,37 @@ pub fn only_the_name(heard: &str) -> bool {
         && called_by_name_on(heard, true)
 }
 
+/// Whether what was heard opens with the lamp's name set off as a call:
+/// "Lamp" or "Lamb" after a greeting ("Hey Lamp …"), or followed by a
+/// pause ("Lamp, …", "Lamp."). Never a stand-in ([`called`]'s "man",
+/// "plan", "mom" are everyday words), and not "Lamp is broken, …" or
+/// "Lamb for dinner tonight?" (#2191, the reviewer's P2 on #2210).
+pub fn begins_with_the_name(heard: &str) -> bool {
+    let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
+    let mut rest = heard;
+    let mut greeted = false;
+    loop {
+        let start = rest.find(char::is_alphanumeric);
+        let Some(start) = start else { return false };
+        rest = &rest[start..];
+        let end = rest
+            .find(|c: char| !c.is_alphanumeric())
+            .unwrap_or(rest.len());
+        let (word, after) = rest.split_at(end);
+        if is(word, GREETINGS) {
+            greeted = true;
+            rest = after;
+            continue;
+        }
+        let set_off = after
+            .trim_start()
+            .chars()
+            .next()
+            .is_none_or(|c| matches!(c, ',' | '.' | '?' | '!' | ';' | ':'));
+        return (greeted || set_off) && is(word, &["lamp", "lamb"]);
+    }
+}
+
 /// What the service has written in the name's place, first or after a
 /// greeting ([`called`]).
 fn called_by_stand_in(words: &[&str]) -> bool {
@@ -754,6 +785,33 @@ pub enum Verdict {
 pub const NAME_BEFORE_US: u64 = 1_500_000;
 const NAMED: &str = "its name was heard in the room's sound";
 
+/// With `LAMP_NAME_SECOND_SIGN=on`, a hearing of the name that began no
+/// later than this into the line's sound (from [`NAME_BEFORE_US`] before
+/// it) is the name at the line's start, a call ("Hey Lamp, …", "Lamp, …"),
+/// and is its own second sign ([`Attention::weigh_the_name`]). Both times
+/// are the voice's: the line's sound opens with its first block, the
+/// detector's pre-roll (`activity::PRE_ROLL_BLOCKS`, 0.3 s, dated when each
+/// block was read), and a hearing is dated from when it began, the time
+/// `lamp-name` said it less its `ago_ms`, never from when it was said
+/// (`lamp-name` says one once its score falls, up to 0.8 s on). But
+/// `lamp-name`'s "began" is when its score reached the bar, which is as the
+/// name ends and a little after, not as the name is first said. On
+/// lamp-4ace on 2026-10-21 at 08:06 (b0802) "Hey Lamp, good morning!",
+/// played at 08:06:33.988, was heard from about 08:06:35.05, about 1.06 s
+/// on, and was dropped with 0.7 s here (the first builder at 09:12 on
+/// #1722). Taking the line's sound as opening when it was played (the
+/// pre-roll against the speaker's and the detector's delays, not
+/// measured), "Lamp" ends about 0.8 s in at 0.3 s a word, so the hearing
+/// began about a quarter of a second after the name's end. A passing mention
+/// comes a few words in ("Yes, the lamp looked at me…", "I left the lamp
+/// on…"), its hearing from about 1.55 s in. On 03:38 the same greeting,
+/// its words written "Mainland. Good morning.", was dropped without the
+/// sign at all (the first builder at 03:54 on #1722).
+// ponytail: one played greeting measured, between it and the earliest
+// passing mention; set it again from the journal's "began … ms into the
+// line" once more played tests are read.
+pub const NAME_AT_THE_START_US: u64 = 1_300_000;
+
 /// A tap on the lamp's head (#711, `docs/creature.md` "Touch") counts as a
 /// call for a request that begins no longer than this after it: the tap
 /// asks the lamp to listen, and the person may take a breath first. It is
@@ -814,6 +872,11 @@ pub(crate) const GOING_ON: &str = "a conversation with the lamp is going on";
 /// let out so had another sign as well (the second route names it, #1712).
 pub(crate) const TRUSTED: &str = "the session has heard enough to be trusted";
 pub(crate) const ROOM_NOT_BUSY: &str = "the room is not known to be busy";
+/// The strict busy rule's holds ([`decide_busy`]).
+pub(crate) const BUSY_NAMED_UNTURNED: &str =
+    "a busy room: its name was heard in the sound, and nobody is turned to the lamp";
+pub(crate) const BUSY_UNCALLED: &str =
+    "a busy room, and nothing shows it was called or that anyone is turned to the lamp";
 /// The text calling the lamp, as the rule says it.
 pub(crate) const CALLED_IN_TEXT: &str = "the text shows it was called";
 const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
@@ -886,13 +949,9 @@ fn decide_called(
     } else if named && !strict {
         Verdict::Play(NAMED)
     } else if strict && named {
-        Verdict::Hold(
-            "a busy room: its name was heard in the sound, and nobody is turned to the lamp",
-        )
+        Verdict::Hold(BUSY_NAMED_UNTURNED)
     } else if strict {
-        Verdict::Hold(
-            "a busy room, and nothing shows it was called or that anyone is turned to the lamp",
-        )
+        Verdict::Hold(BUSY_UNCALLED)
     } else {
         Verdict::Hold("a new session in a busy room, and nothing shows it was called")
     }
@@ -926,6 +985,9 @@ pub struct Attention {
     /// such a hearing counts for the request in hand.
     named_sure_us: Option<u64>,
     named_sure: bool,
+    /// Whether a hearing that counts for the request in hand began at the
+    /// line's start ([`NAME_AT_THE_START_US`]).
+    named_at_start: bool,
     /// When the lamp's head was last tapped, and whether that counts for the
     /// request in hand ([`TAPPED_BEFORE_US`]).
     tapped_us: Option<u64>,
@@ -963,6 +1025,8 @@ pub struct Attention {
     /// "The lamp" said in passing is no call ([`called_by_name`],
     /// `LAMP_NAME_IN_PASSING=ignored`).
     name_in_passing_ignored: bool,
+    /// The text's call narrowed ([`Self::narrow_the_call`]).
+    call_narrowed: bool,
     /// A remark to the room is not a reply to the lamp in a busy room
     /// (`LAMP_REMARKS=on`, [`crate::remarks`], #829).
     remarks: bool,
@@ -1005,9 +1069,15 @@ pub struct Attention {
     /// With `spoken_to`: the request in hand was let out only as the
     /// conversation going on ([`Self::played_on_the_conversation_alone`]).
     conversation_alone: bool,
+    /// The same, with or without `spoken_to`
+    /// ([`Self::played_only_as_going_on`]).
+    going_on_alone: bool,
     /// The request in hand was judged with a conversation going on, and
     /// nobody else's line before it.
     went_on: bool,
+    /// The name heard only in the room's sound counts only with a second
+    /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
+    name_second_sign: bool,
 }
 
 /// The most text kept for one request.
@@ -1022,6 +1092,44 @@ impl Attention {
     /// Whether remarks are held ([`Self::hold_remarks`]).
     pub fn holds_remarks(&self) -> bool {
         self.remarks
+    }
+
+    /// The name heard only in the room's sound counts only with a second
+    /// sign ([`Self::weigh_the_name`]).
+    pub fn ask_a_second_sign_of_the_name(&mut self, on: bool) {
+        self.name_second_sign = on;
+    }
+
+    /// With [`Self::ask_a_second_sign_of_the_name`]: the name heard for the
+    /// request in hand only in the room's sound counts for nothing alone,
+    /// at any score, [`SURE_SCORE`] too. It counts with a second sign: a
+    /// face turned to the lamp (`turned`), said close to the lamp, said to
+    /// it from close, its words calling it, or the hearing at the line's
+    /// start ([`NAME_AT_THE_START_US`]). On lamp-4ace on 2026-10-20
+    /// at 18:16, 18:17 and 18:20 a hearing of 0.9, where the office's false
+    /// hearings reach 0.997, opened a conversation with nobody calling the
+    /// lamp, and the lines after it were answered as that conversation
+    /// going on (the first builder at 21:03 on #1722). Called once a line's
+    /// signs are all in, before it is judged; whether the name was dropped.
+    pub fn weigh_the_name(&mut self, turned: Option<bool>) -> bool {
+        let text_calls = if self.name_in_passing_ignored {
+            called_by_name(&self.heard)
+        } else {
+            called(&self.heard)
+        };
+        let alone = self.name_second_sign
+            && self.named
+            && !(turned == Some(true)
+                || self.near
+                || self.addressed
+                || text_calls
+                || self.named_at_start);
+        if alone {
+            self.named = false;
+            self.named_sure = false;
+            self.best_score = 0.0;
+        }
+        alone
     }
 
     /// In a busy room, let a line out only as the conversation going on
@@ -1211,6 +1319,10 @@ impl Attention {
         self.named_sure = self
             .named_sure_us
             .is_some_and(|named| named.saturating_add(NAME_BEFORE_US) >= now_us);
+        self.named_at_start = self.named
+            && self
+                .named_us
+                .is_some_and(|named| named <= now_us.saturating_add(NAME_AT_THE_START_US));
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
@@ -1255,7 +1367,7 @@ impl Attention {
         let after_unanswered = self.after_unanswered;
         let before = (session == self.session && self.began_us.is_some()).then(|| {
             (
-                self.named,
+                (self.named, self.named_at_start),
                 self.named_sure,
                 self.best_score,
                 std::mem::take(&mut self.heard),
@@ -1265,7 +1377,16 @@ impl Attention {
             )
         });
         self.began_at(request, session, now_us);
-        if let Some((named, named_sure, best_score, heard, near, addressed, began_us)) = before {
+        if let Some((
+            (named, named_at_start),
+            named_sure,
+            best_score,
+            heard,
+            near,
+            addressed,
+            began_us,
+        )) = before
+        {
             self.named |= named;
             self.named_sure |= named_sure;
             self.best_score = self.best_score.max(best_score);
@@ -1273,6 +1394,14 @@ impl Attention {
             self.near |= near;
             self.addressed |= addressed;
             self.began_us = began_us;
+            // At the start is judged against the first part's start, not
+            // the continuation's: a hearing mid-way through the first part
+            // is never at the start because the line was cut there.
+            self.named_at_start = named_at_start
+                || (self.named
+                    && self.named_us.is_some_and(|n| {
+                        began_us.is_some_and(|b| n <= b.saturating_add(NAME_AT_THE_START_US))
+                    }));
             self.after_another = after_another;
             self.after_question = after_question;
             self.after_unanswered = after_unanswered;
@@ -1321,6 +1450,7 @@ impl Attention {
         {
             self.named = true;
             self.named_sure |= sure;
+            self.named_at_start |= at_us <= began.saturating_add(NAME_AT_THE_START_US);
             self.best_score = self.best_score.max(score);
         }
     }
@@ -1492,6 +1622,7 @@ impl Attention {
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
         self.conversation_alone = false;
+        self.going_on_alone = false;
         self.went_on = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         let another = self.another(room, own);
@@ -1527,11 +1658,7 @@ impl Attention {
             self.verdict = Some(verdict);
             return Some(verdict);
         }
-        let called_in_text = if self.name_in_passing_ignored {
-            called_by_name_on(&self.heard, self.stand_alone_ins)
-        } else {
-            called(&self.heard)
-        };
+        let called_in_text = self.called_in_text();
         // A short sound let through in a quiet room (#800): on lamp-52e6 on
         // 2026-10-15 at 13:03 a room sound of 0.7 s was heard as "¿Qué?" and
         // answered, nobody having spoken to the lamp. It is answered only
@@ -1657,8 +1784,7 @@ impl Attention {
                 || turned == Some(true)
                 || self.addressed
         };
-        self.conversation_alone = self.spoken_to
-            && !answering_another
+        self.going_on_alone = !answering_another
             && going_on
             && !(own
                 || called_in_text
@@ -1667,6 +1793,7 @@ impl Attention {
                 || turned == Some(true)
                 || self.addressed
                 || self.lamp_asked);
+        self.conversation_alone = self.spoken_to && self.going_on_alone;
         let verdict = match verdict {
             Verdict::Play(_) if self.spoken_to && !spoken_to => {
                 Verdict::Hold(if let Some(why) = another {
@@ -1767,11 +1894,7 @@ impl Attention {
     /// close to it, or a conversation going on (#1712, the first builder at
     /// 17:49: such lines were journaled as let out by trust).
     pub fn sign(&self, turned: Option<bool>) -> Option<&'static str> {
-        let called_in_text = if self.name_in_passing_ignored {
-            called_by_name_on(&self.heard, self.stand_alone_ins)
-        } else {
-            called(&self.heard)
-        };
+        let called_in_text = self.called_in_text();
         if self.named {
             Some(NAMED)
         } else if self.tapped {
@@ -1791,6 +1914,16 @@ impl Attention {
 
     pub fn played_on_the_conversation_alone(&self) -> bool {
         self.conversation_alone && matches!(self.verdict, Some(Verdict::Play(_)))
+    }
+
+    /// Whether the request in hand was let out only as the conversation
+    /// going on, whether or not `spoken_to` is on: lamp-52e6 and lamp-4ace
+    /// run without it, and there [`Self::played_on_the_conversation_alone`]
+    /// is never true. The going-on holds read this one
+    /// (`LAMP_GOING_ON_SAME_ONE`, `LAMP_QUIET_GOING_ON_SAME_ONE`; 20 Oct at
+    /// 22:4x).
+    pub fn played_only_as_going_on(&self) -> bool {
+        self.going_on_alone && matches!(self.verdict, Some(Verdict::Play(_)))
     }
 
     /// Whether the answer to the request in hand was let out because the
@@ -1814,13 +1947,30 @@ impl Attention {
     /// another person's conversation was going on was judged against that
     /// person's voice).
     pub fn called_for_itself(&self) -> bool {
-        self.named
-            || self.tapped
-            || if self.name_in_passing_ignored {
-                called_by_name_on(&self.heard, self.stand_alone_ins)
-            } else {
-                called(&self.heard)
-            }
+        self.named || self.tapped || self.called_in_text()
+    }
+
+    /// Whether the text shows the lamp was called, as the rule reads it
+    /// ([`called_by_name_on`] with `LAMP_NAME_IN_PASSING=ignored`, else
+    /// [`called`]), narrowed when [`Self::narrow_the_call`] said so.
+    fn called_in_text(&self) -> bool {
+        let read = if self.name_in_passing_ignored {
+            called_by_name_on(&self.heard, self.stand_alone_ins)
+        } else {
+            called(&self.heard)
+        };
+        read && !(self.call_narrowed && !self.named && !begins_with_the_name(&self.heard))
+    }
+
+    /// With `LAMP_BUSY_CALLED_STRICT=on`, in a busy room with nobody turned
+    /// to the lamp (the second route says so before each line): the text
+    /// shows a call only as "Lamp" or "Lamb" set off as one
+    /// ([`begins_with_the_name`]), or with the name heard in the sound. A
+    /// stand-in ("Man, that meeting ran long.", "Mom, can you pick me up?")
+    /// or "Lamp is broken, …" alone is office talk (#1712, the first
+    /// builder on #1722 at 16:11).
+    pub fn narrow_the_call(&mut self, narrowed: bool) {
+        self.call_narrowed = narrowed;
     }
 
     /// Whether the request in hand is someone else's, and why: with the
@@ -4449,5 +4599,48 @@ mod tests {
         ] {
             assert!(!only_the_name(not), "{not}");
         }
+    }
+
+    /// `LAMP_NAME_SECOND_SIGN=on`: a hearing at the line's start
+    /// ([`NAME_AT_THE_START_US`]) is its own second sign, whether it was
+    /// heard before the line began or in it, and it stays one for the line
+    /// going on after the lamp ended it early; a later one is dropped.
+    #[test]
+    fn with_a_second_sign_asked_the_name_at_the_lines_start_is_one() {
+        let began = 10_000_000;
+        let dropped = |at: u64, before: bool, going_on: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            if before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            attention.began_at(1, 1, began);
+            if !before {
+                attention.name_heard_scored(at, 0.95);
+            }
+            if going_on {
+                attention.continued_at(2, 1, began + 3_000_000);
+            }
+            attention.weigh_the_name(None)
+        };
+        for going_on in [false, true] {
+            for before in [false, true] {
+                let at_start = began + NAME_AT_THE_START_US;
+                assert!(!dropped(at_start, before, going_on), "{before} {going_on}");
+                assert!(
+                    dropped(at_start + 1, before, going_on),
+                    "{before} {going_on}"
+                );
+            }
+            assert!(!dropped(began - NAME_BEFORE_US, true, going_on));
+        }
+        // A line begun at 10.0 s, the name heard 1.6 s in (mid-line), cut
+        // and continued at 11.8 s: the hearing is still mid-line, dropped.
+        let mut attention = Attention::default();
+        attention.ask_a_second_sign_of_the_name(true);
+        attention.began_at(1, 1, began);
+        attention.name_heard_scored(began + 1_600_000, 0.95);
+        attention.continued_at(2, 1, began + 1_800_000);
+        assert!(attention.weigh_the_name(None));
     }
 }

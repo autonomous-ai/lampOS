@@ -44,18 +44,32 @@ Diễn ra như sau:
    - mỗi cái được giữ cùng SHA-256 và những gì nó xin dùng (`made.json`);
    - cùng một việc giao được đọc lại thì trả về cái đã giữ, không kiểm tra
      lại.
-6. **Nói ra.** Đèn nói kỹ năng sẽ làm gì (mô tả trong thẻ), sẽ dùng gì
-   ("đèn của nó và việc nó có đang nói hay không"), và nói đúng từng chữ:
-   "I've made it; putting it on needs a yes from the team first."
+6. **Nói ra, và hỏi.** Đèn nói kỹ năng sẽ làm gì (mô tả trong thẻ), sẽ
+   dùng gì ("đèn của nó và việc nó có đang nói hay không"), rồi hỏi đúng
+   từng chữ: "Shall I put it on the lamp?"
    - Các tệp không bao giờ được đọc ra.
    - Một kỹ năng không được giữ thì được nói rõ lý do.
+   - Lời hỏi được ghi cạnh gói (`offered_at_unix_ms` trong `made.json`)
+     khi tin được nghe trọn ở đèn, hoặc gửi trong tin nhắn, không phải lúc
+     đọc tin: đèn kể tin sau, vào lúc thích hợp.
+7. **Cài khi người dùng nói "có" thành tiếng** (quyết định của trưởng nhóm,
+   20/10 08:37 trên #1711: lời đồng ý bằng giọng nói gắn với SHA-256, một
+   ngoại lệ của quy định 18:33 chỉ cho kỹ năng tạo trên đèn; ứng dụng không
+   phải xác nhận thêm). Khi người dùng đồng ý, mô hình gọi
+   `put_on_made_skill`:
+   - chỉ lời "có" nói thành tiếng mới tính; gõ chữ hay câu do đèn tự viết
+     thì không cài gì;
+   - chỉ một lời "có" rõ ràng (`known_faces::plain_agreement`): "No, not
+     yet" mà mô hình hiểu nhầm là "có" thì không cài gì;
+   - chỉ lời hỏi mới nhất, trong vòng 120 giây kể từ khi được nghe;
+   - giọng nói chỉ gửi cho helper quản lý SHA-256 của kỹ năng đó
+     (`{"install_made": SHA256}`), helper chỉ cài đúng các byte đó và kiểm
+     lại giới hạn;
+   - không có helper thì người dùng nghe là không cài được; helper không
+     trả lời trong 8 giây thì nghe là đang cài;
+   - không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.
 
 **Còn mở, chờ trưởng nhóm:**
-- **Cài một kỹ năng tạo ra lên đèn.** Một gói chưa ký do tác tử tạo đi
-  ngược với quyết định 18:33, "chỉ những gói đã ký từ kênh cập nhật". SHA-256
-  được giữ là thứ một lời đồng ý như vậy sẽ gắn vào, nên những gì người dùng
-  nghe là những gì sẽ được cài, và không gì có thể mở rộng sau đó.
-- Lời đồng ý bằng giọng nói đã đủ chưa, hay ứng dụng cũng phải xác nhận.
 - Đăng nhập Harness trên đèn ở nhà.
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến cùng với việc cài nó.

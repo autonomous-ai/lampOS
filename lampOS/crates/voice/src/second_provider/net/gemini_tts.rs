@@ -99,7 +99,7 @@ impl GeminiTts {
     /// long it took, or `None` when not asked or nothing came. Asked as a
     /// line begins, so the answer's first sentence does not open it.
     pub async fn warm(&self) -> Option<(u16, Duration)> {
-        let (status, took, _) = super::warm_get(
+        let (status, took, ..) = super::warm_get(
             &self.client,
             &self.used,
             WARM_AFTER,

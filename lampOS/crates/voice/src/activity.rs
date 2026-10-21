@@ -727,6 +727,23 @@ pub struct ConfirmPolicy {
     /// finished turn (p 0.99) and cut the name off its question; in a busy
     /// room the question was then held for want of its name. 0: no floor.
     pub least_speech_blocks: u16,
+    /// A line under `least_speech_blocks` but with at least this many
+    /// speech blocks is sent to the model as well (`LAMP_ENDPOINT_SHORT_VERDICT`,
+    /// #2135). Its verdict ends it no sooner: a complete one waits for
+    /// `fallback_blocks` as above, an uncertain one ends there too, and only
+    /// a clearly incomplete one holds it to `incomplete_blocks`. On lamp-4ace
+    /// on 21 Oct 71 of 635 Ends (11%) were such lines, never asked, ended on
+    /// the silence window, among them "Hey Lamp, my name is" cut 0.66 s in
+    /// (the first builder on #1722 at 04:56). 0: they are not sent, as on
+    /// 14 Oct, when in a talkative office the model took a whole core.
+    pub short_verdict_blocks: u16,
+    /// An uncertain verdict is asked again at once, with the pause so far,
+    /// and a complete second ends the line when it comes, no sooner than
+    /// the commit; any other answer, or none, leaves the first's, so the
+    /// line ends no later than without it (#2135, the first builder on #1722
+    /// at 07:16: of 23 uncertain Ends on lamp-4ace, 12 were 0.745 to 0.888,
+    /// and none was followed by speech within 1 s).
+    pub recheck_uncertain: bool,
 }
 
 impl Default for ConfirmPolicy {
@@ -740,6 +757,8 @@ impl Default for ConfirmPolicy {
             result_timeout_blocks: 50,
             fallback_blocks: V1_END_SILENCE_BLOCKS,
             least_speech_blocks: 0,
+            short_verdict_blocks: 0,
+            recheck_uncertain: false,
         }
     }
 }
@@ -767,7 +786,8 @@ impl ConfirmPolicy {
             && self.complete_probability > 0.0
             && self.complete_probability < 1.0
             && self.incomplete_probability >= 0.0
-            && self.incomplete_probability <= self.complete_probability;
+            && self.incomplete_probability <= self.complete_probability
+            && self.short_verdict_blocks <= self.least_speech_blocks;
         if valid {
             Ok(())
         } else {
@@ -795,6 +815,21 @@ pub struct EndpointDecision {
     /// lamp's name (`--call-wait-ms`, #782). Absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call_wait_ms: Option<u64>,
+    /// How many times the line was sent to the model under the commit's
+    /// floor (`ConfirmPolicy::short_verdict_blocks`): the inferences the
+    /// switch adds, one a pause, so a line that pauses twice before the
+    /// floor counts two (the reviewer's P3 on #2380). Absent when none.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub short_asks: u16,
+    /// The first verdict's probability, when a second asked of an uncertain
+    /// one ended the line (`ConfirmPolicy::recheck_uncertain`). Absent
+    /// otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rechecked_from: Option<f32>,
+}
+
+fn is_zero(count: &u16) -> bool {
+    *count == 0
 }
 
 impl EndpointDecision {
@@ -806,6 +841,8 @@ impl EndpointDecision {
             fallback: None,
             verdict: None,
             call_wait_ms: None,
+            short_asks: 0,
+            rechecked_from: None,
         }
     }
 }
@@ -858,6 +895,15 @@ struct Confirmation {
     pause_blocks: u16,
     /// Speech blocks heard in this utterance.
     speech_blocks: u16,
+    /// How many times this utterance was sent under the commit's floor
+    /// ([`ConfirmPolicy::short_verdict_blocks`]).
+    short_asks: u16,
+    /// This pause's first verdict while a second is asked of it
+    /// ([`ConfirmPolicy::recheck_uncertain`]); whether the pause has had its
+    /// second; and the first's probability when the second's complete stood.
+    first: Option<Heard>,
+    rechecked: bool,
+    rechecked_from: Option<f32>,
 }
 
 impl Confirmation {
@@ -871,6 +917,10 @@ impl Confirmation {
             pause: Pause::Listening,
             pause_blocks: 0,
             speech_blocks: 0,
+            short_asks: 0,
+            first: None,
+            rechecked: false,
+            rechecked_from: None,
         }
     }
 
@@ -890,6 +940,8 @@ impl Confirmation {
         self.pause = Pause::Listening;
         self.pause_blocks = 0;
         self.speech_blocks = 0;
+        self.short_asks = 0;
+        self.forget_recheck();
         self.audio.clear();
     }
 
@@ -938,22 +990,43 @@ impl Confirmation {
         };
     }
 
+    /// No second verdict for this pause, nor any held for it.
+    fn forget_recheck(&mut self) {
+        self.first = None;
+        self.rechecked = false;
+        self.rechecked_from = None;
+    }
+
     /// Submits the utterance with exactly `check_blocks` of trailing pause,
     /// even when a busy slot delayed the submission.
     fn submit(&mut self) {
+        self.submit_as(0, self.policy.check_blocks);
+    }
+
+    /// Submits it as check `check` with `trailing` blocks of the pause: a
+    /// second verdict sends the whole pause so far.
+    fn submit_as(&mut self, check: u8, trailing: u16) {
         let token = Token {
             utterance: self.utterance,
             generation: self.generation,
-            check: 0,
+            check,
         };
-        let late = usize::from(self.pause_blocks - self.policy.check_blocks) * CAPTURE_SAMPLES;
+        let late =
+            usize::from(self.pause_blocks - trailing.min(self.pause_blocks)) * CAPTURE_SAMPLES;
         let audio = self.audio.make_contiguous();
         let snapshot = &audio[..audio.len().saturating_sub(late)];
         self.pause = match self.classifier.submit(token, snapshot) {
-            Submit::Accepted => Pause::Waiting {
-                token,
-                submitted: self.pause_blocks,
-            },
+            Submit::Accepted => {
+                // An inference the switch adds: taken by the worker, under
+                // the floor (a busy slot's retry is counted once, here).
+                if self.speech_blocks < self.policy.least_speech_blocks {
+                    self.short_asks = self.short_asks.saturating_add(1);
+                }
+                Pause::Waiting {
+                    token,
+                    submitted: self.pause_blocks,
+                }
+            }
             Submit::Busy => Pause::Busy,
             Submit::Unavailable => Pause::Unavailable(self.classifier.availability().reason()),
         };
@@ -970,12 +1043,28 @@ impl Confirmation {
         if let Some(outcome) = self.classifier.poll() {
             self.accept(outcome);
         }
+        // A second verdict's answer: a complete one stands; anything else
+        // gives the first back, so the line ends no later than it would have.
+        if let Some(first) = self.first {
+            match self.pause {
+                Pause::Heard(heard) if heard.probability >= self.policy.complete_probability => {
+                    self.first = None;
+                    self.rechecked_from = Some(first.probability);
+                }
+                Pause::Heard(_) | Pause::Unavailable(_) | Pause::Busy => {
+                    self.pause = Pause::Heard(first);
+                    self.first = None;
+                }
+                Pause::Listening | Pause::Waiting { .. } => {}
+            }
+        }
         if speech {
             self.speech_blocks = self.speech_blocks.saturating_add(1);
             if !matches!(self.pause, Pause::Listening) {
                 self.generation = self.generation.wrapping_add(1);
                 self.pause = Pause::Listening;
             }
+            self.forget_recheck();
             self.pause_blocks = 0;
             return None;
         }
@@ -989,7 +1078,9 @@ impl Confirmation {
             // office, the model took a whole core and the board 76 °C.
             Pause::Listening
                 if pause >= policy.check_blocks
-                    && self.speech_blocks >= policy.least_speech_blocks =>
+                    && (self.speech_blocks >= policy.least_speech_blocks
+                        || (policy.short_verdict_blocks > 0
+                            && self.speech_blocks >= policy.short_verdict_blocks)) =>
             {
                 self.submit()
             }
@@ -1001,6 +1092,25 @@ impl Confirmation {
             }
             _ => {}
         }
+        // An uncertain verdict, asked again at once with the pause so far
+        // (`ConfirmPolicy::recheck_uncertain`). Not taken by the worker: the
+        // first stands.
+        if policy.recheck_uncertain
+            && !self.rechecked
+            && let Pause::Heard(heard) = self.pause
+            && heard.probability >= policy.incomplete_probability
+            && heard.probability < policy.complete_probability
+        {
+            self.rechecked = true;
+            self.first = Some(heard);
+            self.submit_as(1, pause);
+            if !matches!(self.pause, Pause::Waiting { .. }) {
+                self.pause = Pause::Heard(heard);
+                self.first = None;
+            }
+        }
+        let short_asks = self.short_asks;
+        let (first, rechecked_from) = (self.first, self.rechecked_from);
         let decide = |basis, heard: Option<Heard>, fallback| EndpointDecision {
             basis,
             silence_ms: u64::from(pause) * 10,
@@ -1008,6 +1118,8 @@ impl Confirmation {
             fallback,
             verdict: heard.map(|heard| heard.trace),
             call_wait_ms: None,
+            short_asks,
+            rechecked_from,
         };
         match self.pause {
             Pause::Heard(heard)
@@ -1043,6 +1155,10 @@ impl Confirmation {
             // Too short to be sent to the model: the silence window.
             Pause::Listening if pause >= policy.fallback_blocks => {
                 Some(decide("silence_fallback", None, Some("short")))
+            }
+            // A second verdict still out at the window: the first's, as without it.
+            Pause::Waiting { .. } if pause >= policy.fallback_blocks && first.is_some() => {
+                Some(decide("model_uncertain", first, None))
             }
             Pause::Waiting { .. } if pause >= policy.fallback_blocks => {
                 Some(decide("silence_fallback", None, Some("timeout")))

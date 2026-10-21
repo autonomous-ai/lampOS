@@ -930,6 +930,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ABOUT_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_room_not_asker_worker_environment(
+            role,
+            var(crate::remember::ROOM_NOT_ASKER_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1146,6 +1150,17 @@ fn memory_threads_worker_environment(
         .then_some((crate::remember::THREADS_ENVIRONMENT, "on"))
 }
 
+// The room's kept things told as someone in the room's (#2176), passed the
+// same narrow way: the exact `on`, to the two routes that open the sessions
+// told of them (each through `remember::told_for_session`).
+fn memory_room_not_asker_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::ROOM_NOT_ASKER_ENVIRONMENT, "on"))
+}
+
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
 // the two workers that tell the time and judge the night. Cleared, it never
 // reached them, so a lamp whose clock was not set took its saved 22:00 as
@@ -1255,7 +1270,8 @@ fn credentials_worker_environment(
 
 // The second route's Gemini endpoint and voice, its key terms and the
 // lamp's place (#1712), and whether it listens for the names the lamp knows
-// (#753), to its worker only, as set: the worker checks them, and says so.
+// (#753), and whether a named ask is a hand-over (#1722, read by `serve`
+// there), to its worker only, as set: the worker checks them, and says so.
 fn second_route_worker_environment(
     role: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -1265,18 +1281,33 @@ fn second_route_worker_environment(
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
+        crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
+        crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
+        crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+        crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
+        crate::remember::HITS_ENVIRONMENT,
+        crate::second_provider::SKILL_LOOK_ENVIRONMENT,
+        crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+        crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+        crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
+        crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+        crate::second_provider::LOOK_NOTE_ENVIRONMENT,
+        crate::second_provider::LOOK_WALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
+        crate::speaking_faces::EYES_ENVIRONMENT,
+        crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1325,14 +1356,26 @@ mod tests {
     #[test]
     fn the_known_names_switch_reaches_only_the_second_route() {
         for name in [
+            crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_config::OWN_KEYS_ENV,
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+            crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
+            crate::second_provider::SKILL_LOOK_ENVIRONMENT,
+            crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+            crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+            crate::second_provider::OPEN_NAME_ENVIRONMENT,
+            crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
+            crate::second_provider::LOOK_NOTE_ENVIRONMENT,
+            crate::second_provider::LOOK_WALK_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
+            crate::speaking_faces::EYES_ENVIRONMENT,
+            crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -1345,6 +1388,48 @@ mod tests {
                     "{role}"
                 );
             }
+        }
+    }
+
+    /// The reviewer on #2365: with only `LAMP_TASKS_NAMED_ASK=on` set, the
+    /// started second worker gets it, since `serve` reads it there; no other
+    /// worker does.
+    #[test]
+    fn the_named_ask_switch_alone_reaches_the_started_second_worker() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let only = |name: &str| {
+            (name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT)
+                .then(|| std::ffi::OsString::from("on"))
+        };
+        let boot = new_boot().unwrap();
+        for (role, expected) in [
+            ("second", true),
+            ("provider", false),
+            ("capture", false),
+            ("speaker", false),
+        ] {
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                only,
+            ));
+            assert!(status.success(), "{role}");
+            let written =
+                std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+            assert_eq!(
+                written
+                    .lines()
+                    .any(|line| line == "LAMP_TASKS_NAMED_ASK=on"),
+                expected,
+                "{role}"
+            );
         }
     }
 
@@ -1475,6 +1560,12 @@ mod tests {
                     (
                         memory_forget_about_worker_environment,
                         "LAMP_MEMORY_FORGET_ABOUT",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // The room's kept things as someone's (#2176): both routes.
+                    (
+                        memory_room_not_asker_worker_environment,
+                        "LAMP_MEMORY_ROOM_NOT_ASKER",
                         ["provider", "second"].as_slice(),
                     ),
                     // The observation pass, the route with a model (#1693 (2)).
@@ -1618,6 +1709,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS",
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
+                    crate::remember::ROOM_NOT_ASKER_ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
@@ -1658,18 +1750,34 @@ mod tests {
                 } else if name == crate::local_time::PLACE_ENVIRONMENT {
                     "Hanoi, Vietnam"
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
+                    || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
+                    || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
+                    || name == crate::remember::HITS_ENVIRONMENT
+                    || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
+                    || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
+                    || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
+                    || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
+                    || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
+                    || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
+                    || name == crate::speaking_faces::EYES_ENVIRONMENT
+                    || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                 {
                     "on"
+                } else if name == crate::remember::FORGET_ASKED_ENVIRONMENT {
+                    "off"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
                     "4"
                 } else {
@@ -1719,6 +1827,7 @@ mod tests {
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
+                    "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -1729,7 +1838,12 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
+                    "LAMP_BUSY_CALLED_STRICT=on",
+                    "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACE_GAP_HOLD=on",
+                    "LAMP_FORGET_ASKED=off",
+                    "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
@@ -1740,11 +1854,15 @@ mod tests {
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REOPEN_QUIET=on",
+                    "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
+                    "LAMP_NAMED_ALWAYS=on",
+                    "LAMP_NAME_SECOND_SIGN=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
+                    "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FEW_TOOLS=on",
@@ -1753,16 +1871,23 @@ mod tests {
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_LOOK_NOTE=on",
+                    "LAMP_SECOND_LOOK_WALK=on",
+                    "LAMP_SECOND_MEMORY_HITS=on",
+                    "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
+                    "LAMP_SECOND_SKILL_LOOK=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_SPEECH_SOCKET=on",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
+                    "LAMP_TASKS_NAMED_ASK=on",
                 ],
             ),
             (

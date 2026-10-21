@@ -14,16 +14,20 @@ yes, replaces the written one.
 
 | Case | What it holds | Result (lamp-skills, #1669) |
 |---|---|---|
-| `glances-once-at-a-laugh` | A face in view; laughter from 10 to 13 s | Pass: one glance at about 11 s |
+| `glances-once-at-a-laugh` | A face in view; laughter from 10 to 13 s | Pass: one glance at about 10 s |
 | `once-a-burst-and-not-again-within-five-minutes` | Laughter at 10 s, 14 s and 60 s | Pass: one glance; 14 s and 60 s are within the cooldown |
-| `not-at-one-loud-syllable` | One laughter score | Pass: nothing (`for = "1s"`) |
+| `one-score-over-the-bar-is-a-laugh` | One laughter score of 0.06 | Pass: one glance at 10 s (one window is enough) |
+| `not-at-a-score-under-the-bar` | One laughter score of 0.04 | Pass: nothing (`above = 0.05`) |
 | `nobody-in-view` | Laughter, no face | Pass: nothing |
 | `never-while-the-lamp-speaks` | Laughter while the lamp speaks | Pass: nothing |
 | `never-at-night` | From 23:30, laughter | Pass: nothing |
-| `laughter-on-and-on-gets-one-glance` | Laughter without a lull from 10 s to 330 s | Pass: one glance; none at 311 s when the cooldown ends (`rearm`) |
-| `a-laugh-with-nobody-in-view-spends-nothing` | A laugh with nobody at 10 s; a face from 30 s, a laugh at 60 s | Pass: one glance about 61 s; the first spent no cooldown |
+| `laughter-on-and-on-gets-one-glance` | Laughter without a lull from 10 s to 330 s | Pass: one glance; none at 310 s when the cooldown ends (`rearm`) |
+| `a-laugh-with-nobody-in-view-spends-nothing` | A laugh with nobody at 10 s; a face from 30 s, a laugh at 60 s | Pass: one glance about 60 s; the first spent no cooldown |
 | `never-over-its-own-sound` | Laughter while `own_voice` is `present` | Pass: nothing |
+| `a-laugh-through-lamp-52e6s-microphone` | lamp-52e6's own scores (#2399): 20 s of an empty office, 70 s of laughs from a speaker beside it, a line over them; a face and the voice resting beside it | Pass: one glance at the first laugh, 23 s (0.05 there) |
 
-The threshold (0.5) is provisional: no score is measured on a lamp yet
-(`docs/sound-events.md`). How the glance looks, and how it sits beside
+The bar, one window over 0.05, is set from lamp-52e6's own microphone
+(#2399, 21 Oct): laughs from a speaker at the lamp scored 0.04 to 0.15, and
+music, speech over it and an office talking never over 0.015. Off the lamp
+the same laughs scored over 0.3 (#1669, `docs/sound-events.md`). How the glance looks, and how it sits beside
 Expression's own startled glance at a sudden sound, is for the lamp check.

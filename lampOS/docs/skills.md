@@ -703,11 +703,32 @@ the calling session's: no session is renewed while it is owed (at most
 `LOOK_BEGINS_WITHIN` plus `STILL_WAIT`), and if another session is the
 ready one when its turn would go, it is dropped. A call in a turn the
 lamp wrote itself (the look's own turn, a hello) takes no look, nor does
-one whose answer never reached the model; every dropped look is
-recorded as `look_dropped` with `why`. Only Gemini Live takes a tool's
-look: the second route answers the same tools but sends no `LookAsked`
-(its engine answers the call inside the tool round), so there the
-model's words are the look, as before. When the turn is over the look's
+one whose answer never reached the model (on the second route a skill's
+search's own turns are the exception: see below); every dropped look is
+recorded as `look_dropped` with `why`. The second route takes a tool's
+look only with `LAMP_SECOND_SKILL_LOOK=on`: its engine then sends
+`LookAsked` for a skills call answered with `"look": true`, says "Let me
+look." itself and ends the turn, and the look's turn goes to its own
+session with the say's note after "When the picture comes:" after its
+question; in a turn the lamp wrote itself the look is dropped and the turn
+goes on to its next round ([second-voice.md](second-voice.md)). There a search's own turns
+(its look's turn, its note's) take the skill's next look, so
+look-for-things looks at the next place; every other turn the lamp wrote
+still takes none. Off, it answers the same
+tools but sends no `LookAsked`, so there the model's words are the look,
+as before. With `LAMP_SECOND_LOOK_NOTE=on` too, a search whose look got an
+answer that called nothing is sent one note to call `look_for` with the
+next place, once a search, and with `LAMP_SECOND_LOOK_WALK=on` a search
+left after its note is walked on by the lamp: it calls the skill itself
+with the next place not yet looked at, sends each picture as the search's
+next look turn naming the place, and the skill's give-up line once past
+its looks ([second-voice.md](second-voice.md)). Any error a `[search]` skill
+answers a walked call with is taken as its give-up: said once, and the
+search ends, so a search skill errors only past its looks (#2280). A walk
+step dropped while its call is in flight (the person spoke within its
+1.5 s) still turns the head: the skill made the pose, and the line that
+ended the step came before it began, so it may hold until its `for`; a
+check for the lamp row, not yet handled. When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is
 answered at once while the still takes up to 2.5 s. If no still with
@@ -1025,7 +1046,7 @@ for it.
   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
   sets, and the helper says so in the journal each time it lets a peer
   through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).
-- **It checks each request itself,** whoever connected. Two are taken,
+- **It checks each request itself,** whoever connected. Three are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
     name that is not a skill's (1 to 64 lowercase letters, digits and
@@ -1037,16 +1058,45 @@ for it.
     `url` optional (a Skills Store catalogue entry's fields): a package
     fetched and installed only signed with the update channel's key, and
     only with the Store's switch on ("From the Skills Store", below).
+  - `{"install_made": SHA256}`, 64 lowercase hex: a skill made here by
+    voice, put on at its person's yes (below). It needs no Store switch:
+    it fetches nothing.
 
-  Anything else is refused, `a request is one line, {"remove": NAME} or
+  Anything else is refused, `a request is one line, {"remove": NAME},
   {"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
-  VERSION}}, all but url optional`.
+  VERSION}}, all but url optional, or {"install_made": SHA256}`.
 
-  Either waits at most 4 s for the folder's lock (`ASKED_LOCK_WAIT`, under
+  Each waits at most 4 s for the folder's lock (`ASKED_LOCK_WAIT`, under
   `lamp-cloud`'s 5 s wait for a remove's answer; an install waits for it
   only after its fetch, at most 25 s, and its checks, under the 40 s
   `lamp-cloud` waits for an install), then refuses, `the lamp's skills
   can't be changed now`, with nothing done.
+- **A skill made here, put on at its person's yes** (#1685; the lead, 20
+  Oct 08:37 on #1711: a spoken yes bound to the package's SHA-256, the
+  helper installing only those bytes, re-checked and capped). The voice
+  asks `{"install_made": SHA256}`, 64 lowercase hex, and nothing else
+  (`package::install_made`). The helper finds the package the voice's
+  made-skills folder (`/var/lib/lampOS/voice/made-skills`, root's, 0700,
+  read by the helper as its owner) names with that hash in its
+  `made.json`. It reads its bytes once and hashes them, and a package
+  whose hash has changed is refused (`its SHA-256 has changed`). Then it
+  reads those same bytes as the package, so nothing is read twice. Its
+  `skill.toml` is held again to a made skill's cap
+  (`lamp_voice::made_skill::capped`, the voice's own: light, body, and
+  only `voice/state` and `room/presence`), and its `SKILL.md` must say
+  `made: here`. Then it is installed as any package is, under the same lock
+  and wait, with two differences:
+  - **It never takes the place of a skill put on another way** (the
+    reviewer's P3 on #2414): one of the same name whose `SKILL.md` doesn't
+    say `made: here` (Guard mode, Look for my keys, a store one) stays, and
+    the answer names it (`… is already on the lamp, put on another way`).
+    Only a skill made here before is replaced.
+  - Its done line says it is bound to the person's yes by its SHA-256, not
+    that it carries no signature.
+  Tests: `made::a_made_skill_goes_on_by_its_sha256_and_only_by_it`,
+  `…never_takes_the_place_of_one_put_on_another_way`,
+  `…whose_package_changed_does_not_go_on`,
+  `…past_the_cap_or_not_made_here_does_not_go_on`.
 - **Why this and not the others** (the least new surface):
   - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
     as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
@@ -1356,23 +1406,48 @@ happens:
    - each is kept with its SHA-256 and what it asks to use (`made.json`);
    - the same hand-over read again gives back the kept one, not checked
      again.
-6. **Told.** The lamp says what it would do (the card's description), what
-   it would use ("its light and whether it is talking"), and, word for
-   word: "I've made it; putting it on needs a yes from the team first."
+6. **Told, and asked.** The lamp says what it would do (the card's
+   description) and what it would use ("its light and whether it is
+   talking"), then asks, word for word: "Shall I put it on the lamp?"
    - The files are never read out.
    - A skill not kept is told plainly why ("it asks to use more than the
      light and the head, which a made skill can't").
+   - The ask is kept beside the package (`offered_at_unix_ms` in
+     `made.json`, `made_skill::asked`) when the news is heard whole at the
+     lamp, or given in a text, never when it is read: the lamp tells it
+     later, at a good moment. The news is told in the voice's own process,
+     and the yes comes to the worker that runs the call.
+7. **Put on at a spoken yes** (the lead, 20 Oct 08:37 on #1711: a spoken
+   yes bound to the SHA-256, an exception to the 18:33 "only signed
+   packages" ruling for a skill made here alone; the app doesn't confirm
+   too). On the person's yes the model calls `put_on_made_skill`
+   (`made_skill::put_on`):
+   - only a yes said out loud counts (`heard`): a typed one, or one the lamp
+     wrote, puts nothing on;
+   - only a plain yes (the words heard in the line, as the held forget's,
+     `known_faces::plain_agreement`): "No, not yet" the model took for a
+     yes puts nothing on;
+   - only the newest ask, within 120 s of its being heard (`PUT_ON_WITHIN`,
+     as a hand-over's yes);
+   - the voice sends the manage helper that skill's SHA-256 alone
+     (`{"install_made": SHA256}`, "The manage helper" above), which
+     installs only those bytes, held again to this cap;
+   - on the second route, while one waits, each request is told so
+     (`made_skill::waiting_note`), since the route keeps words, not calls;
+   - the person hears that it's on, that it couldn't be put on (also with
+     no helper to ask), or, with no answer from a helper asked within 8 s,
+     that it is being put on;
+   - never without `LAMP_MAKE_SKILL`, whatever the model calls.
+   Tests: `made_skill::tests` (the ask's window, the spoken and plain
+   yes, no helper, the helper's refusal and silence; `task_news::tests`: no
+   ask until the news is heard), and
+   `made::a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper` (the
+   voice's call through the real helper).
 
 **Open, for the lead:**
-- **Putting a made skill on the lamp.** An unsigned package made by an
-  agent goes against the 18:33 ruling, "only signed packages from the
-  update channel". The SHA-256 kept is what such a yes would be bound to,
-  so what the person heard is what would go on, and nothing can widen
-  after it.
-- Whether the spoken yes is enough, or the app confirms too.
 - Harness sign-in on home lamps.
 
-Removing a made skill by voice comes with putting one on.
+Removing a made skill by voice is still to come.
 
 Tests:
 - `made_skill::tests`:

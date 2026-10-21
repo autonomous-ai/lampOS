@@ -72,7 +72,9 @@ pub mod early_finalize;
 mod endpoint;
 mod hand;
 mod holding;
+mod look_note;
 mod notices;
+mod open_name;
 mod second;
 mod service;
 mod speaker_tone;
@@ -136,6 +138,44 @@ const HOLD_FLOOR_US: u64 = 1_800_000;
 /// after a question, ended 4 of 10 waiting answers as `user_interrupted`;
 /// the owner's session on lamp-4ace had dozens. Off unless set.
 pub const WAIT_KEEPS_ANSWER_ENVIRONMENT: &str = "LAMP_WAIT_KEEPS_ANSWER";
+
+/// `LAMP_SECOND_PLAYOUT_START_MS=0..500` (#2135, the first builder on
+/// #1722 at 17:46): the start horizon of a reply the second route answers,
+/// in place of the unit's `--playout-start-ms` (350 on the lamps). That 350
+/// was set for Live, whose audio fell up to 153 ms short of real time after
+/// its first burst ([`PlayoutStart::LONGEST_MS`]); every second-route answer
+/// pays it too, between its first audio and its first sound. Unset, the
+/// unit's horizon as before.
+pub const SECOND_PLAYOUT_START_ENVIRONMENT: &str = "LAMP_SECOND_PLAYOUT_START_MS";
+
+/// [`SECOND_PLAYOUT_START_ENVIRONMENT`]'s horizon, when `value` is one
+/// `--playout-start-ms` takes (0 to 500); anything else is none.
+fn second_playout_start_from(value: Option<&str>) -> Option<PlayoutStart> {
+    value.and_then(|value| value.parse().ok())
+}
+
+/// [`SECOND_PLAYOUT_START_ENVIRONMENT`] in this process's environment, read
+/// once: the coordinator is one a process.
+fn second_playout_start() -> Option<PlayoutStart> {
+    static READ: std::sync::OnceLock<Option<PlayoutStart>> = std::sync::OnceLock::new();
+    *READ.get_or_init(|| {
+        second_playout_start_from(
+            std::env::var(SECOND_PLAYOUT_START_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        )
+    })
+}
+
+/// The start horizon of a reply begun while `role` answers: the second
+/// route's own, when it has one, while the second route's worker is the
+/// provider; else the unit's.
+fn playout_for(unit: PlayoutStart, second: Option<PlayoutStart>, role: &str) -> PlayoutStart {
+    match second {
+        Some(second) if role == "second" => second,
+        _ => unit,
+    }
+}
 /// How long after its trigger a new sound waits, with the switch, before it
 /// may take the turn; and how long before its own decision deadline it is
 /// decided at the latest, so that a real follow-up is never let go for
@@ -158,6 +198,206 @@ const WAIT_KEEPS_WITHIN_US: u64 = 3_000_000;
 /// only its first piece, not all of it (the reviewer on #1130). Two sounds
 /// further apart than this are each let go.
 const AFTER_LET_GO_US: u64 = 1_000_000;
+
+/// `LAMP_OWN_LINE_KEEPS=on` (#2220, El on lamp-06c1, 20 Oct): a line the
+/// lamp starts on its own (a skill's say, a reminder, its hello to someone
+/// arriving, a line of the setup walk, news it tells) waiting for its first
+/// audio is not ended by room sound. On lamp-06c1 two of three of Welcome
+/// back's hellos were dropped as `user_interrupted` by a sound the room made
+/// about 2 s in, before any of their audio. Off unless set.
+pub const OWN_LINE_KEEPS_ENVIRONMENT: &str = "LAMP_OWN_LINE_KEEPS";
+
+fn own_line_keeps_from_environment() -> bool {
+    std::env::var(OWN_LINE_KEEPS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// How long after a sound's last speech the eyes' looks still count for it
+/// ([`OwnLineWait::theirs`]): their mouth reading comes after the sound.
+const OWN_LINE_EYES_LAG_US: u64 = 300_000;
+
+/// What a new sound does while a line the lamp started on its own waits for
+/// its first audio (`LAMP_OWN_LINE_KEEPS`, [`while_own_line_waits`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WhileOwnLineWaits {
+    /// Not such a line, it has sounded, or the switch is off: as before.
+    AsBefore,
+    /// The lamp's name was heard in it, or with `LAMP_WAIT_KEEPS_ANSWER=words`
+    /// its words ask something: decided as before, at once.
+    Decide,
+    /// The eyes saw a face speaking through it, turned to the lamp: the
+    /// person the line is for, not the room (#2287's follow-up). Decided as
+    /// before, at once.
+    Theirs,
+    /// Not yet: it stays pending.
+    Wait,
+    /// The line began to sound, or the sound's own deadline came: let go as
+    /// the room's, and the line goes on.
+    LetGo(&'static str),
+    /// With `LAMP_WAIT_KEEPS_ANSWER=words`, its words only told the lamp to
+    /// stop: let go, never asked of the model, and the line is stopped, as a
+    /// stop said before an answer stops it (#2287's follow-up).
+    Stop,
+}
+
+/// A line the lamp started on its own, with no person's words it answers: a
+/// skill's say, a reminder, news it tells, or the turn `lamp_began` (its
+/// hello to someone arriving, or a line of the setup walk).
+fn own_line(current: &Reply, lamp_began: Option<u64>) -> bool {
+    current.input_sequence == 0
+        && (current.say.is_some()
+            || current.reminder.is_some()
+            || !current.news.is_empty()
+            || lamp_began == Some(current.owner.turn()))
+}
+
+/// What the own line's wait knows besides the candidate and the reply.
+#[derive(Clone, Copy, Debug, Default)]
+struct OwnLineWait {
+    /// [`OWN_LINE_KEEPS_ENVIRONMENT`].
+    on: bool,
+    /// [`own_line`]'s turn the lamp began itself.
+    lamp_began: Option<u64>,
+    /// The candidate has already waited.
+    waited: bool,
+    /// This block was heard by the mask with echo evidence, or the mask has
+    /// no ears, as for the answer's wait ([`AnswerWait::heard`]): a block
+    /// without is kept only among the mask's last reads, so a sound held
+    /// longer could not be held whole (the reviewer on #2242, P3 1).
+    heard: bool,
+    /// When the lamp's name was last heard beginning.
+    name_began_us: Option<u64>,
+    /// The eyes saw a face speaking, turned to the lamp, in at least half of
+    /// their looks since the sound's first read
+    /// ([`crate::speaking_faces::SpeakingFaces::turned_speakers`]).
+    theirs: bool,
+}
+
+/// Whether `current` is a line the lamp started on its own that hasn't
+/// sounded, with `on`: a sound may wait for it, so a stream for a waited
+/// sound's words is kept ready (`LAMP_WAIT_KEEPS_ANSWER=words`).
+fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) -> bool {
+    current.is_some_and(|current| {
+        on && own_line(current, lamp_began) && !current.had_audio && current.playback.is_none()
+    })
+}
+
+/// [`WhileOwnLineWaits`] for `candidate` at `at_us` (`LAMP_OWN_LINE_KEEPS`):
+/// while a line the lamp started on its own has not sounded, a new sound
+/// heard with echo evidence waits, unless the lamp's name began in it (up
+/// to `CALL_BEFORE_US` before its trigger) or the eyes saw a face speaking
+/// through it turned to the lamp: that is the person the line is for, and
+/// their "not now" is no room's talk. One that waited is let go once the
+/// line sounds, or 100 ms before its own decision deadline. A sound that
+/// begins once the line sounds is a cut-in over the lamp's voice, judged as
+/// before, so words said over the lamp still stop it.
+fn while_own_line_waits(
+    wait: OwnLineWait,
+    reply: Option<&Reply>,
+    candidate: &crate::admission::Candidate,
+    at_us: u64,
+) -> WhileOwnLineWaits {
+    let OwnLineWait {
+        on,
+        lamp_began,
+        waited,
+        heard,
+        name_began_us,
+        theirs,
+    } = wait;
+    let Some(current) = reply.filter(|current| on && own_line(current, lamp_began)) else {
+        return WhileOwnLineWaits::AsBefore;
+    };
+    if !heard {
+        return WhileOwnLineWaits::AsBefore;
+    }
+    if current.had_audio || current.playback.is_some() {
+        return if waited {
+            WhileOwnLineWaits::LetGo("sounded")
+        } else {
+            WhileOwnLineWaits::AsBefore
+        };
+    }
+    if name_began_us.is_some_and(|began| {
+        began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
+    }) {
+        return WhileOwnLineWaits::Decide;
+    }
+    if theirs {
+        return WhileOwnLineWaits::Theirs;
+    }
+    if at_us
+        >= candidate
+            .decision_deadline_us
+            .saturating_sub(WAIT_DECIDES_BEFORE_US)
+    {
+        return WhileOwnLineWaits::LetGo("deadline");
+    }
+    WhileOwnLineWaits::Wait
+}
+
+/// `own`, [`while_own_line_waits`] for `candidate`, with its words
+/// (`LAMP_WAIT_KEEPS_ANSWER=words`) as the answer's wait hears them
+/// ([`with_waited_words`]): a sound that waits or is let go is judged by
+/// them too. A lone stop, or in a room not `busy` a lone put-off ("Not
+/// now.", "Later.", [`crate::wait_words::only_a_put_off`]), stops the line,
+/// never asked of the model. In a busy room a put-off is as usual between
+/// colleagues ("No thanks.", "In a minute.") as to the lamp, so it is the
+/// room's, as other words are: in a busy office two colleagues' talk has
+/// words too (the reviewer's P2 on #2308 and P3 on #2322). A face turned to
+/// the lamp and speaking is decided before this ([`WhileOwnLineWaits::Theirs`]).
+/// Any other `own` is as it is.
+#[allow(clippy::too_many_arguments)]
+fn own_line_with_words(
+    words: &mut crate::wait_words::WaitWords,
+    own: WhileOwnLineWaits,
+    candidate: &crate::admission::Candidate,
+    audio: &[ObservedAudio],
+    ended: bool,
+    pause_blocks: u16,
+    last_speech_us: u64,
+    busy: bool,
+    at_us: u64,
+) -> (WhileOwnLineWaits, Option<WordsTold>) {
+    let as_answer = match own {
+        WhileOwnLineWaits::Wait => WhileAnswerWaits::Wait,
+        WhileOwnLineWaits::LetGo(why) => WhileAnswerWaits::LetGo(why),
+        _ => return (own, None),
+    };
+    let (then, told) = with_waited_words(
+        words,
+        as_answer,
+        candidate,
+        audio,
+        ended,
+        pause_blocks,
+        last_speech_us,
+        false,
+        at_us,
+    );
+    let (own, told) = match then {
+        // Words that ask something: a put-off stops the line as a stop does;
+        // anything else is the room's, and the sound is as it was.
+        WhileAnswerWaits::Decide if !busy && words.put_off(candidate.id) => (
+            WhileOwnLineWaits::Stop,
+            told.map(|told| WordsTold {
+                took: false,
+                stop: true,
+                ..told
+            }),
+        ),
+        WhileAnswerWaits::Decide => (
+            own,
+            told.map(|told| WordsTold {
+                took: false,
+                ..told
+            }),
+        ),
+        WhileAnswerWaits::Wait => (WhileOwnLineWaits::Wait, told),
+        WhileAnswerWaits::LetGo(why) => (WhileOwnLineWaits::LetGo(why), told),
+        WhileAnswerWaits::Stop => (WhileOwnLineWaits::Stop, told),
+    };
+    (own, told)
+}
 
 /// Whether `value`, the voice's `LAMP_WAIT_KEEPS_ANSWER`, turns the wait on:
 /// `on`, or `words`, and nothing else.
@@ -278,6 +518,27 @@ fn body_heard(
     } else {
         crate::body_motion::Judged::Still
     }
+}
+
+/// `LAMP_MOTION_VOICE` (#1712's B, the first builder at 03:27 on 21 Oct):
+/// what becomes of `candidate`, a sound [`body_heard`] found begun as the
+/// body moved. Its own speech blocks, from its first read to `at_us`,
+/// against the asker's level as the asker-first rule keeps it, and the
+/// levels it was judged on ([`crate::motion_voice`]).
+fn motion_voice_heard(
+    mode: crate::motion_voice::Mode,
+    asker_first: Option<&crate::asker_first::AskerFirst>,
+    reply: Option<&Reply>,
+    candidate: &crate::admission::Candidate,
+    at_us: u64,
+) -> (
+    crate::motion_voice::Decision,
+    Option<crate::asker_first::Levels>,
+) {
+    let levels = asker_first.zip(reply).and_then(|(rule, current)| {
+        rule.levels_since(current.owner.turn(), candidate.first_read_at_us, at_us)
+    });
+    (crate::motion_voice::decide(mode, levels.as_ref()), levels)
 }
 
 /// [`WhileAnswerWaits`] for `candidate` at `at_us`: `ended` if its sound is
@@ -570,6 +831,9 @@ struct Reply {
     plan: OutputOwner,
     playback: Option<PlaybackToken>,
     pcm: VecDeque<i16>,
+    /// Its samples handed to the speaker so far: how much of it was played
+    /// when a line or a Stop cut it (`LAMP_SAID_AS_HEARD`).
+    handed: u64,
     generation_done: bool,
     provider_idle: bool,
     input_sequence: u64,
@@ -762,6 +1026,7 @@ impl Reply {
                 None => break,
             }
         }
+        self.handed += samples.len() as u64;
         samples.resize(240, 0);
         self.voice_level = crate::ring_face::level_of(&samples);
         Some((samples, final_chunk))
@@ -846,6 +1111,9 @@ struct Rig {
     /// A line's words asked for at a pause (`LAMP_SECOND_EARLY_FINALIZE`,
     /// [`early_finalize`]).
     early_finalize: bool,
+    /// A sound just after a line that ended before its name goes on from it
+    /// (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
+    open_name: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -943,6 +1211,17 @@ fn tap_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -
     head_touch && !asleep_on && !privacy_controls
 }
 
+/// Whether a hand's sleep shows the asleep face while the service waits
+/// (#1362, the first builder on #1362, 21 Oct 09:21), and if so whether it
+/// yields to a closing slide: with head touch, where the face is not
+/// already shown all along by `LAMP_RING_ASLEEP=on`, and on the Controls
+/// privacy route too, while its slide is open, giving the ring to the
+/// slide's indication when it closes ([`crate::ring_asleep::SleepFace`]).
+/// A dark ring reads as idle.
+fn sleep_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -> Option<bool> {
+    (head_touch && (privacy_controls || !asleep_on)).then_some(privacy_controls)
+}
+
 /// What the journal says, once, when `LAMP_REMINDER_PULSE=on` has no
 /// asleep face to draw on (#1545, the first builder, 18 Oct 18:03): the
 /// pulse is drawn over that face, so rather than pulse nothing, it says
@@ -994,7 +1273,16 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
-        trace, cues, controls, reminders, tap_face, health, None, None, wait,
+        trace,
+        cues,
+        controls,
+        reminders,
+        tap_face,
+        None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        health,
+        None,
+        None,
+        wait,
     )
 }
 
@@ -1012,12 +1300,16 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 ///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
-fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
+fn muted_wait_pulsing<
+    F: FnMut() -> Option<crate::ring_asleep::Asleep>,
+    G: FnMut() -> Option<crate::ring_asleep::Asleep>,
+>(
     trace: &mut SessionState,
     cues: &mut Option<CueSink>,
     controls: &RefCell<Option<HandControls>>,
     reminders: &RefCell<Option<crate::reminders::Reminders>>,
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
+    sleep_face: Option<crate::ring_asleep::SleepFace<G>>,
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
     light: Option<crate::ring_light::RingLight>,
@@ -1034,11 +1326,17 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     // "cannot be read" (#1376): only past the wait's own grace.
     let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
+    let sleep_face = RefCell::new(sleep_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
     let light = RefCell::new(light);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
+            // The slide closed: a hand's sleep's face gives the ring to the
+            // slide's indication before the wait starts it (#1362, #795).
+            if let Some(face) = sleep_face.borrow_mut().as_mut() {
+                face.slide(state);
+            }
             unread_since.set(match state {
                 crate::privacy::PrivacyState::Unavailable => {
                     Some(unread_since.get().unwrap_or(at_us))
@@ -1066,10 +1364,25 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
                 Some(controls) => {
                     let (allowed, observation) = controls.quiescent_observation()?;
                     record_hand_pats(&mut trace.borrow_mut(), observation.pets)?;
+                    // A hand's sleep shows the asleep face (#1362), and a
+                    // tap's face is not drawn over it.
+                    let sleeping = match sleep_face.borrow_mut().as_mut() {
+                        Some(face) => {
+                            if face.poll(observation.asleep) {
+                                record(
+                                    &mut trace.borrow_mut(),
+                                    json!({"kind":"head_sleep_face","at_us":monotonic_us()}),
+                                )?;
+                            }
+                            face.showing()
+                        }
+                        None => false,
+                    };
                     answer_muted_tap(
                         tap_face.borrow_mut().as_mut(),
                         &observation,
                         may_hear(allowed, slide.get()),
+                        sleeping,
                         &mut trace.borrow_mut(),
                     )?;
                     (allowed, observation.asleep, controls.restored_after_fault())
@@ -1124,6 +1437,9 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
+    if let Some(face) = sleep_face.into_inner() {
+        face.stop();
+    }
     // Let go before the next session's ring worker takes the light up.
     drop(light.into_inner());
     // The wait ends on the look that read the switch open, with no look
@@ -1139,14 +1455,17 @@ fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 
 /// One look of the muted wait at the head (#711): a tap taken while the
 /// lamp still may not hear gets the asleep face for about a second, said in
-/// the trace as `head_tap_muted_face`.
+/// the trace as `head_tap_muted_face`. Not while a hand's sleep's face is
+/// `sleeping` (#1362): it is shown already, and the ring has one writer.
 fn answer_muted_tap<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     face: Option<&mut crate::ring_asleep::TapFace<F>>,
     observation: &crate::hand_controls::Observation,
     allowed: bool,
+    sleeping: bool,
     trace: &mut SessionState,
 ) -> Result<()> {
-    if let Some(face) = face
+    if !sleeping
+        && let Some(face) = face
         && face.poll(observation.head_tap_at_us.is_some(), allowed)
     {
         record(
@@ -1164,6 +1483,19 @@ fn answer_muted_tap<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// mute open is still a muted lamp (the reviewer on #1288).
 fn may_hear(allowed: bool, slide: Option<crate::privacy::PrivacyState>) -> bool {
     allowed && slide != Some(crate::privacy::PrivacyState::Muted)
+}
+
+/// The asleep face for a hand's sleep, on the lamp's own ring (Linux).
+fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
+    #[cfg(target_os = "linux")]
+    {
+        crate::ring_asleep::Asleep::start(ceiling)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = ceiling;
+        None
+    }
 }
 
 /// The asleep face for a tap, on the lamp's own ring (Linux).
@@ -1192,6 +1524,16 @@ fn mandatory(worker: &Worker, standby: bool) -> bool {
 }
 
 impl Rig {
+    /// The start horizon of a reply begun now ([`playout_for`]): the route
+    /// answering is the provider's slot's.
+    fn playout_start_now(&self) -> PlayoutStart {
+        playout_for(
+            self.playout_start,
+            second_playout_start(),
+            &self.provider.role,
+        )
+    }
+
     /// A hand cancellation has already reached the speaker. Deliver revocation
     /// to every remaining child even if one local channel has gone away.
     fn publish_hand_revocation(&mut self, snapshot: Snapshot) -> io::Result<()> {
@@ -2150,6 +2492,14 @@ fn run_source(
                     privacy_controls,
                 )
             });
+            // A hand's sleep shows the asleep face where it is not shown
+            // all along, on the privacy route too while its slide is open
+            // (#1362).
+            let sleep_face_ceiling = options.ring_channel_ceiling.zip(sleep_face_allowed(
+                crate::hand_controls::head_touch_from_environment(),
+                crate::ring_asleep::enabled_from_environment(),
+                privacy_controls,
+            ));
             if let Some(line) = pulse_without_face(
                 crate::ring_asleep::pulse_enabled_from_environment(),
                 options.ring_channel_ceiling.is_some(),
@@ -2170,6 +2520,9 @@ fn run_source(
                     let tap_face = tap_face_ceiling.map(|ceiling| {
                         crate::ring_asleep::TapFace::new(move || tapped_face(ceiling))
                     });
+                    let sleep_face = sleep_face_ceiling.map(|(ceiling, yields)| {
+                        crate::ring_asleep::SleepFace::new(move || sleeping_face(ceiling), yields)
+                    });
                     // A reminder owed while it waits pulses on the asleep
                     // face (#1545, `LAMP_REMINDER_PULSE=on`).
                     #[cfg(target_os = "linux")]
@@ -2185,6 +2538,7 @@ fn run_source(
                         &controls,
                         &reminders,
                         tap_face,
+                        sleep_face,
                         crate::bus_out::WaitHealth::from_environment(),
                         pulse,
                         crate::ring_light::while_muted_from_environment(
@@ -2835,6 +3189,16 @@ fn observe_provider_output(
                 }
             }
         }
+        ProviderOutput::LookNoCall { request, session } => {
+            if let Some(current) = reply.as_ref().filter(|r| r.owner.turn() == *request) {
+                current.cloud.require_output()?;
+                if current.cloud.session != *session {
+                    return Err(io::Error::other(
+                        "a look's answer belongs to another session",
+                    ));
+                }
+            }
+        }
         ProviderOutput::Ended { .. } => cloud.end_output()?,
         ProviderOutput::Started {
             request, session, ..
@@ -3143,6 +3507,9 @@ fn provider_arguments(
     arguments.extend(crate::misheard_hum::arguments_from_environment());
     arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());
+    arguments.extend(crate::others_answer::arguments_from_environment());
+    arguments.extend(crate::going_on_same_one::arguments_from_environment());
+    arguments.extend(crate::said_as_heard::arguments_from_environment());
     arguments.extend(crate::scoped_session::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
@@ -3444,6 +3811,20 @@ fn spawn_rig(
             _ => return Err(io::Error::other("audio diagnostic startup identity mismatch").into()),
         }
     }
+    match (
+        std::env::var_os(SECOND_PLAYOUT_START_ENVIRONMENT),
+        second_playout_start(),
+    ) {
+        (Some(_), Some(second)) => eprintln!(
+            "lamp-voice: while the second route answers, a reply's first sound waits for {} ms of audio, not the unit's {} ms ({SECOND_PLAYOUT_START_ENVIRONMENT})",
+            second.as_micros() / 1_000,
+            options.playout_start.as_micros() / 1_000
+        ),
+        (Some(_), None) => eprintln!(
+            "lamp-voice: {SECOND_PLAYOUT_START_ENVIRONMENT} is not 0 to 500: the unit's start horizon stays"
+        ),
+        (None, _) => {}
+    }
     Ok(Rig {
         expression_out: None,
         provider,
@@ -3462,6 +3843,7 @@ fn spawn_rig(
         end_silence_blocks: options.end_silence_blocks,
         early_end_blocks: options.early_end_blocks,
         early_finalize: early_finalize::from_environment(),
+        open_name: open_name::from_environment(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -4064,12 +4446,23 @@ thread_local! {
     /// file. Thread-local, so no other test's loop takes it.
     static TEST_FULL_LOOK: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's eyes, with no eyes' link: each still asked for is
+    /// written at once to `TEST_FULL_LOOK`'s file, with its ask's id.
+    static TEST_EYES_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_SECOND_LOOK_NOTE=on`, as `TEST_HOLDING_ANSWER`.
+    static TEST_LOOK_NOTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_SECOND_LOOK_WALK=on`, as `TEST_LOOK_NOTE`.
+    static TEST_LOOK_WALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's skills, in place of lamp-skills' socket, for the
+    /// walk's calls: taken by the loop as it starts.
+    static TEST_WALK_SKILL: std::cell::RefCell<Option<look_note::SkillCaller>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's task news, in place of the tasks part, as
     /// `TEST_FULL_LOOK`: taken by the loop as it starts.
     static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
@@ -4079,6 +4472,24 @@ thread_local! {
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's eyes link, as `TEST_TASK_NEWS`, with its
+    /// `LAMP_CAMERA_FOLLOWS_EYES=on` (#2233).
+    static TEST_EYES: std::cell::RefCell<Option<crate::body_link::EyesLink>> =
+        const { std::cell::RefCell::new(None) };
+    static TEST_CAMERA_FOLLOWS_EYES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_WAIT_KEEPS_ANSWER=on` (#1123), as
+    /// `TEST_CAMERA_FOLLOWS_EYES`.
+    static TEST_WAIT_KEEPS_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's room busy with other people's talk, for the busy-room
+    /// hold, as `TEST_CAMERA_FOLLOWS_EYES`: the fixture plays no three
+    /// unanswered lines.
+    static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_VOICE_TONE=on`, as `TEST_CAMERA_FOLLOWS_EYES`.
+    static TEST_VOICE_TONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's known person at the lamp for the voice's tone, by
+    /// memory id, in place of the eyes' file.
+    static TEST_TONE_PERSON: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's near-call try (#1803), in place of onboarding's own.
     static TEST_NEAR: std::cell::RefCell<Option<crate::onboarding::near::NearFlow>> =
         const { std::cell::RefCell::new(None) };
@@ -4086,6 +4497,67 @@ thread_local! {
     /// monotonic microseconds, in place of onboarding's own.
     static TEST_SENTENCE_WINDOW: std::cell::Cell<Option<(u64, u64)>> =
         const { std::cell::Cell::new(None) };
+    /// A loop test's forgets from memory (`memory/forgot`), one for each
+    /// End in turn, told just before it: `None`, nothing at that End.
+    static TEST_TONE_FORGOT: std::cell::RefCell<VecDeque<Option<String>>> =
+        const { std::cell::RefCell::new(VecDeque::new()) };
+    /// A loop test's reader of memory's forgets on a bus of its own, in
+    /// place of the environment's (`memory/forgot`).
+    pub(super) static TEST_FORGOT_IN: std::cell::RefCell<Option<crate::bus_out::ForgotIn>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Memory has forgotten everything under `person` (`memory/forgot`), or
+/// every person's (`None`): their tone baseline goes, or every one, and
+/// memory's "everyone" is the room's. Anything else it forgot (a rules
+/// scope, `r-`) is no voice. The record never names the person.
+fn tone_forgotten(
+    baselines: &mut crate::voice_tone::Baselines,
+    person: Option<&str>,
+    trace: &mut SessionState,
+    at_us: u64,
+) -> Result<()> {
+    let whose = match person {
+        None => {
+            baselines.forget_all();
+            None
+        }
+        Some("everyone") => {
+            baselines.forget(None);
+            Some(crate::voice_tone::Whose::Room)
+        }
+        Some(person) if lamp_msgs::known::is_person_id(person) => {
+            baselines.forget(Some(person));
+            Some(crate::voice_tone::Whose::Person)
+        }
+        Some(_) => return Ok(()),
+    };
+    record(
+        trace,
+        json!({"kind":"voice_tone_forgot","all":person.is_none(),"whose":whose,"by":"memory","at_us":at_us}),
+    )
+}
+
+/// A line's tone told, in the session record and on the bus: with its
+/// words' valence, or `words` `None` when they never came. Never the words.
+fn tell_tone(
+    trace: &mut SessionState,
+    out: Option<&mut crate::bus_out::ToneOut>,
+    turn: u64,
+    reading: crate::voice_tone::Reading,
+    words: Option<&str>,
+) -> Result<()> {
+    let told =
+        crate::voice_tone::told(turn, reading, words.and_then(crate::voice_tone::valence_of));
+    record(
+        trace,
+        json!({"kind":"voice_tone","turn":turn,"arousal":told.arousal,"sure":told.sure,
+            "valence":told.valence,"words":words.is_some(),"at_us":monotonic_us()}),
+    )?;
+    if let Some(out) = out {
+        out.tell(monotonic_us(), &told);
+    }
+    Ok(())
 }
 
 /// Whether onboarding's near-call step holds the reply to the utterance
@@ -4227,6 +4699,14 @@ fn conversation_with_gate(
     } else {
         None
     };
+    #[cfg(test)]
+    if let Some(given) = TEST_EYES.with(|eyes| eyes.borrow_mut().take()) {
+        eyes_link = Some(given);
+    }
+    #[cfg(not(test))]
+    let follows_eyes = camera_follows_eyes();
+    #[cfg(test)]
+    let follows_eyes = camera_follows_eyes() || TEST_CAMERA_FOLLOWS_EYES.with(std::cell::Cell::get);
     let mut attention = crate::body_link::Attention::default();
     // The same count kept whether or not there is a body to tell: whether
     // the talk in the room has been for the lamp lately.
@@ -4239,7 +4719,28 @@ fn conversation_with_gate(
     // recorded for, so that the record says so once. With `words`, its
     // words are heard too.
     let (wait_keeps_answer, wait_hears_words) = wait_keeps_answer_from_environment();
+    #[cfg(test)]
+    let wait_keeps_answer = wait_keeps_answer || TEST_WAIT_KEEPS_ANSWER.with(std::cell::Cell::get);
     let mut answer_kept_for: Option<crate::admission::CandidateId> = None;
+    // A new sound waits while the lamp's own line has not sounded
+    // (`LAMP_OWN_LINE_KEEPS=on`, #2220), and the candidate it was last
+    // recorded for.
+    let own_line_keeps = own_line_keeps_from_environment();
+    let mut own_kept_for: Option<crate::admission::CandidateId> = None;
+    // The newest turn the lamp began itself with no ticket or news on it:
+    // its hello to someone arriving, or a line of the setup walk.
+    let mut lamp_began: Option<u64> = None;
+    // The eyes' faces, for the person an own line is for (#2287's
+    // follow-up): read every 100 ms off the audio path, only with the
+    // switch; passing ids and booleans, nothing kept past 30 s.
+    let own_line_eyes = own_line_keeps
+        .then(|| std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default()));
+    let _own_line_reader = own_line_eyes.as_ref().and_then(|eyes| {
+        let root = lamp_bus::Bus::from_environment().ok()?.root().to_path_buf();
+        crate::speaking_faces::read_from(std::sync::Arc::clone(eyes), &root)
+    });
+    // The candidate last decided as the own line's person, recorded once.
+    let mut own_theirs_for: Option<crate::admission::CandidateId> = None;
     // When the lamp's name was last heard beginning, and when the sound
     // last let go had stopped, for the wait.
     let mut name_began_us: Option<u64> = None;
@@ -4253,6 +4754,9 @@ fn conversation_with_gate(
     // The turn the lamp last ended, for speech that goes on with it
     // (`LAMP_CUT_KEEPS_NAME`, #782). Never kept without the switch.
     let mut ended_turn: Option<EndedTurn> = None;
+    // The turn whose words ended before a name, and when its speech ended,
+    // for the name said next (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
+    let mut open_name_turn: Option<(u64, u64)> = None;
     // The turn that was asked while the room was busy, and when the lamp
     // began to be heard answering it.
     let mut asked_in_busy_room: Option<u64> = None;
@@ -4267,6 +4771,11 @@ fn conversation_with_gate(
     // session it cut tells it (`LAMP_STOP_TOLD=on`, off until it is played).
     let stop_told = crate::not_speech::stop_told_from_environment();
     let mut stop_untold = crate::not_speech::StopToTell::default();
+    // What was played of a reply that a line or a Stop cut is told to that
+    // line, or to the next on the session the Stop cut
+    // (`LAMP_SAID_AS_HEARD=on`, `crate::said_as_heard`).
+    let said_as_heard = crate::said_as_heard::from_environment();
+    let mut stop_cut: Option<(crate::said_as_heard::HeardOfCut, u64)> = None;
     let mut spoke_in_turn: Option<u64> = None;
     // The head tap's "hm?" (#711): its sound, made once for the cycle when
     // the head is read, and when it last played, so it plays at most once
@@ -4293,6 +4802,21 @@ fn conversation_with_gate(
     } else {
         None
     };
+    // A hand's sleep (#1362): the falling breath in a hold's last second,
+    // where a hold may put the lamp to sleep, at the hum's level; the hold
+    // it last sighed for; and a wake the person made, for its "hm?" once
+    // this conversation can say it.
+    let sleep_breath = if controls.as_ref().is_some_and(HandControls::head_sleep) {
+        let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
+        Some(crate::head_cue::breath(level))
+    } else {
+        None
+    };
+    let mut sighed_for: Option<u64> = None;
+    let mut waking = controls
+        .as_mut()
+        .and_then(|controls| controls.take_woken(monotonic_us()))
+        .map(|woken_us| (woken_us, monotonic_us()));
     let mut last_hum_us: Option<u64> = None;
     let mut took_over_turn: Option<u64> = None;
     // The turn whose speech last ended as something said, not a sound, and
@@ -4458,9 +4982,10 @@ fn conversation_with_gate(
     // asked only once its first audio plays or its reply ends, the moment
     // the lamp would have said it will look, so the head lamp-skills sent
     // down before answering is moving and the eyes wait for it to settle.
-    // With the session that made the call: the look's turn goes to it, or
-    // the look is dropped.
-    let mut look_held: Option<(u64, u64)> = None;
+    // With the session that made the call, and whether the second route
+    // was answering when it was made: the look's turn goes to that session
+    // on that route, or the look is dropped.
+    let mut look_held: Option<(u64, u64, bool)> = None;
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
@@ -4479,6 +5004,34 @@ fn conversation_with_gate(
     // What the voice is doing, heard and said, for whoever listens on the
     // lamp's bus. Nothing here waits for a listener.
     let mut bus_out = crate::bus_out::BusOut::from_environment();
+    // How each line sounded, against the person's own way of speaking
+    // (`LAMP_VOICE_TONE`, [`crate::voice_tone`]): measured on its speech
+    // blocks, read at its End, told with its words' valence.
+    let tone_on = crate::voice_tone::on(
+        std::env::var(crate::voice_tone::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    #[cfg(test)]
+    let tone_on = tone_on || TEST_VOICE_TONE.with(std::cell::Cell::get);
+    let mut tone_meter = tone_on.then(crate::voice_tone::ToneMeter::default);
+    // Each known person's own way of speaking, and the room's; and whose the
+    // last line was, the eyes' known person at its End by memory id.
+    let mut tone_baselines = crate::voice_tone::Baselines::default();
+    let mut tone_person: Option<String> = None;
+    let mut tone_out = tone_on
+        .then(crate::bus_out::ToneOut::from_environment)
+        .flatten();
+    // Memory's forgets, for the tone baselines (`memory/forgot`).
+    let mut forgot_in = tone_on
+        .then(crate::bus_out::ForgotIn::from_environment)
+        .flatten();
+    #[cfg(test)]
+    if tone_on && let Some(given) = TEST_FORGOT_IN.with(|slot| slot.borrow_mut().take()) {
+        forgot_in = Some(given);
+    }
+    // A line's reading, waiting for its words: its turn and when it ended.
+    let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
     // The voice's own timing, for the part that plans what the lamp shows
     // (docs/expression.md). Only if that is switched on.
     let mut expression_out = rig
@@ -4539,6 +5092,28 @@ fn conversation_with_gate(
             "lamp-voice: motion keeps the answer: while an answer is awaited, a sound that begins as the body moves a joint (4 servo counts or more a message) is the lamp's own, unless its name is heard"
         );
     }
+    // Such a sound about as loud as the asker is theirs (`LAMP_MOTION_VOICE`).
+    let motion_voice = crate::motion_voice::Mode::from_environment();
+    // The sound the motion rule last found the asker's: decided once, so a
+    // later rule that holds it doesn't have it judged again on more blocks,
+    // and perhaps let go then (the reviewer's P3 1 on #2371).
+    let mut motion_kept_for: Option<crate::admission::CandidateId> = None;
+    if motion_in.is_some() && motion_voice != crate::motion_voice::Mode::Off {
+        eprintln!(
+            "lamp-voice: motion voice{}: a sound begun as the body moves is the asker's when its own speech is no more than {:.0} dB under theirs{}",
+            if motion_voice == crate::motion_voice::Mode::Record {
+                ", recorded only"
+            } else {
+                ""
+            },
+            f32::from(crate::motion_voice::MARGIN) / 7.5,
+            if asker_mode.applies() {
+                ""
+            } else {
+                "; LAMP_ASKER_FIRST is off, so no asker's level is known and nothing changes"
+            }
+        );
+    }
     if asker_first.is_some() {
         eprintln!(
             "lamp-voice: asker first{}: for {} s while an answer is awaited, speech more than {:.0} dB under the asker's takes no turn; {}",
@@ -4563,6 +5138,28 @@ fn conversation_with_gate(
     #[cfg(not(test))]
     let holding_on = crate::holding_answer::on();
     let mut holding_answer = holding::Continuation::new(holding_on);
+    // A skill's search on the second route that the model left after a look
+    // is noted once to go on (`LAMP_SECOND_LOOK_NOTE=on`).
+    let look_note_on = std::env::var(crate::second_provider::LOOK_NOTE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    #[cfg(test)]
+    let look_note_on = look_note_on || TEST_LOOK_NOTE.with(std::cell::Cell::get);
+    // And, left again after it, walked on by the lamp to the next place
+    // (`LAMP_SECOND_LOOK_WALK=on`), calling the search's skill itself.
+    let look_walk_on = std::env::var(crate::second_provider::LOOK_WALK_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    #[cfg(test)]
+    let look_walk_on = look_walk_on || TEST_LOOK_WALK.with(std::cell::Cell::get);
+    let mut look_note = look_note::LookNote::new(look_note_on).with_walk(look_walk_on);
+    let walk_skill = look_note::skills_caller();
+    #[cfg(test)]
+    let walk_skill = TEST_WALK_SKILL
+        .with(|skill| skill.borrow().clone())
+        .unwrap_or(walk_skill);
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
@@ -5129,6 +5726,8 @@ fn conversation_with_gate(
         let head_tap = observation
             .as_ref()
             .and_then(|seen| seen.head_tap_at_us.zip(seen.head_tap_began_us));
+        // A hand on the head now, and how long (#1362).
+        let head_held = observation.as_ref().and_then(|seen| seen.head_held);
         let speaking = reply
             .as_ref()
             .is_some_and(|current| current.had_audio || current.playback.is_some());
@@ -5170,6 +5769,11 @@ fn conversation_with_gate(
                     .reply
                     .as_ref()
                     .map(|current| current.cloud.session);
+                // How much of that answer was played, for the next line on
+                // its session (`LAMP_SAID_AS_HEARD`).
+                if let Some(cut) = stop_cut_of(said_as_heard, cancellation.reply.as_ref()) {
+                    stop_cut = Some(cut);
+                }
                 // A Stop, a head touch, the mute or a gap ends the unclear
                 // turn's asking too: nothing is asked again after it (#926).
                 let hum = asking.hum;
@@ -5244,6 +5848,7 @@ fn conversation_with_gate(
                 second_look =
                     crate::second_look::SecondLook::default().with_the_note(crate::called::on());
                 holding_answer.clear();
+                look_note.clear();
                 last_turn_us = monotonic_us();
                 speech_ended = None;
                 ended_turn = None;
@@ -5356,6 +5961,17 @@ fn conversation_with_gate(
         }
         if can_open && !permitted {
             owner.set_microphone_permission(now(), Permission::Allowed)?;
+            // The eyes, a process of their own, may look exactly while the
+            // microphone is permitted (`EyesLink`): the authority says so,
+            // so what is read from them (whose a turn is) counts. With no
+            // camera of the voice's own it was never said, and every second
+            // route turn was the room's (#1895, lamp-52e6 20 Oct). A mute
+            // denies both (`hand.rs`).
+            eyes_look_with_the_microphone(
+                owner,
+                eyes_link.is_some() && follows_eyes,
+                rig.camera.is_some(),
+            )?;
             permitted = true;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -5658,11 +6274,23 @@ fn conversation_with_gate(
                     request,
                     session,
                     dropped,
+                    search,
+                    call,
                 } => match dropped {
-                    Some(why) if look.full() => record(
-                        trace,
-                        json!({"kind":"look_dropped","turn":request,"by":"tool","why":why,"at_us":monotonic_us()}),
-                    )?,
+                    Some(why) if look.full() => {
+                        // Dropped in a search's last look's turn: the
+                        // search's bound, not only the lamp having
+                        // written the turn.
+                        let why = if look_note.took_its_looks(request) {
+                            "the search took its looks"
+                        } else {
+                            why.as_str()
+                        };
+                        record(
+                            trace,
+                            json!({"kind":"look_dropped","turn":request,"by":"tool","why":why,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     Some(_) => {}
                     None => {
                         if record_tool_look(
@@ -5673,7 +6301,24 @@ fn conversation_with_gate(
                             &mut look_wanted,
                             trace,
                         )? {
-                            look_held = Some((request, session));
+                            // The route answering now made the call: the
+                            // second route's sessions are numbered apart
+                            // from Gemini's, so the number alone is not
+                            // enough.
+                            let by_second = rig
+                                .second
+                                .as_ref()
+                                .is_some_and(second::Route::second_active);
+                            look_held = Some((request, session, by_second));
+                            // A skill's look on the second route is a
+                            // search's: a new one if the person asked it,
+                            // or one going on in its own written turn.
+                            if search {
+                                let heard = reply.as_ref().is_some_and(|current| {
+                                    current.owner.turn() == request && current.input_sequence > 0
+                                });
+                                look_note.asked(request, heard, call);
+                            }
                         }
                     }
                 },
@@ -5685,6 +6330,23 @@ fn conversation_with_gate(
                 }
                 ProviderOutput::HoldingAnswer { request, session } => {
                     holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                }
+                ProviderOutput::LookNoCall { request, session } => {
+                    // Only the look's own turn, still in hand on its session.
+                    let current = reply.as_ref().is_some_and(|current| {
+                        current.owner.turn() == request && current.cloud.session == session
+                    });
+                    let owed = if current {
+                        look_note.answered(request, session, rig.provider.boot)
+                    } else {
+                        Err("its turn is not the one in hand")
+                    };
+                    if let Err(why) = owed {
+                        record(
+                            trace,
+                            json!({"kind":"look_note_dropped","turn":request,"why":why,"at_us":monotonic_us()}),
+                        )?;
+                    }
                 }
                 // Onboarding's sentence (#1803): every piece of its words is
                 // gathered in memory and only their count goes to onboarding,
@@ -5762,6 +6424,87 @@ fn conversation_with_gate(
                             Some(turn) => bus.said(turn, &text, finished, monotonic_us()),
                             None => bus.heard(&text, finished, monotonic_us()),
                         }
+                    }
+                    // A line the person finished: an answer to a step the
+                    // model ends (`docs/onboarding.md`, LAMP_ONBOARDING_NUDGE).
+                    if request.is_none()
+                        && finished
+                        && let Some(walk) = onboarding.as_mut()
+                    {
+                        walk.heard_line(&text);
+                    }
+                    // The line's words: its tone is told now, with their
+                    // valence. Words heard while another line is the
+                    // lamp's are that line's, so a reading waiting for
+                    // its own is told without them. Never the words.
+                    if request.is_none()
+                        && finished
+                        && let Some((turn, reading)) = tone_pending.take()
+                    {
+                        let words = reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == turn);
+                        tell_tone(
+                            trace,
+                            tone_out.as_mut(),
+                            turn,
+                            reading,
+                            words.then_some(text.as_str()),
+                        )?;
+                    }
+                    // Asked to forget their face, or everything: their own
+                    // baseline goes (the room's for someone not known), or
+                    // every one. The words decide, before any function
+                    // runs. Never the words or the person.
+                    if request.is_none()
+                        && finished
+                        && tone_meter.is_some()
+                        && let Some(forget) = crate::voice_tone::forgets(&text)
+                    {
+                        let all = forget == crate::voice_tone::Forget::All;
+                        if all {
+                            tone_baselines.forget_all();
+                        } else {
+                            tone_baselines.forget(tone_person.as_deref());
+                        }
+                        record(
+                            trace,
+                            json!({"kind":"voice_tone_forgot","all":all,"by":"words",
+                                "whose":(!all).then_some(if tone_person.is_some() {
+                                    crate::voice_tone::Whose::Person
+                                } else {
+                                    crate::voice_tone::Whose::Room
+                                }),"at_us":monotonic_us()}),
+                        )?;
+                    }
+                    // A line whose words end before a name, its answer
+                    // unheard: a sound begun just after its end goes on
+                    // from it (`LAMP_SECOND_OPEN_NAME`). The second route
+                    // holds the answer meanwhile. Never the words.
+                    if request.is_none()
+                        && finished
+                        && let Some((turn, ended_us)) = open_name::opened(
+                            rig.open_name && rig.provider.role == "second",
+                            &text,
+                            reply
+                                .as_ref()
+                                .map(|current| (current.owner.turn(), answer_unheard(current))),
+                            speech_ended,
+                        )
+                    {
+                        open_name_turn = Some((turn, ended_us));
+                        eprintln!(
+                            "lamp-voice: request {turn}: its words end before a name: a sound begun within 2.5 s of its end goes on from it (LAMP_SECOND_OPEN_NAME)"
+                        );
+                        record(
+                            trace,
+                            json!({"kind":"open_name","turn":turn,"ended_at_us":ended_us,"at_us":monotonic_us()}),
+                        )?;
+                    }
+                    if request.is_some()
+                        && let Some(walk) = onboarding.as_mut()
+                    {
+                        walk.lamp_said();
                     }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be
@@ -6096,6 +6839,7 @@ fn conversation_with_gate(
             }
             last_capture = Some(frame.read_completed_at_us);
             holding_answer.observe_capture(&frame);
+            look_note.observe_capture(&frame);
             session_clock.capture_retained();
             owner.set_capture(
                 now(),
@@ -6264,6 +7008,22 @@ fn conversation_with_gate(
             // How loud what the detector calls speech has been lately, for
             // the record of each utterance: its last eight seconds.
             if probability.is_finite() && probability >= 0.5 {
+                // A line's tone takes only speech while the lamp is silent:
+                // the line's own, and what came just before it began. Never
+                // the lamp's answer, or anyone talking over it.
+                if let Some(meter) = tone_meter.as_mut()
+                    && reply
+                        .as_ref()
+                        .is_none_or(|current| current.playback.is_none())
+                {
+                    meter.speech_block(
+                        frame.read_completed_at_us,
+                        &frame.samples,
+                        reply
+                            .as_ref()
+                            .is_some_and(|current| !current.local_input_ended),
+                    );
+                }
                 speech_levels.push_back((frame.read_completed_at_us, heard_level));
                 last_speech_us = frame.read_completed_at_us;
                 // For the asker-first rule: the asker's own speech while
@@ -6457,7 +7217,8 @@ fn conversation_with_gate(
                     })
                     .map(|(_, at)| at);
                 let awaited = snapshot.microphone_permission() == Permission::Allowed
-                    && words_awaited(reply.as_ref(), asked_until_us, monotonic_us());
+                    && (words_awaited(reply.as_ref(), asked_until_us, monotonic_us())
+                        || own_line_awaited(reply.as_ref(), own_line_keeps, lamp_began));
                 words.follow(awaited, still_pending);
             }
             let step = match update.step {
@@ -6523,7 +7284,11 @@ fn conversation_with_gate(
                     // voice: until its answer begins, or 1.8 s have gone
                     // without one, a new sound does not take the turn.
                     let at_us = monotonic_us();
-                    let holding = room.busy()
+                    #[cfg(not(test))]
+                    let busy = room.busy();
+                    #[cfg(test)]
+                    let busy = room.busy() || TEST_ROOM_BUSY.with(std::cell::Cell::get);
+                    let holding = busy
                         && reply.as_ref().is_some_and(|current| {
                             let turn = current.owner.turn();
                             current.local_input_ended
@@ -6538,6 +7303,19 @@ fn conversation_with_gate(
                                     })
                                 }
                         });
+                    // A sound begun just after a line that ended before its
+                    // name goes on from it (`LAMP_SECOND_OPEN_NAME`): the
+                    // answer wait and the body's motors don't let it go. The
+                    // keeper's pause, the busy-room hold and asker-first,
+                    // which keep the room's next voice off an awaited answer,
+                    // still do (the reviewer's P3 on #2355).
+                    let goes_on_from_name = open_name::goes_on(
+                        open_name_turn,
+                        reply
+                            .as_ref()
+                            .map(|current| (current.owner.turn(), answer_unheard(current))),
+                        candidate.first_read_at_us,
+                    );
                     if paused {
                         // Paused by the keeper: a new sound takes no turn,
                         // whether or not one is under way; that one goes on.
@@ -6572,11 +7350,145 @@ fn conversation_with_gate(
                         }
                         continue;
                     }
+                    // #2220: while a line the lamp started on its own has
+                    // not sounded, a sound the room makes doesn't end it.
+                    let own_wait = OwnLineWait {
+                        on: own_line_keeps,
+                        lamp_began,
+                        waited: own_kept_for == Some(candidate.id),
+                        heard: !playback_mask.is_duplex() || frame.echo.is_some(),
+                        name_began_us,
+                        // A face seen speaking through the sound, turned to
+                        // the lamp: from its first read to its last speech
+                        // and the eyes' lag after it, so the looks after a
+                        // short "Not now." don't count against it (the
+                        // reviewer's P3 on #2308).
+                        theirs: own_line_eyes.as_ref().is_some_and(|eyes| {
+                            let (now, now_us) = (Instant::now(), monotonic_us());
+                            let back = |at_us: u64| {
+                                now.checked_sub(Duration::from_micros(now_us.saturating_sub(at_us)))
+                            };
+                            let until_us = if last_speech_us >= candidate.first_read_at_us {
+                                last_speech_us
+                                    .saturating_add(OWN_LINE_EYES_LAG_US)
+                                    .min(now_us)
+                            } else {
+                                now_us
+                            };
+                            back(candidate.first_read_at_us)
+                                .zip(back(until_us))
+                                .is_some_and(|(from, to)| {
+                                    !eyes.turned_speakers(from, to).is_empty()
+                                })
+                        }),
+                    };
+                    let own = while_own_line_waits(own_wait, reply.as_ref(), &candidate, at_us);
+                    // Decided as the line's person's: no rule after it takes
+                    // it for the body's motors, as the lamp's name isn't.
+                    let mut own_theirs_now = false;
+                    // With `words`, its words too, as the answer's wait
+                    // hears them (#2287's follow-up).
+                    let own = match wait_words.as_mut() {
+                        Some(words) => {
+                            let (own, told) = own_line_with_words(
+                                words,
+                                own,
+                                &candidate,
+                                admission.pending_audio(candidate.id).unwrap_or_default(),
+                                admission.pending_ended(),
+                                detector.pause_blocks(),
+                                last_speech_us,
+                                room.busy(),
+                                at_us,
+                            );
+                            if let Some(told) = told {
+                                // The count of its words only, never the words.
+                                record(
+                                    trace,
+                                    json!({"kind":"wait_words","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"words":told.words,"took":told.took,
+                                        "stop":told.stop,"asked_at_us":told.asked_at_us,"at_us":at_us,
+                                        "for":"own_line"}),
+                                )?;
+                            }
+                            own
+                        }
+                        None => own,
+                    };
+                    match own {
+                        WhileOwnLineWaits::AsBefore | WhileOwnLineWaits::Decide => {}
+                        WhileOwnLineWaits::Theirs => {
+                            own_theirs_now = true;
+                            if own_theirs_for != Some(candidate.id) {
+                                own_theirs_for = Some(candidate.id);
+                                eprintln!(
+                                    "lamp-voice: a sound while the lamp's own line waited to sound was its person's, turned to the lamp and speaking: decided as before"
+                                );
+                                record(
+                                    trace,
+                                    json!({"kind":"own_line_theirs","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"at_us":at_us}),
+                                )?;
+                            }
+                        }
+                        WhileOwnLineWaits::Stop => {
+                            // Only a stop, said before the line sounded:
+                            // never asked of the model, and the line is
+                            // stopped on the next pass, as a stop said before
+                            // an answer is.
+                            if let Some(rejection) = admission.release_prospective(monotonic_us())?
+                            {
+                                record_input_rejection(trace, rejection)?;
+                            }
+                            detector.clear_prospective();
+                            own_kept_for = None;
+                            waited_stop = true;
+                            record(
+                                trace,
+                                json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "candidate":candidate.id,"why":"stop_said","at_us":at_us}),
+                            )?;
+                            continue;
+                        }
+                        WhileOwnLineWaits::Wait => {
+                            if own_kept_for != Some(candidate.id) {
+                                own_kept_for = Some(candidate.id);
+                                record(
+                                    trace,
+                                    json!({"kind":"own_line_waits","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                        "candidate":candidate.id,"at_us":at_us}),
+                                )?;
+                            }
+                            continue;
+                        }
+                        WhileOwnLineWaits::LetGo(why) => {
+                            if let Some(rejection) = admission.release_prospective(monotonic_us())?
+                            {
+                                record_input_rejection(trace, rejection)?;
+                            }
+                            detector.clear_prospective();
+                            own_kept_for = None;
+                            eprintln!(
+                                "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
+                            );
+                            record(
+                                trace,
+                                json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "candidate":candidate.id,"why":why,"at_us":at_us,
+                                    "boundary":"a sound while a line the lamp started on its own had not sounded: the room's"}),
+                            )?;
+                            continue;
+                        }
+                    }
                     // #1712's B: a new sound that began as the body moved a
                     // joint, while an answer is awaited, is the lamp's own
                     // motors: let go, and the answer goes on. Until the
                     // body has said where it was then, it waits.
-                    if let Some(motion) = motion_in.as_mut() {
+                    if let Some(motion) = motion_in.as_mut().filter(|_| {
+                        !own_theirs_now
+                            && !goes_on_from_name
+                            && motion_kept_for != Some(candidate.id)
+                    }) {
                         let waits_until_us = candidate
                             .trigger_read_at_us
                             .saturating_add(crate::body_motion::WAITS_US)
@@ -6597,25 +7509,68 @@ fn conversation_with_gate(
                             &candidate,
                         ) {
                             crate::body_motion::Judged::Moved { began, ended } => {
-                                if let Some(rejection) =
-                                    admission.release_prospective(monotonic_us())?
-                                {
-                                    record_input_rejection(trace, rejection)?;
-                                }
-                                detector.clear_prospective();
-                                eprintln!(
-                                    "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                let (decision, levels) = motion_voice_heard(
+                                    motion_voice,
+                                    asker_first.as_ref(),
+                                    reply.as_ref(),
+                                    &candidate,
+                                    at_us,
                                 );
-                                record(
-                                    trace,
-                                    json!({"kind":"input_let_go_body_moving","at_us":at_us,
-                                        "turn":reply.as_ref().map(|current| current.owner.turn()),
-                                        "onset_from_us":candidate.first_read_at_us,
-                                        "onset_to_us":candidate.trigger_read_at_us,
-                                        "moved_from_us":began,"moved_until_us":ended,
-                                        "boundary":"a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"}),
-                                )?;
-                                continue;
+                                let mut moving = json!({"at_us":at_us,
+                                    "turn":reply.as_ref().map(|current| current.owner.turn()),
+                                    "onset_from_us":candidate.first_read_at_us,
+                                    "onset_to_us":candidate.trigger_read_at_us,
+                                    "moved_from_us":began,"moved_until_us":ended});
+                                if motion_voice != crate::motion_voice::Mode::Off {
+                                    moving["candidate"] = json!(candidate.id);
+                                    moving["motion_voice"] = json!(motion_voice.as_str());
+                                    moving["margin"] = json!(crate::motion_voice::MARGIN);
+                                    moving["asker_level"] =
+                                        json!(levels.map(|levels| levels.asker));
+                                    moving["heard_level"] =
+                                        json!(levels.map(|levels| levels.heard));
+                                    moving["heard_upper_tenth"] =
+                                        json!(levels.map(|levels| levels.upper));
+                                    moving["blocks"] =
+                                        json!(levels.map_or(0, |levels| levels.blocks));
+                                }
+                                if let crate::motion_voice::Decision::LetGo { would_keep } =
+                                    decision
+                                {
+                                    if let Some(rejection) =
+                                        admission.release_prospective(monotonic_us())?
+                                    {
+                                        record_input_rejection(trace, rejection)?;
+                                    }
+                                    detector.clear_prospective();
+                                    eprintln!(
+                                        "lamp-voice: a sound that began as the body moved a joint was let go; the answer goes on"
+                                    );
+                                    moving["kind"] = json!("input_let_go_body_moving");
+                                    moving["boundary"] = json!(
+                                        "a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors"
+                                    );
+                                    if motion_voice != crate::motion_voice::Mode::Off {
+                                        moving["would_keep"] = json!(would_keep);
+                                        moving["boundary"] = json!(
+                                            "a new sound began as the body moved a joint while an answer was awaited: the lamp's own motors; levels on the face's scale, 7.5 to a decibel; would_keep: LAMP_MOTION_VOICE=on would have taken it for the asker's"
+                                        );
+                                    }
+                                    record(trace, moving)?;
+                                    continue;
+                                }
+                                // About as loud as the asker: theirs. It goes
+                                // on to the rules after this one, as if the
+                                // body were still.
+                                eprintln!(
+                                    "lamp-voice: a sound that began as the body moved a joint is about as loud as the asker: theirs, not the motors"
+                                );
+                                motion_kept_for = Some(candidate.id);
+                                moving["kind"] = json!("input_kept_body_moving");
+                                moving["boundary"] = json!(
+                                    "a new sound began as the body moved a joint while an answer was awaited, its own speech no more than the margin under the asker's: the asker's, judged on as if the body were still; levels on the face's scale, 7.5 to a decibel"
+                                );
+                                record(trace, moving)?;
                             }
                             crate::body_motion::Judged::Waits => continue,
                             crate::body_motion::Judged::Still => {}
@@ -6639,16 +7594,20 @@ fn conversation_with_gate(
                         decided: answer_sounded_for == Some(candidate.id),
                         heard: !playback_mask.is_duplex() || frame.echo.is_some(),
                     };
-                    let mut waits = while_answer_waits(
-                        wait,
-                        reply.as_ref(),
-                        &candidate,
-                        admission.pending_ended(),
-                        detector.pause_blocks(),
-                        at_us,
-                    );
+                    let mut waits = if goes_on_from_name {
+                        WhileAnswerWaits::Decide
+                    } else {
+                        while_answer_waits(
+                            wait,
+                            reply.as_ref(),
+                            &candidate,
+                            admission.pending_ended(),
+                            detector.pause_blocks(),
+                            at_us,
+                        )
+                    };
                     // With `words`, its words too (step 2).
-                    if let Some(words) = wait_words.as_mut() {
+                    if let Some(words) = wait_words.as_mut().filter(|_| !goes_on_from_name) {
                         let told;
                         (waits, told) = with_waited_words(
                             words,
@@ -6869,7 +7828,7 @@ fn conversation_with_gate(
                                 &mut speaker_pending,
                                 &mut provider_queue,
                                 accepted,
-                                rig.playout_start,
+                                rig.playout_start_now(),
                                 service_down && !offline,
                                 trace,
                                 |state| rig.publish(state),
@@ -6919,6 +7878,12 @@ fn conversation_with_gate(
                         lamp_words_ended_us,
                         accepted.candidate.trigger_read_at_us,
                     );
+                    let heard_of_cut = heard_of_cut(
+                        said_as_heard,
+                        reply.as_ref(),
+                        &mut stop_cut,
+                        provider_session,
+                    );
                     // A line begun in onboarding's sentence window is the
                     // sentence (#1803): count-only from its Start.
                     let count_only = sentence_window(onboarding.as_ref(), monotonic_us());
@@ -6930,15 +7895,24 @@ fn conversation_with_gate(
                         accepted,
                         provider_session,
                         continues,
+                        goes_on_from_name,
                         took_over,
                         stop_untold.take_for(provider_session, monotonic_us()),
+                        heard_of_cut,
                         follows_on,
                         count_only,
-                        rig.playout_start,
+                        rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
                     )?;
                     last_publish = monotonic_us();
+                    if goes_on_from_name {
+                        open_name_turn = None;
+                        eprintln!(
+                            "lamp-voice: request {}: goes on from the line that ended before its name (LAMP_SECOND_OPEN_NAME)",
+                            reply.as_ref().map_or(0, |current| current.owner.turn())
+                        );
+                    }
                     if took_over {
                         took_over_turn = reply.as_ref().map(|current| current.owner.turn());
                     }
@@ -7087,7 +8061,7 @@ fn conversation_with_gate(
                                     provider_session,
                                     rig.cut_keeps_name,
                                     sentence_heard.is_some(),
-                                    rig.playout_start,
+                                    rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
                                 )?;
@@ -7206,6 +8180,9 @@ fn conversation_with_gate(
                     }
                     speech_levels.clear();
                     loud_blocks.clear();
+                    if let Some(meter) = tone_meter.as_mut() {
+                        meter.clear();
+                    }
                     // Its End never went: the Stop it was to tell of goes to
                     // the next request (the first builder on #1148).
                     if let Some(stop) = reply.as_ref().and_then(|current| current.told_stop) {
@@ -7372,6 +8349,45 @@ fn conversation_with_gate(
                         speech_levels.clear();
                     }
                     loud_blocks.clear();
+                    // How it sounded against the person's own way: read now,
+                    // told with its words. A line before it whose words
+                    // never came is told without them. A sound let through
+                    // is not a line.
+                    if let Some(meter) = tone_meter.as_mut() {
+                        let tone = meter.finish().filter(|_| !as_sound);
+                        if let Some((turn, reading)) = tone_pending.take() {
+                            tell_tone(trace, tone_out.as_mut(), turn, reading, None)?;
+                        }
+                        #[cfg(test)]
+                        if let Some(person) = TEST_TONE_FORGOT
+                            .with(|told| told.borrow_mut().pop_front())
+                            .flatten()
+                        {
+                            tone_forgotten(
+                                &mut tone_baselines,
+                                Some(&person),
+                                trace,
+                                monotonic_us(),
+                            )?;
+                        }
+                        // Whose it is: the known person at the lamp, read
+                        // from the eyes' small file as the hello reads it.
+                        tone_person = crate::known_faces::known_from_environment()
+                            .map(|name| crate::known_faces::memory_person(&name));
+                        #[cfg(test)]
+                        if let Some(person) =
+                            TEST_TONE_PERSON.with(|person| person.borrow().clone())
+                        {
+                            tone_person = Some(person);
+                        }
+                        if let Some(tone) = tone {
+                            let (reading, whose, lines) =
+                                tone_baselines.hear(tone_person.as_deref(), &tone);
+                            endpoint_record["tone"] = json!({"tone": tone, "reading": reading,
+                                "whose": whose, "baseline_lines": lines});
+                            tone_pending = Some((current.owner.turn(), reading));
+                        }
+                    }
                     // The asker's level, for what is said while its answer
                     // is awaited: its own blocks, away from the lamp's
                     // sound. A sound let through has none.
@@ -7632,7 +8648,7 @@ fn conversation_with_gate(
             if !heard.is_empty()
                 && let Some(news) = task_news.as_ref()
             {
-                news.heard(heard);
+                news.heard(turn, heard);
             }
             record(
                 trace,
@@ -7662,13 +8678,16 @@ fn conversation_with_gate(
                 )?;
             }
             let sound_finished = current.notice.origin().unshown();
-            holding_answer.settled(
-                turn,
-                matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
-                    && current.delivery_outcome() == "audio_written_unscored"
-                    && !sound_finished,
-                monotonic_us(),
-            );
+            let played_whole = matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
+                && current.delivery_outcome() == "audio_written_unscored"
+                && !sound_finished;
+            holding_answer.settled(turn, played_whole, monotonic_us());
+            if let Some((kind, why)) = look_note.settled(turn, played_whole, monotonic_us()) {
+                record(
+                    trace,
+                    json!({"kind":kind,"turn":turn,"why":why,"at_us":monotonic_us()}),
+                )?;
+            }
             if !sound_finished
                 && let Some(score) = second_look.finished(turn, said_nothing, monotonic_us())
             {
@@ -7935,17 +8954,21 @@ fn conversation_with_gate(
             // A tool's look waits for its turn's first audio or its end; the
             // still's wait counts from the eyes' ask.
             let by_tool = look_held
-                .filter(|(of, _)| *of == turn)
-                .map(|(_, session)| session);
+                .filter(|(of, ..)| *of == turn)
+                .map(|(_, session, by_second)| (session, by_second));
             let asked_again = asking.wanted().is_some_and(|(of, _)| of == turn);
-            // A tool's look goes only to the session that made the call: one
-            // renewed meanwhile never saw it, nor the second route, whose
-            // sessions are numbered apart (only Gemini's worker asks a
-            // tool's look). Worked out before the ask, so none is made.
-            let gone = by_tool.is_some_and(|session| {
-                rig.second
-                    .as_ref()
-                    .is_some_and(second::Route::second_active)
+            // A tool's look goes only to the session that made the call, on
+            // the route that made it: one renewed meanwhile never saw it,
+            // nor the other route, whose sessions are numbered apart (a
+            // Gemini call whose turn the second route took, or the second
+            // route's once Gemini is back). While a route answers, `cloud`
+            // is its link. Worked out before the ask, so none is made.
+            let gone = by_tool.is_some_and(|(session, by_second)| {
+                by_second
+                    != rig
+                        .second
+                        .as_ref()
+                        .is_some_and(second::Route::second_active)
                     || unasked_session(&cloud, paused).is_some_and(|ready| ready != session)
             });
             if (by_tool.is_none() || tool_look_due(reply.as_ref(), turn))
@@ -7999,6 +9022,13 @@ fn conversation_with_gate(
                     {
                         look_wanted = None;
                         let (note, with_picture) = look.turn();
+                        // A search's walk names the place it looked, with
+                        // the skill's note for the picture; with no
+                        // picture, the eye-shut note alone.
+                        let note = match look_note.walk_line(turn) {
+                            Some(line) if with_picture => format!("{note}{line}"),
+                            _ => note.to_owned(),
+                        };
                         if look.full() && !with_picture {
                             eprintln!(
                                 "lamp-voice: a full look went without its still: {}",
@@ -8017,15 +9047,23 @@ fn conversation_with_gate(
                             owner,
                             reply,
                             &mut provider_queue,
-                            note,
+                            &note,
                             with_picture,
                             "lamp_looks",
                             provider_session,
-                            rig.playout_start,
+                            rig.playout_start_now(),
                             trace,
                             |state| rig.publish(state),
                         )?;
                         last_publish = monotonic_us();
+                        // A search's look's turn goes on with it: the
+                        // skill's next look may be taken there.
+                        if by_tool.is_some()
+                            && let Some(current) = reply.as_ref()
+                            && look_note.looked(turn, current.owner.turn())
+                        {
+                            look_note::mark_search(&mut provider_queue, current.owner.turn());
+                        }
                     }
                 }
             }
@@ -8153,7 +9191,7 @@ fn conversation_with_gate(
                             false,
                             "asked_again",
                             provider_session,
-                            rig.playout_start,
+                            rig.playout_start_now(),
                             trace,
                             |state| rig.publish(state),
                         )?;
@@ -8213,7 +9251,7 @@ fn conversation_with_gate(
                 owner,
                 reply,
                 &mut provider_queue,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )? {
@@ -8244,12 +9282,70 @@ fn conversation_with_gate(
             owner,
             reply,
             &mut provider_queue,
-            rig.playout_start,
+            rig.playout_start_now(),
             trace,
             |state| rig.publish(state),
         )? {
             snapshot = started;
             last_publish = monotonic_us();
+        }
+        // A skill's search left after a look is noted once to go on, under
+        // the same gates; the person speaking or a new turn drops it.
+        // After the note, the walk on to the next place, under the same
+        // gates: its look is taken as a skill's look.
+        let look_note_now_us = monotonic_us();
+        match look_note::start(
+            &mut look_note,
+            holding::Gates {
+                at_us: look_note_now_us,
+                cycle_started_us: reminder_cycle_started_us,
+                last_speech_us,
+                last_capture_us: last_capture,
+                session: unasked_session(&cloud, paused),
+                worker: rig.provider.boot,
+                snapshot: &snapshot,
+                admission: &admission,
+                playback: &playback_mask,
+                speaker_pending: speaker_pending.is_some(),
+                submission_draining,
+            },
+            &walk_skill,
+            owner,
+            reply,
+            &mut provider_queue,
+            rig.playout_start,
+            trace,
+            |state| rig.publish(state),
+        )? {
+            look_note::Started::Nothing => {}
+            look_note::Started::Turn(started) => {
+                snapshot = started;
+                last_publish = monotonic_us();
+            }
+            // The skill looked toward the next place: its still is taken as
+            // for a skill's look, from now (nothing is playing), and goes
+            // as the search's next look turn.
+            look_note::Started::Look { turn, session } => {
+                if look.full() && look_wanted.is_none() {
+                    look_wanted = Some((turn, look_note_now_us));
+                    let by_second = rig
+                        .second
+                        .as_ref()
+                        .is_some_and(second::Route::second_active);
+                    look_held = Some((turn, session, by_second));
+                    look_note.asked(turn, false, None);
+                    record(
+                        trace,
+                        json!({"kind":"look_asked","turn":turn,"by":"walk","at_us":look_note_now_us}),
+                    )?;
+                } else {
+                    look_note.clear();
+                    record(
+                        trace,
+                        json!({"kind":"look_walk_dropped","turn":turn,"why":"its look could not be taken","at_us":look_note_now_us}),
+                    )?;
+                }
+            }
         }
         // A second look at something said to the lamp by name that got
         // nothing, as soon as the lamp is at rest. Someone who has spoken
@@ -8276,7 +9372,7 @@ fn conversation_with_gate(
                     false,
                     "lamp_looks_again",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8312,9 +9408,10 @@ fn conversation_with_gate(
                 )
                 && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
             {
-                snapshot = commit_back_online(owner, reply, rig.playout_start, trace, |state| {
-                    rig.publish(state)
-                })?;
+                snapshot =
+                    commit_back_online(owner, reply, rig.playout_start_now(), trace, |state| {
+                        rig.publish(state)
+                    })?;
                 last_publish = monotonic_us();
                 back_owed_since = None;
             }
@@ -8383,7 +9480,7 @@ fn conversation_with_gate(
                 offer,
                 reminders,
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
@@ -8444,7 +9541,7 @@ fn conversation_with_gate(
                 false,
                 "skill_says",
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
@@ -8490,7 +9587,7 @@ fn conversation_with_gate(
                 at_us,
                 owner,
                 reply,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )? {
@@ -8609,15 +9706,16 @@ fn conversation_with_gate(
                     owner,
                     reply,
                     &mut provider_queue,
-                    note,
+                    &note,
                     false,
                     "lamp_leads_setup",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
                 last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
             }
         }
         // A tap on the head of a quiet lamp (#711): a soft "hm?" of its own,
@@ -8662,7 +9760,113 @@ fn conversation_with_gate(
                     "head_tap_cue",
                     "a tap on the head: nothing heard, nothing sent to the provider",
                     0,
-                    rig.playout_start,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                snapshot = now_state;
+                last_hum_us = Some(at_us);
+                last_publish = monotonic_us();
+            }
+        }
+        // A hand kept on the head into the last second of the three that put
+        // the lamp to sleep (#1362): the falling breath, once a hold, as it
+        // starts to settle. The sleep is Controls' own, at three seconds:
+        // the mute above ends this conversation on the pass that sees it,
+        // the breath cut there if it still plays, so the microphones close
+        // not one sample later for it (the first builder on #1362, 10:35).
+        if let (Some(sound), Some((contact, held_us))) = (sleep_breath.as_ref(), head_held)
+            && crate::head_cue::sighs_at(held_us)
+            && sighed_for != Some(contact)
+        {
+            sighed_for = Some(contact);
+            let at_us = monotonic_us();
+            let decided = crate::head_cue::may_sigh(&crate::head_cue::Now {
+                at_us,
+                began_us: at_us.saturating_sub(held_us),
+                allowed: snapshot.microphone_permission() == Permission::Allowed,
+                quiet: reply.is_none()
+                    && provider_queue.is_empty()
+                    && speaker_pending.is_none()
+                    && !admission.owns_stream()
+                    && admission.idle_for_reminder()
+                    && !submission_draining
+                    && !paused
+                    && playback_mask.available(at_us),
+                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                reply_owed: look_wanted.is_some(),
+                last_said_us: last_spoke_us,
+                last_hum_us,
+            });
+            record(
+                trace,
+                json!({"kind":"head_sleep_breath","held_us":held_us,"at_us":at_us,
+                    "plays":decided.is_ok(),"why":decided.err(),
+                    "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
+            )?;
+            if decided.is_ok() {
+                let (now_state, _) = speaker_tone::commit_sound_turn(
+                    owner,
+                    reply,
+                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, sound.clone()),
+                    "head_sleep_breath",
+                    "a hand kept on the head: the lamp settles to sleep, nothing heard, nothing sent to the provider",
+                    0,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                snapshot = now_state;
+                last_publish = monotonic_us();
+            }
+        }
+        // Woken by the person from a hand's sleep (#1362): its rising "hm?",
+        // the first thing this conversation says, once it is quiet and
+        // listening is ready, within a second and a half of its start or not
+        // at all. Not held to the tap's 30 s: the person asked for it.
+        if let (Some(sound), Some((woken_us, began_us))) = (head_cue.as_ref(), waking) {
+            let at_us = monotonic_us();
+            let decided = crate::head_cue::may_hum(&crate::head_cue::Now {
+                at_us,
+                began_us: woken_us,
+                allowed: snapshot.microphone_permission() == Permission::Allowed,
+                quiet: reply.is_none()
+                    && provider_queue.is_empty()
+                    && speaker_pending.is_none()
+                    && !admission.owns_stream()
+                    && admission.idle_for_reminder()
+                    && !submission_draining
+                    && !paused
+                    && playback_mask.available(at_us),
+                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                reply_owed: look_wanted.is_some(),
+                last_said_us: last_spoke_us,
+                last_hum_us: None,
+            });
+            let waits = matches!(decided, Err("not_quiet" | "listening_not_ready"))
+                && at_us.saturating_sub(began_us) < WAKE_HUM_WITHIN_US;
+            if !waits {
+                waking = None;
+                record(
+                    trace,
+                    json!({"kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":at_us,
+                        "plays":decided.is_ok(),"why":decided.err(),
+                        "boundary":"the waking input's acquisition to this decision; the first sample is head_wake_cue_first_write"}),
+                )?;
+            }
+            if decided.is_ok() {
+                if let Some(choreography) = choreography.as_mut() {
+                    choreography.set_unshown(false);
+                    choreography.set_listening(true);
+                }
+                let (now_state, _) = speaker_tone::commit_sound_turn(
+                    owner,
+                    reply,
+                    NoticeDelivery::sound(SpeechOrigin::WakeHum, sound.clone()),
+                    "head_wake_cue",
+                    "the person woke the lamp: nothing heard, nothing sent to the provider",
+                    0,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
@@ -8768,7 +9972,7 @@ fn conversation_with_gate(
                             "the lamp's own \"Sorry?\" said nothing: nothing heard, nothing sent to the provider"
                         },
                         0,
-                        rig.playout_start,
+                        rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
                     )?;
@@ -8780,6 +9984,13 @@ fn conversation_with_gate(
         }
         if let Some(arrival) = arrival.as_mut() {
             arrival.watch(clock);
+        }
+        // Memory has forgotten someone, asked by the app or by voice: their
+        // tone baseline goes too (`memory/forgot`).
+        if let Some(forgot) = forgot_in.as_mut() {
+            for person in forgot.forgotten(clock) {
+                tone_forgotten(&mut tone_baselines, person.as_deref(), trace, clock)?;
+            }
         }
         // A hello that is due and could be begun; with
         // `LAMP_HELLO_ASKS_POLICY=on` the policy is asked first and it
@@ -8836,11 +10047,12 @@ fn conversation_with_gate(
                     false,
                     "lamp_speaks_first",
                     provider_session,
-                    rig.playout_start,
+                    rig.playout_start_now(),
                     trace,
                     |state| rig.publish(state),
                 )?;
                 last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
             } else {
                 eprintln!(
                     "lamp-voice: someone has sat down; a hello was due and is not switched on"
@@ -8962,7 +10174,7 @@ fn conversation_with_gate(
                 false,
                 "lamp_tells_news",
                 provider_session,
-                rig.playout_start,
+                rig.playout_start_now(),
                 trace,
                 |state| rig.publish(state),
             )?;
@@ -9532,15 +10744,21 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
     }
 }
 
+/// How long a wake from a hand's sleep waits for its conversation to be
+/// quiet and ready for its "hm?" (#1362): a late one would not answer it.
+const WAKE_HUM_WITHIN_US: u64 = 1_500_000;
+
 /// What the ring is told of the turn in hand, from what plays in it. The
-/// head tap's "hm?" (#711), and the same hum after an empty "Sorry?"
-/// (#1417), show the listening face, with the hum, which the ring keeps at
-/// rest for the tap's window; a skill's sound (#1144) shows nothing, so no
-/// frame is asked for while it plays.
+/// head tap's "hm?" (#711), the same hum after an empty "Sorry?" (#1417)
+/// and as the person wakes a hand's sleep (#1362), show the listening face,
+/// with the hum, which the ring keeps at rest for the tap's window; a
+/// skill's sound (#1144) and a hand's sleep's breath (#1362, under the
+/// hold's own dimming) show nothing, so no frame is asked for while they
+/// play.
 fn tell_ring_of_turn(choreography: &mut RingChoreographer, origin: Option<SpeechOrigin>) {
     let cue = matches!(
         origin,
-        Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum)
+        Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum | SpeechOrigin::WakeHum)
     );
     choreography.set_listening(cue);
     choreography.set_unshown(origin.is_some_and(SpeechOrigin::unshown) && !cue);
@@ -9863,6 +11081,32 @@ fn record_look_intent(
     Ok(())
 }
 
+/// `LAMP_CAMERA_FOLLOWS_EYES`: exactly `on`; off unless set (the first
+/// builder on #2233). On, a voice whose camera is the eyes' says so in its
+/// authority, which starts per-person memory and #764's per-person Live
+/// sessions on a product lamp.
+pub const CAMERA_FOLLOWS_EYES: &str = "LAMP_CAMERA_FOLLOWS_EYES";
+
+fn camera_follows_eyes() -> bool {
+    std::env::var(CAMERA_FOLLOWS_EYES).ok().as_deref() == Some("on")
+}
+
+/// With the microphone just permitted: the eyes (`lamp-eyes`, a process of
+/// their own, `eyes`, with `LAMP_CAMERA_FOLLOWS_EYES=on`) look exactly while
+/// it is (`EyesLink`), so with no camera of the voice's own (`own_camera`)
+/// the camera is permitted too, and what is read from them counts (#1895).
+/// A mute denies both (`hand.rs`).
+fn eyes_look_with_the_microphone(
+    owner: &mut Controller,
+    eyes: bool,
+    own_camera: bool,
+) -> std::result::Result<(), lamp_turn_owner::Error> {
+    if eyes && !own_camera {
+        owner.set_camera_permission(now(), Permission::Allowed)?;
+    }
+    Ok(())
+}
+
 /// A mute ends the cycle: the eyes are told no at once rather than left to
 /// close on their 1.5 s without a yes (#1802), and the journal marks it.
 /// One datagram, never waited on; no eyes is nothing to tell.
@@ -9887,6 +11131,12 @@ fn ask_for_still(
     if let Some(eyes) = eyes {
         eyes.look_full(id, side);
     }
+    #[cfg(test)]
+    if TEST_EYES_ANSWER.get()
+        && let Some(path) = TEST_FULL_LOOK.with(|still| still.borrow().clone())
+    {
+        std::fs::write(path, crate::sight::still_of(id))?;
+    }
     record(
         trace,
         json!({"kind":"look_full_asked","turn":turn,"side":side,"at_us":clock}),
@@ -9906,13 +11156,13 @@ fn tool_look_due(reply: Option<&Reply>, turn: u64) -> bool {
 /// says so: no still goes for an answer nobody heard.
 fn drop_unsaid_look(
     look_wanted: &mut Option<(u64, u64)>,
-    look_held: Option<(u64, u64)>,
+    look_held: Option<(u64, u64, bool)>,
     turn: u64,
     why: &str,
     trace: &mut SessionState,
 ) -> Result<()> {
     if look_wanted.take_if(|(of, _)| *of == turn).is_some() {
-        let by = if look_held.is_some_and(|(of, _)| of == turn) {
+        let by = if look_held.is_some_and(|(of, ..)| of == turn) {
             "tool"
         } else {
             "words"
@@ -10294,6 +11544,7 @@ fn commit_written_turn(
         privacy_generation: snapshot.microphone_generation(),
         text: note.to_owned(),
         look,
+        search: false,
     });
     let current = Reply {
         owner: turn,
@@ -10318,6 +11569,7 @@ fn commit_written_turn(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -10348,6 +11600,43 @@ fn hear_the_call(
     Ok(Some(began))
 }
 
+/// How much of `current` was played: its request and the samples handed to
+/// the speaker (`LAMP_SAID_AS_HEARD`).
+fn heard_of(current: &Reply) -> crate::said_as_heard::HeardOfCut {
+    crate::said_as_heard::HeardOfCut {
+        request: current.owner.turn(),
+        samples: current.handed,
+    }
+}
+
+/// With `on` (`LAMP_SAID_AS_HEARD`), what a Stop that cut `cancelled` keeps
+/// for the next line on its session: how much of it was played, and that
+/// session.
+fn stop_cut_of(
+    on: bool,
+    cancelled: Option<&Reply>,
+) -> Option<(crate::said_as_heard::HeardOfCut, u64)> {
+    cancelled
+        .filter(|_| on)
+        .map(|current| (heard_of(current), current.cloud.session))
+}
+
+/// With `on` (`LAMP_SAID_AS_HEARD`), how much was played of the reply a line
+/// admitted on `session` cuts, or else of the one a Stop cut on that session
+/// (`stop_cut`). The Stop's is taken either way: it tells only the next line.
+fn heard_of_cut(
+    on: bool,
+    reply: Option<&Reply>,
+    stop_cut: &mut Option<(crate::said_as_heard::HeardOfCut, u64)>,
+    session: u64,
+) -> Option<crate::said_as_heard::HeardOfCut> {
+    let stopped = stop_cut
+        .take()
+        .filter(|(_, of)| *of == session)
+        .map(|(cut, _)| cut);
+    on.then(|| reply.map(heard_of).or(stopped)).flatten()
+}
+
 /// Whether the lamp's own answer could be heard: the reply in hand had sound
 /// or is playing, not only in hand and silent while it waits for an answer
 /// (#828, the reviewer on #1291).
@@ -10364,11 +11653,17 @@ fn commit_admitted_input(
     accepted: Accepted,
     provider_session: u64,
     continues: bool,
+    // It goes on from a line that ended before its name, whose words the
+    // second route asks with its own (`LAMP_SECOND_OPEN_NAME`).
+    goes_on_from_name: bool,
     // It takes over from the lamp's own answer: its End, if queued here, says so (#926).
     cut_in: bool,
     // The Stop this request tells of, when it is the first after one
     // (#829): when it came, and the session it cut.
     after_stop: Option<(u64, u64)>,
+    // How much was played of the reply it, or the Stop before it, cut
+    // (`LAMP_SAID_AS_HEARD`).
+    heard_of_cut: Option<crate::said_as_heard::HeardOfCut>,
     // Begun soon after the lamp's words finished (`crate::follows_on`).
     follows_on: bool,
     // Begun in onboarding's sentence window (#1803): its Start is followed
@@ -10408,15 +11703,22 @@ fn commit_admitted_input(
     if follows_on && after_stop.is_none() {
         admitted["follows_on"] = json!(true);
     }
+    if let Some(cut) = heard_of_cut {
+        admitted["heard_of_cut"] = json!({"request":cut.request,"samples":cut.samples});
+    }
+    if goes_on_from_name {
+        admitted["goes_on_from_its_name"] = json!(true);
+    }
     record(trace, admitted)?;
     provider_queue.push_back(ProviderInput::Start {
         session: provider_session,
         request: turn.turn(),
         privacy_generation: snapshot.microphone_generation(),
         // The same utterance going on after the lamp ended it (#782). The
-        // model is told of a cut only after an end sent early.
+        // model is told of a cut only after an end sent early, or here when
+        // it goes on from a line that ended before its name.
         continues,
-        continues_cut_off: false,
+        continues_cut_off: goes_on_from_name,
         // Said with a reply in hand: no staff's note. Its voice is judged
         // unless the lamp's could be heard (`over_the_lamps_voice`, #829).
         over_the_lamp: replacing,
@@ -10430,6 +11732,7 @@ fn commit_admitted_input(
         follows_on: follows_on && after_stop.is_none(),
         // Begun while the lamp's answer could be heard (#828).
         over_the_lamps_voice,
+        heard_of_cut,
     });
     if count_only {
         provider_queue.push_back(ProviderInput::CountOnly {
@@ -10460,6 +11763,7 @@ fn commit_admitted_input(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     // One candidate's audio, already bounded by the admission's hold. The
     // standard hold's prefix fits the standing bound as it always has, and
@@ -10564,6 +11868,7 @@ fn commit_offline_input(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     current.input_sequence = accepted.audio.len() as u64;
     if accepted.ended {
@@ -10726,6 +12031,7 @@ fn commit_back_online(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -10791,6 +12097,7 @@ fn continue_after_early_end(
         // model has it; marked again, it would be told twice (El on #1278).
         follows_on: false,
         over_the_lamps_voice: false,
+        heard_of_cut: None,
     });
     if count_only {
         provider_queue.push_back(ProviderInput::CountOnly {
@@ -10821,6 +12128,7 @@ fn continue_after_early_end(
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
+        handed: 0,
     };
     // At most a pre-roll, as a new candidate's opening is.
     let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + usize::from(count_only);
@@ -11669,6 +12977,38 @@ mod tests {
     mod turn_taking;
 
     use super::*;
+
+    /// #1895 on lamp-52e6: with the eyes their own process and no camera of
+    /// the voice's own, the camera is permitted with the microphone, so the
+    /// second route's turns can be the person's and not always the room's.
+    /// A voice with its own camera keeps deciding it there; no eyes, none.
+    #[test]
+    fn the_eyes_camera_is_permitted_with_the_microphone_when_the_voice_has_none() {
+        for (eyes, own_camera, allowed) in [
+            (true, false, true),
+            (true, true, false),
+            (false, false, false),
+        ] {
+            let mut owner = Controller::new(new_boot().unwrap(), now());
+            owner
+                .set_microphone_permission(now(), Permission::Allowed)
+                .unwrap();
+            eyes_look_with_the_microphone(&mut owner, eyes, own_camera).unwrap();
+            assert_eq!(
+                owner.snapshot(now()).unwrap().camera_allowed(now()),
+                allowed,
+                "eyes {eyes}, own camera {own_camera}"
+            );
+            // A mute denies both, as `hand.rs` does: the eyes' camera with it.
+            owner
+                .set_microphone_permission(now(), Permission::Denied)
+                .unwrap();
+            owner
+                .set_camera_permission(now(), Permission::Denied)
+                .unwrap();
+            assert!(!owner.snapshot(now()).unwrap().camera_allowed(now()));
+        }
+    }
     use crate::{
         admission::{Evidence, Verdict},
         wire::CaptureTiming,
@@ -11892,6 +13232,7 @@ mod tests {
             end_silence_blocks: None,
             early_end_blocks: None,
             early_finalize: false,
+            open_name: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,
@@ -12535,6 +13876,7 @@ mod tests {
                 after_stop: false,
                 follows_on: false,
                 over_the_lamps_voice: false,
+                heard_of_cut: None,
             })
             .unwrap();
         request.confirm_start(1).unwrap();
@@ -12593,6 +13935,7 @@ mod tests {
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
+                handed: 0,
             },
             permit,
         )
@@ -13547,6 +14890,7 @@ mod tests {
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
+            handed: 0,
         });
         let started = monotonic_us();
         let observed = started + 20_000;
@@ -13833,6 +15177,7 @@ mod tests {
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
+            handed: 0,
         });
         handle_playback_discard(
             &mut owner,
@@ -13932,6 +15277,7 @@ mod tests {
             after_stop: false,
             follows_on: false,
             over_the_lamps_voice: false,
+            heard_of_cut: None,
         }
     }
 
