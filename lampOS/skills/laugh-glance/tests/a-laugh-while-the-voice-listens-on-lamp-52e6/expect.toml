@@ -1,0 +1,11 @@
+# lamp-52e6's own scores and voice states from #2399's played test (21 Oct):
+# the Mac's laughs beside the lamp, each one opening the voice's listening.
+# The face is added beside the recording. One glance at the 0.154 laugh, made
+# while the voice listened; with `equals = "resting"` there was none.
+clock = "12:00"
+
+[[expect]]
+at = "53800ms"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }

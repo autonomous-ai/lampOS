@@ -20,11 +20,13 @@ yes, replaces the written one.
 | `not-at-a-score-under-the-bar` | One laughter score of 0.04 | Pass: nothing (`above = 0.05`) |
 | `nobody-in-view` | Laughter, no face | Pass: nothing |
 | `never-while-the-lamp-speaks` | Laughter while the lamp speaks | Pass: nothing |
+| `never-while-the-lamp-thinks` | Laughter while the lamp thinks over a turn | Pass: nothing |
 | `never-at-night` | From 23:30, laughter | Pass: nothing |
 | `laughter-on-and-on-gets-one-glance` | Laughter without a lull from 10 s to 330 s | Pass: one glance; none at 310 s when the cooldown ends (`rearm`) |
 | `a-laugh-with-nobody-in-view-spends-nothing` | A laugh with nobody at 10 s; a face from 30 s, a laugh at 60 s | Pass: one glance about 60 s; the first spent no cooldown |
 | `never-over-its-own-sound` | Laughter while `own_voice` is `present` | Pass: nothing |
 | `a-laugh-through-lamp-52e6s-microphone` | lamp-52e6's own scores (#2399): 20 s of an empty office, 70 s of laughs from a speaker beside it, a line over them; a face and the voice resting beside it | Pass: one glance at the first laugh, 23 s (0.05 there) |
+| `a-laugh-while-the-voice-listens-on-lamp-52e6` | lamp-52e6's own scores and voice states from #2399's played test: each of the Mac's laughs opened the voice's listening; a face added beside it | Pass: one glance at 53.8 s, made while the voice listened (none with `equals = "resting"`) |
 
 The bar, one window over 0.05, is set from lamp-52e6's own microphone
 (#2399, 21 Oct): laughs from a speaker at the lamp scored 0.04 to 0.15, and

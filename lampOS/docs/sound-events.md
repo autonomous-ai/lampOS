@@ -163,6 +163,10 @@ phrases. Music sway's 0.6 for 20 s with a 5 s gap swayed once on piano and
 on a jazz vocal (60 s and 22 s in), never on the empty office, and not on an
 upbeat track whose 60 s held under the bar too often. Each skill keeps one
 case made of that run's own scores.
+In the played test that followed, laugh glance never glanced: each laugh
+opened the voice's listening, and the glance held only while it rested. It
+now holds unless the voice thinks or speaks (a case from that run's own
+voice states).
 
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, `install::NOT_PRODUCT_SKILLS`); it reads

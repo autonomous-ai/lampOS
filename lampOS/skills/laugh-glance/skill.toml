@@ -24,10 +24,15 @@ above = 0.05              # one window: through lamp-52e6's microphone a laugh s
 rearm = { below = 0.03, for = "20s" }  # once a burst of laughter; again only after twenty seconds without it (under the bar, over the room's 0.015)
 cooldown = "5m"           # now and then, never at every laugh in a merry room
 
-[[while]]                 # never in the middle of a turn: not while it speaks, listens or thinks
+[[while]]                 # never over a turn: not while it thinks or speaks. Listening is allowed: a laugh opens the voice's listening (lamp-52e6, #2399, 21 Oct: every laugh came while it listened, so resting alone never glanced)
 topic = "voice/state"
 field = "state"
-equals = "resting"
+not_equals = "thinking"
+
+[[while]]
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
 
 [[while]]                 # not at the lamp's own sound: a clip it plays as it rests is no one laughing (Jarvis on #1929)
 topic = "ears/classes"
