@@ -40,3 +40,26 @@ asked_within = "30s"                    # on only when someone spoke at the lamp
 if_heard = ["keep an eye", "keep watch", "watch my desk", "watch the desk", "guard", "look after my desk", "while i'm out", "while i am out", "while i'm away", "while i am away"]
 most = "12h"                            # it ends by itself twelve hours after it was asked, with one text that it has stopped
 mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign; while the ring shows something else over it, it counts nothing
+
+# What it says (#940): its own words. {who}, {at}, {long}, {time} and
+# {minutes} are filled in; each line has only its own slots, each once.
+[watch.words]
+on = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk."
+on_unknown = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk. You don't know their face, so ask them to tell you to stop when they're back."
+already_on = "You're already keeping an eye on things. Say so in one short line."
+on_again = "Say in one short line that you're keeping an eye on things again."
+off = "Say in one short line that you've stopped keeping an eye on things."
+was_off = "You weren't keeping an eye on things. Say so in one short line."
+not_asked = "I keep an eye on things only when someone asks me out loud, at the lamp."
+no_mark = "I can't show that I'm keeping an eye on things just now, so I won't do it."
+blind = "I can't see right now, the privacy switch is closed."
+paused = "I've paused watching while your light is off."
+stopped = "I've stopped keeping an eye on things."
+visit = "{who} was at your desk{at}, {long}."
+known = "Someone you've introduced me to"
+unknown = "Someone I don't know"
+someone = "Someone"
+at = " at {time}"
+under_a_minute = "for under a minute"
+a_minute = "for about a minute"
+minutes = "for about {minutes} minutes"

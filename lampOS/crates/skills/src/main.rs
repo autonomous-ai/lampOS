@@ -1043,6 +1043,18 @@ fn serve(
                     eprintln!("lamp-skills: {line}");
                 }
                 *runner.unplug.borrow_mut() = unplug;
+                for skill in &skills {
+                    if skill
+                        .watch
+                        .as_ref()
+                        .is_some_and(|watch| watch.built_in_words)
+                    {
+                        eprintln!(
+                            "lamp-skills: {} is a watch with no [watch.words]: the built-in ones are said, for this release only (#940)",
+                            skill.name
+                        );
+                    }
+                }
                 // A watch whose skill is gone, or changed, is off.
                 {
                     let mut watching = runner.watching.borrow_mut();

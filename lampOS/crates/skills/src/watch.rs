@@ -73,31 +73,15 @@ pub const NEAR: f32 = 0.10;
 pub const ON: &str = "on";
 pub const OFF: &str = "off";
 
-/// The one line said by text when the switch is closed (#1685).
-pub const BLIND: &str = "I can't see right now, the privacy switch is closed.";
 /// Each closing of the switch is told, but at most one line in this long:
 /// a switch flicked to and fro is not a stream of texts.
 pub const BLIND_EVERY_US: u64 = 60_000_000;
-/// The one line said by text when the watch ends by itself, at its `most`.
-pub const STOPPED: &str = "I've stopped keeping an eye on things.";
-/// The one line said by text when the person's own light hides its mark.
-pub const PAUSED: &str = "I've paused watching while your light is off.";
 /// A shown mark is said reached again after each renewal, every 10 s
 /// (`glow::GLOW_EVERY`): with no such word this long, about three
 /// renewals, it is taken as hidden, and nothing is counted until the next.
 pub const CONFIRMED_WITHIN_US: u64 = 30_000_000;
 /// What the journal says when the ring has gone that long without a word.
 pub const UNCONFIRMED: &str = "its mark has not been confirmed for 30 s: no visit counted";
-
-const ON_NOTE: &str = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk.";
-const ON_NOTE_UNKNOWN: &str = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk. You don't know their face, so ask them to tell you to stop when they're back.";
-const ALREADY_ON: &str = "You're already keeping an eye on things. Say so in one short line.";
-const ON_AGAIN: &str = "Say in one short line that you're keeping an eye on things again.";
-const OFF_NOTE: &str = "Say in one short line that you've stopped keeping an eye on things.";
-const WAS_OFF: &str = "You weren't keeping an eye on things. Say so in one short line.";
-/// Refusals, in words the lamp can say.
-const NOT_ASKED: &str = "I keep an eye on things only when someone asks me out loud, at the lamp.";
-const NO_MARK: &str = "I can't show that I'm keeping an eye on things just now, so I won't do it.";
 
 /// `[watch]` as `skill.toml` says it.
 #[derive(Deserialize)]
@@ -113,6 +97,154 @@ pub(crate) struct WatchFile {
     most: String,
     /// The faint light shown while it is on.
     mark: LightFile,
+    /// What it says, in the skill's own words ([`Words`]); a file from
+    /// before them says the built-in ones, for one release.
+    words: Option<Words>,
+}
+
+/// What a watch says, in its skill's own words (`[watch.words]`, #940): its
+/// answers to the model, its refusals, its texts to the person's phone, and
+/// a visit's text, put together from `visit`'s `{who}`, `{at}` and `{long}`.
+/// Each is words, as a say's are, and only the slots named here.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Words {
+    /// The model's answer, turned on by someone whose face it knows...
+    pub on: String,
+    /// ...or by someone whose face it doesn't.
+    pub on_unknown: String,
+    /// Asked again while it's on.
+    pub already_on: String,
+    /// On again after the person's own light paused it.
+    pub on_again: String,
+    /// Turned off.
+    pub off: String,
+    /// Turned off while it wasn't on.
+    pub was_off: String,
+    /// Refused: not asked out loud at the lamp.
+    pub not_asked: String,
+    /// Refused: its mark can't be shown.
+    pub no_mark: String,
+    /// Texted when the privacy switch closes.
+    pub blind: String,
+    /// Texted when the person's own light pauses it.
+    pub paused: String,
+    /// Texted when it ends by itself.
+    pub stopped: String,
+    /// A visit's text: `{who}`, `{at}` and `{long}`, each once.
+    pub visit: String,
+    /// `{who}`: a face the eyes know...
+    pub known: String,
+    /// ...a face they don't...
+    pub unknown: String,
+    /// ...or no face seen.
+    pub someone: String,
+    /// `{at}`, with `{time}` once (`14:31`); nothing when the time isn't
+    /// known.
+    pub at: String,
+    /// `{long}`: under a minute...
+    pub under_a_minute: String,
+    /// ...about one...
+    pub a_minute: String,
+    /// ...or about `{minutes}`, once.
+    pub minutes: String,
+}
+
+impl Words {
+    /// The words lamp-skills said before they were the skill's, said for
+    /// one release by a watch whose file has no `[watch.words]`: guard mode
+    /// is installable, so a lamp keeps the copy it has past a newer
+    /// lamp-skills (as the first builder's P2 on #2632 found for
+    /// prepare-unplug). The next release removes them, and such a file is
+    /// then refused.
+    pub fn built_in() -> Self {
+        Self {
+            on: "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk.".into(),
+            on_unknown: "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk. You don't know their face, so ask them to tell you to stop when they're back.".into(),
+            already_on: "You're already keeping an eye on things. Say so in one short line.".into(),
+            on_again: "Say in one short line that you're keeping an eye on things again.".into(),
+            off: "Say in one short line that you've stopped keeping an eye on things.".into(),
+            was_off: "You weren't keeping an eye on things. Say so in one short line.".into(),
+            not_asked: "I keep an eye on things only when someone asks me out loud, at the lamp.".into(),
+            no_mark: "I can't show that I'm keeping an eye on things just now, so I won't do it.".into(),
+            blind: "I can't see right now, the privacy switch is closed.".into(),
+            paused: "I've paused watching while your light is off.".into(),
+            stopped: "I've stopped keeping an eye on things.".into(),
+            visit: "{who} was at your desk{at}, {long}.".into(),
+            known: "Someone you've introduced me to".into(),
+            unknown: "Someone I don't know".into(),
+            someone: "Someone".into(),
+            at: " at {time}".into(),
+            under_a_minute: "for under a minute".into(),
+            a_minute: "for about a minute".into(),
+            minutes: "for about {minutes} minutes".into(),
+        }
+    }
+
+    /// Each is words of 1 to [`crate::MOST_WORDS_BYTES`] bytes with no
+    /// control characters, with exactly the slots it may have, each once.
+    fn checked(self) -> Result<Self, String> {
+        for (name, text, slots) in [
+            ("on", &self.on, &[][..]),
+            ("on_unknown", &self.on_unknown, &[]),
+            ("already_on", &self.already_on, &[]),
+            ("on_again", &self.on_again, &[]),
+            ("off", &self.off, &[]),
+            ("was_off", &self.was_off, &[]),
+            ("not_asked", &self.not_asked, &[]),
+            ("no_mark", &self.no_mark, &[]),
+            ("blind", &self.blind, &[]),
+            ("paused", &self.paused, &[]),
+            ("stopped", &self.stopped, &[]),
+            ("visit", &self.visit, &["at", "long", "who"]),
+            ("known", &self.known, &[]),
+            ("unknown", &self.unknown, &[]),
+            ("someone", &self.someone, &[]),
+            ("at", &self.at, &["time"]),
+            ("under_a_minute", &self.under_a_minute, &[]),
+            ("a_minute", &self.a_minute, &[]),
+            ("minutes", &self.minutes, &["minutes"]),
+        ] {
+            if text.trim().is_empty()
+                || text.len() > crate::MOST_WORDS_BYTES
+                || text.chars().any(char::is_control)
+            {
+                return Err(format!(
+                    "[watch.words] {name} is words, 1 to {} bytes, with no control characters",
+                    crate::MOST_WORDS_BYTES
+                ));
+            }
+            let mut found = slots_in(text)
+                .ok_or_else(|| format!("[watch.words] {name} has a brace that opens no slot"))?;
+            found.sort_unstable();
+            if found != slots {
+                return Err(format!(
+                    "[watch.words] {name} has the slots {slots:?}, each once, and no others"
+                ));
+            }
+        }
+        Ok(self)
+    }
+}
+
+/// The `{name}` slots in `text`, in order; none for a brace that opens no
+/// slot.
+fn slots_in(text: &str) -> Option<Vec<&str>> {
+    let mut slots = Vec::new();
+    let mut rest = text;
+    while let Some(open) = rest.find(['{', '}']) {
+        if rest[open..].starts_with('}') {
+            return None;
+        }
+        let close = rest[open..].find('}')? + open;
+        let name = &rest[open + 1..close];
+        if name.is_empty() || !name.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+            return None;
+        }
+        slots.push(name);
+        rest = &rest[close + 1..];
+    }
+    Some(slots)
 }
 
 /// A watch as loaded.
@@ -125,6 +257,11 @@ pub struct Spec {
     pub most_us: u64,
     /// A light, at level 1 or 2, steady.
     pub mark: Call,
+    /// What it says ([`Words`]).
+    pub words: Words,
+    /// Whether its file has no `[watch.words]`, so [`Words::built_in`] is
+    /// said, for this release only: the journal says so at each load.
+    pub built_in_words: bool,
 }
 
 /// `[watch]` checked: a text at most every 1 minute to a day, asked within 5
@@ -170,12 +307,18 @@ pub(crate) fn spec(file: WatchFile) -> Result<Spec, String> {
             );
         }
     }
+    let built_in_words = file.words.is_none();
+    let words = file
+        .words
+        .map_or_else(|| Ok(Words::built_in()), Words::checked)?;
     Ok(Spec {
         every_us,
         asked_within_us,
         if_heard,
         most_us,
         mark,
+        words,
+        built_in_words,
     })
 }
 
@@ -209,24 +352,31 @@ struct Visit {
 impl Visit {
     /// "Someone was at your desk at 14:31, for about 2 minutes.": who only
     /// as known or not, never a name.
-    fn text(&self) -> String {
+    fn text(&self, words: &Words) -> String {
         let who = if self.known {
-            "Someone you've introduced me to"
+            &words.known
         } else if self.face {
-            "Someone I don't know"
+            &words.unknown
         } else {
-            "Someone"
+            &words.someone
         };
         let at = self.began_minute.map_or(String::new(), |minute| {
-            format!(" at {}:{:02}", minute / 60, minute % 60)
+            words
+                .at
+                .replace("{time}", &format!("{}:{:02}", minute / 60, minute % 60))
         });
         let seconds = self.seen_us.saturating_sub(self.began_us) / 1_000_000;
         let long = match (seconds + 30) / 60 {
-            _ if seconds < 60 => "for under a minute".to_owned(),
-            1 => "for about a minute".to_owned(),
-            minutes => format!("for about {minutes} minutes"),
+            _ if seconds < 60 => words.under_a_minute.clone(),
+            1 => words.a_minute.clone(),
+            minutes => words.minutes.replace("{minutes}", &minutes.to_string()),
         };
-        format!("{who} was at your desk{at}, {long}.")
+        // The parts have no slots of their own, so none is filled twice.
+        words
+            .visit
+            .replace("{who}", who)
+            .replace("{at}", &at)
+            .replace("{long}", &long)
     }
 }
 
@@ -287,7 +437,7 @@ impl On {
             ))];
         }
         self.texted_us = Some(now_us);
-        vec![Out::Text(visit.text())]
+        vec![Out::Text(visit.text(&spec.words))]
     }
 }
 
@@ -319,10 +469,10 @@ impl Watch {
         if !on {
             return Ok(match self.on.take() {
                 Some(_) => (
-                    json!({ "next": OFF_NOTE }),
+                    json!({ "next": spec.words.off }),
                     vec![Out::Unmark, Out::Said("off, as asked".into())],
                 ),
-                None => (json!({ "next": WAS_OFF }), Vec::new()),
+                None => (json!({ "next": spec.words.was_off }), Vec::new()),
             });
         }
         let asked = heard.is_some_and(|(heard_us, text)| {
@@ -336,16 +486,16 @@ impl Watch {
         });
         if let Some(on) = &mut self.on {
             if !on.paused {
-                return Ok((json!({ "next": ALREADY_ON }), Vec::new()));
+                return Ok((json!({ "next": spec.words.already_on }), Vec::new()));
             }
             // Paused by their own light: asked again in words, it goes on,
             // its mark asked for anew; it counts once the ring shows it.
             if !asked {
-                return Err(NOT_ASKED.into());
+                return Err(spec.words.not_asked.clone());
             }
             on.paused = false;
             return Ok((
-                json!({ "next": ON_AGAIN }),
+                json!({ "next": spec.words.on_again }),
                 vec![
                     Out::Mark(spec.mark.clone()),
                     Out::Said("on again, asked at the lamp: its mark asked for anew".into()),
@@ -353,10 +503,10 @@ impl Watch {
             ));
         }
         if !asked {
-            return Err(NOT_ASKED.into());
+            return Err(spec.words.not_asked.clone());
         }
         if !can_mark {
-            return Err(NO_MARK.into());
+            return Err(spec.words.no_mark.clone());
         }
         self.on = Some(On {
             since_us: now_us,
@@ -372,8 +522,11 @@ impl Watch {
             closed: false,
         });
         let (note, by) = match asker {
-            Some(_) => (ON_NOTE, ", by someone whose face it knows"),
-            None => (ON_NOTE_UNKNOWN, ", by someone whose face it does not know"),
+            Some(_) => (&spec.words.on, ", by someone whose face it knows"),
+            None => (
+                &spec.words.on_unknown,
+                ", by someone whose face it does not know",
+            ),
         };
         Ok((
             json!({ "next": note }),
@@ -452,7 +605,7 @@ impl Watch {
     /// The privacy switch, closed or not: each closing, its line, at most
     /// one a minute (`BLIND_EVERY_US`); and while it is closed nothing about
     /// the desk is taken.
-    pub fn privacy(&mut self, closed: bool, now_us: u64) -> Vec<Out> {
+    pub fn privacy(&mut self, closed: bool, now_us: u64, spec: &Spec) -> Vec<Out> {
         let Some(on) = &mut self.on else {
             return Vec::new();
         };
@@ -474,7 +627,7 @@ impl Watch {
             )];
         }
         on.blind_at_us = Some(now_us);
-        vec![Out::Text(BLIND.into())]
+        vec![Out::Text(spec.words.blind.clone())]
     }
 
     /// The ring says at `now_us` its mark is shown (`light/reached`) or not
@@ -508,7 +661,7 @@ impl Watch {
     /// The person's own light is over its mark (`light/outranked` by the
     /// person): paused, once, its line; nothing about the desk is taken, and
     /// its mark is not asked for over them.
-    pub fn paused_by_person(&mut self) -> Vec<Out> {
+    pub fn paused_by_person(&mut self, spec: &Spec) -> Vec<Out> {
         let Some(on) = &mut self.on else {
             return Vec::new();
         };
@@ -518,7 +671,7 @@ impl Watch {
         on.paused = true;
         on.hidden = true;
         vec![
-            Out::Text(PAUSED.into()),
+            Out::Text(spec.words.paused.clone()),
             Out::Said(
                 "paused: the person's own light is over its mark; on again only when they ask"
                     .into(),
@@ -549,7 +702,7 @@ impl Watch {
         self.on = None;
         vec![
             Out::Unmark,
-            Out::Text(STOPPED.into()),
+            Out::Text(spec.words.stopped.clone()),
             Out::Said(format!(
                 "off: {} h since it was asked, its most",
                 spec.most_us / 3_600_000_000
@@ -748,7 +901,7 @@ impl Watches {
     pub fn privacy(&mut self, closed: bool, now_us: u64) -> Outs {
         let mut made = Vec::new();
         for (skill, entry) in &mut self.each {
-            for out in entry.watch.privacy(closed, now_us) {
+            for out in entry.watch.privacy(closed, now_us, &entry.spec) {
                 made.push((skill.clone(), out));
             }
         }
@@ -785,7 +938,7 @@ impl Watches {
         self.each.get_mut(skill).map_or_else(Vec::new, |entry| {
             entry
                 .watch
-                .paused_by_person()
+                .paused_by_person(&entry.spec)
                 .into_iter()
                 .map(|out| (skill.to_owned(), out))
                 .collect()
@@ -851,7 +1004,55 @@ mod tests {
                 keep: false,
                 until_ends: false,
             },
+            words: guard_words(),
+            built_in_words: false,
         }
+    }
+
+    /// [`spec`], under a name no test's own `spec` hides.
+    fn the_spec() -> Spec {
+        spec()
+    }
+
+    /// Guard mode's own words, as a lamp loads them.
+    fn guard_words() -> Words {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/guard-mode");
+        let watch = crate::load(&dir)
+            .expect("guard mode loads")
+            .watch
+            .expect("it has a watch");
+        assert!(!watch.built_in_words, "it says its own words");
+        watch.words
+    }
+
+    /// The second move of "Everything is a skill" (#940) is a move, not a
+    /// change: guard mode's words are the ones lamp-skills said before,
+    /// byte for byte, and the tests below read its visits as before.
+    #[test]
+    fn the_watch_words_are_guard_modes_and_what_the_lamp_said_before() {
+        assert_eq!(guard_words(), Words::built_in());
+        assert_eq!(
+            Words::built_in().visit,
+            "{who} was at your desk{at}, {long}."
+        );
+    }
+
+    /// Each word is words, with only its own slots, each once.
+    #[test]
+    fn a_watchs_words_have_only_their_own_slots() {
+        assert!(Words::built_in().checked().is_ok());
+        let broken = |change: fn(&mut Words)| {
+            let mut words = Words::built_in();
+            change(&mut words);
+            words.checked().unwrap_err()
+        };
+        assert!(broken(|w| w.visit = "{who} was at your desk.".into()).contains("visit"));
+        assert!(broken(|w| w.visit = "{who}{who} {at} {long}".into()).contains("visit"));
+        assert!(broken(|w| w.known = "Someone {who}".into()).contains("known"));
+        assert!(broken(|w| w.at = " at {time".into()).contains("brace"));
+        assert!(broken(|w| w.minutes = "for {Minutes}".into()).contains("brace"));
+        assert!(broken(|w| w.blind = "a\u{7}b".into()).contains("control"));
+        assert!(broken(|w| w.stopped = " ".into()).contains("stopped"));
     }
 
     /// On, asked at 0 by `asker`, heard a second before.
@@ -935,14 +1136,14 @@ mod tests {
         assert!(watch.presence(true, 2 * MINUTE, None, &spec).is_empty());
         watch.face(true, 2 * MINUTE, None);
         assert!(watch.known(Some("known-a"), 2 * MINUTE, None).is_empty());
-        assert!(watch.privacy(true, MINUTE).is_empty());
+        assert!(watch.privacy(true, MINUTE, &the_spec()).is_empty());
         assert!(!watch.is_on());
         // Asked with nothing heard at the lamp (a text), or heard too long
         // before, or after talk of something else: refused.
         let not_asked = watch.turn(true, &spec, MINUTE, None, None, true);
-        assert_eq!(not_asked.unwrap_err(), NOT_ASKED);
+        assert_eq!(not_asked.unwrap_err(), guard_words().not_asked);
         let long_ago = watch.turn(true, &spec, MINUTE, heard(MINUTE - 31 * SECOND), None, true);
-        assert_eq!(long_ago.unwrap_err(), NOT_ASKED);
+        assert_eq!(long_ago.unwrap_err(), guard_words().not_asked);
         for other in ["what's the weather", "keep the light on", "an eye test"] {
             let elsewhere = watch.turn(
                 true,
@@ -952,7 +1153,7 @@ mod tests {
                 None,
                 true,
             );
-            assert_eq!(elsewhere.unwrap_err(), NOT_ASKED, "{other}");
+            assert_eq!(elsewhere.unwrap_err(), guard_words().not_asked, "{other}");
         }
         // Whole words, any case: "Guard the desk" asks; "guardian" does not.
         let guardian = watch.turn(
@@ -963,11 +1164,11 @@ mod tests {
             None,
             true,
         );
-        assert_eq!(guardian.unwrap_err(), NOT_ASKED);
+        assert_eq!(guardian.unwrap_err(), guard_words().not_asked);
         assert!(!watch.is_on());
         // No mark to show: refused.
         let unmarked = watch.turn(true, &spec, MINUTE, heard(MINUTE - SECOND), None, false);
-        assert_eq!(unmarked.unwrap_err(), NO_MARK);
+        assert_eq!(unmarked.unwrap_err(), guard_words().no_mark);
         assert!(!watch.is_on());
         // Asked out loud, the mark shown.
         let (answer, outs) = watch
@@ -1105,20 +1306,30 @@ mod tests {
     #[test]
     fn the_privacy_switch_closed_gives_one_line_each_closing() {
         let mut watch = on(None);
-        assert!(watch.privacy(false, MINUTE).is_empty());
-        assert_eq!(watch.privacy(true, MINUTE), [Out::Text(BLIND.into())]);
-        assert!(watch.privacy(true, MINUTE + SECOND).is_empty());
-        assert!(watch.privacy(false, 2 * MINUTE).is_empty());
+        assert!(watch.privacy(false, MINUTE, &the_spec()).is_empty());
+        assert_eq!(
+            watch.privacy(true, MINUTE, &the_spec()),
+            [Out::Text(guard_words().blind)]
+        );
+        assert!(watch.privacy(true, MINUTE + SECOND, &the_spec()).is_empty());
+        assert!(watch.privacy(false, 2 * MINUTE, &the_spec()).is_empty());
         // Closed again two minutes after the first: told.
-        assert_eq!(watch.privacy(true, 3 * MINUTE), [Out::Text(BLIND.into())]);
+        assert_eq!(
+            watch.privacy(true, 3 * MINUTE, &the_spec()),
+            [Out::Text(guard_words().blind)]
+        );
         // Opened and closed within the minute: not texted, said.
-        assert!(watch.privacy(false, 3 * MINUTE + 10 * SECOND).is_empty());
-        let flicked = watch.privacy(true, 3 * MINUTE + 20 * SECOND);
+        assert!(
+            watch
+                .privacy(false, 3 * MINUTE + 10 * SECOND, &the_spec())
+                .is_empty()
+        );
+        let flicked = watch.privacy(true, 3 * MINUTE + 20 * SECOND, &the_spec());
         assert!(matches!(&flicked[..], [Out::Said(why)] if why.contains("within a minute")));
-        assert!(watch.privacy(true, 5 * MINUTE).is_empty());
+        assert!(watch.privacy(true, 5 * MINUTE, &the_spec()).is_empty());
         // Off, nothing.
         let mut off = Watch::default();
-        assert!(off.privacy(true, MINUTE).is_empty());
+        assert!(off.privacy(true, MINUTE, &the_spec()).is_empty());
     }
 
     /// The peer read's P2 on #1807: while the ring says its mark is not
@@ -1200,9 +1411,9 @@ mod tests {
         let spec = spec();
         let mut watch = on(None);
         watch.presence(false, MINUTE, None, &spec);
-        let paused = watch.paused_by_person();
-        assert_eq!(texts(&paused), [PAUSED]);
-        assert!(watch.paused_by_person().is_empty());
+        let paused = watch.paused_by_person(&the_spec());
+        assert_eq!(texts(&paused), [guard_words().paused.as_str()]);
+        assert!(watch.paused_by_person(&the_spec()).is_empty());
         // The ring saying the old mark shows does not end a pause.
         assert!(watch.mark_shown(true, None, MINUTE).is_empty());
         assert!(
@@ -1220,7 +1431,7 @@ mod tests {
             None,
             true,
         );
-        assert_eq!(quiet.unwrap_err(), NOT_ASKED);
+        assert_eq!(quiet.unwrap_err(), guard_words().not_asked);
         // Asked again in words: the mark asked for anew, counted once shown.
         let (answer, outs) = watch
             .turn(
@@ -1232,7 +1443,7 @@ mod tests {
                 true,
             )
             .unwrap();
-        assert_eq!(answer["next"], ON_AGAIN);
+        assert_eq!(answer["next"], guard_words().on_again);
         assert_eq!(outs[0], Out::Mark(spec.mark.clone()));
         assert!(watch.presence(true, 7 * MINUTE, None, &spec).is_empty());
         watch.mark_shown(true, None, 7 * MINUTE);
@@ -1253,7 +1464,7 @@ mod tests {
                 true,
             )
             .unwrap();
-        assert_eq!(answer["next"], ALREADY_ON);
+        assert_eq!(answer["next"], guard_words().already_on);
         assert!(outs.is_empty());
     }
 
@@ -1263,11 +1474,11 @@ mod tests {
     fn a_pause_lasts_until_asked_or_its_most() {
         let spec = spec();
         let mut watch = on(None);
-        watch.paused_by_person();
+        watch.paused_by_person(&the_spec());
         assert!(watch.tick(11 * 60 * MINUTE, &spec).is_empty());
         assert!(watch.is_on());
         let ended = watch.tick(12 * 60 * MINUTE + SECOND, &spec);
-        assert_eq!(texts(&ended), [STOPPED]);
+        assert_eq!(texts(&ended), [guard_words().stopped.as_str()]);
         assert!(!watch.is_on());
     }
 
@@ -1282,7 +1493,7 @@ mod tests {
         assert!(watch.tick(12 * 60 * MINUTE, &spec).is_empty());
         let ended = watch.tick(12 * 60 * MINUTE + SECOND, &spec);
         assert_eq!(ended[0], Out::Unmark);
-        assert_eq!(texts(&ended), [STOPPED]);
+        assert_eq!(texts(&ended), [guard_words().stopped.as_str()]);
         assert!(!watch.is_on());
         assert!(watch.tick(13 * 60 * MINUTE, &spec).is_empty());
     }
@@ -1295,7 +1506,10 @@ mod tests {
         let spec = spec();
         let mut watch = on(Some("known-a"));
         watch.presence(false, MINUTE, None, &spec);
-        assert_eq!(watch.privacy(true, MINUTE), [Out::Text(BLIND.into())]);
+        assert_eq!(
+            watch.privacy(true, MINUTE, &the_spec()),
+            [Out::Text(guard_words().blind)]
+        );
         assert!(
             watch
                 .presence(true, 2 * MINUTE, Some(600), &spec)
@@ -1307,7 +1521,7 @@ mod tests {
         assert!(watch.is_on());
         assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
         // Open: the next visit is the first.
-        assert!(watch.privacy(false, 5 * MINUTE).is_empty());
+        assert!(watch.privacy(false, 5 * MINUTE, &the_spec()).is_empty());
         watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
         watch.presence(true, 12 * MINUTE, None, &spec);
         assert_eq!(
@@ -1325,20 +1539,20 @@ mod tests {
             .turn(false, &spec, 5 * MINUTE, None, None, false)
             .unwrap();
         assert_eq!(outs[0], Out::Unmark);
-        assert_eq!(answer["next"], OFF_NOTE);
+        assert_eq!(answer["next"], guard_words().off);
         assert!(!watch.is_on());
         let (answer, outs) = watch
             .turn(false, &spec, 6 * MINUTE, None, None, false)
             .unwrap();
         assert!(outs.is_empty());
-        assert_eq!(answer["next"], WAS_OFF);
+        assert_eq!(answer["next"], guard_words().was_off);
         // On twice is on once.
         let mut watch = on(None);
         let (answer, outs) = watch
             .turn(true, &spec, 2 * SECOND, heard(SECOND), None, true)
             .unwrap();
         assert!(outs.is_empty());
-        assert_eq!(answer["next"], ALREADY_ON);
+        assert_eq!(answer["next"], guard_words().already_on);
     }
 
     /// The repository's guard mode, as the program holds it: a reload

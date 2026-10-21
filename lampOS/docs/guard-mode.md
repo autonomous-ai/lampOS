@@ -1,7 +1,7 @@
 # Guard mode
 
 While you're out, the lamp tells you by text when someone is at your desk:
-"Someone was at your desk at 14:31, for about 2 minutes." An installable
+"Someone was at your desk at 14:31, for about 2 minutes." (Every line it says is its own, in its `skill.toml`'s `[watch.words]`, #940.) An installable
 skill (`skills/guard-mode/`), off until you turn it on. Built to the first
 builder's design on [#1685](https://github.com/autonomous-ai/lampOS/issues/1685)
 (19 Oct, 12:08), from the owner's decision that guard mode is an installable
