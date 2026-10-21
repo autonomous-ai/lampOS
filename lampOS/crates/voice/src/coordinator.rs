@@ -1368,7 +1368,7 @@ fn muted_wait_pulsing<
                     // tap's face is not drawn over it.
                     let sleeping = match sleep_face.borrow_mut().as_mut() {
                         Some(face) => {
-                            if face.poll(observation.asleep) {
+                            if face.poll(observation.asleep, allowed) {
                                 record(
                                     &mut trace.borrow_mut(),
                                     json!({"kind":"head_sleep_face","at_us":monotonic_us()}),
@@ -1437,8 +1437,13 @@ fn muted_wait_pulsing<
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
+    // A wake leaves the person's light on for the conversation's ring
+    // (#1362); anything else ends black.
     if let Some(face) = sleep_face.into_inner() {
-        face.stop();
+        match &outcome {
+            Ok(crate::service_privacy::WaitOutcome::Allowed) => face.release(),
+            _ => face.stop(),
+        }
     }
     // Let go before the next session's ring worker takes the light up.
     drop(light.into_inner());
@@ -1485,11 +1490,21 @@ fn may_hear(allowed: bool, slide: Option<crate::privacy::PrivacyState>) -> bool 
     allowed && slide != Some(crate::privacy::PrivacyState::Muted)
 }
 
-/// The asleep face for a hand's sleep, on the lamp's own ring (Linux).
+/// The person's light a hand's sleep keeps on, from the bus if there is
+/// one (#1362): none means the asleep face. Read on Linux, where the ring is.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn sleep_light(bus: Option<&lamp_bus::Bus>) -> Option<crate::ring_face::Lit> {
+    bus.and_then(crate::ring_asleep::persons_light)
+}
+
+/// What a hand's sleep shows on the lamp's own ring (Linux): the person's
+/// own light, if their ring said one was on, and the asleep face otherwise
+/// (#1362, the first builder on #1362, 21 Oct 15:1x).
 fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
     #[cfg(target_os = "linux")]
     {
-        crate::ring_asleep::Asleep::start(ceiling)
+        let bus = lamp_bus::Bus::from_environment().ok();
+        crate::ring_asleep::Asleep::sleeping(ceiling, sleep_light(bus.as_ref()))
     }
     #[cfg(not(target_os = "linux"))]
     {

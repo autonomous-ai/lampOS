@@ -155,6 +155,9 @@ pub const STOP_DEADLINE: Duration = Duration::from_secs(1);
 /// device closed.
 pub struct Asleep {
     stop: Arc<AtomicBool>,
+    /// With the person's light ([`Self::light_with`]): set before stopping,
+    /// the painter leaves its last frame on the ring ([`Self::release`]).
+    leave: Option<Arc<AtomicBool>>,
     /// A reminder owed, as the muted wait tells it (#1545).
     owed: Arc<Owed>,
     thread: Option<JoinHandle<()>>,
@@ -215,6 +218,51 @@ impl Asleep {
         })
     }
 
+    /// What a hand's sleep shows on lamp-4ace's ring device under
+    /// `ceiling` ([`Self::sleeping_with`]).
+    #[cfg(target_os = "linux")]
+    pub fn sleeping(ceiling: u16, light: Option<crate::ring_face::Lit>) -> Option<Self> {
+        let ceiling = ChannelCeiling::new(ceiling).ok()?;
+        Some(Self::sleeping_with(
+            lamp_ring::linux::open_asleep,
+            ceiling,
+            light,
+        ))
+    }
+
+    /// What a hand's sleep shows, on whatever `open` gives: the person's
+    /// own light, drawn at once, while their ring said one was on, and the
+    /// asleep face otherwise, after [`AFTER`] as always (#1362).
+    pub fn sleeping_with<S, F>(
+        open: F,
+        ceiling: ChannelCeiling,
+        light: Option<crate::ring_face::Lit>,
+    ) -> Self
+    where
+        S: FrameSink + 'static,
+        F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
+    {
+        match light {
+            Some(lit) => Self::light_with(open, ceiling, lit),
+            None => Self::start_with(open, ceiling),
+        }
+    }
+
+    /// [`Self::start_light`], on whatever `open` gives.
+    pub fn light_with<S, F>(open: F, ceiling: ChannelCeiling, lit: crate::ring_face::Lit) -> Self
+    where
+        S: FrameSink + 'static,
+        F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
+    {
+        let leave = Arc::new(AtomicBool::new(false));
+        let leaving = leave.clone();
+        let mut asleep = Self::spawn(STOP_DEADLINE, move |stop, _| {
+            paint_light(open, ceiling, lit, stop, &leaving)
+        });
+        asleep.leave = Some(leave);
+        asleep
+    }
+
     /// Where the muted wait tells the face of a reminder owed (#1545):
     /// while its pulse may show, the face pulses as [`Pulses`] say.
     pub fn owed(&self) -> Arc<Owed> {
@@ -270,6 +318,7 @@ impl Asleep {
             .ok();
         Self {
             stop,
+            leave: None,
             owed,
             thread,
             done: Some(done),
@@ -284,6 +333,17 @@ impl Asleep {
 
     /// Stop painting: the ring is black and the device closed on return.
     pub fn stop(mut self) {
+        self.finish();
+    }
+
+    /// Stop painting as the lamp wakes: the person's light is left on the
+    /// ring, and the device closed, so it doesn't blink off before the
+    /// conversation's ring draws it again (the reviewer-lead's P2 on #2549).
+    /// Any other picture goes black, as [`Self::stop`].
+    pub fn release(mut self) {
+        if let Some(leave) = &self.leave {
+            leave.store(true, Ordering::SeqCst);
+        }
         self.finish();
     }
 
@@ -368,6 +428,107 @@ fn paint_tapped<S: FrameSink>(
     ring.shutdown()
 }
 
+/// A hand's sleep with the person's own light on (#1362, the first builder
+/// on #1362, 21 Oct 15:1x): the light stays theirs. The conversation's ring
+/// worker writes black as the mute stops it; this draws their light back at
+/// once, as their ring showed it at rest ([`crate::ring_face::Face`]), with
+/// one slow dip of a step as it settles: up from the black to a level lower
+/// by [`LIGHT_DIP`]'s first, held to its second, back up by its third. Then
+/// it is their light, and nothing more.
+pub const LIGHT_DIP: [Duration; 3] = [
+    Duration::from_millis(600),
+    Duration::from_millis(2_000),
+    Duration::from_millis(4_000),
+];
+
+/// How much of the person's light shows `since` its painter began, with
+/// `lower` the share one level down ([`crate::ring_face::Lit::step_down_share`]).
+pub fn dip_share(since: Duration, lower: f32) -> f32 {
+    let ease = |from: Duration, to: Duration| {
+        let share = (since.saturating_sub(from).as_secs_f32()
+            / to.saturating_sub(from).as_secs_f32())
+        .clamp(0.0, 1.0);
+        0.5 - 0.5 * (std::f32::consts::PI * share).cos()
+    };
+    let [rise, hold, back] = LIGHT_DIP;
+    if since < rise {
+        lower * ease(Duration::ZERO, rise)
+    } else if since < hold {
+        lower
+    } else {
+        lower + (1.0 - lower) * ease(hold, back)
+    }
+}
+
+/// The person's light `since` its painter began, at `now_us`: their ring's
+/// resting frame under `ceiling`, by [`dip_share`].
+pub fn light_pixels(
+    face: &mut crate::ring_face::Face,
+    lit: crate::ring_face::Lit,
+    since: Duration,
+    now_us: u64,
+    ceiling: ChannelCeiling,
+) -> [lamp_ring::Rgb; lamp_ring::PIXEL_COUNT] {
+    let share = dip_share(since, lit.step_down_share());
+    face.render(crate::ring_face::Mood::Resting, 0, now_us, ceiling.get())
+        .map(|pixel| {
+            let scale = |channel: u8| (f32::from(channel) * share).round() as u8;
+            lamp_ring::Rgb::new(scale(pixel.red), scale(pixel.green), scale(pixel.blue))
+        })
+}
+
+/// The person's own light while a hand's sleep keeps the lamp muted, if
+/// their ring said one was on (`light/state`, kept on the bus by the ring's
+/// light, `crate::ring_light::SOURCE`): the last light the ring showed,
+/// however old, since the ring stopped saying it at the mute. Off, never
+/// said, said by another part, or not a light the ring can draw: none, and
+/// the sleep shows the asleep face.
+pub fn persons_light(bus: &lamp_bus::Bus) -> Option<crate::ring_face::Lit> {
+    let message = bus.latest(lamp_msgs::Light::TOPICS[1]).ok().flatten()?;
+    if message.header.source != crate::ring_light::SOURCE {
+        return None;
+    }
+    let light = message.parse::<lamp_msgs::Light>().ok()?;
+    light
+        .on
+        .then(|| crate::ring_face::Lit::of(true, &light.colour, light.level))
+        .flatten()
+}
+
+/// The person's light drawn at once ([`light_pixels`]) until stopped, then
+/// black, or left on the ring when told to `leave` (a wake).
+fn paint_light<S: FrameSink>(
+    open: impl FnOnce() -> io::Result<AsleepRing<S>>,
+    ceiling: ChannelCeiling,
+    lit: crate::ring_face::Lit,
+    stop: &AtomicBool,
+    leave: &AtomicBool,
+) -> io::Result<()> {
+    let mut ring = open()?;
+    let mut face = crate::ring_face::Face::new();
+    face.light(lit);
+    let began = Instant::now();
+    while !stop.load(Ordering::SeqCst) {
+        let pixels = light_pixels(
+            &mut face,
+            lit,
+            began.elapsed(),
+            lamp_ipc::monotonic_us(),
+            ceiling,
+        );
+        if let Err(error) = ring.show_light(&pixels, ceiling) {
+            let _ = ring.shutdown();
+            return Err(error);
+        }
+        wait(FRAME, stop);
+    }
+    if leave.load(Ordering::SeqCst) {
+        ring.leave();
+        return Ok(());
+    }
+    ring.shutdown()
+}
+
 /// The asleep face for about a second at each tap on the head while the
 /// lamp waits out a mute (#711): one at a time, and none for the tap that
 /// lets it hear again, since its ring worker is about to start.
@@ -432,11 +593,17 @@ impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
     }
 
     /// One look of the muted wait: whether the head's sleep keeps it
-    /// muted. True when a face began.
-    pub fn poll(&mut self, asleep: bool) -> bool {
+    /// muted, and whether the lamp may hear (`opens`). True when a face
+    /// began. The sleep ended by a wake that opens it leaves the person's
+    /// light on for the conversation's ring ([`Asleep::release`]).
+    pub fn poll(&mut self, asleep: bool, opens: bool) -> bool {
         if !asleep {
             if let Some(showing) = self.showing.take() {
-                showing.stop();
+                if opens {
+                    showing.release();
+                } else {
+                    showing.stop();
+                }
             }
             return false;
         }
@@ -467,6 +634,14 @@ impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
     pub fn stop(self) {
         if let Some(showing) = self.showing {
             showing.stop();
+        }
+    }
+
+    /// As the wait ends on a wake: the person's light left on, any other
+    /// picture black, and the device closed ([`Asleep::release`]).
+    pub fn release(self) {
+        if let Some(showing) = self.showing {
+            showing.release();
         }
     }
 }
@@ -787,9 +962,9 @@ mod tests {
             ))
         };
         let mut face = SleepFace::new(start, true);
-        assert!(!face.poll(false), "awake: nothing");
-        assert!(face.poll(true), "asleep: begun");
-        assert!(!face.poll(true), "once");
+        assert!(!face.poll(false, false), "awake: nothing");
+        assert!(face.poll(true, false), "asleep: begun");
+        assert!(!face.poll(true, false), "once");
         let until = Instant::now() + Duration::from_secs(2);
         while !open.load(Ordering::SeqCst) && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(10));
@@ -804,9 +979,9 @@ mod tests {
             EncodedFrame::black()
         );
         assert!(!face.showing());
-        assert!(!face.poll(true), "not again in this wait");
+        assert!(!face.poll(true, false), "not again in this wait");
         face.slide(PrivacyState::Allowed);
-        assert!(!face.poll(true), "nor once the slide opens");
+        assert!(!face.poll(true, false), "nor once the slide opens");
         assert_eq!(starts.get(), 1);
         face.stop();
 
@@ -823,16 +998,214 @@ mod tests {
             },
             false,
         );
-        assert!(off_route.poll(true));
+        assert!(off_route.poll(true, false));
         off_route.slide(PrivacyState::Muted);
         assert!(
             off_route.showing(),
             "off the route the face is the muted look"
         );
-        assert!(!off_route.poll(false));
+        assert!(!off_route.poll(false, false));
         assert!(!off_route.showing(), "awake again: stopped");
-        assert!(off_route.poll(true), "asleep again: begun again");
+        assert!(off_route.poll(true, false), "asleep again: begun again");
         assert_eq!(starts.get(), 2);
         off_route.stop();
+    }
+
+    /// #1362: with the person's light on, the light comes back at once from
+    /// the mute's black, a level lower, held, and back up to their light by
+    /// four seconds; then it is their light and nothing more.
+    #[test]
+    fn the_persons_light_comes_back_with_one_slow_dip() {
+        let lower = 0.65;
+        let at = |ms| dip_share(Duration::from_millis(ms), lower);
+        assert_eq!(at(0), 0.0);
+        assert!(at(300) > 0.0 && at(300) < lower);
+        assert_eq!(at(600), lower);
+        assert_eq!(at(1_999), lower);
+        assert!(at(3_000) > lower && at(3_000) < 1.0);
+        assert_eq!(at(4_000), 1.0);
+        assert_eq!(at(60_000), 1.0);
+        // Never more than their light, never dark once it has come back.
+        let mut since = 0;
+        while since <= 5_000 {
+            let share = at(since);
+            assert!((0.0..=1.0).contains(&share), "{since}");
+            if since >= 600 {
+                assert!(share >= lower, "{since}");
+            }
+            since += 50;
+        }
+    }
+
+    /// #1362: what the sleep draws once the dip is over is the person's
+    /// light at its colour and level, exactly as their ring drew it at rest;
+    /// in the dip, a level lower.
+    #[test]
+    fn the_persons_light_is_drawn_at_its_colour_and_level() {
+        use crate::ring_face::{Face, Lit, Mood};
+        let lit = Lit::of(true, "blue", 4).unwrap();
+        let ceiling = ceiling(48);
+        let (mut drawn, mut theirs) = (Face::new(), Face::new());
+        drawn.light(lit);
+        theirs.light(lit);
+        let mut now = 1_000_000;
+        let mut last = (
+            [lamp_ring::Rgb::BLACK; lamp_ring::PIXEL_COUNT],
+            [lamp_ring::Rgb::BLACK; lamp_ring::PIXEL_COUNT],
+        );
+        for step in 0..120 {
+            now += 50_000;
+            let since = Duration::from_millis(50 * (step + 1));
+            let pixels = light_pixels(&mut drawn, lit, since, now, ceiling);
+            let rest = theirs.render(Mood::Resting, 0, now, ceiling.get());
+            if since == Duration::from_millis(1_500) {
+                let share = lit.step_down_share();
+                for (pixel, full) in pixels.iter().zip(rest.iter()) {
+                    assert_eq!(pixel.blue, (f32::from(full.blue) * share).round() as u8);
+                }
+            }
+            last = (pixels, rest);
+        }
+        // Six seconds in: their light, blue, as their ring draws it.
+        assert_eq!(last.0, last.1);
+        assert!(last.0.iter().any(|pixel| pixel.blue > 0));
+        assert!(
+            last.0
+                .iter()
+                .all(|pixel| pixel.blue >= pixel.red && pixel.blue >= pixel.green)
+        );
+    }
+
+    /// #1362: the person's light is read from what the ring's light said,
+    /// however old: on, it is the light to draw; off, never said, said by
+    /// another part or not a light there is, none (the asleep face).
+    #[test]
+    fn the_persons_light_is_what_the_rings_light_said_on() {
+        let root = std::env::temp_dir().join(format!("lamp-voice-light-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        assert_eq!(persons_light(&bus), None, "never said");
+        let said = |on, colour: &str, level| lamp_msgs::Light {
+            on,
+            colour: colour.into(),
+            level,
+        };
+        let mut ring = bus
+            .publisher_declared(
+                lamp_msgs::Light::TOPICS[1],
+                &lamp_msgs::Light::declaration(),
+                crate::ring_light::SOURCE,
+            )
+            .unwrap();
+        ring.publish_json(1, &said(true, "white", 4)).unwrap();
+        assert_eq!(
+            persons_light(&bus),
+            crate::ring_face::Lit::of(true, "white", 4)
+        );
+        ring.publish_json(2, &said(false, "white", 4)).unwrap();
+        assert_eq!(persons_light(&bus), None, "off");
+        drop(ring);
+        let other = lamp_bus::Bus::new(&root).unwrap();
+        let mut actions = other
+            .publisher_declared(
+                lamp_msgs::Light::TOPICS[1],
+                &lamp_msgs::Light::declaration(),
+                "actions",
+            )
+            .unwrap();
+        actions.publish_json(1, &said(true, "red", 5)).unwrap();
+        assert_eq!(persons_light(&bus), None, "another part's");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #1362: with the person's light, the sleep draws it at once, from the
+    /// writer's black; with none, the asleep face waits its 1.5 s as always,
+    /// so nothing is drawn yet. Both end black.
+    #[test]
+    fn a_hands_sleep_draws_the_persons_light_or_the_asleep_face() {
+        let frames = Frames::default();
+        let sink = frames.clone();
+        let lit = crate::ring_face::Lit::of(true, "green", 3).unwrap();
+        let light = Asleep::sleeping_with(move || AsleepRing::new(sink), ceiling(48), Some(lit));
+        std::thread::sleep(Duration::from_millis(300));
+        light.stop();
+        let drawn = frames.0.lock().unwrap().clone();
+        assert!(drawn.len() >= 3, "{}", drawn.len());
+        assert_eq!(drawn[0], EncodedFrame::black());
+        assert_eq!(*drawn.last().unwrap(), EncodedFrame::black());
+        assert!(
+            drawn[1..drawn.len() - 1]
+                .iter()
+                .any(|frame| *frame != EncodedFrame::black())
+        );
+        let frames = Frames::default();
+        let sink = frames.clone();
+        let face = Asleep::sleeping_with(move || AsleepRing::new(sink), ceiling(48), None);
+        std::thread::sleep(Duration::from_millis(300));
+        face.stop();
+        assert!(frames.0.lock().unwrap().is_empty(), "the face waits AFTER");
+    }
+
+    /// The reviewer-lead's P2 on #2549: as the lamp wakes, the person's
+    /// light is left on the ring for the conversation's ring to draw again,
+    /// not blacked for its start; stopped any other way, it ends black.
+    #[test]
+    fn a_wake_leaves_the_persons_light_on_and_anything_else_ends_black() {
+        let lit = crate::ring_face::Lit::of(true, "warm", 3).unwrap();
+        let painted = |release: bool| {
+            let frames = Frames::default();
+            let sink = frames.clone();
+            let light = Asleep::light_with(move || AsleepRing::new(sink), ceiling(48), lit);
+            std::thread::sleep(Duration::from_millis(300));
+            if release {
+                light.release();
+            } else {
+                light.stop();
+            }
+            frames.0.lock().unwrap().clone()
+        };
+        let released = painted(true);
+        assert!(released.len() >= 2, "{}", released.len());
+        assert_ne!(*released.last().unwrap(), EncodedFrame::black(), "left on");
+        let stopped = painted(false);
+        assert_eq!(*stopped.last().unwrap(), EncodedFrame::black());
+        // Through the sleep's face: a wake that opens it leaves the light on;
+        // a sleep that ends without opening it ends black.
+        for (opens, black) in [(true, false), (false, true)] {
+            let frames = Frames::default();
+            let sink = Arc::new(Mutex::new(Some(frames.clone())));
+            let mut face = SleepFace::new(
+                || {
+                    let sink = sink.lock().unwrap().take()?;
+                    Some(Asleep::light_with(
+                        move || AsleepRing::new(sink),
+                        ceiling(48),
+                        lit,
+                    ))
+                },
+                true,
+            );
+            assert!(face.poll(true, false));
+            std::thread::sleep(Duration::from_millis(300));
+            assert!(!face.poll(false, opens));
+            let last = frames.0.lock().unwrap().last().cloned().unwrap();
+            assert_eq!(last == EncodedFrame::black(), black, "opens {opens}");
+        }
+        // The asleep face itself goes black on a wake too.
+        let frames = Frames::default();
+        let sink = frames.clone();
+        let face = Asleep::start_timed(
+            move || AsleepRing::new(sink),
+            ceiling(48),
+            Pulses::OWED,
+            QUICK,
+        );
+        std::thread::sleep(QUICK.after + Duration::from_millis(200));
+        face.release();
+        assert_eq!(
+            *frames.0.lock().unwrap().last().unwrap(),
+            EncodedFrame::black()
+        );
     }
 }
