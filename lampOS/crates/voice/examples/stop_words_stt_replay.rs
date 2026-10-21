@@ -11,8 +11,15 @@
 //! ```text
 //! cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
 //!     [--second-config /etc/lampOS/voice/second.json] [--sources raw,linear,processed] \
-//!     [--after-ms 1000] [--lamp-words TSV] [--all-sounding] [--words] BUNDLE[:PLAYS] ...
+//!     [--after-ms 1000] [--lamp-words TSV] [--all-sounding] [--words] \
+//!     [--keyterm] [--gain-db N] BUNDLE[:PLAYS] ...
 //! ```
+//!
+//! - `--keyterm` asks with the stop words as key terms, as the voice does
+//!   with `LAMP_STOP_WORDS_KEYTERM=on` ([`stop_words::with_key_terms`]).
+//! - `--gain-db N` raises the `aec_only` (`processed`) source by N dB, over 0
+//!   and at most 24, as the voice does with `LAMP_STOP_WORDS_GAIN_DB`
+//!   ([`StopWords::with_gain`]); the other sources are never raised.
 //!
 //! - `--second-config` is the voice's own second route (default the
 //!   product's, [`lamp_voice::second_config::PRODUCT_PATH`]), read as the
@@ -87,7 +94,7 @@ const TAIL_US: u64 = 3_000_000;
 /// The lamp's words reach the stop words this long before they play.
 const LAMP_LEAD_US: u64 = 2_000_000;
 
-const USAGE: &str = "usage: stop_words_stt_replay [--second-config FILE] [--sources raw,linear,processed] [--after-ms MS] [--lamp-words TSV] [--all-sounding] [--words] BUNDLE[:PLAYS] ...";
+const USAGE: &str = "usage: stop_words_stt_replay [--second-config FILE] [--sources raw,linear,processed] [--after-ms MS] [--lamp-words TSV] [--all-sounding] [--words] [--keyterm] [--gain-db N] BUNDLE[:PLAYS] ...";
 
 fn main() {
     if let Err(why) = run(std::env::args().skip(1).collect()) {
@@ -104,12 +111,15 @@ struct Options {
     lamp_words: Option<PathBuf>,
     all_sounding: bool,
     words: bool,
+    keyterm: bool,
+    gain_db: Option<f32>,
     items: Vec<String>,
 }
 
 fn options(args: &[String]) -> Result<Options> {
     let (mut config, mut sources, mut after_us, mut lamp_words) = (None, None, None, None);
-    let (mut all_sounding, mut words) = (false, false);
+    let (mut all_sounding, mut words, mut keyterm) = (false, false, false);
+    let mut gain_db = None;
     let mut items = Vec::new();
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -126,6 +136,16 @@ fn options(args: &[String]) -> Result<Options> {
             "--lamp-words" => lamp_words.replace(PathBuf::from(value()?)).is_some(),
             "--all-sounding" => std::mem::replace(&mut all_sounding, true),
             "--words" => std::mem::replace(&mut words, true),
+            "--keyterm" => std::mem::replace(&mut keyterm, true),
+            "--gain-db" => {
+                let gain = stop_words::gain_for(Some(&value()?)).ok_or_else(|| {
+                    format!(
+                        "--gain-db is a number of dB over 0 and at most {}",
+                        stop_words::MOST_GAIN_DB
+                    )
+                })?;
+                gain_db.replace(gain).is_some()
+            }
             option if option.starts_with("--") => return Err(USAGE.to_owned()),
             item => {
                 items.push(item.to_owned());
@@ -146,6 +166,8 @@ fn options(args: &[String]) -> Result<Options> {
         lamp_words,
         all_sounding,
         words,
+        keyterm,
+        gain_db,
         items,
     })
 }
@@ -173,6 +195,8 @@ fn run(args: Vec<String>) -> Result<()> {
     for name in [
         stop_words::AUDIO_ENVIRONMENT,
         stop_words::COUNTS_ENVIRONMENT,
+        stop_words::KEYTERM_ENVIRONMENT,
+        stop_words::GAIN_ENVIRONMENT,
     ] {
         if std::env::var_os(name).is_some() {
             return Err(format!("{name} is set: unset it for a replay"));
@@ -180,6 +204,7 @@ fn run(args: Vec<String>) -> Result<()> {
     }
     let config = second_config::load_from_path(&options.second_config)
         .and_then(|config| config.with_environment(|name| std::env::var_os(name)))
+        .map(|config| stop_words::with_key_terms(config, options.keyterm))
         .map_err(|error| format!("{}: {error}", options.second_config.display()))?;
     eprintln!(
         "stop_words_stt_replay: the words are heard at {}, in real time",
@@ -441,6 +466,7 @@ impl Pace {
 fn drive(
     ears: Box<dyn Ears>,
     source: Source,
+    gain_db: Option<f32>,
     samples: &[i16],
     blocks: &[Block],
     lamp_words: &[(u64, String)],
@@ -451,7 +477,9 @@ fn drive(
         ears,
         results: Arc::clone(&results),
     };
-    let mut words = StopWords::always_counted(Box::new(tap), None).with_source(source);
+    let mut words = StopWords::always_counted(Box::new(tap), None)
+        .with_source(source)
+        .with_gain(gain_db);
     let lamp0 = blocks[0].at_us;
     let live0 = lamp_ipc::monotonic_us();
     let stamp = |lamp_at: u64| {
@@ -574,8 +602,17 @@ fn hear_bundle_paced(
             .map(|(stage, source, samples)| {
                 let handle = samples.as_ref().map(|samples| {
                     scope.spawn(move || {
-                        ears(*source)
-                            .map(|ears| drive(ears, *source, samples, blocks_ref, lamp_words, pace))
+                        ears(*source).map(|ears| {
+                            drive(
+                                ears,
+                                *source,
+                                options.gain_db,
+                                samples,
+                                blocks_ref,
+                                lamp_words,
+                                pace,
+                            )
+                        })
                     })
                 });
                 (*stage, handle)
@@ -952,6 +989,8 @@ mod tests {
             lamp_words: None,
             all_sounding: false,
             words: false,
+            keyterm: false,
+            gain_db: None,
             items: Vec::new(),
         }
     }
@@ -1207,5 +1246,16 @@ mod tests {
         assert!(options(&words("--sources pre_aec a")).is_err());
         assert!(options(&words("--words --words a")).is_err());
         assert!(options(&words("--after-ms 1")).is_err());
+        let asked = options(&words("--keyterm --gain-db 12 a")).unwrap();
+        assert!(asked.keyterm);
+        assert_eq!(asked.gain_db, Some(12.0));
+        assert!(!default.keyterm);
+        assert_eq!(default.gain_db, None);
+        for bad in ["0", "-3", "25", "x"] {
+            assert!(
+                options(&words(&format!("--gain-db {bad} a"))).is_err(),
+                "{bad}"
+            );
+        }
     }
 }

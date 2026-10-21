@@ -5615,6 +5615,22 @@ fn conversation_with_gate(
         .then(|| match crate::second_config::load_from_env() {
             Ok(Some(config)) => crate::stop_words::RelayEars::start(
                 {
+                    let keyterm = crate::stop_words::key_terms_from_environment();
+                    let config = crate::stop_words::with_key_terms(config, keyterm);
+                    if keyterm {
+                        eprintln!(
+                            "lamp-voice: stop words: the stop stream listens for the stop words as key terms ({})",
+                            crate::stop_words::KEYTERM_ENVIRONMENT
+                        );
+                    }
+                    if let Some(gain) = crate::stop_words::gain_from_environment()
+                        && crate::stop_words::source() == crate::stop_words::Source::Processed
+                    {
+                        eprintln!(
+                            "lamp-voice: stop words: the canceller's output is raised by {gain} dB before it is heard ({})",
+                            crate::stop_words::GAIN_ENVIRONMENT
+                        );
+                    }
                     eprintln!(
                         "lamp-voice: stop words: {}, from the {} blocks, through the second voice's speech-to-text at {}",
                         if always { "heard-always, all the lamp's speech" } else { "heard, in a yield" },
@@ -5630,8 +5646,17 @@ fn conversation_with_gate(
                         crate::stop_words::StopWords::always(Box::new(ears))
                             .with_source(crate::stop_words::source())
                             .with_hold(crate::stop_words::holds_for_own_words())
+                            .with_gain(crate::stop_words::gain_from_environment())
                     } else {
-                        crate::stop_words::StopWords::new(Box::new(ears))
+                        // Heard in a yield the source stays the default
+                        // (`Processed`), so the gain is passed only when the
+                        // blocks handed on are that source (El's P2 on #2690).
+                        crate::stop_words::StopWords::new(Box::new(ears)).with_gain(
+                            crate::stop_words::yield_gain(
+                                crate::stop_words::gain_from_environment(),
+                                crate::stop_words::source(),
+                            ),
+                        )
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))
