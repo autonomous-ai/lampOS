@@ -724,3 +724,15 @@ Ready for lamp-voice: n/a (app-side, status)
 - Also noticed in passing: v3's own brick-test compile error (flagged
   on #1722 a while back) is fixed now (Mobile's #18, merged) — the
   full suite is clean with no known failures at all.
+
+## 2026-10-21 — missed a review on #2423: no attribution lines in lampOS PRs
+
+Ready for lamp-voice: n/a
+
+- Reviewer, 08:35 on #2423 (missed until the reviewer-lead's 09:5x
+  follow-up): lampOS PR bodies and commits carry no attribution lines
+  (`docs/joining.md`) — mine ended with `Co-Authored-By: Claude …`,
+  carried over from ecm-sds-mobile's different convention. Fixed the
+  body; the commit message never had it. Checked #2360 too — clean.
+- This is a standing rule for every lampOS PR from here on, not a
+  one-off fix.
