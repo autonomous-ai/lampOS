@@ -429,6 +429,11 @@ fn key(id: u64, what: &str) -> String {
     format!("sign-in-{id}-{what}")
 }
 
+/// Whether `key` is a sign-in's news ([`key`]), not a task's.
+pub fn is_news(key: &str) -> bool {
+    key.starts_with("sign-in-")
+}
+
 /// The sign-in whose question `key` is, if it is one.
 pub fn asked_of(key: &str) -> Option<u64> {
     key.strip_prefix("sign-in-")?

@@ -3648,6 +3648,111 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
     }
 }
 
+/// #2602, finding 4 (lamp-75c9, 21 October): a sign-in's news waited for
+/// a quiet room like a task's, though the person had just asked for it and
+/// its question goes unanswered in two minutes. Without
+/// `LAMP_TASK_NEWS_AT_PAUSE`, it is now told at the first pause after the
+/// answer, while a task's news still waits its 15 s.
+#[test]
+fn a_sign_ins_news_is_told_at_the_first_pause_without_the_switch() {
+    let _one = super::pilot_faults::one_session();
+    let told = |key: &str| {
+        let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: key.into(),
+                note: "Harness asks whether to sign this lamp in.".into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        let run = run(Script {
+            second: false,
+            only: true,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        run
+    };
+    let run = told("sign-in-1-asking");
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    assert_eq!(news[0]["key"], "sign-in-1-asking");
+    assert_eq!(news[0]["at_pause"], true);
+    let since = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        (crate::task_news::PAUSE_US / 1_000..crate::task_news::QUIET_US / 1_000).contains(&since),
+        "{since} ms"
+    );
+    // A task's news, the same run: not before its 15 s.
+    let run = told("s1:2:4");
+    run.assert_clean();
+    assert!(
+        run.events("task_news")
+            .iter()
+            .all(|news| news["since_turn_ms"]
+                .as_u64()
+                .is_some_and(|since| since >= crate::task_news::QUIET_US / 1_000)),
+        "{}",
+        run.summary()
+    );
+}
+
+/// The reviewer-lead's P2 on #2642: with `LAMP_TASK_NEWS_AT_PAUSE=on`, as
+/// on product lamps, a sign-in's news waiting behind a task's is told
+/// first, at the first pause after the answer.
+#[test]
+fn with_the_switch_on_a_sign_ins_news_goes_ahead_of_a_tasks() {
+    let _one = super::pilot_faults::one_session();
+    let waiting = |key: &str, note: &str| crate::task_news::News {
+        key: key.into(),
+        note: note.into(),
+        until: None,
+        progress: None,
+        finished: None,
+        also: Vec::new(),
+    };
+    let (news, _heard) = crate::task_news::TaskNews::all_waiting_for_test(
+        vec![
+            waiting(
+                "s1:2:4",
+                "Claude Code just finished the story you asked for.",
+            ),
+            waiting(
+                "sign-in-1-asking",
+                "Harness asks whether to sign this lamp in.",
+            ),
+        ],
+        Duration::from_secs(30),
+    );
+    TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+    TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        written: Written::Said(12),
+        mute_at_frame: Some(800),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+    TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert!(!news.is_empty(), "{}", run.summary());
+    assert_eq!(news[0]["key"], "sign-in-1-asking", "{}", run.summary());
+    let since = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        (crate::task_news::PAUSE_US / 1_000..crate::task_news::QUIET_US / 1_000).contains(&since),
+        "{since} ms"
+    );
+}
+
 /// lamp-52e6 on 21 October: with the person seated quietly, the lamp's fan
 /// opened 11 wordless requests in two minutes, each held the quiet the
 /// lamp's own turns wait for (`last_turn_us`) until it ended, and the
