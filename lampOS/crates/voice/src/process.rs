@@ -887,6 +887,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_journal_resumes_worker_environment(
+            role,
+            var(crate::remember::JOURNAL_RESUMES_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_recall_v2_worker_environment(
             role,
             var(crate::remember::RECALL_V2_ENVIRONMENT).as_deref(),
@@ -960,6 +964,10 @@ fn worker_command(
             role,
             var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
         ))
+        .envs(unplug_worker_environment(
+            role,
+            var(lamp_body::unplug::ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1021,6 +1029,17 @@ fn memory_forget_about_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ABOUT_ENVIRONMENT, "on"))
+}
+
+// Journalling resumed with a fresh session (#2176 row 1b), passed the same
+// narrow way: the exact `on`, to the two routes whose Days client stops and
+// resumes it.
+fn memory_journal_resumes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::JOURNAL_RESUMES_ENVIRONMENT, "on"))
 }
 
 // Recall's second version (#2176), passed the same narrow way: the exact
@@ -1252,6 +1271,16 @@ fn second_route_worker_environment(
     .filter(|_| role == "second")
     .filter_map(|name| var(name).map(|value| (name, value)))
     .collect()
+}
+
+// The unplug switch (#1674), passed the same narrow way: the exact `on`, to
+// the ring only, which draws the asleep picture and says its receipt.
+fn unplug_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((lamp_body::unplug::ENVIRONMENT, "on"))
 }
 
 #[cfg(test)]
@@ -1608,8 +1637,9 @@ mod tests {
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
     /// days, the clock, the name's file (#1323) and its scoped context
-    /// (#1839), and capture the quiet
-    /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
+    /// (#1839), capture the quiet
+    /// evidence switch (#1285) and the detector's input (#828), and the ring
+    /// the unplug switch (#1674, the reviewer on #1699). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -1629,6 +1659,7 @@ mod tests {
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::ROOM_NOT_ASKER_ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
+                    crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
@@ -1642,6 +1673,7 @@ mod tests {
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+                    lamp_body::unplug::ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1738,6 +1770,7 @@ mod tests {
                     "LAMP_MEMORY_EARLY_WORDS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
@@ -1762,6 +1795,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
@@ -1810,6 +1844,8 @@ mod tests {
                     "LAMP_VAD_INPUT=linear",
                 ],
             ),
+            ("ring", vec!["LAMP_UNPLUG=on"]),
+            ("speaker", vec![]),
         ] {
             let status = status_of_fresh(&mut worker_command(
                 &script,

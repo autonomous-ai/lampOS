@@ -947,7 +947,18 @@ reply in a thread, after reading the channel, in 37 s.
   too, and told as finished, not "stopped without finishing"; `wait` and
   `ps`, which carry no answer, read it so, and `show` decides. One `stopped`
   with no answer stays `stopped`, so it is told and never waited on.
-  `working` and `failed` are as Harness says.
+  `working` and `failed` are as Harness says. **Known limits** (the
+  reviewer's P3 1 on #2307):
+  - Harness says `stopped` both for a session Devin put to sleep
+    (`inactivity`, as here) and for one someone stopped by hand
+    (`user_request`). So a session stopped mid-task whose last words were
+    progress ("I'm reading the channel now") is told as finished, and so is
+    a question left long enough for Devin to sleep. Running out of ACUs is
+    `failed`, and told as such. Asked of Harness on openharness#1449
+    (21 Oct): keep a finished session `idle`, or give the stop's reason.
+  - `ps` and `wait` carry no answer, so for a cloud `stopped` with nothing,
+    `tasks/status` says `idle` until `show` is read, while the news says it
+    stopped.
 - **Never closed:** Harness closes no cloud harness ("stop it in Harness"),
   so `close` is never run for one and its task's close is `refused`, once,
   never tried again. **So each hand-over leaves a Devin session open on the

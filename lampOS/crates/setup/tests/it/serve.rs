@@ -1510,3 +1510,20 @@ fn own_keys_are_checked_before_the_marker_and_never_fail_setup() {
         }
     }
 }
+
+/// Writes setup's answer on reports, a yes as `serve` keeps it, to the path
+/// in `LAMP_SETUP_REPORTS_FIXTURE`, for lamp-cloud's kept records
+/// (`crates/cloud/tests/fixtures/stores/`), which every later lamp-cloud must
+/// read. Run by hand when its shape changes, keeping the ones kept.
+#[test]
+#[ignore = "writes setup's reports answer as a fixture: run by hand with LAMP_SETUP_REPORTS_FIXTURE set"]
+fn write_a_reports_answer_fixture() {
+    let target =
+        std::env::var_os("LAMP_SETUP_REPORTS_FIXTURE").expect("LAMP_SETUP_REPORTS_FIXTURE");
+    // 21 Oct 2026, 02:40 UTC.
+    let at = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_792_550_400);
+    // As `serve`'s `reports` writes it.
+    let mut bytes = serde_json::to_vec(&lamp_setup::serve::reports_record(true, at)).unwrap();
+    bytes.push(b'\n');
+    std::fs::write(target, bytes).unwrap();
+}

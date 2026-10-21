@@ -12,10 +12,16 @@ name: lampOS clippy
 # A workflow of its own: ci.yml skips every lampOS change, and a step in the
 # ARM64 run would add to that run's time. Linux, so the cfg(target_os = "linux")
 # code a Mac's gate skips is checked too. Its triggers are the ARM64 run's.
+#
+# Its cache is kept as the ARM64 run's is (lampos-arm64.yml, #1806): saved by
+# lamp-voice's own runs under a key with their commit, restored and not saved
+# by pull requests, but for one onto #1712's branch that found none, and each
+# unchanged source file given back the time the cached build had for it, so
+# clippy checks only what changed.
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml']
+    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-source-times.py']
   pull_request:
     branches: ['lamp-voice', 'first/voice-cascade-gemini']
     paths:
@@ -29,6 +35,7 @@ on:
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
       - '.github/workflows/lampos-clippy.yml'
+      - '.github/scripts/lampos-source-times.py'
   workflow_dispatch:
 
 concurrency:
@@ -52,14 +59,31 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - uses: actions/cache@v4
+      - name: restore the cache
+        id: cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          key: lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}
-          restore-keys: lampos-clippy-u2204-
+          key: lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-clippy-u2204-
+      - name: unchanged source files get the cached build's times back
+        run: python3 -I .github/scripts/lampos-source-times.py
       - name: clippy (every crate and target, warnings as errors)
         working-directory: lampOS
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: save the cache
+        if: >-
+          ${{ !cancelled() && (github.ref == 'refs/heads/lamp-voice'
+          || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: ${{ steps.cache.outputs.cache-primary-key }}

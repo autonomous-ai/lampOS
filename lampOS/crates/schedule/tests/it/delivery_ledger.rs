@@ -1407,3 +1407,136 @@ fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one()
     assert!(current.entries().unwrap().is_empty());
     assert!(directory.join(kept).is_file());
 }
+
+/// The delivery ledgers kept as fixtures (`tests/fixtures/stores/`), one for
+/// each change of the ledger's shape, each written by its day's build
+/// ([`write_a_delivery_ledger_fixture`]). The voice's consumer ledger
+/// outlives an update in its own store, so every later build opens each as
+/// it was kept: nothing set aside or rewritten, its revision and Schedule's
+/// fence, and every delivery where it was, so no reminder said is said again
+/// and none due is lost (the build row "Updates cover the whole lamp, V3 to
+/// V5").
+#[test]
+fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
+    let kept: [(&str, &str); 1] = [(
+        "2026-10-21",
+        include_str!("../fixtures/stores/delivery-2026-10-21.json"),
+    )];
+    for (day, text) in kept {
+        let saved: Value = serde_json::from_str(text).unwrap();
+        // The fixture holds each stage, the retried attempt's record too.
+        assert!(!saved["entries"][1]["previous"].is_null(), "{day}");
+        let disk = Disk::default();
+        disk.0.lock().unwrap().bytes = Some(text.as_bytes().to_vec());
+        let ledger = DeliveryLedger::open(disk.clone(), OTHER)
+            .unwrap_or_else(|error| panic!("{day}: {error:?}"));
+        assert_eq!(ledger.set_aside(), None, "{day}");
+        assert!(!ledger.failed(), "{day}");
+        assert_eq!(
+            disk.bytes(),
+            text.as_bytes(),
+            "{day}: opened, not rewritten"
+        );
+        assert_eq!(
+            ledger.revision(),
+            saved["revision"].as_u64().unwrap(),
+            "{day}"
+        );
+        assert_eq!(
+            ledger.schedule_revision(),
+            saved["schedule"]["revision"].as_u64(),
+            "{day}"
+        );
+        let views = ledger.entries().unwrap();
+        let kept_views: Vec<Value> = saved["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["view"].clone())
+            .collect();
+        assert_eq!(
+            missing(
+                &Value::Array(kept_views),
+                &serde_json::to_value(&views).unwrap(),
+                "entries",
+            ),
+            None,
+            "{day}"
+        );
+        let stages: Vec<(bool, bool)> = views
+            .iter()
+            .map(|view| (view.completion.is_some(), view.ack.is_some()))
+            .collect();
+        assert_eq!(
+            stages,
+            [(true, true), (false, false), (false, false)],
+            "{day}"
+        );
+        assert!(
+            ledger
+                .pending_ack(&views[0].prepared.key)
+                .unwrap()
+                .is_some(),
+            "{day}"
+        );
+    }
+}
+
+/// The first thing a kept record holds that `read` doesn't: a key of an
+/// object missing or different, by its path, an array of another length, or
+/// another value. A key `read` has beyond the kept one is a later build's
+/// addition, and passes: a kept day's test is never edited (#1505; the
+/// reviewer on #2486).
+fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Option<String> {
+    use serde_json::Value;
+    match (kept, read) {
+        (Value::Object(kept), Value::Object(read)) => kept.iter().find_map(|(key, value)| {
+            let path = format!("{path}.{key}");
+            match read.get(key) {
+                Some(got) => missing(value, got, &path),
+                None => Some(format!("{path}: not read")),
+            }
+        }),
+        (Value::Array(kept), Value::Array(read)) if kept.len() == read.len() => kept
+            .iter()
+            .zip(read)
+            .enumerate()
+            .find_map(|(i, (value, got))| missing(value, got, &format!("{path}[{i}]"))),
+        _ if kept == read => None,
+        _ => Some(format!("{path}: kept {kept}, read {read}")),
+    }
+}
+
+/// Writes this build's delivery ledger to the path in
+/// `LAMP_SCHEDULE_DELIVERY_FIXTURE`: three timers at three stages, one said
+/// with its acknowledgement planned, one tried again after an interrupted
+/// attempt, and one only prepared. Run by hand when the ledger's shape
+/// changes, keeping the ones kept.
+#[test]
+#[ignore = "writes a delivery ledger fixture: run by hand with LAMP_SCHEDULE_DELIVERY_FIXTURE set"]
+fn write_a_delivery_ledger_fixture() {
+    let target =
+        std::env::var_os("LAMP_SCHEDULE_DELIVERY_FIXTURE").expect("LAMP_SCHEDULE_DELIVERY_FIXTURE");
+    let mut engine = engine(Disk::default());
+    let ids: Vec<u64> = (1..=3)
+        .map(|seconds| set(&mut engine, 0, When::After { seconds }))
+        .collect();
+    let due: Vec<PendingEvidence> = ids
+        .iter()
+        .map(|&id| pending(&mut engine, id, 4000))
+        .collect();
+    let disk = Disk::default();
+    let mut ledger = ledger(disk.clone());
+    // Said, its acknowledgement planned.
+    let said = ledger.prepare(&due[0], correlation(1)).unwrap();
+    let done = ledger.complete(&said, &proof(&said)).unwrap();
+    ledger.plan_ack(&done, &due[0]).unwrap();
+    // An interrupted attempt, retired and tried again.
+    let cut = ledger.prepare(&due[1], correlation(2)).unwrap();
+    ledger
+        .retry_interrupted(&cut, &due[1], &retirement(&cut), correlation(3))
+        .unwrap();
+    // Only prepared.
+    ledger.prepare(&due[2], correlation(4)).unwrap();
+    std::fs::write(target, disk.bytes()).unwrap();
+}

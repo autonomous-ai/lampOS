@@ -3241,7 +3241,9 @@ async fn a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered(
 
 /// #1854's follow-up (lamp-75c9, 20 Oct 18:19): with
 /// `LAMP_SECOND_WRITTEN_WAIT=on` a turn the lamp wrote itself, such as task
-/// news, is said though its chat begins at 5 s, past `BEGIN_WITHIN`; one that
+/// news, is said though its chat begins at 6.9 s, just under
+/// `WRITTEN_BEGIN_WITHIN` and past `BEGIN_WITHIN`, so its words are said
+/// after it (the reviewer's P3 3 on #2307); one that
 /// never begins ends unanswered at `WRITTEN_BEGIN_WITHIN`. A spoken line is
 /// bounded as before. Without the switch, the written turn ends at 3 s
 /// (`a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered`).
@@ -3272,7 +3274,7 @@ async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
         }
     }
     let news = || written(1, "(Nobody has spoken. News from work you handed over.)");
-    let (slow, _) = said(Duration::from_secs(5), news()).await;
+    let (slow, _) = said(WRITTEN_BEGIN_WITHIN - Duration::from_millis(100), news()).await;
     assert_eq!(slow, ["Devin finished."]);
     let (never, after) = said(Duration::from_secs(60), news()).await;
     assert!(never.is_empty(), "{never:?}");

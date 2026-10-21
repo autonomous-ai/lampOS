@@ -30,6 +30,22 @@ service decides (`Arrival`). A hello is due when all of these hold:
 | it has not just done this | no hello in the last twenty minutes; for someone `close` (#1670, below), no hello in the hour before they arrived, so an arrival that began within the hour is not greeted at all |
 | it is not paused | the keeper has not said `{"paused": true}` on `lamp/pause` ([keeper.md](keeper.md), "Named states and the pause") |
 
+What ends that quiet is talk: the lamp's own words playing, any voice the
+detector calls speech (words or none: a line in a language the route takes
+no words from is still someone talking), a person's words heard (a
+transcript of what was heard with a word in it), or a Stop. The rest of a
+request does not: its end's silence and the wait for an answer that never
+comes aloud (`no_audio_answer`, `not_speech`) leave the quiet counting from
+its last speech, though the lamp still waits for the request to end before
+it begins anything. On lamp-52e6 on 21 October, with the person seated
+quietly, the lamp's own fan opened 11 wordless requests in two minutes, each
+had held the quiet until it ended, and the onboarding walk's 3 s never
+came. A fan the detector calls speech still holds it while it does. Every
+quiet the lamp waits out "since the last turn" is this one (`last_turn_us`):
+the hello's, a reminder's and a skill's say's, the news', a face added from
+a photo's, and each onboarding step's
+(`coordinator::tests::second_route::speech_holds_the_quiet_with_or_without_words_and_a_wordless_requests_tail_does_not`).
+
 Someone already there when the service starts was never away and gets none.
 A hello that is due but cannot be begun (the lamp is in a turn, or paused)
 stays due until it can be. The pause holds every turn the lamp begins

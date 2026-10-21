@@ -243,12 +243,14 @@ the coordinated opt-in across Controls, Voice and Ears.
 
 ## Optional microphone permission contract (#755)
 
-`privacy_topics()` declares one new topic, separate from the original
-seventeen. Only Voice's selected privacy worker publishes it.
+`privacy_topics()` declares two new topics, separate from the original
+seventeen. Only Voice's selected privacy worker publishes `voice/privacy`;
+only the eyes publish `eyes/camera_closed`.
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `MicrophonePrivacy` | `voice/privacy` | latest | 10 / 50 ms | Voice controller identity, microphone generation, original physical acquisition, expiry, capture permission and known/unknown physical mute |
+| `CameraClosed` | `eyes/camera_closed` | latest | on ask | The eyes' receipt for a camera close the voice asked about (`{"close_receipt":N}`, #1802): the voice's token `close` and `released`, whether the last stop of the capture device returned without a fault; said only once the camera is shut |
 
 Version 1 of `lamp_msgs/MicrophonePrivacy` carries a publication `ClockStamp`,
 16-character hexadecimal Bus `session_id`, 32-character hexadecimal

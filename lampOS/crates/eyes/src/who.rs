@@ -2070,16 +2070,24 @@ mod tests {
     /// The people files kept as fixtures, one for each change of the file's
     /// shape, each written by its day's build ([`write_a_people_fixture`]).
     /// Every later build opens each with everyone in it, their faces known,
-    /// their yes to being named and their memory id, so an update never
-    /// leaves a lamp's known people behind (the build row "Updates cover the
-    /// whole lamp, V3 to V5").
+    /// their yes to being named, their memory id and, where the file was
+    /// scored, how familiar each is and when that was, so an update never
+    /// leaves a lamp's known people behind or makes them strangers again
+    /// (the build row "Updates cover the whole lamp, V3 to V5").
     #[test]
     fn each_kept_people_file_opens_with_everyone_in_it() {
         use std::os::unix::fs::PermissionsExt;
-        let kept: [(&str, &str); 1] = [(
-            "2026-10-21",
-            include_str!("../tests/fixtures/stores/people-2026-10-21.json"),
-        )];
+        let kept: [(&str, &str); 2] = [
+            (
+                "2026-10-21",
+                include_str!("../tests/fixtures/stores/people-2026-10-21.json"),
+            ),
+            // The same day's shape with a night scored, which the first lacks.
+            (
+                "2026-10-21-scored",
+                include_str!("../tests/fixtures/stores/people-2026-10-21-scored.json"),
+            ),
+        ];
         for (day, text) in kept {
             let path = file(&format!("kept-{day}"));
             std::fs::write(&path, text).unwrap();
@@ -2101,6 +2109,27 @@ mod tests {
                 Some("p-ca978112ca1bbdca"),
                 "{day}"
             );
+            // Familiarity as kept, where the file has it.
+            let saved: serde_json::Value = serde_json::from_str(text).unwrap();
+            assert_eq!(
+                people.scored_at,
+                saved["scored_at_unix_s"].as_u64(),
+                "{day}"
+            );
+            for person in &people.people {
+                let kept = saved["people"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|kept| kept["name"] == person.name.as_str())
+                    .unwrap();
+                assert_eq!(
+                    person.familiar.map(f64::from),
+                    kept["familiar"].as_f64(),
+                    "{day}: {}",
+                    person.name
+                );
+            }
         }
     }
 
@@ -2123,7 +2152,9 @@ mod tests {
             .unwrap();
         assert!(people.tell_visits("A", true).unwrap());
         people.seen("A", 1_760_086_400);
+        // The first scoring only begins the day; the next night's writes.
         people.score(1_760_090_000, 0).unwrap();
+        assert!(people.score(1_760_090_000 + 86_400, 0).unwrap());
         std::fs::copy(&path, target).unwrap();
     }
 

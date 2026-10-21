@@ -233,6 +233,22 @@ camera closed: not permitted` marks the camera shut. A voice service killed
 outright says nothing, and the eyes close on the 1.5 s. The rule is the same as for its ears: the camera may look
 exactly while the microphone may listen.
 
+For the onboarding privacy step the voice may follow its no with
+`{"close_receipt":N}`. Once the camera is shut, after the device's stop has
+returned and never while it is open, the eyes say so on `eyes/camera_closed`
+(`lamp_msgs::CameraClosed`, `{"close":N,"released":true|false}`, with
+`LAMP_BUS=on`): `released` is whether that last stop (STREAMOFF, buffers
+freed, file closed) returned without a fault; a camera not opened since the
+eyes started is released. An ask that comes while the camera is open waits
+for the next close. The eyes hold one ask at a time: a second ask before the
+first is answered replaces it, and the first is never answered. Onboarding
+then reads the first close as camera not proven when its 2 s wait ends,
+which is the safe side. The publisher is kept alive on every turn of the
+eyes' loop, camera open or shut (before, the looks kept only the faces'
+alive, so with the camera open it lapsed), which is how the voice knows
+these eyes give receipts
+([onboarding.md](onboarding.md#physical-privacy-step-841)).
+
 This is a narrower arrangement than the camera worker described in
 [camera-runtime.md](camera-runtime.md), which takes its permission from the
 interaction authority's own camera grant and hands frames to other
@@ -1172,7 +1188,9 @@ socket; `crates/voice/src/photo_faces.rs`):
   the loop never waits on them (`photo_faces::Watch`).
 - When an unconfirmed face is here and wasn't asked about yet, and the lamp
   is quiet (no turn under way, nothing queued, nothing said for 3 s, input
-  ready, a session open), the thread tells the eyes `photo_asked`. The
+  ready, a session open), the thread tells the eyes `photo_asked`, once:
+  a name the loop wants again while the eyes are still answering is not
+  told twice (on lamp-0c89 it was asked twice, 16 s apart, #1968). The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
   use the name as theirs unless they agree.
@@ -1289,10 +1307,39 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   on the lamp takes over about 100 ms, it moves to its own thread before
   anything turns `--seems` on (the reviewer on #1859).
 
-Next (#1671): a week's log of time, kind, confidence and whether the
-person's own words or laughter agreed, with no identity, picture or audio,
-deleted after the measure; then a labelled session at a lamp. Only then
-may a core skill tell the conversation "they seem low".
+**The measure (#1671, step 0; the first builder, 20 Oct 16:16).** With
+`--seems-log /var/lib/lampos-eyes/seems.log` (beside a reader; that path
+only, which both reset plans wipe, so a factory reset never leaves it
+behind; any other is refused), each read
+is also one line in that file, made 0600: `{"t": unix_s, "kind",
+"confidence", "from"}`, nothing of whose face. An existing file that's a
+link or open to others is refused. It stops writing at 20,000 lines (about
+11 hours of face time with one reader, 5.5 with both: a day at the desk), and says so once, and a write that fails is said once too. The ground truth is a labelled
+session at a lamp, with its person's yes: they say how they feel at moments
+a builder notes, one line each, `{"t": unix_s, "says":
+"positive"|"negative"|"neutral"}`. Nothing of what people say at other
+times is matched. `lamp-seems-measure READS LABELS --delete` counts, for
+each reader and each confidence from 0.5 to 0.9, the reads that named a kind
+within 10 s of a label, and the wrong ones (any named kind is wrong beside a
+`neutral` label; `unsure` is never judged, and the reader's own confidence
+is written and judged, unrounded). It prints whether each is under the bar,
+wrong at most 1 in 10, or "too few" under 20 reads judged, and removes both
+files: stop lamp-eyes, or take `--seems-log` off it, first. Only after that may
+the conversation be told "they seem low".
+
+**Only for the session:** it reads whoever is near the lamp, not only the
+labelled person, so at a desk it would keep the reads of anyone who stops by
+and never said yes. Turn `--seems-log` on for the labelled session alone,
+with nobody else near, and off right after it; don't leave it running to its
+cap. Measure and delete it before a lamp is passed on (a reset wipes it too).
+
+Tests (`seems_log.rs`): a read's line is its time, kind, confidence (as
+read) and reader only, and 0.695 is not judged at 0.7; the log is 0600,
+counts on from its lines when reopened, stops at its most and says so once,
+says a failed write once, and refuses a link (`O_NOFOLLOW`) or a file open
+to others; under 20 reads judged is "too few"; reads are counted right or wrong against the nearest label
+by reader and confidence, an unsure read and one far from any label not at
+all, and bad lines are refused. The flag needs a reader (`main.rs`).
 
 Tests: a face made grey and 64 by 64; the eight scores made shares;
 `positive`, `negative` and `unsure` at the line and just under it; a file

@@ -353,6 +353,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "not-feeling-well",
             "onboarding",
             "point-light",
+            "prepare-unplug",
             "reminders",
             "smoky-air",
             "stretch-break",
@@ -4883,9 +4884,10 @@ fn the_program_dances_again_on_dance_again_but_not_on_a_noise() {
         .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
         .unwrap();
     let mut hear = |text: &str, finished: bool| {
-        heard
+        let asked = heard
             .publish_json(1, &serde_json::json!({"text": text, "finished": finished}))
             .unwrap();
+        assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     };
     let call = || {
         let stream = std::os::unix::net::UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -8779,9 +8781,13 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
             .spawn()
             .unwrap(),
     );
+    // Its words come on the bus, so it hears them only once it listens to
+    // them: a publisher sends to the listeners there when it looks, and words
+    // said before that were refused as not asked out loud (#1569 row 60).
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -8832,7 +8838,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
     assert!(next(&mut requests, Duration::from_millis(300)).is_none());
     // A, whose face the eyes know, asks out loud.
     fs::write(&known, "known-a\n").unwrap();
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -8843,6 +8849,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     let on = call("on");
     assert_eq!(on["ok"], true, "{on}");
     assert!(
@@ -9064,6 +9071,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9100,7 +9108,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
         say(presence, true);
         say(presence, false);
     };
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -9111,6 +9119,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     // Taken in before the call: the skip's answer says so.
     clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -9257,6 +9266,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9294,7 +9304,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
         say(presence, false);
     };
     let speak = |heard: &mut lamp_bus::Publisher| {
-        heard
+        let asked = heard
             .publish_json(
                 1,
                 &Speech {
@@ -9305,6 +9315,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
                 },
             )
             .unwrap();
+        assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
         // Taken in before the call: the skip's answer says so.
         clock.skip(Duration::ZERO);
     };
@@ -9471,6 +9482,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9499,7 +9511,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
             .unwrap();
         clock.skip(Duration::ZERO);
     };
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -9510,6 +9522,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     // Taken in before the call: the skip's answer says so.
     clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -10283,7 +10296,6 @@ fn who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces() {
 
 #[test]
 fn daily_rise_revalidation_keeps_window_and_reload_fences() {
-    use lamp_skills::daily::Journal;
     use std::os::unix::fs::PermissionsExt;
 
     const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
@@ -10314,7 +10326,7 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
         let journal = dir.path().join("daily.json");
         let mut engine = Engine::new(vec![skill.clone()], false)
             .asking_the_policy()
-            .with_daily_journal(Journal::open(&journal).unwrap());
+            .with_daily_journal(crate::journal(&journal));
         engine.clock(0, 0, MORNING);
         assert!(
             engine
@@ -10375,7 +10387,7 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
         // Losing the pending answer never restores its durable chance,
         // even when a new process sees a fresh rise in the same window.
         let mut restarted =
-            Engine::new(vec![skill], true).with_daily_journal(Journal::open(&journal).unwrap());
+            Engine::new(vec![skill], true).with_daily_journal(crate::journal(&journal));
         restarted.clock(0, 0, MORNING);
         restarted.observe("air/state", 0, br#"{"pm2_5":20}"#, None);
         assert!(
@@ -10391,7 +10403,6 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
 /// consumed across reload and restart, using this branch's existing dim owner.
 #[test]
 fn daily_held_dim_keeps_clock_reload_and_restart_fences() {
-    use lamp_skills::daily::Journal;
     use std::os::unix::fs::PermissionsExt;
 
     const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
@@ -10421,7 +10432,7 @@ light = { dim = 1, until = "ends" }
     .unwrap();
     let journal = dir.path().join("daily.json");
     let mut engine =
-        Engine::new(vec![daily.clone()], true).with_daily_journal(Journal::open(&journal).unwrap());
+        Engine::new(vec![daily.clone()], true).with_daily_journal(crate::journal(&journal));
     let local = lamp_local_time::LocalTime::Offset(0);
     engine.clock_in_with_trust(&local, 0, MORNING, false);
     assert!(
@@ -10455,8 +10466,7 @@ light = { dim = 1, until = "ends" }
     );
     drop(engine);
 
-    let mut restarted =
-        Engine::new(vec![daily], true).with_daily_journal(Journal::open(&journal).unwrap());
+    let mut restarted = Engine::new(vec![daily], true).with_daily_journal(crate::journal(&journal));
     restarted.clock(0, 0, MORNING);
     assert!(
         restarted
@@ -10505,4 +10515,298 @@ fn exact_say_and_routine_cue_share_one_speech_slot() {
         let why = load(&path).unwrap_err();
         assert!(why.contains("one say or sound a skill"), "{form}: {why}");
     }
+}
+
+#[test]
+fn unplug_is_only_an_explicit_single_step_and_admission_is_never_readiness() {
+    let dir = tempfile::tempdir().unwrap();
+    let valid = include_str!("../../../../skills/prepare-unplug/skill.toml");
+    let skill = load(&skill_with(dir.path(), "prepare-unplug", valid)).unwrap();
+    assert!(skill.triggers.is_empty());
+    let mut engine = Engine::new(vec![skill], true);
+    let run = engine
+        .tool("prepare_to_unplug", &serde_json::json!({}), 1)
+        .unwrap();
+    assert_eq!(run.calls, [Call::PrepareUnplug]);
+    assert_eq!(lamp_skills::told(&run.calls)["ready"], false);
+    for (name, text) in [
+        (
+            "false",
+            valid.replace("prepare_unplug = true", "prepare_unplug = false"),
+        ),
+        (
+            "no-tool",
+            valid.replace("tool = \"prepare_to_unplug\"\n", ""),
+        ),
+        ("speech", format!("{valid}say = \"Safe to unplug now\"\n")),
+        (
+            "movement",
+            format!("{valid}[[do]]\nbody = {{ gesture = \"nod\" }}\n"),
+        ),
+        (
+            "automatic",
+            format!("{valid}\n[trigger]\ntopic = \"voice/state\"\nwhen = \"appears\"\n"),
+        ),
+    ] {
+        assert!(
+            load(&skill_with(dir.path(), "prepare-unplug", &text)).is_err(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn unplug_operation_rejects_an_ordinary_skill_name_and_an_alias_tool() {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, tool) in [
+        ("desk-rest", "prepare_to_unplug"),
+        ("prepare-unplug", "desk_rest"),
+    ] {
+        let source = include_str!("../../../../skills/prepare-unplug/skill.toml")
+            .replace("prepare_to_unplug", tool);
+        let why = load(&skill_with(dir.path(), name, &source)).unwrap_err();
+        assert!(
+            why.contains("belongs only to prepare-unplug / prepare_to_unplug"),
+            "{why}"
+        );
+    }
+}
+
+#[test]
+fn unplug_requires_core_kind_and_each_declared_permission() {
+    let dir = tempfile::tempdir().unwrap();
+    let valid = include_str!("../../../../skills/prepare-unplug/skill.toml");
+    let root = dir.path().join("source");
+    for kind in ["installable", ""] {
+        let text = if kind.is_empty() {
+            valid.replace("kind = \"core\"\n", "")
+        } else {
+            valid.replace("kind = \"core\"", "kind = \"installable\"")
+        };
+        let why = load(&skill_with(&root, "prepare-unplug", &text)).unwrap_err();
+        assert!(why.contains("requires kind = core"), "{why}");
+    }
+    for permission in ["body", "speak"] {
+        let text = valid.replace(
+            &format!("{permission} = true"),
+            &format!("{permission} = false"),
+        );
+        let why = load(&skill_with(&root, "prepare-unplug", &text)).unwrap_err();
+        assert!(why.contains("not permitted"), "{why}");
+    }
+    for topic in lamp_skills::unplug::READ_TOPICS {
+        let text = valid.replace(topic, "unused/state");
+        let why = load(&skill_with(&root, "prepare-unplug", &text)).unwrap_err();
+        assert!(
+            why.contains(topic) && why.contains("not permitted"),
+            "{why}"
+        );
+    }
+    let source = skill_with(&root, "prepare-unplug", valid);
+    let installed = dir.path().join("installed");
+    fs::create_dir(&installed).unwrap();
+    let why = lamp_skills::package::install(&installed, &source).unwrap_err();
+    assert!(why.contains("core"), "{why}");
+    copy(&source, &installed.join("prepare-unplug"));
+    assert!(
+        lamp_skills::package::remove(&installed, "prepare-unplug")
+            .unwrap_err()
+            .contains("core")
+    );
+    assert!(installed.join("prepare-unplug/skill.toml").exists());
+}
+
+#[test]
+fn unplug_core_is_installed_but_hidden_and_uncallable_with_switch_off() {
+    use lamp_body::unplug::Request;
+    let dir = tempfile::Builder::new()
+        .prefix("uo")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let skills = dir.path().join("skills");
+    copy(
+        &skills_root().join("prepare-unplug"),
+        &skills.join("prepare-unplug"),
+    );
+    // An ordinary core tool leaves a catalog file; an empty catalog is
+    // deliberately removed by the runtime rather than written as [].
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    let root = dir.path().join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let tools = dir.path().join("tools");
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+            ])
+            .env_remove("LAMP_UNPLUG")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !tools.join("tools.json").exists() || !tools.join("call.sock").exists() {
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let catalog: serde_json::Value =
+        serde_json::from_slice(&fs::read(tools.join("tools.json")).unwrap()).unwrap();
+    let names: Vec<_> = catalog["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["dance"]);
+    let mut caller = UnixStream::connect(tools.join("call.sock")).unwrap();
+    caller
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    writeln!(
+        caller,
+        "{}",
+        serde_json::json!({"op":"call","name":"prepare_to_unplug","args":{}})
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(caller).read_line(&mut line).unwrap();
+    let answer: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(answer["ok"], false, "{answer}");
+    assert!(bus.latest(Request::TOPIC).unwrap().is_none());
+}
+
+#[test]
+fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt() {
+    use lamp_body::unplug::{Phase, Request, State};
+    use lamp_bus::Kind;
+    use serde_json::{Value, json};
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    copy(
+        &skills_root().join("prepare-unplug"),
+        &skills.join("prepare-unplug"),
+    );
+    let root = dir.path().join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let tools = dir.path().join("tools");
+    let say_socket = dir.path().join("say.sock");
+    let say = UnixListener::bind(&say_socket).unwrap();
+    say.set_nonblocking(true).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--say-socket".as_ref(),
+                say_socket.as_os_str(),
+            ])
+            .env("LAMP_UNPLUG", "on")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if tools.join("tools.json").exists() && tools.join("call.sock").exists() {
+            break;
+        }
+        assert!(Instant::now() < deadline, "skill never became available");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let mut caller = UnixStream::connect(tools.join("call.sock")).unwrap();
+    caller
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let admitted = Instant::now();
+    writeln!(
+        caller,
+        "{}",
+        json!({"op":"call","name":"prepare_to_unplug","args":{}})
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(caller).read_line(&mut line).unwrap();
+    let response: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["result"]["ready"], false);
+    eprintln!("unplug tool admission on host: {:?}", admitted.elapsed());
+    let request = loop {
+        if let Some(message) = bus.latest(Request::TOPIC).unwrap() {
+            break message.parse::<Request>().unwrap();
+        }
+        assert!(Instant::now() < deadline, "no body request");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert!(say.accept().is_err(), "readiness spoken at admission");
+    let mut body = bus
+        .publisher_declared(State::TOPIC, &State::declaration(), "body")
+        .unwrap();
+    let mut expression = bus
+        .publisher(
+            lamp_skills::unplug::EXPRESSION_TOPIC,
+            Kind::Latest,
+            "expression",
+        )
+        .unwrap();
+    expression.expires_after(Some(Duration::from_millis(500)));
+    let mut ring = bus
+        .publisher(lamp_skills::unplug::RING_TOPIC, Kind::Latest, "ring")
+        .unwrap();
+    ring.expires_after(Some(Duration::from_millis(500)));
+    let state = State {
+        request: request.request.clone(),
+        phase: Phase::Ready,
+        why: String::new(),
+    };
+    let asleep = json!({"request":request.request,"asleep":true});
+    // A published plan without a rendered frame must not become speech.
+    for _ in 0..5 {
+        let now = lamp_ipc::monotonic_us();
+        body.publish_json(now, &state).unwrap();
+        expression.publish_json(now, &asleep).unwrap();
+        assert!(
+            say.accept().is_err(),
+            "readiness spoken without a ring receipt"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let mut connection = loop {
+        let now = lamp_ipc::monotonic_us();
+        body.publish_json(now, &state).unwrap();
+        expression.publish_json(now, &asleep).unwrap();
+        ring.publish_json(now, &asleep).unwrap();
+        if let Ok((stream, _)) = say.accept() {
+            break stream;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no readiness request after physical and rendered proof"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    connection
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let mut line = String::new();
+    BufReader::new(&connection).read_line(&mut line).unwrap();
+    let ready: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(ready["unplug_request"], request.request);
+    assert_eq!(ready["expires_in_ms"], 500);
+    assert_eq!(ready["text"], "My arm is folded. You can unplug me now.");
+    writeln!(connection, "{}", json!({"outcome":"spoken"})).unwrap();
+    assert_eq!(
+        bus.latest(Request::TOPIC)
+            .unwrap()
+            .unwrap()
+            .parse::<Request>()
+            .unwrap(),
+        request
+    );
 }

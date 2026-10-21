@@ -1149,8 +1149,13 @@ V5", 21 Oct): each store as its day's build wrote it is kept as a
 fixture, and every later build's tests read it, as a restart in the same
 boot and after a reboot. A shape change adds the new day's file and keeps
 the old ones. Kept so far, each in its crate's `tests/fixtures/stores/`:
-lamp-tasks (the state and the database around it, as SQL) and
-lamp-schedule (its reminders and timers, the same two); the other parts
+lamp-tasks (the state and the database around it, as SQL); lamp-schedule
+(its reminders and timers, the same two, and the voice's delivery ledger,
+which Schedule's code keeps in a store of its own); memory across days (its database,
+as SQL); the eyes (their known people); lamp-update (its own state and
+journal); the voice (its thread file, which outlives a restart in
+`/run/lampos-voice`); and lamp-cloud's reports (setup's answer, the person's
+own choice, the queue and the exit note a crash came from). The other parts
 follow, by harm.
 
 What follows is the audit for #1680 at `647f1ee63`, read from the code

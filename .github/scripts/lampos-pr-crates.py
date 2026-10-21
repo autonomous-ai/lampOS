@@ -16,7 +16,11 @@ workspace.
 Run from the repository root on the pull request's merge commit (its first
 parent is lamp-voice). Prints the cargo arguments (`--workspace`, or `-p ...`)
 and writes them to $GITHUB_OUTPUT as `args`, with why to $GITHUB_STEP_SUMMARY.
-`--diff A B` takes the diff between two commits instead, for a local check.
+The same crates go to $GITHUB_OUTPUT as `filter`, a nextest filter
+(`package(=a) | package(=b)`, empty for the whole workspace), which the run
+uses: it builds the whole workspace, so dependencies keep one set of features
+and come from the cache (lampos-arm64.yml). `--diff A B` takes the diff between
+two commits instead, for a local check.
 """
 import json
 import os
@@ -82,12 +86,13 @@ def whole_reason(path):
 def main(argv):
     files = changed_files(argv)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
-    def done(args, why):
+    def done(args, why, tested=()):
         print(args)
         print(why, file=sys.stderr)
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                 f.write(f"args={args}\n")
+                f.write(f"filter={' | '.join(f'package(={n})' for n in sorted(tested))}\n")
         if summary:
             with open(summary, "a") as f:
                 f.write(f"**Tested:** `{args}`\n\n{why}\n")
@@ -121,7 +126,7 @@ def main(argv):
     why = (f"Changed: {', '.join(sorted(changed)) or 'no crate (docs only)'}. "
            f"With the crates that depend on them and the three that read other crates' files "
            f"({', '.join(ALWAYS)}): {len(tested)} of {len(deps)} crates.")
-    return done(args, why)
+    return done(args, why, tested)
 
 
 if __name__ == "__main__":

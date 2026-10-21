@@ -620,6 +620,11 @@ one start, timed by the monotonic `at_us` the voice's trace and the bus both
 carry. That assumes each publisher stamps `CLOCK_MONOTONIC`: true of
 `voice/state` on lamp-cb94, not of `ears/level` there (its `at_us` was about
 3,486 s off), so a topic from another clock would land in the wrong place.
+The unplug topics `body/unplug_request`, `body/unplug_state`,
+`expression/unplug_state` and `ring/unplug_state` are counted by name in
+`left-out.json`, within the chosen window only. Their payloads, including
+request identifiers and failure explanations, are never exported or replayed.
+
 `voice/state` is the recorded one when `--bus` has it, else built from the
 trace as `bus_out::state` publishes it (the voice does not write the state
 itself): from `ring_requested.phase` while a turn owns the ring (`listening`

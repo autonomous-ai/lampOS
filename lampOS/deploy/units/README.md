@@ -64,6 +64,12 @@ when it is ready and that its loop is alive. The others are `Type=simple`
 until each calls the keeper's helper; then each becomes `Type=notify` with
 its own `WatchdogSec`.
 
+What the lamp-os package does with each binary is in
+[`package-binaries.json`](../package-binaries.json): `core`, `optional`,
+`provisioning` or `development`. A pull request that adds a binary adds it to
+one list. CI runs `tools/package-binaries.sh` after the release build and fails
+on a binary in none or in two, so the next lamp-os build never stops on it.
+
 Binaries with no unit here: `lamp-turn-end` is a worker the voice starts
 and watches itself; `lamp-bus` is a tool; `lamp-records` (its check and its
 report) has no unit on any lamp yet; `lamp-audio` is a qualification bench;

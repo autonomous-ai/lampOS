@@ -22,8 +22,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
-    RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
+    CameraClosed, Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level,
+    RoomActivity, RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
 };
 use serde::Serialize;
 use std::{io, time::Duration};
@@ -288,6 +288,10 @@ pub fn health(camera: Camera, set_aside: usize, resets: u32) -> Diagnostic {
 pub struct BusOut {
     faces: Publisher,
     health: Publisher,
+    /// `eyes/camera_closed`: the receipt for a close the voice asked about
+    /// (#1802). Kept alive on every tick, open camera or not, so the voice
+    /// can see that these eyes give receipts before it asks for one.
+    closed: Publisher,
     ids: Ids,
     alive_at_us: u64,
     reported_at_us: Option<u64>,
@@ -399,9 +403,12 @@ impl BusOut {
         faces.expires_after(Some(LASTS));
         let health =
             bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), SOURCE)?;
+        let closed =
+            bus.publisher_declared(CameraClosed::TOPIC, &CameraClosed::declaration(), SOURCE)?;
         Ok(Self {
             faces,
             health,
+            closed,
             ids: Ids {
                 mouths: speaking::from_environment(),
                 ..Ids::default()
@@ -624,6 +631,11 @@ impl BusOut {
             self.alive_at_us = now_us;
             let _ = self.faces.alive();
         }
+        // Every tick, not only when no look was published for a second: the
+        // looks keep the faces alive but never this, so with the camera open
+        // its entry outlived the lease and the voice saw no receipt-giving
+        // eyes (lamp-52e6, 21 October). Costs nothing until it is due.
+        let _ = self.closed.alive();
         if let Some(presence) = self.presence.as_mut() {
             // When the voice heard the words, by the host's monotonic clock,
             // never later than now: lines that waited are as old as they are.
@@ -662,6 +674,11 @@ impl BusOut {
                 eprintln!("lamp-eyes: {line}");
             }
         }
+    }
+
+    /// Say that the camera is shut for the close the voice asked about.
+    pub fn camera_closed(&mut self, receipt: CameraClosed, now_us: u64) {
+        let _ = self.closed.publish_json(now_us, &receipt);
     }
 
     /// Say how the eyes are. Call from the loop on every turn, whatever
@@ -826,6 +843,28 @@ mod tests {
         out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
         out.report(Camera::Open, 0, 0, 2_000_000);
+    }
+
+    #[test]
+    fn the_receipt_publisher_stays_alive_while_looks_keep_coming() {
+        let root = std::path::PathBuf::from(format!("/tmp/lec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // A short lease, so it is shown every 100 ms and outlived in 300.
+        let bus = Bus::new(&root)
+            .unwrap()
+            .lease(std::time::Duration::from_millis(300));
+        let mut out = BusOut::on(&bus).unwrap();
+        // The camera open: a look four times a second, each followed by a tick.
+        for look in 0..8u64 {
+            let at = 1_000_000 + look * 250_000;
+            out.saw(&[face(240.0, 120.0, 160.0, 200.0, 0.0)], &[], PICTURE, at);
+            out.tick(at + 1);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let sources = bus.publishers(CameraClosed::TOPIC).unwrap();
+        assert!(sources.iter().any(|source| source.name == SOURCE));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

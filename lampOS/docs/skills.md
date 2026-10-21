@@ -911,7 +911,7 @@ and a skill that says neither is installable.
 
 | Skill | Kind | Why |
 |---|---|---|
-| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
+| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance, Prepare-to-unplug | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is not in the product's install (`install::NOT_PRODUCT_SKILLS`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
 | Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. In the product's install since its lamp check: row 8 on lamp-52e6 with the lead, 20 Oct 11:35 (`install::PRODUCT_SKILLS`) |
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Not in the product's install (`install::NOT_PRODUCT_SKILLS`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
@@ -1625,3 +1625,18 @@ declares what it reads and uses, and the program holds it to that. A
 package's signature and the Store's install are built ("From the Skills
 Store"); the catalogue, review and the Store's server: before anything is
 published.
+
+## Core skill: prepare to unplug (#1674)
+
+`skills/prepare-unplug` is tool-only (`prepare_to_unplug`) with `kind = "core"`.
+It declares body, speech and its four completion/latch topic reads. These grants
+are checked both while loading and at the dedicated runtime boundaries, using
+the existing captured-grant lifetime for admitted runs (see [unplug.md](unplug.md)).
+Both names are reserved for this operation: the loader, runtime admission and bus request
+boundary reject aliases before folding can be requested. Its only step is
+`body = { prepare_unplug = true }`; triggers, extra steps, choice and flag are
+refused so a readiness statement cannot run as an ordinary early `say`. The
+initial response is explicitly not readiness. A bounded background run waits
+for body, Expression and actual ring receipts; Voice guards the separate
+completion statement. Installed with the product, hidden while `LAMP_UNPLUG` is
+off. See [the lifecycle, timing and physical proof](unplug.md).

@@ -237,7 +237,8 @@ pub struct BodyResult {
 /// Own the servo port and run the expressive body on it until `cancelled`
 /// says so or the body stops itself. `news` is asked once a step for the
 /// latest mood and must not wait. See [`crate::body`] for what the body may
-/// write; nothing else is written here.
+/// write; nothing else is written here. `recovery_inhibited` must not wait:
+/// it stops automatic take-hold and wake without cancelling guarded folding.
 #[must_use]
 #[allow(clippy::too_many_arguments)]
 pub fn run_body(
@@ -253,6 +254,7 @@ pub fn run_body(
         Option<crate::body::Source>,
     ),
     watch: impl FnMut(&crate::body::Glimpse),
+    recovery_inhibited: impl Fn() -> bool,
     mut cancelled: impl FnMut() -> io::Result<bool>,
 ) -> BodyResult {
     let origin = Instant::now();
@@ -265,6 +267,7 @@ pub fn run_body(
             let mut runtime = HostRuntime {
                 origin,
                 cancelled: &mut cancelled,
+                recovery_inhibited: Some(&recovery_inhibited),
             };
             let mut io = LinuxPort {
                 fd: owner.fd.as_ref().expect("prepared tty"),
@@ -302,6 +305,7 @@ fn inspect_once_with(
             let mut runtime = HostRuntime {
                 origin,
                 cancelled: &mut cancelled,
+                recovery_inhibited: None,
             };
             // The only hardware write path is the private, fixed inspection plan.
             let mut port = LinuxPort {
@@ -349,6 +353,7 @@ fn empty_result(config: &InspectionConfig) -> InspectionResult {
 struct HostRuntime<'a, F> {
     origin: Instant,
     cancelled: &'a mut F,
+    recovery_inhibited: Option<&'a dyn Fn() -> bool>,
 }
 impl<F: FnMut() -> io::Result<bool>> Runtime for HostRuntime<'_, F> {
     fn now(&self) -> Duration {
@@ -356,6 +361,9 @@ impl<F: FnMut() -> io::Result<bool>> Runtime for HostRuntime<'_, F> {
     }
     fn cancelled(&mut self) -> io::Result<bool> {
         (self.cancelled)()
+    }
+    fn recovery_inhibited(&self) -> bool {
+        self.recovery_inhibited.is_some_and(|inhibited| inhibited())
     }
 }
 

@@ -2618,6 +2618,26 @@ fn last_blocks(judged: &VecDeque<(u8, u8, bool)>) -> Value {
     })
 }
 
+/// The onboarding walk's part of a physical mute: its close candidate, and
+/// its records (the camera ask among them) written to the trace now, since
+/// the mute ends the cycle before the loop would take them. Memory only.
+fn mute_onboarding(
+    trace: &mut SessionState,
+    walk: Option<&mut crate::onboarding::Onboarding>,
+    proof: Option<&crate::wire::PrivacyReceipt>,
+    at_us: u64,
+    eyes: Option<&mut crate::body_link::EyesLink>,
+) -> Result<Option<crate::onboarding::privacy::Checkpoint>> {
+    let (Some(walk), Some(proof)) = (walk, proof) else {
+        return Ok(None);
+    };
+    let (checkpoint, records) = walk.take_close_candidate_telling(proof, at_us, eyes);
+    for line in records {
+        record(trace, line)?;
+    }
+    Ok(checkpoint)
+}
+
 fn record(trace: &mut SessionState, event: Value) -> Result<()> {
     trace.record(event).map_err(Into::into)
 }
@@ -5465,11 +5485,13 @@ fn conversation_with_gate(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
                                 )?;
-                                let onboarding = onboarding.as_mut().and_then(|walk| {
-                                    onboarding_privacy_receipt.as_ref().and_then(|proof| {
-                                        walk.take_close_candidate(proof, observed_at_us)
-                                    })
-                                });
+                                let onboarding = mute_onboarding(
+                                    trace,
+                                    onboarding.as_mut(),
+                                    onboarding_privacy_receipt.as_ref(),
+                                    observed_at_us,
+                                    eyes_link.as_mut(),
+                                )?;
                                 return Err(Box::new(PhysicalMute {
                                     observed_at_us,
                                     onboarding,
@@ -5495,11 +5517,13 @@ fn conversation_with_gate(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
                     )?;
-                    let onboarding = onboarding.as_mut().and_then(|walk| {
-                        onboarding_privacy_receipt
-                            .as_ref()
-                            .and_then(|proof| walk.take_close_candidate(proof, at_us))
-                    });
+                    let onboarding = mute_onboarding(
+                        trace,
+                        onboarding.as_mut(),
+                        onboarding_privacy_receipt.as_ref(),
+                        at_us,
+                        eyes_link.as_mut(),
+                    )?;
                     return Err(Box::new(PhysicalMute {
                         observed_at_us: at_us,
                         onboarding,
@@ -5806,6 +5830,18 @@ fn conversation_with_gate(
         if let Some(observation) = observation {
             record_hand_pats(trace, observation.pets)?;
         }
+        if reply
+            .as_ref()
+            .and_then(|current| current.say.as_ref())
+            .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+        {
+            cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+        }
         let can_open = privacy_state == PrivacyState::Allowed;
         if let Some(reminders) = reminders.as_mut() {
             reminders.poll(monotonic_us());
@@ -5967,6 +6003,9 @@ fn conversation_with_gate(
                 continue;
             }
             observe_provider_output(&mut cloud, reply, &event)?;
+            if words_heard(&event) {
+                last_turn_us = monotonic_us();
+            }
             match event {
                 ProviderOutput::ReminderDeferred {
                     request,
@@ -6037,6 +6076,18 @@ fn conversation_with_gate(
                         cancel_reply(owner, reply, trace, "onboarding_sentence")?;
                         speaker_pending = None;
                         provider_queue.clear();
+                        snapshot = owner.snapshot(now())?;
+                        rig.publish(snapshot)?;
+                        last_publish = monotonic_us();
+                    }
+                    if reply
+                        .as_ref()
+                        .and_then(|current| current.say.as_ref())
+                        .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+                    {
+                        cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+                        provider_queue.clear();
+                        speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
@@ -8402,6 +8453,18 @@ fn conversation_with_gate(
                     "boundary":"the answer's first block waits for the line the asker rule waits on, until its last chance"}),
             )?;
         }
+        if reply
+            .as_ref()
+            .and_then(|current| current.say.as_ref())
+            .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+        {
+            cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+        }
         let notice_attempt = if hold_for_line.is_some() {
             None
         } else {
@@ -8753,10 +8816,23 @@ fn conversation_with_gate(
             words.close();
         }
         // The one thing the lamp says unasked. Only from rest: nothing
-        // being heard, nothing owed, a provider ready to take the turn.
-        if reply.is_some() || admission.owns_stream() {
+        // being heard, nothing owed, a provider ready to take the turn
+        // (each consumer checks that itself). The quiet they wait out is
+        // talk's: the lamp speaking, the person's words heard
+        // (`words_heard`), or any voice the detector calls speech
+        // (`last_speech_us`), words or none: a line in a language the route
+        // takes no words from is still someone talking. The rest of a
+        // request, its end's silence and the wait for an answer that never
+        // comes aloud, does not hold it: on lamp-52e6 on 21 October a fan's
+        // sound opened 11 wordless requests in 2 minutes, and the 3 s the
+        // onboarding walk waits for never came.
+        if reply
+            .as_ref()
+            .is_some_and(|current| current.playback.is_some())
+        {
             last_turn_us = clock;
         }
+        last_turn_us = last_turn_us.max(last_speech_us);
         // The look the lamp said it would take, as soon as it has finished
         // saying so. Someone speaking first takes the turn and the look is
         // dropped; so is one that could not begin within fifteen seconds of being asked for.
@@ -10555,6 +10631,15 @@ impl AnswerAudio {
     }
 }
 
+/// Whether `output` carries the person's words: a transcript of what was
+/// heard (no request) with at least one word in it: talk, which ends the
+/// quiet the lamp's own unasked turns wait for (`last_turn_us`), as the
+/// detector's own speech does.
+fn words_heard(output: &ProviderOutput) -> bool {
+    matches!(output, ProviderOutput::Transcript { request: None, text, .. }
+        if !crate::not_speech::plain_words(text).is_empty())
+}
+
 fn reminder_quiet(
     now_us: u64,
     cycle_started_us: u64,
@@ -12008,6 +12093,15 @@ fn dispatch_speaker_chunk(
     let Some(current) = reply.as_mut() else {
         return Ok(None);
     };
+    // Recheck at the final handoff as well as the cancellation pass. A guard
+    // revoked between them cannot enqueue a first or subsequent audio chunk.
+    if current
+        .say
+        .as_ref()
+        .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+    {
+        return Ok(None);
+    }
     let origin = current.notice.origin();
     // Local notices never forge a provider Started receipt. Provider PCM keeps
     // its exact existing proof; both sources require the real local endpoint.
@@ -14102,6 +14196,95 @@ mod tests {
         assert_eq!(sequence, 2);
         assert_eq!(samples, vec![22; 960]);
         assert!(next_tick.receive(&mut parent.data, 11_999).is_err());
+    }
+
+    #[test]
+    fn unplug_proof_loss_blocks_delayed_audio_and_cancels_existing_authority() {
+        for before_first_audio in [true, false] {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut speaker_parent, mut speaker_child) = pair(&dir, "speaker");
+            let (mut owner, mut current, old_permit) = active_reply();
+            let (ticket, answered, deadline) = crate::say::guarded_ticket_for_test();
+            assert!(ticket.authority_valid(monotonic_us()));
+            current.say = Some(ticket);
+            if before_first_audio {
+                current.playback = None;
+            }
+            // Model audio arrives after the ticket was accepted; proof is lost
+            // before final handoff, including the first-audio case.
+            current.pcm.extend(vec![42; 960]);
+            deadline.store(0, std::sync::atomic::Ordering::Release);
+            let mut reply = Some(current);
+            let mut pending = None;
+            let mut sequence = 0;
+            let mut snapshot = owner.snapshot(now()).unwrap();
+            dispatch_speaker_chunk(
+                &mut owner,
+                &mut reply,
+                &mut speaker_parent.data,
+                &mut pending,
+                &mut sequence,
+                &mut snapshot,
+                &mut PlaybackMask::new(TurnTaking::VadOnly),
+            )
+            .unwrap();
+            assert!(
+                speaker_child
+                    .data
+                    .receive::<SpeakerChunk>()
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(pending.is_none());
+            assert_eq!(sequence, 0);
+            cancel_reply(
+                &mut owner,
+                &mut reply,
+                &mut SessionState::default(),
+                "unplug_authority_lost",
+            )
+            .unwrap();
+            assert_eq!(
+                answered.try_recv().unwrap(),
+                crate::say::Answer::Done(crate::say::Outcome::Dropped(
+                    "unplug_authority_lost".into()
+                ))
+            );
+            let snapshot = owner.snapshot(now()).unwrap();
+            let mut boundary = BoundaryGuard::new(snapshot.boot(), now());
+            boundary.install(now(), snapshot).unwrap();
+            assert!(
+                boundary
+                    .check(now(), old_permit, OutputKind::Speech)
+                    .is_err()
+            );
+        }
+        // Ordinary say tickets retain the existing dispatch behavior.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut speaker_parent, mut speaker_child) = pair(&dir, "speaker");
+        let (mut owner, mut current, _) = active_reply();
+        current.say = Some(crate::say::ticket_for_test("reminders").0);
+        let mut reply = Some(current);
+        let mut snapshot = owner.snapshot(now()).unwrap();
+        dispatch_speaker_chunk(
+            &mut owner,
+            &mut reply,
+            &mut speaker_parent.data,
+            &mut None,
+            &mut 0,
+            &mut snapshot,
+            &mut PlaybackMask::new(TurnTaking::VadOnly),
+        )
+        .unwrap();
+        assert_eq!(
+            speaker_child
+                .data
+                .receive::<SpeakerChunk>()
+                .unwrap()
+                .unwrap()
+                .samples,
+            vec![123; 240]
+        );
     }
 
     #[test]

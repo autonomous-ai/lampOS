@@ -167,8 +167,12 @@ fn by_hand(
     tar_of(&all)
 }
 
-/// A Store on a free local port, giving each connection the next answer as
-/// written, and how many connections it took.
+/// A Store on a free local port, giving each of lamp-skills' requests the
+/// next answer as written, and how many it took. Another program on the host
+/// can connect to the port too, a client of whatever server had it before: a
+/// `node` agent's `GET /v1/models` once counted as a second fetch (#1569 row
+/// 61). So only a request from lamp-skills' fetch (`User-Agent:
+/// lamp-update`) is answered and counted.
 fn serve(answers: Vec<Vec<u8>>) -> (u16, thread::JoinHandle<usize>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -179,23 +183,31 @@ fn serve(answers: Vec<Vec<u8>>) -> (u16, thread::JoinHandle<usize>) {
         for answer in answers {
             let mut socket = loop {
                 match listener.accept() {
-                    Ok((socket, _)) => break socket,
+                    Ok((mut socket, _)) => {
+                        socket.set_nonblocking(false).unwrap();
+                        // A stranger that says nothing can't hold the Store.
+                        socket
+                            .set_read_timeout(Some(Duration::from_secs(1)))
+                            .unwrap();
+                        let mut request = Vec::new();
+                        let mut byte = [0u8; 1];
+                        while !request.ends_with(b"\r\n\r\n") {
+                            if socket.read_exact(&mut byte).is_err() {
+                                break;
+                            }
+                            request.push(byte[0]);
+                        }
+                        if String::from_utf8_lossy(&request).contains("User-Agent: lamp-update") {
+                            break socket;
+                        }
+                    }
                     Err(_) if std::time::Instant::now() < until => {
                         thread::sleep(Duration::from_millis(5));
                     }
                     Err(_) => return taken,
                 }
             };
-            socket.set_nonblocking(false).unwrap();
             taken += 1;
-            let mut request = Vec::new();
-            let mut byte = [0u8; 1];
-            while !request.ends_with(b"\r\n\r\n") {
-                if socket.read_exact(&mut byte).is_err() {
-                    break;
-                }
-                request.push(byte[0]);
-            }
             let _ = socket.write_all(&answer);
         }
         taken

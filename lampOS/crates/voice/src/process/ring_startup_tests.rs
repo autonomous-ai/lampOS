@@ -498,3 +498,63 @@ fn child_exit_before_ready_is_optional_but_abnormal_exit_is_retained() {
     fixture.assert_reaped();
     assert!(!fixture.directory.path.join("ring").exists());
 }
+
+/// The reviewer on #1699: the ring is started with a cleared environment,
+/// so the unplug switch has to be handed to it, or it never draws the
+/// asleep picture nor says its receipt. Through the ring's real startup, a
+/// child in its place writes what it got: `LAMP_UNPLUG=on` when the voice
+/// has it on, nothing of it otherwise, and never another of the voice's.
+#[test]
+fn the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on() {
+    for (value, expected) in [(Some("on"), true), (Some("yes"), false), (None, false)] {
+        let directory = SessionDirectory::create().unwrap();
+        let executable = directory.path.join("fake-ring");
+        let written = directory.path.join("ring-env.txt");
+        fs::write(
+            &executable,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = --fixture-preflight ]; then exit 0; fi\n/usr/bin/env > '{}.tmp' && mv '{0}.tmp' '{0}'\nexec /bin/sleep 60\n",
+                written.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+        let preflight = super::status_of_fresh(
+            Command::new(&executable)
+                .arg("--fixture-preflight")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null()),
+        );
+        assert!(preflight.success(), "fake ring preflight: {preflight}");
+        let started = Worker::spawn_optional_ring_reading(
+            &executable,
+            &directory.path,
+            new_boot().unwrap(),
+            &[],
+            || {
+                move_on_once(written.exists());
+                Ok(())
+            },
+            |name| match name {
+                lamp_body::unplug::ENVIRONMENT => value.map(Into::into),
+                _ => Some("a-secret".into()),
+            },
+        )
+        .unwrap();
+        let (worker, _) = unavailable(started);
+        let mut worker = worker.expect("the started ring stays owned");
+        worker.request_termination().unwrap();
+        await_exit(&mut worker);
+        let got = fs::read_to_string(&written).unwrap();
+        assert_eq!(
+            got.lines().any(|line| line == "LAMP_UNPLUG=on"),
+            expected,
+            "{value:?}"
+        );
+        assert!(
+            !got.contains("a-secret"),
+            "{value:?}: a voice variable leaked"
+        );
+    }
+}

@@ -47,6 +47,7 @@ pub mod readback;
 pub mod runtime;
 pub mod trajectory;
 pub mod units;
+pub mod unplug;
 
 pub const JOINT_COUNT: usize = 5;
 /// A joint that gave way and then moved more than this many counts from
