@@ -876,6 +876,33 @@ the unchanged legacy client, used unless the new Days client is selected.
     tidied, which is right: its evidence was forgotten. #2176 does not
     change this.
 
+- **An exchange linked to what its turn used** (#2176 finding 14,
+  `LAMP_MEMORY_LINK_USED=on`, with the Days client only; off unless set;
+  both voice routes).
+  - **Why:** on lamp-06c1 (21 Oct, build 4510), after a colour was kept
+    (id 14), the next two exchanges, about a wedding and a gift, were
+    linked to it: each exchange cited everything the session had been
+    shown. Two observations were made from them. Forgetting the colour
+    would have taken all four.
+  - **What is linked:** what that turn's own `recall`, `search` or
+    `remember` gave, and anything the session was shown (a note line, a
+    recall result, a thing kept, a thread to ask about) sharing one key
+    word with what was heard or said in the turn. So "forget my favourite
+    colour" takes teal and what was said about it, not the wedding and the
+    gift. One shared word links. And once a source is linked to one
+    exchange, it is linked to every later exchange of the session that is
+    the same person's, so "why do I like it?" after a recall of teal goes
+    with it (the reviewer's P2 on #2511). Not linked: talk of the session
+    before the thing was first used that shares no word with it, and after
+    a session with no resumption, talk of it in other words with no call
+    that gives it. The carry ends only there, at the session's close, or
+    when journalling stops; then the words held for what was shown are
+    dropped too.
+  - **What stays:** the session's 64-source bound and its stops, and a
+    `remember`'s own links to its conversation (`LAMP_MEMORY_FORGET_ALL`).
+    Off, every exchange is linked as before
+    ([memory-days.md](memory-days.md)).
+
 - **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
   with the Days client, on the second route only; off unless set).
   - **When:** at each conversation's end (45 s idle, or another person),

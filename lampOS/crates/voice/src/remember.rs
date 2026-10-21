@@ -364,6 +364,33 @@ pub fn switch_recall_v2(on: bool) -> bool {
     *RECALL_V2.get_or_init(|| on)
 }
 
+/// Only the exact value `on`, with the Days client (#2176 finding 14): an
+/// exchange is linked only to the kept things its own turn used, not to
+/// everything the session was shown, so a forget takes what was said about
+/// the thing forgotten and not the unrelated talk after it. Used: what that
+/// turn's own `recall`, `search` or `remember` gave, and anything the
+/// session was shown (a note line, a recall result, a thing kept, a thread
+/// to ask about) whose words share a key word with what was heard or said
+/// in the turn ([`content_words`]). A source linked to one exchange is
+/// linked to every later exchange of the session that is the same
+/// person's, so a follow-up that says "it" goes with the turn it follows;
+/// that carry ends with a session that presents no resumption, or the
+/// session's close. Off, every exchange is linked to every
+/// source the session was shown, as before.
+pub const LINK_USED_ENVIRONMENT: &str = "LAMP_MEMORY_LINK_USED";
+static LINK_USED: OnceLock<bool> = OnceLock::new();
+
+/// Whether an exchange links only to what its turn used.
+pub fn link_used_on() -> bool {
+    LINK_USED.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_link_used(on: bool) -> bool {
+    *LINK_USED.get_or_init(|| on)
+}
+
 /// The most days a recall's span names, both ends counted: the memory's
 /// own bound (#2176).
 const SPAN_DAYS: u64 = 14;
@@ -1044,12 +1071,30 @@ pub fn run_scoped(
     let Some(snapshot) = lease.scope() else {
         return (gone(), false);
     };
-    let result = run_for_guarded(socket, call, deadline, snapshot.person(), Some(lease));
+    let result = run_for_guarded(
+        socket,
+        call,
+        deadline,
+        snapshot.person(),
+        (Some(lease), Some(lease.key().request)),
+    );
     if lease.is_current() {
         result
     } else {
         (gone(), false)
     }
+}
+
+/// [`run`] for this request's turn: with [`LINK_USED_ENVIRONMENT`], what it
+/// gives is linked to that request's exchange (#2176 finding 14).
+pub fn run_of(socket: &Path, call: &ToolCall, deadline: Duration, request: u64) -> (Value, bool) {
+    run_for_guarded(
+        socket,
+        call,
+        deadline,
+        person_now().as_deref(),
+        (None, Some(request)),
+    )
 }
 
 /// [`run`] for this person's memory ([`person_id`]), `None` for the room's.
@@ -1059,15 +1104,19 @@ pub fn run_for(
     deadline: Duration,
     person: Option<&str>,
 ) -> (Value, bool) {
-    run_for_guarded(socket, call, deadline, person, None)
+    run_for_guarded(socket, call, deadline, person, (None, None))
 }
+
+/// With the request's scope lease, if any, and the request whose turn it
+/// is, if known.
+type Turn<'a> = (Option<&'a crate::memory_scope::ScopeLease>, Option<u64>);
 
 fn run_for_guarded(
     socket: &Path,
     call: &ToolCall,
     deadline: Duration,
     person: Option<&str>,
-    lease: Option<&crate::memory_scope::ScopeLease>,
+    (lease, asked_in): Turn<'_>,
 ) -> (Value, bool) {
     if !scope_current(lease) {
         return (gone(), false);
@@ -1095,7 +1144,7 @@ fn run_for_guarded(
             .filter(|client| client.socket == socket)
             .map_or_else(
                 || (gone(), false),
-                |client| client.run_for_guarded(call, deadline, person, lease),
+                |client| client.run_for_request(call, deadline, person, (lease, asked_in)),
             );
         if forgets {
             FORGET_THREAD.store(true, Ordering::Release);
@@ -1418,6 +1467,7 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
         days && std::env::var(FORGET_ABOUT_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
     switch_replaces(days && std::env::var(REPLACES_ENVIRONMENT).ok().as_deref() == Some("on"));
+    switch_link_used(days && std::env::var(LINK_USED_ENVIRONMENT).ok().as_deref() == Some("on"));
     if days {
         DAYS.get_or_init(|| {
             // The optional thread file contains no source IDs. A new Days
@@ -1531,6 +1581,9 @@ pub fn finished(request: u64) {
             Err(_) => return,
         };
         hand_on_days(done, unix_ms(), client);
+        // What its calls gave and no exchange took (one kept out) is
+        // dropped (#2176 finding 14).
+        client.drop_fetched(request);
         return;
     }
     let Some(jobs) = JOBS.get() else { return };
@@ -1810,8 +1863,15 @@ impl DaysClient {
         ) else {
             return String::new();
         };
+        let linking = self.link_used.load(Ordering::Acquire);
         let said = match self.context.lock() {
-            Ok(mut context) => context.include(Some(person), &[id]),
+            Ok(mut context) => {
+                let said = context.include(Some(person), &[id]);
+                if linking {
+                    context.says(Some(person), id, content_words(text));
+                }
+                said
+            }
             Err(_) => return String::new(),
         };
         say(said);
@@ -1934,6 +1994,8 @@ pub struct DaysClient {
     /// ([`DaysClient::kept_since_note`], #2540): a session's note, frozen
     /// for its run of turns, doesn't have it.
     kept_since_note: AtomicBool,
+    /// [`link_used_on`], read when the client is made (#2176 finding 14).
+    link_used: AtomicBool,
     /// The conversation the writer is in: whose, and the exchanges of it
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
@@ -1974,6 +2036,8 @@ struct Held {
     forgotten: u64,
     sources: Vec<(Option<String>, u64)>,
     rules: Vec<(Option<String>, u64)>,
+    /// What the turn's own memory calls gave ([`DaysContext::fetched`]).
+    fetched: Vec<(Option<String>, u64)>,
 }
 
 impl HandOns {
@@ -1990,6 +2054,9 @@ impl HandOns {
 
 /// Whose conversation it is (`None` for the room's) and its exchanges.
 type Current = (Option<String>, Vec<u64>);
+
+/// A source with its person (`None` for the room's).
+type Source = (Option<String>, u64);
 
 #[derive(Default)]
 struct DaysContext {
@@ -2037,6 +2104,22 @@ struct DaysContext {
     /// corrected, but never a source, so the session's bound isn't spent on
     /// them. The newest [`SOURCE_IDS`].
     hits: Vec<(Option<String>, u64)>,
+    /// With [`LINK_USED_ENVIRONMENT`] (#2176 finding 14): the key words of
+    /// what each source in `sources` says, as the session was shown it
+    /// ([`content_words`]), at most one entry for each source.
+    words: Vec<(Source, Vec<String>)>,
+    /// With [`LINK_USED_ENVIRONMENT`]: the sources each request's own memory
+    /// calls gave (a recall's or search's results, a thing kept), oldest
+    /// first, at most [`SOURCE_IDS`]: taken by that request's exchange.
+    fetched: VecDeque<(u64, Option<String>, u64)>,
+    /// With [`LINK_USED_ENVIRONMENT`]: the sources an exchange of this
+    /// session was linked to, each with its person, linked to every later
+    /// exchange of the session that is that person's (the reviewer's P2 on
+    /// #2511): a follow-up that says "it" goes with the turn it follows.
+    /// Emptied when a session opens that presents no resumption, when the
+    /// session closes, and when journalling stops; never more than
+    /// `sources`.
+    carried: Vec<Source>,
 }
 
 /// Why memory's journal stopped until a fresh worker (#2176): said in the
@@ -2093,6 +2176,12 @@ impl DaysContext {
     #[must_use = "the line is said after the context's guard is dropped"]
     fn inhibit(&mut self, why: Stopped) -> Option<String> {
         self.journal_inhibited = true;
+        // Nothing is linked until a fresh session, which starts these anew:
+        // the text of a thing forgotten isn't left in the process (the
+        // reviewer's P3 on #2511).
+        self.words.clear();
+        self.fetched.clear();
+        self.carried.clear();
         self.inhibits = self.inhibits.saturating_add(1);
         if self.stopped_by.is_some() {
             return None;
@@ -2181,6 +2270,44 @@ impl DaysContext {
             }
         }
         shown
+    }
+
+    /// What source `id` of this person's says, as key words, for whether a
+    /// turn used it; only for a source the context holds, and once.
+    fn says(&mut self, person: Option<&str>, id: u64, words: Vec<String>) {
+        let source = (person.map(str::to_owned), id);
+        if self.sources.contains(&source) && !self.words.iter().any(|(had, _)| *had == source) {
+            self.words.push((source, words));
+        }
+    }
+
+    /// Source `id` of this person's came from `request`'s own memory call.
+    fn fetched_by(&mut self, request: u64, person: Option<&str>, id: u64) {
+        if self.fetched.len() == SOURCE_IDS {
+            self.fetched.pop_front();
+        }
+        self.fetched
+            .push_back((request, person.map(str::to_owned), id));
+    }
+
+    /// What `request`'s own memory calls gave, taken out.
+    fn take_fetched(&mut self, request: u64) -> Vec<(Option<String>, u64)> {
+        let mut taken = vec![];
+        self.fetched.retain(|(by, whose, id)| {
+            if *by == request {
+                taken.push((whose.clone(), *id));
+            }
+            *by != request
+        });
+        taken
+    }
+
+    /// Whether what this person's source `id` says shares a key word with
+    /// `words`, those heard and said in a turn.
+    fn shares(&self, person: Option<&str>, id: u64, words: &[String]) -> bool {
+        self.words.iter().any(|((whose, had), says)| {
+            *had == id && whose.as_deref() == person && says.iter().any(|word| words.contains(word))
+        })
     }
 
     /// This person's sources, for a write to their scope.
@@ -2485,6 +2612,7 @@ impl DaysClient {
             ),
             fresh_tried: Mutex::new(None),
             kept_since_note: AtomicBool::new(false),
+            link_used: AtomicBool::new(link_used_on()),
             current,
             hand_ons,
             early,
@@ -2527,6 +2655,7 @@ impl DaysClient {
             return;
         };
         let person = context.session_person.take();
+        context.carried.clear();
         drop(context);
         // The room's, then the person's beside it when someone was known.
         let whose = std::iter::once(None).chain(person.as_deref().map(Some));
@@ -2591,6 +2720,12 @@ impl DaysClient {
                     resumable,
                 )
             } else {
+                // A new session that presents no resumption: the provider
+                // holds nothing of the last one, so what it linked is not
+                // carried into it (#2511). A resumed one carries it on.
+                if fresh {
+                    context.carried.clear();
+                }
                 (
                     context.session.replace(name.clone()),
                     previous_person,
@@ -2626,6 +2761,18 @@ impl DaysClient {
         let theirs = person.and_then(|person| self.open_one(&name, Some(person), until));
         let mut said = None;
         let mut resumed = None;
+        // What each note line says, for whether a turn used it (#2176
+        // finding 14); worked out before the context is held.
+        let linking = self.link_used.load(Ordering::Acquire);
+        let room_words = if linking {
+            note_words(&snapshot)
+        } else {
+            vec![]
+        };
+        let their_words = match &theirs {
+            Some((theirs, _)) if linking => note_words(theirs),
+            _ => vec![],
+        };
         let accepted = match self.context.try_lock() {
             Ok(mut context)
                 if context.session.as_ref() == Some(&name) && started.elapsed() < deadline =>
@@ -2642,6 +2789,10 @@ impl DaysClient {
                     context.rules.clear();
                     // Hits told by id before are not this snapshot's (#2510).
                     context.hits.clear();
+                    // And what they said, and what was carried (the
+                    // reviewer's P3 on #2511): only this snapshot's words.
+                    context.words.clear();
+                    context.carried.clear();
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(settled);
                     let why = context.stopped_by.take().map_or("unknown", Stopped::as_str);
                     context.journal_inhibited = false;
@@ -2656,6 +2807,12 @@ impl DaysClient {
                 said = context.include(None, &ids);
                 if let Some((_, ids)) = &theirs {
                     said = said.or(context.include(person, ids));
+                }
+                for (id, words) in room_words {
+                    context.says(None, id, words);
+                }
+                for (id, words) in their_words {
+                    context.says(person, id, words);
                 }
                 true
             }
@@ -2742,6 +2899,29 @@ impl DaysClient {
         person: Option<&str>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> (Value, bool) {
+        self.run_for_request(call, deadline, person, (lease, None))
+    }
+
+    /// [`Self::run_for`] in this request's turn: with
+    /// [`LINK_USED_ENVIRONMENT`], what it gives is linked to that request's
+    /// exchange ([`Self::finished_exchange_of`]) (#2176 finding 14).
+    pub fn run_in(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        person: Option<&str>,
+        request: u64,
+    ) -> (Value, bool) {
+        self.run_for_request(call, deadline, person, (None, Some(request)))
+    }
+
+    fn run_for_request(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        person: Option<&str>,
+        (lease, request): Turn<'_>,
+    ) -> (Value, bool) {
         if !scope_current(lease) {
             return (gone(), false);
         }
@@ -2752,12 +2932,10 @@ impl DaysClient {
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
-        match lease {
-            Some(_) => self.run_at_guarded(call, left, (now, zone), person, lease),
-            None => self.run_at(call, left, now, zone, person),
-        }
+        self.run_at_guarded(call, left, (now, zone), person, (lease, request))
     }
 
+    #[cfg(test)]
     fn run_at(
         &self,
         call: &ToolCall,
@@ -2766,7 +2944,7 @@ impl DaysClient {
         zone: Option<&LocalTime>,
         person: Option<&str>,
     ) -> (Value, bool) {
-        self.run_at_guarded(call, deadline, (now, zone), person, None)
+        self.run_at_guarded(call, deadline, (now, zone), person, (None, None))
     }
 
     fn run_at_guarded(
@@ -2775,7 +2953,7 @@ impl DaysClient {
         deadline: Duration,
         time: (u64, Option<&LocalTime>),
         person: Option<&str>,
-        lease: Option<&crate::memory_scope::ScopeLease>,
+        (lease, asked_in): Turn<'_>,
     ) -> (Value, bool) {
         let (now, zone) = time;
         if !scope_current(lease) {
@@ -2892,6 +3070,7 @@ impl DaysClient {
             request["replaces"] = json!(old);
             request["shown"] = json!(context.shown(person));
         }
+        let request_text = request["text"].as_str().map(str::to_owned);
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
             let Ok(mut context) = self.context.try_lock() else {
@@ -3036,8 +3215,21 @@ impl DaysClient {
                     .map(|(_, id)| *id)
             })
             .flatten();
-        for (whose, id) in ids {
+        // What this turn's call gave, with what each says, for the link to
+        // its exchange (#2176 finding 14). Only with the switch.
+        let linking = self.link_used.load(Ordering::Acquire);
+        for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
+            if linking {
+                let says = match call.name.as_str() {
+                    REMEMBER => request_text.as_deref().map(content_words),
+                    _ => told["found"].get(at).map(found_words),
+                };
+                context.says(whose.as_deref(), id, says.unwrap_or_default());
+                if let Some(asked_in) = asked_in {
+                    context.fetched_by(asked_in, whose.as_deref(), id);
+                }
+            }
         }
         if writes {
             context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
@@ -3431,7 +3623,7 @@ impl DaysClient {
         said: &str,
         person: Option<&str>,
     ) -> bool {
-        self.queue_exchange(at_unix_ms, heard, said, person, None)
+        self.queue_exchange(at_unix_ms, heard, said, person, (None, None))
     }
 
     /// Holds this request's hand-on ([`hold`]): what its turn's end knows
@@ -3440,7 +3632,7 @@ impl DaysClient {
     /// reviewer's P3 on #2186); a poisoned one is said, and that answer then
     /// goes with what is known when it is handed on.
     pub fn hold(&self, request: u64) {
-        let Ok(context) = self.context.lock() else {
+        let Ok(mut context) = self.context.lock() else {
             eprintln!(
                 "lamp-voice provider: request {request}'s turn end could not be kept for memory; it goes with what is known when handed on"
             );
@@ -3452,6 +3644,7 @@ impl DaysClient {
             forgotten: self.hand_ons.forgotten.load(Ordering::Acquire),
             sources: context.sources.clone(),
             rules: context.rules.clone(),
+            fetched: context.take_fetched(request),
         };
         drop(context);
         if let Ok(mut all) = self.hand_ons.held.lock() {
@@ -3492,8 +3685,10 @@ impl DaysClient {
     }
 
     /// [`Self::finished_exchange_for`] of a request, with what its turn's
-    /// end knew when its hand-on was held.
-    fn finished_exchange_of(
+    /// end knew when its hand-on was held, and with
+    /// [`LINK_USED_ENVIRONMENT`] what its own memory calls gave
+    /// ([`Self::run_in`]).
+    pub fn finished_exchange_of(
         &self,
         request: u64,
         at_unix_ms: u64,
@@ -3502,7 +3697,16 @@ impl DaysClient {
         person: Option<&str>,
     ) -> bool {
         let held = self.take_held(request);
-        self.queue_exchange(at_unix_ms, heard, said, person, held)
+        self.queue_exchange(at_unix_ms, heard, said, person, (held, Some(request)))
+    }
+
+    /// What a request's own calls gave that no exchange of it took (one kept
+    /// out, as a remember's or a forget's is, [`keep_out`]): dropped, so the
+    /// bounded list holds only turns still going (#2176 finding 14).
+    fn drop_fetched(&self, request: u64) {
+        if let Ok(mut context) = self.context.lock() {
+            let _ = context.take_fetched(request);
+        }
     }
 
     fn queue_exchange(
@@ -3511,7 +3715,7 @@ impl DaysClient {
         heard: &str,
         said: &str,
         person: Option<&str>,
-        held: Option<Held>,
+        (held, request): (Option<Held>, Option<u64>),
     ) -> bool {
         let Ok(mut context) = self.context.try_lock() else {
             self.lost.fetch_add(1, Ordering::Relaxed);
@@ -3535,7 +3739,7 @@ impl DaysClient {
                 .map(|(_, id)| *id)
                 .collect()
         };
-        let (finished, forgotten, sources, rules) = match &held {
+        let (finished, forgotten, mut sources, rules) = match &held {
             Some(held) => (
                 held.finished,
                 held.forgotten,
@@ -3549,6 +3753,30 @@ impl DaysClient {
                 context.rules_of(person),
             ),
         };
+        // #2176 finding 14: only what the turn used, of what it knew: what
+        // its own memory calls gave, what shares a key word with what was
+        // heard or said in it, and what an earlier exchange of the session
+        // was linked to (the reviewer's P2 on #2511). Off, every source, as
+        // before.
+        if self.link_used.load(Ordering::Acquire) {
+            let fetched = match held {
+                Some(held) => mine(&held.fetched),
+                None => {
+                    request.map_or_else(Vec::new, |request| mine(&context.take_fetched(request)))
+                }
+            };
+            let words = content_words(&format!("{heard} {said}"));
+            let carried = mine(&context.carried);
+            sources.retain(|id| {
+                fetched.contains(id) || carried.contains(id) || context.shares(person, *id, &words)
+            });
+            for id in &sources {
+                let source = (person.map(str::to_owned), *id);
+                if !context.carried.contains(&source) {
+                    context.carried.push(source);
+                }
+            }
+        }
         let sent = self
             .jobs
             .try_send(DaysJob::Exchange {
@@ -3919,6 +4147,38 @@ fn snapshot_ids(snapshot: &Value, session: &str, scope: &str) -> Option<Vec<u64>
     (found.len() == source_ids.len()).then_some(source_ids)
 }
 
+/// The key words of each line of a validated session note, by its id, for
+/// whether a turn used it (#2176 finding 14).
+fn note_words(snapshot: &Value) -> Vec<(u64, Vec<String>)> {
+    let Some(quoted) = snapshot["note"]
+        .as_str()
+        .and_then(|note| serde_json::from_str::<Value>(note).ok())
+    else {
+        return vec![];
+    };
+    quoted["facts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|fact| Some((fact["id"].as_u64()?, content_words(fact["text"].as_str()?))))
+        .collect()
+}
+
+/// The key words of one thing recall found ([`days_answer`]): what was kept,
+/// heard and said, or observed.
+fn found_words(item: &Value) -> Vec<String> {
+    let text: Vec<&str> = [
+        "asked_to_remember",
+        "heard",
+        "you_said",
+        "recorded_observation",
+    ]
+    .iter()
+    .filter_map(|field| item[*field].as_str())
+    .collect();
+    content_words(&text.join(" "))
+}
+
 /// A Days answer told to the model, with its source ids. With
 /// `LAMP_MEMORY_REPLACES` (#2510 take #4) `dated`:
 /// each kept thing found says `since` when, in words; with `Some(true)`,
@@ -4205,6 +4465,28 @@ fn adopt_early(
     conversation.person = Some(to.to_owned());
     if let Ok(mut context) = early.context.lock() {
         for source in &mut context.sources {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+        // And what they say and which turn gave them (#2176 finding 14).
+        for (source, _) in &mut context.words {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+        for (_, whose, id) in &mut context.fetched {
+            if whose.is_none()
+                && let Some(moved) = new(*id)
+            {
+                (*whose, *id) = (Some(to.to_owned()), moved);
+            }
+        }
+        for source in &mut context.carried {
             if source.0.is_none()
                 && let Some(id) = new(source.1)
             {
@@ -4770,7 +5052,13 @@ mod tests {
                 let client = DaysClient::new(socket.clone()).unwrap();
                 client.run_for_guarded(&call, Duration::from_secs(2), person, Some(&lease))
             } else {
-                run_for_guarded(&socket, &call, Duration::from_secs(2), person, Some(&lease))
+                run_for_guarded(
+                    &socket,
+                    &call,
+                    Duration::from_secs(2),
+                    person,
+                    (Some(&lease), None),
+                )
             };
             assert!(!result.1);
             assert!(!result.0.to_string().contains("private-secret"));
@@ -4825,7 +5113,13 @@ mod tests {
                 let client = DaysClient::new(socket.clone()).unwrap();
                 client.run_for_guarded(&call, Duration::from_secs(2), person, Some(&lease))
             } else {
-                run_for_guarded(&socket, &call, Duration::from_secs(2), person, Some(&lease))
+                run_for_guarded(
+                    &socket,
+                    &call,
+                    Duration::from_secs(2),
+                    person,
+                    (Some(&lease), None),
+                )
             };
             assert!(result.1);
             assert_eq!(served.join().unwrap()[0]["person"], person_id("Ann"));
@@ -8250,6 +8544,7 @@ mod tests {
             resumes: AtomicBool::new(false),
             fresh_tried: Mutex::new(None),
             kept_since_note: AtomicBool::new(false),
+            link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,
@@ -8413,6 +8708,7 @@ mod tests {
             resumes: AtomicBool::new(false),
             fresh_tried: Mutex::new(None),
             kept_since_note: AtomicBool::new(false),
+            link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,
@@ -8457,6 +8753,198 @@ mod tests {
             client.hold(100 + request);
         }
         assert_eq!(client.held_requests().first(), Some(&101));
+    }
+
+    /// #2176 finding 14: with `LAMP_MEMORY_LINK_USED` off, every exchange is
+    /// linked to every source the session was shown, exactly as before; on,
+    /// only to what its turn used: what its own calls gave (also when its
+    /// hand-on was held), and what shares a key word with its words, and
+    /// then to what an earlier exchange of the session was (#2511).
+    #[test]
+    fn an_exchange_links_to_what_its_turn_used_only_with_the_switch() {
+        for linking in [false, true] {
+            let (jobs, work) = sync_channel(8);
+            let client = held_test_client(jobs);
+            client.link_used.store(linking, Ordering::Release);
+            {
+                let mut context = client.context.lock().unwrap();
+                assert_eq!(context.include(None, &[7, 8, 9, 10]), None);
+                context.says(None, 7, content_words("Their favourite colour is teal"));
+                context.says(None, 8, content_words("Their sister's wedding is in June"));
+                context.fetched_by(41, None, 9);
+                context.fetched_by(43, None, 10);
+                context.fetched_by(50, None, 8);
+            }
+            // 41 recalled 9 and said nothing of what was shown.
+            assert!(client.finished_exchange_of(41, NOW, "what did I ask?", "Something.", None));
+            // 42 called nothing; its words share "colour" with 7's.
+            assert!(client.finished_exchange_of(
+                42,
+                NOW,
+                "which colours for the curtains?",
+                "Maybe blue.",
+                None
+            ));
+            // 43 recalled 10 and its hand-on was held: taken with it.
+            client.hold(43);
+            assert!(client.finished_exchange_of(43, NOW, "good morning", "Morning!", None));
+            // 50 kept something and was kept out: what it gave is dropped,
+            // and nothing is left of any turn.
+            client.drop_fetched(50);
+            assert!(client.finished_exchange_of(51, NOW, "hello there", "Hi.", None));
+            let linked: Vec<Vec<u64>> = (0..4)
+                .map(|_| match work.try_recv().unwrap() {
+                    DaysJob::Exchange { sources, .. } => sources,
+                    _ => panic!("expected Days exchange"),
+                })
+                .collect();
+            if linking {
+                // 8, shown and given only to the turn kept out, is never.
+                assert_eq!(
+                    linked,
+                    [vec![9], vec![7, 9], vec![7, 9, 10], vec![7, 9, 10]]
+                );
+                assert!(client.context.lock().unwrap().fetched.is_empty());
+            } else {
+                assert_eq!(linked, vec![vec![7, 8, 9, 10]; 4]);
+            }
+        }
+    }
+
+    /// The reviewer's P2 on #2511: a source linked to one exchange is linked
+    /// to the session's later exchanges of that person, a follow-up that
+    /// says "it" with no word of it among them; another person's are not,
+    /// and the carry ends with the session.
+    #[test]
+    fn a_linked_source_is_carried_to_the_sessions_later_turns() {
+        let (jobs, work) = sync_channel(8);
+        let client = held_test_client(jobs);
+        client.link_used.store(true, Ordering::Release);
+        {
+            let mut context = client.context.lock().unwrap();
+            context.session = Some("test-1".into());
+            assert_eq!(context.include(None, &[7]), None);
+            assert_eq!(context.include(Some("p-ann"), &[7]), None);
+            context.says(None, 7, content_words("Their favourite colour is teal"));
+            context.fetched_by(1, None, 7);
+        }
+        let turns = [
+            (1, "what did I ask you to keep?", "That one.", None),
+            (
+                2,
+                "why do I like it?",
+                "You said it reminds you of the sea.",
+                None,
+            ),
+            (3, "and what else?", "Waves, mostly.", Some("p-ann")),
+            (4, "tell me more", "A long summer by it.", None),
+        ];
+        for (request, heard, said, person) in turns {
+            assert!(client.finished_exchange_of(request, NOW, heard, said, person));
+        }
+        client.close_open_session(Duration::ZERO);
+        assert!(client.finished_exchange_of(5, NOW, "and it?", "Still blue.", None));
+        let linked: Vec<Vec<u64>> = (0..5)
+            .map(|_| match work.try_recv().unwrap() {
+                DaysJob::Exchange { sources, .. } => sources,
+                _ => panic!("expected Days exchange"),
+            })
+            .collect();
+        assert_eq!(linked, [vec![7], vec![7], vec![], vec![7], vec![]]);
+    }
+
+    /// The reviewer's P3 on #2511: once a forget is confirmed, nothing of
+    /// what the session was shown is held as words, nor as what a turn gave
+    /// or carried.
+    #[test]
+    fn a_forget_leaves_no_words_of_what_was_forgotten() {
+        let (jobs, _work) = sync_channel(8);
+        let client = held_test_client(jobs);
+        client.link_used.store(true, Ordering::Release);
+        let mut context = client.context.lock().unwrap();
+        assert_eq!(context.include(None, &[7]), None);
+        context.says(None, 7, content_words("Their favourite colour is teal"));
+        context.fetched_by(1, None, 7);
+        context.carried.push((None, 7));
+        assert!(context.shares(None, 7, &content_words("teal")));
+        let _ = client.forgotten(&mut context);
+        assert!(context.words.is_empty());
+        assert!(context.fetched.is_empty());
+        assert!(context.carried.is_empty());
+        assert!(!context.shares(None, 7, &content_words("teal")));
+    }
+
+    /// The reviewer's P3 on #2511: a session that resumes journalling holds
+    /// only its own snapshot's words, not those shown while it was stopped;
+    /// and only a session that presents no resumption carries nothing of
+    /// the last one's links.
+    #[test]
+    fn a_resumed_session_holds_only_its_own_words() {
+        let (socket, served) = memory(
+            "link-used-resume",
+            4,
+            |request| json!({"ok":true,"snapshot":snapshot(request["session"].as_str().unwrap())}),
+        );
+        let client = resumes_test_client(socket.clone(), true);
+        client.link_used.store(true, Ordering::Release);
+        let teal = (None, 99);
+        assert!(
+            client
+                .open_fresh_session_within(1, FIRST_READ, None, true)
+                .is_some()
+        );
+        {
+            let mut context = client.context.lock().unwrap();
+            let _ = context.inhibit(Stopped::Forgotten);
+            // Shown while stopped, as a recall then would be.
+            let _ = context.include(None, &[99]);
+            context.says(None, 99, content_words("Their favourite colour is teal"));
+            assert!(context.words.iter().any(|(source, _)| *source == teal));
+        }
+        assert!(
+            client
+                .open_fresh_session_within(2, FIRST_READ, None, true)
+                .is_some()
+        );
+        {
+            let mut context = client.context.lock().unwrap();
+            assert!(!context.journal_inhibited);
+            assert_eq!(context.words, [((None, 7), content_words("coffee black"))]);
+            context.carried.push((None, 7));
+        }
+        assert!(
+            client
+                .open_fresh_session_within(3, FIRST_READ, None, false)
+                .is_some()
+        );
+        assert_eq!(client.context.lock().unwrap().carried, [(None, 7)]);
+        assert!(
+            client
+                .open_fresh_session_within(4, FIRST_READ, None, true)
+                .is_some()
+        );
+        assert!(client.context.lock().unwrap().carried.is_empty());
+        assert_eq!(served.join().unwrap().len(), 4);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2176 finding 14: a session note's lines are known by their key
+    /// words, each by its id.
+    #[test]
+    fn a_note_lines_words_are_known_by_its_id() {
+        let note = json!({"facts":[
+            {"id":7,"kind":"preference","text":"Their favourite colour is teal"},
+            {"id":8,"kind":"thread","text":"A gift for the wedding"}
+        ]})
+        .to_string();
+        assert_eq!(
+            note_words(&json!({ "note": note })),
+            [
+                (7, content_words("favourite colour teal")),
+                (8, content_words("gift wedding"))
+            ]
+        );
+        assert!(note_words(&json!({"note":"not json"})).is_empty());
     }
 
     /// #2145, Twelve's third condition: an exchange made before a forget is
@@ -8559,6 +9047,7 @@ mod tests {
             resumes: AtomicBool::new(resumes),
             fresh_tried: Mutex::new(None),
             kept_since_note: AtomicBool::new(false),
+            link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,

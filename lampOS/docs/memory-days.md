@@ -180,6 +180,71 @@ this code cannot retract words already delivered to a cloud provider.
 Conservative links may delete more derived exchanges than exact citations
 would. Exchanges that use remember/forget still stay out of the journal.
 
+With `LAMP_MEMORY_LINK_USED=on` (#2176 finding 14; off unless set) an
+exchange is linked only to the sources its own turn used, of those its turn's
+end knew (the union above, or what a held hand-on kept, #2145):
+
+- **What its turn's calls gave:** the ids a `recall` or `search` answered and
+  the id a `remember` kept, in that request's turn (the tool call carries its
+  request; the scope lease's, or the request the call was asked in). They go
+  with that request's exchange, taken when its hand-on is held or queued; a
+  turn kept out of the journal (a remember or forget) has its own dropped,
+  so they reach no other turn's.
+- **What it answered from:** a source the session was shown, a note line, a
+  recall result, a thing kept or a thread to ask about, whose words share a
+  key word with what was heard or said in the turn: lower-cased, three
+  letters or more, not a small word, a plural's `s` and a possessive's `'s`
+  off, as the turn's memory notes match (`LAMP_SECOND_MEMORY_HITS`). One
+  shared word is enough. A model's citation is not used: the call
+  interface has none, and a model may leave one out.
+- **What an earlier exchange of the session was linked to** (the
+  reviewer's P2 on #2511): once a source is linked to one exchange, it is
+  linked to every later exchange of the same session that is the same
+  person's, so a follow-up that says "it" ("why do I like it?" after a
+  recall of teal) goes with the turn it follows. It is kept for each person
+  apart, so it never reaches another person's exchange. It goes on through
+  a session that resumes the last (the provider still holds it), and ends
+  only when a session opens that presents no resumption, when the session
+  closes, and when journalling stops.
+
+What is still not linked, and so stays after a forget: an exchange before
+the thing was first used, that shares no key word with it and calls
+nothing that gives it; and after a session that presents no resumption, one
+that speaks of it only in other words, with no call of its own that gives
+it. With the switch off, every exchange
+is linked to everything the session was shown, so those went with a forget.
+
+When journalling stops (a forget among them), the words held for each
+source, what each turn's calls gave and what was carried are dropped, so
+the text of a forgotten thing is not left in the process; a session that
+resumes journalling holds only its own snapshot's words (the reviewer's P3
+on #2511).
+
+Everything else is as above: the union still bounds the session at 64
+sources and stops journalling past it, a forget still stops journalling until
+a fresh worker, and the per-turn ids are never more than the union. Nothing
+is said or sent while the context is held (#2186): the words are worked out
+before, and the filter is in memory. The memory's per-turn notes
+(`LAMP_SECOND_MEMORY_HITS`) are told as notes, never as sources, so they are
+not linked either way; a kept thing that is also a note line is linked by the
+words rule. A `remember`'s own `source_ids` (`LAMP_MEMORY_FORGET_ALL`, #1693:
+the conversation's exchanges so far) are unchanged. On lamp-06c1 (21 Oct,
+build 4510) the two exchanges after a kept colour (id 14) were journalled
+citing 14, and two observations were made from them; `forget {14}` walks
+the links to descendants, so it would have taken all four. With the switch
+they cite nothing, and the forget takes the colour alone. Tests:
+`remember::tests::an_exchange_links_to_what_its_turn_used_only_with_the_switch`
+(off: every exchange cites every source, as before),
+`remember::tests::a_linked_source_is_carried_to_the_sessions_later_turns`,
+`remember::tests::a_forget_leaves_no_words_of_what_was_forgotten`,
+`remember::tests::a_resumed_session_holds_only_its_own_words`,
+`remember::tests::a_note_lines_words_are_known_by_its_id` and
+`crates/memory/tests/voice_link_used.rs` against the real store (the
+lamp-06c1 shape: the colour gone, both exchanges and the observation kept;
+one that answered from it goes with it, one before it stays; a recall of it
+and the two "it" follow-ups after go with it, and so does what was observed
+of them).
+
 The stop is said in the voice's journal (#2176); nothing else about it
 changes. When journalling first stops, one line names why:
 
@@ -430,7 +495,8 @@ of their session ID cannot silently create a different context.
 
 This guarantee follows declared links. Callers must use `append_linked`
 with the IDs actually used in a reply; plain `append` cannot infer that
-provenance. An independently rephrased, unlinked statement is not removed
+provenance. Voice declares every ID its session was shown, or with
+`LAMP_MEMORY_LINK_USED=on` only those its turn used (above). An independently rephrased, unlinked statement is not removed
 by keyword guessing. The first builder must also discard any provider
 session or caller cache already given the deleted text before telling the
 person it is forgotten. The store cannot retract a prompt already sent

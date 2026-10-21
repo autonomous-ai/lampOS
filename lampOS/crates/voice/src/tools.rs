@@ -1210,7 +1210,7 @@ fn run_call_with_scope(
                 lease,
                 || match lease {
                     Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
-                    None => crate::remember::run(socket, call, deadline),
+                    None => crate::remember::run_of(socket, call, deadline, request),
                 },
             );
             let told = match &as_heard {

@@ -938,6 +938,10 @@ fn worker_command(
             role,
             var(crate::remember::ROOM_NOT_ASKER_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_link_used_worker_environment(
+            role,
+            var(crate::remember::LINK_USED_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1174,6 +1178,17 @@ fn memory_room_not_asker_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::ROOM_NOT_ASKER_ENVIRONMENT, "on"))
+}
+
+// An exchange linked only to what its turn used (#2176 finding 14), passed
+// the same narrow way: the exact `on`, to the two routes that journal
+// exchanges through the Days client.
+fn memory_link_used_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::LINK_USED_ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -1601,6 +1616,12 @@ mod tests {
                         "LAMP_MEMORY_ROOM_NOT_ASKER",
                         ["provider", "second"].as_slice(),
                     ),
+                    // An exchange linked to what its turn used (#2176): both.
+                    (
+                        memory_link_used_worker_environment,
+                        "LAMP_MEMORY_LINK_USED",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -1745,6 +1766,7 @@ mod tests {
                     crate::remember::ROOM_NOT_ASKER_ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
+                    crate::remember::LINK_USED_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -1867,6 +1889,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
+                    "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
@@ -1894,6 +1917,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
+                    "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
