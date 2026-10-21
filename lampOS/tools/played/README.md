@@ -39,7 +39,7 @@ Two more you can run on their own:
   `--sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN=on`, through
   `/run` drop-ins that it removes when it ends. It prints PASS or FAIL for
   each step, and hand-overs fail while it runs. A lamp whose own
-  lamp-tasks is older than #2702 (no `--sign-in-by-code`) is told so, and
+  lamp-tasks is older than #2702 (no `--sign-in-by-code` in the binary) is told so, and
   nothing is played. Give `TASKS=` an ARM64 `lamp-tasks` from the same
   artifact, and it's used for the run only. The lamp side is
   `ask-again-setup.sh`, run as root, with the stand-in's HOME given to
