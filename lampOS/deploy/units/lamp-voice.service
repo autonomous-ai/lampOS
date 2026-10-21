@@ -22,8 +22,12 @@ Group=root
 Slice=lampos-voice.slice
 WorkingDirectory=/
 UMask=0077
-# @VOICE_OPTIONS@: the measured options of this lamp (microphone, turn-taking, floors, ring ceiling).
-ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} @VOICE_OPTIONS@
+# @VOICE_OPTIONS@: the measured options of this lamp (microphone, turn-taking, floors), never the ring
+# ceiling, which the unit carries itself: the voice refuses the flag given twice.
+# --ring-channel-ceiling: the light ring's worker, as the product unit starts it. Without it no
+# ring worker runs and a lamp moved from V1 stays dark (#2396). The ring's own values (spidev3.0,
+# 32 pixels) are the board's and in crates/ring; only the ceiling is the unit's.
+ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --ring-channel-ceiling 24 @VOICE_OPTIONS@
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20
