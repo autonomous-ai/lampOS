@@ -2148,6 +2148,139 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
     assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::AsBefore);
 }
 
+/// #2602 (lamp-06c1, 22:21:49 on 21 Oct, `LAMP_OWN_LINE_KEEPS=on`): a
+/// sound let go at its deadline while the lamp's own hello waited stays
+/// that sound while it goes on. The played room talk was let go at +2.144 s,
+/// the hello's first audio came at +2.291 s, and the same talk rose again as
+/// a new candidate at +2.343 s: it is let go too, and the hello is spoken.
+/// A new sound after a gap of the wait's quiet (300 ms), speech that starts
+/// after the first audio with nothing let go before it, or the lamp's name
+/// in it, are a cut-in as before; and with the switch off nothing changes.
+#[test]
+fn a_sound_let_go_at_its_deadline_stays_that_sound_past_the_own_lines_first_audio() {
+    let mut h = Harness::new(TurnTaking::Duplex);
+    let (ticket, _answered) = crate::say::ticket_for_test("welcome-back");
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = Some(ticket);
+    }
+    let turn = h.reply.as_ref().unwrap().owner.turn();
+    // The hello begins at `h.base`; the room's sound waited from +1.041 s.
+    let at = |ms: u64| h.base + ms * 1_000;
+    let first = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: at(1_041),
+        first_read_at_us: at(981),
+        decision_deadline_us: at(2_244),
+    };
+    let on = OwnLineWait {
+        on: true,
+        heard: true,
+        ..OwnLineWait::default()
+    };
+    let waited = OwnLineWait { waited: true, ..on };
+    assert_eq!(
+        while_own_line_waits(on, h.reply.as_ref(), &first, at(1_041)),
+        WhileOwnLineWaits::Wait
+    );
+    assert_eq!(
+        while_own_line_waits(waited, h.reply.as_ref(), &first, at(2_144)),
+        WhileOwnLineWaits::LetGo("deadline")
+    );
+    // Let go at +2.144 s, its last speech in the block before.
+    let let_go = LetGoSound::new(turn, at(2_140));
+    // The talk goes on block by block through the hello's first audio.
+    let mut going_on = Some(let_go);
+    for ms in (2_150..=2_343).step_by(10) {
+        going_on = going_on.and_then(|sound| sound.heard(at(ms), true));
+    }
+    h.reply.as_mut().unwrap().had_audio = true;
+    let again = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(2),
+        trigger_sequence: 30,
+        trigger_read_at_us: at(2_343),
+        first_read_at_us: at(2_283),
+        decision_deadline_us: at(3_543),
+        ..first
+    };
+    let goes_on = |sound: Option<LetGoSound>, candidate: &crate::admission::Candidate| {
+        sound.is_some_and(|sound| sound.goes_on(turn, candidate))
+    };
+    assert!(goes_on(going_on, &again));
+    let carried = OwnLineWait {
+        let_go_goes_on: goes_on(going_on, &again),
+        ..on
+    };
+    assert_eq!(
+        while_own_line_waits(carried, h.reply.as_ref(), &again, at(2_343)),
+        WhileOwnLineWaits::LetGo("goes_on")
+    );
+    // The same sound under another turn is no longer the line's.
+    assert!(!going_on.unwrap().goes_on(turn + 1, &again));
+    // The lamp's name in it is a call, judged as before.
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait {
+                name_began_us: Some(at(2_300)),
+                ..carried
+            },
+            h.reply.as_ref(),
+            &again,
+            at(2_343)
+        ),
+        WhileOwnLineWaits::AsBefore
+    );
+    // A new sound after a gap: the talk stopped at +2.140 s, and 300 ms of
+    // quiet (the wait's `WAIT_QUIET_BLOCKS`) ends it. One that rises at
+    // +2.5 s is a cut-in as before.
+    let mut gapped = Some(let_go);
+    let mut ms = 2_150;
+    while ms < 2_440 {
+        gapped = gapped.and_then(|sound| sound.heard(at(ms), false));
+        ms += 10;
+    }
+    assert!(gapped.is_some(), "29 quiet blocks are still that sound");
+    gapped = gapped.and_then(|sound| sound.heard(at(2_440), false));
+    assert!(gapped.is_none(), "the 30th quiet block ends it");
+    let after_gap = crate::admission::Candidate {
+        trigger_read_at_us: at(2_560),
+        first_read_at_us: at(2_500),
+        ..again
+    };
+    assert!(!goes_on(gapped, &after_gap));
+    assert_eq!(
+        while_own_line_waits(on, h.reply.as_ref(), &after_gap, at(2_560)),
+        WhileOwnLineWaits::AsBefore
+    );
+    // A sound that begins later than 300 ms after the one let go stopped is
+    // no continuation even if the gap was never seen as quiet.
+    assert!(!let_go.goes_on(turn, &after_gap));
+    // Speech that starts after the first audio, nothing let go before it:
+    // a cut-in as before.
+    assert!(!goes_on(None, &again));
+    assert_eq!(
+        while_own_line_waits(on, h.reply.as_ref(), &again, at(2_343)),
+        WhileOwnLineWaits::AsBefore
+    );
+    // With the switch off: as before, whatever was let go.
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait {
+                on: false,
+                ..carried
+            },
+            h.reply.as_ref(),
+            &again,
+            at(2_343)
+        ),
+        WhileOwnLineWaits::AsBefore
+    );
+}
+
 /// #1712's B (the first builder at 06:44, `LAMP_MOTION_KEEPS_ANSWER=on`):
 /// while an answer is awaited and has not sounded, a sound that began as
 /// the body moved a joint is the lamp's own motors and takes no turn, and
