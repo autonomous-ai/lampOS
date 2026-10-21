@@ -1691,7 +1691,7 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     let (notices, models): (Vec<_>, Vec<_>) = all
         .iter()
         .partition(|model| model.path.starts_with(NOTICES));
-    assert_eq!((models.len(), notices.len()), (7, 5));
+    assert_eq!((models.len(), notices.len()), (9, 5));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
     for model in &all {
         assert!(model.path.starts_with("/opt/lampOS/"), "{}", model.path);
@@ -1724,6 +1724,23 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         include_str!("../../../deploy/product/lamp-name.service")
             .contains("--models /opt/lampOS/name/models")
     );
+    // The mesh and Blendshape V2 (#1671): placed beside YuNet and SFace at
+    // the eyes' own pins, and not passed by the product's unit, so how a
+    // face seems stays off until `--seems` is turned on.
+    for (name, pin) in [
+        ("face_mesh_v2.onnx", include_str!("../../eyes/src/mesh.rs")),
+        (
+            "face_blendshapes.onnx",
+            include_str!("../../eyes/src/blendshapes.rs"),
+        ),
+    ] {
+        let model = find(name);
+        assert_eq!(model.path, format!("/opt/lampOS/eyes/models/{name}"));
+        assert!(pin.contains(&model.sha256), "{name}");
+        assert!(!eyes.contains(name), "{name}");
+    }
+    assert_eq!(find("face_mesh_v2.onnx").bytes, 4_915_552);
+    assert_eq!(find("face_blendshapes.onnx").bytes, 1_882_583);
 }
 
 /// Where the product's voice finds its recorded lines (#1844).

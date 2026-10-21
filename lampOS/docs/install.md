@@ -983,7 +983,9 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   newer build moves each link and keeps the old folders. `useradd`,
   `systemctl` and `systemd-tmpfiles` themselves were not run.
 - No build carries the voice's turn-end model and ONNX Runtime library, the
-  eyes' two models or the name's models. `install` fetches each that is
+  eyes' four models (YuNet and SFace; Face Mesh V2 and Blendshape V2, which
+  only `--mouth-model` and `--seems-blendshapes` read, off in the product,
+  #1671) or the name's models. `install` fetches each that is
   missing (#811, from lamp-06c1) from `deploy/product/models.json`: where
   it goes, its URL, size and SHA-256, the runtime's library out of its
   pinned release archive with `tar`. Each is written under a temporary name

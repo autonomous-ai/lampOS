@@ -31,6 +31,18 @@
       "sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
     },
     {
+      "path": "/opt/lampOS/eyes/models/face_mesh_v2.onnx",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/face_mesh_v2.onnx",
+      "bytes": 4915552,
+      "sha256": "09d24504cdc51240b6ccd8c457040c7cb61ab3485e0e08696dd44ce52ed8131a"
+    },
+    {
+      "path": "/opt/lampOS/eyes/models/face_blendshapes.onnx",
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/face_blendshapes.onnx",
+      "bytes": 1882583,
+      "sha256": "68056086da2409d47891e88b7f44d331d60e3d0bc053f5ff0fd51b0915f11ddd"
+    },
+    {
       "path": "/opt/lampOS/name/models/melspectrogram.onnx",
       "url": "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/melspectrogram.onnx",
       "bytes": 1087958,

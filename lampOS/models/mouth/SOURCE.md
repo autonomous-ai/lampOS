@@ -9,7 +9,7 @@ are not enough (#1385, docs/eyes.md). Not ours: converted, not retrained.
 
 | | |
 |---|---|
-| File | `face_mesh_v2.onnx`, 4,915,552 bytes. Not in git, since a part's models come from a release (`deploy/product/models.json`). Until one carries it, `training/mouth/make.sh` makes it, and it is placed by hand |
+| File | `face_mesh_v2.onnx`, 4,915,552 bytes. Not in git, since a part's models come from a release: `models-2026-10-16` carries it with `face_mesh_v2.LICENSE.txt` beside it (22 Oct, #1671), and `lamp-update install` places it at `/opt/lampOS/eyes/models/face_mesh_v2.onnx` from `deploy/product/models.json`. `training/mouth/make.sh` makes the same file |
 | SHA-256 | `09d24504cdc51240b6ccd8c457040c7cb61ab3485e0e08696dd44ce52ed8131a` |
 | Input | `input_12`, float32 `[batch, 256, 256, 3]`: a face crop in RGB from 0 to 1, with a 25% margin and the eyes level |
 | Outputs | `Identity`, float32 `[batch, 1, 1, 1434]`: 478 landmarks, x, y and z each. The lips are 40 of them, 20 outer and 20 inner; the inner gap is points 13 and 14, and the face's height is 10 to 152. `Identity_1`, `[batch, 1, 1, 1]`, and `Identity_2`, `[batch, 1]`: the face score and a second score, not used here |
