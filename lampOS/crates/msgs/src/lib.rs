@@ -626,6 +626,46 @@ impl VoiceTone {
     }
 }
 
+/// Memory has forgotten everything it kept under a person, asked by the
+/// app or by voice (`memory/forgot`), so every other part lets its own go
+/// too: the voice's tone baselines first. The person's id only, or none
+/// when every person's was forgotten. Never a name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryForgot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person: Option<String>,
+}
+
+impl MemoryForgot {
+    pub const TYPE: &str = "lamp_msgs/MemoryForgot";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "memory/forgot";
+
+    /// Once a forget: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// A person is one of memory's ids: 1 to 32 bytes of lower-case
+    /// letters, digits, `_` and `-`, as memory keeps them.
+    pub fn check(&self) -> Result<(), &'static str> {
+        match self.person.as_deref() {
+            Some(person)
+                if !(1..=32).contains(&person.len())
+                    || !person.bytes().all(|byte| {
+                        byte.is_ascii_lowercase()
+                            || byte.is_ascii_digit()
+                            || byte == b'_'
+                            || byte == b'-'
+                    }) =>
+            {
+                Err("a person is one of memory's ids")
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
 /// The voice's tone of each line, apart from the first topics.
 pub fn tone_topics() -> Vec<(&'static str, Declaration)> {
     vec![(VoiceTone::TOPIC, VoiceTone::declaration())]
@@ -1387,7 +1427,10 @@ pub fn keeper_topics() -> Vec<(&'static str, Declaration)> {
 
 /// The memory's typed rules (#813), separate from the original seventeen.
 pub fn memory_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(Rules::TOPIC, Rules::declaration())]
+    vec![
+        (Rules::TOPIC, Rules::declaration()),
+        (MemoryForgot::TOPIC, MemoryForgot::declaration()),
+    ]
 }
 
 /// The first sign of each hearing of the lamp's name (`name/rising`, #782),
@@ -1809,6 +1852,35 @@ mod tests {
             declaration_of(VoiceTone::TOPIC),
             Some(VoiceTone::declaration())
         );
+    }
+
+    #[test]
+    fn a_forget_names_one_of_memorys_ids_or_every_person() {
+        round_trip(
+            &MemoryForgot {
+                person: Some("p-0123456789abcdef".into()),
+            },
+            "{\"person\":\"p-0123456789abcdef\"}",
+        );
+        round_trip(&MemoryForgot { person: None }, "{}");
+        assert_eq!(MemoryForgot::declaration().kind, Kind::Event);
+        assert_eq!(
+            declaration_of(MemoryForgot::TOPIC),
+            Some(MemoryForgot::declaration())
+        );
+        for person in ["p-0123456789abcdef", "r-0123456789abcdef", "everyone"] {
+            let told = MemoryForgot {
+                person: Some(person.into()),
+            };
+            assert!(told.check().is_ok(), "{person}");
+        }
+        for person in ["", "P-ABC", "a name", &"x".repeat(33)] {
+            let told = MemoryForgot {
+                person: Some(person.into()),
+            };
+            assert!(told.check().is_err(), "{person:?}");
+        }
+        assert!(MemoryForgot { person: None }.check().is_ok());
     }
 
     #[test]

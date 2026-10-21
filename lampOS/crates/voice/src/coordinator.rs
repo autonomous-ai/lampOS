@@ -4302,6 +4302,41 @@ thread_local! {
     /// memory id, in place of the eyes' file.
     static TEST_TONE_PERSON: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's forgets from memory (`memory/forgot`), one for each
+    /// End in turn, told just before it: `None`, nothing at that End.
+    static TEST_TONE_FORGOT: std::cell::RefCell<VecDeque<Option<String>>> =
+        const { std::cell::RefCell::new(VecDeque::new()) };
+}
+
+/// Memory has forgotten everything under `person` (`memory/forgot`), or
+/// every person's (`None`): their tone baseline goes, or every one, and
+/// memory's "everyone" is the room's. Anything else it forgot (a rules
+/// scope, `r-`) is no voice. The record never names the person.
+fn tone_forgotten(
+    baselines: &mut crate::voice_tone::Baselines,
+    person: Option<&str>,
+    trace: &mut SessionState,
+    at_us: u64,
+) -> Result<()> {
+    let whose = match person {
+        None => {
+            baselines.forget_all();
+            None
+        }
+        Some("everyone") => {
+            baselines.forget(None);
+            Some(crate::voice_tone::Whose::Room)
+        }
+        Some(person) if lamp_msgs::known::is_person_id(person) => {
+            baselines.forget(Some(person));
+            Some(crate::voice_tone::Whose::Person)
+        }
+        Some(_) => return Ok(()),
+    };
+    record(
+        trace,
+        json!({"kind":"voice_tone_forgot","all":person.is_none(),"whose":whose,"by":"memory","at_us":at_us}),
+    )
 }
 
 /// A line's tone told, in the session record and on the bus: with its
@@ -4710,6 +4745,10 @@ fn conversation_with_gate(
     let mut tone_person: Option<String> = None;
     let mut tone_out = tone_on
         .then(crate::bus_out::ToneOut::from_environment)
+        .flatten();
+    // Memory's forgets, for the tone baselines (`memory/forgot`).
+    let mut forgot_in = tone_on
+        .then(crate::bus_out::ForgotIn::from_environment)
         .flatten();
     // A line's reading, waiting for its words: its turn and when it ended.
     let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
@@ -5977,7 +6016,7 @@ fn conversation_with_gate(
                         }
                         record(
                             trace,
-                            json!({"kind":"voice_tone_forgot","all":all,
+                            json!({"kind":"voice_tone_forgot","all":all,"by":"words",
                                 "whose":(!all).then_some(if tone_person.is_some() {
                                     crate::voice_tone::Whose::Person
                                 } else {
@@ -7786,6 +7825,18 @@ fn conversation_with_gate(
                         if let Some((turn, reading)) = tone_pending.take() {
                             tell_tone(trace, tone_out.as_mut(), turn, reading, None)?;
                         }
+                        #[cfg(test)]
+                        if let Some(person) = TEST_TONE_FORGOT
+                            .with(|told| told.borrow_mut().pop_front())
+                            .flatten()
+                        {
+                            tone_forgotten(
+                                &mut tone_baselines,
+                                Some(&person),
+                                trace,
+                                monotonic_us(),
+                            )?;
+                        }
                         // Whose it is: the known person at the lamp, read
                         // from the eyes' small file as the hello reads it.
                         tone_person = crate::known_faces::known_from_environment()
@@ -9209,6 +9260,13 @@ fn conversation_with_gate(
         }
         if let Some(arrival) = arrival.as_mut() {
             arrival.watch(clock);
+        }
+        // Memory has forgotten someone, asked by the app or by voice: their
+        // tone baseline goes too (`memory/forgot`).
+        if let Some(forgot) = forgot_in.as_mut() {
+            for person in forgot.forgotten(clock) {
+                tone_forgotten(&mut tone_baselines, person.as_deref(), trace, clock)?;
+            }
         }
         // A hello that is due and could be begun; with
         // `LAMP_HELLO_ASKS_POLICY=on` the policy is asked first and it

@@ -195,6 +195,7 @@ fn health_costs_and_socket_requests_with_identical_synthetic_stores() {
             log: String::new(),
             storage_fault: false,
             wrote: false,
+            forgot: None,
         };
         let p99 = measure(
             json!({"measurement":"health_bookkeeping","backend":backend,"health":true,"p99_target_ns":1_000_000,"boundary":"State.begin classification, answered_at, optional Days count read, State.finish; excludes store.answer, legacy scans and bus work"}),

@@ -2552,6 +2552,56 @@ fn a_known_persons_baseline_goes_when_they_ask_to_forget_their_face() {
     );
 }
 
+/// The first builder at 10:5x on #2467: memory has forgotten a known person
+/// (`memory/forgot`, from the app or by voice), so their tone baseline goes.
+/// Enrolled again under the same name, their next line starts a fresh one.
+/// A rules scope memory forgot (`r-`) is no voice, and changes nothing.
+#[test]
+fn a_name_memory_forgot_starts_a_fresh_tone_baseline_when_enrolled_again() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let rules = format!("r-{}", &person[2..]);
+    let lines = |forgot: Option<String>| {
+        TEST_VOICE_TONE.with(|on| on.set(true));
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+        TEST_TONE_FORGOT.with(|told| *told.borrow_mut() = VecDeque::from([None, forgot]));
+        let run = run(Script {
+            only: true,
+            second: false,
+            voiced: true,
+            second_hears: Some("What a nice day"),
+            speak_again: Some(When::Settled(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_TONE_FORGOT.with(|told| told.borrow_mut().clear());
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+        TEST_VOICE_TONE.with(|on| on.set(false));
+        run.assert_clean();
+        let lines: Vec<_> = run
+            .events("local_endpoint")
+            .into_iter()
+            .map(|end| end["tone"]["baseline_lines"].clone())
+            .collect();
+        let forgot: Vec<_> = run
+            .events("voice_tone_forgot")
+            .into_iter()
+            .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+            .collect();
+        (lines, forgot, run.summary())
+    };
+    let (kept, none, summary) = lines(None);
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+    let (fresh, forgot, summary) = lines(Some(person.clone()));
+    assert_eq!(fresh, [json!(1), json!(1)], "{summary}");
+    assert_eq!(forgot, [(json!("memory"), json!("person"))], "{summary}");
+    let (kept, none, summary) = lines(Some(rules));
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+}
+
 /// (h) Gemini is Ready 1 s after the voice starts and the question began
 /// before that: it is held, then Gemini's, and the second route hears none
 /// of it (lampOS#779).

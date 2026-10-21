@@ -174,6 +174,30 @@ Neither observation acknowledges Event delivery, a flushed downstream log,
 publisher cleanup or worker exit. A controller must account for those real
 participants separately before advancing time or claiming evidence.
 
+## Forgets told on the bus (`memory/forgot`)
+
+With `--bus-root`, each `forget_all` that was done is told on
+`memory/forgot` (`lamp_msgs::MemoryForgot`), so the lamp's other parts let
+what they keep under that person go too (the first builder, 10:5x on #2467).
+That covers a forget asked by the app (lamp-cloud's `faces.rs`) and one
+asked by voice (`forget_everything`).
+- **What it says:** the person's id only (`p-…`, `r-…` for their rules,
+  `everyone` for the room's), or no person for a forget of every person.
+  Never a name or anything kept.
+- **When:** after the asker has its answer, so a forget never waits for the
+  bus, and whether or not the asker took the answer, since the forget was
+  done either way.
+- **Not told:** a refused forget, a `forget_last`, a forget of one thing,
+  and every other request.
+- **A bus that can't be written to:** the journal says "a forget could not be
+  told on the bus (memory/forgot)", and the publisher is made again at the
+  next forget. Without `--bus-root`, nothing is told.
+- **Its readers:** the voice's tone baselines ([voice-tone.md](voice-tone.md)),
+  with `LAMP_VOICE_TONE=on`.
+- **Tests:** `tests/forgot.rs` (the real server with a bus: a person's
+  forget, every person's, and three that aren't told), and each protocol's
+  `only_a_forget_all_that_was_done_says_whose`.
+
 ## On the disk
 
 This layout is the default. Enabling `--memory-days` imports it into one
