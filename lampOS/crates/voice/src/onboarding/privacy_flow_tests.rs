@@ -117,7 +117,7 @@ fn deliver(walk: &mut Onboarding, token: u64, now: u64) {
     assert!(
         walk.take_privacy_invitation(token, now)
             .unwrap()
-            .contains("microphones and camera")
+            .contains("turn it off, then on again")
     );
     assert!(walk.bind_privacy_invitation(token, boot, 4));
     walk.privacy_invitation_finished(boot, 4, true, now);
@@ -181,10 +181,14 @@ fn cancellation_retries_once_and_model_success_is_refused() {
     let token = offer(&mut walk, T, 1);
     let boot = BootId::new([7; 16]).unwrap();
     walk.take_privacy_invitation(token, T).unwrap();
-    walk.bind_privacy_invitation(token, boot, 5);
+    assert!(walk.bind_privacy_invitation(token, boot, 5));
     walk.privacy_invitation_finished(boot, 999, true, T);
-    assert!(walk.privacy_flow.attempt.is_none());
+    assert!(
+        walk.privacy_flow.attempt.is_some(),
+        "armed as the turn began"
+    );
     walk.privacy_invitation_finished(boot, 5, false, T);
+    assert!(walk.privacy_flow.attempt.is_none());
     assert_ne!(offer(&mut walk, 2 * T, 2), token);
     let call = ToolCall {
         id: "proof".into(),
@@ -306,11 +310,16 @@ fn an_open_fresh_receipt_before_the_bound_is_offered_as_usual() {
 }
 
 #[test]
-fn a_close_read_just_before_arming_is_offered_again_not_failed() {
+fn a_close_before_the_invitation_began_is_not_its_answer() {
     let (_store, mut walk) = walk();
     let token = offer(&mut walk, T, 1);
-    // The open read (stamped T) is still fresh when the invitation's end is
-    // processed 40 ms later; the slide was read 10 ms before that.
+    // Offered but its words not yet taken: nothing is armed to answer.
+    assert!(
+        walk.take_close_candidate(&receipt(2, T + 10_000, true), T + 10_000)
+            .is_none()
+    );
+    // The open read (stamped T) is still fresh when the invitation begins
+    // 40 ms later; the slide was read 10 ms before that.
     deliver(&mut walk, token, T + 40_000);
     let checkpoint = walk
         .take_close_candidate(&receipt(2, T + 30_000, true), T + 41_000)
@@ -615,4 +624,46 @@ fn a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle() {
     let mut second = store.cycle(3 * T, 3);
     second.drain_storage_for_test(3 * T);
     assert_eq!(second.kept().steps["who_you_are"].outcome, Outcome::Skipped);
+}
+
+// The lead's 52e6 run (21 October): the person closed the switch while the
+// lamp was still saying the invitation, and it was offered again.
+#[test]
+fn a_close_while_the_invitation_is_said_counts_without_another_offer() {
+    let (store, mut first) = walk();
+    let token = offer(&mut first, T, 1);
+    let boot = BootId::new([7; 16]).unwrap();
+    first.take_privacy_invitation(token, T).unwrap();
+    assert!(first.bind_privacy_invitation(token, boot, 4));
+    // No turn end: the mute cuts the words and ends this voice cycle.
+    let checkpoint = first
+        .take_close_candidate(&receipt(2, T + 10_000, true), T + 10_000)
+        .unwrap();
+    assert!(!checkpoint.is_discard());
+    assert!(matches!(
+        store.owner.client().persist_closed(checkpoint).unwrap(),
+        storage::Submit::Queued(_)
+    ));
+    drop(first);
+    let mut second = store.cycle(T + 20_000, 3);
+    pump(&mut second, T + 20_000);
+    second.tick(T + 20_000, START_QUIET_US, false, false, face(), true);
+    second.drain_storage_for_test(T + 20_000);
+    assert_eq!(second.kept().steps["privacy"].outcome, Outcome::Done);
+    assert_eq!(second.kept().privacy_invitation_tries, 1);
+}
+
+#[test]
+fn the_invitation_is_one_short_sentence_with_the_location() {
+    let (_store, mut walk) = walk();
+    let token = offer(&mut walk, T, 1);
+    let note = walk.take_privacy_invitation(token, T).unwrap();
+    let said = note.split('"').nth(1).unwrap();
+    assert_eq!(
+        said,
+        "Try my privacy switch at its verified profile location: turn it off, then on again."
+    );
+    // About 3-5 s spoken; one sentence.
+    assert!(said.split_whitespace().count() <= 16);
+    assert_eq!(said.matches('.').count(), 1);
 }

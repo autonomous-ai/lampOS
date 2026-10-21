@@ -39,7 +39,9 @@ pub(crate) struct Acquisition {
 pub(crate) struct Invitation {
     pub voice_boot: BootId,
     pub turn: u64,
-    /// The agreed attributable delivery boundary, not model text or admission.
+    /// When the invitation's turn began (its words taken for that turn), not
+    /// model text or admission: a close after it, even while the words are
+    /// still being said, is the person's answer. The name is the stored one.
     pub delivered_at_us: u64,
 }
 
