@@ -974,3 +974,32 @@ been in since 20 Oct)
   Posted on [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6317036172).
   No lamp run yet — `LAMP_SKILLS_STORE` isn't live anywhere; offered
   to help Mobile's run on 0c89 with the test key.
+
+## 21 Oct — a Lamp 2's offline record wins, and a non-bug checked
+
+- The first builder's 20:22 ask, two small ones, after Backend3's
+  #2636 (lamp-cloud's offline last will, ~90s):
+  1. Which version field the app reads for a Lamp 2 — checked, no
+     change needed. `record.otaVersion`/`probe?.firmwareVersion` are
+     already generic "whatever this device last reported" fields;
+     the Dart comments calling them "the os-server version" are an
+     Intern-era naming leftover, not a real restriction, and lampOS's
+     own `system.info` sends "the installed build" into exactly that
+     slot (`docs/cloud.md`'s kinds table). Said so rather than open a
+     PR that would duplicate working code.
+  2. The device list's Lamp 2 presence used only this device's own
+     live probe (`osPresenceOf`), whose own doc comment explains why
+     it keeps a stale "online" verdict rather than flicker — exactly
+     what made #2636's fast will invisible to the app. Added
+     `lampRecordConfirmedOffline()` (a pure function, same reasoning
+     as `osPresenceOf`/`isLampV2Page`): the record's own
+     confirmed-offline wins outright, online/starting stay on the
+     probe unchanged. Scoped to Lamp 2 only — `useLampDeviceDetail.ts`
+     documents web trusting the probe over the backend for Lamp by
+     design, and Intern's own backend tracking isn't tied to this new
+     last-will mechanism, so I didn't touch either.
+  3. `flutter test`: 15/15 on device presence (5 new). Full suite
+     885/0.
+  4. Opened [ecm-sds-mobile#31](https://github.com/autonomous-ai/ecm-sds-mobile/pull/31)
+     onto `v3`. Reported both on
+     [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6317296592).
