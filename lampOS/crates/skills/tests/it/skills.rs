@@ -10719,6 +10719,25 @@ fn unplug_words_are_the_granted_skills_own() {
     }
 }
 
+/// #940's second move: guard mode's words are its own `[watch.words]`. A
+/// copy from before them, which a lamp keeps since guard mode is
+/// installable, says the built-in ones for one release, marked so
+/// lamp-skills' journal says so.
+#[test]
+fn a_watch_from_before_its_words_says_the_built_in_ones_for_one_release() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = include_str!("../../../../skills/guard-mode/skill.toml");
+    let own = load(&skill_with(dir.path(), "guard-mode", toml)).unwrap();
+    let own = own.watch.unwrap();
+    assert!(!own.built_in_words);
+    assert_eq!(own.words, lamp_skills::watch::Words::built_in());
+    let older = &toml[..toml.find("\n# What it says (#940)").unwrap()];
+    let older = load(&skill_with(&dir.path().join("older"), "guard-mode", older)).unwrap();
+    let older = older.watch.unwrap();
+    assert!(older.built_in_words);
+    assert_eq!(older.words, lamp_skills::watch::Words::built_in());
+}
+
 #[test]
 fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
     let dir = tempfile::tempdir().unwrap();
