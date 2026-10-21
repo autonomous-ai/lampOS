@@ -1187,7 +1187,7 @@ fn run_call_with_scope(
             let model = call;
             let dated = crate::remember::on::call_as_heard(call, words.as_deref());
             let call = dated.as_ref();
-            let as_heard = crate::remember::heard::call_as_heard(call, request, heard);
+            let as_heard = crate::remember::heard::call_as_heard(call, request, heard, lease);
             let call = as_heard.as_ref().map_or(call, |(call, _)| call);
             // With `LAMP_MEMORY_REPLACES`, a `remember`'s journal line counts
             // its words against those heard in its line (#2510).
