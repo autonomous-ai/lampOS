@@ -29,6 +29,14 @@ against lamp-06c1.
   fails, or a login the broker refuses, is tried again after a wait that
   doubles from 1 s to a minute, and the journal hears of it once, not on
   every try.
+  With `LAMP_CLOUD_OFFLINE_WILL=on`, each connection also leaves the broker a
+  will: the identity with `"type": "offline"` on `fd_channel`, QoS 1, not
+  retained, said 30 s after the connection is lost (`WILL_DELAY_S`, MQTT
+  v5's will delay), so a reconnect within it says nothing. The backend takes
+  it as the lamp gone, and its next ping or `info` as back. Without it, the
+  backend marks a lamp offline 5 to 8 min after its last ping or `info`
+  (Backend3 on #2602, 21 Oct 19:4x). The will's `time` is when the
+  connection was made.
 - **Answers on `fd_channel`, at QoS 1, in V1's shapes** (`mqtt.md`): every
   reply carries `device` (`lamp`), `generation` (`lamp-v2`), `type`, `version`
   (the installed build, `<sequence>+<commit>`), `id`, `mac` (the lamp's
