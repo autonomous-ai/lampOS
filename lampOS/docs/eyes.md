@@ -1394,6 +1394,17 @@ newest, whichever reader that was.
   tract. It comes from the same MediaPipe download as the mouth's mesh
   (`models/blendshapes/SOURCE.md`, made by `training/mouth/make.sh`). No
   build or release carries it yet.
+- **The brows' long face (`LAMP_SEEMS_BROW_LOW=on`, #2132; off unless
+  set).** With it, a face is also `negative` with the brows drawn down
+  (`browDown`, left and right's mean) at or over 0.80 and the smiles under
+  0.3, its confidence the brows' (`blendshapes::judge_with`,
+  `BROW_LOW_FROM`, `BROW_LOW_SMILE_UNDER`). It's there because the frowns
+  never rise on a long face. Offline, through this pipeline on the screen
+  man's clips at 320 across (Ten on #2602, 22 Oct 02:1x), the frowns scored
+  0.03 at most on 70 long-face frames, while the brows held a median of
+  0.84–0.94 there against 0.63–0.72 on his smiles and resting face. This
+  line named 33 of the 70 and none of 50 others. It's one generated face,
+  so the line is authored, for the real person's labelled session to set.
 - **A far face gets no read** (Ten on #2602, 22 Oct 02:4x). One smile frame
   of a screen face, shrunk, reads smile 0.97 with the eyes 14.2 px apart,
   0.87 at 9.9 px and 0.18 at 7.0 px (`unsure`). On lamp-75c9 a screen
