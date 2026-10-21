@@ -1,0 +1,12 @@
+diff --git a/lampOS/crates/voice/src/provider_worker.rs b/lampOS/crates/voice/src/provider_worker.rs
+index 44d4f71c0..0bcbc9c8d 100644
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -2477,7 +2477,6 @@ async fn serve_with_visual<C: Connect>(
+                     match &notice {
+                         Ok(notice) => {
+                             if let Some(lineage) = answer.observe(notice)
+-                                && !reminder_origin
+                                 && provider.live_session() == Some(lineage.session)
+                                 && !intake.handoff.retired(lineage.request.get())
+                                 && !desk.declined(lineage.request)

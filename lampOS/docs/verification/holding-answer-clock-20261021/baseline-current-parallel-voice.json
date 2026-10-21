@@ -1,0 +1,15 @@
+{
+  "base": "bc2f62fca65dac6f01fcf91fec878fb3eb8d5eee",
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-q",
+    "-p",
+    "lamp-voice"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 316.014,
+  "log": "baseline-current-parallel-voice.log"
+}

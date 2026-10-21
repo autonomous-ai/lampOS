@@ -192,10 +192,13 @@ async fn a_substantive_continuation_after_generation_end_prevents_a_holding_obse
     rig.stop().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies() {
     use std::os::unix::net::UnixListener;
 
+    // Wait for the shared worker state before starting the scenario watchdog.
+    let _one = one_thread();
+    let _clock = logical_clock();
     let home = crate::process::SessionDirectory::create().unwrap();
     let executive = UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET)).unwrap();
     executive.set_nonblocking(true).unwrap();

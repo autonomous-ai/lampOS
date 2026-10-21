@@ -1,0 +1,9 @@
+{
+  "base": "88297758e2fc5c04a6d74fdb50d3143185d66903",
+  "branch": "tests/1569-holding-answer-clock",
+  "files": {
+    "lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs": "1af78b07ab96c0fb502cce7f02ea48e31b82f45961dcecccdc986d69971202ea",
+    "lampOS/docs/voice-test-fixtures.md": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14"
+  },
+  "publication_base": "bc2f62fca65dac6f01fcf91fec878fb3eb8d5eee"
+}

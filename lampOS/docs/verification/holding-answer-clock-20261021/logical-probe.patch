@@ -1,0 +1,28 @@
+diff --git a/lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs b/lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs
+index 2e9c307ef..bd0f2cb6b 100644
+--- a/lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs
+@@ -192,10 +192,13 @@ async fn a_substantive_continuation_after_generation_end_prevents_a_holding_obse
+     rig.stop().await;
+ }
+ 
+-#[tokio::test]
++#[tokio::test(start_paused = true)]
+ async fn a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies() {
+     use std::os::unix::net::UnixListener;
+ 
++    // Wait for the shared worker state before starting the scenario watchdog.
++    let _one = one_thread();
++    let _clock = logical_clock();
+     let home = crate::process::SessionDirectory::create().unwrap();
+     let executive = UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET)).unwrap();
+     executive.set_nonblocking(true).unwrap();
+@@ -260,6 +263,8 @@ async fn a_reminders_holding_words_grant_nothing_and_the_next_heard_request_stil
+     assert_eq!(rig.snapshot.camera_permission(), Permission::Denied);
+     assert_eq!(rig.snapshot.owner(), Some(reminder));
+ 
++    // Temporary reproduction probe: deschedule past the fixture's input lease.
++    std::thread::sleep(Duration::from_millis(150));
+     rig.owner.complete_turn(real_time(), reminder).unwrap();
+     rig.publish();
+     let next = rig.speak(&mut dial, false, true).await;

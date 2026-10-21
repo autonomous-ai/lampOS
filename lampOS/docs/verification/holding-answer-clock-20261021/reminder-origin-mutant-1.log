@@ -1,0 +1,16 @@
+
+running 1 test
+
+thread 'provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies' (684235209) panicked at crates/voice/src/provider_worker/tests/holding_answer.rs:248:5:
+[Transcript { request: Some(1), text: "Let me think.", finished: false }, HoldingAnswer { request: 1, session: 1 }, TurnComplete { request: 1, idle: true }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies --- FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3000 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

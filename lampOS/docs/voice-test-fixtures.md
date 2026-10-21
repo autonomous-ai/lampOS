@@ -175,6 +175,26 @@ one request with audio blocks 76 through 290, one early end, no abandoned
 request and 48 speaker chunks. These tests do not measure the lamp's 50 ms
 privacy response.
 
+## Holding-answer reminder ordering
+
+The provider-worker scenario
+`a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies`
+runs on a paused Tokio runtime and the existing `logical_clock()` fixture
+(#1569, row 77). It takes the shared worker-state lock before starting the
+scenario watchdog, so waiting for another test does not consume that budget.
+The rig's heartbeat, owner and worker advance together in 2 ms ticks. A host
+pause between the reminder's last heartbeat and `complete_turn` therefore
+cannot expire the fixture's unchanged 100 ms input leases.
+
+The scenario still completes the reminder through the real turn controller
+before admitting the next heard request. It checks that the reminder grants
+no holding-answer observation, executive call or camera permission, and that
+the next heard request produces exactly one holding-answer observation with
+its own request and session. Host watchdogs and channel operations remain
+real. This is test-ordering evidence, not a measurement of lamp latency or
+privacy response. The [verification record](verification/holding-answer-clock-20261021/README.md)
+keeps the host-pause controls, reminder-origin mutation and local gate results.
+
 ## Actual processes and cleanup
 
 Child startup, exit observation and the shared shutdown watchdog keep real
