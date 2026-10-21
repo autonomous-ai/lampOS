@@ -1255,6 +1255,7 @@ fn second_route_worker_environment(
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+        crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -1323,6 +1324,7 @@ mod tests {
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
+            crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -1712,6 +1714,7 @@ mod tests {
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
+                    || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -1834,6 +1837,7 @@ mod tests {
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_TASKS_NAMED_ASK=on",
+                    "LAMP_TURNED_SPEAKING=on",
                 ],
             ),
             (
