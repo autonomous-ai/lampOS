@@ -4,6 +4,37 @@
 
 Newest first. Times from `date` (+07).
 
+11:50 Merged #2477 (Eighth, follow-up of my P3s on #2307/#2309) as 80fce0bb7
+11:50 #2439: asked Reviewer-lead to refile under rule 3 (rebase asked 10:19); #2446 waits behind it.
+11:42 Merged #2480 (Tests, CI builds only what changed) as c95450f62
+11:41 #2480 (Tests, CI builds only what changed, #1806): first read, no finding, my #2465 P3 taken; mine.
+11:38 Merged #2484 (El, own-keys tests, #2094) as d994b13e5
+11:34 #2475 (Sixth): second commit (laugh bar 0.3->0.05 from the lamp's own scores) reads right, fixtures carry nothing of anyone; fold to one; first builder's.
+11:31 #2484 (El, own-keys endpoint and error-body tests, #2094): first read, no finding; mine on green ARM64.
+11:30 #2485 (Migrate, keeper drops the pins' privacy section for the generic controls): first read; keeper.md:361 needs privacy; P3 lamps prepared before keep the bad file; first builder's (privacy).
+11:29 Merged #2474 (Tests, #1569 rows 59-61) as c42936092
+11:29 #1948 (Seventh's camera receipt, Reviewer-lead's rebase over #2448): reads right, no new finding; conflicts again with lamp-voice (eyes main.rs USAGE vs #2464); first builder's.
+11:28 #2474 (Tests, three lamp-skills test races, #1569 rows 59-61): first read, no finding; merging.
+11:27 #2460 (Third): both P3s closed on f22671142; first builder's.
+11:26 #2137 (Eighth, onto #1712, sign-in by spoken code): re-read of 2fe0bb69f; P2 1 and five P3s closed; P2 2 stands narrower (after a Live reconnect the session id changes, so 'what was the code?' leaves unheld); first builder's.
+11:25 #2481 (Migrate, package-binaries list checked in CI): first read; ARM64 red on lamp-seems-measure (from #2464) unclassified; P3 grep-parsed JSON; mine once green.
+11:24 #2428: Reviewer-lead's rebase 20137fa28 same patch; conflicts again with #1712's e1410041b in switches.md.
+11:23 Merged #2473 (Tests, lamp-cloud reports records kept) as 707e02c30
+11:22 #2473 (Tests, #2458 refiled with both P3s): read, closed, no finding; merging.
+11:21 Merged #2470 (Tests, #1569 row 64) as 53626b109
+11:20 #2470 (Tests, the air's note test on its own clock, #1569 row 64): first read, no finding; mine.
+11:20 #2466 (Thirteen, onto #1712, the look walk = #2280 cherry-picked): late first read; same patch as #2280; P2 its own test the_person_speaking_stops_the_walk fails on ARM64 (a race on a block count); first builder's.
+11:16 #2475 (Sixth, onto #1712, joys-scores tool fix + KEEP_DIR): first read, no finding; tool test 15/15, new checks fail on the old script; first builder's.
+11:12 Merged #2465 (Tests, CI caches saved only by lamp-voice) as 215ee4325
+11:10 Merged #1389 (Ten, self-test head move) as f11099bf8
+11:10 #2478 (Reviewer-lead's rebase of #1699, unplug): same patch as ab4b7f583, 50 files; first builder's.
+11:08 #2477 (Eighth, follow-up of my P3s on #2307/#2309, tests+docs): first read, all closed, no new finding; mine after gate + ARM64.
+11:00 #2458: held at Tests' ask (10:58), taking P3 1 first; #2137 (Eighth) re-read of 1f3a7518b started.
+10:59 #2429 (Sixth): feea3d819's fix (a test-only LAMP_SKILLS_ANY_ASKER in the root helper's own env) reads right; two P3s (no switches.md row; prefer in-process tests, no bypass); first builder's.
+10:57 #2458 (Tests, lamp-cloud reports records kept, #1505): first read, no P1/P2, two P3s (queue state's boot/notes written empty; updates.md's list); mine after gate.
+10:56 #2449 (twelve, onto #1712): re-read of fc1577f87, three paths of my P2 closed; the P2 stands narrower (the held line is filed as A's memory at the turn's end; Who was here's yes/no missing from the guard); for the first builder.
+10:55 #2468 (Seventh, onto #1712, a trusted session's hold for another voice): first read, no P1/P2, three P3s (docs x2, tests); stacked on #2428, needs a rebase; for the first builder.
+10:55 #1389 (Ten, self-test head move: a body that stops mid-move is not_checked): first read, no P1/P2, two P3s (a stop in a window's last second still ends red; the stop report loses its reason, older); mine after gate.
 10:54 #2464 (Reviewer-lead's rebase of #2306): same patch as ac7da1a5c, checked file by file; merge left to Reviewer-lead.
 10:53 #2467 (Fourth, onto #1712): first read, #2457's patch folded, no P1/P2; for the first builder (a person's voice baseline).
 10:52 #2460 (Third, onto #1712): first read, no P1/P2, two P3s (tests don't pin "a hand's sleep only" or the route's wire; docs); for the first builder (the privacy indicator's ring).
