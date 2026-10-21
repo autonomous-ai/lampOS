@@ -105,3 +105,6 @@ Ready for lamp-voice: yes (#2514), once its ARM64 run is green
   "add-ons are off on this lamp". Reviewer-two leaves the shared message
   type to the reviewer and the first builder. openharness#1485 is approved
   on re-review; it waits for a repo admin to approve its held CI run.
+- 14:5x: openharness#1485 merged as `3f3922e52` (the Harness half, CLI only,
+  unreleased). Its re-review's two doc notes are openharness#1488. Told the
+  first builder on #1722.
