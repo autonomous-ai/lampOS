@@ -1,0 +1,22 @@
+{
+  "run": 39650087675,
+  "head": "e61ca8015cb428fe2cc8eaf2cf347a57cc00660e",
+  "checkout_log": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T18:09:33.5571324Z HEAD is now at 6e9592e Merge e61ca8015cb428fe2cc8eaf2cf347a57cc00660e into 789f1f609c49537175365e17a10b2e6eefda9eed",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T18:19:20.7761014Z      Summary [ 161.423s] 9765 tests run: 9765 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.047,
+      "binary": "lamp-memory::it",
+      "test": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.524,
+      "binary": "lamp-memory::it",
+      "test": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled"
+    }
+  ],
+  "checkout": "6e9592e58f4f51f024b708b2758712a874ce9ac3",
+  "integration_base": "789f1f609c49537175365e17a10b2e6eefda9eed"
+}

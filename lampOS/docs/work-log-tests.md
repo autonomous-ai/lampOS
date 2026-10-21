@@ -1,5 +1,40 @@
 # Tests work log
 
+## 2026-10-22 01:23:25 +0700 — memory ready on ARM64; Voice bus controls passed
+
+Ready for lamp-voice: [#2703](https://github.com/autonomous-ai/lampOS/pull/2703)
+yes, pending review, at `e61ca8015cb428fe2cc8eaf2cf347a57cc00660e`.
+[ARM64 #5238](https://github.com/autonomous-ai/lampOS/actions/runs/39650087675)
+passed in 10m44s: 9,765 passed (one leaky), 63 skipped, nextest 161.423 s,
+plus doc and own-harness checks. Its checkout merges that PR head onto
+`789f1f609`; [the extracted rows record both commits](verification/memory-completion-20261022/arm64-after-5238.json).
+Health / held rule: 0.047 / 1.524 s, versus full-main #5220's 1.014 /
+1.731 s before-only. Runner/base differences and the original missed Mac
+targets remain in the PR. No claim about lamp latency or whole-job speed.
+[Linux Clippy #1247](https://github.com/autonomous-ai/lampOS/actions/runs/39650087734)
+passed in 2m46s. [Ready result posted on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6323346072).
+
+The next branch `tests/1806-voice-bus-ready` has passed all 24 exact before/
+after invocations at base `789f1f609`. Warm sums of four separate cases are
+about 1.75 -> 0.72 s; the first state invocation remains slow, 2.3455 ->
+2.0842 s. Only four 250 ms startup sleeps are removed: typed subscription
+already bound and named each socket, and the first publication scans
+synchronously. Original timestamps, event arrays/tuples, 30/100 ms drains,
+500 ms receive bound and separate real silence/lease case are unchanged.
+Four controls compiled and failed their original assertions: state and room
+at the exact repeat boundary, swapped heard/said topics, and leaked
+function-call text. Source restored and static review found no blockers.
+Fmt and strict all-target Clippy for Voice and eleven transitive dependents
+passed. The serial Voice suite and then dependent suites are the remaining
+local gates before commit/push; no readiness claim for that working branch.
+
+The next Linux-only self-test candidate can be audited on this Mac with a
+temporary test-only fixed boot UUID and enabled existing tests, removed
+before publication. Such a harness would not prove Linux boot handling,
+Linux scheduling, ARM64 performance or physical head behavior; native CI
+still owns final platform validation. No implementation of it yet. No
+ARM64 build on the Mac or device access. #1806 remains open.
+
 ## 2026-10-22 01:12:22 +0700 — memory completion pushed as #2703; Voice bus startup batch begun
 
 Ready for lamp-voice: [#2703](https://github.com/autonomous-ai/lampOS/pull/2703)
