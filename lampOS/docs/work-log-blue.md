@@ -149,3 +149,35 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   lamp-msgs, lamp-update, lamp-cloud, lamp-voice-eval; workspace build and
   `--no-run`. Next: a lamp-75c9 run of the two examples on #2553's ARM64
   build, watched with the laptop's camera and mic.
+
+## 2026-10-21 — #2553: the reviewer-lead's read, and a correction
+
+- **Correction:** the first builder had answered both #2530 questions at
+  15:1x (comment 6311216795); I missed it and said they were open. Said so
+  on #2530 at 16:00. The answers:
+  - a `crates/mood` nudge input is yes: ±0.1 inside the clamps, held until
+    `until_us`, decaying over its last minute, the newest replacing the
+    last; warmth positive only, energy both ways; a test that no nudge
+    passes a clamp.
+  - `policy/decisions` is no: decisions go on blue's own `addon/decision`.
+  - One more never: nothing is kept while onboarding runs a step.
+- **The reviewer-lead read `2b892bc26`:** one P2 and three P3s, all fixed
+  and folded as `c1af23e28`.
+  - **P2:** a product lamp dropped every proposal. A `lamp/pause` never said
+    counted as paused, and so did a `voice/mute` never said; the product
+    voice says none. Now:
+    - a pause never said is not paused;
+    - with no mute read 3 s after the judge starts, the rest skill alone
+      tells sleep;
+    - an e2e test publishes neither topic.
+  - **P3s:**
+    - a test that a proposal not written by `skills` is not judged;
+    - `give_back` is deleted and the doc says the claim lapses by itself;
+    - `LAMP_LIGHT_KEEP` is documented as not handled yet.
+  - **Folded too:** the onboarding never (`onboarding/pending` holding an
+    invitation).
+- **Next:**
+  - The mood nudge as part 1's second PR, after #2553: a typed
+    `mood/nudge` written by `lamp-addons`, held in `lamp-mood`'s engine
+    inside its clamps.
+  - Then the lamp-75c9 run.
