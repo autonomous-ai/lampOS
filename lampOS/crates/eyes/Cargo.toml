@@ -18,6 +18,12 @@ path = "src/main.rs"
 name = "lamp-seems-measure"
 path = "src/bin/seems_measure.rs"
 
+# Replays `--glance-log` files and scores the change bar's rules; its tests
+# run with the crate's.
+[[example]]
+name = "glance_replay"
+test = true
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true

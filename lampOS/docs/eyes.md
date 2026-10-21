@@ -167,6 +167,46 @@ sees" with what has and has not been shown of it.
   one of them. Not yet run
   on a lamp: the saving and a sit-down's time to a look are to be measured
   on lamp-4ace.
+- With `--glance-log /var/lib/lampos-eyes/glance.log` (only with
+  `--look-on-change on`; off unless given; `src/glance_log.rs`) each
+  compared glance is written to that file as one JSON line of numbers, so the change bar's rules can be
+  replayed offline: `at_us` (monotonic), `changed` (the current rule's
+  verdict), `lit` (the lamp's own light changing), `cells` (cells past the
+  bar), `mask` (the 768 cells past the bar by the current rule, one bit a
+  cell in row order, as hex), `ratio` (each cell's change over its learned
+  noise before this glance teaches it, times 8, floored, at most 255; 255
+  while the noise is 0; hex, a byte a cell), `resid_greys_q` (each cell's
+  change in greys after its row's median change is taken out, floored, at
+  most 255; hex, a byte a cell), `frame_shift` (the frame's median change
+  in greys), `detect` and `why` (`changed`, `settling`, `every`, `face`,
+  `asked`, `remembering`, `lit` or `skipped`) and `faces` (how many faces the
+  detector found that `--leave-still-faces` kept, so the faces the body
+  was told of; 0 when the detector did not run). It holds no picture: no pixel and
+  no cell's grey, only how much each cell changed after the frame's and
+  its row's shift are taken out (test
+  `a_line_per_compared_glance_with_no_grey_in_it`). It is still a
+  timeline of when someone was at the lamp (`faces` and `at_us`, with each
+  glance's change map), so it is kept in one place only: the path is
+  pinned to `/var/lib/lampos-eyes/glance.log` (any other is refused at
+  start), beside `seems.log`, and the reset plan
+  (`reset-plan-product.json`) names it, so a reset wipes it. Each start
+  makes it new: a log an earlier start left is removed (a link is removed,
+  not followed), then the file is created 0600 with `O_EXCL` and
+  `O_NOFOLLOW`, in a folder no one else may read (0700) (test
+  `each_start_makes_the_log_new`); it stops 20 minutes after its first line or at
+  50 MB, whichever comes first (a line is about 3.4 KB). `cargo run -q -p
+  lamp-eyes --example glance_replay LOG...` scores each log's glances
+  under the current rule, `persist-2` (a cell counts only if past the bar
+  in this glance and the one before), `ratio-12` and `ratio-16` (12 or 16
+  times the noise), and the noise learned again at other rates: the share
+  of empty-room glances each would skip and, with a face in the log, how
+  many looks after the first glance with a face it would have run the
+  detector. A replay cannot know what a rule that detected other glances
+  would have compared later glances to: the log's changes are against the
+  frames the eyes really ran on. It is a test and measurement flag: no
+  product unit passes it, and no file under `deploy/` may (test
+  `nothing_deployed_passes_glance_log`); a builder adds it by hand for a
+  measure, copies the log off and takes the flag away again.
 - It sends one datagram per look to the body's gaze socket and nothing else
   anywhere:
 
@@ -1845,7 +1885,7 @@ within about half a metre. Tested on the host only.
 lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
 `VENDOR:PRODUCT` alone, without `--device` (#2190): then at each open the eyes
 take the one camera with those ids on whatever port it is on, its capture
