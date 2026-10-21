@@ -760,9 +760,10 @@ fn the_products_pins_name_the_reset_and_its_unit_serves_the_touch_path() {
     );
     assert!(pins.head_rest.is_none(), "no unit's baseline is shipped");
     assert!(touch.strip_pads.is_none(), "the base strip waits");
-    // A pat stays the old engine's Pet, as the product's voice and
-    // Expression read no `controls/touch` (the reviewer on #1167).
-    assert!(pins.legacy_head);
+    // The product's voice and Expression read the head from
+    // `controls/touch` (#711), so a pat no longer goes to the old engine's
+    // Pet as well (install's head-touch test holds the rest of it).
+    assert!(!pins.legacy_head);
     let unit = include_str!("../../../../deploy/product/lamp-controls.service");
     let serve = unit
         .lines()

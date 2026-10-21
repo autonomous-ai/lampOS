@@ -2264,9 +2264,16 @@ fn a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest() {
     );
     let mut kept = pins.clone();
     kept.as_object_mut().unwrap().remove("privacy");
-    assert_eq!(
-        kept,
-        serde_json::from_str::<serde_json::Value>(own).unwrap()
+    // Its `legacy_head` goes too, as the build's pins have none (#711).
+    let mut own_now = serde_json::from_str::<serde_json::Value>(own).unwrap();
+    own_now.as_object_mut().unwrap().remove("legacy_head");
+    assert_eq!(kept, own_now);
+    assert!(
+        lamp.said.iter().any(|line| line.starts_with(&format!(
+            "took the old engine's head (legacy_head) out of {PINS}"
+        ))),
+        "{:?}",
+        lamp.said
     );
     assert!(
         first.changed.contains(&format!("wrote {PINS}")),
@@ -2352,10 +2359,10 @@ fn a_lamps_own_pins_on_the_old_guess_get_every_head_line() {
     assert_eq!(pins["head_pads"], product["head_pads"]);
     pins["head_pads"] =
         serde_json::from_str::<serde_json::Value>(guessed).unwrap()["head_pads"].clone();
-    assert_eq!(
-        pins,
-        serde_json::from_str::<serde_json::Value>(guessed).unwrap()
-    );
+    // And no `legacy_head`, as the build's pins have none (#711).
+    let mut guessed_now = serde_json::from_str::<serde_json::Value>(guessed).unwrap();
+    guessed_now.as_object_mut().unwrap().remove("legacy_head");
+    assert_eq!(pins, guessed_now);
     let mut controls = read(&lamp, CONTROLS);
     assert_eq!(
         controls["head_pads"],
@@ -2418,7 +2425,10 @@ fn a_lamps_own_pins_on_the_old_guess_get_every_head_line() {
     fs::write(found.on(PINS), &factory).unwrap();
     fs::write(found.on(CONTROLS), &other_controls).unwrap();
     found.install().unwrap();
-    assert_eq!(fs::read_to_string(found.on(PINS)).unwrap(), factory);
+    // Its head pads and baseline stay; only `legacy_head` goes (#711).
+    let mut factory_now = serde_json::from_str::<serde_json::Value>(&factory).unwrap();
+    factory_now.as_object_mut().unwrap().remove("legacy_head");
+    assert_eq!(read(&found, PINS), factory_now);
     assert_eq!(
         fs::read_to_string(found.on(CONTROLS)).unwrap(),
         other_controls
