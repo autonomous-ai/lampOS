@@ -1,0 +1,88 @@
+{
+  "at": "2026-10-22T00:28:55.925176+07:00",
+  "status": "passed",
+  "error": null,
+  "base": "a8e0c83febdb0e428f96e5afdc4fd7b842993984",
+  "rebased_prior_head": "60055f51fd82d9a69380ce4411ffeb064126b572",
+  "baseline_main_sha256": "7fdc2ef17bce562301d3dc56034a5457a7ddea207f982efa75a4ace3f729549c",
+  "restored_main_sha256": "22b6bd502a4bdaa8657d3ee5ca4d809fee8b3d77433f8411ee127c5250b81383",
+  "test_sha256": "4986ed082fbe495123718d9761fc40b70797961e1cae0efc79662f75880c2478",
+  "source_restored": true,
+  "test_unchanged": true,
+  "stages": [
+    {
+      "stage": "guard-removed",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "journal_output::a_full_unread_journal_does_not_hold_startup_or_tool_replies",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 23.024,
+      "summary_lines": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 240 filtered out; finished in 20.01s"
+      ],
+      "log_sha256": "608cc23c5ecf163419c29ffde59183412926e5ff25656e91583706d1b7a6c4ff"
+    },
+    {
+      "stage": "guard-restored",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "journal_output::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 1.755,
+      "summary_lines": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 238 filtered out; finished in 0.76s"
+      ],
+      "log_sha256": "3391200b59bebe780e25b52f76e7fab56e65efefdf67c1ee3bd15d6473d10910"
+    }
+  ],
+  "filled_bytes": [
+    "8192"
+  ],
+  "timings_us": [
+    {
+      "startup_including_prepare": 16124,
+      "first_reply": 132,
+      "refusal": 93,
+      "next_valid": 79
+    }
+  ],
+  "initial_fixture_attempt": {
+    "status": "aborted during fixture setup; no service behavior result",
+    "reason": "The per-send MSG_DONTWAIT preparation stalled on macOS before the child started. A one-second sample showed the test thread in __sendto; the owned test was terminated with SIGTERM.",
+    "elapsed_seconds": 199.989,
+    "cargo_exit_code": 101,
+    "test_summary_lines": [],
+    "log_sha256": "efbbdb1b85bb1f51059fa0c498e89661cd8abec6031a23158a7e31be4de1892d",
+    "test_sha256": "5d95bad9a88d6dfc93e97cdbc8c082b8a76e0b7f33165b5506882d16d2cb4ad8",
+    "source_restored": true,
+    "sample_sha256": "7350f605d3a83c0efc52fc8a1addc124526a000808a5dc02180e4f8771dbcb47",
+    "correction": "Make the still-unshared endpoint nonblocking for preparation, then restore blocking before any child starts. Probe again only after the child has been killed and reaped."
+  },
+  "latency_boundary": "startup_including_prepare begins before journal filling and fixture creation, ending when tools.json exists; replies measure connect through complete response. Host IPC only.",
+  "bounds": "Preparation: two seconds and four MiB. Startup: twenty seconds; read/write timeouts: up to two seconds capped by the remaining checked thirty-second scenario deadline. This is not a hard total-runtime watchdog for connect, fragmented reads or cleanup."
+}

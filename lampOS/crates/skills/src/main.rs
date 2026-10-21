@@ -154,6 +154,8 @@ impl May {
 }
 
 fn main() -> ExitCode {
+    // A broken or full journal must not stop Skills; flush final CLI errors too.
+    let _log = lamp_ipc::log_relay::guard();
     let given: Vec<String> = std::env::args().skip(1).collect();
     match given.first().map(String::as_str) {
         Some("test") => return test(&given[1..]),

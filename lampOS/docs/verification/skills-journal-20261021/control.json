@@ -1,0 +1,68 @@
+{
+  "at": "2026-10-21T23:52:48.497738+07:00",
+  "base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "baseline_main_sha256": "7fdc2ef17bce562301d3dc56034a5457a7ddea207f982efa75a4ace3f729549c",
+  "restored_main_sha256": "22b6bd502a4bdaa8657d3ee5ca4d809fee8b3d77433f8411ee127c5250b81383",
+  "source_restored": true,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "journal_output::a_broken_journal_does_not_end_skills_or_lose_its_tool_replies",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "log_sha256": "32e2ccfa792aae3d01217e4aa90b1b3d401ea77f526f33e1094ee88f3d80050b",
+      "observed_failure": "After healthy valid and refusal replies, breaking stderr replaced the specific refusal with the listener fallback: My skills did not answer in time. The original wrapper expected EOF and stopped after restoring source; this is the same single observed old-runtime test, not a rerun.",
+      "seconds": 24.355,
+      "stage": "old-runtime",
+      "summary_lines": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 239 filtered out; finished in 0.68s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "journal_output::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log_sha256": "eb07a952889c2450b4af9ba3e7bfbb9519f53cdf29804471e03b8eca923d8d2c",
+      "seconds": 1.999,
+      "stage": "restored-runtime",
+      "summary_lines": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 238 filtered out; finished in 0.99s"
+      ]
+    }
+  ],
+  "status": "passed",
+  "test_sha256": "32da564f583684d57062f2288d01a70402d620bbd71dff60f9b3b82309965de4",
+  "timings_us": [
+    {
+      "broken_refusal": 159,
+      "broken_valid": 198,
+      "ready": 624
+    }
+  ]
+}

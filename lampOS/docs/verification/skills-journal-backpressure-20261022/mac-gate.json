@@ -1,0 +1,91 @@
+{
+  "at": "2026-10-22T00:31:09.954158+07:00",
+  "status": "passed",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "error": null,
+      "seconds": 4.556,
+      "counts": {},
+      "summary_count": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary_lines": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "error": null,
+      "seconds": 13.199,
+      "counts": {},
+      "summary_count": 0,
+      "log_sha256": "30a76e2601fa236e9578e0c43cc11a35b1c2be3ea3a58c51dd8e1560f7972dd1",
+      "summary_lines": []
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "error": null,
+      "seconds": 97.549,
+      "counts": {
+        "passed": 389,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0
+      },
+      "summary_count": 4,
+      "log_sha256": "221e836ddc1b2c8a2a0bdf15116f6c94285bbc851ca14d49f79aa7c0ff86fd81",
+      "summary_lines": [
+        "test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.43s",
+        "test result: ok. 241 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.49s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "source_unchanged": true,
+  "scope": "Mac fmt, strict all-target Clippy and all Skills tests; ARM64 qualification is PR CI",
+  "base": "a8e0c83febdb0e428f96e5afdc4fd7b842993984",
+  "rebased_prior_head": "60055f51fd82d9a69380ce4411ffeb064126b572",
+  "started_at": "2026-10-22T00:29:08.443449+07:00",
+  "source_file_count": 1694,
+  "source_tree_sha256": "865e6757cd215c3c1381e5a58a098dbfd690b1e8651aaff85d20b1cd621ce775",
+  "changed_source_hashes": {
+    "lampOS/crates/skills/src/main.rs": "22b6bd502a4bdaa8657d3ee5ca4d809fee8b3d77433f8411ee127c5250b81383",
+    "lampOS/crates/skills/tests/it/main.rs": "f31f5bd0913d373fd7703a1e7adf7508021fe9f8906d0a46cb59d84b79de2c55",
+    "lampOS/crates/skills/tests/it/journal_output.rs": "4986ed082fbe495123718d9761fc40b70797961e1cae0efc79662f75880c2478"
+  },
+  "owned_scratch_bytes": 17545072640
+}

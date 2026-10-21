@@ -1,0 +1,59 @@
+{
+  "at": "2026-10-21T23:57:00.471975+07:00",
+  "base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "limits": "One exact test per source, performed to compare an unchanged fixture after the retained complete Mac gate failed; this does not replace that gate or establish the original failure cause.",
+  "source_restored": true,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e83d7193d8ed0fae80d0ad733a2c05899563918fd8cce3209e30ffb15d22754e",
+      "seconds": 2.189,
+      "stage": "baseline-unplug",
+      "summary_lines": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 1.03s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log_sha256": "381f62b88bf63872778be57021246895e311d184262b41ce6f12b441d69fb1a5",
+      "seconds": 1.803,
+      "stage": "restored-unplug",
+      "summary_lines": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 239 filtered out; finished in 0.71s"
+      ]
+    }
+  ],
+  "status": "comparison_complete"
+}

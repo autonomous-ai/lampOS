@@ -699,6 +699,21 @@ head is on its way down over the page and the light up before the voice
 asks the eyes (#1146) (`{"next": "..."}`): with `look = true`, to say only "Let me take a
 look.", and `"look": true` beside it; with `say`, the note.
 
+Skills installs the shared `lamp_ipc::log_relay` before handling arguments
+or starting the service. A broken journal stream therefore does not make
+a diagnostic panic and lose a tool reply. The relay retains at most 64 KiB,
+drops lines the journal cannot take, and reports the dropped count if the
+stream accepts output again. Normal command exits allow up to 500 ms for
+queued diagnostics to drain; the command's exit status is unchanged. The
+host regressions break a temporary journal socket after a successful tool
+call, and start Skills with an open journal socket that cannot accept even
+one byte. Both require the exact unknown-tool refusal and another successful
+call. The full socket remains unread, with bounded preparation and a
+checked 30-second scenario deadline alongside the startup and socket
+timeouts. This is not a hard total-runtime watchdog. The startup reading
+includes journal filling and fixture preparation; connect-to-complete-reply
+timings cover local IPC, not device or acoustic latency.
+
 The look is the voice's, not the model's to remember (#941; at 16:05 the
 model answered without one). Once the answer with
 `"look": true` has gone to the model, the provider worker tells the
