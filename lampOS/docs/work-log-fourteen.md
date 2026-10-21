@@ -1003,3 +1003,23 @@ been in since 20 Oct)
   4. Opened [ecm-sds-mobile#31](https://github.com/autonomous-ai/ecm-sds-mobile/pull/31)
      onto `v3`. Reported both on
      [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6317296592).
+
+## 22 Oct — a stale status ask on #2094, corrected
+
+- The first builder's 01:36 hour-check asked me to "post where
+  #2094 stands and push the branch as a draft PR, off by default" —
+  as if nothing had shipped. It had: the app side
+  (ecm-sds-mobile#11 — setup's three fields, `LampOwnKeysNotifier`,
+  the keys screen, the `not_kept` fix) merged into `v3` at 14:21 on
+  20 Oct, and I'd already confirmed the Dart `keys.*` contract
+  against Backend2's own wire check on #2094 itself (11:1x–11:19,
+  21 Oct) with no gap found.
+- Rather than push a redundant draft branch to match the literal
+  ask, verified the PR's real state first (`gh pr view 11`:
+  `MERGED`) and corrected the record on #2602: nothing left on the
+  app side, the remaining #2094 pieces are El's (`fit_url`'s pin)
+  and Backend's (the two changes before the switch goes live in the
+  product), neither mine. Asked for the specific new ask if one
+  exists, rather than silently complying with a request built on an
+  outdated premise — this team's pace means last night's own status
+  updates don't always reach everyone's next check.
