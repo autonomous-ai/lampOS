@@ -47,7 +47,10 @@ not a measurement made by Third. The explicit pins-profile addition is:
 It is independent of button/head GPIO and the optional I²C strip. Selecting
 the route without valid switch evidence leaves Voice and Ears closed. Shadow
 gesture mode does not hide electrical privacy evidence. Controls reads and
-publishes evidence; it cannot open microphones or clear a software mute.
+publishes evidence; it cannot open microphones or clear a software mute. It
+reads the switch in the same loop as the hand, so it runs at real-time priority
+30, above the voice, and its health counts the loop's gaps (#2602,
+[controls.md](controls.md)).
 
 The selected Voice privacy child reads `controls/state` instead of requesting
 GPIO. Each accepted observation retains the actual acquisition clock, time,

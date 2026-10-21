@@ -855,9 +855,11 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         let output = service.step(lamp_ipc::monotonic_us);
         hands.note_reset(began, &output, service.reset_refused());
         let elapsed = lamp_ipc::monotonic_us().saturating_sub(began);
-        if elapsed < service.poll_us() {
-            thread::sleep(Duration::from_micros(service.poll_us() - elapsed));
-        }
+        // Never less than the step's own work: at real-time priority a slow
+        // step never makes the loop spin (#2602).
+        thread::sleep(Duration::from_micros(
+            lamp_controls::touch_runtime::rest_us(elapsed, service.poll_us()),
+        ));
     }
     let worker = service.strip.as_mut().map(Worker::shutdown);
     let recording = service.finish_recording();

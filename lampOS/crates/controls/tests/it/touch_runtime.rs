@@ -4,13 +4,14 @@ use lamp_controls::{
     input::{InputError, Level as PinLevel, Observation, PinReader},
     mpr121,
     mute::MuteRecord,
-    pins::{Pin, Pull},
+    pins::{Lines, Pin, Pull},
+    privacy::{LineReader, Source},
     receiver::Receiver,
     strip_worker::StripReader,
     touch::{StripSample, TouchOutput},
     touch_pins::{HEAD_ITEM, HeadLines, TouchPinsConfig},
     touch_receiver::TouchReceiver,
-    touch_runtime::{DRAIN_LIMIT, Service},
+    touch_runtime::{DRAIN_LIMIT, Pace, Service, rest_us},
 };
 use lamp_msgs::{
     ClockStamp, ControlFault, ControlGesture, ControlsState, Diagnostic, Gesture, Level,
@@ -1194,4 +1195,183 @@ fn without_its_switch_the_strip_is_off_and_the_head_pads_still_work() {
     );
     assert!(!set_aside);
     assert!(served.base.is_none());
+}
+
+/// A privacy switch that always reads open.
+struct Open;
+impl Lines for Open {
+    fn high(&mut self, _: u32) -> std::io::Result<bool> {
+        Ok(true)
+    }
+}
+
+fn attach_open_privacy(rig: &mut Rig) {
+    rig.service
+        .attach_privacy(
+            &rig.bus,
+            Source::new(
+                Box::new(LineReader::new(Open, CLOCK, "privacy-reader")),
+                CLOCK,
+            ),
+        )
+        .unwrap();
+}
+
+/// #2602 (the first builder, 20:2x): a touch reader that fails mid-run
+/// holds nothing back from the privacy reading. Through 200 ms of failed
+/// reads, with the reset not read, every `controls/state` carries a fresh
+/// open reading, and one comes at least every 20 ms, as before it.
+#[test]
+fn a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh() {
+    let mut rig = Rig::new(true);
+    attach_open_privacy(&mut rig);
+    let mut states = rig
+        .bus
+        .subscribe(ControlsState::TOPIC, "test_state")
+        .unwrap();
+    let (mut said, mut not_read) = (Vec::new(), 0);
+    for at in (0..400_000u64).step_by(1_000) {
+        if at % 10_000 == 0 {
+            if (150_000..350_000).contains(&at) {
+                rig.gpio
+                    .values
+                    .borrow_mut()
+                    .push_back(Err(InputError::new(ControlFault::Missing, "GPIO lost")));
+            } else {
+                rig.gpio(at, false, false, false);
+            }
+        }
+        let output = rig.step(at);
+        if source(&output, TouchSource::Reset).active.is_none() && at >= 150_000 {
+            not_read += 1;
+        }
+        while let Some(message) = states.recv(Duration::ZERO).unwrap() {
+            said.push(message.parse::<ControlsState>().unwrap());
+        }
+    }
+    assert!(not_read > 0, "the reset was read throughout");
+    let first = said
+        .iter()
+        .position(|state| state.privacy.as_ref().is_some_and(|p| p.fault.is_none()))
+        .unwrap();
+    for pair in said[first..].windows(2) {
+        assert!(
+            pair[1].stamp.at_us - pair[0].stamp.at_us <= 20_000,
+            "nothing said from {} to {}",
+            pair[0].stamp.at_us,
+            pair[1].stamp.at_us
+        );
+    }
+    for state in &said[first..] {
+        let privacy = state.privacy.as_ref().unwrap();
+        assert_eq!(privacy.fault, None, "at {}", state.stamp.at_us);
+        assert_eq!(privacy.muted, Some(false));
+        assert!(state.stamp.at_us - privacy.stamp.at_us < 50_000);
+    }
+    assert!(said.last().unwrap().stamp.at_us >= 380_000);
+    assert_eq!(rig.service.pace.long_gaps, 0);
+}
+
+/// #2602: what lamp-75c9 showed is the loop not running. After 100 ms with
+/// no step, the reset reads "not read" and the privacy reading has lapsed,
+/// together, since they share the loop; the gap is counted (`long_gaps`).
+#[test]
+fn a_loop_that_stalls_for_100_ms_lapses_the_reset_and_the_privacy_reading_together() {
+    let mut rig = Rig::new(true);
+    attach_open_privacy(&mut rig);
+    for at in (0..=100_000u64).step_by(1_000) {
+        if at % 10_000 == 0 {
+            rig.gpio(at, false, false, false);
+        }
+        rig.step(at);
+    }
+    assert_eq!(rig.legacy().privacy.unwrap().fault, None);
+    assert_eq!(
+        (rig.service.pace.long_gaps, rig.service.pace.longest_gap_us),
+        (0, 1_000)
+    );
+    rig.gpio(200_000, false, false, false);
+    let output = rig.step(200_000);
+    assert_eq!(source(&output, TouchSource::Reset).active, None);
+    assert_eq!(
+        rig.legacy().privacy.unwrap().fault,
+        Some(ControlFault::Stale)
+    );
+    assert_eq!(
+        (rig.service.pace.long_gaps, rig.service.pace.longest_gap_us),
+        (1, 100_000)
+    );
+}
+
+/// #2602: a gap past the privacy reading's 50 ms is counted, and said in
+/// the journal at most once a second, with how many more there were.
+#[test]
+fn a_long_gap_between_steps_is_counted_and_said_at_most_once_a_second() {
+    let mut gaps = Pace::default();
+    assert_eq!(gaps.step(0), None);
+    assert_eq!(gaps.step(1_000), None);
+    let line = gaps.step(61_000).unwrap();
+    assert!(line.contains("didn't run for 60 ms"), "{line}");
+    assert_eq!(gaps.step(62_000), None);
+    assert_eq!(gaps.step(200_000), None, "within a second of the last line");
+    let line = gaps.step(1_200_000).unwrap();
+    assert!(line.contains("(1 more since the last line)"), "{line}");
+    assert_eq!((gaps.long_gaps, gaps.longest_gap_us), (3, 1_000_000));
+}
+
+/// #2602 (the first builder's guard for Controls at priority 30): a step
+/// whose own work takes 1 ms or more is counted in health (`slow_steps`),
+/// and the loop rests at least as long as the work, so it never spins.
+#[test]
+fn a_slow_step_is_counted_and_the_loop_rests_at_least_its_work() {
+    let mut rig = Rig::new(true);
+    attach_open_privacy(&mut rig);
+    rig.gpio(0, false, false, false);
+    rig.step(0);
+    assert_eq!(rig.service.pace.slow_steps, 0);
+    // Each look at the clock 200 us after the last: a step of several.
+    let clock = Cell::new(1_000);
+    rig.service.step(|| {
+        clock.set(clock.get() + 200);
+        clock.get()
+    });
+    assert!(rig.service.counts.longest_step_us >= 1_000);
+    assert_eq!(rig.service.pace.slow_steps, 1);
+    assert_eq!(rest_us(100, 1_000), 900);
+    assert_eq!(rest_us(500, 1_000), 500);
+    assert_eq!(rest_us(800, 1_000), 800);
+    assert_eq!(rest_us(5_000, 1_000), 5_000);
+}
+
+/// #2602 (the first builder, 20:3x): Controls runs at real-time round-robin
+/// priority 30 in the product unit and lamp-4ace's, above the voice's, so
+/// its loop, which reads the privacy switch, never waits behind the voice's
+/// real-time work.
+#[test]
+fn controls_runs_at_real_time_priority_above_the_voice() {
+    fn setting<'a>(unit: &'a str, key: &str) -> Option<&'a str> {
+        unit.lines().find_map(|line| line.strip_prefix(key))
+    }
+    fn priority(unit: &str) -> u32 {
+        setting(unit, "CPUSchedulingPriority=")
+            .unwrap()
+            .parse()
+            .unwrap()
+    }
+    for (controls, voice) in [
+        (
+            include_str!("../../../../deploy/product/lamp-controls.service"),
+            include_str!("../../../../deploy/product/lamp-voice.service"),
+        ),
+        (
+            include_str!("../../../../deploy/lamp-4ace/lamp-controls.service"),
+            include_str!("../../../../deploy/lamp-4ace/lamp-voice.service"),
+        ),
+    ] {
+        assert_eq!(setting(controls, "CPUSchedulingPolicy="), Some("rr"));
+        assert_eq!(priority(controls), 30);
+        assert!(priority(controls) > priority(voice));
+        // Niceness means nothing at real-time priority.
+        assert_eq!(setting(controls, "Nice="), None);
+    }
 }

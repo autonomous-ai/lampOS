@@ -18,7 +18,13 @@ Type=simple
 User=lampos
 Group=lampos
 Slice=lampos-parts.slice
-Nice=5
+# Real-time round-robin at 30, above the voice's 20 (#2602): Controls' one loop also reads the privacy switch. At
+# ordinary priority it shared its core with the voice's real-time workers (Nine's ps on lamp-75c9, 21 Oct), and twice
+# the journal said "hand: reset not read", which needs 100 ms with no step, 40 ms before the voice lost the switch.
+# Its step works well under 1 ms and the loop rests at least as long as it worked, so it never spins (health:
+# slow_steps, longest_gap_us, long_gaps). The kernel's real-time throttling stays as it is.
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=30
 # The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
 # Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
