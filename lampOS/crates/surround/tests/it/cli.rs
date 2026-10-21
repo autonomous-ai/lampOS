@@ -112,7 +112,7 @@ fn serve_without_both_switches_opens_page_but_does_not_create_maintenance_state(
         cmd.arg("serve")
             .arg("--config")
             .arg(&path)
-            .args(["--clock-id", "host-cli-fixture", "--seconds", "1"])
+            .args(["--clock-id", "host-cli-fixture", "--seconds", "10"])
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
         if !config_enabled {
@@ -141,6 +141,16 @@ fn serve_without_both_switches_opens_page_but_does_not_create_maintenance_state(
         let mut response = String::new();
         stream.read_to_string(&mut response).unwrap();
         assert!(response.starts_with("HTTP/1.1 401"));
+        // Stopped as systemd stops it, not after its shortest run
+        // (`--seconds 1`, #1806); `--seconds` is a cap for a test gone wrong.
+        // Answered means SIGTERM is caught: on its one thread the graceful
+        // shutdown's task, spawned before the first accept, runs before
+        // any connection's.
+        rustix::process::kill_process(
+            rustix::process::Pid::from_raw(child.id() as i32).expect("a child's pid"),
+            rustix::process::Signal::TERM,
+        )
+        .unwrap();
         let output = child.wait_with_output().unwrap();
         assert!(
             output.status.success(),
