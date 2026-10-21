@@ -46,8 +46,24 @@ impl Test {
     }
     fn send(&mut self, message: FromWorker, at: u64) {
         assert!(self.worker.send(&message).unwrap());
-        self.parent.poll(at);
-        assert!(!self.parent.failed);
+        // A poll reads for at most `POLL_TARGET_US` (2 ms) of the host's
+        // time, so a test thread stalled past it on a loaded host reads
+        // nothing in that poll (#1569 row 74). Polled again until one poll is
+        // shorter than that, and so read all there was; a second poll sends
+        // nothing again.
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let began = std::time::Instant::now();
+            self.parent.poll(at);
+            assert!(!self.parent.failed);
+            if began.elapsed().as_micros() < u128::from(super::POLL_TARGET_US) {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "no poll within its budget in 5 s"
+            );
+        }
     }
     fn offer(&mut self, offer: Offer, at: u64) {
         self.send(FromWorker::Offer { offer }, at);
