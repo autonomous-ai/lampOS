@@ -3196,6 +3196,10 @@ pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
 /// `on`, and nothing else.
 pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 
+/// The known person's name told to the model each turn, as the Live route
+/// tells it (#2539, the forgotten name): `on`, and nothing else.
+pub const FACE_NAME_ENVIRONMENT: &str = "LAMP_SECOND_FACE_NAME";
+
 /// Round 1 of a spoken turn's chat begun on the line's early words
 /// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02: the route's
 /// first word came about 3.4 s after a line, Live's 2.4 s). Its events are

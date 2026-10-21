@@ -1124,6 +1124,28 @@ When the coordinator switches (below):
   same words after "lamp-voice second:", ending "the answer was sent".
 - `LAMP_MEMORY_DAYS=on` reaches this worker as it reaches the Gemini one
   (`process.rs`).
+- **The known person's name** (#2539, `LAMP_SECOND_FACE_NAME=on`, off by
+  default): a turn whose person is the face the eyes know now is told
+  "(The person at the lamp now is X: you know their face.)", as the Live
+  route tells it (`known_faces::note`), after the memory note
+  (`worker::known_name_told`).
+  - **Why:** without it, the second route reads the known face only to
+    choose whose memory to use. A name kept with `remember_my_face`, in
+    the eyes, is recognised but never said back. That's Fourth's replay of
+    the forgotten name (`memory/tests/it/voice_name.rs`, #1722, 21 Oct
+    15:28).
+  - **Never told:** for the room's turn, another person's turn, or a face
+    gone, since the known file is fresh only 3 s.
+  - **A line another face spoke** is narrowed to the room, and told none, only
+    with `LAMP_SECOND_SCOPED_CONTEXT` and `LAMP_SECOND_SPEAKING_FACE` on.
+    Without them the turn is the session's person, read from the same known
+    file. So a voice off camera, with the known person in view, is told
+    their name, as on the Live route (the reviewer-lead's P3 on #2559).
+  - **Right after `forget_my_face`,** a round within the known file's 3 s
+    can still carry the name, as on the Live route.
+  - **The name switch, not to be confused:** `LAMP_SECOND_KNOWN_NAMES` is the
+    speech to text's listening for names; this one tells the model the face's
+    name.
 
 ## What the rest of the lamp sees
 
