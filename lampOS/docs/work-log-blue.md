@@ -66,3 +66,19 @@ Ready for lamp-voice: yes (#2499)
   untrusted context, never an instruction; remote add-ons need their
   person's yes per subscribed summary, seen and revoked per add-on. Left
   for reviewer-two to merge.
+
+## 2026-10-21 — the Harness half, autonomous-ai/openharness#1485
+
+Ready for lamp-voice: no (not lampOS code)
+
+- At my person's request: device add-ons in Harness's CLI, on branch
+  `feat/device-addons` of the fork `daniel-auto/openharness` (`a9f653ca0`).
+  `addon.publish` / `addon.decision` capabilities and the `addon.proposal`
+  event on the existing device channel, bounded in RAM; `harness
+  autonomous-device addon state|propose|proposal` over the loopback API.
+- Shown on this laptop: typecheck; the new and touched specs; `test:core`
+  2,910 passed with full coverage; the full suite's 25 failures are the
+  same 25 as on `origin/main` here (environment); an isolated daemon from
+  the branch answered every `addon` command. Not shown: a device; none
+  implements the device side yet.
+- Told the first builder on #1722.
