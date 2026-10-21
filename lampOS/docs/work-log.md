@@ -1,3 +1,37 @@
+## Current checkpoint: 2026-10-21 23:43 +07, Music pushed and next independent Skills fix taken
+
+**Ready for lamp-voice: no; #1757 is published for review and its new-head native gate is running.**
+Music head `85b589710af2832f6c8a49119ddda4de0313e518` is rebased onto
+`4d932488e2b2a60986a1655bb8d6ccb5e0afb891` and no longer draft, as requested.
+The Mac gate is restricted to the five changed crates: formatting and strict
+Clippy passed; tests report **4,665 passed, 0 failed, 14 ignored, 0 filtered**,
+exit 0. [Commands, summaries and hashes](https://github.com/autonomous-ai/lampOS/tree/85b589710af2832f6c8a49119ddda4de0313e518/lampOS/docs/verification/requested-audio-mac-20261021-3)
+are committed with the change. No further full local or local ARM64 gate was run.
+
+All 86 historical failures passed individually on unmodified Mac head.
+Its existing native ARM64 baseline run matches **85 PASS and one LEAK**, with
+no failed, skipped or missing match; none is defined in a file Music changes.
+The PR carries all 86 names and retains the original failed receipts.
+Current-head [ARM64 39637125957](https://github.com/autonomous-ai/lampOS/actions/runs/39637125957)
+and [x86 Clippy 39637125891](https://github.com/autonomous-ai/lampOS/actions/runs/39637125891)
+are running. The first builder's requested-track, spoken Stop and physical-mute
+lamp acceptance remains; no physical playback or acoustic latency is claimed.
+
+**Taken: second-P6, Skills survives a failed journal stream.** No unblocked
+Second item was available in Queue #2602. Per the owner's instruction, the
+recommendation and request for the next assignment are posted there while
+work starts on `second/skills-journal`, from current `lamp-voice`. Reproduce
+an unknown-tool diagnostic after stderr fails, then use the existing bounded
+IPC log relay and test that refusal and subsequent valid tool reply survive.
+Only Skills runtime/tests and its documentation are in scope; no lamp is used.
+
+**Release #2462 stays with the merger.** Its read-clean head and green evidence
+remain as recorded below; it does not hold the next task.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21 15:48 UTC, Linux failures retained and worker contention reproduced
 
 **Music #1757: ready: no.** The complete [local Linux ARM64 gate](verification/second-music-integration-linux-20261021/README.md)
