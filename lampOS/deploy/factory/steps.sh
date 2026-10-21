@@ -129,7 +129,10 @@ pause() {
   wait $!
 }
 
-# One run of the body by hand, as the watched run on lamp-cb94 (#1717):
+# One run of the body by hand, as the watched run on lamp-cb94 (#1717),
+# with --wake on: a head that sagged when the lamp was let go (lamp-a63e on
+# 21 Oct rested at pitch 1754, under the body's start window 1760-2020) is
+# brought home slowly before anything else, rather than refused (#2396):
 # lamp-body on a private mood socket the voice does not know, nothing else
 # that moves on its own. With a SHARE, one stand: one "listening", then
 # SIGTERM eases it back and folds it. Without one, it only starts and is
@@ -147,7 +150,7 @@ body_once() {
   STAND_LOG=$log
   body=("$BODY_BIN" --device "$DEVICE" --unit-id "$UNIT_ID" --lock-directory "$LOCKS"
     --mood-socket "$dir/mood.sock" --reach 150,15,1,250 --speed 120 --servo-speed 1000
-    --servo-acceleration 60 --force-limit 600 --wake off --rest-glance off --look-at-name off
+    --servo-acceleration 60 --force-limit 600 --wake on --rest-glance off --look-at-name off
     --let-go-at-stop on)
   # shellcheck disable=SC2206 # the poses are flags, split as the unit splits them
   [[ -n $share ]] && body+=(--stand-share "$share" --stand-seconds 6 --awake-seconds 20 --idle off $poses)
