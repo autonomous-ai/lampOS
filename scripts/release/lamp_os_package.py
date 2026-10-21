@@ -107,6 +107,41 @@ BUS_ENVIRONMENT = ('LAMP_BUS', 'LAMP_BUS_AUDIO')
 BUS_ROOT_OPTION = '--bus-root /run/lampos-bus'
 
 
+# lampOS keeps the classification beside the binaries it builds (lamp-voice
+# #2481): a source with this file decides which built binary is optional,
+# provisioning or development, so a new one needs no change here. The lists
+# above remain for sources from before it. Core parts still need this packager's
+# own handling (their folders, units and placement), so a core binary it does
+# not know is refused.
+BINARY_CLASSES = 'deploy/package-binaries.json'
+
+
+def binary_classes(source):
+    """(optional, provisioning, development) for this source."""
+    path = Path(source) / BINARY_CLASSES
+    if not path.exists():
+        return OPTIONAL_BINARIES, set(PROVISIONING_BINARIES), set(DEVELOPMENT_BINARIES)
+    try:
+        classes = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise ValueError(f'{BINARY_CLASSES}: {error}') from None
+    lists = {}
+    for key in ('core', 'optional', 'provisioning', 'development'):
+        names = classes.get(key, [])
+        if not isinstance(names, list) or not all(
+                isinstance(name, str) and re.fullmatch(r'lamp-[a-z0-9-]+', name) for name in names):
+            raise ValueError(f'{BINARY_CLASSES}: {key} must be a list of lamp-* names')
+        lists[key] = names
+    seen = [name for names in lists.values() for name in names]
+    twice = sorted({name for name in seen if seen.count(name) > 1})
+    if twice:
+        raise ValueError(f'{BINARY_CLASSES}: in more than one list: {twice}')
+    unknown_core = sorted(set(lists['core']) - set(CORE_BINARIES))
+    if unknown_core:
+        raise ValueError(f'{BINARY_CLASSES}: core binaries this packager cannot place yet: {unknown_core}')
+    return tuple(lists['optional']), set(lists['provisioning']), set(lists['development'])
+
+
 def generic_bus(unit, text, product):
     """Join the parts' bus wherever the product unit of that part does.
 
@@ -183,11 +218,13 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         data = read_file(library_root, library.name)
         check_elf(data, library.name)
         add(f'lib/{library.name}', data)
-    unexpected = {p.name for p in Path(binaries).glob('lamp-*') if p.is_file()} - set(CORE_BINARIES + OPTIONAL_BINARIES) - DEVELOPMENT_BINARIES - PROVISIONING_BINARIES
+    optional_binaries, provisioning_binaries, development_binaries = binary_classes(source)
+    unexpected = ({p.name for p in Path(binaries).glob('lamp-*') if p.is_file()}
+                  - set(CORE_BINARIES + optional_binaries) - development_binaries - provisioning_binaries)
     if unexpected:
-        raise ValueError(f'unclassified binaries: {sorted(unexpected)}; update the release inventory')
+        raise ValueError(f'unclassified binaries: {sorted(unexpected)}; add each to lampOS/{BINARY_CLASSES}')
     binary_hashes = {}
-    for name in CORE_BINARIES + OPTIONAL_BINARIES:
+    for name in CORE_BINARIES + optional_binaries:
         if name not in CORE_BINARIES and not (Path(binaries) / name).exists():
             if (Path(source) / 'crates' / name.removeprefix('lamp-') / 'Cargo.toml').exists():
                 raise ValueError(f'missing runtime binary declared in source: {name}')
@@ -215,7 +252,7 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
     if generic:
         # What scripts/provision/lamp-v2-migrate reads from this package on a V1
         # lamp: the bench tool for its poses and V2's own setting templates.
-        for name in sorted(PROVISIONING_BINARIES):
+        for name in sorted(provisioning_binaries):
             data = read_file(binaries, name)
             check_elf(data, name)
             add(f'tools/{name}', data, True)

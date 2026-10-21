@@ -1618,7 +1618,7 @@ stand) trước lần chạy body đầu tiên. Body chỉ cử động đầu v
 xác nhận lần đứng đầu tiên. Lần đọc bị từ chối (torque đang bật) giữ body không
 chạy, và nó không bao giờ tắt torque. Build từ source cũ thì ZIP như trước.
 `lamp-memory-fixture`, `lamp-records-fixture`, `lamp-policy-replay` và CLI đo
-`lamp-same-voice pairs` hiện là công cụ phát triển nên không đưa vào gói. `lamp-station` (công cụ bench của trạm sản xuất) cũng không đưa vào. `lamp-body-mood` là công cụ nhà máy, mang cùng `lamp-body-measure` trong `tools/`, còn `lamp-peek` được mang nhưng không có unit. Binary
+`lamp-same-voice pairs` hiện là công cụ phát triển nên không đưa vào gói. `lamp-station` (công cụ bench của trạm sản xuất) cũng không đưa vào. `lamp-body-mood` là công cụ nhà máy, mang cùng `lamp-body-measure` trong `tools/`, còn `lamp-peek` được mang nhưng không có unit. Source lampOS có `lampOS/deploy/package-binaries.json` (lamp-voice #2481) tự phân loại binary của nó ở đó (`core`, `optional`, `provisioning`, `development`), và packager làm theo. Khi đó binary mới không cần sửa gì trên main. Các danh sách trên chỉ còn dùng cho source cũ chưa có file này. Một tên nằm ở hai danh sách, hoặc một part `core` mà packager chưa biết đặt, vẫn làm đóng gói thất bại. Binary
 chưa phân loại vẫn làm packaging báo lỗi để không âm thầm bỏ sót runtime mới.
 
 ZIP chung vẫn render `DEFAULT_UNITS` của main từ `lampOS/deploy/units`. Chỗ nào

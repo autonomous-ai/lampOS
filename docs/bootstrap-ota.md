@@ -1677,7 +1677,7 @@ confirms its first stand. A read it refuses (torque on) keeps the body from
 starting, and it never turns torque off. From an older source the ZIP is as
 before. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
-`lamp-same-voice pairs` measurement CLI are development tools and are excluded. `lamp-station` (the production station's bench tool) is excluded the same way. `lamp-body-mood` is a factory tool carried with `lamp-body-measure` under `tools/`, and `lamp-peek` is carried without a unit.
+`lamp-same-voice pairs` measurement CLI are development tools and are excluded. `lamp-station` (the production station's bench tool) is excluded the same way. `lamp-body-mood` is a factory tool carried with `lamp-body-measure` under `tools/`, and `lamp-peek` is carried without a unit. A lampOS source with `lampOS/deploy/package-binaries.json` (lamp-voice #2481) classifies its own binaries there (`core`, `optional`, `provisioning`, `development`), and the packager follows it. Then a new binary needs no change on main. The lists above are kept only for sources from before that file. A name in two lists, or a `core` part the packager cannot place yet, still fails packaging.
 Unknown binaries still fail packaging so a new runtime cannot be silently
 omitted.
 

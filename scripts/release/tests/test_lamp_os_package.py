@@ -180,6 +180,32 @@ class PackageTest(unittest.TestCase):
     def build(self):
         return pkg.package(self.source, self.binaries, self.assets, self.profile, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
 
+    def test_source_classifies_its_own_binaries(self):
+        # lamp-voice #2481: a new binary is classified in the source, not here.
+        new = ('lamp-brand-new-tool', 'lamp-brand-new-part')
+        for name in new:
+            (self.binaries / name).write_bytes(self.adapter.read_bytes() + name.encode())
+        with self.assertRaisesRegex(ValueError, 'unclassified binaries.*package-binaries.json'):
+            self.build()
+        classes = {'core': list(pkg.CORE_BINARIES), 'optional': ['lamp-brand-new-part'],
+                   'provisioning': [], 'development': ['lamp-brand-new-tool']}
+        self.write_source(pkg.BINARY_CLASSES, json.dumps(classes).encode())
+        manifest = self.build()
+        with zipfile.ZipFile(self.output) as archive:
+            names = archive.namelist()
+        self.assertIn('lamp-brand-new-part', manifest['binaries'])
+        self.assertFalse(any(path.endswith('/lamp-brand-new-tool') for path in names))
+        # Its lists are exact: one name in two, or a core part this packager
+        # cannot place, is refused.
+        twice = dict(classes, development=['lamp-brand-new-tool', 'lamp-brand-new-part'])
+        self.write_source(pkg.BINARY_CLASSES, json.dumps(twice).encode())
+        with self.assertRaisesRegex(ValueError, 'more than one list'):
+            self.build()
+        core = dict(classes, core=list(pkg.CORE_BINARIES) + ['lamp-brand-new-part'], optional=[])
+        self.write_source(pkg.BINARY_CLASSES, json.dumps(core).encode())
+        with self.assertRaisesRegex(ValueError, 'cannot place'):
+            self.build()
+
     def test_new_or_missing_runtime_cannot_be_silently_omitted(self):
         (self.binaries / 'lamp-new-runtime').write_bytes(self.adapter.read_bytes())
         with self.assertRaisesRegex(ValueError, 'unclassified binaries'):
