@@ -1,3 +1,33 @@
+## Current checkpoint: 2026-10-21 14:32 UTC, release qualified and Music integration running
+
+**Ready for lamp-voice: yes — release #2462, head
+`1399893f45101fdb181b9615fce31daf523034a8`, for reviewer integration.**
+The requested rebase is complete. Fresh host **35 + 12 + 7** checks passed;
+[ARM64, x86, general CI and artifact evidence](verification/second-release-after-landing-20261021/README.md)
+records **9,621 nextest passes (one leaky), 63 skipped**, four doctests,
+12 own-harness passes, relay signals and native **35 + 12 + 7** helper passes.
+All **49/49 artifact payload hashes** match. The tested merge/base and retained
+warnings are explicit. Publication remains disabled; no device was touched.
+Reviewer/DevOps merge and the #1812 workflow/docs handoff remain pending.
+
+**Music #1757: ready: no.** The remote PR remains draft at `c74b0f710`.
+The correction has been integrated with base
+`1c6b0152a2bf8d936a9ca729a49426f6fd96fa78`, retaining newer add-on, sign-in,
+held-forget and query-aware search paths. Source cross-review found no new
+P1/P2. Its first integration gate stopped at a missing two-field test fixture;
+that failure is retained and the fixture corrected before a new source freeze.
+The new gate binds **2,291 source files**, 30 parent fixtures and 37 consumers.
+Formatting, strict workspace/all-target Clippy, Actions **23**, actual Voice
+Ticket **1**, Music integration **12**, Voice audio **50** and Skills recording
+**31** focused checks passed. The complete consumer gate is still running;
+its Add-ons calm-light test has failed and is under diagnosis. The inherited
+Eyes macOS fixture issue remains separate. No passing complete gate or new
+Music runtime head is claimed here.
+
+The earlier checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21, frozen Actions correction and release rebase pending
 
 **Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757): ready: no.**
