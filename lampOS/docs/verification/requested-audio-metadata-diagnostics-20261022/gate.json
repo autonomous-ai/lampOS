@@ -1,0 +1,91 @@
+{
+  "started_at": "2026-10-22T01:41:48.575947+07:00",
+  "base": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "source_before": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.64,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.998,
+      "log_name": "clippy.log",
+      "log_sha256": "f38326ed850f06fbcab4e985270d92ddc6eeb1579b326b2480fb8e054e6a099f",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 107.532,
+      "log_name": "tests.log",
+      "log_sha256": "667e6882829bf67e865830ecf97bbadaa844f49adf96e135543811fe253a7ab7",
+      "summaries": [
+        "test result: ok. 137 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.19s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.43s",
+        "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 84.02s",
+        "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.27s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 425,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "passed",
+  "source_after": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T01:43:43.765481+07:00"
+}

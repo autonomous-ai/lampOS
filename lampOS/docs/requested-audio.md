@@ -266,6 +266,17 @@ before making the page writable. Waiting for a timestamp to settle therefore
 does not establish an immutable file image. The scan uses actual content
 verification on every supported host and filesystem.
 
+When the file-stability check refuses a file, its existing error prefix is
+followed by fixed labels for the file's role (description, manifest or
+recording), the check phase (after-read or final), the opened/listed stamp
+fields that differ and the original/opened/listed numeric stamps. The message
+contains no paths, filenames, hashes or contents and fits within 1,536 bytes.
+It is constructed only on failure from metadata already read. Load and pack
+return it through their existing error path; boolean scans still return false
+without adding a journal line. Folder, initial-open and content-hash refusals
+retain their separate errors. These details help identify a future refusal;
+they do not establish the cause of the retained packaging failure below.
+
 All file I/O and hashing run outside the authorization mutex. Only a successful
 scan of the same accepted generation and key set can refresh freshness. A
 stale successful result cannot restore inventory already revoked by another

@@ -87,6 +87,109 @@ impl Stamp {
     }
 }
 
+impl std::fmt::Display for Stamp {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            out,
+            "{{device={},inode={},size={},mtime=({},{}),ctime=({},{}),mode={},uid={},gid={}}}",
+            self.device,
+            self.inode,
+            self.size,
+            self.modified.0,
+            self.modified.1,
+            self.changed.0,
+            self.changed.1,
+            self.mode,
+            self.uid,
+            self.gid,
+        )
+    }
+}
+
+#[derive(Clone, Copy)]
+enum FileRole {
+    Description,
+    Manifest,
+    Recording,
+}
+
+impl FileRole {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Description => "description",
+            Self::Manifest => "manifest",
+            Self::Recording => "recording",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CheckPhase {
+    AfterRead,
+    Final,
+}
+
+impl CheckPhase {
+    fn name(self) -> &'static str {
+        match self {
+            Self::AfterRead => "after-read",
+            Self::Final => "final",
+        }
+    }
+}
+
+struct Observation {
+    stamp: Stamp,
+    regular: bool,
+    symlink: bool,
+}
+
+impl Observation {
+    fn differences(&self, before: Stamp) -> String {
+        let names: Vec<_> = [
+            (!self.regular, "not-regular"),
+            (self.symlink, "symlink"),
+            (self.stamp.device != before.device, "device"),
+            (self.stamp.inode != before.inode, "inode"),
+            (self.stamp.size != before.size, "size"),
+            (self.stamp.modified != before.modified, "mtime"),
+            (self.stamp.changed != before.changed, "ctime"),
+            (self.stamp.mode != before.mode, "mode"),
+            (self.stamp.uid != before.uid, "uid"),
+            (self.stamp.gid != before.gid, "gid"),
+        ]
+        .into_iter()
+        .filter_map(|(differs, name)| differs.then_some(name))
+        .collect();
+        if names.is_empty() {
+            "none".into()
+        } else {
+            names.join(",")
+        }
+    }
+}
+
+// Only fixed labels and numeric metadata enter this failure message. File
+// paths, package text and content hashes are deliberately not inputs.
+fn stability_refusal(
+    role: FileRole,
+    phase: CheckPhase,
+    before: Stamp,
+    opened: Observation,
+    listed: Observation,
+) -> String {
+    format!(
+        "audio file changed while checking: role={} phase={} opened_diff=[{}] listed_diff=[{}] before={} opened={} listed={}",
+        role.name(),
+        phase.name(),
+        opened.differences(before),
+        listed.differences(before),
+        before,
+        opened.stamp,
+        listed.stamp,
+    )
+}
+
 struct PlainFile {
     file: fs::File,
     path: PathBuf,
@@ -94,10 +197,11 @@ struct PlainFile {
     most: u64,
     parents: Vec<(PathBuf, (u64, u64))>,
     stamp_of: fn(&fs::Metadata) -> Stamp,
+    role: FileRole,
 }
 
 impl PlainFile {
-    fn stable(&self) -> Result<(), String> {
+    fn stable(&self, phase: CheckPhase) -> Result<(), String> {
         for (path, identity) in &self.parents {
             let meta = fs::symlink_metadata(path).map_err(|_| "audio folder missing")?;
             if !meta.is_dir()
@@ -112,13 +216,29 @@ impl PlainFile {
             .metadata()
             .map_err(|_| "audio file not readable")?;
         let listed = fs::symlink_metadata(&self.path).map_err(|_| "audio file missing")?;
+        let opened_stamp = (self.stamp_of)(&opened);
+        let listed_stamp = (self.stamp_of)(&listed);
         if !opened.is_file()
             || !listed.is_file()
             || listed.file_type().is_symlink()
-            || (self.stamp_of)(&opened) != self.stamp
-            || (self.stamp_of)(&listed) != self.stamp
+            || opened_stamp != self.stamp
+            || listed_stamp != self.stamp
         {
-            return Err("audio file changed while checking".into());
+            return Err(stability_refusal(
+                self.role,
+                phase,
+                self.stamp,
+                Observation {
+                    stamp: opened_stamp,
+                    regular: opened.is_file(),
+                    symlink: opened.file_type().is_symlink(),
+                },
+                Observation {
+                    stamp: listed_stamp,
+                    regular: listed.is_file(),
+                    symlink: listed.file_type().is_symlink(),
+                },
+            ));
         }
         Ok(())
     }
@@ -133,7 +253,7 @@ impl PlainFile {
         if bytes.len() as u64 > self.most {
             return Err("audio file exceeds its bound".into());
         }
-        self.stable()?;
+        self.stable(CheckPhase::AfterRead)?;
         Ok(bytes)
     }
 }
@@ -161,14 +281,15 @@ fn definition_hash(description: &[u8], manifest: &[u8]) -> String {
 /// The package reader's no-link/nonblocking/plain-file protections, applied
 /// to one already validated relative path. Only its at most four components
 /// are inspected; a runtime scan does not enumerate unrelated directories.
-fn plain_file(root: &Path, relative: &str, most: u64) -> Result<PlainFile, String> {
-    plain_file_with(root, relative, most, Stamp::of)
+fn plain_file(root: &Path, relative: &str, most: u64, role: FileRole) -> Result<PlainFile, String> {
+    plain_file_with(root, relative, most, role, Stamp::of)
 }
 
 fn plain_file_with(
     root: &Path,
     relative: &str,
     most: u64,
+    role: FileRole,
     stamp_of: fn(&fs::Metadata) -> Stamp,
 ) -> Result<PlainFile, String> {
     let path = root.join(relative);
@@ -203,6 +324,7 @@ fn plain_file_with(
         most,
         parents,
         stamp_of,
+        role,
     })
 }
 
@@ -258,9 +380,24 @@ impl Asset {
         }
         // Check descriptor images against the validated package, with path
         // and parent identity checks bracketing their bounded content reads.
-        let mut description = plain_file(&root, "SKILL.md", MOST_DEFINITION_BYTES)?;
-        let mut manifest = plain_file(&root, "skill.toml", MOST_DEFINITION_BYTES)?;
-        let mut recording = plain_file(&root, relative, lamp_voice::requested_audio::MOST_BYTES)?;
+        let mut description = plain_file(
+            &root,
+            "SKILL.md",
+            MOST_DEFINITION_BYTES,
+            FileRole::Description,
+        )?;
+        let mut manifest = plain_file(
+            &root,
+            "skill.toml",
+            MOST_DEFINITION_BYTES,
+            FileRole::Manifest,
+        )?;
+        let mut recording = plain_file(
+            &root,
+            relative,
+            lamp_voice::requested_audio::MOST_BYTES,
+            FileRole::Recording,
+        )?;
         let mut read = 0;
         if definition_hash(&description.bytes(&mut read)?, &manifest.bytes(&mut read)?)
             != definition_sha256
@@ -268,9 +405,9 @@ impl Asset {
         {
             return Err("requested audio changed while loading".into());
         }
-        description.stable()?;
-        manifest.stable()?;
-        recording.stable()?;
+        description.stable(CheckPhase::Final)?;
+        manifest.stable(CheckPhase::Final)?;
+        recording.stable(CheckPhase::Final)?;
         let asset = Self {
             path,
             sha256: sound.sha256.clone(),
@@ -319,14 +456,25 @@ impl Asset {
         if !self.root_unchanged() {
             return Err("audio folder changed".into());
         }
-        let mut description =
-            plain_file_with(&self.root, "SKILL.md", MOST_DEFINITION_BYTES, stamp_of)?;
-        let mut manifest =
-            plain_file_with(&self.root, "skill.toml", MOST_DEFINITION_BYTES, stamp_of)?;
+        let mut description = plain_file_with(
+            &self.root,
+            "SKILL.md",
+            MOST_DEFINITION_BYTES,
+            FileRole::Description,
+            stamp_of,
+        )?;
+        let mut manifest = plain_file_with(
+            &self.root,
+            "skill.toml",
+            MOST_DEFINITION_BYTES,
+            FileRole::Manifest,
+            stamp_of,
+        )?;
         let mut recording = plain_file_with(
             &self.root,
             &self.relative,
             lamp_voice::requested_audio::MOST_BYTES,
+            FileRole::Recording,
             stamp_of,
         )?;
         if (recording.stamp.device, recording.stamp.inode) != self.file_identity {
@@ -348,9 +496,9 @@ impl Asset {
         if audio_hash(&recording.bytes(read)?) != self.sha256 {
             return Err("audio file changed".into());
         }
-        description.stable()?;
-        manifest.stable()?;
-        recording.stable()?;
+        description.stable(CheckPhase::Final)?;
+        manifest.stable(CheckPhase::Final)?;
+        recording.stable(CheckPhase::Final)?;
         if !self.root_unchanged() {
             return Err("audio folder changed".into());
         }
@@ -630,6 +778,8 @@ impl Skill {
 mod file_checks {
     use super::*;
 
+    type StampChange = fn(&mut Stamp);
+
     fn coarse_stamp(metadata: &fs::Metadata) -> Stamp {
         // Model equal timestamp observations for distinct file images. All
         // identities, sizes, modes and owner fields still come from the file.
@@ -638,6 +788,237 @@ mod file_checks {
             changed: (1, 0),
             ..Stamp::of(metadata)
         }
+    }
+
+    #[derive(Clone, Copy)]
+    struct StampShift {
+        at: usize,
+        seen: usize,
+        change: StampChange,
+    }
+
+    thread_local! {
+        static STAMP_SHIFT: std::cell::Cell<Option<StampShift>> = const {
+            std::cell::Cell::new(None)
+        };
+    }
+
+    struct ShiftReset;
+
+    impl Drop for ShiftReset {
+        fn drop(&mut self) {
+            STAMP_SHIFT.with(|slot| slot.set(None));
+        }
+    }
+
+    fn shift_stamp(at: usize, change: StampChange) -> ShiftReset {
+        STAMP_SHIFT.with(|slot| {
+            assert!(slot.get().is_none(), "stamp injection must not nest");
+            slot.set(Some(StampShift {
+                at,
+                seen: 0,
+                change,
+            }));
+        });
+        ShiftReset
+    }
+
+    fn shifted_stamp(metadata: &fs::Metadata) -> Stamp {
+        let mut stamp = coarse_stamp(metadata);
+        STAMP_SHIFT.with(|slot| {
+            if let Some(mut shift) = slot.get() {
+                if shift.seen == shift.at {
+                    (shift.change)(&mut stamp);
+                }
+                shift.seen += 1;
+                slot.set(Some(shift));
+            }
+        });
+        stamp
+    }
+
+    #[test]
+    fn stability_refusals_identify_role_and_phase_without_disclosing_input() {
+        let content = b"private content must not enter diagnostics";
+        let relative = "private-recording-name.wav";
+        for (role, role_name) in [
+            (FileRole::Description, "description"),
+            (FileRole::Manifest, "manifest"),
+            (FileRole::Recording, "recording"),
+        ] {
+            for (phase, phase_name) in [
+                (CheckPhase::AfterRead, "after-read"),
+                (CheckPhase::Final, "final"),
+            ] {
+                let dir = tempfile::tempdir().unwrap();
+                fs::write(dir.path().join(relative), content).unwrap();
+                let mut file =
+                    plain_file_with(dir.path(), relative, 64, role, shifted_stamp).unwrap();
+                let mut read = 0;
+                if matches!(phase, CheckPhase::Final) {
+                    assert_eq!(file.bytes(&mut read).unwrap(), content);
+                }
+                // Change only the opened descriptor's observed ctime. This
+                // does not depend on the host timestamp resolution or timing.
+                let _reset = shift_stamp(0, |stamp| stamp.changed.1 ^= 1);
+                let error = match phase {
+                    CheckPhase::AfterRead => file.bytes(&mut read).unwrap_err(),
+                    CheckPhase::Final => file.stable(phase).unwrap_err(),
+                };
+                assert!(error.starts_with(&format!(
+                    "audio file changed while checking: role={role_name} phase={phase_name} "
+                )));
+                assert!(error.contains("opened_diff=[ctime] listed_diff=[none]"));
+                assert_eq!(read, content.len() as u64);
+                assert!(!error.contains(dir.path().to_str().unwrap()));
+                assert!(!error.contains(relative));
+                assert!(!error.contains(std::str::from_utf8(content).unwrap()));
+                assert!(!error.contains(&audio_hash(content)));
+                assert!(error.len() <= 1536);
+                assert!(error.is_ascii() && !error.contains('\n'));
+            }
+        }
+    }
+
+    #[test]
+    fn each_stamp_change_is_refused_and_identifies_its_observation_side() {
+        let changes: [(&str, StampChange); 10] = [
+            ("device", |stamp| stamp.device ^= 1),
+            ("inode", |stamp| stamp.inode ^= 1),
+            ("size", |stamp| stamp.size ^= 1),
+            ("mtime", |stamp| stamp.modified.0 ^= 1),
+            ("mtime", |stamp| stamp.modified.1 ^= 1),
+            ("ctime", |stamp| stamp.changed.0 ^= 1),
+            ("ctime", |stamp| stamp.changed.1 ^= 1),
+            ("mode", |stamp| stamp.mode ^= 1),
+            ("uid", |stamp| stamp.uid ^= 1),
+            ("gid", |stamp| stamp.gid ^= 1),
+        ];
+        for (field, change) in changes {
+            for side in 0..=1 {
+                let dir = tempfile::tempdir().unwrap();
+                fs::write(dir.path().join("skill.toml"), b"original").unwrap();
+                let mut file = plain_file_with(
+                    dir.path(),
+                    "skill.toml",
+                    64,
+                    FileRole::Manifest,
+                    shifted_stamp,
+                )
+                .unwrap();
+                // Arm only after opening, so this exercises the same before/
+                // opened/listed comparison as a real post-open change.
+                let _reset = shift_stamp(side, change);
+                let mut read = 0;
+                let error = file.bytes(&mut read).unwrap_err();
+                let (opened, listed) = if side == 0 {
+                    (field, "none")
+                } else {
+                    ("none", field)
+                };
+                assert!(
+                    error.contains(&format!("opened_diff=[{opened}] listed_diff=[{listed}]")),
+                    "{error}"
+                );
+                assert_eq!(read, 8);
+                let mut changed = file.stamp;
+                change(&mut changed);
+                let (opened, listed) = if side == 0 {
+                    (changed, file.stamp)
+                } else {
+                    (file.stamp, changed)
+                };
+                assert!(error.ends_with(&format!(
+                    "before={} opened={opened} listed={listed}",
+                    file.stamp
+                )));
+            }
+        }
+    }
+
+    #[test]
+    fn non_regular_observations_keep_their_refusal_and_fixed_type_details() {
+        for replacement in 0..3 {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("private-recording.wav");
+            fs::write(&path, b"original").unwrap();
+            let mut file = plain_file_with(
+                dir.path(),
+                "private-recording.wav",
+                64,
+                FileRole::Recording,
+                coarse_stamp,
+            )
+            .unwrap();
+            match replacement {
+                0 => file.file = fs::File::open(dir.path()).unwrap(),
+                1 => {
+                    fs::remove_file(&path).unwrap();
+                    fs::create_dir(&path).unwrap();
+                }
+                _ => {
+                    let target = dir.path().join("private-symlink-target");
+                    fs::rename(&path, &target).unwrap();
+                    std::os::unix::fs::symlink(&target, &path).unwrap();
+                }
+            }
+            let error = file.stable(CheckPhase::Final).unwrap_err();
+            if replacement == 0 {
+                assert!(error.contains("opened_diff=[not-regular,"));
+            } else if replacement == 1 {
+                assert!(error.contains("listed_diff=[not-regular,"));
+            } else {
+                assert!(error.contains("listed_diff=[not-regular,symlink,"));
+            }
+            assert!(!error.contains("private-"));
+            assert!(!error.contains(dir.path().to_str().unwrap()));
+        }
+    }
+
+    #[test]
+    fn maximum_width_numeric_refusal_stays_within_1536_bytes() {
+        let before = Stamp {
+            device: u64::MAX,
+            inode: u64::MAX,
+            size: u64::MAX,
+            modified: (i64::MIN, i64::MIN),
+            changed: (i64::MIN, i64::MIN),
+            mode: u32::MAX,
+            uid: u32::MAX,
+            gid: u32::MAX,
+        };
+        let different = |offset| Observation {
+            stamp: Stamp {
+                device: before.device - offset,
+                inode: before.inode - offset,
+                size: before.size - offset,
+                modified: (i64::MIN + offset as i64, i64::MIN + offset as i64),
+                changed: (i64::MIN + offset as i64, i64::MIN + offset as i64),
+                mode: before.mode - offset as u32,
+                uid: before.uid - offset as u32,
+                gid: before.gid - offset as u32,
+            },
+            regular: false,
+            symlink: true,
+        };
+        let error = stability_refusal(
+            FileRole::Description,
+            CheckPhase::AfterRead,
+            before,
+            different(1),
+            different(2),
+        );
+        assert!(error.len() <= 1536, "{} bytes", error.len());
+        assert!(error.is_ascii() && !error.contains('\n'));
+        assert!(error.contains(&u64::MAX.to_string()));
+        assert!(error.contains(&u32::MAX.to_string()));
+        assert!(error.contains(&i64::MIN.to_string()));
+        assert_eq!(
+            error
+                .matches("not-regular,symlink,device,inode,size,mtime,ctime,mode,uid,gid")
+                .count(),
+            2
+        );
     }
 
     #[test]
@@ -737,14 +1118,27 @@ mod file_checks {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("skill.toml");
         fs::write(&path, b"original").unwrap();
-        let mut opened = plain_file_with(dir.path(), "skill.toml", 64, coarse_stamp).unwrap();
+        let mut opened = plain_file_with(
+            dir.path(),
+            "skill.toml",
+            64,
+            FileRole::Manifest,
+            coarse_stamp,
+        )
+        .unwrap();
         fs::rename(&path, dir.path().join("old.toml")).unwrap();
         fs::write(&path, b"original").unwrap();
         // Renaming can change the old inode's ctime. Hold observed times
         // equal so only the listed path's replacement can refuse the read.
         assert_eq!(coarse_stamp(&opened.file.metadata().unwrap()), opened.stamp);
         assert_ne!(coarse_stamp(&fs::metadata(&path).unwrap()), opened.stamp);
-        assert!(opened.bytes(&mut 0).is_err());
+        let mut read = 0;
+        let error = opened.bytes(&mut read).unwrap_err();
+        assert!(
+            error.starts_with("audio file changed while checking: role=manifest phase=after-read ")
+        );
+        assert!(error.contains("opened_diff=[none] listed_diff=[inode]"));
+        assert_eq!(read, 8);
     }
 
     #[test]
@@ -758,13 +1152,17 @@ mod file_checks {
             dir.path().join("replacement/fixture.wav"),
         )
         .unwrap();
-        let mut opened = plain_file(dir.path(), "sounds/fixture.wav", 64).unwrap();
+        let mut opened =
+            plain_file(dir.path(), "sounds/fixture.wav", 64, FileRole::Recording).unwrap();
         fs::rename(dir.path().join("sounds"), dir.path().join("previous")).unwrap();
         fs::rename(dir.path().join("replacement"), dir.path().join("sounds")).unwrap();
         assert_eq!(
             Stamp::of(&fs::metadata(dir.path().join("sounds/fixture.wav")).unwrap()),
             opened.stamp
         );
-        assert!(opened.bytes(&mut 0).is_err());
+        assert_eq!(
+            opened.bytes(&mut 0).unwrap_err(),
+            "audio folder changed while checking"
+        );
     }
 }
