@@ -5215,6 +5215,14 @@ A usage limit paused me from about 00:40 to 06:2x.
   - a name forgotten and enrolled again starts fresh;
   - five mutations are caught. It's on #1712's `e1410041b`, in its gate.
 
+## 2026-10-21, 13:09 ICT: `memory/forgot` merged (#2493); my lamp runs handed back (no lamp)
+
+- **#2493 merged** into #1712 (13:05): memory tells each forget of everything kept under a person on `memory/forgot`, after its answer, and only memory's own ids. The voice's tone baselines let that person's go.
+  - The reviewer's three P3s were folded: ids only, a loop test with a real reader, and the topic as an event.
+  - The fold's gate: 4060 passed, plus one `privacy_bus` timing test that passes alone. The first version's quiet rerun: 2785 passed, 0 failed.
+- **Lamp runs:** the lead (12:5x, 13:0x) asked each builder with a lamp to run their own switches' rows by 19:00. I have none, so I listed my rows on #1722 for the first builder to move. I gave two new rows for the voice tone and Mood's tone.
+- **(b)**, Mood reading `voice/tone`, waits for tonight's landing.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
