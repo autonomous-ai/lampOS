@@ -6,6 +6,17 @@ The first builder's named routing is requested. The separate branch
 `second/audio-metadata-diagnostics` starts at #1757's qualified
 `0a878cd4d9d44867b2971e70c118244f0c21ad38`; #1757's head is unchanged.
 
+## Implementation checkpoint
+
+Pushed as one follow-up commit `1bdecb484def9c1e843bda1f445f107110f1ce4d`
+on `second/audio-metadata-diagnostics`, above #1757's qualified head.
+[Evidence](https://github.com/autonomous-ai/lampOS/blob/1bdecb484def9c1e843bda1f445f107110f1ce4d/lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/README.md):
+fmt and strict Skills Clippy pass; **425 passed, 0 failed, 0 ignored,
+0 filtered out**. The generic-message control failed 3/5/0/129 as intended.
+The first Clippy type-complexity failure and test-only alias correction remain
+recorded. Read review found no P1/P2. No native qualification is claimed.
+The separate PR onto lamp-voice follows #1757's module merging there.
+
 ## Problem and scope
 
 The retained packaging refusal `audio file changed while checking` cannot
