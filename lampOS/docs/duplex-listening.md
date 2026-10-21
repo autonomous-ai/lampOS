@@ -420,6 +420,23 @@ it happens (`duplex_fruitless_forgiven`, with `forgiven_so_far`), and
 `fallen_back_at_end` says only whether the last reply had fallen back when
 the session ended (Eighth on #2048).
 
+**With `LAMP_CUT_IN_KEEPS_LISTENING=on` (#2602, off unless set), a person
+who keeps trying is still heard within those 20 s.** On the Mac's replay
+of the coordinator's real path (22 Oct), a third line 3 to 19 s after two
+asides made no yield and no candidate, and the story played on over it;
+21 and 30 s after, it was heard. With the switch, a reply that has fallen
+back still yields to a voice over it that keeps going: 30 blocks in a row
+heard as a person over the lamp (`KEEPS_TRYING_BLOCKS`, 300 ms), then the
+yield's own onset, about 0.4 s in all. That person is scored to the
+detector as before the fallback, so the line commits and stops the story
+as any cut-in does. Only `Over` blocks count, and only after the lamp's
+own sound has been found again (`MATCHED_BLOCKS`), so the lamp's echo is
+never one; a word or a cough is shorter. A voice that keeps going and is
+never a line (a television) may cost at most two more fruitless yields
+(`KEEPS_TRYING_YIELDS`) before 20 s gives one back; then the reply falls
+back as without the switch. `duplex_policy` gives both numbers
+(`keeps_listening`).
+
 What that means for a person in the room:
 
 - Someone who starts a new question over the lamp is heard from their
@@ -1188,6 +1205,10 @@ functions:
 | `a_yield_that_is_never_settled_is_given_up_at_its_deadline` | Resume at 60 blocks; the candidate ends as policy, not deadline or capacity |
 | `the_standard_hold_cannot_keep_a_candidate_through_a_yield` | Why the hold is longer |
 | `a_reply_that_twice_yields_to_nothing_masks_like_the_baseline_...` | The third time, no yield and no candidate |
+| `with_keeps_listening_a_third_line_soon_after_two_asides_stops_the_story` | `LAMP_CUT_IN_KEEPS_LISTENING=on`: a third line 5, 10 or 30 s after two asides yields, commits and ends the story as `user_interrupted` |
+| `without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard` | The switch off: 5 and 19 s after, no yield and no candidate; 21 s after, heard (the forgiven yield) |
+| `with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in` | With the switch: 3,000 blocks of the lamp's own voice, a 25-block word, and 1,000 blocks of voice unexplained before the lamp's sound is found again after a third aside, none a yield |
+| `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
 | `without_echo_evidence_duplex_decides_as_the_conservative_baseline_does` | Same masked blocks, candidates and rejections as `v1-baseline` |
 | `a_microphone_that_stops_arriving_does_not_hold_the_reply_back` | Dispatch resumes after 100 ms without a block |
 | `a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn` | Six blocks and admitted, as ever |

@@ -50,6 +50,31 @@ pub const FRUITLESS_YIELDS: u8 = 2;
 /// request (#1712, the first builder at 04:11 and their yes at 04:40). A
 /// noise that trips it more often than this still falls back as before.
 pub const FORGIVE_FRUITLESS_US: u64 = 20_000_000;
+/// With `LAMP_CUT_IN_KEEPS_LISTENING=on`, a reply fallen back after its
+/// fruitless yields still yields to a voice over it that keeps going: this
+/// many blocks over the lamp in a row (300 ms), then the yield's own onset
+/// (about 100 ms more). A person who tries a third time within
+/// [`FORGIVE_FRUITLESS_US`] is not talked over for the rest of the story:
+/// on the Mac's replay on 22 Oct a line 3 to 19 s after two asides made no
+/// yield and no candidate (#2602, "Cutting in"). A cough or a word is
+/// shorter than this and is still not let through.
+pub const KEEPS_TRYING_BLOCKS: u16 = 30;
+/// How many more yields that came to nothing such a voice may cost a reply,
+/// before [`FORGIVE_FRUITLESS_US`] gives one back: a television that keeps
+/// talking over a story pauses it at most this many times more.
+pub const KEEPS_TRYING_YIELDS: u8 = 2;
+/// The voice's environment switch for [`KEEPS_TRYING_BLOCKS`], with `on`;
+/// off unless set.
+pub const CUT_IN_KEEPS_LISTENING_ENVIRONMENT: &str = "LAMP_CUT_IN_KEEPS_LISTENING";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_KEEPS_LISTENING_ENVIRONMENT`].
+pub fn cut_in_keeps_listening() -> bool {
+    std::env::var(CUT_IN_KEEPS_LISTENING_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
 /// Blocks of the lamp's own sound that the render must have explained, since
 /// the lamp last had nothing to say or last went on after a pause, before a
 /// block can be a person over it. The evidence takes the start of every
@@ -165,6 +190,11 @@ struct Duplex {
     matched: u16,
     /// When the latest block was heard.
     listened_at_us: u64,
+    /// `LAMP_CUT_IN_KEEPS_LISTENING=on`: see [`KEEPS_TRYING_BLOCKS`].
+    keeps_listening: bool,
+    /// Blocks in a row heard as a person over the lamp while it speaks,
+    /// whether or not it may yield.
+    over_run: u16,
 }
 
 /// One capture block as the duplex mask heard it.
@@ -248,6 +278,8 @@ impl PlaybackMask {
                 stop_committed: false,
                 matched: 0,
                 listened_at_us: 0,
+                keeps_listening: false,
+                over_run: 0,
             }),
             ..Self::new(TurnTaking::V1Baseline)
         }
@@ -288,6 +320,14 @@ impl PlaybackMask {
         self.listen_gaps
             .as_ref()
             .and_then(|gaps| gaps.overran_us(owner, started_us, last_zero_us))
+    }
+    /// `LAMP_CUT_IN_KEEPS_LISTENING=on`: a reply fallen back after its
+    /// fruitless yields still yields to a voice that keeps going over it
+    /// ([`KEEPS_TRYING_BLOCKS`]). Only with ears.
+    pub fn keep_listening(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.keeps_listening = true;
+        }
     }
     /// Remember enough hearing for a yield's first words (#828): every
     /// block of a candidate that reaches back is checked against it before
@@ -422,10 +462,22 @@ impl PlaybackMask {
             heard => heard,
         };
         duplex.margin.observe(heard, evidence);
+        duplex.over_run = if speaking && heard == Heard::Over {
+            duplex.over_run.saturating_add(1)
+        } else {
+            0
+        };
+        let fallen = duplex.fruitless >= FRUITLESS_YIELDS;
+        // With the switch, a voice that keeps going over a reply fallen
+        // back is still a person trying to cut in, a few times more.
+        let keeps_trying = duplex.keeps_listening
+            && fallen
+            && duplex.fruitless < FRUITLESS_YIELDS.saturating_add(KEEPS_TRYING_YIELDS)
+            && duplex.over_run > KEEPS_TRYING_BLOCKS;
         // A reply that keeps yielding to nothing stops yielding.
         // A stop heard by its own listener yields however many did not.
-        let may_yield = speaking
-            && (duplex.fruitless < FRUITLESS_YIELDS || duplex.interruption.force_pending());
+        let may_yield =
+            speaking && (!fallen || keeps_trying || duplex.interruption.force_pending());
         let plain = duplex.hearing.plain(heard, evidence);
         let step = duplex.interruption.observe(heard, plain, may_yield);
         if duplex.heard.len() >= duplex.max_heard {
@@ -433,7 +485,10 @@ impl PlaybackMask {
         }
         duplex.heard.push_back((sequence, heard));
         Self::settle(duplex, sequence, step);
-        let score = if speaking && duplex.fruitless >= FRUITLESS_YIELDS && heard == Heard::Over {
+        // The person the lamp stopped for with the switch is heard on.
+        let heard_on =
+            keeps_trying || (duplex.keeps_listening && fallen && duplex.interruption.yielded());
+        let score = if speaking && fallen && !heard_on && heard == Heard::Over {
             // Fallen back for this reply: a person over the lamp is not let
             // through either, as in the conservative baseline.
             0.0
