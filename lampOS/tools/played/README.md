@@ -38,7 +38,11 @@ Two more you can run on their own:
   ARM64 run's artifact. It puts it in as lamp-tasks' Harness, with
   `--sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN=on`, through
   `/run` drop-ins that it removes when it ends. It prints PASS or FAIL for
-  each step, and hand-overs fail while it runs.
+  each step, and hand-overs fail while it runs. The lamp side is
+  `ask-again-setup.sh`, run as root, with the stand-in's HOME given to
+  lamp-tasks' own user. If a setup step fails, it says which, and nothing
+  is played. `ask-again-test.sh` runs that setup against a stand-in
+  `systemctl`, with no lamp and no root: run it after changing the setup.
 
 ## What it needs
 

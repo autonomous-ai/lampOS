@@ -17,7 +17,6 @@ FIXTURE=${2:?FIXTURE: an ARM64 lamp-tasks-harness-fixture}
 RATE=${LAMP_SAY_RATE:-185}
 OUT="$PLAYED_OUT/scenarios/ask-again-$L.txt"
 REMOTE=/usr/local/lib/played-ask-again   # /run may be noexec; this folder is removed when the run ends
-DROP=zz-played-ask-again.conf
 ./lamp_ssh 'sudo -n true' </dev/null || { echo "the lamp's user needs sudo -n" >&2; exit 2; }
 ./quiet_gate.sh 45 || { echo "the lamp is not quiet: nothing played" >&2; exit 3; }
 
@@ -43,39 +42,19 @@ wait_for() {  # PATTERN SECONDS: wait until the journal has a line matching PATT
 print "ask-again $L  $(date -u +%Y-%m-%dT%H:%M:%SZ)  fixture $(shasum -a 256 "$FIXTURE" | cut -c1-16)" | tee "$OUT"
 ./lamp_ssh "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
 
-# The stand-in in, and put back whatever happens.
+# The stand-in in (ask-again-setup.sh, on the lamp as root), and put back whatever happens. A setup that fails says
+# which step and stops here: nothing is played (#2715's first run, lamp-4ace, 22 Oct 02:5x).
 put_back() {
-  ./lamp_ssh "sudo -n sh -s" <<EOF
-rm -f /run/systemd/system/lamp-tasks.service.d/$DROP /run/systemd/system/lamp-voice.service.d/$DROP
-systemctl daemon-reload
-systemctl restart lamp-tasks lamp-voice
-sleep 5
-rm -rf $REMOTE
-echo "put back: lamp-tasks \$(systemctl is-active lamp-tasks), lamp-voice \$(systemctl is-active lamp-voice)"
-EOF
+  ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < ask-again-setup.sh
 }
-trap 'put_back | tee -a "$OUT"' EXIT
-./lamp_ssh "sudo -n sh -s" <<EOF | tee -a "$OUT" || exit 9
-set -e
-home=$REMOTE/home
-mkdir -p \$home
-printf '{"login":{"code_flow":true}}\n' > \$home/plan.json
-printf '#!/bin/sh\nHOME=%s exec %s "\$@"\n' "\$home" "$REMOTE/harness-fixture" > $REMOTE/harness
-chmod 0755 $REMOTE/harness
-chown -R lampos:lampos \$home
-# lamp-tasks' own ExecStart, its --harness swapped for the stand-in, with --sign-in-by-code.
-exec_line=\$(systemctl cat lamp-tasks | awk '/^ExecStart=./ { line = substr(\$0, 11) } END { print line }')
-case "\$exec_line" in *--harness\ *) ;; *) echo "lamp-tasks has no --harness: nothing changed"; exit 1;; esac
-exec_line=\$(printf '%s\n' "\$exec_line" | sed -E "s#--harness [^ ]+#--harness $REMOTE/harness#")
-case "\$exec_line" in *--sign-in-by-code*) ;; *) exec_line="\$exec_line --sign-in-by-code";; esac
-mkdir -p /run/systemd/system/lamp-tasks.service.d /run/systemd/system/lamp-voice.service.d
-printf '[Service]\nExecStart=\nExecStart=%s\n' "\$exec_line" > /run/systemd/system/lamp-tasks.service.d/$DROP
-printf '[Service]\nEnvironment=LAMP_TASKS_SIGN_IN=on\n' > /run/systemd/system/lamp-voice.service.d/$DROP
-systemctl daemon-reload
-systemctl restart lamp-tasks lamp-voice
+trap 'put_back 2>&1 | tee -a "$OUT"' EXIT
+if ! ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- in" < ask-again-setup.sh >> "$OUT" 2>&1; then
+  tail -2 "$OUT" >&2
+  echo "ask-again $L: the stand-in's setup failed; nothing was played (see $OUT)" | tee -a "$OUT" >&2
+  exit 9
+fi
+tail -1 "$OUT"
 sleep 20
-echo "stand-in in: lamp-tasks \$(systemctl is-active lamp-tasks), lamp-voice \$(systemctl is-active lamp-voice)"
-EOF
 START=$(./lamp_ssh 'date +%s' </dev/null)
 
 typeset -A result
