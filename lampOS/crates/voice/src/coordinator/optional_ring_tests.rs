@@ -353,6 +353,55 @@ fn a_closed_ring_channel_does_not_create_input_readiness_or_stop_audio_authority
     );
 }
 
+/// The first builder on #2602 (lamp-75c9, 21 Oct 22:32:43): the session's
+/// privacy worker ended before an authority send. On the Controls route one
+/// that ended cleanly is the switch unreadable: the microphones stay closed
+/// and it is read again, never an exit. One that crashed, and any on the
+/// direct route, still ends the voice.
+#[test]
+fn a_refused_privacy_worker_that_ended_cleanly_is_an_unreadable_switch_on_the_controls_route() {
+    for (privacy_controls, exit, unreadable) in [
+        (true, "exit 0", true),
+        (true, "exit 3", false),
+        (false, "exit 0", false),
+    ] {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut rig, mut peers) = fixture(&directory);
+        rig.privacy_controls = privacy_controls;
+        // Its own folder: the fixture's privacy sockets are bound already.
+        let other = SessionDirectory::create().unwrap();
+        let (privacy, privacy_peer) = Worker::command_fixture(&other.path, "privacy", exit);
+        drop(privacy_peer);
+        rig.privacy = privacy;
+        let mut controller = Controller::new(new_boot().unwrap(), now());
+        // A forked child may hold the socket for a moment, as above.
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        let refused = loop {
+            match rig.publish(controller.snapshot(now()).unwrap()) {
+                Err(error) => break error,
+                Ok(()) => {
+                    assert!(
+                        std::time::Instant::now() < until,
+                        "the privacy worker was not gone after 5 s"
+                    );
+                    for peer in [&mut peers.speaker, &mut peers.capture, &mut peers.provider] {
+                        while let Ok(Some(_)) = peer.control.receive::<Control>() {}
+                    }
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            }
+        };
+        assert!(refused.to_string().contains("privacy."), "{refused}");
+        assert_eq!(
+            crate::service_privacy::is_unavailable(&refused),
+            unreadable,
+            "{privacy_controls} {exit}: {refused}"
+        );
+        drop(rig);
+        let _ = std::fs::remove_dir_all(&other.path);
+    }
+}
+
 #[test]
 fn audio_authority_failure_is_still_terminal_even_if_ring_is_disabled() {
     let directory = SessionDirectory::create().unwrap();

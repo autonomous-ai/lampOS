@@ -76,7 +76,13 @@ The conversation's own privacy worker counts the same if it ends cleanly at
 its start (`privacy_started`, Seventh on #1396): the conversation ends closed
 and the wait reads the switch again. A worker that crashed (a panic, a
 signal, any other status) and any other start failure end it as before
-(the reviewer-lead on #2506). Each read again tells the wait the switch
+(the reviewer-lead on #2506). The same holds when the conversation first
+finds it gone by its refused socket, as it sends the worker its authority
+(`authority_refused`): a worker that ended cleanly, waited for at most
+100 ms, is the switch unreadable, not an exit (lamp-75c9, 21 Oct 22:32:43,
+the first builder on #2602: the session's new worker had ended on
+`physical privacy source expired` before its first authority, and
+`privacy.c.p: Connection refused` ended the voice). Each read again tells the wait the switch
 reads unavailable, so after 1 s the health says the microphones are off
 until the privacy switch can be read, while every fresh worker ends at its
 start as well as when one ends running (the first builder on #2506). The worker's own `privacy switch unreadable:`
