@@ -1,0 +1,20 @@
+--- a/lampOS/crates/voice/src/bus_out.rs
++++ b/lampOS/crates/voice/src/bus_out.rs
+@@ -1181,17 +1181,6 @@
+     /// (`not_for_me{}`) is left out wherever it comes (lamp-4ace,
+     /// 2026-10-16 17:12).
+     pub fn said(&mut self, request: u64, text: &str, finished: bool, now_us: u64) {
+-        if self.unsaid == Some(request) {
+-            return;
+-        }
+-        let opening = self.said_in != Some(request);
+-        if opening && crate::not_speech::names_a_function(text) {
+-            self.unsaid = Some(request);
+-            return;
+-        }
+-        if !self.calls.keeps(request, text) {
+-            return;
+-        }
+         self.said_in = Some(request);
+         let _ = self
+             .said

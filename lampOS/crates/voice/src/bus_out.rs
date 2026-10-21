@@ -1701,8 +1701,8 @@ mod tests {
         let mut watch = bus
             .subscribe_typed(VoiceState::TOPIC, "watch", VoiceState::TYPE)
             .unwrap();
-        // A subscriber is found within the bus's 200 ms.
-        std::thread::sleep(Duration::from_millis(250));
+        // Subscription has bound and named the socket; first publication
+        // scans for it synchronously, before the later rescan interval.
         let mut said = Vec::new();
         for (phase, at_us) in [
             (None, 0),
@@ -2086,7 +2086,6 @@ mod tests {
         let mut said = bus
             .subscribe_typed("voice/said", "s", Speech::TYPE)
             .unwrap();
-        std::thread::sleep(Duration::from_millis(250));
         // Before any turn's input began, then in turn 7's, then in 8's.
         out.heard("Hm.", true, 1);
         out.input_started(7);
@@ -2124,7 +2123,6 @@ mod tests {
         let mut said = bus
             .subscribe_typed("voice/said", "s", Speech::TYPE)
             .unwrap();
-        std::thread::sleep(Duration::from_millis(250));
         out.said(1, "not_for_me", false, 1);
         out.said(1, " Sure.", true, 2);
         out.said(2, "Yes?", false, 3);
@@ -2177,7 +2175,6 @@ mod tests {
         let mut watch = bus
             .subscribe_typed(RoomState::TOPIC, "watch", RoomState::TYPE)
             .unwrap();
-        std::thread::sleep(Duration::from_millis(250));
         let mut seen = Vec::new();
         for (room, at_us) in [
             (Judged::Unknown, 0),

@@ -1,0 +1,152 @@
+=== before-compile | exit 0 | 83.381748 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice#lamp-voice@0.1.0","manifest_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_voice","src_path":"/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-ce5519f421d320d4","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice-processes)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/health)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/policy)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/expression)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/ears)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/tasks)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/controls)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-bus-20261022/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 23s
+=== end before-compile ===
+=== before-state-1 | exit 0 | 2.345506 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.51s
+
+--- stderr ---
+=== end before-state-1 ===
+=== before-speech-1 | exit 0 | 0.351973 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.33s
+
+--- stderr ---
+=== end before-speech-1 ===
+=== before-calls-1 | exit 0 | 0.389865 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::a_function_call_written_as_words_is_never_published_as_said ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.37s
+
+--- stderr ---
+=== end before-calls-1 ===
+=== before-room-1 | exit 0 | 0.474394 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.45s
+
+--- stderr ---
+=== end before-room-1 ===
+=== before-state-2 | exit 0 | 0.540706 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.52s
+
+--- stderr ---
+=== end before-state-2 ===
+=== before-speech-2 | exit 0 | 0.348942 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.33s
+
+--- stderr ---
+=== end before-speech-2 ===
+=== before-calls-2 | exit 0 | 0.391474 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::a_function_call_written_as_words_is_never_published_as_said ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.37s
+
+--- stderr ---
+=== end before-calls-2 ===
+=== before-room-2 | exit 0 | 0.475865 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.45s
+
+--- stderr ---
+=== end before-room-2 ===
+=== before-state-3 | exit 0 | 0.534082 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_state_is_published_when_it_changes_and_once_a_second ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.51s
+
+--- stderr ---
+=== end before-state-3 ===
+=== before-speech-3 | exit 0 | 0.351118 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::what_was_heard_and_what_was_said_go_to_their_own_topics ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.33s
+
+--- stderr ---
+=== end before-speech-3 ===
+=== before-calls-3 | exit 0 | 0.392915 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::a_function_call_written_as_words_is_never_published_as_said ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.37s
+
+--- stderr ---
+=== end before-calls-3 ===
+=== before-room-3 | exit 0 | 0.472784 s ===
+--- stdout ---
+
+running 1 test
+test bus_out::tests::the_room_is_published_when_it_changes_and_every_second_and_the_worker_is_given_the_root_by_a_flag ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3042 filtered out; finished in 0.45s
+
+--- stderr ---
+=== end before-room-3 ===
