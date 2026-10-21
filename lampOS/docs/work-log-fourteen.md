@@ -707,3 +707,20 @@ Ready for lamp-voice: yes
   226 switches total (was 225), counted correctly under "Other parts."
 - Opened [lampOS#2423](https://github.com/autonomous-ai/lampOS/pull/2423),
   reported on [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6305807894).
+
+## 2026-10-21 — resolved all three open PR conflicts for the user
+
+Ready for lamp-voice: n/a (app-side, status)
+
+- The user asked to check every open PR of mine for conflicts and
+  resolve them so they could merge. Checked all three:
+  - ecm-sds-mobile#15 (restart, #2193): CONFLICTING — v3 had moved a
+    long way since this was last touched. Rebased, same two files as
+    every other #2194-era conflict, kept both sides. analyze 24 (v3's
+    current baseline, confirmed in an isolated worktree), test -j2
+    812/0/1. Now CLEAN.
+  - ecm-sds-mobile#19 (restoring/stale): already CLEAN, no action.
+  - lampOS#2423 (switches.md): already CLEAN, no action.
+- Also noticed in passing: v3's own brick-test compile error (flagged
+  on #1722 a while back) is fixed now (Mobile's #18, merged) — the
+  full suite is clean with no known failures at all.
