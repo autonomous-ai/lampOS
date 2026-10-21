@@ -10657,6 +10657,60 @@ fn unplug_operation_is_the_core_grant_not_the_skill_name() {
     }
 }
 
+/// #940's first move: prepare-unplug's words are its own `[unplug]`,
+/// required with the `prepare_unplug` grant, refused without it, and each
+/// line words as a say's are.
+#[test]
+fn unplug_words_are_the_granted_skills_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let valid = include_str!("../../../../skills/prepare-unplug/skill.toml");
+    let skill = load(&skill_with(dir.path(), "prepare-unplug", valid)).unwrap();
+    assert_eq!(
+        skill.unplug.as_ref().unwrap().ready,
+        "My arm is folded. You can unplug me now."
+    );
+    // The grant without its words.
+    let start = valid.find("[unplug]").unwrap();
+    let end = start + valid[start..].find("\n\n").unwrap() + 2;
+    let wordless = format!("{}{}", &valid[..start], &valid[end..]);
+    let why = load(&skill_with(
+        &dir.path().join("wordless"),
+        "prepare-unplug",
+        &wordless,
+    ))
+    .unwrap_err();
+    assert!(why.contains("says its [unplug] words"), "{why}");
+    // Words without the grant, in a skill with no fold.
+    let ungranted = valid
+        .replace("core = [\"prepare_unplug\"]\n", "")
+        .replace("body = { prepare_unplug = true }", "say = \"Resting.\"");
+    assert_ne!(ungranted, valid);
+    let why = load(&skill_with(
+        &dir.path().join("ungranted"),
+        "desk-rest",
+        &ungranted,
+    ))
+    .unwrap_err();
+    assert!(why.contains("only with that grant"), "{why}");
+    // A line that isn't words.
+    let check = "check = \"Say exactly: I can't get up by myself; I need to be checked.\"";
+    for bad in [
+        "\"\"".to_owned(),
+        "\"a\\u0007b\"".to_owned(),
+        format!("\"{}\"", "x".repeat(901)),
+    ] {
+        let text = valid.replace(check, &format!("check = {bad}"));
+        assert_ne!(text, valid);
+        let why = load(&skill_with(
+            &dir.path().join("bad"),
+            "prepare-unplug",
+            &text,
+        ))
+        .unwrap_err();
+        assert!(why.contains("[unplug] check is words"), "{why}");
+    }
+}
+
 #[test]
 fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
     let dir = tempfile::tempdir().unwrap();

@@ -11,5 +11,15 @@ core = ["prepare_unplug"]
 speak = true
 topics = ["body/unplug_request", "body/unplug_state", "expression/unplug_state", "ring/unplug_state", "body/unplug_cancel"]
 
+# What it says at each outcome (#940): its own words, read only with its
+# core grant. The fold, its readiness check and the voice's guard stay core.
+# ready is said as written; the others are notes for the voice, as before.
+[unplug]
+ready = "My arm is folded. You can unplug me now."
+failed = "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
+stay = "Say exactly: Okay, I'll stay."
+timeout = "Say exactly: I'm still plugged in, so I'm getting back up."
+check = "Say exactly: I can't get up by myself; I need to be checked."
+
 [[do]]
 body = { prepare_unplug = true }

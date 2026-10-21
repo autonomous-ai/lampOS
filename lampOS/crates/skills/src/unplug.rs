@@ -22,11 +22,6 @@ pub const READ_TOPICS: [&str; 5] = [
 /// declared whenever the skill is loaded and refused with no latch in force.
 pub const STAY_TOOL: &str = "stay_plugged_in";
 const STAY_DESCRIPTION: &str = "Call only when, after you began preparing to be unplugged, the person says they will not unplug you after all (for example: never mind, don't unplug, I'm not unplugging you, stay on). The lamp says it will stay, then stands up again by itself. Do not say anything yourself.";
-pub const STAY_LINE: &str = "Say exactly: Okay, I'll stay.";
-pub const TIMEOUT_LINE: &str = "Say exactly: I'm still plugged in, so I'm getting back up.";
-/// Said once when a preparation that was Ready fails before any cancel, or
-/// when the body fails one after the cancel (no stand within 60 s).
-pub const CHECK_LINE: &str = "Say exactly: I can't get up by myself; I need to be checked.";
 /// Unbroken minutes Ready, with Skills still up, before the lamp gets back up.
 pub const STAY_ENVIRONMENT: &str = "LAMP_UNPLUG_STAY_MIN";
 const STAY_DEFAULT_MIN: u64 = 10;

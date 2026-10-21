@@ -168,6 +168,9 @@ struct SkillFile {
     /// What the model is told of a call while the tool's run, which holds
     /// no pose, is under way.
     still: Option<String>,
+    /// What a skill granted `prepare_unplug` says at each outcome
+    /// ([`UnplugLines`]).
+    unplug: Option<UnplugLines>,
     /// What the room's presence was over the last hours, for the model
     /// (#1685, "was anyone here while I was out?").
     history: Option<HistoryFile>,
@@ -578,6 +581,51 @@ const MOST_SAY_EXPIRES_MS: u64 = 3_600_000;
 /// The most bytes of a skill's own words the voice takes
 /// (`lamp_voice::say::MOST_WORDS_BYTES`).
 pub const MOST_WORDS_BYTES: usize = 900;
+
+/// What a skill granted `prepare_unplug` says at each of the operation's
+/// outcomes, in its own `skill.toml`'s `[unplug]` (#940: the first move of
+/// "Everything is a skill"). The fold, its readiness check and the voice's
+/// guard are the core grant's; the words are the skill's.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct UnplugLines {
+    /// Said as written, once the fold and the asleep look are confirmed.
+    pub ready: String,
+    /// A note for the voice when the fold isn't confirmed.
+    pub failed: String,
+    /// A note for the voice when the person says to stay plugged in.
+    pub stay: String,
+    /// A note for the voice when it gets back up after the wait.
+    pub timeout: String,
+    /// A note for the voice, said once when a preparation that was Ready
+    /// fails before any cancel, or when the body fails one after the cancel
+    /// (no stand within 60 s): it can't get up by itself.
+    pub check: String,
+}
+
+impl UnplugLines {
+    /// Each line is words, as a say's own are: 1 to [`MOST_WORDS_BYTES`]
+    /// bytes, with no control characters.
+    fn checked(self) -> Result<Self, String> {
+        for (name, line) in [
+            ("ready", &self.ready),
+            ("failed", &self.failed),
+            ("stay", &self.stay),
+            ("timeout", &self.timeout),
+            ("check", &self.check),
+        ] {
+            if line.trim().is_empty()
+                || line.len() > MOST_WORDS_BYTES
+                || line.chars().any(char::is_control)
+            {
+                return Err(format!(
+                    "[unplug] {name} is words, 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ));
+            }
+        }
+        Ok(self)
+    }
+}
 
 /// What a `say` asks of the voice: a note it phrases, its exact words, or
 /// what it keeps.
@@ -1278,6 +1326,8 @@ pub struct Skill {
     steps: Vec<(Option<Only>, Step)>,
     /// A watch, on only while a person asked for it ([`watch`]).
     pub watch: Option<watch::Spec>,
+    /// With the `prepare_unplug` grant, what it says ([`UnplugLines`]).
+    pub unplug: Option<UnplugLines>,
 }
 
 impl Skill {
@@ -3103,6 +3153,24 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             Some(within_us)
         }
     };
+    // The words are the grant's: a skill granted it says them all, and no
+    // other skill has them (#940).
+    let unplug = match (file.unplug, file.permissions.grants("prepare_unplug")) {
+        (Some(lines), true) => Some(lines.checked()?),
+        (Some(_), false) => {
+            return Err(
+                "[unplug] is what a skill granted core = [\"prepare_unplug\"] says: only with that grant"
+                    .into(),
+            );
+        }
+        (None, true) => {
+            return Err(
+                "a skill granted prepare_unplug says its [unplug] words: ready, failed, stay, timeout and check"
+                    .into(),
+            );
+        }
+        (None, false) => None,
+    };
     let skill = Skill {
         name,
         description,
@@ -3130,6 +3198,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         stop,
         steps,
         watch,
+        unplug,
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.

@@ -129,6 +129,8 @@ struct Sockets {
 struct May {
     skill: String,
     permissions: Permissions,
+    /// With the `prepare_unplug` grant, the skill's own words (#940).
+    unplug: Option<lamp_skills::UnplugLines>,
 }
 
 impl May {
@@ -915,6 +917,7 @@ fn serve(
         clock_waiting: Cell::new(false),
         rest_client,
         permissions: RefCell::new(HashMap::new()),
+        unplug: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
             watches: Watches::default(),
@@ -1034,6 +1037,10 @@ fn serve(
                 *runner.permissions.borrow_mut() = skills
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
+                    .collect();
+                *runner.unplug.borrow_mut() = skills
+                    .iter()
+                    .filter_map(|skill| Some((skill.name.clone(), skill.unplug.clone()?)))
                     .collect();
                 // A watch whose skill is gone, or changed, is off.
                 {
@@ -1381,6 +1388,8 @@ struct Runner {
     /// By skill, what each loaded skill may use, as of the last load: a
     /// skill not loaded may use nothing.
     permissions: RefCell<HashMap<String, Permissions>>,
+    /// By skill, its `[unplug]` words, as of the last load (#940).
+    unplug: RefCell<HashMap<String, lamp_skills::UnplugLines>>,
     /// By skill, the looks its search under way has taken (#1685).
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
@@ -1751,6 +1760,7 @@ impl Runner {
                 .get(skill)
                 .cloned()
                 .unwrap_or_default(),
+            unplug: self.unplug.borrow().get(skill).cloned(),
         };
         sockets
     }
@@ -2427,6 +2437,9 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
         return why;
     }
+    if sockets.may.unplug.is_none() {
+        return "unplug preparation refused: the skill says no [unplug] words".into();
+    }
     if !lamp_body::unplug::enabled() {
         return "unplug preparation is disabled; nothing requested".into();
     }
@@ -2489,6 +2502,8 @@ fn stay_call((name, args, reply, admission): ToolAsk, engine: &Engine, runner: &
         Err("Preparing to unplug is not enabled.".to_owned())
     } else if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
         Err(why)
+    } else if sockets.may.unplug.is_none() {
+        Err("Preparing to unplug is not enabled.".to_owned())
     } else {
         unplug::may_stay(&runner.bus, clock::now_us(), false)
     };
@@ -2507,8 +2522,14 @@ fn stay_call((name, args, reply, admission): ToolAsk, engine: &Engine, runner: &
         "next": "Say nothing. The lamp says it will stay, then gets back up by itself."
     }));
     let bus = runner.bus.clone();
+    let line = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.stay.clone())
+        .unwrap_or_default();
     std::thread::spawn(move || {
-        let outcome = stay(&sockets, &bus, &request, unplug::STAY_LINE);
+        let outcome = stay(&sockets, &bus, &request, &line);
         eprintln!("lamp-skills: {name}: {outcome}");
     });
 }
@@ -2564,11 +2585,14 @@ fn failed_after_cancel(bus: &Bus, request: &str) -> bool {
 }
 
 fn say_check(sockets: &Sockets) -> String {
+    let Some(lines) = &sockets.may.unplug else {
+        return "nothing said: the skill says no [unplug] words".into();
+    };
     say(
         &sockets.say,
         "unplug needs checking",
         &sockets.may.skill,
-        json!({"note": lamp_skills::unplug::CHECK_LINE, "priority": 8}),
+        json!({"note": lines.check, "priority": 8}),
         &[],
         || {},
     )
@@ -2581,6 +2605,7 @@ fn say_check(sockets: &Sockets) -> String {
 /// once that it needs to be checked, and nothing stands it up.
 fn stay_after(sockets: &Sockets, bus: &Bus, request: &str, wait: Duration) -> Option<String> {
     use lamp_skills::unplug;
+    let timeout = sockets.may.unplug.as_ref()?.timeout.clone();
     let mut ready_since: Option<u64> = None;
     let mut was_ready = false;
     loop {
@@ -2594,7 +2619,7 @@ fn stay_after(sockets: &Sockets, bus: &Bus, request: &str, wait: Duration) -> Op
             Ok(_) => {
                 was_ready = true;
                 if ready_for(&mut ready_since, true, now, wait) {
-                    return Some(stay(sockets, bus, request, unplug::TIMEOUT_LINE));
+                    return Some(stay(sockets, bus, request, &timeout));
                 }
             }
             // Failed, however old: it stays down until it is inspected. A
@@ -2633,11 +2658,14 @@ fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
     if let Some(why) = sockets.may.refuses(&Call::Say(String::new())) {
         return why;
     }
+    let Some(lines) = &sockets.may.unplug else {
+        return "nothing said: the skill says no [unplug] words".into();
+    };
     say(
         &sockets.say,
         "unplug preparation failed",
         skill,
-        json!({"note": "Say briefly: I could not confirm a safe folded position. Please do not unplug yet.", "priority": 5}),
+        json!({"note": lines.failed, "priority": 5}),
         &[],
         || {},
     )
@@ -2655,6 +2683,12 @@ fn say_unplug_ready(
     if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
         return Err(io::Error::new(io::ErrorKind::PermissionDenied, why));
     }
+    let Some(lines) = &sockets.may.unplug else {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "the skill says no [unplug] words",
+        ));
+    };
     let attempt = || -> io::Result<Option<String>> {
         let mut stream = UnixStream::connect(&sockets.say)?;
         stream.set_write_timeout(Some(Duration::from_millis(500)))?;
@@ -2667,7 +2701,7 @@ fn say_unplug_ready(
         let ask = json!({
             "skill": skill, "priority": 8, "expires_in_ms": 500,
             "unplug_request": request,
-            "text": "My arm is folded. You can unplug me now."
+            "text": lines.ready
         });
         writeln!(stream, "{ask}")?;
         let mut lines = BufReader::new(stream.take(64 * 1_024));
@@ -3940,8 +3974,36 @@ mod tests {
             may: May {
                 skill: "test".into(),
                 permissions,
+                unplug: Some(unplug_lines()),
             },
         }
+    }
+
+    /// The prepare-unplug skill's own words, as a lamp loads them.
+    fn unplug_lines() -> lamp_skills::UnplugLines {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/prepare-unplug");
+        lamp_skills::load(&dir)
+            .expect("the prepare-unplug skill loads")
+            .unplug
+            .expect("it says its [unplug] words")
+    }
+
+    /// The first move of "Everything is a skill" (#940) is a move, not a
+    /// change: the skill's words are the five lamp-skills said before,
+    /// byte for byte.
+    #[test]
+    fn the_unplug_words_are_the_skills_and_what_the_lamp_said_before() {
+        assert_eq!(
+            unplug_lines(),
+            lamp_skills::UnplugLines {
+                ready: "My arm is folded. You can unplug me now.".into(),
+                failed: "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
+                    .into(),
+                stay: "Say exactly: Okay, I'll stay.".into(),
+                timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
+                check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+            }
+        );
     }
 
     fn unplug_grants() -> Permissions {
@@ -4110,11 +4172,11 @@ mod tests {
         );
         let sockets = nowhere(dir.path(), unplug_grants());
         let request = lamp_skills::unplug::may_stay(&bus, clock::now_us(), false).unwrap();
-        let outcome = stay(&sockets, &bus, &request, lamp_skills::unplug::STAY_LINE);
+        let outcome = stay(&sockets, &bus, &request, &unplug_lines().stay);
         assert!(outcome.contains("cancel published for r1"), "{outcome}");
         assert_eq!(
             heard.join().unwrap(),
-            [(lamp_skills::unplug::STAY_LINE.to_owned(), false)],
+            [(unplug_lines().stay, false)],
             "the line reached the voice before any cancel"
         );
         assert!(cancels(&bus).is_some());
@@ -4142,15 +4204,12 @@ mod tests {
                 latched(&bus, "failed");
             })
         };
-        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        let outcome = stay(&sockets, &bus, "r1", &unplug_lines().stay);
         failing.join().unwrap();
         assert!(outcome.contains("it then failed"), "{outcome}");
         assert_eq!(
             heard.join().unwrap(),
-            [
-                (lamp_skills::unplug::STAY_LINE.to_owned(), false),
-                (lamp_skills::unplug::CHECK_LINE.to_owned(), true)
-            ]
+            [(unplug_lines().stay, false), (unplug_lines().check, true)]
         );
     }
 
@@ -4163,7 +4222,7 @@ mod tests {
         let bus = Bus::new(dir.path().join("bus")).unwrap();
         latched(&bus, "ready");
         let sockets = nowhere(dir.path(), unplug_grants());
-        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        let outcome = stay(&sockets, &bus, "r1", &unplug_lines().stay);
         assert!(outcome.contains("nothing cancelled"), "{outcome}");
         assert!(cancels(&bus).is_none());
     }
@@ -4187,10 +4246,7 @@ mod tests {
         assert!(fired.contains("cancel published for r1"), "{fired}");
         // Once cancelled, it is over: a second timer finds nothing to do.
         assert_eq!(stay_after(&sockets, &bus, "r1", Duration::ZERO), None);
-        assert_eq!(
-            heard.join().unwrap(),
-            [(lamp_skills::unplug::TIMEOUT_LINE.to_owned(), false)]
-        );
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().timeout, false)]);
         assert_eq!(cancels(&bus), Some(1));
     }
 
@@ -4235,10 +4291,7 @@ mod tests {
         let said = stay_after(&sockets, &bus, "r1", Duration::from_secs(600)).unwrap();
         failing.join().unwrap();
         assert!(said.contains("spoken"), "{said}");
-        assert_eq!(
-            heard.join().unwrap(),
-            [(lamp_skills::unplug::CHECK_LINE.to_owned(), false)]
-        );
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().check, false)]);
         assert_eq!(cancels(&bus), None);
     }
 
@@ -4255,6 +4308,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             looks: RefCell::default(),
+            unplug: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
@@ -4467,6 +4521,7 @@ mod tests {
                     glows: None,
                     body_requests: false,
                     ends: RefCell::default(),
+                    unplug: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
@@ -4544,6 +4599,7 @@ mod tests {
             glows: None,
             body_requests: false,
             ends: RefCell::default(),
+            unplug: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
