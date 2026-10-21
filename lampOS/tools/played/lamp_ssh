@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Run one command on your own lamp over ssh, for the played kit. argv: the remote command, as with ssh.
+# Settings, from the environment (see README.md):
+#   LAMP_HOST         the lamp's address or name; required, there is no default
+#   LAMP_USER         the lamp's user (default: orangepi)
+#   LAMP_SSH_KEY      a private key to use, and only it (optional; otherwise ssh's own keys and ~/.ssh/config)
+#   LAMP_KNOWN_HOSTS  a known_hosts file the lamp's host key must be in (optional; otherwise your own
+#                     ~/.ssh/known_hosts and ssh config decide, as for any ssh)
+#   LAMP_SSH_TIMEOUT  seconds to connect (default 8; scenario.py uses 5)
+# BatchMode is on: ssh never asks for a password or to accept a new host key, so ssh to the lamp once by hand
+# first. Input given to it goes to the lamp (quiet_gate.sh sends its check that way): give </dev/null when there
+# is none.
+set -u
+if [ -z "${LAMP_HOST:-}" ]; then
+  echo "lamp_ssh: LAMP_HOST is not set. Set it to your own lamp's address (see lampOS/tools/played/README.md)." >&2
+  exit 2
+fi
+opts=(-o ControlPath=none -o BatchMode=yes -o "ConnectTimeout=${LAMP_SSH_TIMEOUT:-8}")
+if [ -n "${LAMP_SSH_KEY:-}" ]; then opts+=(-i "$LAMP_SSH_KEY" -o IdentitiesOnly=yes); fi
+if [ -n "${LAMP_KNOWN_HOSTS:-}" ]; then opts+=(-o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$LAMP_KNOWN_HOSTS"); fi
+exec /usr/bin/ssh "${opts[@]}" "${LAMP_USER:-orangepi}@$LAMP_HOST" "$@"
