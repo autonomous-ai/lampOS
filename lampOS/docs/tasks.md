@@ -1545,6 +1545,128 @@ an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
 Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
 `agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
 
+### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
+
+A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in
+by a code it says aloud (openharness#1410). The tasks part runs Harness's
+own sign-in for the voice (`lamp-tasks serve --sign-in-by-code`, its trusted
+ops `sign_in_start`, `sign_in_state`, `sign_in_asked` and `sign_in_answer`;
+["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
+With `LAMP_TASKS_SIGN_IN=on` the voice declares two functions
+([`sign_in.rs`](../crates/voice/src/sign_in.rs)), on both routes.
+
+**Where the state is.** The voice's news runs in its coordinator and its
+tools in a worker: two processes, which share nothing in memory. So where
+the sign-in is, whether its question was heard and whether an answer may
+be taken are kept in the tasks part alone, each sign-in by its `id`
+(#2137's redesign, after its first version kept them per process and could
+never have asked or taken an answer on a lamp).
+
+- **`sign_in_computer`**, when the person asks to sign the lamp in: the code
+  is said digit by digit in two groups ("1 2 3 4, 5 6 7 8"), with where to
+  type it (the Harness app under Machines ▸ Approve a device, or
+  harness.autonomous.ai). A start refused says why: only the switch being
+  off is "not set up"; a busy tasks part is "busy just now".
+- **The news, in the coordinator, from the tasks part's state only**
+  (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
+  otherwise): a code that came after the start's answer (`code_told`
+  false); once the person approves in Harness, the question "Shall I sign
+  in as someone at example dot com?", the email read back slowly ("dot",
+  "at", "dash", "underscore", "plus"); and how it ended (signed in, or why
+  not). A sign-in first seen already done gets none (the start's answer told
+  it), nor does the end after a no. Each is told once; its key
+  (`sign-in-<id>-code`, `-asking`, `-done`) has no `:`, so it is never taken
+  for a task's or sent as `told`.
+- **The question heard:** once the question's turn was heard whole
+  (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
+  sign-in's id and that turn's number, the same number the worker's tools
+  get as their request. A question cut off or never said opens nothing.
+- **`sign_in_answer`** with `yes` or `no` and its request: the tasks part
+  takes it only after the question was heard, in a later request, within
+  two minutes, once; past that the sign-in ends as `too_late`, and the
+  person is told they can ask again.
+
+Only a request the lamp heard may start a sign-in or answer it: never one
+it wrote, a reminder or a text. No session exists before the person's yes,
+so a stranger who heard the code gains nothing. The guard against someone
+else in the room saying yes is the email read back: the voice doesn't yet
+take the yes only from the voice that asked (`same_voice` exists on the
+Live route alone; a follow-up).
+
+**The code and the email never leave the worker in words** (the first
+builder at 09:46 on #1676; the reviewer's P2 and Jarvis's P1 on #2137).
+Each sign-in news note begins with `sign_in::NEWS_TAG`; the worker given it
+marks its request and reads the code and the email from the tasks part.
+The request whose `sign_in_computer` gave a code and the one that answered
+are marked too. Where each worker's words leave it, before the thread keeps
+them and before they are sent (`sign_in::leaving`, `leaving_text`):
+
+- **the lamp's words of a marked request** leave as one line, "(a sign-in
+  code and account were said)", however they were split, its later pieces
+  empty. The audio is untouched. So the coordinator's events, `voice/said`,
+  the second route's history, the thread's file and the memory's journal
+  never get them. On the second route a cut answer's played words
+  (`LAMP_SAID_AS_HEARD`) are that line too, and any other request's are
+  scrubbed (`keep_heard`);
+- **on Live, every later request of the session that heard it** leaves as
+  "(words kept back: this conversation heard a sign-in code)"
+  (`sign_in::leaving_live`, Jarvis's and the reviewer's P2 on #2137).
+  Gemini's session keeps the tool's result, so "Sorry, what was the code?"
+  could be answered in a request nobody marked. A connection Gemini resumes
+  (a GoAway, about every 10 minutes, or after an outage) goes on with the
+  same conversation under a new session number, so it is held too; a
+  marked request cut before its first word holds its session as well. Only
+  a fresh connection never heard it, so its words are kept again. The second route needs none of this: its
+  history has only the one line, so it can't say the code again without
+  `sign_in_computer`, which marks its request;
+- **the person's words**: any run of three or more of the code's digits in
+  its order, as digits ("4 8 2", "48213907") or words ("four eight two"),
+  says "a sign-in code"; the account's name and its domain, each as written
+  or as said, say "their account". Other numbers are left ("at 2 pm in 10
+  minutes"). On Live, while the code or the account is kept, the person's
+  pieces are held until their line ends and leave whole
+  (`sign_in::person_piece`): a piece split inside the code or a name can't
+  be scrubbed alone, and one sent can't be taken back. So, during a sign-in,
+  `voice/heard` gets the person's line at its end, not word by word. The
+  second route hears each line whole.
+
+The thread also scrubs what it keeps joined, after each piece. The code and
+the account are kept in each worker for 15 minutes after the newest news of
+them at most, and for two minutes after the done news, then forgotten
+(the reviewer's P3 5). Their read from the tasks part is off the worker's
+loop, so a slow tasks part never holds its sound (P3 4). **Left:** past
+those two minutes, the person saying the code or the email back is kept as
+said; and an email split inside its domain across two of the lamp's
+pieces, in a request not marked, on the second route, can leave a fragment.
+
+Tests: `sign_in::tests`:
+- the code and the email as said, and each state as the model is told it;
+- the switch and the two functions;
+- `a_sign_in_by_voice_goes_from_its_code_to_its_news`, through a stand-in
+  tasks part, the worker's calls and the news sharing nothing but it: off,
+  not heard, the code, the question once, its hearing told with its request,
+  a refused answer said, the yes passed on with its own request, the end
+  once;
+- `a_sign_in_is_never_told_twice_nor_its_end_after_a_no`;
+- `a_refused_start_says_why` (a tasks part too old for the ops,
+  `bad_request`, is "not set up on this lamp", the reviewer's P3 2);
+- `the_code_is_kept_only_for_its_sign_in_and_held_pieces_leave_whole`;
+- `what_leaves_the_worker_has_neither_the_code_nor_the_account`, with
+  Jarvis's planted values, in pieces and mixed forms;
+- `the_code_and_the_email_are_taken_out_of_what_is_kept`.
+
+Each worker's own path is tested too:
+`the_second_worker_sends_a_sign_ins_words_as_one_line` (second worker) and
+`the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons`
+(Live, with Jarvis's planted run: an unmarked request in the same session
+held back, and in a resumed one, a fresh one's kept, a marked request cut
+before its first word holding its session, the person's three-word pieces whole, and
+the thread's file clean). Either fails if its call is taken out. The second
+route's news test holds the turn heard to the news's, and
+`task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request`
+holds the number `send_heard` tells the tasks part to that turn's (the
+reviewer's P3 1).
+
 ### A skill made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
 
 The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
@@ -1932,6 +2054,39 @@ before it binds a task, is not seen: a receipt that does not leaves the task
   `check_agent_task` name it from the task's engine (`task_news::who`, now
   with OpenCode).
 
+**Read on the second route too, and only the one named (#1722).** On
+lamp-4ace on 2026-10-20 (17:1x) "Ask codex to write a haiku about coffee."
+was heard right and the lamp said "handing that to Claude Code". Its
+`targets.json` had two targets (claude and codex), with `LAMP_TASKS_WHO=on`,
+but the journal had no "work can go to" line: only the Live worker read the
+staff (`agent_tasks::start`), and the second worker never did. So
+`start_agent_task` had no `who`, and all work went to `LAMP_TASKS_TARGET`
+as Claude Code. The second worker now reads them as the Live worker does,
+with `LAMP_TASKS_WHO=on` (`second_provider::worker::start_tasks`).
+
+With one target, `start_agent_task` still had no `who`, its description
+named only that agent, the staff's note matched only the staff, and the
+voice sent any call to the one there was. Off unless
+`LAMP_TASKS_NAMED_ONLY=on` (the provider worker's `--tasks-named-only`,
+after `--tasks-make-skill`, and only with `--tasks-who`). With it, once the
+staff are read:
+
+- `who` is offered even with one of the staff, as an enum of every agent the
+  voice knows (Claude Code, Codex, OpenCode), and its description
+  says who is set up: "Set up on this lamp: Claude Code, and nobody else. If
+  they named another of these, give that name: you will be told it isn't
+  set up, and nothing goes to anyone else."
+- a name that is one of those agents' close forms and not among the staff
+  prepares nothing and asks nothing of the tasks part; the model is told
+  "Nothing was handed over: Codex isn't set up on this lamp. Say so plainly
+  in a few words ("Codex isn't set up on this lamp."), and do not give the
+  work to anyone else unless the person asks you to."
+- the staff's note (`LAMP_STAFF_NOTE`) matches any agent the voice knows, so
+  "ask Codex" is noted as a hand-over where only Claude Code is set up.
+- nobody named is the default, as before; one of the staff named gets it.
+
+Not run on a lamp yet.
+
 **Without the switch, nothing changes.** Tests show that with it off, or on
 with the staff not yet read, or on with one target `office` for Claude Code,
 the three functions declared are exactly the ones before (compared with a
@@ -2082,6 +2237,107 @@ Codex.
 **Not shown.** No task was started anywhere for this; no Harness session,
 receipt or answer from Codex or OpenCode was seen. Nothing was run on a lamp.
 How often the model names the right one from speech is not measured.
+
+### A named ask is a hand-over (off unless `LAMP_TASKS_NAMED_ASK=on`, #1722)
+
+On lamp-4ace on 2026-10-21, with two of the staff read (Claude Code and Codex,
+#2297), played asks such as "Hey Lamp, ask Claude Code to write a two-line poem
+about the rain." went to `not_for_me` or were answered by the lamp itself
+("poetry's mine to write, no need to ask anyone"), 0 to 3 of 3 per run. The
+person named who should do it; the lamp refused anyway.
+
+With `LAMP_TASKS_NAMED_ASK=on` (the voice passes it to the second route's
+worker only, through `second_route_worker_environment`, and that worker reads
+it; with the tasks part on), a spoken turn's first chat round whose last message is the person's words,
+and whose words ask one of the staff by name to do something, is sent with
+`tool_choice: {"type": "function", "function": {"name": "start_agent_task"}}`
+(`agent_tasks::named_ask`, `second_provider::worker::named_asks`,
+`net::Chat::forcing`). The model still writes the task; it can't decline the
+hand-over or do the work itself. A round after a call ends with the call's
+result and is asked as before.
+
+- **Asks:** "ask", "tell", "get" or "have" right before the agent's whole name
+  with "to" after it ("ask Claude Code to …", "tell Codex to …"), or "can",
+  "could", "would" or "will" "you ask/get <name> …".
+- **Not asks:** a mention ("I told Claude Code yesterday", "is Codex done?",
+  "what did Claude Code say?", "did you ask Codex to …", "tell Claude Code I'm
+  late"), a negation right before the verb ("don't ask Claude Code to …",
+  "do not tell …", "never ask Codex to …", "not get …"), a question the person
+  asks themself ("should I ask Claude Code to …", "shall I …", "do I …"), a name not of the staff ("ask Devin to …" when Devin isn't set up), a
+  garbled name ("Claude Co", "cloud code"; the staff's note still hears those).
+  With none of the staff read, only Claude Code.
+- **The trade:** the rules can let through a line said to someone else (in a
+  quiet room without `LAMP_SPOKEN_TO`, or as a conversation going on). Today the
+  model can still say such a line wasn't for the lamp (`not_for_me`). When it
+  names an agent ("…, ask Claude Code to fix the build"), forcing takes that
+  away: it becomes a prepared hand-over and a question to the room. The heard
+  yes still guards the start: `start_agent_task` only prepares, and nothing
+  runs without a later yes heard within 120 s.
+- **Off:** the request is the same as before, word for word (a test compares
+  the bodies). `tool_choice` is never sent with a held line's named functions.
+- **The relay:** checked on lamp-06c1 on 2026-10-21 at 03:4x: the relay's
+  DeepSeek chat, thinking off, called the function `tool_choice` named on "What's two plus two?"
+  3 of 3, and none of 3 without it.
+- **Who does it** (played test b0701 on lamp-4ace, #1722, 2026-10-21 07:19):
+  forced, "Hey Lamp, can you ask Claude Code on my office computer to write a
+  short story …" went to Codex. The words matched (Claude Code). The force named
+  only the function, so the model chose `who`. Now the forced round's
+  `start_agent_task` is told only the agent the words name: `who` gets that one
+  value in its `enum` and is required (`net::Forced`). A round 1 call whose
+  `who` names another agent, or nobody, is given to the named agent before the
+  tasks part prepares it (`second_provider::Engine::asking_by_name`).
+- **Several asked** (the reviewer on #2410: "Hey Lamp, ask Codex to check the
+  build and ask Claude Code to write a poem." gave both calls to Claude Code):
+  `named_ask` gives every agent of the staff the words ask, once each, in the
+  order the words ask them. With two or more, round 1 is still forced to
+  `start_agent_task`, but `who` is told as declared, nothing pinned. Each
+  round 1 call whose `who` is one of the asked agents keeps it. A call that
+  names nobody, or an agent the words don't ask, goes to the first asked agent,
+  in word order, that no round 1 call names yet, or else the first asked
+  (`second_provider::given_to_the_named`). So a line's two tasks, one naming
+  Codex and one nobody, go one to each, not both to the first named.
+- **The journal**, once per line, with no words: `named ask: matched <agent>`
+  (several in word order: `matched Codex, Claude Code`), plus, for each agent
+  a call was given to, `; the call named another agent, given to <agent>` or
+  `; the call named nobody, given to <agent>`; `named ask: no match (<n> words)`;
+  `named ask: matched <agent>, not applied: round 1 called <functions>, not
+  start_agent_task` (or `answered in words`); and, for a line held back,
+  `named ask: matched <agent>, not applied: the line is held`.
+- **Over the lamp's voice** (b0701, request 58: "Hey Lamp, ask Codex to write
+  a haiku about coffee.", said while the lamp spoke, a stop phrase heard, then
+  `not_for_me`): every line the second route answers is forced the same way.
+  Over the lamp's voice, after a stop and as a conversation going on, its notes
+  go before the person's words, which stay last. That line's words match
+  (Codex), and the relay keeps `tool_choice` (above). So request 58 most likely
+  asked with other words than those. A stop phrase heard over the lamp abandons
+  the line then being heard until its end (`coordinator/hand.rs`, `cancel`, then
+  `InputAdmission::abandon_until_end`), so the next request can be only the rest
+  of what was said. The journal line now shows which: `no match` with its word
+  count, or `matched` and what round 1 did.
+
+**The probe** (`cargo run -p lamp-voice --example probe_handover`, run where
+the voice runs, as root, with the voice unit's tasks switches): each played ask
+as a spoken turn's first round, the system message, staff note, call note,
+functions and chat the second worker builds, with two of the staff held as the
+tasks part would answer. With `PROBE_HANDOVER_HISTORY=on`, each run first asks
+"tell me a story about a clever fox, at least eight sentences" and keeps the
+real answer in the thread as an exchange. It prints counts only. On lamp-06c1
+on 2026-10-21, 10 runs per line:
+
+| Wording | Story first | Rain poem | Sea poem | Haiku (Codex) |
+|---|---|---|---|---|
+| A (today's note) | no | 10/10 | 10/10 | 10/10 |
+| B (#2337, reverted) | no | 10/10 | 9/10 (1 self) | 10/10 |
+| C (rule first) | no | 10/10 | 10/10 | 10/10 |
+| A | yes | 10/10 | 10/10 | 10/10 |
+| B | yes | 10/10 | 10/10 | 9/10 (1 self) |
+| C | yes | 10/10 | 10/10 | 10/10 |
+| D (A, `LAMP_TASKS_NAMED_ASK=on`) | yes | 10/10 | 10/10 | 10/10 |
+
+So the probe doesn't reproduce lamp-4ace's 0 of 3: what the played run sends
+beyond it (the memory's notes, the skills' lines, the web search's functions,
+the name heard) isn't in it. D makes the hand-over not depend on that. Not
+played on a lamp yet.
 
 ## Progress on the bus (`serve --progress`, #732)
 

@@ -5,7 +5,7 @@
 //! `cargo run --release -p lamp-voice-eval --example turn_end_replay --
 //!  MODEL CLIPS.json [--end-silence-ms 600] [--verdict-ms 130]
 //!  [--speech-level-db DB] [--faint-floor-db DB [--faint-hold-ms MS]]
-//!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS ...`
+//!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short] ...`
 //!
 //! `CLIPS.json` is `[{"id": "...", "wav": "/path.wav"}, ...]`, each a 16 kHz
 //! mono 16-bit WAV. Each clip gets 600 ms of lead-in and 2.5 s of tail at a
@@ -158,18 +158,32 @@ struct Profile {
 
 fn profile(text: &str) -> Result<Profile, Error> {
     let parts: Vec<&str> = text.split(':').collect();
-    let [name, commit, complete, least] = parts[..] else {
-        return Err(format!("profile {text}: NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS").into());
+    let [name, commit, complete, least, ref flags @ ..] = parts[..] else {
+        return Err(format!(
+            "profile {text}: NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short]"
+        )
+        .into());
     };
     let blocks = |ms: &str| -> Result<u16, Error> { Ok(u16::try_from(ms.parse::<u64>()? / 10)?) };
+    let mut policy = ConfirmPolicy {
+        commit_blocks: blocks(commit)?,
+        complete_probability: complete.parse()?,
+        least_speech_blocks: blocks(least)?,
+        ..ConfirmPolicy::default()
+    };
+    // The voice's switches, as the lamp sets them: an uncertain verdict
+    // asked again (`recheck_uncertain`), and lines under the floor asked
+    // from 0.2 s (`LAMP_ENDPOINT_SHORT_VERDICT`).
+    for flag in flags {
+        match *flag {
+            "recheck" => policy.recheck_uncertain = true,
+            "short" => policy.short_verdict_blocks = 20,
+            other => return Err(format!("profile {text}: unknown flag {other}").into()),
+        }
+    }
     Ok(Profile {
         name: name.into(),
-        policy: ConfirmPolicy {
-            commit_blocks: blocks(commit)?,
-            complete_probability: complete.parse()?,
-            least_speech_blocks: blocks(least)?,
-            ..ConfirmPolicy::default()
-        },
+        policy,
     })
 }
 
@@ -292,6 +306,8 @@ fn replay(
                     "basis": decision.map(|decision| decision.basis),
                     "silence_ms": decision.map(|decision| decision.silence_ms),
                     "p": decision.and_then(|decision| decision.probability),
+                    "first_p": decision.and_then(|decision| decision.rechecked_from),
+                    "short_asks": decision.map_or(0, |decision| decision.short_asks),
                 }));
                 started = None;
             }

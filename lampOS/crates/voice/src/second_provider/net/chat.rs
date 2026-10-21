@@ -48,6 +48,17 @@ impl Message {
     pub fn system(text: impl Into<String>) -> Self {
         Self::new("system", Some(text.into()))
     }
+    /// Its words: the text, or a look's text part.
+    pub fn words(&self) -> Option<&str> {
+        match self.content.as_ref()? {
+            Value::String(text) => Some(text),
+            Value::Array(parts) => parts
+                .iter()
+                .find_map(|part| part.get("text").and_then(Value::as_str)),
+            _ => None,
+        }
+    }
+
     pub fn user(text: impl Into<String>) -> Self {
         Self::new("user", Some(text.into()))
     }
@@ -154,6 +165,44 @@ pub type Declare = Arc<dyn Fn() -> Vec<lamp_gemini::Tool> + Send + Sync>;
 pub type Narrow =
     Arc<dyn Fn(Vec<lamp_gemini::Tool>, &[Message]) -> Vec<lamp_gemini::Tool> + Send + Sync>;
 
+/// The function a request with these messages must call, if any
+/// ([`Chat::forcing`]): sent as the request's `tool_choice`.
+pub type Force = Arc<dyn Fn(&[Message]) -> Option<Forced> + Send + Sync>;
+
+/// A function a request must call ([`Force`]), and the one value one of
+/// its string parameters may take, if any: that parameter is then told
+/// only that value and is required (`LAMP_TASKS_NAMED_ASK`: `who` is the
+/// agent the words name, #1722). A function without that parameter is
+/// told as declared.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Forced {
+    pub name: &'static str,
+    pub only: Option<(&'static str, &'static str)>,
+}
+
+/// `tool`'s parameters with `parameter` told only `value`, and required,
+/// when it has that parameter.
+fn pinned(tool: &mut lamp_gemini::Tool, (parameter, value): (&str, &str)) {
+    let Some(parameters) = tool.parameters.as_mut() else {
+        return;
+    };
+    let Some(property) = parameters
+        .get_mut("properties")
+        .and_then(|properties| properties.get_mut(parameter))
+    else {
+        return;
+    };
+    property["enum"] = json!([value]);
+    match parameters.get_mut("required").and_then(Value::as_array_mut) {
+        Some(required) => {
+            if !required.iter().any(|name| name == parameter) {
+                required.push(json!(parameter));
+            }
+        }
+        None => parameters["required"] = json!([parameter]),
+    }
+}
+
 /// How much Gemini thinks before it answers through its OpenAI-compatible
 /// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
 /// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
@@ -179,6 +228,8 @@ pub struct Chat {
     declare: Declare,
     /// Which of the declared tools a request is given, if not all.
     narrow: std::sync::OnceLock<Narrow>,
+    /// Which function a request must call, if any.
+    force: std::sync::OnceLock<Force>,
     /// When the last request went, for the journal: a connection idle past
     /// the client's pool keep (`http_client`, 90 s) is made anew.
     last_sent: std::sync::Mutex<Option<std::time::Instant>>,
@@ -334,7 +385,7 @@ impl Chat {
     /// when not due, or when it failed (the chat then connects as before).
     pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
         let models = self.url.replacen("/chat/completions", "/models", 1);
-        let (status, took, _) = super::warm_get(
+        let (status, took, ..) = super::warm_get(
             &self.client,
             &self.last_sent,
             WARM_AFTER,
@@ -353,6 +404,16 @@ impl Chat {
         let _ = self.narrow.set(narrow);
     }
 
+    /// A request whose messages `force` names a function for, when that
+    /// function is among those it is given, must call it (`tool_choice`,
+    /// the OpenAI form, which DeepSeek takes; `LAMP_TASKS_NAMED_ASK`,
+    /// #1722), with the one value it names for a parameter, if it names
+    /// one ([`Forced::only`]). Never with `only`. Set once: a second call
+    /// changes nothing.
+    pub fn forcing(&self, force: Force) {
+        let _ = self.force.set(force);
+    }
+
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
         Ok(Self {
             client: http_client()?,
@@ -363,6 +424,7 @@ impl Chat {
             sees: true,
             declare,
             narrow: std::sync::OnceLock::new(),
+            force: std::sync::OnceLock::new(),
             last_sent: std::sync::Mutex::new(None),
             last_prefix: std::sync::Mutex::new(None),
         })
@@ -385,9 +447,25 @@ impl Chat {
         } else if let Some(narrow) = self.narrow.get() {
             declared = narrow(declared, messages);
         }
+        let forced = only
+            .is_none()
+            .then(|| self.force.get().and_then(|force| force(messages)))
+            .flatten()
+            .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
+        if let Some(Forced {
+            name,
+            only: Some(only),
+        }) = forced
+            && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
+        {
+            pinned(tool, only);
+        }
         let tools = functions(&declared);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
+        }
+        if let Some(Forced { name, .. }) = forced {
+            body["tool_choice"] = json!({"type": "function", "function": {"name": name}});
         }
         // The configuration refuses any of the request's own fields here.
         for (field, value) in &self.extra {

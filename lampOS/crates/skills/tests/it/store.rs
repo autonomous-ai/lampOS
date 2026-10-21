@@ -252,6 +252,8 @@ fn ask(
     let mut output = Vec::new();
     let done = package::asked(
         skills,
+        // No skill the lamp made is asked for here.
+        &skills.with_extension("made"),
         package::ASKED_LOCK_WAIT,
         Some(Store {
             key_file: key_file.to_path_buf(),

@@ -468,3 +468,35 @@ fn actual_provider_capacity_and_speaker_channel_continue_while_start_is_held() {
         "dispatch is not accepted speech"
     );
 }
+
+/// `LAMP_SECOND_PLAYOUT_START_MS` (#2135): a reply begun while the second
+/// route's worker is the provider takes the second route's own start
+/// horizon; one begun while Gemini's is, or with the switch unset, the
+/// unit's, continuity included. Only what `--playout-start-ms` takes is a
+/// horizon: anything else leaves the unit's.
+#[test]
+fn the_second_route_starts_on_its_own_horizon_only_while_it_answers() {
+    let unit = PlayoutStart::new(350).unwrap();
+    let second = second_playout_start_from(Some("120"));
+    assert_eq!(second, Some(PlayoutStart::new(120).unwrap()));
+    assert_eq!(playout_for(unit, second, "second").as_micros(), 120_000);
+    assert_eq!(playout_for(unit, second, "provider").as_micros(), 350_000);
+    assert_eq!(playout_for(unit, None, "second").as_micros(), 350_000);
+    let continuity = PlayoutStart::continuity();
+    assert_eq!(playout_for(continuity, None, "second"), continuity);
+    assert_eq!(playout_for(continuity, second, "provider"), continuity);
+    assert_eq!(
+        playout_for(unit, second_playout_start_from(Some("0")), "second").as_micros(),
+        0
+    );
+    for refused in [
+        None,
+        Some(""),
+        Some("501"),
+        Some("-1"),
+        Some("1e2"),
+        Some(" 120"),
+    ] {
+        assert_eq!(second_playout_start_from(refused), None, "{refused:?}");
+    }
+}

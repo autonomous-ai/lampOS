@@ -770,6 +770,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
@@ -869,6 +870,7 @@ mod reminder_tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
             )
             .unwrap();
@@ -1012,6 +1014,7 @@ mod timed_tests {
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 },
             )
             .unwrap();
@@ -1059,6 +1062,7 @@ mod timed_tests {
                     privacy_generation: state.microphone_generation(),
                     text: String::new(),
                     look: false,
+                    search: false,
                 },
             )
             .unwrap();
@@ -1098,6 +1102,7 @@ mod timed_tests {
                         privacy_generation: state.microphone_generation(),
                         text: String::new(),
                         look: false,
+                        search: false,
                     },
                 )
                 .is_err()

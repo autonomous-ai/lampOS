@@ -174,6 +174,33 @@ Neither observation acknowledges Event delivery, a flushed downstream log,
 publisher cleanup or worker exit. A controller must account for those real
 participants separately before advancing time or claiming evidence.
 
+## Forgets told on the bus (`memory/forgot`)
+
+With `--bus-root`, each `forget_all` that was done is told on
+`memory/forgot` (`lamp_msgs::MemoryForgot`), so the lamp's other parts let
+what they keep under that person go too (the first builder, 10:5x on #2467).
+That covers a forget asked by the app (lamp-cloud's `faces.rs`) and one
+asked by voice (`forget_everything`).
+- **What it says:** the person's id only (`p-…`, `r-…` for their rules,
+  `everyone` for the room's), or no person for a forget of every person.
+  Never a name or anything kept: a forget of any other id memory takes (a
+  slug a caller chose, such as a name) is done but never told
+  (`MemoryForgot::check`, the reviewer's P3 1 on #2488).
+- **When:** after the asker has its answer, so a forget never waits for the
+  bus, and whether or not the asker took the answer, since the forget was
+  done either way.
+- **Not told:** a refused forget, a `forget_last`, a forget of one thing,
+  and every other request.
+- **A bus that can't be written to:** the journal says "a forget could not be
+  told on the bus (memory/forgot)", and the publisher is made again at the
+  next forget. Without `--bus-root`, nothing is told.
+- **Its readers:** the voice's tone baselines ([voice-tone.md](voice-tone.md)),
+  with `LAMP_VOICE_TONE=on`.
+- **Tests:** `tests/forgot.rs` (the real server with a bus: a person's
+  forget, every person's, and four that aren't told, one of them an id
+  memory doesn't make), and each protocol's
+  `only_a_forget_all_that_was_done_says_whose`.
+
 ## On the disk
 
 This layout is the default. Enabling `--memory-days` imports it into one
@@ -321,6 +348,100 @@ the unchanged legacy client, used unless the new Days client is selected.
   memory that does not answer loses that exchange and nothing else. An
   answer with no word in it is not journalled. Talk the lamp did not
   answer never reaches here.
+- **A forget runs only when it is asked for** (second route and texts,
+  `LAMP_FORGET_ASKED`, on unless `off`): `forget`, `forget_everything` and
+  `forget_my_face` run only on a spoken turn whose own words ask to forget
+  (`remember::asks_to_forget`: "forget", "delete", "erase", "remove",
+  "wipe", "clear", "unremember", "stop remembering", "scratch that", "get rid
+  of", "don't keep", "off your list", matched with accents off, and "quên",
+  "xóa" with their accents kept, since without them "quen" is "to know
+  someone" and "xoa" "to stroke"). Lines that only describe forgetting ("I
+  keep forgetting my keys.") aren't asks. Never on a turn the lamp wrote
+  itself (a hello, a skill's say, task news), whatever its text says. A
+  text runs one only when the typed text asks; a typed yes confirms
+  nothing. Not taken, so asked again: "never mind what I told you" and
+  other words without one of these.
+- **A forget the model calls unasked is held for a yes** (second route,
+  spoken turns, same switch). Keying a yes on the words of the lamp's
+  question leaked each time (#2324, #2326, #2331), since the model writes
+  the question. So the engine holds the call itself: its name and
+  arguments, the request's session and known person, and the time. The
+  model is told to ask once, plainly ("Shall I forget your face?"), and
+  stop. **The hold stands only on that question:** once the held turn's
+  answer is said whole, it must hold a question (a sentence ending in "?")
+  that asks to forget (the `asks_to_forget` words) and names the forget
+  held (`remember::asks_about_forgetting`): "face" or "khuôn mặt" for
+  `forget_my_face`, "everything" or "tất cả" for `forget_everything`, and
+  for a plain `forget` the lamp as the one who would ("Shall I / Should I
+  / Do you want me to forget …", "Tôi có nên quên …"). "Want me to set a
+  reminder?", "I can forget your face.", "Did you forget your keys?",
+  "Should I clear the timer?" or an answer cut, failed or held drops it.
+  This is on top of the call, so what the model writes never widens it
+  (Fourth's P2 and 05:11 P3 on #2340).
+  Only the next spoken turn can run it, and only when it is a plain yes
+  and nothing else (`known_faces::plain_agreement`: "Yes.", "Vâng.", never
+  "OK, what's my name?" or "Yes?"), said while the same session's person
+  is the face at the lamp, within 60 s. Any other turn drops it and runs
+  nothing: a no, other words, another face at the lamp, a turn the lamp
+  wrote, a later yes, or a new held call. One waits at a time.
+  **Where the eyes read speaking, it is their face saying it** (#2377,
+  the reviewer's P3 1 on #2340). Without that, the engine knows only the
+  face at the lamp, not who spoke, so anyone in the room could say the
+  yes. With `LAMP_EYES_SPEAKING=on` in the voice's unit as well as the
+  eyes' (and the bus and the eyes' known file), the voice reads the eyes'
+  faces on its own thread ([`speaking_faces`](../crates/voice/src/speaking_faces.rs),
+  as `LAMP_SECOND_SPEAKING_FACE` does). The yes runs the call only when,
+  over the yes line's own sound, from its start to its end, the held
+  person's face (the id beside the known file, read with their name) is
+  seen speaking and no other face is (`speaking_faces::seen_saying`). It
+  uses that reader's own bar: a face reads speaking in at least half of
+  the looks, with at least three looks. Nobody seen speaking, another face
+  speaking while they are at the lamp, both speaking, too few looks, or no
+  fresh face beside the known file all count as not seen. That is the safe
+  side, and a missed reading costs one "Yes, forget my face." said again.
+  Then the hold is dropped and nothing runs. The model is told once that
+  the yes did not count and that nothing was forgotten
+  (`remember::unseen_yes_told`). It may ask them, once and in a few words,
+  to say it themselves ("Yes, forget my face."), with no explanation. That
+  ask in words runs it at once, and a second plain yes runs nothing,
+  because nothing is held. With the switch on, the worker reads the eyes'
+  faces every 100 ms from its start to its end, on the reader seeing who
+  speaks (`LAMP_SECOND_SPEAKING_FACE`) already runs when that is on, or on
+  its own otherwise; only the judging, at a line's end, waits for a held
+  forget. Without the bus or the known faces file, the journal says once
+  that the speaking check is off and a plain yes runs as before.
+  With the switch off, the yes runs it while their face is at the lamp,
+  whoever says it, as before.
+  **Their ask a turn before carries for the forget it names:** when the
+  same person's own spoken turn just before, in the same session and
+  within 60 s, asked in words (`asks_to_forget` on their words, never the
+  lamp's) and named that forget ("everything" or "tất cả" for
+  `forget_everything`, "face" or "khuôn mặt" for `forget_my_face`,
+  `remember::names_forget`), the call runs at once: "Forget everything
+  about me." "Everything, really?" "Yes." runs it with no second question
+  (Fourth's P3 on #2340). A plain `forget` of a kept thing never carries,
+  and "Clear the timer." or "Don't forget my keys." names neither, so a
+  forget called after them is held. **A yes with nothing held forgets nothing**,
+  whatever the lamp asked: with nothing held, a yes to any question runs
+  nothing. On the turn a held forget runs, the model is told it ran and
+  not to call it again,
+  so the lamp doesn't ask twice. **Nobody known, nothing held:** with no
+  known person in the request's scope (the room, or the camera off),
+  nothing is held, because a forget that can't be undone shouldn't take an
+  anonymous yes. The model is told to ask them to say it in words, as
+  without the hold, and "forget my face" said in words still runs. The
+  forget functions' descriptions on spoken turns say so (call once; if
+  they didn't ask in their own words, the lamp holds it and asks; their
+  yes, or their asking in words, runs it), and `forget_everything` is
+  called once even when the model isn't sure they mean everything, then
+  asked about, rather than asking first. Texts keep their descriptions,
+  and the model's "nothing was forgotten" names both ways and says a yes
+  isn't one there. The journal says "held a forget",
+  "ran a held forget" and "dropped a held forget" with the call's name and
+  the reason, never words. Otherwise a forget not asked for isn't run, the
+  journal says so, and the model is told nothing was forgotten and how to
+  ask, never that the person didn't ask. Not on the Live route, whose tool
+  runner has neither gate; lamps run the second route.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.
@@ -680,6 +801,19 @@ the unchanged legacy client, used unless the new Days client is selected.
   It costs that turn what a person change costs: one note within 300 ms
   ([second-voice.md](second-voice.md), "Each turn is one person's").
 
+### Told on each turn (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c)
+
+On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `search` once in four hours, so a name kept that morning was never used ("the lamp forgot my name"). With this switch and the Days memory, each spoken turn's final words are searched before its chat begins (`remember::hits_note`):
+
+- **The scope, one count for the turn:** the known face's (`known_faces::known_now`, `person_id`) only when the session the turn is in is theirs too, and the room's when neither names anyone. The turn's session is opened before the hits are asked (`worker::hits_person`), and the turn's notes still see the change, so a person's first turn is theirs and not the last session's (the reviewer's P2 on #2268: "What's my name?" is often the first thing asked). When they differ, nothing is told: someone leaning in for one look doesn't have their kept things told in another's conversation (the reviewer's P2 on #2251). The journal says "memory isn't told: the face and the session's person differ".
+- **What's asked:** the newest 16 KB of that scope's kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB). That's the whole list unless its things are long (200 of up to 300 bytes is 60 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard: lower-cased, three letters or more, a possessive's `'s` and a plural's `s` taken off, and small words left out. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. **English only:** accents aren't folded, and Vietnamese words match as written.
+- **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
+- **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
+- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
+- **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
+- **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
+- **Not with `LAMP_SECOND_SCOPED_CONTEXT`:** it doesn't read the per-line lease yet, so the worker says so and tells nothing.
+
 ### Each person's own (#764)
 
 When the voice has eyes that remember faces (`LAMP_EYES_WHO_SOCKET`, the
@@ -832,6 +966,40 @@ then use that person's scope:
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`
   pins the bytes).
+
+- **The room's isn't the asker's** (#2176, the "Dylan" case,
+  `LAMP_MEMORY_ROOM_NOT_ASKER=on`, with the Days client only; off unless
+  set; both voice routes, since each opens its sessions through
+  `remember::told_for_session`). On lamp-4ace a played "my name is Dylan",
+  with no face known, was kept as the room's. Every later session's note
+  carried it under the rule "The speaker is unknown: never say 'you told
+  me'", and the model called the one asking "Dylan". With the switch:
+  - **The rule** for the room's snapshot, and for the earlier exchanges a
+    turn is given, says they were said by whoever was in the room then,
+    not necessarily the one asking now: never say "you told me", never take
+    a name or anything else about a person in them as the asker's own, and
+    if it comes up, say someone here said it and ask.
+  - **A room-kept fact about a person** is put in the note as "Someone in
+    the room said: ..." (`remember::about_a_person`): one with the word
+    `name`, `names`, `named`, `nickname` or `called`, or `I'm`, `I am`,
+    `call me`, lower-cased with a curly apostrophe read as a straight one.
+    Simple on purpose: every room-kept thing *was* said by someone in the
+    room, so a fact it catches wrongly is still told truly.
+  - **A known person's own snapshot** is told as before: their own kept
+    name stays theirs.
+  - **The journal**, at each session's open, after the open has let go of
+    the client's context: "a session's memory note carried N of the room's
+    kept things (M as someone in the room's) and K of the person's own".
+    Counts only, never a word.
+  - Off, the note is byte for byte what it was. The legacy client's note is
+    unchanged either way. Tests:
+    `remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s`,
+    `remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs`,
+    `remember::tests::without_the_switch_the_note_is_byte_identical`,
+    `remember::tests::a_fact_about_a_person_is_one_that_names_them_or_says_who_they_are`,
+    `remember::tests::the_session_s_counts_line_says_no_word_kept`. The
+    probe's quality case waits for a base with the relay probe (#2279);
+    until then these tests are its check.
 
 ### A session for each person (#764 follow-up)
 
@@ -1234,6 +1402,25 @@ The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
 written request's note is kept as the room's, as it is admitted. The context is
 still built on the turn's task, so a slow memory service delays that turn's
 first round as before; nothing new is read on the input path.
+A request is admitted for a person only while the authority permits the
+camera (`memory_camera_allowed`): the eyes' known file is otherwise not
+read. With the eyes a process of their own (`LAMP_EYES_PERMIT_SOCKET`, no
+camera of the voice's own), they may look exactly while the microphone is
+permitted, and with `LAMP_CAMERA_FOLLOWS_EYES=on` (off unless set) the
+coordinator says so in the authority (`eyes_look_with_the_microphone`); a
+mute denies both. Without it the camera is never permitted there, and every
+turn on both routes is the room's. **The product's voice unit sets it, so a
+product lamp has per-person memory and #764's per-person Live sessions**: Live opens a new session between turns when the person at
+the lamp changes, telling it only that person's thread and kept things, and
+on the second route with `LAMP_SECOND_SCOPED_CONTEXT=on` each heard turn is
+the person's the eyes name. On lamp-52e6 (#1895, 20 Oct) the two-person run
+went from 0 of 12, every turn the room's and codes crossing, to 11 of 12
+with no code crossed (the one miss an answer too late). Run again on 21 Oct
+(#2402): voices with no face stayed the room's (7 of 7), and once the lamp
+remembered a face, that person's turns were theirs. **A name told before the
+lamp knows the face ("remember my face") is the room's**: "my name is …"
+from someone not yet known lands in the room's memory, for everyone in the
+house, so the owner's first words begin with "remember my face".
 
 Off, a turn is told and kept as before, for the person the session was opened
 for.

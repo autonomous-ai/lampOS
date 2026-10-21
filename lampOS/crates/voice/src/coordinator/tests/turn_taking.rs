@@ -122,6 +122,7 @@ impl Harness {
             last_provider_audio_at_us: None,
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),
+            handed: 0,
         };
         Self {
             owner,
@@ -370,6 +371,35 @@ impl Harness {
     fn commit_with(&mut self, accepted: Accepted, cut_in: bool) -> VecDeque<ProviderInput> {
         self.commit_told(accepted, cut_in, false, false)
     }
+    /// Committed with how much of the reply it cuts was played
+    /// (`LAMP_SAID_AS_HEARD`).
+    fn commit_heard(
+        &mut self,
+        accepted: Accepted,
+        cut: crate::said_as_heard::HeardOfCut,
+    ) -> VecDeque<ProviderInput> {
+        let mut queue = VecDeque::new();
+        commit_admitted_input(
+            &mut self.owner,
+            &mut self.reply,
+            &mut None,
+            &mut queue,
+            accepted,
+            1,
+            false,
+            false,
+            true,
+            None,
+            Some(cut),
+            false,
+            false,
+            PlayoutStart::default(),
+            &mut self.trace,
+            |_| Ok(()),
+        )
+        .unwrap();
+        queue
+    }
     fn commit_told(
         &mut self,
         accepted: Accepted,
@@ -386,8 +416,10 @@ impl Harness {
             accepted,
             1,
             false,
+            false,
             cut_in,
             after_stop.then_some((1, 1)),
+            None,
             follows_on,
             false,
             PlayoutStart::default(),
@@ -440,6 +472,92 @@ fn v1_baseline_first_write_race_waits_then_discards_original_overlapping_input()
             .is_none()
     );
     assert!(!h.admission.owns_stream());
+}
+
+/// `LAMP_SAID_AS_HEARD`: a reply counts the samples it hands the speaker,
+/// not its last chunk's padding. A line that cuts it is told how much was
+/// played, on its Start and in its record. With no reply in hand, the next
+/// line on a Stop's session is told what the Stop cut, once. Off, nothing.
+#[test]
+fn a_line_that_cuts_a_reply_is_told_how_much_of_it_was_played() {
+    use crate::said_as_heard::HeardOfCut;
+    let mut h = Harness::new(TurnTaking::V1Baseline);
+    let reply = h.reply.as_mut().unwrap();
+    reply.pcm = vec![7; 600].into();
+    reply.generation_done = true;
+    // 240, 240 and its last 120, padded to 240.
+    for _ in 0..3 {
+        assert!(reply.next_speaker_chunk().is_some());
+    }
+    assert!(reply.next_speaker_chunk().is_none());
+    assert_eq!(reply.handed, 600);
+    let request = reply.owner.turn();
+    let mut stop_cut = None;
+    let cut = heard_of_cut(true, h.reply.as_ref(), &mut stop_cut, 1);
+    assert_eq!(
+        cut,
+        Some(HeardOfCut {
+            request,
+            samples: 600
+        })
+    );
+    assert_eq!(
+        heard_of_cut(false, h.reply.as_ref(), &mut stop_cut, 1),
+        None
+    );
+    // A Stop that cuts the reply keeps how much was played, and its
+    // session, for the next line; off, nothing.
+    let session = h.reply.as_ref().unwrap().cloud.session;
+    assert_eq!(
+        stop_cut_of(true, h.reply.as_ref()),
+        Some((cut.unwrap(), session))
+    );
+    assert_eq!(stop_cut_of(false, h.reply.as_ref()), None);
+    assert_eq!(stop_cut_of(true, None), None);
+    let stopped = HeardOfCut {
+        request: 3,
+        samples: 4_800,
+    };
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 1), Some(stopped));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 1), None, "once");
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(true, None, &mut stop_cut, 2), None);
+    assert!(stop_cut.is_none(), "another session's is let go");
+    stop_cut = Some((stopped, 1));
+    assert_eq!(heard_of_cut(false, None, &mut stop_cut, 1), None, "off");
+    // The line that cuts it carries it.
+    h.dispatch(10_000);
+    h.accepted(11_000, 11_000);
+    h.drain(20_000);
+    let mut accepted = None;
+    for n in 1..=30 {
+        if let Some(a) = h.feed(20_000 + TAIL_US + n * 10_000, 0.99).unwrap() {
+            accepted = Some(a);
+            break;
+        }
+    }
+    let cut = cut.unwrap();
+    let queue = h.commit_heard(accepted.expect("a line"), cut);
+    assert!(
+        queue.iter().any(|input| matches!(
+            input,
+            ProviderInput::Start {
+                heard_of_cut: Some(told),
+                ..
+            } if *told == cut
+        )),
+        "{queue:?}"
+    );
+    let admitted = h
+        .trace
+        .iter()
+        .find(|event| event["kind"] == "input_admitted")
+        .expect("admitted");
+    assert_eq!(
+        admitted["heard_of_cut"],
+        serde_json::json!({"request": request, "samples": 600})
+    );
 }
 
 #[test]
@@ -1875,6 +1993,161 @@ fn with_words_a_sound_decided_without_echo_evidence_is_never_held_for_its_words(
     assert!(stop.accepted.is_none() && stop.let_go.is_empty() && stop.told.is_empty());
 }
 
+/// `LAMP_OWN_LINE_KEEPS` (#2220): while a line the lamp started on its own
+/// (a skill's say, news it tells, its hello to someone arriving or a line of
+/// the setup walk) hasn't sounded, a new sound waits. The lamp's name heard
+/// as it began takes the turn; otherwise it's let go once the line sounds,
+/// or at its own deadline. A sound begun once the line sounds is judged as
+/// before (a cut-in), and so is anything with the switch off, for an
+/// answer to someone, or in a block heard without echo evidence.
+#[test]
+fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
+    let mut h = Harness::new(TurnTaking::Duplex);
+    let trigger = h.base + 300_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: trigger - 60_000,
+        decision_deadline_us: trigger + 1_200_000,
+    };
+    let (ticket, _answered) = crate::say::ticket_for_test("welcome-back");
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = Some(ticket);
+        assert!(!reply.had_audio && reply.playback.is_none());
+    }
+    let wait = |h: &Harness, waited, name, at| {
+        let wait = OwnLineWait {
+            on: true,
+            waited,
+            heard: true,
+            name_began_us: name,
+            ..OwnLineWait::default()
+        };
+        while_own_line_waits(wait, h.reply.as_ref(), &candidate, at)
+    };
+    assert_eq!(wait(&h, false, None, trigger), WhileOwnLineWaits::Wait);
+    // A block the mask heard without echo evidence can't be held whole:
+    // decided as before (the reviewer on #2242, P3 1).
+    let heard = OwnLineWait {
+        on: true,
+        heard: true,
+        ..OwnLineWait::default()
+    };
+    let unheard = OwnLineWait {
+        heard: false,
+        ..heard
+    };
+    assert_eq!(
+        while_own_line_waits(unheard, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+    assert_eq!(
+        wait(&h, true, None, trigger + 500_000),
+        WhileOwnLineWaits::Wait
+    );
+    assert_eq!(
+        wait(&h, true, None, trigger + 1_100_000),
+        WhileOwnLineWaits::LetGo("deadline")
+    );
+    // The lamp's name, heard as it began, takes the turn; an older one is
+    // no call.
+    let call = crate::activity::CALL_BEFORE_US;
+    assert_eq!(
+        wait(&h, false, Some(trigger - call), trigger),
+        WhileOwnLineWaits::Decide
+    );
+    assert_eq!(
+        wait(&h, false, Some(trigger - call - 1), trigger),
+        WhileOwnLineWaits::Wait
+    );
+    // The line's own person (#2287's follow-up): a face seen speaking
+    // through the sound, turned to the lamp, decides it at once; the room's
+    // sound with no such face waits. The name still comes first.
+    let theirs = OwnLineWait {
+        theirs: true,
+        ..heard
+    };
+    assert_eq!(
+        while_own_line_waits(theirs, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::Theirs
+    );
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait {
+                name_began_us: Some(trigger),
+                ..theirs
+            },
+            h.reply.as_ref(),
+            &candidate,
+            trigger
+        ),
+        WhileOwnLineWaits::Decide
+    );
+    assert_eq!(
+        while_own_line_waits(heard, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::Wait
+    );
+    // The line sounds: one that waited is let go, one begun now is a cut-in
+    // as before.
+    h.reply.as_mut().unwrap().had_audio = true;
+    assert_eq!(
+        wait(&h, true, None, trigger + 600_000),
+        WhileOwnLineWaits::LetGo("sounded")
+    );
+    assert_eq!(
+        wait(&h, false, None, trigger + 600_000),
+        WhileOwnLineWaits::AsBefore
+    );
+    // Off, or an answer to someone's words: as before.
+    h.reply.as_mut().unwrap().had_audio = false;
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait::default(),
+            h.reply.as_ref(),
+            &candidate,
+            trigger
+        ),
+        WhileOwnLineWaits::AsBefore
+    );
+    h.reply.as_mut().unwrap().input_sequence = 1;
+    assert_eq!(wait(&h, false, None, trigger), WhileOwnLineWaits::AsBefore);
+    // No line at all: as before.
+    assert_eq!(
+        while_own_line_waits(heard, None, &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+    // A written turn with no ticket: the lamp's own only as the turn it
+    // began itself (its hello to someone arriving, a line of the setup
+    // walk) or with news it tells. Another written turn, a look's, is as
+    // before.
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = None;
+    }
+    let turn = h.reply.as_ref().unwrap().owner.turn();
+    let began = |h: &Harness, lamp_began| {
+        let wait = OwnLineWait {
+            lamp_began,
+            ..heard
+        };
+        while_own_line_waits(wait, h.reply.as_ref(), &candidate, trigger)
+    };
+    assert_eq!(began(&h, None), WhileOwnLineWaits::AsBefore);
+    assert_eq!(began(&h, Some(turn + 1)), WhileOwnLineWaits::AsBefore);
+    assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::Wait);
+    h.reply.as_mut().unwrap().news = vec!["task-1".to_owned()];
+    assert_eq!(began(&h, None), WhileOwnLineWaits::Wait);
+    // News on an answer to someone's words is no line of the lamp's own.
+    h.reply.as_mut().unwrap().input_sequence = 1;
+    assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::AsBefore);
+}
+
 /// #1712's B (the first builder at 06:44, `LAMP_MOTION_KEEPS_ANSWER=on`):
 /// while an answer is awaited and has not sounded, a sound that began as
 /// the body moved a joint is the lamp's own motors and takes no turn, and
@@ -1940,4 +2213,196 @@ fn while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own() {
         body_heard(unasked, None, false, None, &candidate),
         Judged::Still
     );
+}
+
+/// `LAMP_MOTION_VOICE` (the first builder on #1722, 21 Oct 03:27): a sound
+/// the body rule found begun as a joint moved is read against the asker of
+/// the answer awaited, on its own speech blocks from its first read. The
+/// asker going on as the body turns to them (lamp-4ace, 03:11) is kept with
+/// `on`; motor sound well under them is let go; with no asker's level, or
+/// asker-first off, it is let go as before.
+#[test]
+fn a_sound_begun_as_the_body_moves_is_the_askers_when_about_as_loud() {
+    use crate::motion_voice::{Decision, Mode};
+    let h = Harness::new(TurnTaking::Duplex);
+    let turn = h.reply.as_ref().unwrap().owner.turn();
+    let trigger = h.base + 300_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: trigger - 100_000,
+        decision_deadline_us: trigger + 200_000,
+    };
+    let asked = |level: u8| {
+        let mut rule = crate::asker_first::AskerFirst::default();
+        for _ in 0..50 {
+            rule.asking(turn, 150);
+        }
+        rule.asked(turn, h.base);
+        // Its own blocks, every 20 ms from its first read.
+        for block in 0..8 {
+            rule.heard(candidate.first_read_at_us + block * 20_000, level);
+        }
+        rule
+    };
+    let at = trigger + 50_000;
+    let voice = asked(145);
+    let (decision, levels) =
+        motion_voice_heard(Mode::On, Some(&voice), h.reply.as_ref(), &candidate, at);
+    assert_eq!(decision, Decision::Kept);
+    let levels = levels.unwrap();
+    assert_eq!((levels.asker, levels.upper, levels.blocks), (150, 145, 8));
+    assert_eq!(
+        motion_voice_heard(Mode::Record, Some(&voice), h.reply.as_ref(), &candidate, at).0,
+        Decision::LetGo { would_keep: true }
+    );
+    let motors = asked(30);
+    assert_eq!(
+        motion_voice_heard(Mode::On, Some(&motors), h.reply.as_ref(), &candidate, at).0,
+        Decision::LetGo { would_keep: false }
+    );
+    // No asker-first rule, or no answer awaited: nothing to read against.
+    assert_eq!(
+        motion_voice_heard(Mode::On, None, h.reply.as_ref(), &candidate, at),
+        (Decision::LetGo { would_keep: false }, None)
+    );
+    assert_eq!(
+        motion_voice_heard(Mode::On, Some(&voice), None, &candidate, at),
+        (Decision::LetGo { would_keep: false }, None)
+    );
+}
+
+/// #2287's follow-up, way 1: with `LAMP_WAIT_KEEPS_ANSWER=words`, a sound
+/// waiting on the lamp's own line is judged by its words as the answer's
+/// wait judges them. A lone "Stop." stops the line, and so does a lone
+/// put-off, "Not now." (told as a stop, taking no turn), in a room not busy;
+/// in a busy one a put-off is the room's, as usual between colleagues (the
+/// reviewer's P3 on #2322). Other words are the room's: two colleagues
+/// talking nearby still wait, told as not taken (the reviewer's P2 on
+/// #2308). Nothing said leaves it waiting. An outcome that
+/// isn't a wait or a let-go is passed on as it is, and nothing is asked.
+#[test]
+fn with_words_a_stop_said_before_the_own_line_sounds_stops_it() {
+    use crate::activity::ObservedAudio;
+    let base = 10_000_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: Harness::new(TurnTaking::Duplex).lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: base + 60_000,
+        first_read_at_us: base,
+        decision_deadline_us: base + 2_000_000,
+    };
+    let audio: Vec<ObservedAudio> = (0..30u64)
+        .map(|index| ObservedAudio {
+            sequence: index + 1,
+            captured_at_us: base + index * 10_000,
+            samples: [400; 160],
+        })
+        .collect();
+    let spoke_until = base + 29 * 10_000;
+    let quiet = crate::wait_words::ASK_AFTER_QUIET_BLOCKS;
+    // (what was said, a busy room, what the line does)
+    for (said, busy, then) in [
+        ("Stop.", false, WhileOwnLineWaits::Stop),
+        ("Stop.", true, WhileOwnLineWaits::Stop),
+        ("Not now.", false, WhileOwnLineWaits::Stop),
+        // In a busy room a put-off is as usual between colleagues: the
+        // room's (the reviewer's P3 on #2322).
+        ("Not now.", true, WhileOwnLineWaits::Wait),
+        ("No thanks.", true, WhileOwnLineWaits::Wait),
+        (
+            "Did you send the report to the team?",
+            false,
+            WhileOwnLineWaits::Wait,
+        ),
+        ("", false, WhileOwnLineWaits::Wait),
+    ] {
+        let (mut words, script) = crate::wait_words::tests::scripted();
+        words.follow(true, true);
+        let wait = WhileOwnLineWaits::Wait;
+        let (own, told) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            0,
+            spoke_until,
+            busy,
+            base + 300_000,
+        );
+        assert_eq!(
+            (own, told.is_some()),
+            (wait, false),
+            "{said}: heard while it speaks"
+        );
+        let (own, _) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            quiet,
+            spoke_until,
+            busy,
+            base + 400_000,
+        );
+        assert_eq!(own, wait, "{said}: asked, its words not back");
+        script.lock().unwrap().words = Some(said.into());
+        let (own, told) = own_line_with_words(
+            &mut words,
+            wait,
+            &candidate,
+            &audio,
+            false,
+            quiet,
+            spoke_until,
+            busy,
+            base + 500_000,
+        );
+        assert_eq!(own, then, "{said:?}, busy {busy}");
+        if then == WhileOwnLineWaits::Stop {
+            let told = told.expect("what its words did is told once");
+            assert!(told.stop && !told.took, "{said}: {told:?}");
+        } else if !said.is_empty() {
+            let told = told.expect("what its words did is told once");
+            assert!(!told.took && !told.stop, "{said}: the room's, {told:?}");
+        }
+    }
+    for own in [
+        WhileOwnLineWaits::AsBefore,
+        WhileOwnLineWaits::Decide,
+        WhileOwnLineWaits::Theirs,
+    ] {
+        let (mut words, script) = crate::wait_words::tests::scripted();
+        words.follow(true, true);
+        assert_eq!(
+            own_line_with_words(
+                &mut words,
+                own,
+                &candidate,
+                &audio,
+                false,
+                quiet,
+                spoke_until,
+                false,
+                base
+            ),
+            (own, None)
+        );
+        assert!(
+            !script
+                .lock()
+                .unwrap()
+                .told
+                .iter()
+                .any(|told| told == "finalize"),
+            "nothing asked for {own:?}"
+        );
+    }
 }

@@ -34,6 +34,26 @@ pub const FEWEST_LOOKS: usize = 3;
 /// theirs would be.
 pub const EYES_EVERY: Duration = Duration::from_millis(500);
 
+/// Where the voice reads that the eyes judge whether a face is speaking at
+/// this lamp (`LAMP_EYES_SPEAKING=on`, the eyes' own switch, set in the
+/// voice's unit too): a held forget's yes then counts only from the held
+/// person's face seen speaking it (#2377).
+pub const EYES_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING";
+
+/// Whether [`EYES_ENVIRONMENT`] is `on`, and nothing else.
+pub fn eyes_from_environment() -> bool {
+    std::env::var(EYES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Whether the person `person` was seen saying a line: some face read
+/// speaking through it ([`SpeakingFaces::speakers`]), and every face that
+/// did is theirs, the known person's face beside the eyes' known file
+/// (`known`, [`known_with_face`]) while the eyes know them. No reading, a
+/// stale known file or another face speaking is not seen (#2377).
+pub fn seen_saying(speakers: &[String], person: &str, known: Option<(String, String)>) -> bool {
+    !speakers.is_empty() && !someone_elses(speakers, person, known)
+}
+
 pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
@@ -44,8 +64,13 @@ pub type Speakers = Vec<String>;
 
 struct Look {
     at: Instant,
+    /// The eyes' boot its frame was published under; empty for none.
+    boot: String,
     /// The passing ids that read speaking in this look.
     speaking: Vec<String>,
+    /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
+    /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
+    turned: Vec<String>,
 }
 
 #[derive(Default)]
@@ -94,7 +119,7 @@ impl SpeakingFaces {
                 looks.frame = None;
             }
         }
-        let speaking = frame
+        let speaking_faces: Vec<_> = frame
             .map(|(_, faces)| {
                 faces
                     .faces
@@ -104,9 +129,17 @@ impl SpeakingFaces {
                             .as_ref()
                             .is_some_and(|speaking| speaking.state == SpeakingState::Yes)
                     })
-                    .map(|face| face.id.clone())
                     .collect()
             })
+            .unwrap_or_default();
+        let speaking = speaking_faces.iter().map(|face| face.id.clone()).collect();
+        let turned = speaking_faces
+            .iter()
+            .filter(|face| face.facing == Some(true))
+            .map(|face| face.id.clone())
+            .collect();
+        let boot = frame
+            .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
         let kept = &mut looks.kept;
         while kept
@@ -116,12 +149,61 @@ impl SpeakingFaces {
         {
             kept.pop_front();
         }
-        kept.push_back(Look { at, speaking });
+        kept.push_back(Look {
+            at,
+            boot,
+            speaking,
+            turned,
+        });
     }
 
     /// The faces that read speaking in at least half of the looks from
     /// `from` to `to`.
     pub fn speakers(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| look.speaking.clone())
+    }
+
+    /// As [`Self::speakers`], each id kept with the eyes' boot it was seen
+    /// under (`boot/f3`): after the eyes start again a passing id names
+    /// someone else, so an id from an older boot matches none of the new.
+    pub fn speakers_with_boot(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| {
+            look.speaking
+                .iter()
+                .map(|id| format!("{}/{id}", look.boot))
+                .collect()
+        })
+    }
+
+    /// Forget every look: the camera closed or the microphone was muted,
+    /// and no passing id outlives that.
+    pub fn forget(&self) {
+        if let Ok(mut looks) = self.looks.lock() {
+            *looks = Looks::default();
+        }
+    }
+
+    /// The faces that read speaking and turned to the lamp in at least half
+    /// of the looks from `from` to `to`: someone at the lamp talking to it,
+    /// not the room (#2287's follow-up).
+    pub fn turned_speakers(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| look.turned.clone())
+    }
+
+    /// As [`Self::turned_speakers`], each id with the eyes' boot, as
+    /// [`Self::speakers_with_boot`] gives them.
+    pub fn turned_speakers_with_boot(&self, from: Instant, to: Instant) -> Speakers {
+        self.counted(from, to, |look| {
+            look.turned
+                .iter()
+                .map(|id| format!("{}/{id}", look.boot))
+                .collect()
+        })
+    }
+
+    /// The ids `of` each look gives in at least half of the looks from
+    /// `from` to `to`, and none with fewer than [`FEWEST_LOOKS`].
+    fn counted(&self, from: Instant, to: Instant, of: impl Fn(&Look) -> Vec<String>) -> Speakers {
         let Ok(looks) = self.looks.lock() else {
             return Speakers::new();
         };
@@ -133,9 +215,9 @@ impl SpeakingFaces {
         if during.len() < FEWEST_LOOKS {
             return Speakers::new();
         }
-        let mut counts: Vec<(&str, usize)> = Vec::new();
-        for id in during.iter().flat_map(|look| &look.speaking) {
-            match counts.iter_mut().find(|(seen, _)| *seen == id.as_str()) {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for id in during.iter().flat_map(|look| of(look)) {
+            match counts.iter_mut().find(|(seen, _)| *seen == id) {
                 Some((_, count)) => *count += 1,
                 None => counts.push((id, 1)),
             }
@@ -143,7 +225,7 @@ impl SpeakingFaces {
         counts
             .into_iter()
             .filter(|(_, count)| count * 2 >= during.len())
-            .map(|(id, _)| id.to_owned())
+            .map(|(id, _)| id)
             .collect()
     }
 }
@@ -288,6 +370,34 @@ mod tests {
 
     use SpeakingState::{No, Unknown, Yes};
 
+    /// #2287's follow-up: of the faces speaking, only those turned to the
+    /// lamp in at least half the looks are its own person's; one turned away,
+    /// or not said, is the room's. The speakers are as before.
+    #[test]
+    fn a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        for index in 0..4u32 {
+            let mut seen = faces(&[("f1", Yes), ("f2", Yes), ("f3", Yes)]);
+            seen.faces[0].facing = Some(true);
+            seen.faces[1].facing = Some(false);
+            // f3 is turned to the lamp in one look of four only.
+            seen.faces[2].facing = (index == 0).then_some(true);
+            eyes.look(from + EVERY * index, Some((("b", u64::from(index)), &seen)));
+        }
+        let to = from + EVERY * 4;
+        assert_eq!(eyes.turned_speakers(from, to), ["f1"]);
+        assert_eq!(eyes.speakers(from, to), ["f1", "f2", "f3"]);
+        // Turned to the lamp but not speaking is no one's line.
+        let quiet = SpeakingFaces::default();
+        for index in 0..3u32 {
+            let mut seen = faces(&[("f1", No)]);
+            seen.faces[0].facing = Some(true);
+            quiet.look(from + EVERY * index, Some((("b", u64::from(index)), &seen)));
+        }
+        assert!(quiet.turned_speakers(from, from + EVERY * 3).is_empty());
+    }
+
     /// A face speaking in at least half of the line's looks spoke through
     /// it; one under half did not; two faces doing so are several.
     #[test]
@@ -332,6 +442,33 @@ mod tests {
         assert_eq!(eyes.speakers(start, looked(4)), ["f1"]);
         eyes.look(start + KEPT + EYES_EVERY * 5, None);
         assert!(eyes.speakers(start, looked(4)).is_empty());
+    }
+
+    /// #2305's review: an id is kept with the eyes' boot, so the same
+    /// passing id after the eyes start again is another; and a privacy
+    /// change forgets every look.
+    #[test]
+    fn ids_keep_their_boot_and_a_privacy_change_forgets_them() {
+        let eyes = SpeakingFaces::default();
+        let start = Instant::now();
+        for index in 0..3u32 {
+            eyes.look(
+                start + EVERY * index,
+                Some((("a", index.into()), &faces(&[("f1", Yes)]))),
+            );
+        }
+        for index in 3..6u32 {
+            eyes.look(
+                start + EVERY * index,
+                Some((("b", index.into()), &faces(&[("f1", Yes)]))),
+            );
+        }
+        let (first, second) = (start + EVERY * 2, start + EVERY * 3);
+        assert_eq!(eyes.speakers_with_boot(start, first), ["a/f1"]);
+        assert_eq!(eyes.speakers_with_boot(second, start + EVERY * 5), ["b/f1"]);
+        assert_eq!(eyes.speakers(start, first), ["f1"]);
+        eyes.forget();
+        assert!(eyes.speakers(start, start + EVERY * 5).is_empty());
     }
 
     /// The reviewer on #2008: the eyes' one frame, read six times, is one

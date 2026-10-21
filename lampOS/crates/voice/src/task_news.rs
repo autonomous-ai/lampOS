@@ -257,7 +257,7 @@ pub struct TaskNews {
     /// checked against it, never waited on.
     status: Arc<Mutex<Option<TaskStatus>>>,
     /// News heard whole, for the tasks part to be told ([`Self::heard`]).
-    heard: Sender<String>,
+    heard: Sender<(String, u64)>,
 }
 
 impl Drop for TaskNews {
@@ -378,14 +378,43 @@ fn send_told(directory: &Path, key: &str) -> Sent {
     Sent::Again
 }
 
+/// A made skill's news heard whole, or given in a text, has just asked
+/// whether to put it on: what the person's yes is held to
+/// ([`crate::made_skill::asked`]).
+fn asked(made: Option<&crate::made_skill::Keeping>, key: &str) {
+    if let Some(made) = made
+        && let Err(error) = crate::made_skill::asked(&made.directory, key, unix_ms())
+    {
+        eprintln!("lamp-voice: a made skill's ask was not kept: {error}");
+    }
+}
+
 /// Tell the tasks part in `directory` of each piece of news heard as it
 /// comes from `heard`, and again every [`READ_EVERY`] while it can't take
-/// one, for [`TOLD_PASSES`] passes. Ends when the news is let go.
-fn send_heard(directory: &Path, heard: &Receiver<String>, stopping: &AtomicBool) {
+/// one, for [`TOLD_PASSES`] passes; a made skill's as asked ([`asked`]).
+/// Ends when the news is let go.
+fn send_heard(
+    directory: &Path,
+    heard: &Receiver<(String, u64)>,
+    stopping: &AtomicBool,
+    made: Option<&crate::made_skill::Keeping>,
+) {
     let mut unsent: Vec<(String, u32)> = Vec::new();
     loop {
         match heard.recv_timeout(READ_EVERY) {
-            Ok(key) => {
+            Ok((key, request)) => {
+                // A sign-in's question heard whole: its answer may come in a
+                // later request (#1676). Told once; a question not taken
+                // there (done, or another sign-in) opens nothing.
+                if let Some(id) = crate::sign_in::asked_of(&key) {
+                    if !crate::sign_in::tell_asked(directory, id, request) {
+                        eprintln!(
+                            "lamp-voice: the sign-in question heard ({key}) was not taken by the tasks part"
+                        );
+                    }
+                    continue;
+                }
+                asked(made, &key);
                 if observation_of(&key).is_some() && !unsent.iter().any(|(kept, _)| *kept == key) {
                     unsent.push((key, 0));
                 }
@@ -437,6 +466,9 @@ pub struct ForTexts {
     typed_file: PathBuf,
     read: Arc<Mutex<Vec<News>>>,
     stopping: Arc<AtomicBool>,
+    /// Where a made skill is kept: its news given in a text asks whether
+    /// to put it on ([`asked`]).
+    made: Option<crate::made_skill::Keeping>,
 }
 
 /// The tasks asked for and started by text in this process (#1673),
@@ -530,6 +562,7 @@ impl ForTexts {
         clock: fn() -> Option<BootClock>,
         made: Option<crate::made_skill::Keeping>,
     ) -> Option<Self> {
+        let kept = made.clone();
         let read = Arc::new(Mutex::new(Vec::new()));
         let stopping = Arc::new(AtomicBool::new(false));
         {
@@ -566,6 +599,7 @@ impl ForTexts {
             typed_file,
             read,
             stopping,
+            made: kept,
         })
     }
 
@@ -591,6 +625,7 @@ impl ForTexts {
     pub fn given(&self, keys: &[String]) {
         for key in keys {
             keep_told(&self.told_file, key);
+            asked(self.made.as_ref(), key);
         }
         if let Ok(mut read) = self.read.lock() {
             read.retain(|news| !keys.contains(&news.key));
@@ -658,6 +693,8 @@ impl TaskNews {
         clock: fn() -> Option<BootClock>,
     ) -> Option<Self> {
         let directory = directory.to_path_buf();
+        // A sign-in by voice is followed only with its switch (#1676).
+        let sign_in = std::env::var(crate::agent_tasks::SIGN_IN_ENVIRONMENT).as_deref() == Ok("on");
         let (offer, offered) = mpsc::channel();
         let (told, heard_told) = mpsc::channel();
         let told_already = Arc::new(Mutex::new(BTreeSet::new()));
@@ -727,7 +764,10 @@ impl TaskNews {
             let (directory, stopping) = (directory.clone(), stopping.clone());
             std::thread::Builder::new()
                 .name("lamp-voice-task-heard".into())
-                .spawn(move || send_heard(&directory, &to_send, &stopping))
+                .spawn(move || {
+                    let made = crate::made_skill::Keeping::from_environment();
+                    send_heard(&directory, &to_send, &stopping, made.as_ref())
+                })
                 .ok()?;
         }
         let shared = told_already.clone();
@@ -742,6 +782,7 @@ impl TaskNews {
                     &shared,
                     &clock,
                     WOKEN_GAP,
+                    sign_in,
                 )
             })
             .ok()?;
@@ -758,13 +799,14 @@ impl TaskNews {
     }
 
     /// News told in a turn that was heard whole, on the proof a say's
-    /// `spoken` takes (`coordinator`): the tasks part is told so, so that
-    /// with `--close-told` the harness its task started is closed (#1390).
-    /// News taken to tell but cut short, or not heard, never comes here.
-    /// Never waits.
-    pub fn heard(&self, keys: Vec<String>) {
+    /// `spoken` takes (`coordinator`), in the voice's `request`: the tasks
+    /// part is told so, so that with `--close-told` the harness its task
+    /// started is closed (#1390), and a sign-in's question may be answered
+    /// in a later request (#1676). News taken to tell but cut short, or not
+    /// heard, never comes here. Never waits.
+    pub fn heard(&self, request: u64, keys: Vec<String>) {
         for key in keys {
-            let _ = self.heard.send(key);
+            let _ = self.heard.send((key, request));
         }
     }
 
@@ -822,7 +864,10 @@ impl TaskNews {
     /// [`Self::waiting_for_test`], with what the voice says was heard
     /// ([`Self::heard`]) coming out of the receiver.
     #[cfg(test)]
-    pub(crate) fn waiting_for_test_heard(news: News, ago: Duration) -> (Self, Receiver<String>) {
+    pub(crate) fn waiting_for_test_heard(
+        news: News,
+        ago: Duration,
+    ) -> (Self, Receiver<(String, u64)>) {
         let (heard, heard_out) = mpsc::channel();
         let came = Instant::now()
             .checked_sub(ago)
@@ -928,7 +973,9 @@ impl TaskNews {
 /// Read the tasks part every [`READ_EVERY`], and at once when a task newly
 /// settled is seen on `tasks/status` ([`Wake::Settled`], #560), though
 /// never sooner than `woken_gap` ([`WOKEN_GAP`] on the lamp) after the read
-/// before, with the tasks part's own clock (`clock`).
+/// before, with the tasks part's own clock (`clock`). With `sign_in`, a
+/// sign-in's news too (#1676).
+#[allow(clippy::too_many_arguments)]
 fn read_forever(
     directory: &Path,
     told_file: &Path,
@@ -937,9 +984,11 @@ fn read_forever(
     shared: &Mutex<BTreeSet<String>>,
     clock: &dyn Fn() -> Option<BootClock>,
     woken_gap: Duration,
+    sign_in: bool,
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
+    let mut follow = crate::sign_in::Follow::default();
     let made = crate::made_skill::Keeping::from_environment();
     loop {
         // A settled task's wake waiting here is answered by the read just
@@ -963,6 +1012,31 @@ fn read_forever(
                 }
             }
         }
+        // A sign-in the person began by voice (#1676, `crate::sign_in`): its
+        // code if it came late, the question once approved in Harness, and
+        // how it ended, each told once; read again soon while one is open.
+        let (sign_in_news, sign_in_open) = if sign_in {
+            crate::sign_in::news(directory, &offered, &mut follow)
+        } else {
+            (Vec::new(), false)
+        };
+        for (key, note) in sign_in_news {
+            if told_keys.contains(&key) {
+                continue;
+            }
+            offered.insert(key.clone());
+            let news = News {
+                key,
+                note,
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            };
+            if offer.send(news).is_err() {
+                return;
+            }
+        }
         // Wait for the next read, keeping what is told the moment it is
         // told: on lamp-4ace on 2026-10-15 a build whose provider ended
         // just after news was told told the same news three times, each
@@ -971,7 +1045,12 @@ fn read_forever(
         // above was under way, though never sooner than `woken_gap` after
         // that read.
         let read_at = std::time::Instant::now();
-        let mut next = read_at + READ_EVERY;
+        let mut next = read_at
+            + if sign_in_open {
+                crate::sign_in::READ_OPEN_EVERY
+            } else {
+                READ_EVERY
+            };
         loop {
             let left = next.saturating_duration_since(std::time::Instant::now());
             if left.is_zero() {
@@ -1273,10 +1352,12 @@ fn made_note(
     }
     let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
     match &made {
-        Ok(made) => eprintln!(
-            "lamp-voice: a skill made by voice is kept, version {}, sha256 {}",
-            made.version, made.sha256
-        ),
+        Ok(made) => {
+            eprintln!(
+                "lamp-voice: a skill made by voice is kept, version {}, sha256 {}",
+                made.version, made.sha256
+            );
+        }
         Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
     }
     let when = if age_ms <= JUST_MS {
@@ -1854,6 +1935,38 @@ mod tests {
         os::unix::net::UnixListener,
     };
 
+    /// The reviewer's P3 1 on #2137: the sign-in question heard whole is
+    /// told to the tasks part with the very request it was heard in, the
+    /// number the worker's tools get as `request`, so a yes in a later one
+    /// is taken.
+    #[test]
+    fn a_sign_in_question_heard_is_told_with_its_own_request() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let directory =
+            std::env::temp_dir().join(format!("voice-news-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = crate::agent_tasks::tests::tasks_part(
+            &directory,
+            vec![(
+                "voice.sock",
+                serde_json::json!({"ok":true,"sign_in":"asking"}),
+            )],
+        );
+        let (heard, hearing) = mpsc::channel();
+        let stopping = AtomicBool::new(false);
+        heard.send(("sign-in-5-asking".to_owned(), 42)).unwrap();
+        drop(heard);
+        send_heard(&directory, &hearing, &stopping, None);
+        assert_eq!(
+            seen.recv_timeout(Duration::from_secs(5)).unwrap(),
+            serde_json::json!({"op":"sign_in_asked","id":5,"request":42})
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     fn task(engine: &str, observations: Value) -> Value {
         json!({"ok":true,"text":"Suggest three \"friendly\" names for a desk lamp",
             "target":{"engine":engine,"machine_id":"c533fbfda3de5f8f1fdb6619ae2e30b5","project":"lamp-tasks"},
@@ -2167,7 +2280,7 @@ mod tests {
 
     /// #1685, a skill made by voice: the hand-over of a brief, back done,
     /// is told as the skill kept (what it would do, what it would use and
-    /// "putting it on needs a yes from the team first"), alone, never its
+    /// "Shall I put it on the lamp?"), alone, never its
     /// files; its request is what is quoted of it, never the brief; and
     /// read again it is the kept one, not checked again. Without the switch
     /// its news is any task's, the request quoted. Here the checker is a
@@ -2232,7 +2345,7 @@ mod tests {
             told.contains("It would use its light and whether it is talking."),
             "{told}"
         );
-        assert!(told.contains(crate::made_skill::NEEDS_A_YES), "{told}");
+        assert!(told.contains(crate::made_skill::ASK_TO_PUT_ON), "{told}");
         assert!(
             !told.contains("skill.toml") && !told.contains("[permissions]"),
             "{told}"
@@ -2245,6 +2358,33 @@ mod tests {
             .collect();
         assert_eq!(kept.len(), 1, "{kept:?}");
         assert!(kept[0].starts_with("evening-dim-1.0.0-"), "{kept:?}");
+        // Kept, but not told yet: nothing asked, so a yes puts nothing on
+        // (the reviewer's P2 on #2424).
+        let index = || -> Value {
+            serde_json::from_slice(
+                &std::fs::read(root.join("made").join(crate::made_skill::INDEX)).unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(index()[0]["offered_at_unix_ms"].is_null(), "{}", index());
+        let early = crate::made_skill::put_on(
+            &keeping.directory,
+            &root.join("nobody.sock"),
+            Some("Yes."),
+            unix_ms(),
+        );
+        assert_eq!(
+            early["error"], "no skill made here is waiting for a yes",
+            "{early}"
+        );
+        // Heard whole (or given in a text): asked now, what a yes is held to.
+        asked(Some(&keeping), &news[0].key);
+        assert!(
+            index()[0]["offered_at_unix_ms"].as_u64().is_some(),
+            "{}",
+            index()
+        );
+        assert!(crate::made_skill::waiting_note(&keeping.directory, unix_ms()).is_some());
         // Read again: the kept one, not checked again.
         let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
         assert_eq!(again[0].note, *told);
@@ -2399,20 +2539,23 @@ mod tests {
             needs: None,
             staff_note: false,
             make_skill: true,
+            named_only: false,
+            sign_in: false,
         };
         let kept = read(&on);
-        assert!(kept.contains(crate::made_skill::NEEDS_A_YES), "{kept}");
+        assert!(kept.contains(crate::made_skill::ASK_TO_PUT_ON), "{kept}");
         assert!(!kept.contains("skill.toml"), "{kept}");
         let typed_note = crate::messages::typed(&kept);
         assert!(
-            typed_note.contains(crate::made_skill::NEEDS_A_YES),
+            typed_note.contains(crate::made_skill::ASK_TO_PUT_ON),
             "{typed_note}"
         );
         let plain = read(&crate::agent_tasks::Place {
             make_skill: false,
+            sign_in: false,
             ..on.clone()
         });
-        assert!(!plain.contains(crate::made_skill::NEEDS_A_YES), "{plain}");
+        assert!(!plain.contains(crate::made_skill::ASK_TO_PUT_ON), "{plain}");
         assert!(plain.contains(&format!("\"{request}\"")), "{plain}");
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -3250,6 +3393,7 @@ mod tests {
                     &shared,
                     &|| Some(now()),
                     woken_gap,
+                    false,
                 );
             })
         };

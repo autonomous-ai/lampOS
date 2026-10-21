@@ -100,6 +100,7 @@ fn run_with_notice_policy(
         end_silence_blocks: None,
         early_end_blocks: None,
         early_finalize: false,
+        open_name: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),
@@ -158,6 +159,7 @@ fn run_with_notice_policy(
                     after_stop: false,
                     follows_on: false,
                     over_the_lamps_voice: false,
+                    heard_of_cut: None,
                 })
                 .unwrap();
         }

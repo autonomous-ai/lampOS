@@ -24,6 +24,24 @@ pub const FORGET: &str = "forget_my_face";
 pub const NAMES_ENVIRONMENT: &str = "LAMP_NAMES";
 /// The provider worker's flag for it, right after the eyes' socket.
 pub const NAMES_FLAG: &str = "--names-checked";
+/// Who was here's names (#1997): the person at the lamp says yes or no to
+/// being named to anyone who asks when they've been at the desk, through
+/// the eyes' `visits_yes` and `visits_no`.
+pub const TELL: &str = "tell_others_i_was_here";
+pub const DONT_TELL: &str = "dont_tell_others_i_was_here";
+/// Where they're offered, the switch lamp-skills reads too (`on` only).
+pub const VISITS_ENVIRONMENT: &str = "LAMP_WHO_WAS_HERE_NAMES";
+/// The provider worker's flag for it, after the names'.
+pub const VISITS_FLAG: &str = "--who-visits";
+
+/// What the face functions are switched to: names checked
+/// (`LAMP_NAMES=checked`) and the yes and no to being named
+/// (`LAMP_WHO_WAS_HERE_NAMES=on`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FaceSwitches {
+    pub checked: bool,
+    pub visits: bool,
+}
 /// The exchanges before the turn in hand that a name may have been said
 /// in, to be kept once the lamp has said it back and the person agreed
 /// ([`name_heard`]).
@@ -95,7 +113,7 @@ const AGREE_WITH_A_NO: &[&[&str]] = &[
     &["do", "not", "mind"],
 ];
 
-fn lower_words(text: &str) -> Vec<String> {
+pub(crate) fn lower_words(text: &str) -> Vec<String> {
     text.replace('\u{2019}', "'")
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .map(|word| word.trim_matches('\''))
@@ -226,6 +244,13 @@ fn plain_yes(name: &str, turn: &str) -> bool {
         })
 }
 
+/// Whether `turn` is a plain yes and nothing else ([`plain_yes`] with no
+/// name): "Yes.", "OK.", "Vâng ạ.", never "OK, what's my name?" or "Yes?".
+/// What runs a forget held for a person's yes on the second route.
+pub(crate) fn plain_agreement(turn: &str) -> bool {
+    plain_yes("", turn)
+}
+
 /// Whether the lamp said `name` back in the exchange just before the turn
 /// in hand, and the person said a plain yes to it now ([`plain_yes`]):
 /// what `replace` needs, and a name kept from an earlier exchange.
@@ -241,6 +266,16 @@ fn agreed_to(name: &str, said: &Said) -> bool {
 pub fn names_arguments(value: Option<&str>) -> Vec<String> {
     if value == Some("checked") {
         vec![NAMES_FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// The provider worker's argument for Who was here's names, after the
+/// names' ([`VISITS_ENVIRONMENT`]).
+pub fn visits_arguments(value: Option<&str>) -> Vec<String> {
+    if value == Some("on") {
+        vec![VISITS_FLAG.to_owned()]
     } else {
         Vec::new()
     }
@@ -329,7 +364,7 @@ fn spelled_runs(theirs: &[String]) -> Vec<String> {
 /// The words of `text` as a name is matched: lowercase, without accents,
 /// written as one letter or as a letter and its mark, a word with an
 /// apostrophe kept whole and ’ read as '.
-fn folded_words(text: &str) -> Vec<String> {
+pub(crate) fn folded_words(text: &str) -> Vec<String> {
     text.replace('\u{2019}', "'")
         .chars()
         .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
@@ -445,6 +480,98 @@ const QUESTION: &[&str] = &[
     "do", "does", "did", "can", "could", "will", "would", "is", "are", "what", "who", "how", "why",
     "when", "where",
 ];
+
+/// What the person says just before their name, as a line's last words:
+/// the name still to come, in English and Vietnamese ("tên tôi là", "tôi
+/// tên là", "gọi tôi là", with "mình" or "em" for "tôi"; the reviewer's P3
+/// on #2355). Not "I'm" or "I am" alone: "Yes, I am." ends a line.
+const OPENS_A_NAME: &[&[&str]] = &[
+    &["my", "name", "is"],
+    &["my", "name's"],
+    &["call", "me"],
+    &["i'm", "called"],
+    &["i", "am", "called"],
+    &["the", "name", "is"],
+    &["the", "name's"],
+    &["tên", "tôi", "là"],
+    &["tôi", "tên", "là"],
+    &["gọi", "tôi", "là"],
+    &["tên", "mình", "là"],
+    &["mình", "tên", "là"],
+    &["gọi", "mình", "là"],
+    &["tên", "em", "là"],
+    &["em", "tên", "là"],
+    &["gọi", "em", "là"],
+];
+
+/// Said while a name is found: "My name is, um,", "Tên tôi là, ờ,".
+const FILLERS: &[&str] = &["um", "uh", "er", "erm", "ah", "eh", "hmm", "ờ", "ừm"];
+
+/// Words that, just before an opening, mean no name follows: "Don't call
+/// me.", "Never call me."
+const NO_NAME_AFTER: &[&str] = &["don't", "dont", "never", "not"];
+
+/// Words a line opens with that make "call me" a request to call them,
+/// whose "?" speech to text often drops: "Can you call me", "Please call
+/// me" (the reviewer's P3 on #2355). "You can call me" still opens a name.
+const CALL_ME_ASKS: &[&str] = &["can", "could", "will", "would", "please"];
+
+/// Words before what a line says: a greeting and the lamp's name, skipped
+/// to find the word it opens with ("Hey Lamp, can you call me").
+const BEFORE_A_LINE: &[&str] = &["hey", "hi", "hello", "ok", "okay", "lamp", "so"];
+
+/// Whether what the person said ends opening their name, the name still to
+/// come: "Hey Lamp, my name is", "You can call me, um,". A line the
+/// turn-end model ends there is cut before the name: on lamp-4ace "my name
+/// is" and 400 ms of quiet was `model_complete` (0.933), and the name came
+/// as the next line (#2135, the first builder on #1722 at 01:58). Never a
+/// question ("Do you know what my name is?", "Can you call me?"), one asking
+/// what it is ("Tell me what my name is."), "Don't call me.", or a line that
+/// opens with "can", "could" or "please" before "call me" ("Can you call
+/// me", a call asked for with its "?" lost).
+pub fn opens_a_name(said: &str) -> bool {
+    let said = said.replace('\u{2019}', "'");
+    if said.trim_end().ends_with('?') {
+        return false;
+    }
+    let mut words: Vec<String> = said
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    while words
+        .last()
+        .is_some_and(|word| FILLERS.contains(&word.as_str()))
+    {
+        words.pop();
+    }
+    // The word the last sentence opens with, past a greeting and the name.
+    let last_sentence = said
+        .split(['.', '!', '?'])
+        .rfind(|sentence| sentence.chars().any(char::is_alphanumeric))
+        .unwrap_or_default()
+        .to_lowercase();
+    let opens_with = last_sentence
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .find(|word| !word.is_empty() && !BEFORE_A_LINE.contains(word))
+        .unwrap_or_default()
+        .to_owned();
+    OPENS_A_NAME.iter().any(|opening| {
+        if *opening == ["call", "me"] && CALL_ME_ASKS.contains(&opens_with.as_str()) {
+            return false;
+        }
+        let Some(at) = words.len().checked_sub(opening.len()) else {
+            return false;
+        };
+        let before = at.checked_sub(1).map(|before| words[before].as_str());
+        words[at..]
+            .iter()
+            .zip(opening.iter())
+            .all(|(word, open)| word == open)
+            && !before
+                .is_some_and(|before| ASKING.contains(&before) || NO_NAME_AFTER.contains(&before))
+    })
+}
 
 /// Whether what the person said gives their name: "my name is Jim", "my
 /// name's Jim", "call me Jim", "I am called Jim", "I'm Jim" or "I am Jim",
@@ -585,7 +712,17 @@ pub fn tools() -> Vec<Tool> {
 
 /// The same, with names checked or not.
 pub fn tools_checked(checked: bool) -> Vec<Tool> {
-    vec![
+    tools_for(FaceSwitches {
+        checked,
+        visits: false,
+    })
+}
+
+/// The face functions as switched: with Who was here's names on, the yes
+/// and the no to being named beside them ([`TELL`], [`DONT_TELL`]).
+pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
+    let checked = switches.checked;
+    let mut tools = vec![
         Tool {
             name: REMEMBER.into(),
             description: if checked {
@@ -633,12 +770,47 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
             })),
             silent: false,
         },
+    ];
+    if switches.visits {
+        tools.extend(visits_tools());
+    }
+    tools
+}
+
+fn visits_tools() -> [Tool; 2] {
+    let name = || {
+        Some(json!({
+            "type": "object",
+            "properties": {"name": {"type": "string", "description": "The name you know them by."}},
+            "required": ["name"]
+        }))
+    };
+    [
+        Tool {
+            name: TELL.into(),
+            description: "Call this only on a clear yes, in their own words, from the person you know, to \
+                          your telling anyone who asks when they've been at the desk, by name: after you \
+                          asked them, or when they say so themselves (\"you can tell people when I've been \
+                          here\"). Never on a maybe, and never for someone else."
+                .into(),
+            parameters: name(),
+            silent: false,
+        },
+        Tool {
+            name: DONT_TELL.into(),
+            description: "Call this when someone you know says you should not tell others when they've \
+                          been here, or takes back a yes to it (\"don't tell anyone I was here\"). Then \
+                          tell them briefly that you'll only say someone you know was here."
+                .into(),
+            parameters: name(),
+            silent: false,
+        },
     ]
 }
 
 /// Whether the voice routes this function to the eyes.
 pub fn is_tool(name: &str) -> bool {
-    matches!(name, REMEMBER | FORGET)
+    matches!(name, REMEMBER | FORGET | TELL | DONT_TELL)
 }
 
 /// Ask the eyes to remember or forget, and say what to tell the model; the
@@ -646,6 +818,34 @@ pub fn is_tool(name: &str) -> bool {
 /// its own. With names `checked`, a name the person did not say is not
 /// kept, and a face known by another name is asked about first.
 pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
+    run_for(
+        socket,
+        call,
+        FaceSwitches {
+            checked,
+            visits: false,
+        },
+        None,
+    )
+}
+
+/// [`run`] as switched, for a request whose admitted scope is `person`'s
+/// (`crate::remember::person_id`, `None` for the room's or unknown): a yes
+/// to being named is taken only from that person's own scope.
+pub fn run_for(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+) -> (Value, bool) {
+    if matches!(call.name.as_str(), TELL | DONT_TELL) {
+        return if switches.visits {
+            run_visits(socket, call, person)
+        } else {
+            (crate::tools::unavailable(), false)
+        };
+    }
+    let checked = switches.checked;
     let said = if checked {
         crate::thread::THREAD
             .lock()
@@ -654,10 +854,22 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
     } else {
         Said::default()
     };
-    run_with(socket, call, checked, &said)
+    run_switched(socket, call, switches, &said)
 }
 
+#[cfg(test)]
 fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Value, bool) {
+    let visits = false;
+    run_switched(socket, call, FaceSwitches { checked, visits }, said)
+}
+
+fn run_switched(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    said: &Said,
+) -> (Value, bool) {
+    let checked = switches.checked;
     let Some(name) = call
         .args
         .get("name")
@@ -697,12 +909,99 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
         _ => return (crate::tools::unavailable(), false),
     };
     match crate::tools::exchange(socket, &line, DEADLINE) {
-        Some(answer) => (told(&answer), true),
+        Some(answer) => (told_asking(&answer, switches.visits), true),
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),
             false,
         ),
     }
+}
+
+/// What the model is told when a yes to being named may not be the named
+/// person's own: nothing is sent, and it isn't asked again in that turn.
+pub const NOT_SURE_WHOSE_YES: &str = "I can't be sure that yes was theirs, so I haven't taken it. Don't ask again now; they can tell you when it's only them at the lamp.";
+/// The eyes answer a yes or no to being named within this.
+const VISITS_DEADLINE: Duration = Duration::from_millis(1_500);
+
+/// A yes or no to being named, through the eyes. A yes only from the named
+/// person's own scope (`person`; Third on #1997); a no from anyone at the
+/// lamp, since it only narrows. The journal names nobody.
+///
+/// The scope is whose face was in view as the line began, not who spoke:
+/// someone off camera saying yes for the person in view is taken, unless a
+/// face seen speaking narrowed the line to the room
+/// (`LAMP_SECOND_SPEAKING_FACE`, the second route only). The person hears
+/// the lamp confirm, and can say no.
+fn run_visits(socket: &Path, call: &ToolCall, person: Option<&str>) -> (Value, bool) {
+    let Some(name) = call
+        .args
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    else {
+        return (json!({"error": "There was no name in that."}), true);
+    };
+    let yes = call.name == TELL;
+    if yes {
+        let whose = match person {
+            None => Some("the line's scope is the room's"),
+            Some(id) if id != crate::remember::person_id(name) => {
+                Some("the line's scope is someone else's")
+            }
+            Some(_) => None,
+        };
+        if let Some(why) = whose {
+            eprintln!(
+                "lamp-voice: a yes to being named in Who was here was not taken: {why}; nothing was sent"
+            );
+            return (json!({"error": NOT_SURE_WHOSE_YES}), true);
+        }
+    }
+    let line = if yes {
+        json!({"visits_yes": name})
+    } else {
+        json!({"visits_no": name})
+    };
+    match crate::tools::exchange(socket, &line, VISITS_DEADLINE) {
+        Some(answer) => {
+            let told = visits_told(&answer, yes);
+            if told.get("ok").is_some() {
+                eprintln!(
+                    "lamp-voice: someone the lamp knows said {} to being named in Who was here",
+                    if yes { "yes" } else { "no" }
+                );
+            }
+            (told, true)
+        }
+        None => (
+            json!({"error": "My eye is not answering right now, so I could not do that."}),
+            false,
+        ),
+    }
+}
+
+/// What the eyes said to a yes or no to being named, in words the model
+/// can say.
+fn visits_told(answer: &Value, yes: bool) -> Value {
+    match (answer.get("visits").and_then(Value::as_str), yes) {
+        (Some("yes"), true) => {
+            return json!({"ok": true, "note": "Tell them in a few words that you'll say it's them when someone asks who was here."});
+        }
+        (Some("no"), false) => {
+            return json!({"ok": true, "note": "Tell them in a few words that you'll only say someone you know was here."});
+        }
+        _ => {}
+    }
+    let words = match answer.get("error").and_then(Value::as_str) {
+        Some("not_here") => {
+            "I can only take that yes while I can see them at the lamp. They should look at me and say it again."
+        }
+        Some("not_known") => "I don't know a face by that name.",
+        Some("tellable_off") => "That part of me is not running right now, so I could not do it.",
+        _ => "My eye could not do that just now.",
+    };
+    json!({"error": words})
 }
 
 /// A face forgotten while old face records the eyes couldn't read are kept
@@ -716,19 +1015,38 @@ pub const NOT_KNOWN_SOME_KEPT_APART: &str = "You did not know a face by that nam
 /// own words.
 pub const VISITS_LINE: &str = "Also say, in one short sentence, that you'll notice how often they come by, so you can greet them more warmly.";
 
+/// What a person just remembered is asked once, with Who was here's names
+/// on (#1997; Third and the reviewer: the ask says it's when they've been
+/// here, told to anyone who asks).
+pub const ASK_TO_NAME: &str = "Then ask them once whether you may tell anyone who asks when they've been at the desk, by name; otherwise you'd only say someone you know was here. Call tell_others_i_was_here only on their own clear yes, and dont_tell_others_i_was_here on a no.";
+
 /// What the eyes said, in words the model can say.
+#[cfg(test)]
 fn told(answer: &Value) -> Value {
+    told_asking(answer, false)
+}
+
+/// [`told`], and with Who was here's names on (`visits`), a person just
+/// remembered is asked once whether they may be named ([`ASK_TO_NAME`]).
+fn told_asking(answer: &Value, visits: bool) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
         // With visits counted (`lamp-eyes --visits on`), the person is told so
         // in one line, as they are remembered (the first builder on #1670).
-        if answer.get("visits").and_then(Value::as_bool) == Some(true) {
-            return json!({
+        let counted = answer.get("visits").and_then(Value::as_bool) == Some(true);
+        let also_say = match (counted, visits) {
+            (true, true) => Some(format!("{VISITS_LINE} {ASK_TO_NAME}")),
+            (true, false) => Some(VISITS_LINE.to_owned()),
+            (false, true) => Some(ASK_TO_NAME.to_owned()),
+            (false, false) => None,
+        };
+        return match also_say {
+            Some(also_say) => json!({
                 "ok": true,
                 "remembered": name,
-                "also_say": VISITS_LINE,
-            });
-        }
-        return json!({"ok": true, "remembered": name});
+                "also_say": also_say,
+            }),
+            None => json!({"ok": true, "remembered": name}),
+        };
     }
     // Set-aside files the eyes couldn't search: the forget waits for them,
     // and the person is told what was forgotten and what wasn't (#1586),
@@ -1158,6 +1476,51 @@ mod tests {
         );
     }
 
+    /// #1997: with Who was here's names on, someone just remembered is
+    /// asked once whether they may be named, beside #1670's visits line;
+    /// the eyes' yes, no and refusals are said in words.
+    #[test]
+    fn someone_remembered_is_asked_once_about_being_named_and_the_eyes_answer_is_said() {
+        assert_eq!(
+            told_asking(&json!({"remembered":"Minh"}), true),
+            json!({"ok":true,"remembered":"Minh","also_say":ASK_TO_NAME})
+        );
+        assert_eq!(
+            told_asking(&json!({"remembered":"Minh","visits":true}), true)["also_say"],
+            format!("{VISITS_LINE} {ASK_TO_NAME}")
+        );
+        assert!(ASK_TO_NAME.contains("when") && ASK_TO_NAME.contains("anyone who asks"));
+        assert_eq!(
+            told_asking(&json!({"forgot":true}), true),
+            json!({"ok":true})
+        );
+        assert_eq!(visits_told(&json!({"visits":"yes"}), true)["ok"], true);
+        assert_eq!(visits_told(&json!({"visits":"no"}), false)["ok"], true);
+        // An answer that isn't the one asked for is no success.
+        assert!(visits_told(&json!({"visits":"no"}), true)["error"].is_string());
+        for code in ["not_here", "not_known", "tellable_off", "storage", "else"] {
+            let words = visits_told(&json!({"error": code}), true);
+            assert!(
+                words["error"]
+                    .as_str()
+                    .is_some_and(|words| words.ends_with('.')),
+                "{code}"
+            );
+        }
+        let names = |visits| {
+            tools_for(FaceSwitches {
+                checked: true,
+                visits,
+            })
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(names(true), [REMEMBER, FORGET, TELL, DONT_TELL]);
+        assert_eq!(names(false), [REMEMBER, FORGET]);
+        assert!(is_tool(TELL) && is_tool(DONT_TELL));
+    }
+
     #[test]
     fn a_call_without_a_name_is_not_sent_and_a_silent_eye_is_said_so() {
         let call = |name: &str, args: Value| ToolCall {
@@ -1318,6 +1681,55 @@ mod tests {
             "Who's my name for?",
         ] {
             assert!(!gives_a_name(not), "{not}");
+        }
+    }
+
+    /// #2135: a line that ends opening a name, the name still to come, is
+    /// told from one that gives it, asks about it, or ends.
+    #[test]
+    fn a_line_ending_before_its_name_is_told_apart() {
+        for open in [
+            "Hey Lamp, my name is",
+            "Hey Lamp, my name is.",
+            "Hey, Lamp. My name is",
+            "My name's",
+            "Hi, my name is, um,",
+            "You can call me",
+            "Lamp, just call me uh",
+            "I'm called",
+            "I am called",
+            "The name is",
+            "My name\u{2019}s",
+            "Chào Lamp, tên tôi là",
+            "Tôi tên là, ờ,",
+            "Lamp ơi, gọi em là",
+            "Hey Lamp, you can call me",
+            "Can you remember? Call me",
+        ] {
+            assert!(opens_a_name(open), "{open}");
+            assert!(!gives_a_name(open), "{open}");
+        }
+        for not in [
+            "Hey Lamp, my name is Jim.",
+            "Call me Jim.",
+            "Do you know what my name is?",
+            "Tell me what my name is.",
+            "Can you call me?",
+            "Don't call me.",
+            "Yes, I am.",
+            "I'm",
+            "What's my name",
+            "Remember my name.",
+            "My name is Jim, and I'm",
+            "Tên tôi là Lan.",
+            "Tên bạn là gì?",
+            "Can you call me",
+            "Hey Lamp, could you call me.",
+            "Please call me",
+            "Lamp, will you call me",
+            "",
+        ] {
+            assert!(!opens_a_name(not), "{not}");
         }
         assert!(
             tools_checked(true)[0]

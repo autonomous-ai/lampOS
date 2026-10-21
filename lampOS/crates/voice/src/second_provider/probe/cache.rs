@@ -105,8 +105,13 @@ pub fn changing(n: u32) -> String {
 /// reports. The actions part's light and volume are its own catalog file on
 /// the lamp, so they are not among them.
 pub fn functions() -> Vec<lamp_gemini::Tool> {
+    crate::tools::declared(&settings())
+}
+
+/// The settings [`functions`] declares with.
+pub(crate) fn settings() -> crate::tools::Settings {
     let declared = std::path::PathBuf::from("/nonexistent");
-    crate::tools::declared(&crate::tools::Settings {
+    crate::tools::Settings {
         decline: true,
         clock: true,
         places: true,
@@ -116,7 +121,7 @@ pub fn functions() -> Vec<lamp_gemini::Tool> {
         onboarding: Some(declared),
         reports_stop: true,
         ..crate::tools::Settings::default()
-    })
+    }
 }
 
 /// One request's answer: when its first event came, and the service's

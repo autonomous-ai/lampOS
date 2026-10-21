@@ -86,12 +86,30 @@ enum Written {
     Said(usize),
 }
 
+/// How the second route, alone, answers a look's turn or the look's note
+/// (`LAMP_SECOND_LOOK_NOTE`): as its engine tells them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum LookAnswer {
+    /// Calls `look_for` for the next place: `LookAsked`, before its audio,
+    /// dropped as the engine drops it in a turn that is no search's.
+    Next,
+    /// Calls nothing: `LookNoCall`, after its audio.
+    Nothing,
+    /// Calls something else (a found place, another tool): neither.
+    Other,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum When {
     /// This many turns have been settled by the coordinator.
     Settled(usize),
+    /// The coordinator has sent this many requests' End.
+    Ended(usize),
     /// The speaker has accepted this many chunks.
     Accepted(usize),
+    /// Alone, the second route has been sent this many look turns: the
+    /// coordinator has committed them, whatever the host's pace.
+    LookTurns(usize),
 }
 
 #[derive(Clone)]
@@ -105,6 +123,24 @@ struct Script {
     second_packets: usize,
     /// The second route's answers open with these words.
     second_says: Option<&'static str>,
+    /// The second route's first answer comes after a skill's look step
+    /// (`LAMP_SECOND_SKILL_LOOK`, #941): `LookAsked` for the session that
+    /// began it, before its audio.
+    second_looks: bool,
+    /// `second_looks`' look is the route's own `take_a_look`, no skill's
+    /// search.
+    own_look: bool,
+    /// Alone, how the second route answers each look's turn in order, then
+    /// `Other`.
+    look_answers: &'static [LookAnswer],
+    /// Alone, how the second route answers the look's note.
+    note_answer: LookAnswer,
+    /// The place the person named for the search's first look, or none
+    /// (the desk).
+    first_place: Option<&'static str>,
+    /// `LAMP_SECOND_LOOK_WALK`: the second route tells a note's turn left
+    /// with no call too.
+    walk: bool,
     /// Packets of a wait cue the second route plays before its words.
     second_cue: usize,
     /// What the second route heard the person say, as its recogniser
@@ -112,6 +148,12 @@ struct Script {
     second_hears: Option<&'static str>,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
+    /// A murmur of two capture frames, too short to be a turn: the room is
+    /// not quiet for a second after it.
+    murmur: Option<When>,
+    /// A hand Stop (the button's tap) comes through Controls this many
+    /// capture frames after the murmur.
+    hand_stop: Option<u64>,
     /// Privacy reports muted once this many turns are settled.
     turns: usize,
     /// The Live link is Ready again, with a new session, once this many
@@ -150,6 +192,13 @@ struct Script {
     /// The second route answers nothing at End: its chat is still
     /// streaming (#1620 on the second route).
     second_holds: bool,
+    /// The second route's first request is told at End with its words
+    /// (`second_hears`) and nothing else, its answer held, as that route
+    /// holds a line that ends before its name (`LAMP_SECOND_OPEN_NAME`);
+    /// the requests after it are answered as usual.
+    second_waits_first: bool,
+    /// `LAMP_SECOND_OPEN_NAME` in the rig.
+    open_name: bool,
     /// The second route fails each turn before any audio, as its worker
     /// does when its speech to text or chat cannot be reached.
     second_fails: Option<Fault>,
@@ -159,6 +208,9 @@ struct Script {
     limit: Duration,
     /// No person's input: only authored skill output is under test.
     silent: bool,
+    /// The person's speech is a voice, a 150 Hz tone, not a flat level, so
+    /// the voice's tone can read it (`LAMP_VOICE_TONE`).
+    voiced: bool,
     /// One parsed Say request, read at this capture frame's scenario time.
     say_at_frame: Option<(u64, crate::say::LineForTest)>,
     /// Onboarding's near-call try window opens this many milliseconds from
@@ -187,9 +239,17 @@ impl Script {
             live: vec![live],
             second_packets: 12,
             second_says: None,
+            second_looks: false,
+            own_look: false,
+            look_answers: &[],
+            note_answer: LookAnswer::Other,
+            first_place: None,
+            walk: false,
             second_cue: 0,
             second_hears: None,
             speak_again: None,
+            murmur: None,
+            hand_stop: None,
             turns: 1,
             live_back_after: None,
             live_late: None,
@@ -205,11 +265,14 @@ impl Script {
             second_shape: None,
             expression: false,
             second_holds: false,
+            second_waits_first: false,
+            open_name: false,
             second_fails: None,
             ignores_stop: None,
             limit: LIMIT,
             silent: false,
             say_at_frame: None,
+            voiced: false,
             near_window_ms: None,
             sentence_window_ms: None,
             live_hears: &[],
@@ -233,8 +296,9 @@ struct Seen {
     live: Vec<ProviderInput>,
     second: Vec<ProviderInput>,
     chunks: Vec<Chunk>,
-    /// Owner and microphone of every authority the speaker's guard took.
-    installs: Vec<(Option<u64>, bool)>,
+    /// Owner, microphone and camera of every authority the speaker's guard
+    /// took.
+    installs: Vec<(Option<u64>, bool, bool)>,
     phases: Vec<RingPhase>,
     stopped: Vec<&'static str>,
 }
@@ -381,6 +445,13 @@ impl Peer {
     }
 }
 
+thread_local! {
+    /// Memory, telling the voice it forgot a person once this many Ends have
+    /// been sent (`memory/forgot`), on the bus `TEST_FORGOT_IN` reads.
+    static TEST_MEMORY_FORGETS: std::cell::RefCell<Option<(usize, String, lamp_bus::Publisher)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 struct Peers {
     script: Script,
     peers: Vec<Peer>,
@@ -404,6 +475,16 @@ struct Peers {
     live_ready_sent: bool,
     /// The capture frame at which the second route's worker exited.
     second_died_at: Option<u64>,
+    /// The session of the second route's last Start.
+    second_session: u64,
+    /// The second route has asked its look (`Script::second_looks`).
+    second_looked: bool,
+    /// Look's turns the second route has answered (`Script::look_answers`).
+    look_turns: usize,
+    /// The capture frame the murmur began at (`Script::murmur`).
+    murmur_at: Option<u64>,
+    /// Controls' queue into the voice's hand controls (`Script::hand_stop`).
+    hand: Option<crate::hand_controls::TestControls>,
 }
 
 impl Peers {
@@ -416,10 +497,31 @@ impl Peers {
             && ((20..20 + self.script.speech_frames).contains(&frame)
                 || self
                     .speech_offset
-                    .is_some_and(|offset| (offset..offset + 60).contains(&frame)))
+                    .is_some_and(|offset| (offset..offset + 60).contains(&frame))
+                || self
+                    .murmur_at
+                    .is_some_and(|at| (at..at + 2).contains(&frame)))
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        let ended = self.ended.len();
+        TEST_MEMORY_FORGETS.with(|slot| {
+            if slot
+                .borrow()
+                .as_ref()
+                .is_some_and(|(after, ..)| ended >= *after)
+                && let Some((_, person, mut memory)) = slot.borrow_mut().take()
+            {
+                memory
+                    .publish_json(
+                        monotonic_us(),
+                        &lamp_msgs::MemoryForgot {
+                            person: Some(person),
+                        },
+                    )
+                    .unwrap();
+            }
+        });
         if self
             .script
             .say_at_frame
@@ -436,12 +538,33 @@ impl Peers {
         if let Some(when) = self.script.speak_again {
             let due = match when {
                 When::Settled(count) => self.settled >= count,
+                When::Ended(count) => self.ended.len() >= count,
                 When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
             };
             if due {
                 self.script.speak_again = None;
                 self.speech_offset = Some(self.frames);
             }
+        }
+        if let Some(when) = self.script.murmur {
+            let due = match when {
+                When::Settled(count) => self.settled >= count,
+                When::Ended(count) => self.ended.len() >= count,
+                When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
+            };
+            if due {
+                self.script.murmur = None;
+                self.murmur_at = Some(self.frames);
+            }
+        }
+        if let (Some(after), Some(at)) = (self.script.hand_stop, self.murmur_at)
+            && self.frames >= at + after
+            && let Some(hand) = self.hand.as_ref()
+        {
+            self.script.hand_stop = None;
+            hand.send(hand_stop_state(monotonic_us()));
         }
         // A voice still serving a second after its second route died can
         // be muted then, which ends the run cleanly.
@@ -657,7 +780,16 @@ impl Peers {
                 probability: if speech { 0.99 } else { 0.0 },
                 echo: None,
                 reference: Default::default(),
-                samples: vec![if speech { 2_000 } else { 7 }; 160],
+                samples: if speech && self.script.voiced {
+                    (0..160u64)
+                        .map(|at| {
+                            let t = (frame * 160 + at) as f32 / 16_000.0;
+                            (2_000.0 * (2.0 * std::f32::consts::PI * 150.0 * t).sin()) as i16
+                        })
+                        .collect()
+                } else {
+                    vec![if speech { 2_000 } else { 7 }; 160]
+                },
                 timing: CaptureTiming {
                     first_read_started_at_us: at,
                     last_read_started_at_us: at,
@@ -741,6 +873,9 @@ impl Peers {
                     if live || self.script.only {
                         self.live_requests.push(request);
                     }
+                    if !live {
+                        self.second_session = session;
+                    }
                     self.peers[index].queued.push_back(ProviderOutput::Started {
                         request,
                         session,
@@ -750,7 +885,12 @@ impl Peers {
                 // Alone, the second route answers the lamp's own turns as
                 // the Live route would, with its own samples.
                 ProviderInput::Written {
-                    request, session, ..
+                    request,
+                    session,
+                    text,
+                    look,
+                    search,
+                    ..
                 } if live || self.script.only => {
                     let queued = &mut self.peers[index].queued;
                     let started = ProviderOutput::Started {
@@ -775,7 +915,50 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
+                            // Alone, a look's turn or the look's note is
+                            // answered as the script says.
+                            let answer = if live {
+                                None
+                            } else if look {
+                                self.look_turns += 1;
+                                Some(
+                                    self.script
+                                        .look_answers
+                                        .get(self.look_turns - 1)
+                                        .copied()
+                                        .unwrap_or(LookAnswer::Other),
+                                )
+                            } else if text == super::look_note::NOTE {
+                                Some(self.script.note_answer)
+                            } else {
+                                None
+                            };
+                            // As the engine: the skill's next look is taken
+                            // only in a search's own turn, and dropped in any
+                            // other the lamp wrote (#1146).
+                            if answer == Some(LookAnswer::Next) {
+                                self.peers[index]
+                                    .queued
+                                    .push_back(ProviderOutput::LookAsked {
+                                        request,
+                                        session,
+                                        dropped: (!search).then(|| {
+                                            "the turn is one the lamp wrote itself".to_owned()
+                                        }),
+                                        search: true,
+                                        // A place these tests do not read.
+                                        call: None,
+                                    });
+                            }
                             self.audio(index, request, packets, if live { LIVE } else { SECOND });
+                            // As the engine: a note's turn left so is
+                            // told only with the walk (`walking_looks`).
+                            let told = look || self.script.walk;
+                            if answer == Some(LookAnswer::Nothing) && told {
+                                self.peers[index]
+                                    .queued
+                                    .push_back(ProviderOutput::LookNoCall { request, session });
+                            }
                             self.finish(index, request);
                         }
                     }
@@ -783,6 +966,18 @@ impl Peers {
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
                     if !live && self.script.second_holds {
+                        continue;
+                    }
+                    if !live && self.script.second_waits_first && self.ended.len() == 1 {
+                        if let Some(text) = self.script.second_hears {
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::Transcript {
+                                    request: None,
+                                    text: text.into(),
+                                    finished: true,
+                                });
+                        }
                         continue;
                     }
                     if !live && let Some(reason) = self.script.second_fails {
@@ -836,11 +1031,39 @@ impl Peers {
                             self.finish(index, request);
                             continue;
                         }
+                        if self.script.second_looks
+                            && !std::mem::replace(&mut self.second_looked, true)
+                        {
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::LookAsked {
+                                    request,
+                                    session: self.second_session,
+                                    dropped: None,
+                                    search: !self.script.own_look,
+                                    // The skill's call, at the place the
+                                    // person named, or none: the desk.
+                                    call: (!self.script.own_look).then(|| {
+                                        crate::provider_worker::SearchCall {
+                                            name: "look_for".into(),
+                                            args: self.script.first_place.map_or_else(
+                                                || json!({}),
+                                                |place| json!({"place": place}),
+                                            ),
+                                        }
+                                    }),
+                                });
+                        }
                         // A wait cue first: audio with no words.
                         if self.script.second_cue > 0 {
                             self.audio(index, request, self.script.second_cue, CUE);
                         }
-                        if let Some(text) = self.script.second_hears {
+                        // The first request's words only, when it waits.
+                        if let Some(text) = self
+                            .script
+                            .second_hears
+                            .filter(|_| !self.script.second_waits_first)
+                        {
                             self.peers[index]
                                 .queued
                                 .push_back(ProviderOutput::Transcript {
@@ -917,6 +1140,8 @@ impl Peers {
                                     request,
                                     session,
                                     dropped: None,
+                                    search: false,
+                                    call: None,
                                 });
                             self.audio(index, request, packets, LIVE);
                             self.finish(index, request);
@@ -945,6 +1170,8 @@ impl Peers {
                                 request,
                                 session: 1,
                                 dropped: None,
+                                search: false,
+                                call: None,
                             });
                             match answer {
                                 Live::LookSilent => {
@@ -1063,6 +1290,7 @@ impl Peers {
             self.seen.lock().unwrap().installs.push((
                 snapshot.owner().map(|owner| owner.turn()),
                 snapshot.microphone_permission() == Permission::Allowed,
+                snapshot.camera_permission() == Permission::Allowed,
             ));
         }
     }
@@ -1097,6 +1325,49 @@ impl PrivacyPeer {
         }
         Ok(())
     }
+}
+
+/// The clock the run's hand controls are stamped with (`Script::hand_stop`).
+const HAND_CLOCK: &str = "second-route-hand";
+
+/// Controls' state with one tap of the button that stops, at `at_us`.
+fn hand_stop_state(at_us: u64) -> lamp_msgs::ControlsState {
+    use lamp_msgs::{ClockStamp, ControlGesture, ControlIntent, ControlSource, Gesture, HoldTier};
+    let stamp = || ClockStamp {
+        clock_id: HAND_CLOCK.into(),
+        at_us,
+        sequence: 1,
+    };
+    let state = lamp_msgs::ControlsState {
+        stamp: stamp(),
+        session_id: "second-route-controls".into(),
+        enabled: true,
+        ready: true,
+        fault: None,
+        buttons: vec![],
+        head_active: false,
+        base_ready: false,
+        base_held_us: None,
+        base_tier: HoldTier::None,
+        latest_stop: Some(ControlGesture {
+            stamp: stamp(),
+            session_id: "second-route-controls".into(),
+            source: ControlSource::Button,
+            name: "primary".into(),
+            gesture: Gesture::Tap,
+            intent: ControlIntent::Stop,
+            duration_us: 100_000,
+            released_us: at_us,
+            enabled: true,
+        }),
+        latest_mute: None,
+        event_sequence: 1,
+        rejected_inputs: 0,
+        privacy: None,
+        no_privacy_slide: false,
+    };
+    state.check().unwrap();
+    state
 }
 
 fn run(script: Script) -> Run {
@@ -1143,6 +1414,7 @@ fn run(script: Script) -> Run {
         end_silence_blocks: None,
         early_end_blocks: None,
         early_finalize: false,
+        open_name: script.open_name,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),
@@ -1260,6 +1532,14 @@ fn run(script: Script) -> Run {
     }
     let seen = Arc::new(Mutex::new(Seen::default()));
     let muted = Arc::new(AtomicBool::new(false));
+    let (mut controls, hand) = match script.hand_stop {
+        Some(_) => {
+            let (controls, hand) =
+                HandControls::with_test_sender(HAND_CLOCK, monotonic_us()).unwrap();
+            (Some(controls), Some(hand))
+        }
+        None => (None, None),
+    };
     let privacy_at = peers.iter().position(|p| p.role == "privacy").unwrap();
     let mut privacy = PrivacyPeer {
         peer: peers.remove(privacy_at),
@@ -1288,6 +1568,11 @@ fn run(script: Script) -> Run {
         link_back: false,
         live_ready_sent: false,
         second_died_at: None,
+        second_session: 0,
+        second_looked: false,
+        look_turns: 0,
+        murmur_at: None,
+        hand,
     };
     let started = crate::scenario_clock::instant();
     let mut reported = false;
@@ -1316,7 +1601,7 @@ fn run(script: Script) -> Run {
         .unwrap();
     let mut reply = None;
     let mut trace = SessionState::default();
-    let result = conversation(
+    let result = conversation_with_controls(
         &mut rig,
         &mut owner,
         Lifetime::Serve,
@@ -1326,6 +1611,8 @@ fn run(script: Script) -> Run {
         &mut None,
         &Termination::inactive(),
         &FailureNotices::none(),
+        &mut controls,
+        &mut None,
     );
     let result = finish_active_run(
         &mut rig, &mut owner, &mut reply, &mut trace, &mut None, result,
@@ -1556,6 +1843,736 @@ fn the_second_route_s_own_phrase_asks_its_look_after_the_tool_s_is_dropped() {
     );
 }
 
+/// A skill's look step on the second route (`LAMP_SECOND_SKILL_LOOK`,
+/// #941): the look its worker asks for its own session is taken once the
+/// answer's first audio plays, never before it, and its still goes to that
+/// session as the `lamp_looks` written turn with the picture. Standing by
+/// with Gemini's link gone, and as the only route. Its answer plain, no
+/// look is asked.
+#[test]
+fn a_skills_look_on_the_second_route_takes_the_still_for_its_own_session() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-skill-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let script = |only: bool, looks: bool| Script {
+        only,
+        second: !only,
+        second_looks: looks,
+        // The look's turn has time to go before the run ends.
+        mute_at_frame: Some(500),
+        written: Written::Said(6),
+        ..Script::question(if only {
+            Live::Answer(12)
+        } else {
+            Live::DropLink
+        })
+    };
+    let standing_by = run(script(false, true));
+    let alone = run(script(true, true));
+    let plain = run(script(false, false));
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    for (case, run) in [("standing by", &standing_by), ("alone", &alone)] {
+        let at = |kind: &str| {
+            run.trace
+                .iter()
+                .position(|e| e["kind"] == kind)
+                .unwrap_or_else(|| panic!("{case}: no {kind}: {}", run.summary()))
+        };
+        assert!(
+            run.trace
+                .iter()
+                .any(|e| e["kind"] == "look_asked" && e["by"] == "tool" && e["turn"] == 1),
+            "{case}"
+        );
+        let dropped: Vec<_> = run.events("look_dropped");
+        assert!(dropped.is_empty(), "{case}: {dropped:?}");
+        // Asked of the eyes once the answer is heard, not before.
+        assert!(at("speaker_first_write") < at("look_full_asked"), "{case}");
+        let still: Vec<_> = run.events("look_full_still");
+        assert_eq!(still.len(), 1, "{case}");
+        assert_eq!(still[0]["still"], true, "{case}");
+        // The look's written turn, on the second route's own session.
+        let session = run.seen.second.iter().find_map(|input| match input {
+            ProviderInput::Start { session, .. } => Some(*session),
+            _ => None,
+        });
+        let looks: Vec<_> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written {
+                    session,
+                    text,
+                    look,
+                    ..
+                } => Some((Some(*session), text.as_str(), *look)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            looks,
+            [(session, crate::speak_up::LOOK_FULL_NOTE, true)],
+            "{case}"
+        );
+        assert!(
+            run.trace
+                .iter()
+                .any(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "lamp_looks"),
+            "{case}"
+        );
+    }
+    assert!(plain.events("look_asked").is_empty());
+    assert!(plain.events("look_full_asked").is_empty());
+    assert!(
+        !plain
+            .seen
+            .second
+            .iter()
+            .any(|input| matches!(input, ProviderInput::Written { .. }))
+    );
+}
+
+/// The first builder on this change's plan (20 Oct): a skill's look on
+/// the second route is dropped the moment the person speaks, as every look
+/// is when someone speaking first takes the turn; no look's turn goes.
+#[test]
+fn a_skills_look_on_the_second_route_is_dropped_when_the_person_speaks() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-skill-cut-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        second_packets: 60,
+        speak_again: Some(When::Accepted(8)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(60))
+    });
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    assert_eq!(run.finished(1)["outcome"], "user_interrupted");
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["by"].clone()))
+        .collect();
+    assert_eq!(dropped, [(json!(1), json!("tool"))], "{}", run.summary());
+    assert!(run.events("look_full_still").is_empty());
+    assert!(
+        !run.seen
+            .second
+            .iter()
+            .any(|input| matches!(input, ProviderInput::Written { look: true, .. }))
+    );
+}
+
+/// A skill's search on the second route alone (`LAMP_SECOND_SKILL_LOOK`),
+/// its look's turns answered as `look_answers` says, the note's as `note`,
+/// with `LAMP_SECOND_LOOK_NOTE` on or off.
+fn search(
+    on: bool,
+    look_answers: &'static [LookAnswer],
+    note: LookAnswer,
+    speak_again: Option<When>,
+) -> Run {
+    search_with(on, look_answers, note, speak_again, None)
+}
+
+/// As [`search`], with a murmur and a hand Stop that many capture frames
+/// after it (`Script::murmur`, `Script::hand_stop`).
+fn search_with(
+    on: bool,
+    look_answers: &'static [LookAnswer],
+    note: LookAnswer,
+    speak_again: Option<When>,
+    murmur_then_stop: Option<(When, u64)>,
+) -> Run {
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-note-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(on);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers,
+        note_answer: note,
+        speak_again,
+        murmur: murmur_then_stop.map(|(murmur, _)| murmur),
+        hand_stop: murmur_then_stop.map(|(_, after)| after),
+        turns: if speak_again.is_some() { 3 } else { 1 },
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(1_100),
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run
+}
+
+/// The look's notes the second route was sent, by request.
+fn look_notes(run: &Run) -> Vec<u64> {
+    run.seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written { request, text, .. } if text == super::look_note::NOTE => {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The written turns sent to the second route as a search's own.
+fn search_turns(run: &Run) -> Vec<u64> {
+    run.seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written {
+                request,
+                search: true,
+                ..
+            } => Some(*request),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The look's turns (`lamp_looks`) the second route was sent, by request.
+fn look_turns(run: &Run) -> Vec<u64> {
+    run.trace
+        .iter()
+        .filter(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "lamp_looks")
+        .map(|e| e["turn"].as_u64().unwrap())
+        .collect()
+}
+
+/// (a) The first builder's step 2 for look-for-things on the second route
+/// (20 Oct): a skill's search whose look got an answer that called nothing
+/// is sent one note to go on, once that answer has played and the room has
+/// been quiet a second, on the same session; the note's answer is said.
+#[test]
+fn a_skills_look_answered_with_no_call_gets_one_note_after_it_plays() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(true, &[LookAnswer::Nothing], LookAnswer::Other, None);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    let notes = look_notes(&run);
+    assert_eq!(notes.len(), 1, "{:?}", run.events("look_note_dropped"));
+    let sent = run.events("look_note_sent");
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0]["turn"], looks[0]);
+    assert_eq!(sent[0]["next_turn"], notes[0]);
+    // After the look's answer played whole, and a second of quiet.
+    let at = |kind: &str, turn: u64| {
+        run.trace
+            .iter()
+            .position(|e| e["kind"] == kind && e["turn"] == turn)
+            .unwrap_or_else(|| panic!("no {kind} for {turn}: {}", run.summary()))
+    };
+    assert!(at("turn_finished", looks[0]) < at("look_note_sent", looks[0]));
+    assert_eq!(run.played(looks[0]), vec![SECOND; 24]);
+    assert_eq!(run.played(notes[0]), vec![SECOND; 24]);
+    let session = run.seen.second.iter().find_map(|input| match input {
+        ProviderInput::Start { session, .. } => Some(*session),
+        _ => None,
+    });
+    assert!(run.seen.second.iter().any(|input| matches!(input,
+        ProviderInput::Written { request, session: of, look: false, .. }
+            if *request == notes[0] && Some(*of) == session)));
+    assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// (b) Once a search: the note's answer calls the next place, its look is
+/// taken there (the note's turn goes on with the search), and that look's
+/// answer calls nothing again: no second note.
+#[test]
+fn a_second_look_left_in_the_same_search_gets_no_second_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(
+        true,
+        &[LookAnswer::Nothing, LookAnswer::Nothing],
+        LookAnswer::Next,
+        None,
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 2, "{}", run.summary());
+    let notes = look_notes(&run);
+    assert_eq!(notes.len(), 1, "{}", run.summary());
+    // The search's own turns, in order: look, note, look.
+    assert_eq!(search_turns(&run), [looks[0], notes[0], looks[1]]);
+    assert!(run.events("look_dropped").is_empty());
+    let dropped: Vec<_> = run
+        .events("look_note_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(json!(looks[1]), json!("its search had its note"))]
+    );
+}
+
+/// (c) The chain: the look's answer calls `look_for` for the next place,
+/// that look is taken in the look's own turn and the next `lamp_looks` turn
+/// goes, also the search's; its answer called something else: no note.
+#[test]
+fn a_look_answer_that_called_gets_no_note() {
+    let _one = super::pilot_faults::one_session();
+    // The chain needs only `LAMP_SECOND_SKILL_LOOK`; the note's switch
+    // changes nothing of it.
+    for on in [true, false] {
+        let run = search(
+            on,
+            &[LookAnswer::Next, LookAnswer::Other],
+            LookAnswer::Other,
+            None,
+        );
+        run.assert_clean();
+        let looks = look_turns(&run);
+        assert_eq!(looks.len(), 2, "note {on}: {}", run.summary());
+        assert_eq!(search_turns(&run), looks, "note {on}");
+        assert!(run.events("look_dropped").is_empty(), "note {on}");
+        assert_eq!(run.events("look_full_still").len(), 2, "note {on}");
+        assert!(look_notes(&run).is_empty(), "note {on}");
+        assert!(run.events("look_note_sent").is_empty(), "note {on}");
+    }
+}
+
+/// The voice's own bound on a search (`look_note::SEARCH_LOOKS_AT_MOST`,
+/// lamp-skills' 8): every look's answer calls the next place, the search's
+/// looks are taken in its own turns up to the 8th, and the 9th, asked in
+/// the 8th look's turn, is dropped as in any turn the lamp wrote (#1146),
+/// saying the search took its looks. No note follows.
+#[test]
+fn a_searchs_ninth_chained_look_is_dropped() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-cap-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers: &[LookAnswer::Next; 8],
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(3_000),
+        written: Written::Said(6),
+        limit: Duration::from_secs(40),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run.assert_clean();
+    let at_most = super::look_note::SEARCH_LOOKS_AT_MOST as usize;
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), at_most, "{}", run.summary());
+    assert_eq!(run.events("look_full_still").len(), at_most);
+    // Every look's turn but the last is the search's own.
+    assert_eq!(search_turns(&run), looks[..at_most - 1]);
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(
+            json!(looks[at_most - 1]),
+            json!("the search took its looks")
+        )]
+    );
+    assert!(look_notes(&run).is_empty());
+}
+
+/// #1146 kept: a look's turn that is no skill's search (the route's own
+/// `take_a_look`) is a turn the lamp wrote itself like any other: a skill's
+/// look its answer asks for is dropped, and no second still goes.
+#[test]
+fn a_look_asked_in_a_turn_that_is_no_searchs_is_still_dropped() {
+    let _one = super::pilot_faults::one_session();
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-own-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        own_look: true,
+        look_answers: &[LookAnswer::Next],
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(1_100),
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    assert!(search_turns(&run).is_empty());
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(
+            json!(looks[0]),
+            json!("the turn is one the lamp wrote itself")
+        )]
+    );
+    assert_eq!(run.events("look_full_still").len(), 1);
+}
+
+/// (d) The person speaks while the look's answer plays (the speaker has
+/// taken 48 chunks of the question's answer and 12 of the look's 24): the
+/// answer is cut, no note goes, and why is recorded.
+#[test]
+fn the_person_speaking_after_the_look_drops_the_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(
+        true,
+        &[LookAnswer::Nothing],
+        LookAnswer::Other,
+        Some(When::Accepted(60)),
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    assert!(look_notes(&run).is_empty(), "{}", run.summary());
+    let dropped = run.events("look_note_dropped");
+    assert_eq!(dropped.len(), 1, "{}", run.summary());
+    assert_eq!(dropped[0]["turn"], looks[0]);
+    assert!(
+        [
+            "the person is speaking",
+            "another turn began",
+            "its answer was not heard whole"
+        ]
+        .contains(&dropped[0]["why"].as_str().unwrap()),
+        "{dropped:?}"
+    );
+}
+
+/// A hand Stop after the look's answer has played whole ends the search
+/// (the reviewer's P3 on #2266): the note owed for it is not sent once the
+/// room is quiet, after the person said stop, nor recorded as dropped.
+#[test]
+fn a_hand_stop_after_a_looks_answer_drops_its_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search_with(
+        true,
+        &[LookAnswer::Nothing],
+        LookAnswer::Other,
+        None,
+        Some((When::Accepted(70), 50)),
+    );
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    // The look's answer played whole, so the note was owed; the murmur
+    // near its end kept it waiting for a quiet second.
+    assert_eq!(run.played(looks[0]), vec![SECOND; 24]);
+    let at = |kind: &str| {
+        run.trace
+            .iter()
+            .position(|e| {
+                e["kind"] == kind
+                    && (kind != "turn_finished" || e["turn"] == looks[0])
+                    && (kind != "hand_control_cancel" || e["reason"] == "hand_stop")
+            })
+            .unwrap_or_else(|| panic!("no {kind}: {}", run.summary()))
+    };
+    // The Stop came by hand once the look's turn had finished.
+    assert!(at("turn_finished") < at("hand_control_cancel"));
+    // The quiet came after it: no note, and no turn written for one.
+    assert!(look_notes(&run).is_empty(), "{}", run.summary());
+    assert!(run.events("look_note_sent").is_empty());
+    assert!(
+        !run.trace
+            .iter()
+            .any(|e| e["kind"] == "input_admitted" && e["admission_basis"] == "look_note"),
+        "{}",
+        run.summary()
+    );
+    // The search ended with the Stop: nothing owed is left to drop.
+    assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// (e) Without `LAMP_SECOND_LOOK_NOTE`, a look left with no call is as
+/// before: no note, nothing recorded of one.
+#[test]
+fn without_the_switch_a_look_left_gets_no_note() {
+    let _one = super::pilot_faults::one_session();
+    let run = search(false, &[LookAnswer::Nothing], LookAnswer::Other, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 1, "{}", run.summary());
+    assert!(look_notes(&run).is_empty());
+    assert!(run.events("look_note_sent").is_empty());
+    assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// look-for-things' give-up line (`[search] give_up`), as lamp-skills
+/// refuses a look past its five with it.
+const GIVE_UP: &str = "That was the last look. Say kindly, in a few words, that you can't see it from here, and do not look again.";
+/// The skill's note for each look's picture.
+const PICTURE: &str = "say in a few words what you see.";
+
+/// lamp-skills' look-for-things as the walk calls it: each call one look,
+/// the search's first (the model's) counted, and past `[search] looks = 5`
+/// its give-up line as an error. The places the walk asked, in order.
+fn fake_skill() -> (super::look_note::SkillCaller, Arc<Mutex<Vec<String>>>) {
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let places = asked.clone();
+    let skill: super::look_note::SkillCaller = Arc::new(move |call, _| {
+        assert_eq!(call.name, "look_for");
+        let mut places = places.lock().unwrap();
+        places.push(call.args["place"].as_str().unwrap().to_owned());
+        if places.len() + 1 > 5 {
+            (json!({"error": GIVE_UP}), true)
+        } else {
+            (
+                json!({"next": format!("Say only \"Let me take a look.\" now. When the picture comes: {PICTURE}"),
+                    "look": true}),
+                true,
+            )
+        }
+    });
+    (skill, asked)
+}
+
+/// A skill's search on the second route alone with the note and, `walk`
+/// on or off, the walk (`LAMP_SECOND_LOOK_WALK`), its skill `fake_skill`:
+/// the run, and the places the walk asked the skill for.
+fn walk(
+    walk: bool,
+    look_answers: &'static [LookAnswer],
+    first_place: Option<&'static str>,
+    speak_again: Option<When>,
+) -> (Run, Vec<String>) {
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-walk-{}.jpg",
+        std::process::id()
+    ));
+    let (skill, asked) = fake_skill();
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(true);
+    TEST_LOOK_WALK.set(walk);
+    TEST_WALK_SKILL.with(|walk| *walk.borrow_mut() = Some(skill));
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers,
+        note_answer: LookAnswer::Nothing,
+        first_place,
+        walk,
+        speak_again,
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(4_000),
+        written: Written::Said(6),
+        limit: Duration::from_secs(50),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_WALK_SKILL.with(|walk| *walk.borrow_mut() = None);
+    TEST_LOOK_WALK.set(false);
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    let asked = asked.lock().unwrap().clone();
+    (run, asked)
+}
+
+/// The places the walk recorded asking for, in order.
+fn walked(run: &Run) -> Vec<String> {
+    run.events("look_walk_asked")
+        .into_iter()
+        .map(|e| e["place"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// The give-up lines the second route was sent.
+fn give_ups(run: &Run) -> usize {
+    run.seen
+        .second
+        .iter()
+        .filter(|input| matches!(input, ProviderInput::Written { text, .. } if text == GIVE_UP))
+        .count()
+}
+
+/// (a) The first builder's step 4 for look-for-things (20 Oct): the model
+/// never calls again. The desk's look, the note, then the lamp walks on by
+/// itself, left, right, far_left, far_right, each look's picture sent as
+/// the search's next look turn naming its place; the skill refuses the
+/// sixth with its give-up line, which goes once. Five looks in all.
+#[test]
+fn a_search_the_model_never_calls_again_walks_five_looks_and_gives_up_once() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing; 5], None, None);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 5, "{}", run.summary());
+    assert_eq!(look_notes(&run).len(), 1);
+    let places = ["left", "right", "far_left", "far_right", "far_right"];
+    assert_eq!(asked, places, "{}", run.summary());
+    assert_eq!(walked(&run), places);
+    // Each walk's look turn names its place and carries the skill's note,
+    // and is the search's own.
+    let texts: Vec<&String> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written {
+                text,
+                look: true,
+                search: true,
+                ..
+            } => Some(text),
+            _ => None,
+        })
+        .collect();
+    // The first is the desk's, the model's own.
+    assert_eq!(texts.len(), 5, "{}", run.summary());
+    assert!(!texts[0].contains("You looked"));
+    for (text, toward) in texts[1..].iter().zip([
+        "to the left",
+        "to the right",
+        "far to the left",
+        "far to the right",
+    ]) {
+        assert!(
+            text.contains(&format!("(You looked {toward}; the picture is that look.)")),
+            "{text}"
+        );
+        assert!(text.contains(PICTURE), "{text}");
+    }
+    assert_eq!(run.events("look_full_still").len(), 5);
+    assert_eq!(give_ups(&run), 1, "{}", run.summary());
+    assert_eq!(run.events("look_walk_gave_up").len(), 1);
+    assert!(
+        run.events("look_walk_dropped").is_empty(),
+        "{:?}",
+        run.events("look_walk_dropped")
+    );
+    assert!(run.events("look_dropped").is_empty());
+}
+
+/// (b) The model says found (`look_for(found)`, a call) in the answer to
+/// the walk's left look: the search is over, nothing more is walked.
+#[test]
+fn a_search_found_after_the_walks_first_look_walks_no_further() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing, LookAnswer::Other], None, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 2, "{}", run.summary());
+    assert_eq!(asked, ["left"]);
+    assert_eq!(walked(&run), ["left"]);
+    assert_eq!(give_ups(&run), 0);
+    assert!(run.events("look_walk_gave_up").is_empty());
+}
+
+/// (c) The person speaks as the walk's left look's answer plays: the walk
+/// stops there, for that reason, and asks the skill for nothing more. The
+/// speech is keyed to the left look's turn reaching the second route (its
+/// second look turn), not to a chunk count: keyed to the note's last chunk,
+/// it raced the walk's skill call on its own thread, and a slow host heard
+/// the person before the left look was taken (CI ARM64, PR #2466).
+#[test]
+fn the_person_speaking_stops_the_walk() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(
+        true,
+        &[LookAnswer::Nothing; 5],
+        None,
+        Some(When::LookTurns(2)),
+    );
+    run.assert_clean();
+    assert_eq!(asked, ["left"], "{}", run.summary());
+    assert_eq!(look_turns(&run).len(), 2, "{}", run.summary());
+    let dropped: Vec<_> = run
+        .events("look_walk_dropped")
+        .into_iter()
+        .map(|e| e["why"].clone())
+        .collect();
+    assert_eq!(
+        dropped,
+        [json!("the person is speaking")],
+        "{}",
+        run.summary()
+    );
+    assert_eq!(give_ups(&run), 0);
+}
+
+/// (d) Without `LAMP_SECOND_LOOK_WALK`: the note alone, as in step 2. The
+/// skill is never called by the lamp.
+#[test]
+fn without_the_switch_a_search_gets_only_its_note() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(false, &[LookAnswer::Nothing; 5], None, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 1, "{}", run.summary());
+    assert_eq!(look_notes(&run).len(), 1);
+    assert!(asked.is_empty());
+    assert!(walked(&run).is_empty());
+    assert!(run.events("look_walk_dropped").is_empty());
+    assert_eq!(give_ups(&run), 0);
+}
+
+/// (e) Places already looked at are skipped: a search the person began at
+/// the left walks on right, far_left, far_right, then the desk it has not
+/// looked at, and the skill's give-up line ends it after five looks.
+#[test]
+fn the_walk_skips_the_place_the_person_named() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing; 5], Some("left"), None);
+    run.assert_clean();
+    assert_eq!(asked[..3], ["right", "far_left", "far_right"]);
+    assert_eq!(asked, ["right", "far_left", "far_right", "desk", "desk"]);
+    assert!(!asked.iter().any(|place| place == "left"));
+    assert_eq!(look_turns(&run).len(), 5, "{}", run.summary());
+    assert_eq!(give_ups(&run), 1);
+}
+
 #[test]
 fn without_a_second_route_the_packets_and_records_are_as_before() {
     let _one = super::pilot_faults::one_session();
@@ -1721,6 +2738,275 @@ fn spoken_over_the_second_routes_answer_stops_as_gemini_does() {
     }
     assert!(switched.played(1).iter().all(|&v| v == SECOND));
     assert_eq!(dedup(&live.seen.installs), dedup(&switched.seen.installs));
+}
+
+/// The reviewer's P2 on #2427: a line spoken over the lamp's answer is read
+/// only from what was heard once the lamp fell silent, never the speech
+/// heard while its answer still played.
+#[test]
+fn a_lines_tone_takes_no_speech_heard_while_the_lamp_answers() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_packets: 60,
+        speak_again: Some(When::Accepted(8)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(60))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    assert_eq!(run.finished(1)["outcome"], "user_interrupted");
+    let read: Vec<(u64, u64)> = run
+        .events("local_endpoint")
+        .into_iter()
+        .filter_map(|end| {
+            Some((
+                end["turn"].as_u64()?,
+                end["tone"]["tone"]["blocks"].as_u64()?,
+            ))
+        })
+        .collect();
+    // The first line is all its 60 blocks. The second's 60 began while the
+    // answer played: here 53 are read, and the 7 heard before it stopped
+    // are not; taken while it played, 59 would be (and before the fix,
+    // all 60 since the first line's end).
+    assert_eq!(read.first(), Some(&(1, 60)), "{}", run.summary());
+    let (turn, blocks) = read.get(1).copied().unwrap();
+    assert!(turn == 2 && blocks <= 55, "{read:?}");
+}
+
+/// Each line's tone is told once its words come, under its own turn and
+/// with their valence; the first line says nothing of its arousal, and the
+/// second is read against it.
+#[test]
+fn each_lines_tone_is_told_with_its_own_words() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("I'm so happy today"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let told: Vec<_> = run
+        .events("voice_tone")
+        .into_iter()
+        .map(|told| {
+            (
+                told["turn"].clone(),
+                told["words"].clone(),
+                told["valence"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [
+            (json!(1), json!(true), json!(1.0)),
+            (json!(2), json!(true), json!(1.0))
+        ],
+        "{}",
+        run.summary()
+    );
+    // No known face here: the room's baseline, the second line its second.
+    let whose: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| {
+            (
+                end["tone"]["whose"].clone(),
+                end["tone"]["baseline_lines"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        whose,
+        [(json!("room"), json!(1)), (json!("room"), json!(2))]
+    );
+    let tones = run.events("voice_tone");
+    assert_eq!(tones[0]["sure"], 0.0);
+    assert!(tones[1]["sure"].as_f64().unwrap() > 0.0, "{}", tones[1]);
+    assert!(
+        tones[1]["arousal"].as_f64().unwrap().abs() < 0.1,
+        "{}",
+        tones[1]
+    );
+}
+
+/// A known person's lines are read against their own baseline, and their
+/// words asking the lamp to forget their face let it go: the line after
+/// starts their baseline again.
+#[test]
+fn a_known_persons_baseline_goes_when_they_ask_to_forget_their_face() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = Some("p-jim".into()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("Please forget my face"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let whose: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| {
+            (
+                end["tone"]["whose"].clone(),
+                end["tone"]["baseline_lines"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        whose,
+        [(json!("person"), json!(1)), (json!("person"), json!(1))],
+        "{}",
+        run.summary()
+    );
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["all"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [
+            (json!(false), json!("person")),
+            (json!(false), json!("person"))
+        ],
+        "{}",
+        run.summary()
+    );
+}
+
+/// The first builder at 10:5x on #2467: memory has forgotten a known person
+/// (`memory/forgot`, from the app or by voice), so their tone baseline goes.
+/// Enrolled again under the same name, their next line starts a fresh one.
+/// A rules scope memory forgot (`r-`) is no voice, and changes nothing.
+#[test]
+fn a_name_memory_forgot_starts_a_fresh_tone_baseline_when_enrolled_again() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let rules = format!("r-{}", &person[2..]);
+    let lines = |forgot: Option<String>| {
+        TEST_VOICE_TONE.with(|on| on.set(true));
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+        TEST_TONE_FORGOT.with(|told| *told.borrow_mut() = VecDeque::from([None, forgot]));
+        let run = run(Script {
+            only: true,
+            second: false,
+            voiced: true,
+            second_hears: Some("What a nice day"),
+            speak_again: Some(When::Settled(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_TONE_FORGOT.with(|told| told.borrow_mut().clear());
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+        TEST_VOICE_TONE.with(|on| on.set(false));
+        run.assert_clean();
+        let lines: Vec<_> = run
+            .events("local_endpoint")
+            .into_iter()
+            .map(|end| end["tone"]["baseline_lines"].clone())
+            .collect();
+        let forgot: Vec<_> = run
+            .events("voice_tone_forgot")
+            .into_iter()
+            .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+            .collect();
+        (lines, forgot, run.summary())
+    };
+    let (kept, none, summary) = lines(None);
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+    let (fresh, forgot, summary) = lines(Some(person.clone()));
+    assert_eq!(fresh, [json!(1), json!(1)], "{summary}");
+    assert_eq!(forgot, [(json!("memory"), json!("person"))], "{summary}");
+    let (kept, none, summary) = lines(Some(rules));
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+}
+
+/// The reviewer's P3 2 on #2488: the voice's loop reads memory's forgets
+/// from the bus itself (`ForgotIn` beside the hello's watch, not a test
+/// seam at the End): memory tells it forgot a known person after their first
+/// line, and their second line starts a fresh baseline.
+#[test]
+fn the_loop_reads_memorys_forget_from_the_bus_and_the_next_line_starts_fresh() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let root = PathBuf::from(format!("/tmp/lv-forgot-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    TEST_FORGOT_IN.with(|slot| {
+        *slot.borrow_mut() = Some(crate::bus_out::ForgotIn::on(&bus).unwrap());
+    });
+    let memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    TEST_MEMORY_FORGETS.with(|slot| *slot.borrow_mut() = Some((1, person.clone(), memory)));
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("What a nice day"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    let told = TEST_MEMORY_FORGETS
+        .with(|slot| slot.borrow_mut().take())
+        .is_none();
+    TEST_FORGOT_IN.with(|slot| *slot.borrow_mut() = None);
+    let _ = std::fs::remove_dir_all(&root);
+    run.assert_clean();
+    assert!(told, "memory's forget was never told");
+    let lines: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| end["tone"]["baseline_lines"].clone())
+        .collect();
+    assert_eq!(lines, [json!(1), json!(1)], "{}", run.summary());
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [(json!("memory"), json!("person"))],
+        "{}",
+        run.summary()
+    );
 }
 
 /// (h) Gemini is Ready 1 s after the voice starts and the question began
@@ -2124,7 +3410,13 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
         );
         assert_eq!(run.played(1), vec![voice; 48], "only {only}");
         assert_eq!(run.played(2), vec![voice; 48], "only {only}");
-        assert_eq!(heard, ["s1:2:4"], "only {only}: {}", run.summary());
+        // Heard in the turn that told it, the news's.
+        assert_eq!(
+            heard,
+            [("s1:2:4".to_owned(), 2)],
+            "only {only}: {}",
+            run.summary()
+        );
         if only {
             assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
         }
@@ -2379,7 +3671,12 @@ fn a_scheduled_exact_say_uses_only_the_second_route_and_finishes_spoken() {
             .iter()
             .all(|chunk| chunk.turn == *request && chunk.accepted)
     );
-    assert!(run.seen.installs.contains(&(Some(*request), true)));
+    assert!(
+        run.seen
+            .installs
+            .iter()
+            .any(|i| i.0 == Some(*request) && i.1)
+    );
     assert!(
         matches!(
             answered.as_slice(),
@@ -2420,7 +3717,7 @@ fn the_bedtime_morning_hum_plays_on_second_only_without_provider_input() {
         .flat_map(|chunk| chunk.samples.iter().copied())
         .collect();
     assert_eq!(played, crate::head_cue::hum(crate::head_cue::DBFS));
-    assert!(run.seen.installs.contains(&(Some(turn), true)));
+    assert!(run.seen.installs.iter().any(|i| i.0 == Some(turn) && i.1));
     assert!(
         matches!(
             answered.as_slice(),
@@ -3136,6 +4433,47 @@ fn the_second_route_alone_gives_mood_what_was_heard_and_the_voices_phases() {
     }
 }
 
+/// #2233 through the session (the reviewer's P3, 16:46): with
+/// `LAMP_CAMERA_FOLLOWS_EYES=on`, a voice whose camera is the eyes' own (an
+/// eyes link and no camera of its own) publishes the camera permitted in the
+/// authority with the microphone, and denied with it after the mute. Without
+/// the switch, the camera is never permitted.
+#[test]
+fn with_the_switch_the_eyes_camera_is_permitted_with_the_microphone_through_the_session() {
+    let _one = super::pilot_faults::one_session();
+    for on in [false, true] {
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-eyes-camera-{on}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let permit = directory.join("permit.sock");
+        let _eyes = std::os::unix::net::UnixDatagram::bind(&permit).unwrap();
+        TEST_EYES.with(|eyes| {
+            *eyes.borrow_mut() = Some(crate::body_link::EyesLink::to(permit).unwrap())
+        });
+        TEST_CAMERA_FOLLOWS_EYES.with(|follows| follows.set(on));
+        let run = run(Script::question(Live::Answer(12)));
+        TEST_CAMERA_FOLLOWS_EYES.with(|follows| follows.set(false));
+        TEST_EYES.with(|eyes| eyes.borrow_mut().take());
+        let _ = std::fs::remove_dir_all(&directory);
+        run.assert_clean();
+        let installs = dedup(&run.seen.installs);
+        assert!(
+            installs.iter().any(|install| install.1),
+            "on {on}: {installs:?}"
+        );
+        assert!(
+            installs.last().is_some_and(|install| !install.1),
+            "on {on}: {installs:?}"
+        );
+        for install in &installs {
+            assert_eq!(install.2, on && install.1, "on {on}: {installs:?}");
+        }
+    }
+}
+
 /// #1803: in onboarding's near-call try window the person calls the lamp's
 /// name for the measurement, and an answer within a second of it spoils the
 /// try. The voice holds its reply to that call, on Gemini Live and on the
@@ -3193,6 +4531,113 @@ fn a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window() {
             );
         }
     }
+}
+
+/// #2135 (`LAMP_SECOND_OPEN_NAME`, the first builder on #1722 at 02:16):
+/// with the second route alone, a line whose words end before a name ("Hey
+/// Lamp, my name is"), its answer held, and speech again as soon as its End
+/// is sent. With the switch the new line goes on from it: its Start says so
+/// (`continues_cut_off`), so the route asks the two as one, and its record
+/// says why. Without it, the new line is one of its own, as before. With
+/// `LAMP_WAIT_KEEPS_ANSWER=on` too, as on lamp-4ace, the name first waits as
+/// a sound while the answer is awaited (`answer_waits`; there it was let
+/// go), and with the switch it goes on at once, never waiting.
+#[test]
+fn a_name_said_just_after_a_line_that_ended_before_it_goes_on_from_it() {
+    let _one = super::pilot_faults::one_session();
+    for (on, waits) in [(false, false), (true, false), (false, true), (true, true)] {
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(waits));
+        let run = run(Script {
+            second: false,
+            only: true,
+            open_name: on,
+            second_hears: Some("Hey Lamp, my name is"),
+            second_waits_first: true,
+            speak_again: Some(When::Ended(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(false));
+        run.assert_clean();
+        assert_eq!(
+            run.events("answer_waits").is_empty(),
+            !waits || on,
+            "on {on}, waits {waits}: {}",
+            run.summary()
+        );
+        let continues: Vec<(u64, bool)> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Start {
+                    request,
+                    continues_cut_off,
+                    ..
+                } => Some((*request, *continues_cut_off)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            continues,
+            [(1, false), (2, on)],
+            "on {on}: {}",
+            run.summary()
+        );
+        assert_eq!(run.events("open_name").len(), usize::from(on), "on {on}");
+        let went_on = run
+            .events("input_admitted")
+            .into_iter()
+            .filter(|admitted| admitted["goes_on_from_its_name"] == true)
+            .count();
+        assert_eq!(went_on, usize::from(on), "on {on}: {}", run.summary());
+        assert_eq!(run.finished(1)["outcome"], "user_interrupted", "on {on}");
+    }
+}
+
+/// The reviewer's P3s on #2355: in a room busy with other people's talk, a
+/// sound begun just after a line that ended before its name is still held
+/// by the busy-room floor, as the room's next voice is, never joined to the
+/// line as its name. The colleague's "…see you at lunch" never becomes the
+/// person's name. With the switch, as without it.
+#[test]
+fn in_a_busy_room_a_sound_after_a_line_that_ends_before_its_name_is_held_as_before() {
+    let _one = super::pilot_faults::one_session();
+    TEST_ROOM_BUSY.with(|busy| busy.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        open_name: true,
+        second_hears: Some("Hey Lamp, my name is"),
+        second_waits_first: true,
+        speak_again: Some(When::Ended(1)),
+        mute_at_frame: Some(300),
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_ROOM_BUSY.with(|busy| busy.set(false));
+    run.assert_clean();
+    assert_eq!(run.events("open_name").len(), 1, "{}", run.summary());
+    assert!(!run.events("floor_held").is_empty(), "{}", run.summary());
+    assert!(
+        !run.events("input_admitted")
+            .iter()
+            .any(|admitted| admitted["goes_on_from_its_name"] == true),
+        "{}",
+        run.summary()
+    );
+    assert!(
+        !run.seen.second.iter().any(|input| matches!(
+            input,
+            ProviderInput::Start {
+                continues_cut_off: true,
+                ..
+            }
+        )),
+        "{}",
+        run.summary()
+    );
 }
 
 /// #1803, the sentence part: a line ending in onboarding's sentence window

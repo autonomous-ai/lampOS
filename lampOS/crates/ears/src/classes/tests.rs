@@ -302,6 +302,7 @@ fn the_worker_publishes_scores_then_unavailable_and_the_pump_rechecks_authority(
                     })
                 }),
                 |classified| sent.send(classified).unwrap(),
+                || true,
             )
         })
     };
@@ -412,6 +413,7 @@ fn a_lamp_muted_from_the_start_says_privacy() {
                 lamp_ipc::monotonic_us,
                 Some(|_: &[f32]| Err::<SoundScores, _>("never scored".to_owned())),
                 |classified| sent.send(classified).unwrap(),
+                || true,
             )
         })
     };
@@ -434,19 +436,136 @@ fn a_lamp_muted_from_the_start_says_privacy() {
     worker.join().unwrap();
 }
 
-/// The reviewer's P2 on #2086: the classifier starts only with its switch
-/// exactly `on` and on a lamp with a slide (`LAMP_PRIVACY_CONTROLS=on`).
-/// With `no-slide` it never runs, whatever the switch says, and that is
-/// said; with the switch off there is nothing to say.
+/// The classifier starts only with its switch exactly `on`: on a lamp with
+/// a slide (`LAMP_PRIVACY_CONTROLS=on`) as built, and on a lamp with no
+/// slide only with the person's stored yes (the lead's decision, 07:33),
+/// which is asked for nowhere else. Any other route never runs it, and that
+/// is said; with the switch off there is nothing to say.
 #[test]
-fn the_classifier_starts_only_on_a_lamp_with_a_slide() {
-    assert_eq!(start(Some("on"), Some("on")), Start::Start);
-    for route in [Some("no-slide"), None, Some(""), Some("off"), Some("ON")] {
-        assert_eq!(start(Some("on"), route), Start::NotOnThisRoute, "{route:?}");
+fn the_classifier_starts_with_a_slide_or_on_no_slide_with_a_yes() {
+    let count = std::cell::Cell::new(0);
+    let asked = &count;
+    let yes = |answer: bool| {
+        move || {
+            asked.set(asked.get() + 1);
+            answer
+        }
+    };
+    assert_eq!(start(Some("on"), Some("on"), yes(false)), Start::Start);
+    assert_eq!(start(Some("on"), Some("no-slide"), yes(true)), Start::Start);
+    assert_eq!(
+        start(Some("on"), Some("no-slide"), yes(false)),
+        Start::NoYes
+    );
+    assert_eq!(asked.get(), 2, "the yes is read only on no-slide");
+    for route in [None, Some(""), Some("off"), Some("ON"), Some("NO-SLIDE")] {
+        assert_eq!(
+            start(Some("on"), route, yes(true)),
+            Start::NotOnThisRoute,
+            "{route:?}"
+        );
     }
     for classes in [None, Some(""), Some("off"), Some("ON")] {
         for route in [Some("on"), Some("no-slide"), None] {
-            assert_eq!(start(classes, route), Start::Off, "{classes:?} {route:?}");
+            assert_eq!(
+                start(classes, route, yes(true)),
+                Start::Off,
+                "{classes:?} {route:?}"
+            );
         }
     }
+    assert_eq!(asked.get(), 2, "nor with the switch off");
+}
+
+/// Seventh's read rule (#1722, 07:41): only a JSON object whose
+/// `room_sounds` is exactly `"yes"` is a yes; anything else is no.
+#[test]
+fn only_a_stored_room_sounds_yes_is_a_yes() {
+    let folder = std::env::temp_dir().join(format!("room-sounds-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = folder.join("room-sounds.json");
+    assert!(!room_sounds_yes(&file), "missing");
+    let read = |text: &str| {
+        std::fs::write(&file, text).unwrap();
+        room_sounds_yes(&file)
+    };
+    assert!(read(
+        r#"{"version":1,"room_sounds":"yes","at_unix_s":1792500000}"#
+    ));
+    assert!(
+        read(r#"{"version":2,"room_sounds":"yes","new":true}"#),
+        "one version ahead"
+    );
+    let padded = format!(r#"{{"room_sounds":"yes","pad":"{}"}}"#, "x".repeat(4096));
+    for text in [
+        r#"{"room_sounds":"no"}"#,
+        r#"{"room_sounds":"Yes"}"#,
+        r#"{"room_sounds":true}"#,
+        r#"{"room_sounds":"yes""#,
+        r#"["yes"]"#,
+        r#""yes""#,
+        "yes",
+        "",
+        &padded,
+    ] {
+        assert!(!read(text), "{text:.40}");
+    }
+    std::fs::remove_dir_all(&folder).unwrap();
+    std::fs::create_dir_all(&file).unwrap();
+    assert!(!room_sounds_yes(&file), "a folder, unreadable as a file");
+    std::fs::remove_dir_all(&folder).unwrap();
+}
+
+/// Third's P2 on #2109: a yes taken back while the classifier runs (a forget
+/// or a redo of setup removes the file) stops it within `YES_EVERY_US`, with
+/// no restart: it says `privacy` once and its thread ends.
+#[test]
+fn a_yes_taken_back_stops_the_classifier_within_its_bound() {
+    let (_handoff, intake) = handoff();
+    let gate = Arc::new(PublicationGate::default());
+    let stop = Arc::new(AtomicBool::new(false));
+    let yes = Arc::new(AtomicBool::new(true));
+    let (sent, received) = mpsc::channel();
+    let started = Instant::now();
+    let worker = {
+        let (gate, stop, yes) = (gate.clone(), stop.clone(), yes.clone());
+        thread::spawn(move || {
+            serve(
+                intake,
+                &gate,
+                &stop,
+                lamp_ipc::monotonic_us,
+                Some(|_: &[f32]| Err::<SoundScores, _>("never scored".to_owned())),
+                |classified| sent.send(classified).unwrap(),
+                move || yes.load(Ordering::Acquire),
+            )
+        })
+    };
+    thread::sleep(Duration::from_millis(300));
+    yes.store(false, Ordering::Release);
+    let taken_back = Instant::now();
+    worker.join().unwrap();
+    assert!(
+        taken_back.elapsed() <= Duration::from_micros(YES_EVERY_US) + Duration::from_millis(500),
+        "ended {:?} after the yes went",
+        taken_back.elapsed()
+    );
+    assert!(
+        started.elapsed() >= Duration::from_micros(YES_EVERY_US),
+        "asked only every bound"
+    );
+    assert!(!stop.load(Ordering::Acquire), "no stop: the yes ended it");
+    let last = received
+        .try_iter()
+        .last()
+        .map(|classified| classified.classes);
+    assert!(
+        matches!(
+            last,
+            Some(SoundClasses::Unavailable {
+                reason: SoundUnavailable::Privacy
+            })
+        ),
+        "{last:?}"
+    );
 }

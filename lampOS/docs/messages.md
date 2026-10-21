@@ -101,7 +101,8 @@ the room's Live session or the speaker.
   rounds of calls.
   - **Memory:** `remember`, `recall` and `forget` read and write the room's
     memory, never the person's in view.
-  - **Faces:** `remember_my_face` and `forget_my_face` are refused: "Faces
+  - **Faces:** `remember_my_face` and `forget_my_face` are refused, and
+    so are the yes and no to being named (#1997): "Faces
     are kept and forgotten only when the person asks at the lamp, in
     person." This is so for every request not heard at the lamp, a request
     the lamp wrote itself too, as marks are (`tools::run_call`).

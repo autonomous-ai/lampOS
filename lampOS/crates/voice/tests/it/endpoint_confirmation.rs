@@ -102,8 +102,18 @@ impl Rig {
     }
 
     fn with(policy: ConfirmPolicy) -> Self {
+        Self::with_window(policy, None)
+    }
+
+    /// With the detector's own silence window, the policy's fallback, of
+    /// `blocks` (the lamp's `--end-silence-ms 600` is 60).
+    fn with_window(policy: ConfirmPolicy, blocks: Option<u16>) -> Self {
         let script = Scripted::default();
-        let detector = TurnDetector::v1_baseline()
+        let mut detector = TurnDetector::v1_baseline();
+        if let Some(blocks) = blocks {
+            detector = detector.with_end_silence(blocks).unwrap();
+        }
+        let detector = detector
             .with_confirmation(Box::new(script.clone()), policy)
             .unwrap();
         Self {
@@ -338,6 +348,169 @@ fn a_few_words_are_not_sent_to_the_model_and_end_on_the_silence_window() {
     long.script.reply(long.script.submissions()[0], 0.99);
     assert_eq!(long.quiet_until_end(200), Some(20));
     assert_eq!(long.decision().silence_ms, 400);
+}
+
+/// #2135 (`LAMP_ENDPOINT_SHORT_VERDICT`): with the floor's short lines
+/// asked, a clearly unfinished one ("Hey Lamp, my…" cut 0.66 s in on
+/// lamp-4ace) holds to the incomplete window, and the rest that comes stays
+/// in the line; a complete one ("Yes.") and an uncertain one end on the
+/// silence window as before, never sooner. Under 20 blocks, or with the
+/// switch's floor 0, nothing is asked, and it ends as `short`.
+#[test]
+fn with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as_before() {
+    let asked = ConfirmPolicy {
+        least_speech_blocks: 80,
+        short_verdict_blocks: 20,
+        incomplete_probability: 0.01,
+        incomplete_blocks: 150,
+        ..mechanics()
+    };
+    assert!(asked.validate().is_ok());
+    let window = asked.fallback_blocks;
+    // Unfinished: held past the window, to the incomplete one.
+    let mut unfinished = Rig::with(asked);
+    unfinished.speak(60);
+    unfinished.quiet(20);
+    let token = unfinished.script.submissions()[0];
+    unfinished.script.reply(token, 0.004);
+    // Held past the silence window (`quiet` fails on an End).
+    unfinished.quiet(window - 20);
+    // The rest comes: the same line goes on.
+    unfinished.speak(40);
+    unfinished.quiet(20);
+    assert_eq!(unfinished.script.submissions().len(), 2);
+    assert_eq!(
+        unfinished.script.submissions()[1].utterance,
+        token.utterance
+    );
+    // Unfinished and nothing more: ended at the incomplete window.
+    let mut alone = Rig::with(asked);
+    alone.speak(60);
+    alone.quiet(20);
+    alone.script.reply(alone.script.submissions()[0], 0.004);
+    assert_eq!(alone.quiet_until_end(400), Some(150 - 20));
+    assert_eq!(alone.decision().basis, "model_incomplete");
+    // Counted: the switch's own submission says so on its End.
+    assert_eq!(alone.decision().short_asks, 1);
+    // Paused twice before the floor: asked twice, counted twice (the
+    // reviewer's P3 on #2380).
+    let mut twice = Rig::with(asked);
+    twice.speak(30);
+    twice.quiet(20);
+    twice.script.reply(twice.script.submissions()[0], 0.004);
+    twice.quiet(10);
+    twice.speak(10);
+    twice.quiet(20);
+    assert_eq!(twice.script.submissions().len(), 2);
+    twice.script.reply(twice.script.submissions()[1], 0.99);
+    twice.quiet_until_end(400);
+    assert_eq!(twice.decision().short_asks, 2);
+    // Finished, or uncertain: the silence window, as before.
+    for (probability, basis) in [(0.99, "model_complete"), (0.5, "model_uncertain")] {
+        let mut rig = Rig::with(asked);
+        rig.speak(60);
+        rig.quiet(20);
+        rig.script.reply(rig.script.submissions()[0], probability);
+        assert_eq!(rig.quiet_until_end(400), Some(window - 20), "{basis}");
+        assert_eq!(rig.decision().basis, basis);
+        assert_eq!(rig.decision().silence_ms, u64::from(window) * 10);
+        assert_eq!(rig.decision().short_asks, 1);
+    }
+    // A scrap under the switch's floor, or the switch off: not asked.
+    for (policy, blocks) in [
+        (asked, 5),
+        (
+            ConfirmPolicy {
+                short_verdict_blocks: 0,
+                ..asked
+            },
+            60,
+        ),
+    ] {
+        let mut rig = Rig::with(policy);
+        rig.speak(blocks);
+        rig.quiet(20);
+        assert!(rig.script.submissions().is_empty(), "{blocks}");
+        assert_eq!(rig.quiet_until_end(400), Some(window - 20));
+        assert_eq!(rig.decision().fallback, Some("short"));
+        assert_eq!(rig.decision().short_asks, 0);
+    }
+    // A line long enough for the floor is asked as before, not counted.
+    let mut long = Rig::with(asked);
+    long.speak(90);
+    long.quiet(20);
+    long.script.reply(long.script.submissions()[0], 0.99);
+    long.quiet_until_end(400);
+    assert_eq!(long.decision().short_asks, 0);
+}
+
+/// #2135 (`ConfirmPolicy::recheck_uncertain`, off unless set; kept to
+/// measure, the first builder on #1722 at 07:48): an uncertain verdict is
+/// asked again at once with the pause so far. A complete second ends the
+/// line once the commit's pause is reached, said so (`rechecked_from`); an uncertain or failed
+/// second, or one still out at the window, leaves the first's, so the line
+/// ends at the window as without it, never later. Without the policy no
+/// second is asked.
+#[test]
+fn an_uncertain_verdict_asked_again_ends_the_line_only_on_a_complete_second() {
+    // The lamp's window, 600 ms: a second asked at its first's answer is
+    // still out when the window comes, before its own result timeout.
+    let policy = ConfirmPolicy {
+        recheck_uncertain: true,
+        complete_probability: 0.9,
+        incomplete_probability: 0.01,
+        ..mechanics()
+    };
+    let window = 60;
+    // Complete second: ended when it comes, past the commit.
+    let mut rig = Rig::with_window(policy, Some(window));
+    rig.speak(60);
+    rig.quiet(20);
+    rig.script.reply(rig.script.submissions()[0], 0.8);
+    rig.quiet(1);
+    let tokens = rig.script.submissions();
+    assert_eq!(tokens.len(), 2, "asked again at once");
+    assert_eq!(tokens[1].check, 1);
+    assert_eq!(tokens[1].utterance, tokens[0].utterance);
+    rig.script.reply(tokens[1], 0.95);
+    // At the commit (40 blocks), never sooner, and long before the window.
+    assert_eq!(rig.quiet_until_end(400), Some(40 - 21));
+    let decision = rig.decision();
+    assert_eq!(decision.basis, "model_complete");
+    assert_eq!(decision.silence_ms, 400);
+    assert_eq!(decision.rechecked_from, Some(0.8));
+    // Uncertain, failed, or never back: the first's, at the window.
+    for second in ["uncertain", "failed", "never"] {
+        let mut rig = Rig::with_window(policy, Some(window));
+        rig.speak(60);
+        rig.quiet(20);
+        rig.script.reply(rig.script.submissions()[0], 0.8);
+        rig.quiet(1);
+        let token = rig.script.submissions()[1];
+        match second {
+            "uncertain" => rig.script.reply(token, 0.5),
+            "failed" => rig.script.fail(token),
+            _ => {}
+        }
+        assert_eq!(rig.quiet_until_end(400), Some(window - 21), "{second}");
+        let decision = rig.decision();
+        assert_eq!(decision.basis, "model_uncertain", "{second}");
+        assert_eq!(decision.probability, Some(0.8), "{second}");
+        assert_eq!(decision.rechecked_from, None, "{second}");
+    }
+    // Off: no second verdict, the window as before.
+    let mut off = Rig::with_window(
+        ConfirmPolicy {
+            recheck_uncertain: false,
+            ..policy
+        },
+        Some(window),
+    );
+    off.speak(60);
+    off.quiet(20);
+    off.script.reply(off.script.submissions()[0], 0.8);
+    assert_eq!(off.quiet_until_end(400), Some(window - 20));
+    assert_eq!(off.script.submissions().len(), 1);
 }
 
 #[test]

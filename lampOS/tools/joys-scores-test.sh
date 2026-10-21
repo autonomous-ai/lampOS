@@ -77,7 +77,8 @@ line() { # line TOPIC TYPE SEQ AT_MS PAYLOAD
   line voice/state lamp_msgs/VoiceState 3 $((B + 46000)) '{"state":"resting"}'
 } >"$T/rec/voice_state.jsonl"
 
-# A laugh skill as Laugh glance is: laughter over 0.5 for 1 s, the voice
+# A laugh skill as Laugh glance was: laughter over 0.4 for 1 s (a bar of its
+# own, so the counts show the tool reads it from the skill), the voice
 # resting and a face in view, once a minute.
 mkdir -p "$T/laugh"
 printf -- '---\nname: laugh\ndescription: A test.\n---\n' >"$T/laugh/SKILL.md"
@@ -89,7 +90,7 @@ body = true
 [trigger]
 topic = "ears/classes"
 field = "scores.laughter"
-above = 0.5
+above = 0.4
 for = "1s"
 cooldown = "1m"
 [[while]]
@@ -130,7 +131,7 @@ run
 status=$?
 cat "$T/out" | sed 's/^/  | /'
 check "it ends well" test "$status" = 0
-check "the empty room never goes over the bar" grep -q '^empty laughter: 40 scored, 0 unavailable, mean 0.02, highest 0.02, over 0.5 0%' "$T/out"
+check "the empty room never goes over the bar" grep -q '^empty laughter: 40 scored, 0 unavailable, mean 0.02, highest 0.02, over 0.4 0%' "$T/out"
 check "the laugh track's spell over it is 10 s" grep -q '^track laughter: .* longest over 10.0 s' "$T/out"
 check "one glance on the track, none over the line while the lamp speaks" \
   grep -q '^body.gaze asked: empty 0, track 1, over 0; while the voice spoke 0; at 25.0s$' "$T/out"
@@ -178,6 +179,22 @@ status=$?
 check "on no-slide already with the person's yes, Ears alone restarted" \
   bash -c "[[ $status == 0 ]] && [[ \$(grep '^restart' '$T/systemctl.log' | sort -u) == 'restart lamp-ears.service' ]]"
 rm -rf "$T/onboarding"
+
+# A voice that said nothing in the recording (its topic declared, no
+# message): the counts still come, none while the voice spoke (#2399).
+cp "$T/rec/voice_state.jsonl" "$T/voice_state.full"
+head -1 "$T/voice_state.full" >"$T/rec/voice_state.jsonl"
+run
+status=$?
+check "a voice with no message in the recording still gives its asked line" \
+  bash -c "[[ $status == 0 ]] && grep -q '^body.gaze asked: empty [0-9]*, track [0-9]*, over [0-9]*; while the voice spoke 0' '$T/out'"
+cp "$T/voice_state.full" "$T/rec/voice_state.jsonl"
+
+# KEEP_DIR: the sound scores alone kept there, the rest still deleted.
+run KEEP_DIR="$T/kept"
+status=$?
+check "with KEEP_DIR, ears_classes.jsonl alone kept" \
+  bash -c "[[ $status == 0 ]] && cmp -s '$T/rec/ears_classes.jsonl' '$T/kept/ears_classes.jsonl' && [[ \$(ls '$T/kept') == ears_classes.jsonl && -z \$(ls -A '$T/tmp') ]]"
 
 # A lamp-skills that fails the skill's own cases (one without #1920's dotted
 # fields) is refused before anything is touched.

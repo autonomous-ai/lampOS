@@ -616,7 +616,14 @@ pub mod tests {
         let folder = places.folder.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let _ = lamp_skills::package::asked(&folder, lock_wait, None, &stream, &stream);
+                let _ = lamp_skills::package::asked(
+                    &folder,
+                    &folder.join("no-made"),
+                    lock_wait,
+                    None,
+                    &stream,
+                    &stream,
+                );
             }
         });
     }
@@ -1223,6 +1230,7 @@ pub mod tests {
                 };
                 let _ = lamp_skills::package::asked(
                     &folder,
+                    &folder.join("no-made"),
                     lamp_skills::package::ASKED_LOCK_WAIT,
                     Some(store),
                     &stream,

@@ -21,6 +21,7 @@ pub mod fake;
 pub mod import;
 pub mod ledger;
 pub mod mood_minute;
+pub mod motion_voice;
 pub mod physical;
 pub mod plan;
 mod playback;

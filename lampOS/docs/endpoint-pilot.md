@@ -814,6 +814,53 @@ kinder to it. Not shown: people's own voices and pauses.
 The fast worker is on, on lamp-4ace, since 13:21 (`--endpoint
 smart-turn-fast`; with the floor since 13:41).
 
+### Short lines asked (`LAMP_ENDPOINT_SHORT_VERDICT`, #2135, 21 Oct)
+
+Under that floor a line is never sent to the model: it ends on the 600 ms
+window as `silence_fallback` with `fallback: short`. On lamp-4ace in the 9
+hours to 21 Oct 04:56 that was 71 of 635 Ends (11%), every fallback of the
+night: speech blocks p10/p50/p90 24/77/119, 610/1,171/1,601 ms from
+admission to End, 51 of them under 1.5 s (the first builder on #1722).
+Right for "Yes."; wrong for a line short only because the person paused
+early.
+
+With `LAMP_ENDPOINT_SHORT_VERDICT=on` (off unless set), a line of at least
+20 speech blocks (0.2 s, `SHORT_VERDICT_BLOCKS`) and under the floor is sent
+too (`ConfirmPolicy::short_verdict_blocks`). Its verdict ends it no sooner:
+
+- a complete verdict still waits for the 600 ms window, as the floor says,
+  so "Yes." ends as before;
+- an uncertain verdict, or none in time, ends it there too;
+- only a clearly unfinished one (under 0.01) holds it, to the 1.5 s
+  `incomplete_blocks`, so the rest of "Hey Lamp, my…" stays in the line.
+
+Each End of such a line says how many times it was sent under the floor
+(`short_asks`, `local_endpoint.endpoint`): the inferences the switch adds,
+one a pause (134 ms, 145 ms round trip on lamp-4ace on 21 Oct), so a line
+that pauses twice before the floor counts two (the reviewer's P3 on
+#2380). The floor was set on 14 Oct when, in a talkative office, the model
+took a whole core and the board reached 76 °C. The endpoint runs before
+the room's rules, so in a busy room every short line of other people's
+talk is asked too: the cost is measured in a talkative room, not only in
+the played test's empty one (below). If that shows heat, short lines are
+skipped while the room is busy, as a next step.
+
+Not covered: a line under 20 speech blocks. Round 1 of `open-name.sh` at
+03:11 (turn 68) had 12, its name missed by `lamp-name` (#694); and "Hey
+Lamp," said alone, which the model takes for finished (p 0.99 above), is
+the call wait's (`--call-wait-ms`).
+
+Tests: `with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as_before`
+(`tests/it/endpoint_confirmation.rs`) and
+`coordinator::endpoint::tests::short_lines_are_asked_only_with_the_switch_and_a_floor`.
+
+For a lamp, both ways: the played test's `silence_fallback` count and
+`short_asks` sum; `open-name.sh`; and the day's short replies ("Yes. …
+Please start it.") ending no later. Then, with the switch on, a stretch of
+two people talking (#829's `twopeople829.sh`, or an hour at the desk), with
+the `short_asks` sum, the worker's CPU and the board's temperature beside
+the same stretch with it off (the reviewer's P3 on #2380).
+
 ## Cut at a comma (#782, 2026-10-15)
 
 Measured by the fourth builder on its Intel Mac, from the first builder's
@@ -893,12 +940,17 @@ A rule built on it would hold about as many finished turns as it keeps
 pauses whole, so it was not built.
 
 **The replay.** `cargo run --release -p lamp-voice-eval --example
-turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS …`
+turn_end_replay -- MODEL CLIPS.json --profile NAME:COMMIT_MS:P:LEAST_MS[:recheck][:short] …`
 feeds 16 kHz mono WAV files through `TurnDetector` with the model in its own
 process, each verdict handed over a fixed 130 ms later on the replay's own
 clock, and prints each turn's start, end and decision, and every verdict.
 `--speech-level-db` and `--faint-floor-db`/`--faint-hold-ms` add the
-voice's own level and floor. Nothing is played. Its evidence for #782 is in
+voice's own level and floor. Nothing is played. A profile's two flags set
+the policy as the lamp would:
+- `recheck` asks an uncertain verdict again at once, with the pause so far, and a complete second ends the line at the commit (`ConfirmPolicy::recheck_uncertain`, off on every lamp, with no switch). A turn it ended says `first_p`, the first verdict's probability.
+- `short` asks lines under the commit's floor from 0.2 s, as `LAMP_ENDPOINT_SHORT_VERDICT` does. Each turn says its `short_asks`.
+
+On 21 Oct (#2135, #1722 07:45) neither paid. On 53 real-speech lines the second ask ended 1 line 140 ms sooner. On 428 played lines it ended 12 sooner and cut 2 in two. The short verdict changed no End on either, for 340 more inferences. Both are kept to measure the next real bundles. Its evidence for #782 is in
 [verification/comma-pause-20261015/](verification/comma-pause-20261015/).
 
 ## A bare call ends nothing (#782, 2026-10-15)

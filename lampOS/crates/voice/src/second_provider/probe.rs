@@ -38,6 +38,7 @@
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;
+pub mod handover;
 pub mod quality;
 pub mod tools;
 pub mod wire;

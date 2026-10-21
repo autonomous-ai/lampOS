@@ -1045,13 +1045,17 @@ fn an_endpoint_is_a_scheme_a_host_perhaps_a_port_and_a_path() {
 
 static LOOKUPS: AtomicUsize = AtomicUsize::new(0);
 static LOOKED_UP_PORT: AtomicU16 = AtomicU16::new(0);
+static LOOKUP_GATE: std::sync::Mutex<Option<mpsc::Receiver<()>>> = std::sync::Mutex::new(None);
 
-/// A lookup that takes 400 ms, as one does with the network gone, and
-/// then finds the test's own server.
+/// The first lookup stays pending until the deadline checks release it.
+/// Later lookups find the test's current server without waiting.
 fn slow_lookup(host: &str, port: u16) -> io::Result<Vec<SocketAddr>> {
     assert_eq!((host, port), ("localhost", 8080));
     LOOKUPS.fetch_add(1, Ordering::SeqCst);
-    thread::sleep(Duration::from_millis(400));
+    let waiting = LOOKUP_GATE.lock().unwrap().take();
+    if let Some(waiting) = waiting {
+        waiting.recv_timeout(LONG).map_err(io::Error::other)?;
+    }
     let port = LOOKED_UP_PORT.load(Ordering::SeqCst);
     Ok(vec![SocketAddr::from(([127, 0, 0, 1], port))])
 }
@@ -1062,6 +1066,11 @@ fn a_slow_lookup_is_not_waited_for_past_the_deadline_and_is_not_begun_twice() {
     LOOKED_UP_PORT.store(server.port, Ordering::SeqCst);
     let mut jev = jev("http://localhost:8080/api/alpha/decisions", "lookup");
     jev.lookup.resolve = slow_lookup;
+    // Keep the lookup pending through both timeout checks instead of racing
+    // a fixed sleep against host scheduling.
+    // Unwinding drops the only sender, disconnecting the lookup's bounded wait.
+    let (release_lookup, waiting) = mpsc::channel();
+    *LOOKUP_GATE.lock().unwrap() = Some(waiting);
     // Two askings give up while the one lookup is still out.
     for _ in 0..2 {
         let deadline = Duration::from_millis(120);
@@ -1072,7 +1081,10 @@ fn a_slow_lookup_is_not_waited_for_past_the_deadline_and_is_not_begun_twice() {
         assert!(took >= deadline && took < deadline + MARGIN, "{took:?}");
     }
     assert_eq!(LOOKUPS.load(Ordering::SeqCst), 1);
-    // The third finds it done, and what it found is used from then on.
+    assert_eq!(server.connections.load(Ordering::SeqCst), 0);
+    release_lookup.send(()).expect("release the pending lookup");
+    drop(release_lookup);
+    // The third uses the released lookup, whose result is then cached.
     good(&jev.ask(STATE, &questions(), LONG).unwrap());
     assert!(server.request().contains("\r\nHost: localhost:8080\r\n"));
     good(&jev.ask(STATE, &questions(), LONG).unwrap());
