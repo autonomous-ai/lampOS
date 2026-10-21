@@ -1,0 +1,53 @@
+{
+  "base": "4efcf4eb0cda0ef730d30658572f49da7592a0b8",
+  "rows": [
+    {
+      "test": "light::stopping_ends_with_black_and_a_closed_ring",
+      "run": 1,
+      "label": "after-stop-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+        "light::stopping_ends_with_black_and_a_closed_ring",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.73023,
+      "stdout": "after-stop-1.stdout",
+      "stderr": "after-stop-1.stderr"
+    },
+    {
+      "test": "light::stopping_ends_with_black_and_a_closed_ring",
+      "run": 2,
+      "label": "after-stop-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+        "light::stopping_ends_with_black_and_a_closed_ring",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.048206,
+      "stdout": "after-stop-2.stdout",
+      "stderr": "after-stop-2.stderr"
+    },
+    {
+      "test": "light::stopping_ends_with_black_and_a_closed_ring",
+      "run": 3,
+      "label": "after-stop-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+        "light::stopping_ends_with_black_and_a_closed_ring",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.048684,
+      "stdout": "after-stop-3.stdout",
+      "stderr": "after-stop-3.stderr"
+    }
+  ]
+}

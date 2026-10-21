@@ -1,0 +1,75 @@
+=== gate-fmt | exit 0 | 10.813805 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-fmt ===
+=== gate-clippy | exit 0 | 11.242349 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-clippy ===
+=== gate-tests | exit 0 | 12.056394 s ===
+--- stdout ---
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 136 tests
+.......................................................................i............... 87/136
+.................................................
+test result: ok. 135 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.18s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- stderr ---
+=== end gate-tests ===
+=== gate-build | exit 0 | 56.228016 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-build ===
+=== gate-diff | exit 0 | 0.067833 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-diff ===
+=== gate-cloud-clippy | exit 0 | 33.608246 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-cloud-clippy ===
+=== gate-cloud-tests | exit 0 | 55.903717 s ===
+--- stdout ---
+
+running 143 tests
+..................................................................................i.... 87/143
+........................................................
+test result: ok. 142 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 9.66s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- stderr ---
+=== end gate-cloud-tests ===

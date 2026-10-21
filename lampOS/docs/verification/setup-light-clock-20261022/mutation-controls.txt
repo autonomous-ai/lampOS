@@ -1,0 +1,29 @@
+=== mutant-stop-without-black-compile | exit 0 | 4.036793 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup#lamp-setup@0.1.0","manifest_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup)
+    Finished `test` profile [unoptimized] target(s) in 3.96s
+=== end mutant-stop-without-black-compile ===
+=== mutant-stop-without-black | exit 101 | 0.782849 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... FAILED
+
+failures:
+
+failures:
+    light::stopping_ends_with_black_and_a_closed_ring
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.03s
+
+--- stderr ---
+
+thread 'light::stopping_ends_with_black_and_a_closed_ring' (686371933) panicked at crates/setup/tests/it/light.rs:239:5:
+assertion `left == right` failed: newest first
+  left: [Closed, Frame(Rgb { red: 8, green: 7, blue: 5 })]
+ right: [Closed, Frame(Rgb { red: 0, green: 0, blue: 0 })]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+=== end mutant-stop-without-black ===

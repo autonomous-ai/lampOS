@@ -463,6 +463,11 @@ during the fade out not opened after the marker (the reviewer's probe on
 never dark; and with the switch off no ring opened. Not shown on a lamp: the colours, the
 brightness in a room and the timing on the ring itself are a lamp check.
 
+The stop-order fixture uses the same frame-stepped `Fast` clock as the
+adjacent fade tests. It still waits for white, stops the painter, then
+checks that its last frame is black and the ring is closed. The product's
+fade durations and the real two-second stop deadline are unchanged.
+
 ## A person's own keys (#2094, built, off unless set)
 
 With `LAMP_OWN_KEYS=on`, the setup request may carry a person's own

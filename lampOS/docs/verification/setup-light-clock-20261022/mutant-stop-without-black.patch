@@ -1,0 +1,14 @@
+--- a/lampOS/crates/setup/src/light.rs
++++ b/lampOS/crates/setup/src/light.rs
+@@ -299,6 +299,11 @@
+         let phase = status.lock().unwrap_or_else(PoisonError::into_inner).phase;
+         if phase != Phase::Connecting {
+             held.released = false;
++        }
++        if held.stop {
++            held.ended = true;
++            changed.notify_all();
++            return;
+         }
+         let let_go = held.stop || held.released;
+         let wanted = if let_go { None } else { look(phase) };
