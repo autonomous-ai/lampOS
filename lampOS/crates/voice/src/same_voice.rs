@@ -519,6 +519,10 @@ pub struct Voices<P: Printer> {
     /// The conversation's voice is its caller's only
     /// ([`CALLER_ONLY_ENVIRONMENT`], [`Self::callers_only`]).
     caller_only: bool,
+    /// With it, a going-on line the eyes saw only the caller speaking
+    /// ([`Self::seen_from_the_caller`]): its print becomes the voice of a
+    /// conversation that has none.
+    caller_seen: Option<u64>,
     /// Where its lines are said ([`to_stderr`] on a lamp).
     journal: Journal,
 }
@@ -535,6 +539,7 @@ impl<P: Printer> Voices<P> {
             judged: None,
             late_other: None,
             caller_only: false,
+            caller_seen: None,
             journal: to_stderr(),
         }
     }
@@ -769,7 +774,16 @@ impl<P: Printer> Voices<P> {
             }
             // The caller's voice only: a going-on line is judged against
             // it, never added to it.
-            _ if going_on && self.caller_only => {}
+            _ if going_on && self.caller_only => {
+                // Only a conversation with no voice yet, from a line the
+                // eyes tie to its caller.
+                if self.conversation.is_empty() && self.caller_seen == Some(request) {
+                    (self.journal)(&format!(
+                        "lamp-voice provider: request {request}: seen spoken by the caller alone: its print is the conversation's voice"
+                    ));
+                    self.keep(print);
+                }
+            }
             _ if going_on => self.keep(print),
             _ => {
                 self.begin_afresh();
@@ -820,6 +834,15 @@ impl<P: Printer> Voices<P> {
     pub fn take_late_other(&mut self) -> Option<u64> {
         self.poll();
         self.late_other.take()
+    }
+
+    /// With [`Self::callers_only`]: the line `request`, going on, was seen
+    /// spoken by the caller's face and no other. If the conversation has no
+    /// voice yet (its call was too short to print), this line's print becomes
+    /// it (the first builder on #2602, 21 Oct 21:19). Told before
+    /// [`Self::decided`].
+    pub fn seen_from_the_caller(&mut self, request: u64) {
+        self.caller_seen = Some(request);
     }
 
     /// The answer to the line `request` was judged: let out (`played`) or
@@ -1433,6 +1456,46 @@ exec sleep 30"#,
             said(&mut voices, 5, 1, 48_000);
             assert_eq!(voices.likeness(5), Some(1.0), "the caller goes on");
         }
+    }
+
+    /// The first builder on #2602 (21 Oct 21:19): with the caller's voice
+    /// only, a call too short to print leaves the conversation with none,
+    /// until a follow-up the eyes saw spoken by the caller alone: its print
+    /// becomes the voice, and the next other voice is another. A follow-up
+    /// not so seen leaves it with none; once there is a voice, a later one
+    /// seen so adds nothing.
+    #[test]
+    fn a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken() {
+        for seen in [true, false] {
+            let mut voices = Voices::new(StandIn::default()).callers_only(true);
+            said(&mut voices, 1, 1, 8_000);
+            voices.decided(1, true, false);
+            said(&mut voices, 2, 1, 48_000);
+            assert_eq!(voices.likeness(2), None, "no voice yet");
+            if seen {
+                voices.seen_from_the_caller(2);
+            }
+            voices.decided(2, true, true);
+            said(&mut voices, 3, -1, 48_000);
+            if seen {
+                assert_eq!(voices.likeness(3), Some(0.0), "another voice");
+            } else {
+                assert_eq!(voices.likeness(3), None, "still no voice");
+            }
+        }
+        // A voice known: a later line seen from the caller is never added.
+        let mut voices = Voices::new(StandIn::default()).callers_only(true);
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        said(&mut voices, 2, 5, 48_000);
+        voices.seen_from_the_caller(2);
+        voices.decided(2, true, true);
+        said(&mut voices, 3, 4, 48_000);
+        assert!(
+            voices
+                .likeness(3)
+                .is_some_and(|likeness| likeness < DIFFERENT_BELOW)
+        );
     }
 
     /// A voice at 0.20 against the conversation's is another, whether its

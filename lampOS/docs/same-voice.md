@@ -550,7 +550,20 @@ Reviewer's P2 on #2650, `a_caller_let_in_by_a_turned_face_takes_the_conversation
 A caller whose call was too short to print has no voice known for that
 whole conversation, unlike without the switch, where the next going-on
 line's print becomes its voice: the check then stays silent until the next
-call, on the side of holding nothing. Not yet run on a lamp.
+call, on the side of holding nothing, unless the eyes tie a follow-up to
+the caller: a going-on line seen spoken by the call's one face and no other
+(`seen_from_the_caller`, the worker's `spoken_by_the_caller_alone`) gives
+a conversation with no voice its voice, and nothing else ever does (the
+first builder on #2602, 21 Oct 21:19;
+`a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken`).
+A call seen spoken by two faces names no caller, so nothing is taken. The
+one line marked is the newest seen so: a later one seen before an earlier
+one's print is back takes its place, and that earlier print is never taken,
+on the side of holding nothing. The caller's face can also come from the
+first going-on line's face turned to the lamp when none was seen speaking
+the call (#2341), which may be someone who never called; and a moving mouth
+is not the sound's source, so lips moving under a TV voice pass too.
+Not yet run on a lamp.
 
 ## Not shown
 
