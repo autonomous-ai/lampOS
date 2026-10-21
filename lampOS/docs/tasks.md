@@ -827,15 +827,23 @@ credential of its own.
   sign-in failed in under 3 s, `new_failed`, with Harness saying "Harness is
   not running here" (lamp-75c9, 20 October, two voice hand-overs to Devin
   Cloud). Once a sign-in by code succeeds, the part runs `harness start`
-  once (`Cli::start_daemon`, through systemd where the service is
-  installed). It's the next job on the lane, ahead of a hand-over already
-  waiting, which would otherwise go to the stopped daemon. It's given 75 s
+  (`Cli::start_daemon`, through systemd where the service is installed).
+  It's the next job on the lane, ahead of a hand-over already waiting,
+  which would otherwise go to the stopped daemon. It's given 75 s
   (`DAEMON_START_TIMEOUT`), past Harness's own 60 s wait for the daemon,
   and the part journals `Harness's daemon started after the sign-in` or why
-  not. A sign-in that fails or is cancelled starts nothing. **Known limit:**
-  the start is tried once; if it fails, it isn't tried again until the next
-  sign-in, and hand-overs fail as before. Until openharness#1463 is
-  answered.
+  not. A sign-in that fails or is cancelled starts nothing.
+- **A failed start is tried again.** On lamp-75c9 (21 October) the start
+  right after a spoken sign-in said `start_failed`, and one by hand about a
+  minute later worked. So a failed start is tried again 10 s later, then
+  20 s and 40 s after each next failure (`DAEMON_RETRY_AFTER`,
+  `DAEMON_START_TRIES`: four tries in all, about 70 s of waits). While a try
+  is due no hand-over goes, since it would fail on the stopped daemon; reads
+  of tasks already handed over go on. Each failure is journalled with when
+  it's tried again. If every try runs to its 75 s, a waiting hand-over
+  waits about six minutes. **Known limit:** after the fourth failure it
+  isn't tried again until the next sign-in, and hand-overs fail as before,
+  until openharness#1463 is answered.
 
 The journal says `tasks: sign-in 1: started`, `code given (good for 120 s)`,
 `approved in Harness: asking whether to sign in`, `question told in request
@@ -853,7 +861,9 @@ against a scripted program, and the service's
 `the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end` (the
 daemon started once after the sign-in succeeded, not before),
 `after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over` (ahead
-of a hand-over waiting, and never after a sign-in that failed) and
+of a hand-over waiting, and never after a sign-in that failed),
+`a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over` (a
+waiting hand-over goes after the try that works, or after the last) and
 `the_daemon_is_started_with_harness_start`. The
 voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 

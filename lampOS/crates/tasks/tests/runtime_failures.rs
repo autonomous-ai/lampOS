@@ -63,6 +63,7 @@ fn config(root: &Path) -> Config {
         // a fraction of a second (#1128).
         sign_in_by_code: false,
         report_every: Duration::from_millis(50),
+        daemon_retry_after: Duration::from_millis(50),
     }
 }
 

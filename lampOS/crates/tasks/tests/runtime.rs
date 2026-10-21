@@ -106,6 +106,8 @@ struct Counts {
     sign_in_starts: AtomicUsize,
     /// How many times Harness's daemon was started (openharness#1463).
     daemon_starts: AtomicUsize,
+    /// How many daemon starts still fail, `start_failed` (lamp-75c9, 21 Oct).
+    daemon_fails: AtomicUsize,
     /// Each launch and daemon start, in the order they ran, and a launch
     /// held on the job lane while set (the reviewer-lead's P2 on #2309).
     order: Mutex<Vec<&'static str>>,
@@ -223,6 +225,13 @@ impl Adapter for Script {
     fn start_daemon(&self) -> Result<(), String> {
         self.counts.daemon_starts.fetch_add(1, Ordering::SeqCst);
         self.counts.order.lock().unwrap().push("daemon");
+        let fails = &self.counts.daemon_fails;
+        if fails
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok()
+        {
+            return Err("start_failed".into());
+        }
         Ok(())
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
@@ -320,6 +329,8 @@ impl Running {
             // waits a fraction of a second (#1128).
             sign_in_by_code: false,
             report_every: Duration::from_millis(50),
+            // A failed daemon start tried again in 50, 100 and 200 ms.
+            daemon_retry_after: Duration::from_millis(50),
         };
         let mut running = Self {
             root,
@@ -1677,6 +1688,88 @@ fn after_a_sign_in_the_daemon_is_started_before_a_waiting_hand_over() {
         *s.counts.order.lock().unwrap(),
         ["launch", "daemon", "launch"]
     );
+    // Each launch's end kept before the service is stopped: the store syncs
+    // with `fullfsync`, and on a Mac under the whole binary's load a write
+    // still under way took past the stop's 300 ms (#1569 row 76).
+    for prepared in [&first, &second] {
+        s.wait(&prepared["id"], |v| {
+            !v["task"]["dispatch"]["finished"].is_null()
+        });
+    }
+}
+
+/// lamp-75c9, 21 October: the daemon's start right after a spoken sign-in
+/// said `start_failed`, and one by hand a minute later worked. A failed
+/// start is tried again later, twice as long after each failure, and a
+/// hand-over confirmed meanwhile waits for it; after the last try it goes
+/// as before.
+#[test]
+fn a_failed_daemon_start_is_tried_again_before_a_waiting_hand_over() {
+    use lamp_tasks::sign_in::{Done, Event};
+    let mut s = Running::new(false);
+    s.stop();
+    s.config.sign_in_by_code = true;
+    s.start();
+    let signed_in = |s: &Running| {
+        assert_eq!(s.trusted(json!({"op":"sign_in_start"}))["ok"], true);
+        s.counts
+            .sign_in_lines
+            .lock()
+            .unwrap()
+            .push_back(Ok(Event::Result(Done::Success { email: None })));
+    };
+    let launched = |s: &Running, want: usize| {
+        let start = Instant::now();
+        while s.counts.launches.load(Ordering::SeqCst) < want {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "{:?}",
+                s.counts.order
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+    };
+    // Two starts fail: the third, 50 and 100 ms later, works, and the
+    // hand-over confirmed after the first failure goes only then.
+    s.counts.daemon_fails.store(2, Ordering::SeqCst);
+    signed_in(&s);
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "never started");
+        thread::sleep(Duration::from_millis(2));
+    }
+    let first = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&first))["ok"], true);
+    launched(&s, 1);
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["daemon", "daemon", "daemon", "launch"]
+    );
+    // Every try fails: four in all, and then the hand-over goes as before.
+    s.counts.order.lock().unwrap().clear();
+    s.counts.daemon_fails.store(10, Ordering::SeqCst);
+    signed_in(&s);
+    let start = Instant::now();
+    while s.counts.daemon_starts.load(Ordering::SeqCst) < 4 {
+        assert!(start.elapsed() < Duration::from_secs(5), "not tried again");
+        thread::sleep(Duration::from_millis(2));
+    }
+    let second = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&second))["ok"], true);
+    launched(&s, 2);
+    thread::sleep(Duration::from_millis(500));
+    assert_eq!(
+        *s.counts.order.lock().unwrap(),
+        ["daemon", "daemon", "daemon", "daemon", "launch"]
+    );
+    // Each launch's end kept before the service is stopped: the store syncs
+    // with `fullfsync`, and on a Mac under the whole binary's load a write
+    // still under way took past the stop's 300 ms (#1569 row 76).
+    for prepared in [&first, &second] {
+        s.wait(&prepared["id"], |v| {
+            !v["task"]["dispatch"]["finished"].is_null()
+        });
+    }
 }
 
 /// Without `serve --set-up-later` nothing of it is said, and the targets
