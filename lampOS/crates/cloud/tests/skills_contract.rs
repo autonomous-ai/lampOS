@@ -248,6 +248,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         for stream in listener.incoming().flatten() {
             let _ = lamp_skills::package::asked(
                 &served,
+                &served.join("no-made"),
                 lamp_skills::package::ASKED_LOCK_WAIT,
                 &stream,
                 &stream,

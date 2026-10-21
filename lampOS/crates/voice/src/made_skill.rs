@@ -55,7 +55,7 @@ const MOST_FILE_BYTES: usize = 8 * 1024;
 /// The most of a description said.
 const MOST_DESCRIPTION_CHARS: usize = 200;
 /// The file that keeps what was made, in [`DIRECTORY`].
-const INDEX: &str = "made.json";
+pub const INDEX: &str = "made.json";
 
 /// The brief's first words: a task that begins with them is a skill to make.
 pub const BRIEF_HEAD: &str = "Write one lamp skill (lampOS lamp-skills)";
