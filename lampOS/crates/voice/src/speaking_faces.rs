@@ -34,6 +34,26 @@ pub const FEWEST_LOOKS: usize = 3;
 /// theirs would be.
 pub const EYES_EVERY: Duration = Duration::from_millis(500);
 
+/// Where the voice reads that the eyes judge whether a face is speaking at
+/// this lamp (`LAMP_EYES_SPEAKING=on`, the eyes' own switch, set in the
+/// voice's unit too): a held forget's yes then counts only from the held
+/// person's face seen speaking it (#2377).
+pub const EYES_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING";
+
+/// Whether [`EYES_ENVIRONMENT`] is `on`, and nothing else.
+pub fn eyes_from_environment() -> bool {
+    std::env::var(EYES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Whether the person `person` was seen saying a line: some face read
+/// speaking through it ([`SpeakingFaces::speakers`]), and every face that
+/// did is theirs, the known person's face beside the eyes' known file
+/// (`known`, [`known_with_face`]) while the eyes know them. No reading, a
+/// stale known file or another face speaking is not seen (#2377).
+pub fn seen_saying(speakers: &[String], person: &str, known: Option<(String, String)>) -> bool {
+    !speakers.is_empty() && !someone_elses(speakers, person, known)
+}
+
 pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }

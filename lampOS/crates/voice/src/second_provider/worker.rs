@@ -1741,7 +1741,9 @@ pub fn serve(
     // own thread, say whose a line is when another face spoke it. Only with
     // the memory's known file, the bus and the scoped context, which tells
     // and files each turn for its lease (Second on #2008); the reader stops
-    // when this worker returns.
+    // when this worker returns. Its faces are kept for a held forget's
+    // sight below, so one thread reads the topic.
+    let mut speaking_eyes = None;
     let _speaking_reader = match (&scope_file, files.bus_root.as_deref()) {
         (Some(known), Some(root))
             if crate::speaking_faces::from_environment() && engine.scopes_context() =>
@@ -1749,7 +1751,8 @@ pub fn serve(
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let reader = crate::speaking_faces::read_from(eyes.clone(), root);
             if reader.is_some() {
-                engine = engine.seeing_who_speaks(eyes, known.clone());
+                engine = engine.seeing_who_speaks(eyes.clone(), known.clone());
+                speaking_eyes = Some(eyes);
             }
             reader
         }
@@ -1757,6 +1760,50 @@ pub fn serve(
             if crate::speaking_faces::from_environment() && !engine.scopes_context() {
                 eprintln!(
                     "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
+                );
+            }
+            None
+        }
+    };
+    // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
+    // forget's yes counts only from the held person's face seen saying it.
+    // The faces seeing who speaks reads, when it is on, or else its own
+    // reader, which reads the eyes' faces every 100 ms while this worker
+    // runs; the judging happens only at a held forget's yes. Without the
+    // memory's known file and the bus, a held forget runs on a yes as before,
+    // and the journal says so once.
+    let _forget_sight_reader = match (&scope_file, files.bus_root.as_deref()) {
+        (Some(known), Some(root)) if crate::speaking_faces::eyes_from_environment() => {
+            let (eyes, reader) = match speaking_eyes {
+                Some(eyes) => (Some(eyes), None),
+                None => {
+                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                    let reader = crate::speaking_faces::read_from(eyes.clone(), root);
+                    (reader.is_some().then_some(eyes), reader)
+                }
+            };
+            match eyes {
+                Some(eyes) => {
+                    eprintln!(
+                        "lamp-voice second: a held forget's yes counts only from their face seen saying it (LAMP_EYES_SPEAKING)"
+                    );
+                    engine = engine.confirming_forgets_by_sight(eyes, known.clone());
+                }
+                None => eprintln!(
+                    "lamp-voice second: held forgets: the speaking check is off (the bus can't be opened); a plain yes runs as before"
+                ),
+            }
+            reader
+        }
+        (known, root) => {
+            if crate::speaking_faces::eyes_from_environment() {
+                eprintln!(
+                    "lamp-voice second: held forgets: the speaking check is off ({}); a plain yes runs as before",
+                    match (known.is_some(), root.is_some()) {
+                        (false, false) => "no bus, no known faces file",
+                        (false, true) => "no known faces file",
+                        _ => "no bus",
+                    }
                 );
             }
             None

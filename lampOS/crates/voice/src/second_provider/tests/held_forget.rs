@@ -41,6 +41,30 @@ struct Ran {
 }
 
 async fn run(turns: &[Turn]) -> Ran {
+    run_seen(turns, None).await
+}
+
+/// The face the eyes give each person at the lamp, beside the known file.
+fn face_of(who: &str) -> &'static str {
+    match who {
+        "A" => "f1",
+        "B" => "f2",
+        _ => "f9",
+    }
+}
+
+/// One turn's eyes: whom they see speaking, and whether the known face is
+/// beside the known file.
+type Sight = (&'static [&'static str], bool);
+
+/// [`run`], with the eyes reading speaking (`LAMP_EYES_SPEAKING=on`,
+/// #2377) when `sight` is given: for each turn, whom the eyes see speaking
+/// while it is said, A (`f1`) and B (`f2`) both in view, and whether the
+/// known person's face is beside the known file (a missing reading when
+/// not).
+async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    use std::sync::atomic::{AtomicBool, Ordering};
     let mut chats = VecDeque::new();
     for (who, _, lamp, _) in turns {
         match lamp {
@@ -82,6 +106,7 @@ async fn run(turns: &[Turn]) -> Ran {
     ));
     let cache = Arc::new(FaceCache::default());
     let (engine, _, now) = scripted(script.clone());
+    let eyes = Arc::new(SpeakingFaces::default());
     let mut engine = engine
         .with_memory_scope(
             lamp_turn_owner::BootId::new([12; 16]).unwrap(),
@@ -92,27 +117,83 @@ async fn run(turns: &[Turn]) -> Ran {
             })),
         )
         .announcing(false);
+    if sight.is_some() {
+        engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
+    }
     engine.memory_camera(true, 1);
+    let mut frame = 0u64;
     for (at, (who, said, _, after)) in turns.iter().enumerate() {
         let request = at as u64 + 1;
         *now.lock().unwrap() += Duration::from_secs(*after);
+        let (speaking, face_beside) = sight.map_or((&[][..], false), |sight| sight[at]);
+        let _ = std::fs::remove_file(known_face_of(&path));
         let seen = if who.is_empty() {
             None
         } else {
             std::fs::write(&path, who).unwrap();
+            if face_beside {
+                std::fs::write(known_face_of(&path), format!("{}\n", face_of(who))).unwrap();
+            }
             crate::known_faces::FaceObservation::read(&path)
         };
         cache.replace(cache.begin_refresh(), seen);
         if let Some(words) = said.strip_prefix(WROTE) {
             engine.submit(written(request, words));
         } else {
+            // The eyes, while the line is said: A and B in view, those in
+            // `speaking` read speaking.
+            let done = Arc::new(AtomicBool::new(false));
+            let feeder = {
+                let (eyes, done) = (eyes.clone(), done.clone());
+                let speaking: Vec<&'static str> = speaking.iter().map(|who| face_of(who)).collect();
+                std::thread::spawn(move || {
+                    while !done.load(Ordering::Acquire) {
+                        let faces = lamp_msgs::Faces {
+                            faces: ["f1", "f2"]
+                                .map(|id| lamp_msgs::Face {
+                                    id: id.to_owned(),
+                                    xmin: 0.1,
+                                    ymin: 0.1,
+                                    xmax: 0.3,
+                                    ymax: 0.4,
+                                    confidence: 1.0,
+                                    yaw: None,
+                                    facing: None,
+                                    speaking: Some(lamp_msgs::Speaking {
+                                        state: if speaking.contains(&id) {
+                                            lamp_msgs::SpeakingState::Yes
+                                        } else {
+                                            lamp_msgs::SpeakingState::No
+                                        },
+                                        score: 0.9,
+                                        from: None,
+                                    }),
+                                })
+                                .into(),
+                        };
+                        frame += 1;
+                        eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    frame
+                })
+            };
             engine.submit(start(request));
             engine.submit(audio(request, 1));
+            if sight.is_some() {
+                tokio::time::sleep(Duration::from_millis(40)).await;
+            }
             engine.submit(end(request));
+            turn(&mut engine).await;
+            done.store(true, Ordering::Release);
+            frame = feeder.join().unwrap();
+            engine.retire_through(request);
+            continue;
         }
         turn(&mut engine).await;
         engine.retire_through(request);
     }
+    let _ = std::fs::remove_file(known_face_of(&path));
     let _ = std::fs::remove_file(path);
     let forgets = forgets
         .lock()
@@ -623,4 +704,91 @@ async fn a_held_forget_stands_only_on_a_question_that_names_it() {
             .collect();
         assert_eq!(ran.forgets, want, "{name}: {line}");
     }
+}
+
+/// #2377, the reviewer's P3 1 on #2340: where the eyes read speaking
+/// (`LAMP_EYES_SPEAKING=on`), a held forget's yes runs it only when the
+/// held person's face is seen saying it, and no other face. Nobody seen
+/// speaking, another face speaking while A is at the lamp, both, or no
+/// known face beside the known file (a missing reading) runs nothing, and
+/// the model is told once that the yes did not count. A's own face seen
+/// saying it runs exactly the call.
+#[tokio::test]
+async fn where_the_eyes_read_speaking_only_their_face_saying_yes_runs_it() {
+    let held = ("A", "What's my name?", ASKS, 0);
+    let yes = ("A", "Yes.", Lamp::Says("Okay."), 5);
+    let quiet: Sight = (&[], true);
+    let cases: &[(&[Sight], usize, &str)] = &[
+        (&[quiet, (&["A"], true)], 1, "A seen saying it"),
+        (&[quiet, (&[], true)], 0, "nobody seen speaking"),
+        (
+            &[quiet, (&["B"], true)],
+            0,
+            "B seen speaking while A is at the lamp",
+        ),
+        (
+            &[quiet, (&["A", "B"], true)],
+            0,
+            "A and B both seen speaking",
+        ),
+        (
+            &[quiet, (&["A"], false)],
+            0,
+            "no known face beside the known file",
+        ),
+    ];
+    for (sight, runs, case) in cases {
+        let ran = run_seen(&[held, yes], Some(sight)).await;
+        let want: Vec<(String, Value)> = (0..*runs)
+            .map(|_| (FACE.to_owned(), json!({"name": "A"})))
+            .collect();
+        assert_eq!(ran.forgets, want, "{case}");
+        let told = Message::system(crate::remember::unseen_yes_told(FACE));
+        let told_on_yes = ran.asked.last().unwrap().contains(&told);
+        assert_eq!(told_on_yes, *runs == 0, "{case}");
+    }
+}
+
+/// #2377: after a yes that did not count, the one asked for in words,
+/// "Yes, forget my face.", runs at once (the cost of a missed reading);
+/// a second plain yes runs nothing, with nothing held.
+#[tokio::test]
+async fn after_an_unseen_yes_their_words_run_it_and_a_yes_does_not() {
+    let held = ("A", "What's my name?", ASKS, 0);
+    let unseen = (
+        "A",
+        "Yes.",
+        Lamp::Says("Say \"Yes, forget my face.\" if you want that."),
+        5,
+    );
+    let ran = run_seen(
+        &[
+            held,
+            unseen,
+            ("A", "Yes, forget my face.", Lamp::Calls(FACE, "Done."), 5),
+        ],
+        Some(&[(&[], true), (&[], true), (&[], true)]),
+    )
+    .await;
+    assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": "A"}))]);
+    let ran = run_seen(
+        &[held, unseen, ("A", "Yes.", Lamp::Says("Okay."), 5)],
+        Some(&[(&[], true), (&[], true), (&["A"], true)]),
+    )
+    .await;
+    assert_eq!(ran.forgets, []);
+}
+
+/// #2377: without `LAMP_EYES_SPEAKING`, #2340's hold is as it was: A's
+/// plain yes runs it while their face is at the lamp, whoever the eyes see
+/// speaking, and nothing extra is told.
+#[tokio::test]
+async fn without_the_eyes_switch_a_held_forget_is_as_before() {
+    let held = ("A", "What's my name?", ASKS, 0);
+    let ran = run(&[held, ("A", "Yes.", Lamp::Says("Done."), 5)]).await;
+    assert_eq!(ran.forgets, [(FACE.to_owned(), json!({"name": "A"}))]);
+    let told = Message::system(crate::remember::unseen_yes_told(FACE));
+    assert!(ran.asked.iter().all(|asked| !asked.contains(&told)));
+    let ran = run(&[held, ("B", "Yes.", Lamp::Says("Okay."), 5)]).await;
+    assert_eq!(ran.forgets, []);
 }

@@ -587,6 +587,13 @@ struct Shared {
     /// A forget the model called unasked, held for that person's yes
     /// ([`HeldForget`]).
     held_forget: Mutex<HeldForgets>,
+    /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
+    /// looks and their known file, and a held forget's yes counts only
+    /// from the held person's face seen saying it (#2377).
+    forget_sight: Option<(
+        Arc<crate::speaking_faces::SpeakingFaces>,
+        std::path::PathBuf,
+    )>,
 }
 
 /// How long after its end a line whose words end before a name waits for
@@ -995,6 +1002,7 @@ impl Engine {
                 first_words: None,
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
+                forget_sight: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -1135,6 +1143,21 @@ impl Engine {
             return self;
         }
         shared.speaking = Some((eyes, known));
+        self
+    }
+
+    /// A held forget's yes counts only from the held person's face seen
+    /// saying it (`LAMP_EYES_SPEAKING=on`, #2377): `eyes` are the eyes'
+    /// looks and `known` their known file, with its face beside it. Without
+    /// it, the yes runs it while their face is the one at the lamp, as
+    /// #2340 did.
+    pub fn confirming_forgets_by_sight(
+        mut self,
+        eyes: Arc<crate::speaking_faces::SpeakingFaces>,
+        known: std::path::PathBuf,
+    ) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.forget_sight = Some((eyes, known));
         self
     }
 
@@ -2577,6 +2600,25 @@ async fn spoken(
             }
         }
     }
+    // A forget held for a yes: who the eyes saw saying this line, kept for
+    // its answer ([`take_held_forget`], #2377). Read only while one is held.
+    if let Some((eyes, known)) = &shared.forget_sight
+        && shared
+            .held_forget
+            .lock()
+            .is_ok_and(|hold| hold.held.is_some())
+    {
+        let speakers = eyes.speakers(begun, finishing);
+        let known = known.clone();
+        let pair =
+            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+                .await
+                .ok()
+                .flatten();
+        if let Ok(mut hold) = shared.held_forget.lock() {
+            hold.sight = Some((request, speakers, pair));
+        }
+    }
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
@@ -3512,7 +3554,19 @@ struct HeldForgets {
     /// The last spoken turn's words' ask, never the lamp's words: a turn
     /// the lamp wrote clears it ([`asked_just_before`]).
     before: Option<SpokenBefore>,
+    /// Who the eyes saw saying the last spoken line read while a forget
+    /// was held: its request, the faces seen speaking it and the known
+    /// person with their face (`LAMP_EYES_SPEAKING=on`, #2377).
+    sight: Option<SightRead>,
 }
+
+/// A line's request, the faces seen speaking it, and the known person's
+/// name with their face's id ([`HeldForgets::sight`]).
+type SightRead = (
+    u64,
+    crate::speaking_faces::Speakers,
+    Option<(String, String)>,
+);
 
 /// Whom a turn's forget is held for, or whose yes runs one: the admitted
 /// request's session and known person. None with nobody known (the room)
@@ -3524,11 +3578,25 @@ fn forget_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64,
     Some((scope.key().session, person))
 }
 
+/// What became of a held forget on a turn ([`take_held_forget`]).
+enum Taken {
+    /// Nothing held, or dropped: nothing runs and nothing is told.
+    Nothing,
+    /// Their yes runs exactly this call.
+    Runs(net::ToolCall),
+    /// A yes that would have run it, but the eyes did not see the held
+    /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
+    /// the model is told the yes did not count.
+    Unseen(String),
+}
+
 /// The held forget request `request` runs, if any. Every turn takes the
 /// hold: it runs only on a later spoken turn that is a plain yes and
 /// nothing else (`known_faces::plain_agreement`), from the same session's
-/// person, within `remember::HELD_FORGET_FOR`; any other turn drops it,
-/// running nothing. The journal never has the words.
+/// person, within `remember::HELD_FORGET_FOR`; where the eyes read speaking
+/// ([`Engine::confirming_forgets_by_sight`]), only with that person's face
+/// seen saying it and no other face (`speaking_faces::seen_saying`). Any
+/// other turn drops it, running nothing. The journal never has the words.
 fn take_held_forget(
     shared: &Shared,
     request: u64,
@@ -3536,10 +3604,15 @@ fn take_held_forget(
     said: &str,
     asker: Option<&(u64, String)>,
     now: Instant,
-) -> Option<net::ToolCall> {
-    let mut hold = shared.held_forget.lock().ok()?;
+) -> Taken {
+    let Ok(mut hold) = shared.held_forget.lock() else {
+        return Taken::Nothing;
+    };
     hold.latest = hold.latest.max(request);
-    let held = hold.held.take()?;
+    let sight = hold.sight.take();
+    let Some(held) = hold.held.take() else {
+        return Taken::Nothing;
+    };
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -3552,6 +3625,16 @@ fn take_held_forget(
         Some("not the same person")
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
         Some("too late")
+    } else if shared.forget_sight.is_some()
+        && !sight.is_some_and(|(seen, speakers, known)| {
+            seen == request && crate::speaking_faces::seen_saying(&speakers, &held.asker.1, known)
+        })
+    {
+        eprintln!(
+            "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): their face was not seen saying the yes",
+            held.call.name, held.request
+        );
+        return Taken::Unseen(held.call.name);
     } else {
         None
     };
@@ -3561,9 +3644,9 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
                 held.call.name, held.request
             );
-            None
+            Taken::Nothing
         }
-        None => Some(held.call),
+        None => Taken::Runs(held.call),
     }
 }
 
@@ -3835,19 +3918,24 @@ async fn answer(
         (shared.clock)(),
     );
     let forget_may_run = crate::remember::forget_may_run(heard, asks_now);
-    let mut held_forget_runs = take_held_forget(
+    let (mut held_forget_runs, unseen_yes) = match take_held_forget(
         shared,
         request,
         heard,
         &said,
         asker.as_ref(),
         (shared.clock)(),
-    );
+    ) {
+        Taken::Nothing => (None, None),
+        Taken::Runs(call) => (Some(call), None),
+        Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
+    };
     let words = Message::user(said.clone());
     // A chat begun on the early words was asked without the held forget's
-    // result, so it does not stand for round 1.
+    // result, or that its yes did not count, so it does not stand for
+    // round 1.
     let prepared_for = prepared
-        .filter(|_| held_forget_runs.is_none())
+        .filter(|_| held_forget_runs.is_none() && unseen_yes.is_none())
         .map(|prepared| (prepared, said.clone()));
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
@@ -3929,6 +4017,10 @@ async fn answer(
                 )));
                 held_forget_ran = true;
             }
+        }
+        // Their yes did not count (#2377): told once, beside the request.
+        if let Some(told) = unseen_yes {
+            messages.push(Message::system(told));
         }
         messages.push(question);
         // What round 1 was asked, kept for the rounds after it.

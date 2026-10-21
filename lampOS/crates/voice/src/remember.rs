@@ -114,6 +114,22 @@ pub fn held_forget_told(name: &str) -> serde_json::Value {
     })
 }
 
+/// What the model is told when a held forget's yes did not count: the lamp
+/// did not see the person whose forget it is say it
+/// (`second_provider::HeldForget`, `LAMP_EYES_SPEAKING=on`). Nothing ran;
+/// it may ask them once to say it themselves, with no explanation (rule 8:
+/// no lecture, no nagging).
+pub fn unseen_yes_told(name: &str) -> String {
+    let (what, example) = match name {
+        crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
+        FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
+        _ => ("that", "Yes, forget that."),
+    };
+    format!(
+        "(For you to know: that yes did not count, so nothing was forgotten and {what} is still kept. If they want it, ask them once, in a few words, to say it themselves, for example \"{example}\". Do not explain why, and do not call {name} now.)"
+    )
+}
+
 /// What the forget functions add for the second route's spoken turns, where
 /// a forget nobody asked for in words is held for their yes
 /// ([`held_forget_told`]), so the description and the engine agree.
