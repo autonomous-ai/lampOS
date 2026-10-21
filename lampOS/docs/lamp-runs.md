@@ -191,7 +191,7 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 | `LAMP_MEMORY_RULES` | #822 | Rules kept, told and taken back by number; the Policy reading them; a seventh rule. | nothing (played) | #1712 |
 | `LAMP_WAIT_KEEPS_ANSWER` | #1130, #1123 | A cough within 2 s of an answer, a real follow-up, #1123's count before and after; then "No." and "Wait." five times each and five coughs in the gap, counting `wait_words` and `stop_said`. | the person's voice | #1712 |
 
-## lamp-75c9 (Ten, Eighth)
+## lamp-75c9 (Ten, Eighth, Blue)
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
@@ -213,6 +213,8 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 | `LAMP_TASK_NEWS_AT_PAUSE` (Eighth) | #1161 | Talk while a task runs: news at the first 1 s pause, about 3 s after the lamp's words, under 20 s; two tasks done within a minute told in one turn. | the person's voice | #1712 |
 | `LAMP_PROGRESS_NEWS` (Eighth) | #765 | A few-minute task with `lamp-policy --act progress`: `say_now`, then one spoken sentence. | nothing | #1712 |
 | `LAMP_HOLDING_ANSWER` (Eighth) | #1579 | Five hand-over rounds off and on: holding-only turns, and the last holding word to the first answer word. | nothing (played) | #1712 |
+| `LAMP_ADDONS`, the add-ons' judge, part 1 (Blue) | #2553, #2577 | ~~Two probe add-ons (the `docs/addons.md` light and mood, triggered by the voice resting) proposing every 40 s: a busy room drops both; the person's own light drops the light; a mood is kept and said on `mood/nudge`; the next within 2 min is dropped by the rate; `lamp-keeper pause` drops both; the rate frees after 2 min~~ (passed on lamp-75c9, 21 Oct 21:18–21:23, Blue on #2530, from `lamp-bus record` of `addon/decision` and `lamp/pause`). The examples' own triggers wait: the evening one needs a face the lamp's eyes see (the laptop screen unlocked), the music one `ears/classes`, which is off on 75c9. | nothing (probes); the screen person for the evening example | lamp-voice |
+| `LAMP_ADDONS`, a brief glow over a resting person's light (Blue) | #2640 | With 75c9's person's light set before this boot's last 12 h: a probe light kept, its `light/request` at `Idle` holding 5 s, and the ring back to their light by itself (the laptop camera on the ring); with their light set off, the same probe dropped. | nothing (probes) | #2640 |
 
 ## lamp-a63e (Migrate)
 
