@@ -1,5 +1,47 @@
 # Tests work log
 
+## 2026-10-21 23:22:51 +0700 — reminder clock published; motor comparison recorded; addons grace next
+
+Ready for lamp-voice: no — [#2679](https://github.com/autonomous-ai/lampOS/pull/2679) is a draft until its exact-head Linux checks finish.
+
+Kind: test harness only; no product default or deadline changes. Commit
+`0af798d348ba06f7163f7aac90b79a381263888c` on
+`tests/1569-holding-answer-clock`, Part of #1569, labelled `builder:tests`.
+Posted on [Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6320854496).
+
+- Row 77's identical 150 ms host pause failed 3/3 before and passed 3/3
+  after. Removing the reminder-origin guard still failed its original
+  assertion 2/2. Temporary pauses and mutations are absent from the commit.
+- On original base `88297758e`, formatting, all-target voice Clippy and
+  workspace build passed. The serial voice suite passed 3,252 tests, with
+  zero failures and 14 existing ignored tests. Its earlier parallel run
+  failed 16 motor fixtures; all names and raw panics remain in the PR.
+- On unchanged integration head `bc2f62fca`, all 3,004 library tests passed,
+  including those 16. The integration binary failed the independent
+  `light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them`
+  timing assertion (259 passed, one failed), with none of this patch.
+- On executables from that same base, those 16 motor cases plus the reminder
+  ran in one parallel process in order unchanged/changed/changed/unchanged:
+  17/17 passed all four times. No regression was reproduced; this is not
+  proof that the old motor failures reproduced unchanged. Their cause
+  remains unresolved. Formatting, all-target Clippy and the workspace
+  build passed again after updating the branch.
+- The [verification folder](https://github.com/autonomous-ai/lampOS/tree/0af798d348ba06f7163f7aac90b79a381263888c/lampOS/docs/verification/holding-answer-clock-20261021)
+  holds the exact commands, bases, controls and raw results. The Mac built
+  for x86_64-apple-darwin only. No lamp or acoustic/motor latency was tested.
+
+Native Linux ARM64 [#5191](https://github.com/autonomous-ai/lampOS/actions/runs/39633785316)
+and Linux Clippy [#1200](https://github.com/autonomous-ai/lampOS/actions/runs/39633785317)
+are running on that exact PR head. The PR will record their terminal results.
+
+#1806's recorded slow-test total fell from 212.6 s to 187.3 s across full
+ARM64 runs 39592616556 and 39612385215; that is aggregate merged progress,
+not the reminder patch's speedup. The next batch extends #2647's addons
+judge decision waits with the approved never-said-mute grace setting.
+#2577 has merged; the product default and actual-mute freshness stay 3 s,
+and the voice-restart reset remains. The test should finish on the judge's
+decision without the extra 3.2 s startup sleep. Row 72 is not claimed fixed.
+
 ## 2026-10-18 10:55:21 +0700 — three flaky tests fixed, two more up, the census merged, and the capture question settled
 
 Ready for lamp-voice: #1463 (two voice-eval fork races) once ARM64 is green. #1373 waits only on #1340.
