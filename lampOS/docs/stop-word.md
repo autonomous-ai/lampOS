@@ -654,6 +654,59 @@ cargo run --release -p lamp-name --example stop_words_replay -- \
   counting. They don't cover what `stop.onnx` hears: the front-end models
   aren't in the repository.
 
+## Scoring the speech-to-text stop path: `stop_words_stt_replay`
+
+The same bundles, plays and counting, heard by the voice's other stop
+path: `LAMP_STOP_WORDS=heard-always`, where everything heard while the
+lamp speaks goes to the second route's speech-to-text and the words are
+matched for a stop phrase. `crates/voice/examples/stop_words_stt_replay.rs`
+is in the voice crate because the client and the matcher are the voice's:
+it builds `StopWords::always` with `with_source` over `RelayEars::start`,
+as the coordinator does, so the request (the relay's
+`…/ws/audio/transcriptions`, Deepgram behind it), the cadence for `raw` and
+`linear`, the flushes at a pause after speech, and `stop_over` are the
+product's own. Unlike `stop_words_replay`, **it sends the audio out**: run
+it only on recordings made for the purpose, such as the Mac's `say` voices.
+
+```sh
+# from lampOS/, with the second route's file and its credential (0600)
+cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
+  --second-config ~/lamp-voice-data/second.json --sources raw,processed --words \
+  ~/lamp-voice-data/names/cutab-night0151-now:$HOME/lamp-voice-data/names/cutab-night0151-now/plays-stops.tsv \
+  ~/lamp-voice-data/names/cutab-night0151-6db:$HOME/lamp-voice-data/names/cutab-night0151-6db/plays-stops.tsv
+```
+
+- **The credential** is the one `second.json` names for speech-to-text
+  (`deepgram_credential_file`, else `stt_credential_file`, else
+  `llm_credential_file`), read as the voice and `lamp-voice stt-check` read
+  it, with the voice unit's environment over the file. The default file
+  is the product's `/etc/lampOS/voice/second.json`. Nothing prints a key:
+  only the host the words go to. It refuses to run with
+  `LAMP_STOP_WORDS_AUDIO` or `LAMP_STOP_WORDS_COUNTS` set.
+- **Real time.** Each source is heard as the lamp read it, 10 ms block by
+  block, the sources side by side, each on a stream of its own: a 2.7 min
+  bundle takes about 2.8 min.
+- **What the voice is told** comes from the recording. A block is
+  speech-like when the lamp's detector scored it at 0.5 or more
+  (`vad_score`). The lamp is sounding while the replayed canceller's
+  `render_quiet_blocks` is under the duplex rule's `clear_after_blocks`
+  (`--all-sounding` takes every block). A reply is under way throughout,
+  and a stop ends it, as the hand's Stop does, with the next block
+  beginning another on a new stream. The lamp's own words are known only
+  if `--lamp-words` (`at_us<TAB>text`) gives them. Without them, a stop
+  word the speech-to-text writes from the lamp's own story counts.
+  `--words` prints each result with what it counted as.
+- **The plays** are read as `stop_words_replay` reads them: with a fourth
+  column, only its `cut` lines are stop lines.
+- **The table** is `stop_words_replay`'s, with `stt` as the bar.
+- **The tests** (`cargo test -p lamp-voice --example stop_words_stt_replay`)
+  use scripted ears in place of the relay. They cover the bundle's reading,
+  `StopWords` as the voice runs it (the matcher, a turned-round "don't
+  stop", the lamp's own words, the cadence for `raw`, sending only while
+  the lamp sounds), the reply begun again after a stop, and the counting.
+  They don't cover the relay or what Deepgram writes: only a run with a
+  credential does.
+
 ## Where it is most likely to be wrong on the lamp, and how to see it quickly
 
 In the order I would look:
