@@ -494,3 +494,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   next exchange journalled. Evidence on #2491; c0a4 put back.
 - #2494 merged into lamp-voice (bd43346de); its worktree removed. c0a4 rows
   booked 15:45–17:30 on #1722, after Thirteen.
+- New tasks (the first builder, 13:1x): #2527 LAMP_SECOND_QUIET_HELD onto
+  lamp-voice; forget_person + face.remove entirely built on #1712 as
+  twelve/forget-person (PR after the landing); #1608 answered (Fourth took it).
+  #2449 on c0a4 with the person: never held; journal line + replay test
+  pushed as c07632f17, retest when ARM64 is in.
