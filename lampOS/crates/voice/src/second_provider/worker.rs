@@ -5375,6 +5375,13 @@ pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
     keep_scoped(event, file, None, None)
 }
 
+/// [`keep`] for a request admitted with `lease`, as the worker keeps it
+/// with `LAMP_SECOND_SCOPED_CONTEXT=on`: for other parts' tests.
+#[cfg(test)]
+pub(crate) fn keep_admitted(event: &ProviderOutput, lease: &crate::memory_scope::ScopeLease) {
+    keep_scoped(event, None, Some(lease), None)
+}
+
 /// [`keep`] for a request's admitted scope (`lease`). With `held`
 /// (`LAMP_SAID_AS_HEARD`), an answer's hand-on to memory at its turn's end is
 /// held until it is known how much of it was heard.
