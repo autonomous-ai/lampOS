@@ -1,0 +1,23 @@
+--- a/lampOS/crates/tasks/src/runtime.rs
++++ b/lampOS/crates/tasks/src/runtime.rs
+@@ -977,7 +977,7 @@
+                             later.from_machines?;
+                             let signed_in = set_up
+                                 .as_ref()
+-                                .is_some_and(|found| found.sign_in == Some(SignIn::In));
++                                .is_some_and(|found| found.sign_in.is_some());
+                             if !signed_in || Instant::now() < machines_due {
+                                 return None;
+                             }
+--- a/lampOS/crates/tasks/tests/runtime.rs
++++ b/lampOS/crates/tasks/tests/runtime.rs
+@@ -217,6 +217,9 @@
+         Ok(Closed::Closed)
+     }
+     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
++        if self.counts.signed_out.load(Ordering::SeqCst) {
++            thread::sleep(Duration::from_millis(800));
++        }
+         self.counts.machine_reads.fetch_add(1, Ordering::SeqCst);
+         Ok(self.counts.machines.lock().unwrap().clone())
+     }

@@ -778,6 +778,17 @@ Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps
 `tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
 (asking while signed out fails it), `targets_from_machines_needs_an_engine_and_set_up_later`.
 
+The signed-out machines test observes diagnostics for its original 600 ms,
+then sends a targets request and waits for an idle, still-signed-out report
+that includes that request. The owner writes this report after scheduling,
+so the test checks both that no machines read remains pending and that the
+read count and targets stayed unchanged. It also checks the read count on
+each diagnostic while waiting: a wrong machines job that keeps the worker
+busy must fail this assertion, not hide behind the idle barrier. Sign-in
+call counts alone do not establish that the machines timer was due or that
+the owner finished its pass. Both diagnostic waits are bounded by the test
+helper.
+
 ### Signing in by a spoken code (`--sign-in-by-code`, #1676)
 
 `lamp-tasks serve --sign-in-by-code`, off unless set. A lamp has no screen

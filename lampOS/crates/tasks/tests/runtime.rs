@@ -299,6 +299,13 @@ impl Running {
         Self::all(false, true, false, close_told)
     }
     fn all(slow: bool, progress: bool, watch: bool, close_told: bool) -> Self {
+        let mut running = Self::unstarted(slow, progress, watch, close_told);
+        running.start();
+        running
+    }
+    /// As [`Running::all`], not started: for a test that changes its config
+    /// first, with no service started and stopped for nothing (#1806).
+    fn unstarted(slow: bool, progress: bool, watch: bool, close_told: bool) -> Self {
         let root = tempfile::Builder::new()
             .prefix("tsk-")
             .tempdir_in("/private/tmp")
@@ -332,7 +339,7 @@ impl Running {
             // A failed daemon start tried again in 50, 100 and 200 ms.
             daemon_retry_after: Duration::from_millis(50),
         };
-        let mut running = Self {
+        Self {
             root,
             config,
             clock: Injected(Arc::new(Mutex::new(Sample {
@@ -343,9 +350,7 @@ impl Running {
             counts: Arc::new(Counts::default()),
             handle: None,
             slow,
-        };
-        running.start();
-        running
+        }
     }
     fn start(&mut self) {
         self.stop.store(false, Ordering::Release);
@@ -1177,8 +1182,7 @@ fn without_progress_nothing_is_listed_the_topic_is_untouched_and_the_report_is_a
 /// never moves here, so the watch itself never looks: only the push reads.
 #[test]
 fn a_held_wait_that_comes_back_reads_the_agent_at_once_and_keeps_its_idle_answer() {
-    let mut s = Running::configured(false, false, true);
-    s.stop();
+    let mut s = Running::unstarted(false, false, true, false);
     s.config.push_wait = true;
     s.start();
     // Nothing handed over: nothing waited on.
@@ -1257,8 +1261,7 @@ fn tasks_diagnostic(s: &Running) -> Diagnostic {
 /// say nothing.
 #[test]
 fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
-    let mut s = Running::new(false);
-    s.stop();
+    let mut s = Running::unstarted(false, false, false, false);
     s.config.targets = BTreeMap::new();
     s.config.targets_newer = Some(2);
     s.start();
@@ -1328,8 +1331,7 @@ fn told_targets(s: &Running) -> usize {
 /// no computer again. Not set up is not unwell: the level stays ok.
 #[test]
 fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
-    let mut s = Running::new(false);
-    s.stop();
+    let mut s = Running::unstarted(false, false, false, false);
     let path = s.root.path().join("targets.json");
     s.config.targets = BTreeMap::new();
     s.config.set_up_later = Some(SetUpLater {
@@ -1403,13 +1405,13 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
 /// machines are not asked while signed out.
 #[test]
 fn targets_from_machines_are_written_and_used_while_signed_in() {
-    let mut s = Running::new(false);
-    s.stop();
+    let mut s = Running::unstarted(false, false, false, false);
     let path = s.root.path().join("targets.json");
     s.config.targets = BTreeMap::new();
+    // A look every 20 ms, the machines' every 100 (#1806).
     s.config.set_up_later = Some(SetUpLater {
         targets: path.clone(),
-        every: Duration::from_millis(50),
+        every: Duration::from_millis(20),
         from_machines: Some(EngineKind::Claude),
     });
     let machine = |id: char, label: &str, current: bool| AccountMachine {
@@ -1452,7 +1454,34 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         .lock()
         .unwrap()
         .push(machine('c', "MacBook Air", false));
-    thread::sleep(Duration::from_millis(600));
+    // Keep the original 600 ms observation: sign-in calls are not the
+    // machines timer, and a call can be counted before its result is used.
+    let unchanged = || {
+        assert_eq!(
+            s.counts.machine_reads.load(Ordering::SeqCst),
+            asked,
+            "asked while signed out"
+        );
+    };
+    let start = Instant::now();
+    let report = tasks_diagnostic_until(&s, |_| {
+        unchanged();
+        start.elapsed() >= Duration::from_millis(600)
+    });
+    let requests: u64 = said(&report, "requests").unwrap().parse().unwrap();
+    let answer = s.ask(json!({"op":"targets"}));
+    assert_eq!(answer["ok"], true, "{answer}");
+    // The owner reports this request only after scheduling jobs. An idle,
+    // signed-out report after it means that pass finished with no machines
+    // read pending, rather than just that the request was answered.
+    tasks_diagnostic_until(&s, |d| {
+        unchanged();
+        said(d, "requests")
+            .and_then(|count| count.parse::<u64>().ok())
+            .is_some_and(|count| count > requests)
+            && said(d, "signed_in").as_deref() == Some("no")
+            && said(d, "cli_busy").as_deref() == Some("false")
+    });
     assert_eq!(
         s.counts.machine_reads.load(Ordering::SeqCst),
         asked,
@@ -1497,8 +1526,7 @@ fn the_sign_in_by_code_is_the_trusted_routes_from_its_code_to_its_end() {
         off.trusted(json!({"op":"sign_in_start"}))["error"],
         "sign_in_off"
     );
-    let mut s = Running::new(false);
-    s.stop();
+    let mut s = Running::unstarted(false, false, false, false);
     s.config.sign_in_by_code = true;
     s.start();
     assert_eq!(s.ask(json!({"op":"sign_in_start"}))["error"], "untrusted");

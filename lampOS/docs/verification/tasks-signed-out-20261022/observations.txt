@@ -1,0 +1,501 @@
+BEGIN initial/before-1.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.95s
+
+
+END
+
+BEGIN initial/before-1.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/before-2.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.94s
+
+
+END
+
+BEGIN initial/before-2.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/before-3.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.98s
+
+
+END
+
+BEGIN initial/before-3.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/after-1.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 1.49s
+
+
+END
+
+BEGIN initial/after-1.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/after-2.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 1.72s
+
+
+END
+
+BEGIN initial/after-2.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/after-3.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 1.53s
+
+
+END
+
+BEGIN initial/after-3.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+tasks: Harness signed in: yes
+tasks: 2 task targets written from the machines
+tasks: the targets file changed: 2 task targets
+tasks: 2 computer names
+tasks: 2 task targets from the machines, unchanged
+tasks: 2 task targets from the machines, their names written
+
+END
+
+BEGIN initial/missing-sign-in-guard.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... FAILED
+
+failures:
+
+failures:
+    targets_from_machines_are_written_and_used_while_signed_in
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.65s
+
+
+END
+
+BEGIN initial/missing-sign-in-guard.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+
+thread 'targets_from_machines_are_written_and_used_while_signed_in' (687109850) panicked at crates/tasks/tests/runtime.rs:1447:9:
+assertion `left == right` failed: asked while signed out
+  left: 4
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+tasks: 2 task targets written from the machines
+
+END
+
+BEGIN initial/missing-sign-in-guard-delayed-worker.stdout
+
+running 1 test
+test targets_from_machines_are_written_and_used_while_signed_in ... FAILED
+
+failures:
+
+failures:
+    targets_from_machines_are_written_and_used_while_signed_in
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 2.23s
+
+
+END
+
+BEGIN initial/missing-sign-in-guard-delayed-worker.stderr
+tasks: no computer names
+tasks: Harness signed in: yes
+tasks: 1 task targets written from the machines
+tasks: the targets file changed: 1 task targets
+tasks: 1 computer names
+tasks: 1 task targets from the machines, unchanged
+tasks: Harness signed in: no
+
+thread 'targets_from_machines_are_written_and_used_while_signed_in' (687110655) panicked at crates/tasks/tests/runtime.rs:1450:9:
+assertion `left == right` failed: asked while signed out
+  left: 4
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+tasks: 2 task targets written from the machines
+
+END
+
+BEGIN initial/gate-dependent-tests.stdout
+
+running 380 tests
+....................................................................................... 87/380
+....................................................................................... 174/380
+....................................................................................... 261/380
+....................................................................................... 348/380
+................................
+test result: ok. 380 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.86s
+
+
+running 29 tests
+.............................
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 125 tests
+....................................................................................... 87/125
+......................................
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 136 tests
+..............................................................................i........ 87/136
+.................................................
+test result: ok. 135 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 9.93s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
+
+
+running 26 tests
+..........................
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 275 tests
+....................................................................................... 87/275
+....................................................................................... 174/275
+....................................................................................... 261/275
+..............
+test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.16s
+
+
+running 27 tests
+...........................
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.29s
+
+
+running 35 tests
+...................................
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 53 tests
+ii...................................................
+test result: ok. 51 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+
+running 94 tests
+..............i........................................................................ 87/94
+.......
+test result: ok. 93 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 17.43s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.90s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 124 tests
+..............................................i.....................i.i.............i.. 87/124
+.............test days::a_full_kept_list_refuses_the_next_fact_without_evicting_an_explicit_memory has been running for over 60 seconds
+test days::a_relevant_old_fact_remains_available_to_correct_after_thirty_two_unrelated_observations has been running for over 60 seconds
+........i...........test days::observations_in_a_newer_category_take_no_previous_slot has been running for over 60 seconds
+....
+test result: ok. 119 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 101.85s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.10s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.14s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 116 tests
+.......................................................................i............... 87/116
+.............................
+test result: ok. 115 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.58s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+
+running 119 tests
+..................................... 37/119
+daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart --- FAILED
+.................................................................................
+failures:
+
+---- daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart stdout ----
+
+thread 'daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart' (687268764) panicked at crates/skills/src/daily.rs:854:48:
+called `Result::unwrap()` on an `Err` value: Custom { kind: WouldBlock, error: "daily journal directory is already owned" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart
+
+test result: FAILED. 118 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+
+
+END
+
+BEGIN initial/gate-dependent-tests.stderr
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+error: test failed, to rerun pass `-p lamp-skills --lib`
+
+END
+
+BEGIN continuation/baseline-skills-parallel-1.stdout
+
+running 119 tests
+....................................................................................... 87/119
+................................
+test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+
+
+END
+
+BEGIN continuation/baseline-skills-parallel-1.stderr
+
+END
+
+BEGIN continuation/baseline-skills-parallel-2.stdout
+
+running 119 tests
+....................................................................................... 87/119
+................................
+test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+
+
+END
+
+BEGIN continuation/baseline-skills-parallel-2.stderr
+
+END
+
+BEGIN continuation/baseline-skills-parallel-3.stdout
+
+running 119 tests
+....................................................................................... 87/119
+................................
+test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
+
+
+END
+
+BEGIN continuation/baseline-skills-parallel-3.stderr
+
+END
