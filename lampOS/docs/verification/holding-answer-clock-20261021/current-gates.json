@@ -1,0 +1,61 @@
+[
+  {
+    "stage": "current-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "stage": "current-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-q",
+      "--message-format=short",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 65.733
+  },
+  {
+    "stage": "current-test-build",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 91.009
+  },
+  {
+    "stage": "current-workspace-build",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-q",
+      "--workspace"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 60.789
+  }
+]

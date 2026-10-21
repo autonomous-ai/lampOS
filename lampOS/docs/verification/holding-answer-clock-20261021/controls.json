@@ -1,0 +1,105 @@
+{
+  "host-stall-before": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "runs": [
+      {
+        "run": 1,
+        "exit": 101,
+        "seconds": 0.715,
+        "reproduced_stale_owner": true
+      },
+      {
+        "run": 2,
+        "exit": 101,
+        "seconds": 0.629,
+        "reproduced_stale_owner": true
+      },
+      {
+        "run": 3,
+        "exit": 101,
+        "seconds": 0.676,
+        "reproduced_stale_owner": true
+      }
+    ]
+  },
+  "host-stall-after": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "runs": [
+      {
+        "run": 1,
+        "exit": 0,
+        "seconds": 2.578,
+        "passed_with_same_host_stall": true
+      },
+      {
+        "run": 2,
+        "exit": 0,
+        "seconds": 0.578,
+        "passed_with_same_host_stall": true
+      },
+      {
+        "run": 3,
+        "exit": 0,
+        "seconds": 0.594,
+        "passed_with_same_host_stall": true
+      }
+    ]
+  },
+  "reminder-origin-mutant": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "provider_worker::tests::holding_answer::a_reminders_holding_words_grant_nothing_and_the_next_heard_request_still_qualifies",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "runs": [
+      {
+        "run": 1,
+        "exit": 101,
+        "caught_unexpected_holding_answer": true
+      },
+      {
+        "run": 2,
+        "exit": 101,
+        "caught_unexpected_holding_answer": true
+      }
+    ]
+  },
+  "base": "88297758e2fc5c04a6d74fdb50d3143185d66903",
+  "host": "x86_64-apple-darwin",
+  "rustc": "1.96.0 (ac68faa20 2026-05-25)"
+}

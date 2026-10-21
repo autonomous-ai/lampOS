@@ -1,0 +1,75 @@
+[
+  {
+    "gate": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 11.048
+  },
+  {
+    "gate": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-q",
+      "--message-format=short",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 116.787
+  },
+  {
+    "gate": "voice-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice"
+    ],
+    "exit": 101,
+    "seconds": 388.88
+  },
+  {
+    "gate": "voice-tests-serial",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 568.165
+  },
+  {
+    "gate": "workspace-build",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-q",
+      "--workspace"
+    ],
+    "exit": 0,
+    "seconds": 145.407
+  }
+]
