@@ -777,6 +777,7 @@ impl Setup {
             speaker,
             privacy,
             privacy_controls: false,
+            capture_held: false,
             privacy_receipts: false,
             ring: None.into(),
             camera: None,

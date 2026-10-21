@@ -1503,6 +1503,7 @@ mod tests {
                     provider: second_worker,
                     privacy,
                     privacy_controls: false,
+                    capture_held: false,
                     privacy_receipts: false,
                     ring: None.into(),
                     camera: None,

@@ -356,10 +356,17 @@ const PERMIT_REPEAT_US: u64 = 500_000;
 /// ([`EyesLink::close`], also on drop), so the camera does not wait out the
 /// eyes' 1.5 s on a privacy close (#1802). A service killed outright says
 /// nothing more, and the eyes close on that 1.5 s.
+/// What a test's eyes link said, and when (`EyesLink::logging`).
+#[cfg(test)]
+pub(crate) type SaidLog = std::sync::Arc<std::sync::Mutex<Vec<(bool, u64)>>>;
+
 pub struct EyesLink {
     socket: UnixDatagram,
     path: PathBuf,
     last: Option<(bool, u64)>,
+    /// What a test hears it said, and when (`EyesLink::logging`).
+    #[cfg(test)]
+    said: Option<SaidLog>,
 }
 
 impl EyesLink {
@@ -375,7 +382,17 @@ impl EyesLink {
             socket,
             path,
             last: None,
+            #[cfg(test)]
+            said: None,
         })
+    }
+
+    /// A test's link that also notes each yes or no it says, with the
+    /// time it says it on the loop test's clock.
+    #[cfg(test)]
+    pub(crate) fn logging(mut self, said: SaidLog) -> Self {
+        self.said = Some(said);
+        self
     }
 
     pub fn permit(&mut self, allowed: bool, now_us: u64) {
@@ -392,6 +409,12 @@ impl EyesLink {
         };
         // Nobody listening, a full queue, a missing path: all the same here.
         let _ = self.socket.send_to(message, &self.path);
+        #[cfg(test)]
+        if let Some(said) = &self.said {
+            said.lock()
+                .unwrap()
+                .push((allowed, crate::scenario_clock::monotonic_us()));
+        }
     }
 
     /// No, now, whatever was said last and when, unless no was the last

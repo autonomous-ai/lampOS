@@ -90,6 +90,7 @@ mod playback;
 pub mod policy_holds;
 pub mod privacy;
 pub mod privacy_bus;
+pub mod privacy_gap;
 #[cfg(any(target_os = "linux", test))]
 pub mod privacy_indicator;
 pub mod process;

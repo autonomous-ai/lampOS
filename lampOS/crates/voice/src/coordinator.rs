@@ -1095,6 +1095,11 @@ struct Rig {
     /// read closes the cycle as a mute does, for the service to wait and read
     /// again, never ending it (#795).
     privacy_controls: bool,
+    /// While a gap in the switch's readings is ridden
+    /// (`LAMP_PRIVACY_GAP_RIDE=on`, #2602): the capture's and the camera's
+    /// authority aren't renewed, so their leases lapse and capture closes
+    /// the microphone as on a stall.
+    capture_held: bool,
     /// The Controls route reads a slide (`LAMP_PRIVACY_CONTROLS=on`), so its
     /// observations carry a physical receipt for onboarding's privacy step;
     /// `no-slide` has none to give (#2155's P3).
@@ -1555,7 +1560,13 @@ impl Rig {
     fn publish_hand_revocation(&mut self, snapshot: Snapshot) -> io::Result<()> {
         let mut failure = None;
         let standby = self.second.is_some();
+        let held = self.capture_held;
         for worker in [&mut self.capture, &mut self.privacy, &mut self.provider] {
+            // A ridden gap's lapse holds here too (#2602, the first
+            // builder's P1 on #2623): no fresh lease for capture.
+            if held && worker.role == "capture" {
+                continue;
+            }
             if let Err(error) = worker
                 .channels
                 .control
@@ -1575,7 +1586,9 @@ impl Rig {
             motor.publish(snapshot);
         }
         self.ring.publish(snapshot);
-        if let Some(camera) = &mut self.camera {
+        if let Some(camera) = &mut self.camera
+            && !held
+        {
             let _ = camera
                 .worker
                 .channels
@@ -1591,12 +1604,17 @@ impl Rig {
             motor.publish(snapshot);
         }
         let standby = self.second.is_some();
+        let held = self.capture_held;
         for worker in [
             &mut self.speaker,
             &mut self.capture,
             &mut self.privacy,
             &mut self.provider,
         ] {
+            // A ridden gap lets the capture's lease lapse (#2602).
+            if held && worker.role == "capture" {
+                continue;
+            }
             if let Err(error) = worker
                 .channels
                 .control
@@ -1614,6 +1632,7 @@ impl Rig {
         }
         self.ring.publish(snapshot);
         if let Some(camera) = self.camera.as_mut()
+            && !held
             && !camera.failed
             && camera
                 .worker
@@ -3848,6 +3867,7 @@ fn spawn_rig(
         speaker,
         privacy,
         privacy_controls: privacy_route.is_some(),
+        capture_held: false,
         privacy_receipts: matches!(privacy_route, Some((_, crate::privacy_bus::Route::Slide))),
         ring,
         camera,
@@ -4467,6 +4487,8 @@ thread_local! {
     static TEST_EYES_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
+    static TEST_PRIVACY_GAP_RIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
@@ -4781,6 +4803,18 @@ fn conversation_with_gate(
     let mut privacy_sequence = 0u64;
     let mut onboarding_privacy_receipt: Option<crate::wire::PrivacyReceipt> = None;
     let mut permitted = false;
+    // A gap in the switch's readings ridden with the capture's lease let
+    // lapse (`LAMP_PRIVACY_GAP_RIDE=on`, #2602), on the Controls route only;
+    // and from when frames are taken again after one (none read before).
+    #[cfg(test)]
+    let gap_ride_on = crate::privacy_gap::enabled_from_environment()
+        || TEST_PRIVACY_GAP_RIDE.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let gap_ride_on = crate::privacy_gap::enabled_from_environment();
+    let mut gap_ride = crate::privacy_gap::GapRide::new(
+        gap_ride_on && rig.privacy_controls && lifetime.continuous(),
+    );
+    let mut frames_from_us = 0u64;
     // A privacy observation read stale before the microphone was first
     // allowed: said once (lamp-4ace, 19 Oct 01:19).
     let mut said_stale_at_start = false;
@@ -5616,6 +5650,9 @@ fn conversation_with_gate(
                 json!({"kind":"keeper_pause","paused":paused,"at_us":clock}),
             )?;
         }
+        // A privacy gap ridden holds as the keeper's pause does: no new
+        // turn begins, so the lamp says nothing in it (#2602).
+        let mut paused = paused || gap_ride.lasted(clock).is_some();
         if session_clock.startup_expired(session_instant()) {
             return Err(io::Error::other("voice input never became ready").into());
         }
@@ -5649,11 +5686,16 @@ fn conversation_with_gate(
         let starting = !permitted
             && session_instant().saturating_duration_since(privacy_started)
                 < Duration::from_micros(crate::privacy::PRIVACY_START_STALE_US);
+        // With `LAMP_PRIVACY_GAP_RIDE=on`, a lapse after the microphone was
+        // allowed is ridden for up to a second below (#2602): not the end
+        // here.
         if lifetime.continuous()
             && privacy_sequence != 0
             && !starting
             && gate.state(now()) == PrivacyState::Unavailable
+            && !gap_ride.rides(permitted, monotonic_us())
         {
+            gap_ended(&gap_ride, trace, "no fresh reading")?;
             return Err(lost(
                 "service privacy freshness lost before next observation".into(),
             ));
@@ -5708,7 +5750,12 @@ fn conversation_with_gate(
                                     )?;
                                 }
                             }
+                            // Ridden as any lapse (#2602): nothing is taken
+                            // meanwhile, and it ends at its second.
+                            PrivacyState::Unavailable
+                                if gap_ride.rides(permitted, monotonic_us()) => {}
                             PrivacyState::Unavailable => {
+                                gap_ended(&gap_ride, trace, "no fresh reading")?;
                                 return Err(lost(
                                     "invalid or stale service privacy observation".into(),
                                 ));
@@ -5718,6 +5765,7 @@ fn conversation_with_gate(
                                 // The camera is told no first, before any
                                 // record (#1802).
                                 tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy event)");
+                                gap_ended(&gap_ride, trace, "read closed")?;
                                 record(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
@@ -5750,6 +5798,7 @@ fn conversation_with_gate(
                 PrivacyState::Muted => {
                     let at_us = monotonic_us();
                     tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy gate)");
+                    gap_ended(&gap_ride, trace, "read closed")?;
                     record(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
@@ -5767,11 +5816,13 @@ fn conversation_with_gate(
                     }));
                 }
                 PrivacyState::Unavailable
-                    if (privacy_sequence != 0 && !starting)
+                    if ((privacy_sequence != 0 && !starting)
                         || (privacy_sequence == 0
                             && session_instant().saturating_duration_since(privacy_started)
-                                >= Duration::from_micros(gate.freshness_us())) =>
+                                >= Duration::from_micros(gate.freshness_us())))
+                        && !gap_ride.rides(permitted, monotonic_us()) =>
                 {
+                    gap_ended(&gap_ride, trace, "no fresh reading")?;
                     return Err(lost("physical privacy unavailable; not a user mute".into()));
                 }
                 _ => {}
@@ -6096,7 +6147,72 @@ fn conversation_with_gate(
             }
         }
         if permitted && !can_open {
-            return Err(lost("physical privacy closed or lost freshness".into()));
+            // A lapse, not a closed switch (that was the mute above): with
+            // `LAMP_PRIVACY_GAP_RIDE=on` the conversation stays for up to a
+            // second (#2602). From this moment no frame is taken, the turn
+            // in flight is cut, nothing new begins and the capture's and
+            // the camera's authority aren't renewed, so their leases lapse
+            // and capture closes the microphone as on a stall.
+            let rides = match privacy_state {
+                PrivacyState::Unavailable => gap_ride.rides(permitted, monotonic_us()),
+                // The readings are back and open but not yet steady: a gap
+                // ridden waits for the gate's 60 ms, as the first grant does.
+                PrivacyState::Stabilizing => {
+                    gap_ride.lasted(monotonic_us()).is_some()
+                        && gap_ride.rides(permitted, monotonic_us())
+                }
+                _ => false,
+            };
+            if !rides {
+                gap_ended(&gap_ride, trace, "no fresh reading")?;
+                return Err(lost("physical privacy closed or lost freshness".into()));
+            }
+            if gap_ride.begin(permitted, monotonic_us()) {
+                rig.capture_held = true;
+                paused = true;
+                tell_eyes_no(eyes_link.as_mut(), "privacy gap");
+                // The reply is cut here whatever `gap_cancelled` says: the
+                // next pass's cancel (admission's reset) is skipped only when
+                // a capture gap still open has already run it.
+                cancel_reply(owner, reply, trace, "privacy_gap")?;
+                provider_queue.clear();
+                speaker_pending = None;
+                gap_cut_utterance = true;
+                // The speaker hears of the cut at once, not at the next
+                // renewal; capture and the camera are held from here.
+                snapshot = owner.snapshot(now())?;
+                rig.publish(snapshot)?;
+                last_publish = monotonic_us();
+                eprintln!(
+                    "lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to {} ms for a fresh one",
+                    crate::privacy_gap::RIDE_US / 1_000
+                );
+                record(
+                    trace,
+                    json!({"kind":"privacy_gap","state":"began","at_us":monotonic_us()}),
+                )?;
+            }
+        }
+        // The gap ridden is over: a fresh reading said open (#2602). The
+        // capture's authority is renewed again; capture reopens in the same
+        // generation with a new epoch, and no frame read before now is taken.
+        if permitted
+            && can_open
+            && let Some(lasted_us) = gap_ride.reopened(monotonic_us())
+        {
+            rig.capture_held = false;
+            frames_from_us = monotonic_us();
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+            eprintln!(
+                "lamp-voice: the privacy switch reads open again after {} ms: the conversation goes on",
+                lasted_us / 1_000
+            );
+            record(
+                trace,
+                json!({"kind":"privacy_gap","state":"reopened","at_us":monotonic_us(),"lasted_us":lasted_us}),
+            )?;
         }
         if can_open && !permitted {
             owner.set_microphone_permission(now(), Permission::Allowed)?;
@@ -6907,6 +7023,13 @@ fn conversation_with_gate(
                 break;
             };
             heard_a_frame(controls);
+            // A privacy gap ridden (#2602): from its lapse no frame is taken,
+            // including those capture still reads inside its lease, and after
+            // it none read before the reopen.
+            if !gap_ride.takes_frame(frame.read_completed_at_us, frames_from_us, monotonic_us()) {
+                capture_gap.dropped += 1;
+                continue;
+            }
             // A turn cut by a gap is cancelled on the next pass: until then
             // nothing reaches admission or the provider across the cut.
             if closed_epoch == Some(frame.epoch) || gap_cut_utterance {
@@ -8600,9 +8723,7 @@ fn conversation_with_gate(
                 }
             }
         }
-        if let Some(at) = last_capture
-            && monotonic_us().saturating_sub(at) >= CAPTURE_GAP_US
-        {
+        if retention_expired(last_capture, frames_from_us, monotonic_us()) {
             return Err(io::Error::other("microphone retention heartbeat expired").into());
         }
         let monitor = rig.endpoint.as_ref().and_then(|e| e.monitor.as_ref());
@@ -9040,9 +9161,11 @@ fn conversation_with_gate(
                 clock,
             );
         }
+        // A ridden gap tells the eyes no as it begins, and no yes follows
+        // until it is over (#2602, the first builder's P1 on #2623).
         if let Some(eyes) = eyes_link.as_mut() {
             eyes.permit(
-                snapshot.microphone_permission() == Permission::Allowed,
+                snapshot.microphone_permission() == Permission::Allowed && !rig.capture_held,
                 clock,
             );
         }
@@ -11260,6 +11383,35 @@ fn eyes_look_with_the_microphone(
 /// A mute ends the cycle: the eyes are told no at once rather than left to
 /// close on their 1.5 s without a yes (#1802), and the journal marks it.
 /// One datagram, never waited on; no eyes is nothing to tell.
+/// A privacy gap ridden ends with the conversation (#2602): its trace mark
+/// and one journal line, on every exit while one is ridden.
+fn gap_ended(
+    gap_ride: &crate::privacy_gap::GapRide,
+    trace: &mut SessionState,
+    why: &str,
+) -> Result<()> {
+    let at_us = monotonic_us();
+    if let Some(lasted_us) = gap_ride.lasted(at_us) {
+        eprintln!(
+            "lamp-voice: the privacy gap ends the conversation after {} ms: {why}",
+            lasted_us / 1_000
+        );
+        record(
+            trace,
+            json!({"kind":"privacy_gap","state":"ended","at_us":at_us,"lasted_us":lasted_us,"why":why}),
+        )?;
+    }
+    Ok(())
+}
+
+/// Whether the microphone's retention heartbeat has run out at `now_us`:
+/// 1.5 s with no frame retained since `last_capture`, counted from a ridden
+/// privacy gap's reopen (`from_us`) when that is later (#2602), so capture
+/// has its whole bound to come back after a reopen near the gap's second.
+fn retention_expired(last_capture: Option<u64>, from_us: u64, now_us: u64) -> bool {
+    last_capture.is_some_and(|at| now_us.saturating_sub(at.max(from_us)) >= CAPTURE_GAP_US)
+}
+
 fn tell_eyes_no(eyes: Option<&mut crate::body_link::EyesLink>, exit: &str) {
     if eyes.is_some_and(|eyes| eyes.close()) {
         eprintln!("lamp-voice: the eyes are told no at once: {exit}");
@@ -13390,6 +13542,7 @@ mod tests {
             provider,
             privacy,
             privacy_controls: false,
+            capture_held: false,
             privacy_receipts: false,
             ring: Some(ring).into(),
             camera: None,

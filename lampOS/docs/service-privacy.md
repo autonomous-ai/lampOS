@@ -89,6 +89,41 @@ and the wait ends as a failed cleanup. A previous runtime
 error cannot hide a shutdown failure. The combined error retains both causes
 and does not expose a restartable physical- or software-mute token.
 
+**A short gap ridden inside a conversation** (`LAMP_PRIVACY_GAP_RIDE=on`,
+off unless set, Controls route only; #2602, the first builder's (B), lamp-75c9
+on 21 Oct 16:33:06). A lapse of the switch's freshness after the microphone was
+allowed no longer ends the conversation at once (`privacy_gap.rs`):
+- **From the lapse:** no capture frame is taken, including those capture still
+  reads inside its lease (`GapRide::takes_frame`). The turn in flight is cut
+  (`privacy_gap`) and the speaker is told at once; nothing new begins (it holds
+  as the keeper's pause does), so the lamp says nothing. The capture's and the
+  camera's authority aren't renewed (`Rig::capture_held`, in both `publish` and
+  `publish_hand_revocation`), so their leases lapse: within 250 ms
+  (`MAX_AUTHORITY_LEASE_US`), about 100 ms while a turn is under way. Capture
+  then closes the microphone as on a stall (`Discontinuity::AuthorityExpired`).
+  The eyes are told no at the lapse and hear no yes until the reopen. The
+  microphone permission and its generation are untouched: capture keeps one
+  generation for its life.
+- **The camera:** a camera worker given no authority for 250 ms
+  (`WORKER_INITIAL_AUTHORITY_US`) ends itself, so a gap longer than that costs
+  the camera for the rest of the conversation (`camera_unavailable`); the voice
+  goes on.
+- **A fresh reading that says open:** once steady for the gate's 60 ms
+  (`REOPEN_STABLE_US`), as the first grant needs, within 1 s (`RIDE_US`), the
+  authority is renewed. Capture reopens in the same generation with a new
+  epoch, no frame read before the reopen is taken, the microphone's retention
+  heartbeat (1.5 s) counts from the reopen, and the conversation goes on with
+  its history.
+- **A fresh reading that says closed** is the physical mute, as before.
+- **No fresh reading within 1 s:** the conversation ends as before, and the
+  wait reads again. That's before capture's own 1.5 s (`REOPEN_US`).
+- **What it says:** the trace's `privacy_gap` (`began`, `reopened`, or `ended`
+  with `why` on every exit while one is ridden, each with `lasted_us`) and one
+  journal line at each. Off, every lapse ends the conversation as it always has.
+- **No recording of the lease's tail:** the ride runs only in serve, which
+  refuses raw audio diagnostics, so no local recording holds what capture read
+  after the lapse.
+
 With the independent `--controls-mute ABS_PRIVATE_RECORD` experiment, the
 software latch is restored before any worker, including the metadata writer.
 A restored software mute on the default direct-GPIO path waits with no
