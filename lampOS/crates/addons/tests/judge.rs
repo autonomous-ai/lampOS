@@ -23,10 +23,16 @@ impl Drop for Running {
 }
 
 fn judge(root: &Path, enabled: bool) -> Running {
+    judge_with(root, enabled, &[])
+}
+
+/// The same, with `more` options.
+fn judge_with(root: &Path, enabled: bool, more: &[&str]) -> Running {
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-addons"));
     command
         .args(["serve", "--clock-id", "test-boot", "--bus-root"])
         .arg(root)
+        .args(more)
         .env_remove("LAMP_ADDONS")
         .stdout(Stdio::null())
         // Its journal, kept in the test's folder for a failure to show
@@ -308,6 +314,104 @@ fn a_kept_mood_is_said_to_lamp_mood() {
         ("evening-glow", 0.1, 0.05)
     );
     assert_eq!(nudge.until_us - nudge.stamp.at_us, 600_000_000);
+}
+
+/// A `nod` proposed on a calm lamp, the judge's move quiet `quiet_ms`
+/// (`None`: the product's minute): what the body's mood socket was sent, and
+/// what the judge decided.
+fn moved(quiet_ms: Option<u64>) -> (Option<serde_json::Value>, Vec<AddonDecision>) {
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let bus = Bus::new(dir.path()).unwrap();
+    let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
+    let socket = dir.path().join("mood.sock");
+    let body = std::os::unix::net::UnixDatagram::bind(&socket).unwrap();
+    body.set_read_timeout(Some(Duration::from_millis(1_500)))
+        .unwrap();
+    let quiet = quiet_ms.map(|ms| ms.to_string());
+    let mut more = vec!["--body-socket", socket.to_str().unwrap()];
+    if let Some(quiet) = &quiet {
+        more.extend(["--move-quiet-ms", quiet.as_str()]);
+    }
+    let _judge = judge_with(dir.path(), true, &more);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    calm(&bus, false, false);
+    std::thread::sleep(Duration::from_millis(300));
+    let nod = AddonProposal {
+        act: "move".into(),
+        why: "music".into(),
+        light: None,
+        gesture: Some("nod".into()),
+        ..glow(lamp_ipc::monotonic_us())
+    };
+    bus.publisher_declared(
+        AddonProposal::TOPIC,
+        &AddonProposal::declaration(),
+        "skills",
+    )
+    .unwrap()
+    .publish_json(lamp_ipc::monotonic_us(), &nod)
+    .unwrap();
+    let mut datagram = [0u8; 512];
+    let asked = body
+        .recv(&mut datagram)
+        .ok()
+        .map(|read| serde_json::from_slice(&datagram[..read]).unwrap());
+    let mut decisions = Vec::new();
+    while let Some(message) = said.recv(Duration::from_millis(300)).unwrap() {
+        decisions.push(message.parse().unwrap());
+    }
+    let journal = std::fs::read_to_string(dir.path().join("judge.log")).unwrap_or_default();
+    JOURNAL.with(|kept| *kept.borrow_mut() = journal);
+    (asked, decisions)
+}
+
+/// The first builder on #2530 (22 Oct 04:25): a kept move is asked of the
+/// body on its mood socket as one gesture, at idle, from the add-on.
+#[test]
+fn a_kept_move_is_asked_of_the_body_as_one_gesture_at_idle() {
+    let (asked, decisions) = moved(Some(0));
+    assert_eq!(
+        asked,
+        Some(
+            serde_json::json!({"gesture": "nod", "source": "addon:evening-glow", "priority": "idle"})
+        ),
+        "{decisions:?}; the judge's journal:\n{}",
+        journal()
+    );
+    let [decision] = decisions.as_slice() else {
+        panic!("{decisions:?}");
+    };
+    assert_eq!(
+        (
+            decision.act.as_str(),
+            decision.choice.as_str(),
+            decision.by.as_str()
+        ),
+        ("move", "kept", "rule")
+    );
+    assert_eq!(decision.why, "asked of the body at idle: nod");
+}
+
+/// Within a minute of the voice speaking, whoever is near, a move is
+/// dropped and the body is sent nothing: after talk it reads as an answer.
+#[test]
+fn a_move_just_after_talk_is_dropped_and_the_body_sent_nothing() {
+    let (asked, decisions) = moved(None);
+    assert_eq!(asked, None, "{decisions:?}");
+    let [decision] = decisions.as_slice() else {
+        panic!("{decisions:?}");
+    };
+    assert_eq!(decision.choice, "dropped");
+    assert_eq!(
+        decision.why,
+        "the lamp spoke or was spoken to in the last minute"
+    );
 }
 
 /// The first builder on #2530 (20:1x): once the lamp has slept since the

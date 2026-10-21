@@ -82,7 +82,7 @@ pub enum Drop {
     PersonsLight,
     /// A mood that would make the lamp colder: warmth goes up only (#2530).
     Colder,
-    /// An act the judge does not carry out yet: `note`, `move`.
+    /// An act the judge does not carry out yet: `note`.
     NotYet,
     /// A say within [`SAY_QUIET_US`] of the lamp speaking or being spoken to.
     TooSoon,
@@ -96,6 +96,13 @@ pub enum Drop {
     PolicyShadow,
     /// The policy did not answer within [`ASK_WAIT_US`].
     PolicySilent,
+    /// A move within [`MOVE_QUIET_US`] of the lamp speaking or being spoken
+    /// to: after talk, any move reads as an answer.
+    MoveTooSoon,
+    /// Its add-on moved the lamp within [`MOVE_EVERY_US`].
+    MoveRate,
+    /// The add-ons' moves this hour, all together ([`MOVES_AN_HOUR`]).
+    MovesThisHour,
     /// Its add-on's own rate ([`EVERY_US`], [`AN_HOUR`]).
     Rate,
     /// Its lease had passed by the time it was judged.
@@ -116,6 +123,9 @@ impl Drop {
             Self::PersonsLight => "the light shown is the person's own, which always wins",
             Self::Colder => "an add-on may warm the lamp, never cool it",
             Self::NotYet => "the lamp does not act on this yet (#2530)",
+            Self::MoveTooSoon => "the lamp spoke or was spoken to in the last minute",
+            Self::MoveRate => "its add-on moved the lamp in the last 30 minutes",
+            Self::MovesThisHour => "add-ons have moved the lamp enough this hour",
             Self::TooSoon => "the lamp spoke or was spoken to in the last 15 s",
             Self::SaysThisHour => "add-ons have said enough this hour",
             Self::Asking => "another add-on's say is being asked about",
@@ -147,6 +157,16 @@ pub const SAYS_AN_HOUR: usize = 4;
 /// How long the policy has to answer a say: past it the say is dropped.
 pub const ASK_WAIT_US: u64 = 3_000_000;
 
+/// A move waits this long after the voice last spoke or was spoken to,
+/// whoever is near: after talk, any move reads as an answer (the first
+/// builder on #2530, 22 Oct 04:25).
+pub const MOVE_QUIET_US: u64 = 60_000_000;
+/// One kept move an add-on every this long at most: a partner's code moving
+/// the body is the act likeliest to read as a machine.
+pub const MOVE_EVERY_US: u64 = 1_800_000_000;
+/// All add-ons together: this many moves kept an hour at most.
+pub const MOVES_AN_HOUR: usize = 2;
+
 /// One kept act an add-on every this long at most: a light, then nothing new
 /// from it for two minutes.
 pub const EVERY_US: u64 = 120_000_000;
@@ -160,10 +180,14 @@ pub struct Judge {
     kept: HashMap<String, VecDeque<u64>>,
     /// Every add-on's says kept within the hour.
     says: VecDeque<u64>,
+    /// Every add-on's moves kept within the hour, and whose.
+    moves: VecDeque<(String, u64)>,
     /// The say put to the policy, one at a time.
     asking: Option<Asking>,
     /// A shorter quiet before a say than [`SAY_QUIET_US`], for tests only.
     say_quiet_us: Option<u64>,
+    /// A shorter quiet before a move than [`MOVE_QUIET_US`], for tests only.
+    move_quiet_us: Option<u64>,
 }
 
 /// A say put to the policy, and its two deadlines on the judge's clock:
@@ -226,6 +250,9 @@ impl Judge {
                     .entry(proposal.addon.clone())
                     .or_default()
                     .push_back(now_us);
+                if proposal.act == "move" {
+                    self.moves.push_back((proposal.addon.clone(), now_us));
+                }
                 Verdict::Kept
             }
         }
@@ -275,8 +302,21 @@ impl Judge {
         Some((asking.proposal, drop))
     }
 
-    fn quiet_us(&self) -> u64 {
-        self.say_quiet_us.unwrap_or(SAY_QUIET_US)
+    /// The same judge, its moves waiting `quiet_us` (at most
+    /// [`MOVE_QUIET_US`]) after talk: for tests only, the product keeps a
+    /// minute.
+    pub fn with_move_quiet(self, quiet_us: u64) -> Self {
+        Self {
+            move_quiet_us: Some(quiet_us.min(MOVE_QUIET_US)),
+            ..self
+        }
+    }
+
+    fn quiet_us(&self) -> Quiet {
+        Quiet {
+            say_us: self.say_quiet_us.unwrap_or(SAY_QUIET_US),
+            move_us: self.move_quiet_us.unwrap_or(MOVE_QUIET_US),
+        }
     }
 
     fn rule(
@@ -301,6 +341,18 @@ impl Judge {
         {
             return Some(Drop::Rate);
         }
+        if proposal.act == "move" {
+            self.moves
+                .retain(|(_, at)| now_us.saturating_sub(*at) < HOUR_US);
+            if self.moves.iter().any(|(addon, at)| {
+                *addon == proposal.addon && now_us.saturating_sub(*at) < MOVE_EVERY_US
+            }) {
+                return Some(Drop::MoveRate);
+            }
+            if self.moves.len() >= MOVES_AN_HOUR {
+                return Some(Drop::MovesThisHour);
+            }
+        }
         if proposal.act == "say" {
             self.says.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
             if self.says.len() >= SAYS_AN_HOUR {
@@ -314,10 +366,17 @@ impl Judge {
     }
 }
 
+/// How long a say and a move wait after talk.
+#[derive(Clone, Copy, Debug)]
+struct Quiet {
+    say_us: u64,
+    move_us: u64,
+}
+
 /// The rules that hold by how the lamp is, whoever asks: checked when a
 /// proposal comes, and again for a say when the policy's answer does.
-fn holds(proposal: &AddonProposal, s: &Situation, now_us: u64, quiet_us: u64) -> Option<Drop> {
-    if !matches!(proposal.act.as_str(), "light" | "mood" | "say") {
+fn holds(proposal: &AddonProposal, s: &Situation, now_us: u64, quiet: Quiet) -> Option<Drop> {
+    if !matches!(proposal.act.as_str(), "light" | "mood" | "say" | "move") {
         return Some(Drop::NotYet);
     }
     if proposal
@@ -366,9 +425,15 @@ fn holds(proposal: &AddonProposal, s: &Situation, now_us: u64, quiet_us: u64) ->
     }
     if proposal.act == "say"
         && s.resting_since_us
-            .is_none_or(|since| now_us.saturating_sub(since) < quiet_us)
+            .is_none_or(|since| now_us.saturating_sub(since) < quiet.say_us)
     {
         return Some(Drop::TooSoon);
+    }
+    if proposal.act == "move"
+        && s.resting_since_us
+            .is_none_or(|since| now_us.saturating_sub(since) < quiet.move_us)
+    {
+        return Some(Drop::MoveTooSoon);
     }
     None
 }
@@ -636,18 +701,126 @@ mod tests {
     }
 
     #[test]
-    fn a_note_and_a_move_wait() {
-        for act in ["note", "move"] {
-            let proposal = AddonProposal {
-                act: act.into(),
-                ..light("glow")
+    fn a_note_waits() {
+        let proposal = AddonProposal {
+            act: "note".into(),
+            ..light("glow")
+        };
+        assert_eq!(
+            Judge::default().judge(&proposal, 0, &calm(), NOW),
+            Verdict::Dropped(Drop::NotYet)
+        );
+    }
+
+    fn nod(addon: &str) -> AddonProposal {
+        AddonProposal {
+            act: "move".into(),
+            why: "music".into(),
+            light: None,
+            gesture: Some("nod".into()),
+            ..light(addon)
+        }
+    }
+
+    /// The first builder on #2530 (22 Oct 04:25): a move is kept on a calm
+    /// lamp only a minute after the voice last spoke or was spoken to,
+    /// whoever is near, and the rules every act has still hold.
+    #[test]
+    fn a_move_is_kept_only_a_minute_after_talk() {
+        assert_eq!(
+            Judge::default().judge(&nod("music-nod"), 0, &calm(), NOW),
+            Verdict::Kept
+        );
+        for since in [Some(NOW - MOVE_QUIET_US + 1), None] {
+            let situation = Situation {
+                resting_since_us: since,
+                ..calm()
             };
             assert_eq!(
-                Judge::default().judge(&proposal, 0, &calm(), NOW),
-                Verdict::Dropped(Drop::NotYet),
-                "{act}"
+                Judge::default().judge(&nod("music-nod"), 0, &situation, NOW),
+                Verdict::Dropped(Drop::MoveTooSoon),
+                "{since:?}"
             );
         }
+        // A say's 15 s is not a move's minute.
+        let situation = Situation {
+            resting_since_us: Some(NOW - SAY_QUIET_US),
+            ..calm()
+        };
+        assert_eq!(
+            Judge::default().judge(&nod("music-nod"), 0, &situation, NOW),
+            Verdict::Dropped(Drop::MoveTooSoon)
+        );
+        for (situation, drop) in [
+            (
+                Situation {
+                    paused: Some(true),
+                    ..calm()
+                },
+                Drop::Paused,
+            ),
+            (
+                Situation {
+                    asleep: Some(Reading::new(true, NOW - 100_000)),
+                    ..calm()
+                },
+                Drop::Asleep,
+            ),
+            (
+                Situation {
+                    room_quiet: Some(Reading::new(false, NOW - 100_000)),
+                    ..calm()
+                },
+                Drop::BusyRoom,
+            ),
+        ] {
+            assert_eq!(
+                Judge::default().judge(&nod("music-nod"), 0, &situation, NOW),
+                Verdict::Dropped(drop),
+                "{situation:?}"
+            );
+        }
+    }
+
+    /// One kept move an add-on every 30 minutes, and two an hour across
+    /// all add-ons; a dropped move is not counted.
+    #[test]
+    fn moves_are_rarer_than_lights() {
+        let mut judge = Judge::default();
+        assert_eq!(judge.judge(&nod("one"), 0, &calm(), NOW), Verdict::Kept);
+        // Its light is held by the 2 min every act has; its move by 30 min.
+        let later = NOW + EVERY_US;
+        assert_eq!(
+            judge.judge(&light("one"), 0, &calm_at(later), later),
+            Verdict::Kept
+        );
+        let later = later + EVERY_US;
+        assert_eq!(
+            judge.judge(&nod("one"), 0, &calm_at(later), later),
+            Verdict::Dropped(Drop::MoveRate)
+        );
+        // Another add-on's move is its own, and the hour's second.
+        assert_eq!(
+            judge.judge(&nod("two"), 0, &calm_at(later), later),
+            Verdict::Kept
+        );
+        // A third add-on's is past the hour's two.
+        assert_eq!(
+            judge.judge(&nod("three"), 0, &calm_at(later), later),
+            Verdict::Dropped(Drop::MovesThisHour)
+        );
+        // 30 min after its first, "one" is still held by the hour's two.
+        let half = NOW + MOVE_EVERY_US;
+        assert_eq!(
+            judge.judge(&nod("one"), 0, &calm_at(half), half),
+            Verdict::Dropped(Drop::MovesThisHour)
+        );
+        // An hour after the first, one of the two has gone.
+        let hour = NOW + 3_600_000_000;
+        assert_eq!(
+            judge.judge(&nod("one"), 0, &calm_at(hour), hour),
+            Verdict::Kept
+        );
     }
 
     fn say(addon: &str, proposal: u64) -> AddonProposal {

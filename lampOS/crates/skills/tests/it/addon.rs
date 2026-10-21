@@ -233,6 +233,19 @@ fn the_loader_refuses_an_add_on_anything_but_proposing() {
         .replace("act = \"light\"", "act = \"move\"");
     let error = load(&addon_with(dir.path(), "flips", &gesture)).unwrap_err();
     assert!(error.contains("is not one of the body's"), "{error}");
+    // One of the body's gestures, but not an add-on's (the first builder on
+    // #2530, 22 Oct 04:25): refused; nod, curious and stretching load.
+    let scan = gesture.replace("\"backflip\"", "\"scanning\"");
+    let error = load(&addon_with(dir.path(), "scans", &scan)).unwrap_err();
+    assert!(
+        error.contains("a move is nod, curious or stretching"),
+        "{error}"
+    );
+    for allowed in lamp_msgs::ADDON_GESTURES {
+        let moves = gesture.replace("\"backflip\"", &format!("\"{allowed}\""));
+        load(&addon_with(dir.path(), &format!("moves-{allowed}"), &moves))
+            .unwrap_or_else(|error| panic!("{allowed}: {error}"));
+    }
 }
 
 /// #2530 part 2: an add-on that proposes `say` loads with its say grant,
