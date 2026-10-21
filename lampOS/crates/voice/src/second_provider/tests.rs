@@ -20,7 +20,7 @@ struct Script {
     asked: Mutex<Vec<Vec<Message>>>,
     /// A chat stream that, after its script, never ends.
     hold_chat: bool,
-    /// A chat's first  waits this long (on the test's clock).
+    /// A chat's first event waits this long (on the test's clock).
     first_event_after: Option<Duration>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
