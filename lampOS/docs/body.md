@@ -852,7 +852,7 @@ taken or dropped by the same rules, and a look alone never stands a folded
 lamp up. A face across the room is not a reason to get up; being spoken to,
 somebody sitting in front of it for a second, or a gesture asked is. When
 whether a face in view is looked at changes, the journal says so once, with
-why (paused, folded or folding, neither listening nor speaking), and the
+why (paused, asleep, folded or folding, neither listening nor speaking), and the
 face line every five seconds says it too:
 
 ```text
@@ -1422,7 +1422,8 @@ What the body does with the request:
   Asked of one still rising (for a mood, or for a gesture asked just
   before), it waits for the rest of the rise, `(1 - stand) × --stand-seconds`
   and never less than the gesture it replaces, and then three seconds
-  more. Not stood up for, and dropped: a lamp paused (`lamp/pause`),
+  more. Not stood up for, and dropped: a lamp paused (`lamp/pause`), one
+  a hand on the head put to sleep (`dropped: asleep`, "Asleep" below),
   stopping, held by a hand where a joint gave way, or that let go under
   overload or a hand and lies where it slumped (until a mood or somebody
   in front of it stands it up), and one that may not stand. A gesture
@@ -1933,6 +1934,25 @@ of it is taken, and it sees nobody, so a standing lamp folds when its awake
 time runs out even with somebody in front of it; its report says `state`
 `paused`. Nothing kept on the
 topic, or a bus it cannot reach, is not paused.
+
+**Asleep** (#1362). With `LAMP_HEAD_TOUCH=on`, a body that can reach the
+bus also reads `voice/mute` every quarter of a second, and at once when the
+voice speaks to it while it is taken to be asleep. While the voice says a
+hand held on the head put the lamp to sleep (its mute with the reason
+`sleep`, [alive.md](alive.md)), every mood is rest, it sees nobody, it is
+held still and a gesture asked is dropped (`dropped: asleep`). A standing
+lamp folds now, over `--stand-seconds` (6 on the product), even with
+somebody in front of it and whatever its awake time, once a gesture from
+outside already playing has ended: the slow fold is the sleep a person
+sees, as Expression's sleeping pose alone moves the head 0.023 rad. The
+head still takes Expression's sleeping breath. Woken by a tap, the voice
+says it is open again, and the body stands up at once, the lift, before
+any mood of the voice's; it then stays up for its awake time as after a
+mood. Only the voice's word is taken (the topic's publisher `voice`): the
+same from another part, a mute for another reason, a value older than its
+three seconds, nothing kept or a bus it cannot reach is not asleep, and is no wake
+either: a folded lamp stays down until a mood or somebody in front of it
+stands it up. Without the switch nothing is read.
 
 The loop that talks to the servos never waits for the bus. It hands
 every fourth step to a thread of its own, which has room for sixteen; a

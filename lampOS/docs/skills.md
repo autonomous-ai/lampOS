@@ -140,9 +140,9 @@ must not leave a step silently undone)*.
 | `enabled` | no | Boolean, true by default for existing skills. False still validates the folder but removes its active triggers and model tools |
 | `[limits]` | no | A local `during = { from, to }` window and one or both of `light_channel_max` (12–120) and `volume_raw_max` (1–100). Private, durable restrictions; requires `permissions.output_limits = true` and the routine and cap switches. See [Bedtime and Morning](bedtime-morning.md#durable-output-ceilings) |
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
-| `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
+| `kind` | no | `core` (comes with the lamp, always there, never removed), `installable` (its owner puts it on and takes it off), or `addon` (a partner's: it only proposes, [addons.md](addons.md)), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out; and for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)). A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
@@ -907,7 +907,17 @@ As built on 2026-10-19 (`crates/skills/src/package.rs`; not yet run on a
 lamp):
 
 **The kind.** `skill.toml` says `kind = "core"` or `kind = "installable"`,
-and a skill that says neither is installable.
+and a skill that says neither is installable. `kind = "addon"` is a
+partner's add-on ([addons.md](addons.md)): installed and removed as an
+installable skill, but it only proposes. It says its version; its
+`[permissions]` give `propose` (some of `say`, `light`, `move`, `mood`,
+`note`) and topics from the add-on allowlist alone
+(`lamp_msgs::ADDON_TOPICS`), and nothing else; it starts by its triggers
+alone, with no `[ask]`, tool, `[history]` or other tool's tables; and its
+steps are `propose = { act, why, sure, holds, ... }` only. `lamp-skills`
+writes each proposal on `addon/proposal`, stamped with the add-on's name
+and version and held to the add-on limits, for a judge. Without
+`LAMP_ADDONS=on` an add-on is not loaded, and the journal says so.
 
 | Skill | Kind | Why |
 |---|---|---|
@@ -917,7 +927,7 @@ and a skill that says neither is installable.
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Not in the product's install (`install::NOT_PRODUCT_SKILLS`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Not in the product's install yet (`NOT_PRODUCT_SKILLS`): not yet tried on a lamp, and three more functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
-| Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). Not in the product's install until it has been tried on a lamp (`NOT_PRODUCT_SKILLS`), and its texts reach no phone until `lamp-cloud` and the app's relay take `messages/out` |
+| Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). Not in the product's install until it has been tried on a lamp (`NOT_PRODUCT_SKILLS`), and its texts reach the phone only with `LAMP_MESSAGES=on` in `lamp-cloud` ([messages.md](messages.md), "Unasked texts") |
 | A sip of water, Rest your eyes, Stand up, Wind down (#1685) | installable | The wellbeing nudges beyond Stretch break, each wordless: a slow blue breath after 90 minutes at the desk (10:00 to 17:00); a small tilt and a shade softer light after 45 (09:00 to 20:00, once an hour); a turn and a tilt after 100 minutes of Stretch break's sitting (08:00 to 20:00); a droop and a shade of dim until they leave, in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes, never from bedtime on, the night then Bedtime and Morning's). Each has `most_a_day`, `[active]`, `[quiet]`, `[rest]`, Stretch break's `[[while]]` on `room/activity` (never while someone reads or writes head down, #1678; nothing without the eyes' `LAMP_ACTIVITY`), a second on its `sitting_s` (above the trigger's `for`, `unknown = "holds"`: the sitting is the sitter's own, since the eyes begin it again when someone else sits down, so a face in the chair for 90 minutes that was two people is no 90-minute sitting; cases `a-sip-when-the-eyes-say-the-same-sitting` and `not-when-someone-else-sat-down`), one shared `[stop]`, `wellbeing_nudges` (the one that came last, or `all`), and `[budget] group = "wellbeing"`, `per_hour = 1`, with Stretch break: one an hour between them. None speaks: a spoken water reminder is one the person asks for, which Reminders says. Not in the product's install (`NOT_PRODUCT_SKILLS`): not yet tried on a lamp |
 | Who was here | installable | "Was anyone here while I was out?" (#1685): the owner's call, 19 Oct: an installable skill. The model is told the lamp's record of the room from `room/presence` (#1721), times only, never a picture or who (with `LAMP_WHO_WAS_HERE_KNOWN=on`, at most "someone the lamp knows", and with `LAMP_WHO_WAS_HERE_NAMES=on` the name of someone who said yes to being named, #1997). Not in the product's install: not yet tried on a lamp, `room/presence` is off in the product, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Bedtime and Morning | core, disabled | Installed for every product lamp, with authored evening, rest, morning and output-limit data; no active trigger or tool until enabled after its lamp comparison |
@@ -1024,6 +1034,18 @@ for it.
   another in one template unit, so with the Store on a remove runs with
   the network too; the network for installs alone would need a unit and
   socket of their own, not built.
+- **Only two parts may ask** (the reviewer's P3 on #2429): before reading
+  the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
+  `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
+  install) and `lamp-voice` (a made skill's spoken yes, #1685), each at
+  the system's place for it, are answered. Any other part in the group
+  `lampos` gets `only the app's link and the voice may change the lamp's
+  skills`, as the keys helper does (#2167; `package::from_an_asker`,
+  `only_lamp_cloud_and_the_voice_may_ask_the_manage_helper`). The tests that
+  drive `lamp-skills asked` over a socket pair of their own set
+  `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
+  sets, and the helper says so in the journal each time it lets a peer
+  through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).
 - **It checks each request itself,** whoever connected. Three are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
@@ -1093,9 +1115,14 @@ for it.
   `lampos` may ask for a remove, never of a core skill. A group of
   `lamp-cloud`'s own would narrow that; it needs `lamp-update install` to
   make the group, and is not done here.
-- **Not on a lamp yet.** The two units are in `deploy/product/` but not in
-  `lamp-update`'s install list (`install::PRODUCT`); they go there after
-  their lamp check. Tested on a Mac only: `tests/it/package.rs` and
+- **On a lamp by `lamp-update install`** (#1685, for a made skill's spoken
+  yes): the two units are in its install list (`install::PRODUCT`), the
+  socket enabled and the template never, since systemd starts one for each
+  connection (`the_skills_manage_socket_is_enabled_and_its_template_is_not`).
+  A round never adds a unit (updates.md), so a lamp installed before #2429
+  (lamp-0c89 too) has the helper only after `sudo lamp-update install …`
+  once; until then a remove and a made skill's yes are refused there.
+  Not yet tried on a lamp. Tested on a Mac: `tests/it/package.rs` and
   `tests/it/store.rs` run the real program on a Unix socket and refuse a core
   skill, bad names, a URL that is not https, a Store that speaks no TLS,
   and any install with the Store's switch off (unset, `off`, `ON`, empty;
@@ -1149,6 +1176,7 @@ look = true     # the full look's picture for the model (do.look)
 messages = true # a short text for the person's phone, unasked (a watch's)
 known_faces = true  # whether a face at the lamp is known, never whose (a watch's)
 output_limits = true  # private declarative light/volume restrictions
+propose = []    # an add-on's alone (kind = "addon"): the acts it may propose
 actions = []    # the actions part's functions it may call by name
 ```
 
@@ -1639,4 +1667,8 @@ refused so a readiness statement cannot run as an ordinary early `say`. The
 initial response is explicitly not readiness. A bounded background run waits
 for body, Expression and actual ring receipts; Voice guards the separate
 completion statement. Installed with the product, hidden while `LAMP_UNPLUG` is
-off. See [the lifecycle, timing and physical proof](unplug.md).
+off. Its second reserved tool, `stay_plugged_in` ("never mind"), is added to
+`tools.json` by the program whenever the skill is loaded and refused while no
+latch is in force; no skill may
+declare that name, and its grants are this skill's (it also reads
+`body/unplug_cancel`). See [the lifecycle, timing and physical proof](unplug.md).

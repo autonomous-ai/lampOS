@@ -438,6 +438,7 @@ decision, so their bytes are as they were (a test).
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
+| `AddonProposal` | `addon/proposal` | event | none / none | A partner's add-on suggests what the lamp might do ([addons.md](addons.md)): the proposal's number (`lamp-skills`' monotonic clock in µs), the add-on's name and version as `lamp-skills` loaded them, the act (`say`, `light`, `move`, `mood`, `note`), why (a fixed list), how sure (0 to 1), how long it holds (1 to 30 s), and the one part its act names: a light, a gesture, a mood nudge (±0.1 at most, 10 min at most), or a note of at most 300 bytes from the add-on's folder. Written by `lamp-skills` alone, with `LAMP_ADDONS=on`. Never an order |
 | `SkillAsk` | `skills/ask` | event | none / none | A skill asks the policy whether the lamp may do something it would start itself (#939, [policy.md](policy.md)): the ask's number (the asker's monotonic clock in µs, positive), the skill's name, the act (`hello`, `news`, `reminder` (added 2026-10-16), `unprompted`), the person if known, and for a hello its minutes away and seconds there. No words, no picture, no face |
 
 `check()` asks for a positive number, a skill's name (1 to 64 lowercase

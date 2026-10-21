@@ -121,9 +121,9 @@ is released or the reader has failed.
 | "Hey Lamp" or "Lamp, ..." | Turns to you (to your face if it sees one), the eye's arc points at you, answers | Now; bare "Lamp" #694 |
 | A conversation | Nods in your pauses, looks away while thinking, back before its first word, eye pulses with its voice | Now |
 | You talk over it | Stops and listens | Now for sentences (6 of 10 played), weak for one word; tonight's work |
-| Two people talk near it | Stays out; a glance now and then at whoever laughs | Now (stays out); the glance built, off: `skills/laugh-glance` on `ears/classes` (#1669), its bar set on lamp-52e6's microphone (#2399), not yet played to a person |
+| Two people talk near it | Stays out | Now. A glance at whoever laughs was dropped (the lead on #1711, 21 Oct: the owner never asked for it); `skills/laugh-glance` stays parked and off |
 | A bang, something dropped | One startled glance, then lets it go; the next ones get nothing | Now when awake; resting #710 |
-| Music | Once, a slight sway when music has played a while, only if it is not working with you | Built, off: `skills/music-sway` on `ears/classes` (#1669), its bar held on lamp-52e6's microphone (#2399), the sway not yet seen |
+| Music | Once, a slight sway when music has played a while, only if it is not working with you | Built, off: `skills/music-sway` on `ears/classes` (#1669), its bar kept from lamp-52e6 (#2475) |
 | A long silence | Breathing eye, tiny shifts of weight; dozes after a while | Rest clip now; sleep to build |
 
 ### Sight
@@ -173,10 +173,12 @@ One part, read by every behaviour (to build):
 4. **Resting reactions**: a resting lamp lifts its head (#710).
 5. **The air**: the SEN63C is read (`lamp-air`, running); the quiet droop and the remark.
 6. **Familiarity**: who it knows (eyes and memory).
-7. **Joys**: music sway, laughing, the stretch as an invitation. Their bars
-   are measured on a lamp with nothing moving by `tools/joys-scores.sh
-   laugh|music` (#1669): an empty room, a track and a line over it, scored
-   against each bar, and the glances or sways the skill would have asked
+7. **Joys**: music sway, laughing, the stretch as an invitation. What
+   "laughing" means is the owner's to say: a glance at other people's
+   laughter is not it, and that skill is parked (the lead on #1711, 21 Oct).
+   The sway's bar is measured on a lamp with nothing moving by
+   `tools/joys-scores.sh music` (#1669): an empty room, a track and a line
+   over it, scored against the bar, and the sways the skill would have asked
    for, replayed offline from the bus. With `KEEP_DIR`, the sound scores
    alone are kept, for a replay of other bars over them (#2399).
 

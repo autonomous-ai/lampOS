@@ -1372,6 +1372,61 @@ pub struct Store<'a> {
 /// its standard input and output ([`asked`]).
 pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 
+/// The units that may ask the manage helper, where the system's manager
+/// puts them (each one's `Slice=` in its product unit): `lamp-cloud`, for
+/// the app's remove and a Store install, and `lamp-voice`, for a made
+/// skill's spoken yes (#1685). Any other part in the group `lampos` may
+/// connect, but is refused before its line is read (the reviewer's P3 on
+/// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
+pub const ASKERS: [&str; 2] = [
+    "/lampos.slice/lampos-parts.slice/lamp-cloud.service",
+    "/lampos.slice/lampos-voice.slice/lamp-voice.service",
+];
+
+/// The refusal to any other peer.
+pub const NOT_AN_ASKER: &str = "only the app's link and the voice may change the lamp's skills";
+
+/// Whether `/proc/<pid>/cgroup`'s text puts the process in one of
+/// [`ASKERS`] (or a cgroup under one): the unified hierarchy's line
+/// (`0::…`), or systemd's own on a hybrid one (`…:name=systemd:…`).
+pub fn from_an_asker(cgroup: &str) -> bool {
+    cgroup.lines().any(|line| {
+        let mut fields = line.splitn(3, ':');
+        let (Some(_), Some(controllers), Some(path)) =
+            (fields.next(), fields.next(), fields.next())
+        else {
+            return false;
+        };
+        (controllers.is_empty() || controllers == "name=systemd")
+            && ASKERS.iter().any(|asker| {
+                path.strip_prefix(asker)
+                    .is_some_and(|below| below.is_empty() || below.starts_with('/'))
+            })
+    })
+}
+
+/// In the helper's own environment (its unit's, never the peer's), `on`
+/// lets any peer ask: only for the tests that drive `lamp-skills asked` over
+/// a socket pair of their own. No unit sets it, and `lamp-update`'s
+/// product unit has no way to.
+pub const ANY_ASKER: &str = "LAMP_SKILLS_ANY_ASKER";
+
+/// Whether the peer on standard input (the socket systemd hands over) is
+/// one of [`ASKERS`], by its credentials (`SO_PEERCRED`) and its cgroup.
+/// Peer credentials are read on Linux only; elsewhere no peer is.
+pub fn peer_is_an_asker() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let stdin = std::io::stdin();
+        rustix::net::sockopt::socket_peercred(&stdin).is_ok_and(|peer| {
+            fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+                .is_ok_and(|cgroup| from_an_asker(&cgroup))
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    false
+}
+
 /// The most bytes of a request to [`asked`].
 pub const ASKED_MOST: u64 = 4_096;
 
@@ -1523,6 +1578,64 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The reviewer's P3 on #2429: each asker's cgroup is where its product
+    /// unit's `Slice=` puts it (systemd nests a dashed slice under each of
+    /// its prefixes), so a moved slice fails here instead of refusing every
+    /// request quietly.
+    #[test]
+    fn the_askers_cgroups_are_their_product_units_slices() {
+        for (unit, text) in [
+            (
+                "lamp-cloud.service",
+                include_str!("../../../deploy/product/lamp-cloud.service"),
+            ),
+            (
+                "lamp-voice.service",
+                include_str!("../../../deploy/product/lamp-voice.service"),
+            ),
+        ] {
+            let slice = text
+                .lines()
+                .find_map(|line| line.strip_prefix("Slice="))
+                .expect("the unit names its slice")
+                .trim();
+            let name = slice.strip_suffix(".slice").unwrap();
+            let mut path = String::new();
+            for (at, _) in name.match_indices('-').chain([(name.len(), "")]) {
+                path.push_str(&format!("/{}.slice", &name[..at]));
+            }
+            assert!(
+                ASKERS.contains(&format!("{path}/{unit}").as_str()),
+                "{path}/{unit}"
+            );
+        }
+    }
+
+    /// #2429: only lamp-cloud and the voice, at the system's place for each,
+    /// may ask the manage helper; another part, or a same-named unit a user's
+    /// manager made, may not.
+    #[test]
+    fn only_lamp_cloud_and_the_voice_may_ask_the_manage_helper() {
+        assert!(from_an_asker(
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n"
+        ));
+        assert!(from_an_asker(
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service/worker\n"
+        ));
+        assert!(from_an_asker(
+            "1:name=systemd:/lampos.slice/lampos-parts.slice/lamp-cloud.service\n"
+        ));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-body.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service-not\n",
+            "0::/user.slice/user-1000.slice/user@1000.service/lamp-cloud.service\n",
+            "4:cpu:/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+            "",
+        ] {
+            assert!(!from_an_asker(other), "{other:?}");
+        }
+    }
 
     /// A file swapped after its folder was listed, for a link (to a file
     /// only root may read, run as root), another file or a fifo, is refused

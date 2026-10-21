@@ -689,7 +689,8 @@ fn the_rule_and_the_model_are_counted_side_by_side_by_kind() {
 /// the power took) is passed over, and the lines after it still read.
 #[test]
 fn a_picture_line_cut_inside_a_character_does_not_end_the_run() {
-    let dir = std::env::temp_dir().join(format!("policy-pictures-{}", std::process::id()));
+    // Not pictures' `policy-pictures-`: the crate's unit tests are one process.
+    let dir = std::env::temp_dir().join(format!("policy-replay-cut-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let picture = |at: u64, heard: &str| {

@@ -8786,7 +8786,8 @@ mod tests {
         ] {
             keep(&event, None);
         }
-        let root = PathBuf::from(format!("/tmp/lvw-{}", std::process::id()));
+        // Not hand_controls' `/tmp/lvw-`: the crate's unit tests are one process.
+        let root = PathBuf::from(format!("/tmp/lvsp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();

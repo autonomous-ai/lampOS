@@ -899,12 +899,24 @@ fn ask_helper_while(
     line: &[u8],
     meanwhile: impl FnOnce(&mut std::process::Child),
 ) -> (serde_json::Value, bool, String) {
+    ask_helper_as(skills, line, true, meanwhile)
+}
+
+/// [`ask_helper_while`], the peer let through by the helper's test switch
+/// (`package::ANY_ASKER`) only when `any_asker`.
+fn ask_helper_as(
+    skills: &Path,
+    line: &[u8],
+    any_asker: bool,
+    meanwhile: impl FnOnce(&mut std::process::Child),
+) -> (serde_json::Value, bool, String) {
     use std::io::{BufRead, Read, Write};
     use std::os::unix::net::UnixStream;
     use std::process::{Command, Stdio};
     let (mut ours, theirs) = UnixStream::pair().unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
         .args(["asked", "--dir"])
+        .env(package::ANY_ASKER, if any_asker { "on" } else { "" })
         .arg(skills)
         .stdin(Stdio::from(std::os::fd::OwnedFd::from(
             theirs.try_clone().unwrap(),
@@ -933,6 +945,24 @@ fn ask_helper_while(
         status.success(),
         journal,
     )
+}
+
+/// A peer that is neither `lamp-cloud` nor the voice (here the test itself,
+/// on a socket pair) is refused before its line is read, and the skill
+/// stays (the reviewer's P3 on #2429).
+#[test]
+fn a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    tutor(&skills, "1.0.0");
+    let (answer, ok, _) = ask_helper_as(&skills, b"{\"remove\": \"desk-tutor\"}\n", false, |_| {});
+    assert!(!ok, "{answer}");
+    assert_eq!(
+        answer,
+        serde_json::json!({"refused": package::NOT_AN_ASKER})
+    );
+    assert!(skills.join("desk-tutor").join("skill.toml").is_file());
 }
 
 /// While another run holds the skills folder, the helper waits at most

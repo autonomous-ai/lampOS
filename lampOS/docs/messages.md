@@ -208,11 +208,43 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
 - **Who sends:** `lamp-skills`, for a skill whose `[permissions]` give
   `messages = true`, checked again as each text leaves the program
   ([skills.md](skills.md), "A watch").
-- **Not delivered yet.** Nothing takes `messages/out` off the lamp:
-  `lamp-cloud` has to carry it to the backend (as it carries `task_news`,
-  with no run), and the app team's push relay (mobile-P1) has to deliver it
-  to a phone that isn't open on the chat. Until both, a text is on the
-  lamp's bus and in `lamp-skills`' journal only.
+- **Carried up with `LAMP_MESSAGES=on`** (`lamp_cloud::unasked`): off
+  unless set, the same switch as texts. `lamp-cloud` listens on
+  `messages/out` from the start and sends each piece on `fd_channel` as
+  the backend reads unasked news (the backend and the app, #1722, 21 Oct):
+  V1's `chat.event`, the top-level `id` the lamp's own, no `run_id` and no
+  `session_id`, and `data.event` a `task_news` event: its own `id`
+  (`evt-N`) and `time` (RFC 3339), which together are the backend's
+  `news_id`; `summary`, the text's first 200 characters; and
+  `detail.message`, the whole text, with `role` and `channel` as an
+  answer's. The skill's text only, unchanged: nothing added, no picture,
+  no name. It is the shape the voice's unasked task news goes in (#2311),
+  made by the same `chat::Stream`. The backend keeps it per lamp, for the
+  owner only, for 90 days, and pushes it to the owner's phones; the app
+  shows it in the lamp's chat.
+  - **Bounded:** at most 6 pieces are taken in any hour
+    (`unasked::PER_HOUR`), the backend's own push limit, whatever the skill
+    sends (guard mode sends at most one every 10 minutes); a newer one past
+    it is dropped, and the journal says so.
+  - **Only lamp-skills':** only lines whose publisher is `lamp-skills`
+    (`skills`, `unasked::SKILLS`) are taken. One another publisher puts on
+    the topic (a test tool, a `lamp-bus` publish from a shell, a part that
+    writes it later) is not sent, and the journal names that publisher
+    once, never the text: `a text on messages/out from the publisher
+    lamp_bus_cli wasn't sent to the phone: only lamp-skills' are, and later
+    ones from it aren't journalled` (at most 8 publishers named).
+  - **In order, once:** pieces go in the order heard; one heard again (the
+    same publisher, boot and `seq`) is dropped.
+  - **Offline:** while the broker is away, at most 4 wait in memory
+    (`unasked::KEPT_OFFLINE`), the oldest dropped first, and go on
+    reconnect. A piece is kept until the broker's ack; one the connection
+    took before it goes again with the same event `id` and `time`, so the
+    backend pushes it once. A restart of `lamp-cloud` loses those waiting,
+    and the bus hands none older than 10 minutes.
+  - **The journal:** one line a piece sent, the skill and the count, never
+    the text: `a text from the skill guard-mode went to the phone (3 since
+    the start)`; and one for a piece not sent, and why: `a text from the
+    skill guard-mode wasn't sent to the phone: more than 6 in an hour`.
 
 ## Tests
 
@@ -231,6 +263,18 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
   refused at once with nothing listening, and "not on this lamp" with the
   switch off; task news with no text asked first; a text on `chat/in`
   lasts its run's minute.
+- `lamp_cloud::unasked::tests`: pieces in order and one heard again
+  dropped; at most 6 in any hour; the newest 4 kept offline, those owed
+  back first; the journal's lines name the skill, never the text.
+- `lamp_cloud::online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text`:
+  through the test broker, two of guard mode's lines as `chat.event`s,
+  field by field, in order, and the journal's lines without their text;
+  `without_the_switch_no_skills_line_goes_up`; and
+  `a_skills_line_lost_with_the_connection_goes_again_unchanged`, through a
+  broker that drops the first connection.
+- `crates/cloud/tests/it/texts.rs::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news`:
+  through `Real` on a bus of the test's own, a line published as
+  `lamp-skills` publishes it; none with the switch off.
 - `lamp_msgs::chat::tests`: the two types' checks and their wire, and
   `a_text_lasts_as_long_as_its_run_waits`.
 - `messages::tests`: a text answered in pieces, then whole, and told it is

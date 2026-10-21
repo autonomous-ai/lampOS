@@ -4,7 +4,7 @@
 # to the network and stays ProtectSystem=strict with no writable path for the skills (the first
 # builder, 18:33 on #1722). systemd holds the socket and starts lamp-skills-manage@.service as root
 # for each connection; nothing listens between requests. Only root and the group lampos may connect.
-# Not yet in lamp-update's install list: it goes there after its lamp check.
+# In lamp-update's install list (install::PRODUCT): the socket enabled, the template never.
 [Unit]
 Description=lampOS skills' manage helper socket
 

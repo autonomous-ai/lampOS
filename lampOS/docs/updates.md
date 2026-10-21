@@ -104,9 +104,9 @@ that is the channel's head.**
 - The sequence is the workflow's run number, which only goes up. A lamp
   takes a build only if its sequence is greater than the one it runs.
 - `min_updater` (#1680), when set, is the oldest updater that can apply the
-  build. It's a level, `manifest::UPDATER` in `lamp-update` (4 now: 2 reads
-  `models`, 3 reads `settings`, and 4 reads `image`), raised whenever the
-  updater learns to apply something an older one can't. It
+  build. It's a level, `manifest::UPDATER` in `lamp-update` (5 now: 2 reads
+  `models`, 3 reads `settings`, 4 reads `image`, and 5 reads `reset_plan`),
+  raised whenever the updater learns to apply something an older one can't. It
   isn't the sequence, because a binary doesn't know its CI run number. It
   sits in the manifest's signed bytes like every other field. Left out
   (`lamp-update manifest` without `--min-updater`), it isn't written, and
@@ -820,6 +820,51 @@ which (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is
 not set`). The rest of the build is taken as today. Users and groups
 aren't carried: a later step, when a build needs a new one.
 
+### Setup's reset plan (#806)
+
+The reset plan, `/etc/lampOS/setup/reset-plan.json`, is what the 5 s reset
+wipes. It is the product's and never the person's: an old plan makes the
+reset wipe less than the build's stores, so a person's own keys or display
+name would survive a reset. Found on lamp-06c1 on 21 Oct: its plan was the
+fixture of 19 Oct (`4de8ebe1c`, sha256 `5dff6f81…`), 10 stores short, kept
+by install as "this lamp's own" and never carried by a round.
+
+- **Carried.** `lamp-update manifest --settings on` also writes
+  `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
+  as one setting (`install::reset_plan_setting`), 0644, and raises
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 5. It
+  is a field of its own, not in `settings`, for the image's reason: a
+  lamp-update-back from before it refuses a setting path it doesn't know,
+  and passes over a field it doesn't know. Its path must be the plan's,
+  never removed, 0644, at most 16 KiB (`manifest::check_reset_plan`).
+- **Always the build's.** With `LAMP_UPDATE_APPLY=on`, wherever the lamp
+  has a plan, lamp-update-apply writes the build's over it, whatever it
+  is (`apply::reset_plan_step`): a past build's, one placed by hand, one
+  changed on the lamp. It is never kept as the lamp's own. The build's
+  already there is only recorded. A lamp with no plan gets none: on a lamp
+  set up by hand (lamp-4ace), with setup's marker, a plan would start
+  `lamp-setup-reset.service` and arm the 5 s reset.
+- **Backed up.** Before the first write, the old plan is copied whole into
+  the records as `reset-plan.json.before-<build>` (`-<ms>` after it if one
+  of another plan has that name), 0600, unless it is the plan recorded
+  (a build wrote it, and `back.json` holds it). The journal line says
+  whether it was a plan an earlier build shipped
+  (`install::RESET_PLAN_SHIPPED`, every version of the fixture in git) or
+  one no build shipped. `back.json` holds it as every setting, so a build
+  put back puts the old plan back byte for byte.
+- **Nothing restarted.** No part is restarted for it: the reset's watcher
+  hands each reset to `lamp-setup reset-now --plan`, which reads the file
+  again.
+- **An older lamp-update-back** (installed before this) writes the rest of
+  the build's settings and not the plan; the round goes on and says
+  `/etc/lampOS/setup/reset-plan.json was not written: this lamp's
+  lamp-update-back is older than it, so install again`.
+- **Install** does the same at every run (`install::reset_plan`): with
+  `--setup on` it writes the plan where there is none; with or without it,
+  it writes the build's over any other, the old one kept in the records
+  first, and records it. Without `--setup on`, a lamp with no plan gets
+  none.
+
 ### The image's own files (`LAMP_UPDATE_IMAGE`, off)
 
 The image lays down files of its own that `install` never placed
@@ -848,8 +893,7 @@ path it doesn't know, and ignores a field it doesn't know.
   where it has one, else the standard one. On the lamp, the variant is
   `/etc/autonomous/hardware-profile` as the image wrote it (none, empty or
   `standard`: the standard lamp); one that isn't a plain name carries
-  nothing. `min_updater` is then at least 4 (`manifest::IMAGE_UPDATER`);
-  `UPDATER` is 4.
+  nothing. `min_updater` is then at least 4 (`manifest::IMAGE_UPDATER`).
 - **Shipped.** `install` never recorded these files, so the build's before
   is also every SHA-256 the image has shipped at that path for that
   variant: `deploy/image/shipped.json`, from the history of `robots/lamp`.
@@ -1229,7 +1273,7 @@ the file is never read back.
 | cloud | queued reports, `/var/lib/lampos-cloud/reports/<seq>.json` | JSON | `schema` `lamp-report/1`; a higher one is **kept where it is and not sent**, with a line (`reports.rs:945-993`) | read, and sent as is | a `kind` other than `crash` or `stopped`: kept and not sent, as a newer schema | unreadable (garbage, cut short, over 4 KiB, no `sent_at`) is set aside whole as `<seq>.json.unread-<s>`, never sent, with a line; the rest are read. A no deletes the kept newer ones too (`reports.rs:1280`) |
 | cloud | exit notes, `/run/lampos-exits/<unit>@<at_us>.json` (root's, 0644) | JSON | none | read | a new `result` sends no crash | unreadable is skipped with one line and left whole: `lamp-cloud` can't write the folder, and `/run` goes at the next boot; `write_whole`'s `.tmp` is no longer read (`reports.rs:1457-1508`) |
 | setup | serve config (only `lamp-update install --setup on` writes it, `update/src/install.rs:375-384`), `/etc/lampOS/setup/serve.json` | JSON | none | read, dropped with a line (`setup/src/serve.rs`, `read`) | n/a | an extra field is dropped and named in the journal; a bad known value or bad JSON still refuses to start, exit 2. Not in update's settings list, so a put-back never restores it |
-| setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | **refused**, except `keep_back`, whose every entry is dropped with a line and its path wiped (`setup/src/reset.rs`, `read`) | a `wipe` entry that isn't a plain path's text **refuses the reset**; a newer plan's extra plain path is wiped (still checked against `PROTECTED`) | all or nothing: a refused plan journals nothing, keeps the marker and wipes nothing; `watch-reset` keeps watching and tells the person who holds the button "Nothing was wiped. Update me, then reset again." (say service, network only), the other commands exit 2. A bad known value or bad JSON is refused as before. Not restored by a put-back |
+| setup | reset plan, `/etc/lampOS/setup/reset-plan.json` | JSON | none | **refused**, except `keep_back`, whose every entry is dropped with a line and its path wiped (`setup/src/reset.rs`, `read`) | a `wipe` entry that isn't a plain path's text **refuses the reset**; a newer plan's extra plain path is wiped (still checked against `PROTECTED`) | all or nothing: a refused plan journals nothing, keeps the marker and wipes nothing; `watch-reset` keeps watching and tells the person who holds the button "Nothing was wiped. Update me, then reset again." (say service, network only), the other commands exit 2. A bad known value or bad JSON is refused as before. Written over by the build's at each install and each round that carries `reset_plan` (#806), the old one kept in the records first; a put-back restores it |
 | setup | done marker `/var/lib/lampos-setup/done`; reset journal `reset.json` | file / JSON | `version` written, never read | n/a | n/a | existence only (`serve.rs:702-703`, `reset.rs:333`) |
 | update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped (a guard test) | n/a | fixed for #1680: one it can't parse is a switch that **failed**, never one confirmed. When the link moved after the file was written and `update/` holds exactly one other build, the new build is refused, then the link goes back, then the file is set aside (`update/src/own.rs`, `known_builds`, `settle`); a cut between steps never turns it around, since a start that finds the other build refused takes the put-back as done and only sets the file aside. This is done by the updater that runs, which then execs the old one, or by `lamp-update-back` on its usual gate, the deadline counted from the file's mtime. When the builds aren't known it's renamed `self.json.corrupt-<ms>` with a `log.jsonl` line and the link left, by `serve` only after the dry round a confirm needs. A round refuses while it waits. A file the disk won't give (not bad JSON) is never settled: that round is refused with a line (`self-unread`) and the next one reads it again. Only a `lamp-update-back` installed from this build on does its part |
 | update | `/var/lib/lampos-update/state.json` | JSON | none | **kept**: fields a later build wrote survive a save (`State::later`, `records.rs`) | n/a | read when a round acts. Unparseable is set aside as `state.json.corrupt-<ms>` with a line. `peek_state` (dry rounds) still falls back to empty silently |
@@ -1357,6 +1401,11 @@ test does (#1512):
   round's place of systemd. The unit's sandbox, `systemd-tmpfiles` and
   `systemctl restart` of a one-shot haven't run on a lamp. No published
   build carries settings yet.
+- Setup's reset plan (#806): tested on the Mac only (`tests/round.rs`,
+  `tests/install.rs`): a lamp with the plan of 19 Oct or of 20 Oct 10:36
+  (lamp-0c89's), updated by a round, ends with the build's and a backup.
+  No round carrying the plan has run on a lamp, and no published build
+  carries it yet.
 - The keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a

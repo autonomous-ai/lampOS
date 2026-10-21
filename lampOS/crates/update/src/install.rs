@@ -122,6 +122,18 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
     ),
+    // The skills' manage helper (#1722, #2414): root's, started by its
+    // socket for each connection, so the socket is enabled and the template
+    // never is. lamp-cloud's skills.remove and a made skill's spoken yes
+    // (#1685) ask it.
+    (
+        "lamp-skills-manage.socket",
+        include_str!("../../../deploy/product/lamp-skills-manage.socket"),
+    ),
+    (
+        "lamp-skills-manage@.service",
+        include_str!("../../../deploy/product/lamp-skills-manage@.service"),
+    ),
     (
         "lamp-records.service",
         include_str!("../../../deploy/product/lamp-records.service"),
@@ -224,8 +236,8 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     (
         "guard-mode",
         "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach no phone until `lamp-cloud` and the app's push \
-         relay take `messages/out`",
+         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_MESSAGES=on` in \
+         `lamp-cloud`, which carries `messages/out` up as unasked news",
     ),
     (
         "light-out",
@@ -387,20 +399,54 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("prepare-unplug", "SKILL.md"),
 ];
 
-/// Setup's two settings (docs/setup.md, "On a lamp"), written only with
-/// `install --setup on`: with them and no marker, `lamp-setup.service` starts
-/// the hotspot at boot. Off unless set, so rerunning install to upgrade the
-/// updater on a lamp set up by hand never puts it into setup (#811).
-pub const SETUP_SETTINGS: &[(&str, &str)] = &[
-    (
-        "/etc/lampOS/setup/serve.json",
-        include_str!("../../setup/fixtures/serve-own-page.json"),
-    ),
-    (
-        "/etc/lampOS/setup/reset-plan.json",
-        include_str!("../../setup/fixtures/reset-plan-product.json"),
-    ),
+/// Setup's own page (docs/setup.md, "On a lamp"), written only with
+/// `install --setup on`: with it, the reset plan ([`RESET_PLAN`]) and no
+/// marker, `lamp-setup.service` starts the hotspot at boot. Off unless set,
+/// so rerunning install to upgrade the updater on a lamp set up by hand
+/// never puts it into setup (#811).
+pub const SETUP_SETTINGS: &[(&str, &str)] = &[(
+    "/etc/lampOS/setup/serve.json",
+    include_str!("../../setup/fixtures/serve-own-page.json"),
+)];
+/// Setup's reset plan, at [`manifest::RESET_PLAN`]: what the 5 s reset
+/// wipes. The product's and never the person's (#806): install writes it
+/// with `--setup on`, and over any plan a lamp has, the old one kept in the
+/// records first; a lamp with none and no `--setup on` (set up by hand)
+/// gets none, since with setup's marker a plan arms the reset. A build
+/// carries it too (`reset_plan`, crate::apply).
+pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-product.json");
+/// Every SHA-256 of `crates/setup/fixtures/reset-plan-product.json` in git
+/// (`git log -p --follow` on it), the newest first: a lamp's plan that is
+/// one of these is a plan an earlier build shipped, said as such when the
+/// build's is written over it. Add the new one first whenever the fixture
+/// changes; never remove one.
+pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "881c5fd156474fcd8484e41f77e34f952f69aa85c6d71f3e33ceb0d7bfb9bd9d", // 64cefadfc, 21 Oct
+    "60be2ab39e759a6161d249710e5babfec042c944baa62450779ed7a4478eea22", // d06e9d53e, 21 Oct
+    "d5d911cdd1adb34395127e6d02c2936c826b13fa9f0fc34cf5bc1fc1d92254e4", // ce05f063e, 21 Oct
+    "4845d51735c6f369184f2d82fc7fb4d4922cd69460796ca699c8b5d267959120", // c4fd23ac2, 20 Oct
+    "de872e78cb60d724ce35d49ebff92be6cfba6caf5e38824c1e5d06cca60e7506", // ef6a2b9a7, 20 Oct: lamp-0c89's
+    "dd6c5fd360b6ba7b60c8e4d6330d992babf25e5fd21ac0d01d925dfc7cf20a7f", // 4de994a4d, 20 Oct
+    "67ed9881a61b82847fdf42a461cd9bbec4e84fb13dbca62c500b089a61abff4f", // 6b7e02655, 19 Oct
+    "e1db47e6dd266a5bbad77fba42ae5e1a4bd7c3091fa5bbc5e6c12c4c5061f4ac", // ff05ecea9, 19 Oct
+    "2bd3145d083626b82e88b067c37dd55dc1e701012c1447fdd5ccc05a93fb65d1", // 2e754384b, 19 Oct
+    "5dff6f81202528430637a63818bb7f159a912fb4c83dcde6386d56ab9ac4e3d4", // 4de8ebe1c, 19 Oct: lamp-06c1's
+    "6cce76f0751c44a53d4b35965a8c4819a46ff3dd562aa5483c928d23e37c0229", // 1f2bba3e0, 18 Oct
+    "199913e2f9a49ba4865c574046ba76c14b046fa19c7d6cde7fb81169a9e03d92", // c11cadbbd, 18 Oct
+    "5b77f93a80c524b593f685a8a1885db64c5a89a17bb4e5d7e9b8abdf4c3a58be", // a805cdc98, 18 Oct
+    "dea03e06a79e48659ede0b0cbb2be6dd8be165bcb15e368f5bb8140ce2ffbc05", // 7183d2219, 18 Oct
+    "dd547cb194c666b0d89c0010570d0c3588c054f9fcbceff395f6ebb6ec7ff061", // ac1f106bb, 17 Oct
+    "12377352390c46a4b610a13565ea27846b14e01176b449adf5788c56f7e519bc", // 572fe829e, 16 Oct
+    "b3a24f7b04d5431fc18c76e91b5ef14d86fbf9b40f85a97e542dc4ab7b6f2632", // b1d9bb2e5, 16 Oct
+    "8dfd3d03d80f06a852be4b92e4d803633d2776177c8e8e0ed349a9e8700d4f78", // 3a6e28adf, 16 Oct
+    "0fa5b5f7d1e8d4e9a6452505a7cb4a2f3a1e283453eebb0e14344dafc84668a8", // 10596b41a, 16 Oct
+    "e9c7404b207eb40b66813011220e3021deceb969ec7c939006577669ccad959c", // 831e92295, 16 Oct
 ];
+
+/// The reset plan as a build carries it (`reset_plan`, #806).
+pub fn reset_plan_setting() -> manifest::Setting {
+    manifest::Setting::new(manifest::RESET_PLAN, RESET_PLAN)
+}
 /// Models no build carries (#811): where each goes, where it is fetched from,
 /// and its size and SHA-256 (`deploy/product/models.json`): one release of
 /// ours, with the name part's own `name.onnx`, the one the lamps run.
@@ -568,6 +614,7 @@ const BESIDE_IF_CARRIED: &[(&str, &[&str])] =
     &[("lamp-body", &["lamp-body-measure", "lamp-body-mood"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
+/// A template (`NAME@.service`) is started by its socket, never enabled.
 const TIMED: &[&str] = &[
     "lamp-records.service",
     "lamp-selftest.service",
@@ -584,6 +631,7 @@ fn enabled() -> Vec<String> {
         .map(|(name, _)| *name)
         .filter(|name| {
             name.ends_with(".service")
+                && !name.contains('@')
                 && !TIMED.contains(name)
                 && !STARTED_BY_A_ROUND.contains(name)
         })
@@ -593,6 +641,7 @@ fn enabled() -> Vec<String> {
             "lamp-selftest.timer",
             "lamp-update-back.timer",
             "lampos-setup-done.path",
+            "lamp-skills-manage.socket",
         ])
         .map(str::to_owned)
         .collect()
@@ -1113,6 +1162,14 @@ pub fn install(
         &mut |state| save(&records, state),
     )?;
     own_pins_follow_build(config, &defaults, &mut changed, say)?;
+    reset_plan(
+        config,
+        manifest.sequence,
+        &mut state,
+        &mut changed,
+        say,
+        &mut |state| save(&records, state),
+    )?;
     // The voice's service and the user's key, private. Each is install's
     // while it is still what an install wrote, so a newer provider, or a key
     // V1 rotated in its config, reaches the lamp; one setup wrote, or one
@@ -1528,6 +1585,60 @@ pub fn settings_with_mode(
     // Every setting is settled: nothing is being written any more.
     state.settings_writing.clear();
     if *state != before {
+        persist(state)?;
+    }
+    Ok(())
+}
+
+/// Setup's reset plan ([`RESET_PLAN`], #806): written with `--setup on`
+/// where missing, and over any other plan the lamp has, never kept as the
+/// lamp's own. The old one is kept in the records first
+/// (crate::apply::keep_reset_plan) unless it is the plan recorded. A lamp
+/// with no plan and no `--setup on` gets none. Recorded as install's, its
+/// intent first, as [`settings_with_mode`] does.
+fn reset_plan(
+    config: &Install,
+    sequence: u64,
+    state: &mut State,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+    persist: &mut dyn FnMut(&State) -> Result<(), String>,
+) -> Result<(), String> {
+    let path = manifest::RESET_PLAN;
+    let new = manifest::sha256_hex(RESET_PLAN.as_bytes());
+    let now = match fs::read(config.on(path)) {
+        Ok(bytes) => Some(manifest::sha256_hex(&bytes)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("{path}: {error}")),
+    };
+    match now {
+        None if !config.setup => return Ok(()),
+        Some(now) if now == new => {
+            set_mode(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+        }
+        _ => {
+            let was = state
+                .settings
+                .get(path)
+                .or_else(|| state.settings_writing.get(path))
+                .cloned();
+            crate::apply::keep_reset_plan(
+                &config.root,
+                &config.on(&config.records),
+                sequence,
+                was.as_ref(),
+                say,
+            )
+            .map_err(|error| format!("{path}: {error}"))?;
+            state.settings_writing.insert(path.to_owned(), new.clone());
+            persist(state)?;
+            put(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+            state.settings_writing.remove(path);
+        }
+    }
+    if state.settings.get(path) != Some(&new) || state.settings_writing.contains_key(path) {
+        state.settings.insert(path.to_owned(), new);
+        state.settings_writing.remove(path);
         persist(state)?;
     }
     Ok(())
@@ -2258,13 +2369,36 @@ mod tests {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset and the waking face share one binary, and so do
-        // the air and its bus clock; every other service is a part.
+        // the air and its bus clock, and the skills and their manage helper;
+        // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 3, "every product service is a part");
+        assert_eq!(parts.len(), services - 4, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
         }
+    }
+
+    /// #1722, #2414: the skills' manage helper is installed, its socket
+    /// enabled and its template never (systemd starts one for each
+    /// connection), so the app's remove and a made skill's yes reach it.
+    #[test]
+    fn the_skills_manage_socket_is_enabled_and_its_template_is_not() {
+        assert!(
+            PRODUCT
+                .iter()
+                .any(|(name, _)| *name == "lamp-skills-manage@.service")
+        );
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lamp-skills-manage.socket")
+        );
+        assert!(
+            !enabled().iter().any(|name| name.contains('@')),
+            "{:?}",
+            enabled()
+        );
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from

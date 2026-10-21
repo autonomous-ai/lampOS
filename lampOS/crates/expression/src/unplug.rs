@@ -1,6 +1,6 @@
 //! Presentation follows the body's confirmed fold; it never claims a fold itself.
 use crate::Output;
-use lamp_body::unplug::{Phase, REQUEST_TOPIC, Request, STATE_TOPIC, State};
+use lamp_body::unplug::{Phase, REQUEST_TOPIC, Request, STATE_TOPIC, State, cancelled};
 use lamp_bus::{Bus, Kind, Message, Published, Publisher};
 use lamp_msgs::ExpressionFace;
 use std::{io, time::Duration};
@@ -11,7 +11,7 @@ pub(crate) struct Unplug {
     bus: Bus,
     acknowledgement: Publisher,
     resting: f32,
-    latched: bool,
+    pub(crate) latched: bool,
 }
 
 impl Unplug {
@@ -37,6 +37,14 @@ impl Unplug {
             .as_ref()
             .and_then(|message| message.parse::<Request>().ok())
             .filter(Request::valid);
+        // A matching Skills cancel ("never mind") hands the body back.
+        if request
+            .as_ref()
+            .is_some_and(|request| cancelled(&self.bus, request))
+        {
+            self.latched = false;
+            return None;
+        }
         self.latched |= request.is_some();
         if self.latched {
             output.body = None;

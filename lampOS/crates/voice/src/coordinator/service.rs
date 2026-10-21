@@ -747,6 +747,121 @@ mod tests {
         }
     }
 
+    /// lamp-0c89's update round, 21 Oct 13:13 (#1396): Controls swapped
+    /// mid-session. The conversation ends on its lapsed freshness, and the
+    /// next wait's privacy worker ends at its start, before the new
+    /// Controls reads the switch. The voice stays, the microphones closed,
+    /// reads the switch again, and opens on the next fresh read.
+    #[test]
+    fn a_controls_swap_mid_session_closes_the_microphones_and_never_ends_the_voice() {
+        let mut ended = Some(a_privacy_worker_ended("exit 0"));
+        let mut trace = SessionState::default();
+        let reads = Cell::new(0);
+        let active = Cell::new(0);
+        supervise(
+            &mut trace,
+            &mut None,
+            &Termination::inactive(),
+            |_, _| {
+                crate::service_privacy_controls::unreadable_retried(
+                    &Termination::inactive(),
+                    Duration::from_millis(1),
+                    || {
+                        reads.set(reads.get() + 1);
+                        // The second wait's first read: its worker ended.
+                        let error = if reads.get() == 2 { ended.take() } else { None };
+                        match error {
+                            Some(error) => crate::service_privacy_controls::started(Err(error))
+                                .map(|_| WaitOutcome::Allowed),
+                            None => Ok(WaitOutcome::Allowed),
+                        }
+                    },
+                    |_| Ok(()),
+                )
+            },
+            |_, _| {
+                active.set(active.get() + 1);
+                if active.get() == 1 {
+                    crate::service_privacy::finish(
+                        Err(crate::service_privacy::unavailable(
+                            "service privacy freshness lost before next observation",
+                        )),
+                        Ok(()),
+                    )
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .unwrap();
+        // Three reads: the first wait, the ended worker, the fresh one; and
+        // the conversation again after it.
+        assert_eq!((reads.get(), active.get()), (3, 2));
+        assert!(ended.is_none(), "the ended worker was read");
+        let muted: Vec<_> = trace
+            .iter()
+            .filter(|row| row["kind"] == "service_cycle_muted")
+            .collect();
+        assert_eq!(muted.len(), 1);
+        assert_eq!(muted[0]["reason"], "privacy_unreadable");
+    }
+
+    use crate::service_privacy_controls::tests::a_privacy_worker_ended;
+
+    /// Seventh on #1396: the conversation's own privacy worker ending
+    /// cleanly at its start, on the Controls route, ends the conversation as
+    /// an unreadable switch, so the voice goes back to the wait with the
+    /// microphones closed and doesn't exit. On the direct GPIO route, for a
+    /// worker that crashed and for another start failure, the error is as
+    /// it was (the reviewer-lead's P2 on #2506).
+    #[test]
+    fn a_conversations_privacy_worker_ended_at_its_start_goes_back_to_the_wait() {
+        let started = |error, controls| privacy_started(Err(error), controls).err().unwrap();
+        assert!(is_unavailable(&started(
+            a_privacy_worker_ended("exit 0"),
+            true
+        )));
+        assert!(!is_unavailable(&started(
+            a_privacy_worker_ended("exit 0"),
+            false
+        )));
+        assert!(!is_unavailable(&started(
+            a_privacy_worker_ended("exit 101"),
+            true
+        )));
+        assert!(!is_unavailable(&started(
+            a_privacy_worker_ended("kill -SEGV $$"),
+            true
+        )));
+        let timed_out = io::Error::new(io::ErrorKind::TimedOut, "worker readiness timed out");
+        assert!(!is_unavailable(&started(timed_out, true)));
+        let mut trace = SessionState::default();
+        let waits = Cell::new(0);
+        let active = Cell::new(0);
+        let mut ended = Some(a_privacy_worker_ended("exit 0"));
+        supervise(
+            &mut trace,
+            &mut None,
+            &Termination::inactive(),
+            |_, _| {
+                waits.set(waits.get() + 1);
+                Ok(WaitOutcome::Allowed)
+            },
+            |_, _| {
+                active.set(active.get() + 1);
+                match ended.take() {
+                    Some(error) => Err(started(error, true).into()),
+                    None => Ok(()),
+                }
+            },
+        )
+        .unwrap();
+        assert_eq!((waits.get(), active.get()), (2, 2));
+        assert!(trace.iter().any(
+            |row| row["kind"] == "service_cycle_muted" && row["reason"] == "privacy_unreadable"
+        ));
+    }
+
     /// #795: on the Controls route a switch that cannot be read closes the
     /// cycle; the service waits and reads again instead of ending, and says
     /// why. With its cleanup failed it still ends.

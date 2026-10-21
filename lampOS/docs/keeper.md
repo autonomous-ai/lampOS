@@ -359,7 +359,11 @@ keeps its own:
 - The settings the package carries in `provision/`: the voice's
   `provider.json` (0600), and the controls' `controls.json` and
   `controls-pins.json` (0644), the pins without `reset` and `legacy_head`,
-  which only `--touch` takes.
+  which only `--touch` takes, and without `privacy`, which only
+  `LAMP_PRIVACY_CONTROLS=on` takes (#2485): the generic controls refuse
+  either and would not start. A lamp moved before #2485 keeps a pins file
+  with `privacy`, since prepare writes only a missing file. lamp-a63e was the
+  only one, and was fixed by hand on 21 Oct.
 - The runtime directories under `/var/lib` (`lampOS`, the memory's, the
   actions', and the motor and camera locks 0700, the last four the parts'
   account's, `orangepi` on a V1 image).

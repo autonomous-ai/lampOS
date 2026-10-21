@@ -32,7 +32,7 @@ use std::{
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
-                     [--known-file PATH] [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
+                     [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -43,6 +43,9 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
+/// The eyes' known file, as the product unit passes it; `--known-file` wins
+/// when both are given.
+const KNOWN_ENVIRONMENT: &str = "LAMP_SKILLS_KNOWN_FILE";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -255,11 +258,10 @@ fn main() -> ExitCode {
     // The product unit gives the daily journal as an `Environment=` line, which
     // a lamp-skills built before it ignores, where an unknown `--daily-state`
     // would end that older binary at its start (#2157). The flag wins.
-    let daily_state = daily_state.or_else(|| {
-        std::env::var_os(DAILY_ENVIRONMENT)
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-    });
+    let daily_state = flag_or_environment(daily_state, DAILY_ENVIRONMENT);
+    // The eyes' known file comes so too, for a watch to tell the face of the
+    // person who asked (#1685): `--known-file` is as new as guard mode.
+    let known_file = flag_or_environment(known_file, KNOWN_ENVIRONMENT);
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -267,6 +269,7 @@ fn main() -> ExitCode {
         ask,
         light_requests: std::env::var(REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
+        addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         boot_id,
         clock_control,
         daily_state,
@@ -363,6 +366,26 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // (`package::STORE_SWITCH`): off, an install is refused as
         // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
         ("asked", []) => {
+            // Only lamp-cloud and the voice, by their cgroup, before the
+            // line is read (the reviewer's P3 on #2429).
+            let any = std::env::var(package::ANY_ASKER).as_deref() == Ok("on");
+            if any {
+                // Said each time, so a drop-in that sets it by mistake shows
+                // in the journal (the reviewer's P3 2 on #2429).
+                eprintln!(
+                    "lamp-skills: asked: {}=on: any peer may ask, as in the tests",
+                    package::ANY_ASKER
+                );
+            } else if !package::peer_is_an_asker() {
+                eprintln!(
+                    "lamp-skills: asked: refused a peer that is neither lamp-cloud nor the voice"
+                );
+                println!(
+                    "{}",
+                    serde_json::json!({ "refused": package::NOT_AN_ASKER })
+                );
+                return ExitCode::FAILURE;
+            }
             let store_on =
                 package::store_switched_on(std::env::var(package::STORE_SWITCH).ok().as_deref());
             let mut web = match store_on
@@ -508,6 +531,9 @@ struct Options {
     /// `LAMP_BODY_REQUESTS=on`: a skill's gestures and moves say who asks,
     /// for a body with `--arbitration on` (#940).
     body_requests: bool,
+    /// `LAMP_ADDONS=on`: add-ons are loaded and their proposals written
+    /// (`docs/addons.md`); without it, they are not loaded.
+    addons: bool,
     /// `--boot-id`: the boot a light request's claim is on, in place of the
     /// host's own, which only Linux has.
     boot_id: Option<String>,
@@ -836,7 +862,7 @@ fn serve(
                 }
             }
             None => eprintln!(
-                "lamp-skills: {} is on without --known-file, so Who was here marks nobody",
+                "lamp-skills: {} is on without --known-file or LAMP_SKILLS_KNOWN_FILE, so Who was here marks nobody",
                 lamp_skills::known::ENVIRONMENT
             ),
         }
@@ -898,6 +924,19 @@ fn serve(
             signs: None,
             retaken: HashMap::new(),
         }),
+        // Declared only when on: without the switch nothing new is on the bus.
+        proposals: if options.addons {
+            Some(Arc::new(Mutex::new(Proposals {
+                out: bus.publisher_declared(
+                    lamp_msgs::AddonProposal::TOPIC,
+                    &lamp_msgs::AddonProposal::declaration(),
+                    "skills",
+                )?,
+                limits: lamp_skills::addon::Limits::default(),
+            })))
+        } else {
+            None
+        },
     };
     let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
@@ -965,6 +1004,17 @@ fn serve(
                 let (mut skills, errors) = load_all(dir);
                 skills.retain(|skill| options.routines || !skill.is_routine());
                 skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
+                skills.retain(|skill| {
+                    let kept = options.addons || skill.kind != lamp_skills::SkillKind::Addon;
+                    if !kept {
+                        eprintln!(
+                            "lamp-skills: not loaded: {}: kind = \"addon\" runs only with {}=on",
+                            skill.name,
+                            lamp_skills::ADDONS_ENVIRONMENT
+                        );
+                    }
+                    kept
+                });
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
@@ -1165,7 +1215,17 @@ fn observe(
         let mut newest = NEWEST_HEARD
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        *newest = newest.max(Some(turn));
+        // A voice that started again numbers its turns from 1 again: its
+        // turns are newer than any of the boot before (lamp-c0a4, #1871).
+        // Boots aren't ordered: a late line of the old boot, read after the
+        // new one's first, takes the old boot back until the new boot's
+        // next line, and a search asked then stops on the new boot's words
+        // at once. Narrow, and the safe way round: the search stops.
+        let boot = &message.header.boot;
+        *newest = match newest.take() {
+            Some((was, newer)) if was == *boot => Some((was, newer.max(turn))),
+            _ => Some((boot.clone(), turn)),
+        };
     }
     let made = engine.observe(
         &message.header.topic,
@@ -1325,6 +1385,72 @@ struct Runner {
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
     watching: RefCell<Watching>,
+    /// With `LAMP_ADDONS=on`: where the add-ons' proposals are written, and
+    /// their limits (`docs/addons.md`).
+    proposals: Option<Arc<Mutex<Proposals>>>,
+}
+
+/// `addon/proposal`, written for the add-ons, and what they proposed lately.
+struct Proposals {
+    out: Publisher,
+    limits: lamp_skills::addon::Limits,
+}
+
+/// An add-on's run: each proposal numbered, held to the limits and written
+/// for the judge. What became of each is said; nothing else is made.
+fn propose(calls: &[Call], proposals: Option<&Arc<Mutex<Proposals>>>, may: &May) -> String {
+    let Some(proposals) = proposals else {
+        return format!(
+            "not proposed: {} is not on",
+            lamp_skills::ADDONS_ENVIRONMENT
+        );
+    };
+    let mut said = Vec::new();
+    for call in calls {
+        let Call::Propose(proposal) = call else {
+            continue;
+        };
+        if let Some(why) = may.refuses(call) {
+            said.push(why);
+            continue;
+        }
+        let mut proposals = proposals
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let numbered = match proposals.limits.admit(proposal, lamp_ipc::monotonic_us()) {
+            Ok(numbered) => numbered,
+            Err(why) => {
+                said.push(why);
+                continue;
+            }
+        };
+        let sent = proposals
+            .out
+            .publish_json(lamp_ipc::monotonic_us(), &numbered);
+        said.push(match sent {
+            Ok(_) => format!(
+                "proposed {} as {} on {}",
+                numbered.act,
+                numbered.proposal,
+                lamp_msgs::AddonProposal::TOPIC
+            ),
+            Err(error) => format!(
+                "not proposed: {} was not written ({error})",
+                lamp_msgs::AddonProposal::TOPIC
+            ),
+        });
+    }
+    said.join("; ")
+}
+
+/// A path given by its flag, or else by the environment's `name`, unless
+/// that is empty.
+fn flag_or_environment(flag: Option<PathBuf>, name: &str) -> Option<PathBuf> {
+    flag.or_else(|| {
+        std::env::var_os(name)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    })
 }
 
 /// The watch skills' watches ([`watch`]), the mark each shows while on,
@@ -1715,6 +1841,23 @@ fn start(
         );
         return made_rx;
     }
+    // An add-on's run proposes, and nothing else: written for the judge at
+    // once, on this thread, as it holds no output to wait on.
+    if !calls.is_empty() && calls.iter().all(|call| matches!(call, Call::Propose(_))) {
+        let why = propose(
+            &calls,
+            runner.proposals.as_ref(),
+            &runner.sockets_for(&skill).may,
+        );
+        let _ = made.send(());
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why,
+            allowed: None,
+        });
+        return made_rx;
+    }
     // A run waits on the voice for as long as the say takes (at most
     // SAY_TIMEOUT a line) or a light's for (at most 10 min): its own
     // thread, one a skill, so the skills go on listening.
@@ -1957,6 +2100,9 @@ fn tool_call(
     out: &mut Publisher,
     runner: &Runner,
 ) {
+    if name == lamp_skills::unplug::STAY_TOOL {
+        return stay_call((name, args, reply, admission), engine, runner);
+    }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
@@ -2277,6 +2423,18 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
         Ok(request) => request,
         Err(error) => return format!("unplug preparation could not start: {error}"),
     };
+    // Only for a request this process made: a repeated call keeps its timer.
+    if since == began {
+        let (sockets, bus, request) = (sockets.clone(), bus.clone(), request.clone());
+        let minutes = unplug::stay_minutes(std::env::var(unplug::STAY_ENVIRONMENT).ok().as_deref());
+        std::thread::spawn(move || {
+            if let Some(outcome) =
+                stay_after(&sockets, &bus, &request, Duration::from_secs(minutes * 60))
+            {
+                eprintln!("lamp-skills: unplug not taken in {minutes} min: {outcome}");
+            }
+        });
+    }
     let failure = loop {
         match unplug::read(bus, &request, since, clock::now_us()) {
             Ok(Progress::Ready) => {
@@ -2301,6 +2459,160 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     // Resuming automatically could raise the arm after the person heard a reply.
     let outcome = say_unplug_failure(skill, sockets);
     format!("unplug preparation failed: {failure}; {outcome}")
+}
+
+/// "Never mind": refused at once unless the unplug skill is loaded with its
+/// grants and the latch can be cancelled now; the line and the cancel follow
+/// on their own thread.
+fn stay_call((name, args, reply, admission): ToolAsk, engine: &Engine, runner: &Runner) {
+    use lamp_skills::unplug;
+    let sockets = runner.sockets_for(unplug::SKILL);
+    let checked = if !engine
+        .skills()
+        .iter()
+        .any(lamp_skills::Skill::prepares_unplug)
+    {
+        Err("Preparing to unplug is not enabled.".to_owned())
+    } else if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        Err(why)
+    } else {
+        unplug::may_stay(&runner.bus, clock::now_us(), false)
+    };
+    if !admission.commit() {
+        return;
+    }
+    let request = match checked {
+        Ok(request) => request,
+        Err(why) => {
+            eprintln!("lamp-skills: {name} with {args} not run: {why}");
+            let _ = reply.send(json!({ "error": why }));
+            return;
+        }
+    };
+    let _ = reply.send(json!({
+        "next": "Say nothing. The lamp says it will stay, then gets back up by itself."
+    }));
+    let bus = runner.bus.clone();
+    std::thread::spawn(move || {
+        let outcome = stay(&sockets, &bus, &request, unplug::STAY_LINE);
+        eprintln!("lamp-skills: {name}: {outcome}");
+    });
+}
+
+/// The line first; only once it has begun is the cancel published, and the
+/// body waits a further 3 s before any motion. A line never begun cancels
+/// nothing: a person mid-unplug must hear it before the arm moves.
+fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    let mut cancelled = None;
+    let outcome = say(
+        &sockets.say,
+        "staying plugged in",
+        lamp_skills::unplug::SKILL,
+        json!({"note": line, "priority": 8}),
+        &[],
+        || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
+    );
+    match cancelled {
+        Some(Ok(())) if failed_after_cancel(bus, request) => format!(
+            "{outcome}; cancel published for {request}; it then failed: {}",
+            say_check(sockets)
+        ),
+        Some(Ok(())) => format!("{outcome}; cancel published for {request}"),
+        Some(Err(error)) => format!("{outcome}; the cancel was not published: {error}"),
+        None => format!("{outcome}; nothing cancelled: the line was not begun"),
+    }
+}
+
+/// After a cancel, whether the body failed this request instead of standing
+/// (it fails 60 s after the cancel with no fresh proof). It stops looking
+/// once the body's state for it is 2 s old (it stood) or another's, and
+/// after 65 s whatever it reads.
+fn failed_after_cancel(bus: &Bus, request: &str) -> bool {
+    let until = clock::now_us() + 65_000_000;
+    while clock::now_us() < until {
+        let Some(message) = bus.latest(lamp_body::unplug::State::TOPIC).ok().flatten() else {
+            return false;
+        };
+        let Ok(state) = message.parse::<lamp_body::unplug::State>() else {
+            return false;
+        };
+        if state.request != request
+            || clock::now_us().saturating_sub(message.header.at_us) > 2_000_000
+        {
+            return false;
+        }
+        if state.phase == lamp_body::unplug::Phase::Failed {
+            return true;
+        }
+        clock::sleep(Duration::from_millis(500));
+    }
+    false
+}
+
+fn say_check(sockets: &Sockets) -> String {
+    say(
+        &sockets.say,
+        "unplug needs checking",
+        lamp_skills::unplug::SKILL,
+        json!({"note": lamp_skills::unplug::CHECK_LINE, "priority": 8}),
+        &[],
+        || {},
+    )
+}
+
+/// The timeout: after `wait` of unbroken Ready with this process up, the
+/// same cancel with its own line, once. A look that is not Ready (stale, or
+/// still folding) starts the wait again. Never from Failed: a preparation
+/// that fails after it was Ready (a hand on the arm before any cancel) says
+/// once that it needs to be checked, and nothing stands it up.
+fn stay_after(sockets: &Sockets, bus: &Bus, request: &str, wait: Duration) -> Option<String> {
+    use lamp_skills::unplug;
+    let mut ready_since: Option<u64> = None;
+    let mut was_ready = false;
+    loop {
+        let now = clock::now_us();
+        match lamp_body::unplug::in_force(bus, Some("skills")) {
+            Ok(Some(live)) if live.request == request => {}
+            // Cancelled, replaced or unreadable: nothing of ours to time out.
+            _ => return None,
+        }
+        match unplug::may_stay(bus, now, true) {
+            Ok(_) => {
+                was_ready = true;
+                if ready_for(&mut ready_since, true, now, wait) {
+                    return Some(stay(sockets, bus, request, unplug::TIMEOUT_LINE));
+                }
+            }
+            // Failed, however old: it stays down until it is inspected. A
+            // failure before Ready was said by the preparation itself.
+            Err(_)
+                if bus
+                    .latest(lamp_body::unplug::State::TOPIC)
+                    .ok()
+                    .flatten()
+                    .and_then(|message| message.parse::<lamp_body::unplug::State>().ok())
+                    .is_some_and(|state| {
+                        state.request == request && state.phase == lamp_body::unplug::Phase::Failed
+                    }) =>
+            {
+                return was_ready.then(|| say_check(sockets));
+            }
+            Err(_) => {
+                ready_for(&mut ready_since, false, now, wait);
+            }
+        }
+        clock::sleep(Duration::from_millis(500));
+    }
+}
+
+/// One look of the timer at `now`: whether `wait` of unbroken Ready has
+/// passed. A look that is not Ready starts the wait again.
+fn ready_for(ready_since: &mut Option<u64>, ready: bool, now: u64, wait: Duration) -> bool {
+    if !ready {
+        *ready_since = None;
+        return false;
+    }
+    now.saturating_sub(*ready_since.get_or_insert(now)) >= wait.as_micros() as u64
 }
 
 fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
@@ -2889,21 +3201,24 @@ fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut 
     }
 }
 
-/// The newest turn heard on `voice/heard`, as the main loop read it: the
-/// bus keeps no latest of an event topic. Read before each call (#2179).
-static NEWEST_HEARD: Mutex<Option<u64>> = Mutex::new(None);
+/// The newest turn heard on `voice/heard`, as the main loop read it, with
+/// the voice's boot it was heard from: the bus keeps no latest of an event
+/// topic. Read before each call (#2179).
+static NEWEST_HEARD: Mutex<Option<(String, u64)>> = Mutex::new(None);
 
 /// What ends a search (#1685): the body pushed, the lamp paused, or words
 /// heard. The voice listening is not enough: on lamp-52e6 a line of office
 /// noise, 0 words heard, ended a search after its first look (Fifth's row 3,
 /// #1871). Words of the turn that asked for the search, or an earlier one,
 /// do not end it: on Live the last pieces of the asking line can come after
-/// the call. Without `voice/heard` it ends as a show does, on the voice
-/// listening.
+/// the call. A turn of another voice boot is always later: a voice that
+/// started again numbers from 1. Without `voice/heard` it ends as a show
+/// does, on the voice listening.
 struct SearchStop {
     heard: Option<Subscriber>,
-    /// The turn of the newest words heard as the search began.
-    asked: Option<u64>,
+    /// The turn of the newest words heard as the search began, and the
+    /// voice boot it was heard from.
+    asked: Option<(String, u64)>,
 }
 
 impl SearchStop {
@@ -2914,9 +3229,10 @@ impl SearchStop {
             .subscribe(Speech::TOPICS[0], &format!("skills_search_{n}"))
             .map_err(|error| eprintln!("lamp-skills: voice/heard not read for a search: {error}"))
             .ok();
-        let asked = *NEWEST_HEARD
+        let asked = NEWEST_HEARD
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
         Self { heard, asked }
     }
 
@@ -2927,14 +3243,15 @@ impl SearchStop {
         let Some(heard) = &mut self.heard else {
             return voice_listening(bus).then(|| "the voice is listening to someone".into());
         };
-        let asked = self.asked;
-        let later = |speech: &Speech| match (speech.request, asked) {
-            (Some(turn), Some(asked)) => turn > asked,
+        let asked = self.asked.as_ref();
+        let later = |boot: &str, speech: &Speech| match (speech.request, asked) {
+            (Some(turn), Some((was, asked))) if was == boot => turn > *asked,
             _ => true,
         };
         while let Some(message) = receive(heard, Duration::ZERO) {
+            let boot = message.header.boot.clone();
             if message.parse::<Speech>().is_ok_and(|speech| {
-                later(&speech) && speech.text.chars().any(char::is_alphanumeric)
+                later(&boot, &speech) && speech.text.chars().any(char::is_alphanumeric)
             }) {
                 return Some("someone spoke to the lamp".into());
             }
@@ -3362,6 +3679,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),
         Call::Text(_) => "text: a watch's, sent by the watch".into(),
+        Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
     }
 }
@@ -3392,6 +3710,25 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The known file and the daily journal come by their flag, or else by
+    /// the unit's `Environment=` line, which an older binary ignores where
+    /// it would end on an unknown flag (#2157); the flag wins.
+    #[test]
+    fn a_path_comes_by_its_flag_or_else_the_environment() {
+        let flag = Some(PathBuf::from("/run/lampos-eyes/known"));
+        assert_eq!(flag_or_environment(flag.clone(), "HOME"), flag);
+        assert_eq!(
+            flag_or_environment(None, "HOME"),
+            std::env::var_os("HOME")
+                .filter(|home| !home.is_empty())
+                .map(PathBuf::from)
+        );
+        assert_eq!(
+            flag_or_environment(None, "LAMP_SKILLS_NOT_A_SWITCH_ANYWHERE"),
+            None
+        );
+    }
 
     /// Fourth on #2304: a descriptor that says a hang-up with nothing to
     /// read makes the wait wait on the wake alone, so a call still wakes it
@@ -3658,6 +3995,211 @@ mod tests {
         }
     }
 
+    /// A latched request and the body's fresh state for it, as the body has them.
+    fn latched(bus: &Bus, phase: &str) {
+        let mut request = bus
+            .publisher_declared(
+                lamp_body::unplug::Request::TOPIC,
+                &lamp_body::unplug::Request::declaration(),
+                "skills",
+            )
+            .unwrap();
+        request.publish_json(1, &json!({"request": "r1"})).unwrap();
+        let mut body = bus
+            .publisher_declared(
+                lamp_body::unplug::State::TOPIC,
+                &lamp_body::unplug::State::declaration(),
+                "body",
+            )
+            .unwrap();
+        body.publish_json(
+            clock::now_us(),
+            &json!({"request": "r1", "phase": phase, "why": ""}),
+        )
+        .unwrap();
+    }
+
+    fn cancels(bus: &Bus) -> Option<u64> {
+        bus.latest(lamp_body::unplug::CANCEL_TOPIC)
+            .unwrap()
+            .map(|message| message.header.seq)
+    }
+
+    /// A say service that answers each line `begun` then `spoken`, noting for
+    /// each whether the cancel was already published when the line arrived.
+    fn voice(listener: UnixListener, bus: Bus) -> std::thread::JoinHandle<Vec<(String, bool)>> {
+        listener.set_nonblocking(false).unwrap();
+        std::thread::spawn(move || {
+            let mut heard = Vec::new();
+            listener.set_nonblocking(true).unwrap();
+            let until = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < until {
+                let Ok((stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
+                heard.push((
+                    asked["note"].as_str().unwrap().to_owned(),
+                    cancels(&bus).is_some(),
+                ));
+                let mut stream = &stream;
+                writeln!(stream, "{}", json!({"event": "begun"})).unwrap();
+                writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
+            }
+            heard
+        })
+    }
+
+    #[test]
+    fn never_mind_says_its_line_before_the_cancel_that_moves_the_body() {
+        let dir = tempfile::Builder::new()
+            .prefix("us")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "folding");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let request = lamp_skills::unplug::may_stay(&bus, clock::now_us(), false).unwrap();
+        let outcome = stay(&sockets, &bus, &request, lamp_skills::unplug::STAY_LINE);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::STAY_LINE.to_owned(), false)],
+            "the line reached the voice before any cancel"
+        );
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// The reviewer on #2069 (new P3): a body that fails after the cancel
+    /// (no proof within 60 s) is said to need checking, once.
+    #[test]
+    fn a_failure_after_the_cancel_says_it_needs_checking() {
+        let dir = tempfile::Builder::new()
+            .prefix("uc")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let failing = {
+            let bus = bus.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                latched(&bus, "failed");
+            })
+        };
+        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        failing.join().unwrap();
+        assert!(outcome.contains("it then failed"), "{outcome}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [
+                (lamp_skills::unplug::STAY_LINE.to_owned(), false),
+                (lamp_skills::unplug::CHECK_LINE.to_owned(), true)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_line_never_begun_cancels_nothing() {
+        let dir = tempfile::Builder::new()
+            .prefix("un")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        assert!(outcome.contains("nothing cancelled"), "{outcome}");
+        assert!(cancels(&bus).is_none());
+    }
+
+    #[test]
+    fn the_timeout_fires_once_and_never_from_failed() {
+        let dir = tempfile::Builder::new()
+            .prefix("ut")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let sockets = nowhere(dir.path(), unplug_grants());
+        latched(&bus, "failed");
+        assert_eq!(stay_after(&sockets, &bus, "r1", Duration::ZERO), None);
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let fired = stay_after(&sockets, &bus, "r1", Duration::ZERO).unwrap();
+        assert!(fired.contains("cancel published for r1"), "{fired}");
+        // Once cancelled, it is over: a second timer finds nothing to do.
+        assert_eq!(stay_after(&sockets, &bus, "r1", Duration::ZERO), None);
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::TIMEOUT_LINE.to_owned(), false)]
+        );
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// The reviewer on #2069 (P3 2): Ready at minute 0, lost and Ready again
+    /// at 9:30, stands 10 minutes after 9:30, not at 10:00.
+    #[test]
+    fn the_timer_counts_unbroken_minutes_ready() {
+        let min = |m: f64| (m * 60_000_000.0) as u64;
+        let wait = Duration::from_secs(600);
+        let mut since = None;
+        assert!(!ready_for(&mut since, true, 0, wait));
+        assert!(!ready_for(&mut since, false, min(9.0), wait), "a gap");
+        assert!(!ready_for(&mut since, true, min(9.5), wait));
+        assert!(!ready_for(&mut since, true, min(10.0), wait));
+        assert!(!ready_for(&mut since, true, min(19.4), wait));
+        assert!(ready_for(&mut since, true, min(19.5), wait));
+    }
+
+    /// The first builder on #2069 (P2): a hand on the arm before any cancel
+    /// fails a Ready preparation; the timer then says it needs to be checked,
+    /// once, and cancels nothing.
+    #[test]
+    fn a_failure_after_ready_says_it_needs_checking_and_never_stands() {
+        let dir = tempfile::Builder::new()
+            .prefix("uf")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let sockets = nowhere(dir.path(), unplug_grants());
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let failing = {
+            let bus = bus.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(200));
+                latched(&bus, "failed");
+            })
+        };
+        let said = stay_after(&sockets, &bus, "r1", Duration::from_secs(600)).unwrap();
+        failing.join().unwrap();
+        assert!(said.contains("spoken"), "{said}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::CHECK_LINE.to_owned(), false)]
+        );
+        assert_eq!(cancels(&bus), None);
+    }
+
     #[test]
     fn unplug_reload_changes_new_admissions_not_captured_run_grants() {
         let dir = tempfile::tempdir().unwrap();
@@ -3687,6 +4229,7 @@ mod tests {
                 signs: None,
                 retaken: HashMap::new(),
             }),
+            proposals: None,
         };
         let admitted = runner.sockets_for(lamp_skills::unplug::SKILL);
         runner.permissions.borrow_mut().clear();
@@ -3913,6 +4456,7 @@ mod tests {
                         signs: None,
                         retaken: HashMap::new(),
                     }),
+                    proposals: None,
                 };
                 let told = start(
                     "test".into(),
@@ -3977,6 +4521,7 @@ mod tests {
                 signs: None,
                 retaken: HashMap::new(),
             }),
+            proposals: None,
         };
         let dance = runner.sockets_for("dance");
         assert_eq!(dance.may.skill, "dance");

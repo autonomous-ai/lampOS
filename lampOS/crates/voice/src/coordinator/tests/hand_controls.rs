@@ -1943,6 +1943,62 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
     }
 }
 
+/// The first builder on #2506 (#1396): while the Controls route reads the
+/// switch again because each fresh worker ends at its start, the retry
+/// tells the wait the switch reads unavailable, and once that has lasted
+/// `WAIT_UNREADABLE_AFTER_US` the health says the microphones are off until
+/// it can be read, so the wait shows outside the journal.
+#[test]
+fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
+    use crate::privacy::PrivacyState;
+    use crate::service_privacy::WaitOutcome;
+    use lamp_msgs::{Diagnostic, Level};
+    let root = std::path::PathBuf::from(format!("/tmp/lvw-unread-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut hears = bus
+        .subscribe_typed(Diagnostic::TOPIC, "test", Diagnostic::TYPE)
+        .unwrap();
+    let controls = RefCell::new(None);
+    let reminders = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let outcome = muted_wait(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        Some(crate::bus_out::WaitHealth::on(&bus).unwrap()),
+        |on_state, gate| {
+            // As `wait_selected`'s retry says it, since a while ago.
+            let since = monotonic_us() - crate::bus_out::WAIT_UNREADABLE_AFTER_US - 100_000;
+            on_state(
+                PrivacyState::Unavailable,
+                crate::process::new_boot().unwrap(),
+                since,
+            )?;
+            gate()?;
+            Ok(WaitOutcome::Stopped)
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Stopped);
+    let mut said = Vec::new();
+    while let Some(message) = hears.recv(std::time::Duration::from_millis(50)).unwrap() {
+        let report = message.parse::<Diagnostic>().unwrap();
+        said.push((report.level, report.message));
+    }
+    assert!(
+        said.contains(&(
+            Level::Warn,
+            "the microphones are off until the privacy switch can be read".to_owned()
+        )),
+        "{said:?}"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// #1371, and the reviewer and Jarvis on #1376: the muted wait's own
 /// closures, around the real privacy wait and its mock GPIO worker (closed
 /// for its first readings, then open), say the voice's health while it

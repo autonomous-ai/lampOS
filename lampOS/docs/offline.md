@@ -20,7 +20,21 @@ breaks, a part that says whether the lamp is online, show it) come after it.
 - **The voice's report on the bus** (`crates/voice/src/bus_out.rs`): on
   `diagnostics`, `link: "down"` and "it cannot reach the speech service, and
   keeps trying" after 5 s; `lamp-health` shows it. Taken as the signal a
-  watcher of reachability can use, before any probe of its own.
+  watcher of reachability can use, before any probe of its own. A refusal is
+  not a link down (#2231), and is said at once as it is, with `link:
+  "refused"`, and also as the run ends (`BusOut::report_now`). A refused key
+  (`refused: "key"`) gives "the speech service refused this lamp's key: it
+  needs a working key, from setup or the app's own keys". A spent quota
+  (`refused: "limited"`) gives "the speech service refuses this lamp for now
+  (its allowance is used up); it asks again in a few minutes". A rate limit
+  gives "the speech service is busy and turns this lamp away for now; it asks
+  again shortly". `voice/link` says `Authentication` or `Limited` for these.
+  A run that ends on a spent quota or a rate limit stays 120 s before it
+  leaves. A refused key does the same only the second time in a row within
+  10 minutes (`.key-refused` beside the sessions; any other end removes it),
+  so one 401/403 from a proxy, or a key being changed, is asked again after
+  the usual restart. A change in the voice's settings folder (a key put
+  right from setup or the app) ends the wait early.
 - **`voice/link`** (`crates/msgs/src/lib.rs`, `VoiceLink`: ready or
   unavailable, with why) is declared and registered, and nothing publishes
   it. The place for the voice's own link state.
@@ -110,6 +124,15 @@ capture never comes up still fails at 25 s, and so does every finite
 (`directed`) session; with the switch off or anything but `on`, the budget
 covers the link as before (`crates/voice/src/session_lifetime.rs`, tests
 `serve_started_offline_*` and `started_offline_without_*`).
+
+The line is printed only by a voice still not ready when the budget runs
+out, which is Live waiting for its link. The second route
+(`LAMP_VOICE_ROUTE=second`) says its link is Ready at start
+(`crates/voice/src/second_provider/link.rs`), so with no internet it shows
+`listening_ready` as soon as the route is up, with no link wait, stays
+active, and never prints the line: the 25 s budget does not apply there at
+all. On the second route it is `LAMP_OFFLINE_VOICE` and `LAMP_REACH_PROBE`
+that make an offline start useful, not `LAMP_START_OFFLINE` (#1844).
 
 Kind: off unless set. Not yet shown on a host with its network cut or on a
 lamp.

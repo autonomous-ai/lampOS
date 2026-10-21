@@ -228,6 +228,11 @@ software mute with the reason `sleep`: microphones off (First, #711).
   nothing else wakes it: not a tap the voice did not take, its name, a
   touch, a reminder or a face. After a restart of either part it is asleep
   again from the voice's first word.
+- The body sleeps with it (#1362): lamp-body, with `LAMP_HEAD_TOUCH=on`,
+  reads the same word and folds now, over its stand time, even with
+  somebody in front of it ([body.md](body.md), "Asleep"). The sleeping pose
+  here is the head's only, 0.023 rad, too small to see; the fold is what a
+  person sees. Woken by a tap, the body stands up at once.
 - When the voice opens again (a tap on the head, or the button's hold), it
   wakes.
 - A hold the voice did not take as sleep (the voice open, or muted for a

@@ -24,6 +24,13 @@
 //! takes. It never writes `state.json` itself, which may be of a newer
 //! updater than it.
 //!
+//! The build's reset plan (`reset_plan`, #806) is the product's and never
+//! the person's: wherever the lamp has a plan, the build's is written over
+//! it, the old one kept first in the records as
+//! `reset-plan.json.before-<build>` unless it is the plan recorded. A lamp
+//! with no plan gets none: one set up by hand would have its 5 s reset armed.
+//! A copy older than the field ignores it, and the round says so.
+//!
 //! With the request's `image`, the image's own files for the lamp's
 //! variant are written the same way (crate::image, #1369), where the lamp's
 //! is still one the image shipped; then systemd and udev are reloaded, and
@@ -35,7 +42,7 @@
 use crate::{
     image,
     manifest::{self, ImageFile, Setting},
-    records::{State, sync_folder, write_whole},
+    records::{State, sync_folder, unix_ms, write_whole},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
@@ -229,6 +236,70 @@ pub fn plan(
     Ok(steps)
 }
 
+/// What the build's reset plan needs on this lamp (#806): none where the
+/// lamp has no plan; recorded where it is the build's already; written over
+/// any other, the lamp's own or a past build's alike, never kept.
+pub fn reset_plan_step(
+    root: &Path,
+    plan: &Setting,
+    recorded: &BTreeMap<String, String>,
+) -> io::Result<Option<Step>> {
+    let now = now_sha(root, &plan.path)
+        .map_err(|error| io::Error::new(error.kind(), format!("{}: {error}", plan.path)))?;
+    let act = match now {
+        None => None,
+        Some(now) if Some(&now) == plan.sha256.as_ref() => {
+            (recorded.get(&plan.path) != Some(&now)).then_some(Act::Record)
+        }
+        Some(_) => Some(Act::Write),
+    };
+    Ok(act.map(|act| Step {
+        setting: plan.clone(),
+        act,
+    }))
+}
+
+/// The lamp's reset plan, kept in `records` before the build's is written
+/// over it, as `reset-plan.json.before-<sequence>` (with the time after it
+/// if one of another plan is there), and said: whether it is a plan install
+/// once shipped ([`crate::install::RESET_PLAN_SHIPPED`]) or not. None when
+/// it is the plan recorded, which a build wrote, or it is not there.
+pub fn keep_reset_plan(
+    root: &Path,
+    records: &Path,
+    sequence: u64,
+    recorded: Option<&String>,
+    say: &mut dyn FnMut(&str),
+) -> io::Result<Option<PathBuf>> {
+    let at = on_root(root, manifest::RESET_PLAN);
+    let bytes = match fs::read(&at) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let sha = manifest::sha256_hex(&bytes);
+    if recorded == Some(&sha) {
+        return Ok(None);
+    }
+    let mut kept = records.join(format!("reset-plan.json.before-{sequence}"));
+    if fs::read(&kept).is_ok_and(|there| there != bytes) {
+        kept = records.join(format!("reset-plan.json.before-{sequence}-{}", unix_ms()));
+    }
+    write_whole(&kept, &bytes, 0o600)?;
+    let whose = if crate::install::RESET_PLAN_SHIPPED.contains(&sha.as_str()) {
+        "a plan an earlier build shipped"
+    } else {
+        "a plan no build shipped"
+    };
+    say(&format!(
+        "{} was {whose} ({}…): kept in {} before the build's is written",
+        manifest::RESET_PLAN,
+        &sha[..12],
+        kept.display()
+    ));
+    Ok(Some(kept))
+}
+
 /// The paths a plan writes or removes.
 pub fn writes(steps: &[Step]) -> Vec<String> {
     steps
@@ -341,6 +412,8 @@ struct Signed {
     settings: Vec<Setting>,
     #[serde(default)]
     image: Vec<ImageFile>,
+    #[serde(default)]
+    reset_plan: Option<Setting>,
 }
 
 /// The little of the state it reads: the records, never written by it.
@@ -465,6 +538,9 @@ fn apply(
     }
     manifest::check_settings(&signed.settings).map_err(|why| why.0)?;
     manifest::check_image(&signed.image).map_err(|why| why.0)?;
+    if let Some(plan) = &signed.reset_plan {
+        manifest::check_reset_plan(plan).map_err(|why| why.0)?;
+    }
     let recorded: Recorded = read_json(&records.join("state.json"))
         .map_err(|error| format!("the state: {error}"))?
         .unwrap_or_default();
@@ -476,6 +552,11 @@ fn apply(
         &BTreeMap::new(),
     )
     .map_err(|error| error.to_string())?;
+    if let Some(plan) = &signed.reset_plan {
+        steps.extend(
+            reset_plan_step(root, plan, &recorded.settings).map_err(|error| error.to_string())?,
+        );
+    }
     let of_settings = steps.len();
     if request.image && !signed.image.is_empty() {
         match image::variant(root).map_err(|error| format!("{}: {error}", image::PROFILE))? {
@@ -504,7 +585,7 @@ fn apply(
     for (at, step) in steps.iter().enumerate() {
         let path = &step.setting.path;
         let allowed = if at < of_settings {
-            manifest::is_setting_path(path)
+            manifest::is_setting_path(path) || path == manifest::RESET_PLAN
         } else {
             is_image_path(path)
         };
@@ -523,6 +604,21 @@ fn apply(
                 command,
             )?;
         }
+    }
+    // The lamp's reset plan kept whole in the records, beside back.json,
+    // which the next build's apply writes over (#806).
+    if steps
+        .iter()
+        .any(|step| step.act == Act::Write && step.setting.path == manifest::RESET_PLAN)
+    {
+        keep_reset_plan(
+            root,
+            records,
+            sequence,
+            recorded.settings.get(manifest::RESET_PLAN),
+            say,
+        )
+        .map_err(|error| failed_at(manifest::RESET_PLAN, error))?;
     }
     // Every file as it was, kept before the first is changed.
     let mut files = Vec::new();
@@ -632,7 +728,10 @@ fn back(
             let mut troubles = Vec::new();
             for before in &back.files {
                 let path = &before.path;
-                if !manifest::is_setting_path(path) && !is_image_path(path) {
+                if !manifest::is_setting_path(path)
+                    && !is_image_path(path)
+                    && path != manifest::RESET_PLAN
+                {
                     troubles.push(format!("{path} is not a setting's path"));
                     continue;
                 }
@@ -880,6 +979,7 @@ mod tests {
                 models: Vec::new(),
                 settings,
                 image,
+                reset_plan: None,
             };
             // Signed unchecked: what a lamp refuses is a publisher's to sign.
             manifest::seal_unchecked(&serde_json::to_vec(&manifest).unwrap(), &self.key).unwrap()
@@ -1521,6 +1621,7 @@ mod tests {
         for path in manifest::IMAGE_FILES
             .iter()
             .chain(manifest::SETTING_FILES)
+            .chain([&manifest::RESET_PLAN])
             .copied()
             .chain(
                 manifest::SETTING_FOLDERS

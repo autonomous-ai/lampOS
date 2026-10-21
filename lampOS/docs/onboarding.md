@@ -268,8 +268,9 @@ then, as privacy always is once available. Never done: the bound adds no
 evidence. A restart re-arms the wait.
 
 The runner gives the model one short sentence to say and nothing else,
-about 3-5 s spoken: "Try my privacy switch <verified location>: turn it off,
-then on again." (`privacy_invitation` in `onboarding.rs`). The attempt is
+about 3-5 s spoken: "Try my privacy switch <verified location>: close it,
+then open it again." (`privacy_invitation` in `onboarding.rs`; closed =
+microphones off, so the words end with the lamp hearing). The attempt is
 armed as the invitation's turn begins (its words taken for that turn, the
 `onboarding_privacy_armed` row), not when the turn ends: a fresh close from
 then on counts, even while the lamp is still saying it. That close mutes the
@@ -278,7 +279,12 @@ candidate and is neither a failed try nor a new offer; the next cycle
 completes on the fresh open as below. On the lead's 52e6 run (21 October) the
 person closed the switch 13 s after the offer while a longer invitation was
 still being said, nothing was armed yet, and the step was offered again and
-skipped. A close stamped before the invitation began is not its answer. An
+skipped. Words are given only for a baseline the attempt can arm with
+(`privacy::armable`); if arming still fails as the turn begins, the words
+already being said spend no try: the same try is offered again once the
+switch reads open (an `onboarding_privacy_arm_failed` row), and the offer's
+90 s give-up bounds a failure that keeps coming. A close stamped before the
+invitation began is not its answer. An
 invitation that ends without being heard whole (cut off, a playback gap, no
 audio: the turn's shared `heard_whole` proof) drops the armed attempt and can
 be retried once, then skipped. Software mute, sleep, an initial open level,

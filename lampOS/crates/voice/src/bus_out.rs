@@ -511,13 +511,42 @@ pub const LINK_GRACE_US: u64 = 5_000_000;
 pub fn health(
     link_up: bool,
     down_for_us: u64,
+    refusal: Option<crate::provider_worker::Fault>,
     mic_at_start: Option<crate::wire::MicWaited>,
 ) -> lamp_msgs::Diagnostic {
+    use crate::provider_worker::Fault;
     use lamp_msgs::{Diagnostic, Level};
     let well = |link: &str| match mic_at_start {
         Some(waited) => Diagnostic::new(Level::Ok, SOURCE, &waited.plain()).with("link", link),
         None => Diagnostic::ok(SOURCE).with("link", link),
     };
+    // Refused, not unreachable (#2231): said at once and as it is, so a
+    // person knows what the lamp needs rather than that it keeps trying.
+    let refused = match refusal {
+        _ if link_up => None,
+        Some(Fault::Authentication) => Some((
+            "the speech service refused this lamp's key: it needs a working key, from setup or the app's own keys",
+            "key",
+        )),
+        Some(Fault::QuotaExceeded) => Some((
+            "the speech service refuses this lamp for now (its allowance is used up); it asks again in a few minutes",
+            "limited",
+        )),
+        Some(Fault::RateLimited) => Some((
+            "the speech service is busy and turns this lamp away for now; it asks again shortly",
+            "limited",
+        )),
+        _ => None,
+    };
+    if let Some((message, refused)) = refused {
+        let message = match mic_at_start {
+            Some(waited) => format!("{message}; {}", waited.plain()),
+            None => message.to_owned(),
+        };
+        return Diagnostic::new(Level::Warn, SOURCE, &message)
+            .with("link", "refused")
+            .with("refused", refused);
+    }
     if link_up {
         well("ready")
     } else if down_for_us < LINK_GRACE_US {
@@ -857,14 +886,25 @@ impl WaitHealth {
 
 /// The link as `voice/link` says it: unavailable only once it has been
 /// down for [`LINK_GRACE_US`], so a session renewing itself is not the
-/// lamp going offline. The fault's own kind is not known here: the
-/// coordinator keeps only whether the link is ready, so it is said as a
-/// failed connection.
-pub fn link_state(link_up: bool, down_for_us: u64) -> VoiceLink {
-    if link_up || down_for_us < LINK_GRACE_US {
-        VoiceLink::ready()
-    } else {
-        VoiceLink::unavailable(LinkFault::Transport)
+/// lamp going offline. A refusal (#2231) is said at once with its kind;
+/// any other fault's kind is not known here, so it is said as a failed
+/// connection.
+pub fn link_state(
+    link_up: bool,
+    down_for_us: u64,
+    refusal: Option<crate::provider_worker::Fault>,
+) -> VoiceLink {
+    use crate::provider_worker::Fault;
+    if link_up {
+        return VoiceLink::ready();
+    }
+    match refusal {
+        Some(Fault::Authentication) => VoiceLink::unavailable(LinkFault::Authentication),
+        Some(Fault::QuotaExceeded | Fault::RateLimited) => {
+            VoiceLink::unavailable(LinkFault::Limited)
+        }
+        _ if down_for_us < LINK_GRACE_US => VoiceLink::ready(),
+        _ => VoiceLink::unavailable(LinkFault::Transport),
     }
 }
 
@@ -1022,12 +1062,27 @@ impl BusOut {
         let _ = self.said.alive();
     }
 
+    /// The report said now, whatever was said last (#2231, the reviewer on
+    /// #2459): a run that ends on a refusal says why before it leaves, even
+    /// within the 950 ms after its last report.
+    pub fn report_now(
+        &mut self,
+        link_up: bool,
+        refusal: Option<crate::provider_worker::Fault>,
+        now_us: u64,
+        mic_at_start: Option<crate::wire::MicWaited>,
+    ) {
+        self.reported_at_us = None;
+        self.report(link_up, refusal, now_us, mic_at_start);
+    }
+
     /// Whether the voice can reach the speech service now. Call every
     /// tick: how the voice is, is said a little more often than once a
     /// second, for the lamp's health.
     pub fn report(
         &mut self,
         link_up: bool,
+        refusal: Option<crate::provider_worker::Fault>,
         now_us: u64,
         mic_at_start: Option<crate::wire::MicWaited>,
     ) {
@@ -1048,14 +1103,14 @@ impl BusOut {
             .map_or(0, |since| now_us.saturating_sub(since));
         let report = ring_off(
             could_not_start(
-                health(link_up, down_for, mic_at_start),
+                health(link_up, down_for, refusal, mic_at_start),
                 self.could_not_start,
             ),
             self.ring_off,
         );
         let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
-            let _ = link.publish_json(now_us, &link_state(link_up, down_for));
+            let _ = link.publish_json(now_us, &link_state(link_up, down_for, refusal));
         }
     }
 
@@ -1168,6 +1223,51 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
     const WAIT: Duration = Duration::from_millis(500);
+
+    /// #2231: a refusal is said at once and as it is, the key's and the
+    /// quota's apart, on `voice/link` too, and not once the link is up.
+    #[test]
+    fn a_refused_key_or_quota_is_said_as_it_is_and_at_once() {
+        use crate::provider_worker::Fault;
+        let key = health(false, 0, Some(Fault::Authentication), None);
+        assert_eq!(key.level, lamp_msgs::Level::Warn);
+        assert!(
+            key.message.contains("refused this lamp's key"),
+            "{}",
+            key.message
+        );
+        assert!(!key.message.contains("cannot reach"), "{}", key.message);
+        assert_eq!(
+            link_state(false, 0, Some(Fault::Authentication)),
+            VoiceLink::unavailable(LinkFault::Authentication)
+        );
+        let quota = health(false, 0, Some(Fault::QuotaExceeded), None);
+        assert!(
+            quota.message.contains("allowance is used up"),
+            "{}",
+            quota.message
+        );
+        // A 429 is said as busy, not as a spent quota (the reviewer-lead on #2459).
+        let busy = health(false, 0, Some(Fault::RateLimited), None);
+        assert!(busy.message.contains("busy"), "{}", busy.message);
+        assert!(!busy.message.contains("allowance"), "{}", busy.message);
+        assert_eq!(
+            link_state(false, 0, Some(Fault::RateLimited)),
+            VoiceLink::unavailable(LinkFault::Limited)
+        );
+        // Any other fault is the link down, after its grace, as before.
+        let other = health(false, LINK_GRACE_US, Some(Fault::Transport), None);
+        assert!(other.message.contains("cannot reach"), "{}", other.message);
+        assert_eq!(
+            link_state(false, 0, Some(Fault::Transport)),
+            VoiceLink::ready()
+        );
+        // A link up again is well, whatever was refused before.
+        assert_eq!(
+            health(true, 0, Some(Fault::Authentication), None).level,
+            lamp_msgs::Level::Ok
+        );
+    }
 
     /// A kept room older than `ROOM_FRESH_MS` is no room: the worker that
     /// published it may have stopped (Third on #1032).
@@ -1324,7 +1424,7 @@ mod tests {
     #[test]
     fn a_ring_off_for_good_is_a_warning_with_its_fact_and_the_rest_after() {
         use lamp_msgs::Level;
-        let well = health(true, 0, None);
+        let well = health(true, 0, None, None);
         assert_eq!(ring_off(well.clone(), false), well);
         let off = ring_off(well, true);
         assert_eq!(off.level, Level::Warn);
@@ -1341,7 +1441,10 @@ mod tests {
         };
         assert_eq!(fact(&off, "ring").as_deref(), Some("off"));
         assert_eq!(fact(&off, "link").as_deref(), Some("ready"));
-        let down = ring_off(could_not_start(health(false, LINK_GRACE_US, None), 1), true);
+        let down = ring_off(
+            could_not_start(health(false, LINK_GRACE_US, None, None), 1),
+            true,
+        );
         assert_eq!(down.level, Level::Warn);
         assert!(down.message.starts_with(
             "the light ring faulted and stays off until the voice starts again; the voice could not start"
@@ -1351,7 +1454,7 @@ mod tests {
     #[test]
     fn runs_that_could_not_start_are_a_warning_never_a_mute() {
         use lamp_msgs::Level;
-        let well = health(true, 0, None);
+        let well = health(true, 0, None, None);
         assert_eq!(could_not_start(well.clone(), 0), well);
         let once = could_not_start(well.clone(), 1);
         assert_eq!(once.level, Level::Warn);
@@ -1370,7 +1473,7 @@ mod tests {
                 .any(|fact| fact.key == "could_not_start" && fact.value == "1")
         );
         assert!(!once.message.contains("muted"));
-        let down = could_not_start(health(false, LINK_GRACE_US, None), 3);
+        let down = could_not_start(health(false, LINK_GRACE_US, None, None), 3);
         assert_eq!(down.level, Level::Warn);
         assert!(
             down.message
@@ -1445,19 +1548,22 @@ mod tests {
 
     #[test]
     fn the_link_is_unavailable_only_after_its_grace_and_published_only_when_asked() {
-        assert_eq!(link_state(true, 0), VoiceLink::ready());
-        assert_eq!(link_state(false, LINK_GRACE_US - 1), VoiceLink::ready());
-        let down = link_state(false, LINK_GRACE_US);
+        assert_eq!(link_state(true, 0, None), VoiceLink::ready());
+        assert_eq!(
+            link_state(false, LINK_GRACE_US - 1, None),
+            VoiceLink::ready()
+        );
+        let down = link_state(false, LINK_GRACE_US, None);
         assert_eq!(down, VoiceLink::unavailable(LinkFault::Transport));
         assert!(down.check().is_ok());
         let (bus, root) = bus("link");
         let mut off = BusOut::on(&bus).unwrap().with_link(&bus, false).unwrap();
-        off.report(false, 0, None);
-        off.report(false, LINK_GRACE_US + 1_000_000, None);
+        off.report(false, None, 0, None);
+        off.report(false, None, LINK_GRACE_US + 1_000_000, None);
         assert!(bus.latest(VoiceLink::TOPIC).unwrap().is_none());
         let mut on = BusOut::on(&bus).unwrap().with_link(&bus, true).unwrap();
-        on.report(false, 0, None);
-        on.report(false, LINK_GRACE_US + 1_000_000, None);
+        on.report(false, None, 0, None);
+        on.report(false, None, LINK_GRACE_US + 1_000_000, None);
         let latest = bus.latest(VoiceLink::TOPIC).unwrap().unwrap();
         assert_eq!(
             latest.parse::<VoiceLink>().unwrap(),
@@ -1606,21 +1712,21 @@ mod tests {
                 .map(|fact| (fact.key.clone(), fact.value.clone()))
                 .collect()
         };
-        let up = health(true, 0, None);
+        let up = health(true, 0, None, None);
         assert_eq!(
             (up.level, up.name.as_str(), up.message.as_str()),
             (Level::Ok, "voice", "")
         );
         assert_eq!(facts(&up), [("link".to_string(), "ready".to_string())]);
         // Down for a moment, as at every start and every renewal: still well.
-        let renewing = health(false, LINK_GRACE_US - 1, None);
+        let renewing = health(false, LINK_GRACE_US - 1, None, None);
         assert_eq!(renewing.level, Level::Ok);
         assert_eq!(
             facts(&renewing),
             [("link".to_string(), "connecting".to_string())]
         );
         // Down for longer: said, with for how long.
-        let down = health(false, 42_500_000, None);
+        let down = health(false, 42_500_000, None, None);
         assert_eq!(
             (down.level, down.message.as_str()),
             (
@@ -1642,7 +1748,7 @@ mod tests {
             waited_ms: 4_300,
             opened_on_try: 18,
         });
-        let noted = health(true, 0, waited);
+        let noted = health(true, 0, None, waited);
         assert_eq!(
             (noted.level, noted.message.as_str()),
             (
@@ -1650,7 +1756,7 @@ mod tests {
                 "the voice mic was off USB for 4.3 s at start; opened on try 18"
             )
         );
-        let down = health(false, 42_500_000, waited);
+        let down = health(false, 42_500_000, None, waited);
         assert_eq!(
             (down.level, down.message.as_str()),
             (
@@ -1668,7 +1774,7 @@ mod tests {
         let mut out = BusOut::on(&bus).unwrap();
         // Nine seconds of ticks, 2 ms apart: up for one, then down.
         for tick in 0..4_500u64 {
-            out.report(tick < 500, tick * 2_000, None);
+            out.report(tick < 500, None, tick * 2_000, None);
         }
         let mut said = Vec::new();
         while let Some(message) = hears.recv(Duration::from_millis(50)).unwrap() {

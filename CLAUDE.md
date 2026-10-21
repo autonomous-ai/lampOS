@@ -109,6 +109,13 @@ This repo is developed in both **Cursor** and **Claude Code**. The following rul
 
 See `docs/DEV-MULTI-IDE.md` for full conventions.
 
+## Communication Language
+
+Use English by default for all user-facing communication, including progress
+updates, questions, and final responses. Switch to Vietnamese or another
+language only when the user explicitly requests it; do not infer a language
+switch solely from the language of their message.
+
 ## Subagent Usage
 
 When work can be split across independent, file-scoped tasks, spawn subagents in parallel instead of doing them sequentially. Common cases in this repo:

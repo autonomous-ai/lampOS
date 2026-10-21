@@ -19,6 +19,7 @@ use std::{
     sync::Arc,
 };
 
+pub mod addon;
 pub mod clock;
 pub mod daily;
 pub mod glow;
@@ -44,6 +45,11 @@ pub fn clip_us(name: &str) -> Option<u64> {
 /// With `LAMP_BODY_REQUESTS=on`, each gesture and move a skill sends on the
 /// body's mood socket says who asks (#940).
 pub const BODY_REQUESTS_ENVIRONMENT: &str = "LAMP_BODY_REQUESTS";
+
+/// `LAMP_ADDONS=on`: skills of kind `addon` run and write their proposals
+/// on `addon/proposal` (`docs/addons.md`). Off unless set: without it they
+/// are not loaded, and nothing new is published.
+pub const ADDONS_ENVIRONMENT: &str = "LAMP_ADDONS";
 /// The engine's local clock value, produced internally rather than by a
 /// bus publisher. Clock triggers still pass the usual conditions and gate.
 pub const LOCAL_CLOCK_TOPIC: &str = "clock/local";
@@ -484,6 +490,43 @@ struct StepFile {
     if_choice: Option<Vec<String>>,
     /// A light show, `shows/NAME.toml`: its frames in turn (#1679).
     show: Option<String>,
+    /// An add-on's proposal (`kind = "addon"` only, `docs/addons.md`): what
+    /// it suggests, which a judge keeps or drops.
+    propose: Option<ProposeFile>,
+}
+
+/// `propose = { ... }`: what an add-on suggests, as its folder writes it.
+/// Every word in it is the folder's, read when the skill is installed.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProposeFile {
+    act: String,
+    why: String,
+    sure: f32,
+    /// How long it stays worth doing: `"30s"`, at most 30 s.
+    holds: String,
+    light: Option<ProposeLightFile>,
+    gesture: Option<String>,
+    mood: Option<ProposeMoodFile>,
+    note: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProposeLightFile {
+    colour: String,
+    level: u8,
+    pattern: Option<PatternFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProposeMoodFile {
+    energy: Option<f32>,
+    warmth: Option<f32>,
+    /// How long the nudge lasts: `"10m"`, at most 10 minutes.
+    #[serde(rename = "for")]
+    lasting: String,
 }
 
 /// Which runs a step is made in, when not every one: those its trigger
@@ -691,6 +734,12 @@ pub enum SkillKind {
     /// `lamp-skills remove`), from a folder or a package.
     #[default]
     Installable,
+    /// A partner's add-on (`docs/addons.md`): installed and removed as an
+    /// installable skill, but it only proposes. It reads the add-on topics
+    /// alone ([`lamp_msgs::ADDON_TOPICS`]), its steps are proposals that
+    /// `lamp-skills` writes on `addon/proposal` for a judge, and it runs
+    /// only with `LAMP_ADDONS=on` ([`ADDONS_ENVIRONMENT`]).
+    Addon,
 }
 
 impl SkillKind {
@@ -698,6 +747,7 @@ impl SkillKind {
         match self {
             Self::Core => "core",
             Self::Installable => "installable",
+            Self::Addon => "addon",
         }
     }
 
@@ -706,7 +756,10 @@ impl SkillKind {
         match kind {
             Some("core") => Ok(Self::Core),
             None | Some("installable") => Ok(Self::Installable),
-            Some(other) => Err(format!("kind = {other:?}: \"core\" or \"installable\"")),
+            Some("addon") => Ok(Self::Addon),
+            Some(other) => Err(format!(
+                "kind = {other:?}: \"core\", \"installable\" or \"addon\""
+            )),
         }
     }
 }
@@ -769,6 +822,10 @@ pub struct Permissions {
     /// no presentation or generic action, and no restoration of a setting.
     #[serde(default)]
     pub output_limits: bool,
+    /// What an add-on may propose ([`lamp_msgs::ADDON_ACTS`]): its only
+    /// output, and an add-on's alone.
+    #[serde(default)]
+    pub propose: Vec<String>,
 }
 
 impl Permissions {
@@ -801,6 +858,14 @@ impl Permissions {
             }
             Call::Look => ("look", self.look),
             Call::Text(_) => ("messages", self.messages),
+            Call::Propose(proposal) => {
+                return (!self.propose.contains(&proposal.act)).then(|| {
+                    format!(
+                        "propose {} needs {:?} in [permissions] propose, which it does not give",
+                        proposal.act, proposal.act
+                    )
+                });
+            }
             Call::PrepareUnplug => unreachable!("handled above"),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -863,6 +928,9 @@ impl Permissions {
         if !self.actions.is_empty() {
             parts.push(format!("actions {}", self.actions.join(", ")));
         }
+        if !self.propose.is_empty() {
+            parts.push(format!("proposes {}", self.propose.join(", ")));
+        }
         if parts.is_empty() {
             "nothing".into()
         } else {
@@ -895,6 +963,19 @@ impl Permissions {
                 return Err(format!("[permissions] {what} lists one twice"));
             }
         }
+        if let Some(wrong) = self
+            .propose
+            .iter()
+            .find(|act| !lamp_msgs::ADDON_ACTS.contains(&act.as_str()))
+        {
+            return Err(format!(
+                "[permissions] propose: {wrong:?} is not one of {:?}",
+                lamp_msgs::ADDON_ACTS
+            ));
+        }
+        if (1..self.propose.len()).any(|at| self.propose[..at].contains(&self.propose[at])) {
+            return Err("[permissions] propose lists one twice".into());
+        }
         Ok(())
     }
 }
@@ -921,6 +1002,151 @@ fn function_name(name: &str) -> bool {
         .is_some_and(|first| first.is_ascii_lowercase())
         && name.len() <= 48
         && letters.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+/// What a skill of kind `addon` may not have (`docs/addons.md`, "The
+/// `addon` kind's manifest"): it only proposes, it starts itself by its
+/// triggers alone, and every proposal goes to a judge, so no output of its
+/// own, no tool a model could call, no Policy's question and no step but a
+/// proposal.
+fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
+    let refused = |what: &str| {
+        Err(format!(
+            "an add-on only proposes: {what} is refused for kind = \"addon\""
+        ))
+    };
+    if file.version.is_none() {
+        return Err("an add-on says its version: version = \"MAJOR.MINOR.PATCH\"".into());
+    }
+    if no_triggers {
+        return Err("an add-on starts itself by its triggers alone: it needs one".into());
+    }
+    let p = &file.permissions;
+    for (given, what) in [
+        (p.speak, "speak"),
+        (p.light, "light"),
+        (p.body, "body"),
+        (p.look, "look"),
+        (p.messages, "messages"),
+        (p.known_faces, "known_faces"),
+        (p.output_limits, "output_limits"),
+        (!p.actions.is_empty(), "actions"),
+    ] {
+        if given {
+            return refused(&format!("{what} in [permissions]"));
+        }
+    }
+    if p.propose.is_empty() {
+        return Err("an add-on lists what it may propose in [permissions] propose".into());
+    }
+    if let Some(topic) = p
+        .topics
+        .iter()
+        .find(|topic| !lamp_msgs::ADDON_TOPICS.contains(&topic.as_str()))
+    {
+        return refused(&format!(
+            "reading {topic} (an add-on reads only {:?})",
+            lamp_msgs::ADDON_TOPICS
+        ));
+    }
+    for (there, what) in [
+        (
+            file.ask.is_some(),
+            "[ask] (its judge is asked about every proposal)",
+        ),
+        (
+            file.tool.is_some(),
+            "a tool (a person's call is the model's, not a partner's)",
+        ),
+        (file.choice.is_some(), "[choice]"),
+        (file.flag.is_some(), "[flag]"),
+        (file.again.is_some(), "[again]"),
+        (file.still.is_some(), "still"),
+        (file.history.is_some(), "[history]"),
+        (file.search.is_some(), "[search]"),
+        (file.stop.is_some(), "[stop]"),
+        (file.watch.is_some(), "[watch]"),
+        (file.limits.is_some(), "[limits]"),
+        (file.rest.is_some(), "[rest]"),
+    ] {
+        if there {
+            return refused(what);
+        }
+    }
+    for step in &file.steps {
+        if step.propose.is_none()
+            || step.body.is_some()
+            || step.light.is_some()
+            || step.say.is_some()
+            || step.sound.is_some()
+            || step.cue.is_some()
+            || step.rest.is_some()
+            || step.look.is_some()
+            || step.show.is_some()
+            || step.after.is_some()
+            || step.if_choice.is_some()
+        {
+            return refused("a step that is not a proposal");
+        }
+    }
+    Ok(())
+}
+
+/// A proposal as an add-on's folder writes it, checked as the judge will
+/// read it, under the add-on's name and version. Numbered when it is sent.
+fn proposal(
+    file: ProposeFile,
+    addon: &str,
+    version: &str,
+) -> Result<lamp_msgs::AddonProposal, String> {
+    let holds_ms = u32::try_from(duration_us(&file.holds)? / 1_000).unwrap_or(u32::MAX);
+    let light = match file.light {
+        None => None,
+        Some(light) => Some(lamp_msgs::AddonLight {
+            pattern: light
+                .pattern
+                .map(|pattern| pattern_of(pattern, Some(light.level)))
+                .transpose()?,
+            colour: light.colour,
+            level: light.level,
+        }),
+    };
+    let mood = match file.mood {
+        None => None,
+        Some(mood) => Some(lamp_msgs::AddonMood {
+            energy: mood.energy,
+            warmth: mood.warmth,
+            for_ms: u32::try_from(duration_us(&mood.lasting)? / 1_000).unwrap_or(u32::MAX),
+        }),
+    };
+    if let Some(gesture) = &file.gesture
+        && !gesture_known(gesture)
+    {
+        return Err(format!(
+            "propose: gesture {gesture:?} is not one of the body's"
+        ));
+    }
+    let proposal = lamp_msgs::AddonProposal {
+        // A placeholder that passes the check: the program numbers it.
+        proposal: 1,
+        addon: addon.into(),
+        version: version.into(),
+        act: file.act,
+        why: file.why,
+        sure: file.sure,
+        holds_ms,
+        light,
+        gesture: file.gesture,
+        mood,
+        note: file.note,
+    };
+    proposal
+        .check()
+        .map_err(|lamp_msgs::Invalid(why)| format!("propose: {why}"))?;
+    Ok(lamp_msgs::AddonProposal {
+        proposal: 0,
+        ..proposal
+    })
 }
 
 /// `MAJOR.MINOR.PATCH`, each a whole number without a sign or a leading
@@ -1124,6 +1350,17 @@ impl Skill {
     }
 
     /// The core unplug skill is not advertised until all parts are enabled.
+    /// An add-on's proposals, as its folder writes them, not yet numbered.
+    pub fn proposals(&self) -> Vec<&lamp_msgs::AddonProposal> {
+        self.steps
+            .iter()
+            .filter_map(|(_, step)| match step {
+                Step::Call(Call::Propose(proposal)) => Some(proposal.as_ref()),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn prepares_unplug(&self) -> bool {
         self.steps
             .iter()
@@ -1405,6 +1642,9 @@ pub enum Call {
     /// A short text for the person's phone, on `messages/out`: only a
     /// watch's ([`watch`]), never a step.
     Text(String),
+    /// An add-on's proposal (`docs/addons.md`), written on `addon/proposal`
+    /// with its number stamped as it is sent: never an output by itself.
+    Propose(Box<lamp_msgs::AddonProposal>),
     /// The trigger of a run that holds something until it ends stopped
     /// holding: what it held is given back. Alone in its run.
     Ends,
@@ -1602,6 +1842,14 @@ impl Call {
             Self::Rest(rest) => ("rest", json!({ "op": rest.op })),
             Self::AfterSay => ("after_say", json!({})),
             Self::Text(text) => ("text", json!({ "text": text })),
+            Self::Propose(proposal) => {
+                let mut args = json!(proposal);
+                // Numbered as it is sent: a test names what it proposes.
+                if let Some(args) = args.as_object_mut() {
+                    args.remove("proposal");
+                }
+                ("propose", args)
+            }
             Self::Ends => ("ends", json!({})),
         }
     }
@@ -1884,6 +2132,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     }
     let file: SkillFile =
         toml::from_str(&read("skill.toml")?).map_err(|error| format!("skill.toml: {error}"))?;
+    let kind = SkillKind::read(file.kind.as_deref())?;
+    if kind == SkillKind::Addon {
+        addon_file(&file, file.trigger.is_none())?;
+    } else if !file.permissions.propose.is_empty() {
+        return Err("[permissions] propose is an add-on's: kind = \"addon\"".into());
+    }
     let triggers = match file.trigger {
         None => Vec::new(),
         Some(toml::Value::Array(many)) => many,
@@ -1943,8 +2197,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         return Err("skill.toml needs a trigger or a tool, and at least one [[do]]".into());
     }
     let watch = file.watch.map(watch::spec).transpose()?;
-    let policy = file.ask.map(|ask| ask.policy).unwrap_or_default();
-    if !triggers.is_empty() && policy.is_empty() {
+    let policy = file
+        .ask
+        .as_ref()
+        .map(|ask| ask.policy.clone())
+        .unwrap_or_default();
+    // An add-on asks nobody here: each proposal goes to its judge.
+    if !triggers.is_empty() && policy.is_empty() && kind != SkillKind::Addon {
         return Err("[ask] names the Policy's question".into());
     }
     if let Some(tool) = &file.tool {
@@ -1960,6 +2219,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         {
             return Err(format!(
                 "tool {tool:?}: a lowercase letter, then at most 47 lowercase letters, digits and _"
+            ));
+        }
+        if tool == unplug::STAY_TOOL {
+            return Err(format!(
+                "tool {tool:?} is reserved for the unplug cancel of prepare-unplug"
             ));
         }
         if description.len() > 1_024 {
@@ -2274,9 +2538,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.rest.is_none()
             && step.look.is_none()
             && step.show.is_none()
+            && step.propose.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, look or show".into(),
+                "a [[do]] step names body, light, say, sound, cue, rest, look, show or propose"
+                    .into(),
             );
         }
         if let Some(on) = &step.on
@@ -2557,6 +2823,15 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             }
             steps.push(Step::Call(Call::Rest(rest.checked()?)));
         }
+        if let Some(propose) = step.propose {
+            if kind != SkillKind::Addon {
+                return Err("propose is an add-on's step: kind = \"addon\"".into());
+            }
+            let version = file.version.clone().unwrap_or_default();
+            steps.push(Step::Call(Call::Propose(Box::new(proposal(
+                propose, &name, &version,
+            )?))));
+        }
         ons.resize(steps.len(), on);
     }
     let steps: Vec<(Option<Only>, Step)> = ons.into_iter().zip(steps).collect();
@@ -2654,7 +2929,6 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             return Err(format!("not permitted: {why}"));
         }
     }
-    let kind = SkillKind::read(file.kind.as_deref())?;
     if let Some(version) = &file.version
         && !version_ok(version)
     {
@@ -2802,6 +3076,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     for (topic, by) in skill.reads() {
         if let Some(why) = skill.permissions.refuses_reading(&topic) {
             return Err(format!("not permitted: {by} reads {topic}, and {why}"));
+        }
+        if skill.kind == SkillKind::Addon && !lamp_msgs::ADDON_TOPICS.contains(&topic.as_str()) {
+            return Err(format!(
+                "not permitted: {by} reads {topic}, and an add-on reads only {:?}",
+                lamp_msgs::ADDON_TOPICS
+            ));
         }
     }
     for (_, step) in &skill.steps {
@@ -3136,7 +3416,7 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     // `[stop]` may be shared by the skills of one group (#1685), one
     // function for them all.
     let mut taken: BTreeMap<String, (String, SkillKind, Option<String>)> = BTreeMap::new();
-    for kind in [SkillKind::Core, SkillKind::Installable] {
+    for kind in [SkillKind::Core, SkillKind::Installable, SkillKind::Addon] {
         for (_, result) in &mut loaded {
             let Ok(skill) = result else { continue };
             if skill.kind != kind {
@@ -4550,7 +4830,8 @@ impl Engine {
                     continue;
                 }
                 watch.waiting_us = None;
-                if trigger.once_per_day && (self.skip_ask || self.ask_policy) {
+                let acts = self.skip_ask || self.ask_policy || skill.kind == SkillKind::Addon;
+                if trigger.once_per_day && acts {
                     if self.daily_faulted {
                         continue;
                     }
@@ -4603,7 +4884,7 @@ impl Engine {
                     question["away_min"] = json!(watch.away_us / 60_000_000);
                     question["there_s"] = json!(held_us / 1_000_000);
                 }
-                if self.skip_ask || self.ask_policy {
+                if acts {
                     watch.ran_us = Some(now_us);
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
@@ -4835,6 +5116,28 @@ fn decide(
     question: Value,
     made: impl FnOnce() -> Vec<Call>,
 ) -> Run {
+    // An add-on asks nobody here: what it proposes goes to its judge, which
+    // keeps or drops each proposal (`docs/addons.md`).
+    if skill.kind == SkillKind::Addon {
+        let events = vec![
+            event(&skill.name, SkillStage::Triggered, held, None),
+            event(
+                &skill.name,
+                SkillStage::Answered,
+                "an add-on: its proposals go to the judge on addon/proposal".into(),
+                Some(true),
+            ),
+        ];
+        return Run {
+            generation: generation.cloned(),
+            skill: skill.name.clone(),
+            events,
+            calls: made(),
+            ask: None,
+            queue: false,
+            from: None,
+        };
+    }
     let mut events = vec![
         event(&skill.name, SkillStage::Triggered, held, None),
         event(
@@ -5091,6 +5394,15 @@ pub fn tools_file(skills: &[Skill]) -> Value {
                 "parameters": {"type": "object", "properties": properties}
             }));
         }
+    }
+    // "Never mind" is declared whenever the unplug skill is loaded, so a Live
+    // session that asked for the unplug already has it; with no latch in
+    // force the call is refused (`unplug::may_stay`). It moves the body.
+    if skills.iter().any(Skill::prepares_unplug)
+        && !tools.iter().any(|tool| tool["name"] == unplug::STAY_TOOL)
+    {
+        tools.push(unplug::stay_tool());
+        moving.push(unplug::STAY_TOOL);
     }
     if moving.is_empty() {
         json!({ "tools": tools })

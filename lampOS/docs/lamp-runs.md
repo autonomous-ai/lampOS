@@ -113,7 +113,7 @@ Seventh borrows it this morning. Fifth offered (07:4x on #1722) to take runs the
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
-| `LAMP_SECOND_SKILL_LOOK` and the "Look for my keys" row | #941, #1871 | "Lamp, where are my keys?" with look-for-things installed: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees. | person at the arm | #1712 |
+| `LAMP_SECOND_SKILL_LOOK` and the "Look for my keys" row | #941, #1871 | ~~"Lamp, where are my keys?" with look-for-things installed: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees~~ (the first builder's four cases passed on lamp-c0a4, 21 Oct 13:3x, Thirteen on #1871: found at the first look, found to one side, not found and stopped, ended by "stop"; a push wasn't shown, and c0a4's side looks don't turn the base, as its gaze isn't measured). | person at the arm | #1712 |
 | `LAMP_ADDRESSED` | #792 | Played on a lamp that faces its seat (lamp-4ace's seat is sideways, #763). | nothing (played) | #1712 |
 | `LAMP_HEAD_TOUCH` | #849 | Tap to speaker under 150 ms, the hum by ear, `head_gap_ms` recorded. | a hand on the head | #1712 |
 | `LAMP_HEAD_TAP_CUE_DBFS` | #849 | The tap's hum level tuned by ear (-35 is unmeasured). | a hand on the head; an ear | #1712 |
@@ -138,13 +138,13 @@ Friday also runs probes and #2176's memory cases here. One person serves all thr
 
 | Row or switch | PR | The run | Needs | Build |
 |---|---|---|---|---|
-| `lamp-health --reach-idle` (El) | #1844 | A Wi-Fi minute with nobody speaking: `lamp/online` false within about 30 s of the cut, true within about 5 s of it back. | the Wi-Fi cut by hand | #1712 |
-| `LAMP_REACH_PROBE` (El) | #1247 | A minute with the Wi-Fi off (offline, the line once) and a minute with only the relay unreachable (online, no line). | the Wi-Fi cut; the relay blocked | #1712 |
-| `LAMP_VOICE_LINK` (El) | #884 | `lamp/online` false 5 s after the link drops, with `lamp-health --online on`. | the Wi-Fi cut | #1712 |
-| `LAMP_START_OFFLINE` (El) | #884 | Wi-Fi off, restart the voice: it stays up and logs "listening with no link". | the Wi-Fi cut | #1712 |
-| `lamp-expression --offline-face` (El) | #978 | Its minute on a lamp, with the Wi-Fi off. | the Wi-Fi cut | lamp-voice |
+| `lamp-health --reach-idle` (El) | #1844 | ~~A Wi-Fi minute with nobody speaking: `lamp/online` false within about 30 s of the cut, true within about 5 s of it back~~ (passed on lamp-75c9, 21 Oct 14:1x, Nine on #1844: false 8.7 s after the cut, true 1.7 s after it was back). | the Wi-Fi cut by hand | #1712 |
+| `LAMP_REACH_PROBE` (El) | #1247 | ~~A minute with the Wi-Fi off (offline, the line once) and a minute with only the relay unreachable (online, no line)~~ (passed on lamp-75c9, 21 Oct 14:1x, Nine on #1844). | the Wi-Fi cut; the relay blocked | #1712 |
+| `LAMP_VOICE_LINK` (El) | #884 | ~~`lamp/online` false 5 s after the link drops, with `lamp-health --online on`~~ (passed on lamp-75c9, 21 Oct 14:1x, Nine on #1844: 1.1 s after). | the Wi-Fi cut | #1712 |
+| `LAMP_START_OFFLINE` (El) | #884 | ~~Wi-Fi off, restart the voice: it stays up and logs "listening with no link" on Live; on the second route (`LAMP_VOICE_ROUTE=second`), `listening_ready` and the voice still active a minute later, with no such line~~ (passed on the second route, the lamps' route, on lamp-75c9, 21 Oct 14:1x, Nine on #1844). | the Wi-Fi cut | #1712 |
+| `lamp-expression --offline-face` (El) | #978 | ~~Its minute on a lamp, with the Wi-Fi off~~ (passed on lamp-75c9, 21 Oct 14:1x, Nine on #1844). | the Wi-Fi cut | lamp-voice |
 | `LAMP_SERVICE_DOWN_LINE` (El) | #830 | Only the relay blocked for a minute, the recorded line heard. It follows the notices' ear check (#1844, #2288). | the relay blocked; an ear | #1712 |
-| `LAMP_SECOND_DOWN_LINE` (El) | #1195 | Heard with the relay's chat down. | the relay blocked | #1712 |
+| `LAMP_SECOND_DOWN_LINE` (El) | #1195 | ~~Heard with the relay's chat down~~ (passed on lamp-06c1, 21 Oct 14:0x, El on #1195, read from the journal; the first turn after the voice's start stays silent). | the relay blocked | #1712 |
 | `LAMP_OWN_LINE_KEEPS` (El) | #2220 (#2287) | Played room noise over three hellos, before and after; the person's own "not now" before a hello sounds ends it; with `words`, "stop" does; the cut-in test unchanged. | the person's face and voice | #1712 |
 | "Setup for a home, 5 s reset" row (El) | #806, #1209 | A fresh install's 5 s reset needs no hand fix to the pins (#2188 and #2189 are in), and set up again from the app its hellos aren't cut (#2220). | the person; the app | lamp-voice |
 | `LAMP_SKILL_LIGHT_SPEAKING` (El) | #1722 | Welcome back with both on: the hello's face warmer than a plain answer's and moving with the voice, plain as it ends; a blue `light/request` held through a say shows a blue-led Speaking face. | the person's face | #1712 |

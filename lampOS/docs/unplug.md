@@ -126,22 +126,23 @@ review the evidence first.
 
 ## Lifetime and restart
 
-**Only a reboot brings the arm back.** Once a request is accepted, no request,
-spoken "never mind", service restart or switch change clears the latch: the
-body refuses `torque_write(_, 1)` while recovery is inhibited, so a person who
-changes their mind has a limp lamp until it is power-cycled. There is no
-cancel in this first version; whether to add one is an open decision (#1699).
+Once a request is accepted, only a matching cancel ("never mind", below) or a
+reboot brings the arm back. No other request, service restart or switch change
+clears the latch: the body refuses `torque_write(_, 1)` while recovery is
+inhibited.
 
-The latch is not cleared by a cancelled speech, timeout, skill reload or
-completion. With the default volatile bus at `/run/lampos-bus`, it stays until
-reboot clears that bus. If `LAMP_BUS_ROOT` points to persistent storage, reboot
+The latch is not cleared by a cancelled speech, skill reload or completion.
+With the default volatile bus at `/run/lampos-bus`, an uncancelled request
+stays until reboot clears that bus. If `LAMP_BUS_ROOT` points to persistent storage, reboot
 alone does not remove the request; a persistent bus is not a supported automatic
 recovery path for this first version. No software resume command is provided.
 A failed preparation must be inspected before an operator plans recovery; never
 clear the request merely to make a startup pass.
 
-A kept or malformed request makes a restarted body refuse startup before
-actuator access, **even when `LAMP_UNPLUG` is now off**. Removing the switch is
+A kept or malformed request with no matching cancel makes a restarted body
+refuse startup before actuator access, **even when `LAMP_UNPLUG` is now off**.
+A kept request with its matching Skills cancel starts normally, unless the
+body's last state for it was Failed. Removing the switch is
 not a way to clear accepted intent. Off with no kept request still creates no
 live adapter, publisher or polling worker; startup only checks the kept path.
 An unreadable bus/request fails closed rather than assuming no latch exists.
@@ -157,6 +158,7 @@ Topics, all kept Latest:
 | `body/unplug_state` | body | `{request, phase, why}` | 500 ms |
 | `expression/unplug_state` | expression | `{request, asleep: true}` | 500 ms |
 | `ring/unplug_state` | ring | `{request, asleep: true}` | 500 ms |
+| `body/unplug_cancel` | skills | `{request}` | kept; matches one request only |
 
 While already running, Body accepts a request only from the `skills` source
 label. A readable foreign-source header is ignored before parsing its payload,
@@ -171,6 +173,76 @@ Receipt readers check source, request identifier and monotonic age; none uses
 the bus expiry grace to extend readiness. The Expression receipt confirms its
 asleep presentation (a bus publication, when it has a light to send); only the
 ring receipt confirms a successful sink write.
+
+## Never mind: cancelling an unplug that doesn't come (#2069)
+
+Two paths publish the same kept `body/unplug_cancel {request}` from Skills,
+and the body has one path for both:
+
+- **Spoken.** `stay_plugged_in` is a second reserved tool of `prepare-unplug`
+  ("never mind", "don't unplug", "I'm not unplugging you", "stay on"). The
+  model recognises the words; there is no keyword list. It is in the
+  skills' `tools.json` whenever `prepare-unplug` is loaded, latch or not, so
+  a Live session that asked for the unplug already has it (Live takes a
+  changed catalog only between conversations); with no Skills request in
+  force, or one already cancelled, the call is refused. No skill may declare
+  that tool name.
+- **Timeout.** After `LAMP_UNPLUG_STAY_MIN` unbroken minutes Ready (default
+  10, whole minutes over zero) with the same Skills process still up, Skills
+  cancels once with "I'm still plugged in, so I'm getting back up." The timer
+  starts only for a request that process made, and looks every 500 ms; a look
+  that is not Ready (stale, or proving the fold again after a gap) starts the
+  minutes again. It never fires from Failed: a preparation that was Ready and
+  then fails (a hand on the arm before any cancel) makes Skills say once
+  "I can't get up by myself; I need to be checked.", and it stays down.
+
+Skills checks first that the latch is in force and the body's own state is
+fresh (500 ms), names that request, and is Folding (spoken only) or Ready,
+never Failed. It then asks Voice for the line ("Okay, I'll stay." or the
+timeout's) at priority 8, and publishes the cancel only once Voice says the
+line has begun. A line that never begins cancels nothing.
+
+The body checks again itself. It accepts a cancel only if its source label is
+`skills`, its identifier equals the request it accepted, and the preparation
+has not failed. A foreign, malformed or other-request cancel is ignored and the
+latch stays. A cancel during Folding lets the fold finish to its rest pose; it
+never reverses mid-fold. The body clears its latch only when it is Ready on
+fresh, safe evidence (the same proof as above: no hold, contact, fault or
+stale read) and at least 3 s after it saw the cancel, so the line comes
+before motion. After the cancel, an unsafe sample (a hand on the arm to
+help it up, a joint moved) withdraws Ready as a gap does and never fails the
+preparation: the latch holds while it lasts, and the stand waits for 500 ms
+of fresh, safe evidence again, so a hand only delays it. That delay is
+bounded: a preparation not Ready 60 s after the cancel (an arm resting on a
+book, a joint that keeps reading as moved) fails and stays latched, and the
+Skills thread that published the cancel, watching the body's state until it
+stands, says the same "I can't get up by myself; I need to be checked." once.
+Before any cancel, an
+unsafe sample after Ready still fails it, and a failed one is never
+cancelled. The stand ends only its own request's preparation: a newer request
+already in force (a "never mind", then "actually, get ready to unplug" within
+the 3 s) is taken at once with the latch held. The motor loop then opens the ordinary wake
+window, and the lamp stands through the same guarded rise as when it is
+spoken to; a keeper pause still keeps it down. Expression hands the body
+back on the same matching cancel. The cancelled request no longer latches or
+inhibits startup, and the next `prepare_to_unplug` mints a fresh identifier.
+
+A model call is enough consent to cancel, the same standard as the latch: like
+the request, the cancel is not proof of a person's intent, and the body's own
+checks are what keep motion safe. A kept matching cancel also lets a
+restarted body start normally, unless the body's last state for that request
+was Failed (for example a cancel during Folding whose fold then failed, or a
+body stopped before it stood): a failed preparation still needs inspection,
+and only a reboot clears it.
+
+Host tests cover the cancel at Ready, during Folding, from Failed, stale,
+foreign, other-request and with no request, a hand after the cancel (during
+and past the 3 s), a new request within the 3 s, restart with request and
+cancel, the tool refused with no latch, the line before the cancel, a single
+timeout, unbroken minutes Ready, the line after a failure once Ready, and
+no proof after a cancel (not failed at 59.9 s, Failed at 60 s, then the line).
+A lamp trial must still measure the line-to-stand time, a one-minute timeout,
+and a hand on the arm after a "never mind", let go.
 
 ## V1 baseline and what remains unverified
 

@@ -100,7 +100,7 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           --models FILE: the models in FILE (deploy/product/models.json's form) are
           carried, and N is then at least 2.
           --settings on: the product's settings and tmpfiles are carried, and N is
-          then at least 3.
+          then at least 3; with them setup's reset plan, and N is then at least 5.
           --image DIR: the image's own files of DIR (robots/lamp: its rootfs and each
           variant's override), each listed in --deploy's image/shipped.json, are
           carried, and N is then at least 4.
@@ -261,9 +261,13 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
                 .map_err(|error| format!("{lamp}: {error}"))?
         }
     };
-    let settings = match options.get("settings").map(String::as_str) {
-        None | Some("off") => Vec::new(),
-        Some("on") => install::product_settings(),
+    // With the settings, setup's reset plan, in its own field (#806).
+    let (settings, reset_plan) = match options.get("settings").map(String::as_str) {
+        None | Some("off") => (Vec::new(), None),
+        Some("on") => (
+            install::product_settings(),
+            Some(install::reset_plan_setting()),
+        ),
         Some(_) => return Err("--settings is on or off".into()),
     };
     let models = match options.get("models") {
@@ -298,6 +302,7 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         models,
         settings,
         image,
+        reset_plan,
     )
     .map_err(|error| error.to_string())?;
     println!(

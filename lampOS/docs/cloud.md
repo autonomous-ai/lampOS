@@ -88,7 +88,7 @@ lamp says so.
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SKILLS_STORE=on` ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the update channel's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without `LAMP_SKILLS_STORE`, V1's "not on this lamp" |
-| `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder); the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
+| `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules. `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
@@ -100,6 +100,18 @@ lamp says so.
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of the keeper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the keeper has taken it, before the lamp goes down, or `failure` with the keeper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+
+### News for the phone, unasked (`messages/out`)
+
+With `LAMP_MESSAGES=on`, a skill's short line for the person's phone, as
+guard mode's "Someone was at your desk at 14:31, for about 2 minutes.", goes
+up on `fd_channel` with nothing asked first: V1's `chat.event` with no run,
+its `data.event` a `task_news` event with its own `id` and `time` and the
+skill's text whole, as the voice's unasked task news (`crate::unasked`,
+[messages.md](messages.md), "Unasked texts"). At most 6 in any hour, in
+order, one heard again dropped; at most 4 wait while the broker is away and
+go on reconnect, each kept until the broker's ack. The journal says one line
+a piece, the skill and the count, never the text.
 
 ### The light: V1's colours on this lamp's
 
@@ -368,7 +380,10 @@ shows no Skills row. Its envelope is V1's, as `reports.*`'s.
 `skills.install` needs `LAMP_SKILLS_STORE=on` as well; without it, `not on
 this lamp: skills.install`. The manage helper checks the same switch in
 its own environment and refuses with the same words ([skills.md](skills.md),
-"The manage helper").
+"The manage helper"). `LAMP_ADDONS` is read the same way: without
+`LAMP_ADDONS=on` in `lamp-cloud`'s unit, an add-on (`kind = "addon"`,
+[addons.md](addons.md)) is listed with `loads: false` and `why: "add-ons
+are off on this lamp"`, as `lamp-skills` does not run it then.
 
 **Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
 (the product unit's `--dir`), with `lamp-skills`' own loader
@@ -535,11 +550,13 @@ should ever remove one is a separate decision, not taken.
   install deletes `.removed-NAME-PID`. The app gets the list as usual; where
   the folder was set aside, and why it was not deleted, go to the helper's
   journal alone, never into the reply.
-- **On a product lamp** the helper's two units are in `deploy/product/`
-  (`lamp-skills-manage.socket` and `lamp-skills-manage@.service`) but not
-  yet in `lamp-update`'s install list: they go there after their lamp
-  check. Until a lamp has them, the remove is answered `the lamp's skills
-  can't be changed now`.
+- **On a product lamp** the helper's two units
+  (`lamp-skills-manage.socket` and `lamp-skills-manage@.service`) are in
+  `lamp-update`'s install list (`install::PRODUCT`, #1685): the socket is
+  enabled, the template never. A round never adds a unit, so a lamp
+  installed before #2429 has it only after `sudo lamp-update install …`
+  once; until then the remove is answered `the lamp's skills can't be
+  changed now`.
 - **How long.** A read of the folder before and after, a connection and
   the start of the helper (one process, started by systemd), two renames
   and a delete; it waits for the folder's lock while an install by hand

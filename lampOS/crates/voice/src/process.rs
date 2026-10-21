@@ -97,6 +97,19 @@ impl Drop for SessionDirectory {
     }
 }
 
+/// A worker's process found ended cleanly, said as `"{role} worker exited:
+/// {status}"`.
+#[derive(Debug)]
+struct EndedCleanly(String);
+
+impl std::fmt::Display for EndedCleanly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for EndedCleanly {}
+
 pub struct Worker {
     pub channels: WorkerChannels,
     child: Child,
@@ -441,12 +454,26 @@ impl Worker {
     }
     pub fn check_running(&mut self) -> io::Result<()> {
         if let Some(status) = self.child.try_wait()? {
-            return Err(io::Error::other(format!(
-                "{} worker exited: {status}",
-                self.role
-            )));
+            let said = format!("{} worker exited: {status}", self.role);
+            // Only a clean end can be the worker's own choice (#1396); a
+            // panic, a signal or any other status stays an abnormal exit.
+            return Err(if status.success() {
+                io::Error::other(EndedCleanly(said))
+            } else {
+                io::Error::other(said)
+            });
         }
         Ok(())
+    }
+
+    /// Whether `error` says a worker's process had ended cleanly, status 0
+    /// ([`Self::check_running`]), so a caller can tell the worker's own end
+    /// from a crash or any other start failure (#1396, the reviewer-lead's
+    /// P2 on #2506).
+    pub fn ended_cleanly(error: &io::Error) -> bool {
+        error
+            .get_ref()
+            .is_some_and(|inner| inner.is::<EndedCleanly>())
     }
     pub(crate) fn try_exit(&mut self) -> io::Result<Option<ExitStatus>> {
         self.child.try_wait()

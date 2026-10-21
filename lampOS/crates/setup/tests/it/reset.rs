@@ -936,3 +936,27 @@ fn a_reset_wipes_the_persons_own_keys() {
     assert!(own.is_dir());
     assert_eq!(fs::read_dir(&own).unwrap().count(), 0);
 }
+
+/// #806: `lamp-setup check` reads the plan install and a round place
+/// (`lamp-update`'s `install::RESET_PLAN` is this file), with the stores the
+/// 19 Oct plan lacked.
+#[test]
+fn check_reads_the_product_plan_install_places() {
+    let checked = Command::new(PROGRAM)
+        .args([
+            "check",
+            "--plan",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/fixtures/reset-plan-product.json"
+            ),
+        ])
+        .output()
+        .unwrap();
+    assert!(checked.status.success(), "{checked:?}");
+    let plan: serde_json::Value = serde_json::from_slice(&checked.stdout).unwrap();
+    let wipe = plan["wipe"].as_array().unwrap();
+    for store in ["/etc/lampOS/voice/own", "/etc/lampOS/setup/display-name"] {
+        assert!(wipe.iter().any(|path| path == store), "{store}: {wipe:?}");
+    }
+}

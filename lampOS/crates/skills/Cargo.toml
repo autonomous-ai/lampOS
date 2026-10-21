@@ -49,7 +49,8 @@ ring = "0.17"
 base64 = "0.22"
 # The main loop's one wait on every topic's socket and its wake pipe
 # (`poll`, `pipe`), safe calls, as the voice's controls make (#1806).
-rustix = { version = "=1.1.5", features = ["pipe", "fs", "event"] }
+# `net` and `process`: the manage helper's peer, by SO_PEERCRED (#2429).
+rustix = { version = "=1.1.5", features = ["pipe", "fs", "event", "net", "process"] }
 
 [dev-dependencies]
 tempfile = "3"

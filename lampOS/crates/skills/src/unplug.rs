@@ -1,5 +1,5 @@
 //! Readiness is evidence from the body and Expression, never a tool admission.
-use lamp_body::unplug::{Phase, Request, State};
+use lamp_body::unplug::{CANCEL_TOPIC, Phase, Request, State};
 use lamp_bus::{Bus, Message};
 use serde_json::Value;
 use std::io;
@@ -14,8 +14,27 @@ pub fn core_identity(skill: &str, tool: &str) -> bool {
 
 pub const EXPRESSION_TOPIC: &str = "expression/unplug_state";
 pub const RING_TOPIC: &str = "ring/unplug_state";
-/// Reads made by the composite operation, including reuse of the kept latch.
-pub const READ_TOPICS: [&str; 4] = [Request::TOPIC, State::TOPIC, EXPRESSION_TOPIC, RING_TOPIC];
+/// Reads made by the composite operation, including reuse of the kept latch
+/// and whether it was cancelled.
+pub const READ_TOPICS: [&str; 5] = [
+    Request::TOPIC,
+    State::TOPIC,
+    EXPRESSION_TOPIC,
+    RING_TOPIC,
+    CANCEL_TOPIC,
+];
+/// The second reserved tool of `prepare-unplug`: "never mind". It is
+/// declared whenever the skill is loaded and refused with no latch in force.
+pub const STAY_TOOL: &str = "stay_plugged_in";
+const STAY_DESCRIPTION: &str = "Call only when, after you began preparing to be unplugged, the person says they will not unplug you after all (for example: never mind, don't unplug, I'm not unplugging you, stay on). The lamp says it will stay, then stands up again by itself. Do not say anything yourself.";
+pub const STAY_LINE: &str = "Say exactly: Okay, I'll stay.";
+pub const TIMEOUT_LINE: &str = "Say exactly: I'm still plugged in, so I'm getting back up.";
+/// Said once when a preparation that was Ready fails before any cancel, or
+/// when the body fails one after the cancel (no stand within 60 s).
+pub const CHECK_LINE: &str = "Say exactly: I can't get up by myself; I need to be checked.";
+/// Unbroken minutes Ready, with Skills still up, before the lamp gets back up.
+pub const STAY_ENVIRONMENT: &str = "LAMP_UNPLUG_STAY_MIN";
+const STAY_DEFAULT_MIN: u64 = 10;
 pub const WAIT_US: u64 = 32_000_000;
 const FRESH_US: u64 = 500_000;
 
@@ -95,7 +114,10 @@ pub fn begin(bus: &Bus, skill: &str, tool: &str, now: u64) -> io::Result<(String
         if !request.valid() {
             return Err(io::Error::other("invalid kept unplug request"));
         }
-        return Ok((request.request, message.header.at_us));
+        // A cancelled request is over: the next unplug gets a fresh one.
+        if !lamp_body::unplug::cancelled(bus, &request) {
+            return Ok((request.request, message.header.at_us));
+        }
     }
     let mut out = bus.publisher_declared(Request::TOPIC, &Request::declaration(), "skills")?;
     let request = Request {
@@ -103,6 +125,55 @@ pub fn begin(bus: &Bus, skill: &str, tool: &str, now: u64) -> io::Result<(String
     };
     out.publish_json(now, &request)?;
     Ok((request.request, now))
+}
+
+/// The "never mind" tool, declared whenever the unplug skill is loaded.
+pub fn stay_tool() -> Value {
+    serde_json::json!({"name": STAY_TOOL, "description": STAY_DESCRIPTION})
+}
+
+/// The request a cancel may name now, or why not. Skills checks what the body
+/// checks again itself: a live latch, and the body's own fresh, matching state
+/// in Folding (spoken only) or Ready, never Failed.
+pub fn may_stay(bus: &Bus, now: u64, ready_only: bool) -> Result<String, String> {
+    let Ok(Some(request)) = lamp_body::unplug::in_force(bus, Some("skills")) else {
+        return Err("There is no unplug preparation to cancel.".into());
+    };
+    let state = bus
+        .latest(State::TOPIC)
+        .ok()
+        .flatten()
+        .filter(|message| fresh(message, "body", 0, now))
+        .and_then(|message| message.parse::<State>().ok())
+        .filter(|state| state.request == request.request);
+    match state.map(|state| state.phase) {
+        Some(Phase::Ready) => Ok(request.request),
+        Some(Phase::Folding) if !ready_only => Ok(request.request),
+        Some(Phase::Failed) => {
+            Err("The fold failed: it stays down until it is inspected. Keep it plugged in.".into())
+        }
+        _ => Err("The body has not confirmed where it is; it stays down for now.".into()),
+    }
+}
+
+/// Publishes the kept cancel the body checks against its accepted request.
+pub fn cancel(bus: &Bus, request: &str, now: u64) -> io::Result<()> {
+    bus.publisher_declared(CANCEL_TOPIC, &Request::cancel_declaration(), "skills")?
+        .publish_json(
+            now,
+            &Request {
+                request: request.to_owned(),
+            },
+        )?;
+    Ok(())
+}
+
+/// `LAMP_UNPLUG_STAY_MIN`, whole minutes over zero; 10 otherwise.
+pub fn stay_minutes(value: Option<&str>) -> u64 {
+    value
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|minutes| *minutes > 0)
+        .unwrap_or(STAY_DEFAULT_MIN)
 }
 
 pub fn read(bus: &Bus, request: &str, since: u64, now: u64) -> io::Result<Progress> {
@@ -248,6 +319,82 @@ mod tests {
         assert!(begin(&bus, "desk-rest", TOOL, 200).is_err());
         assert_eq!(bus.latest(Request::TOPIC).unwrap().unwrap(), original);
         assert_eq!(begin(&bus, SKILL, TOOL, 200).unwrap(), kept);
+    }
+
+    fn publish(bus: &Bus, topic: &str, source: &str, value: Value) {
+        bus.publisher_declared(topic, &Request::declaration(), source)
+            .unwrap()
+            .publish_json(1, &value)
+            .unwrap();
+    }
+
+    /// The reviewer on #2069 (P3 1): declared always, so a Live session has
+    /// it; with no latch in force the call is refused.
+    #[test]
+    fn never_mind_is_refused_unless_a_latch_is_in_force() {
+        let no = "There is no unplug preparation to cancel.";
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        assert_eq!(stay_tool()["name"], STAY_TOOL);
+        assert_eq!(may_stay(&bus, 0, false).unwrap_err(), no, "no latch");
+        let (request, _) = begin(&bus, SKILL, TOOL, 100).unwrap();
+        assert_ne!(may_stay(&bus, 0, false).unwrap_err(), no, "latched");
+        cancel(&bus, &request, 200).unwrap();
+        assert_eq!(may_stay(&bus, 0, false).unwrap_err(), no, "cancelled");
+        let (next, _) = begin(&bus, SKILL, TOOL, 300).unwrap();
+        assert_ne!(next, request, "the next unplug gets a fresh request");
+        let foreign = tempfile::tempdir().unwrap();
+        let foreign = Bus::new(foreign.path()).unwrap();
+        publish(
+            &foreign,
+            Request::TOPIC,
+            "expression",
+            json!({"request": "r1"}),
+        );
+        assert_eq!(
+            may_stay(&foreign, 0, false).unwrap_err(),
+            no,
+            "not a request Skills made"
+        );
+    }
+
+    #[test]
+    fn a_cancel_needs_the_bodys_fresh_matching_folding_or_ready() {
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        let now = 10_000_000;
+        assert!(may_stay(&bus, now, false).is_err(), "no request");
+        publish(&bus, Request::TOPIC, "skills", json!({"request": "r1"}));
+        let state = |phase: &str, request: &str, at: u64| {
+            let mut out = bus
+                .publisher_declared(State::TOPIC, &State::declaration(), "body")
+                .unwrap();
+            out.publish_json(at, &json!({"request": request, "phase": phase, "why": ""}))
+                .unwrap();
+        };
+        assert!(may_stay(&bus, now, false).is_err(), "no body state");
+        state("ready", "r1", now - 600_000);
+        assert!(may_stay(&bus, now, false).is_err(), "stale");
+        state("ready", "r0", now);
+        assert!(may_stay(&bus, now, false).is_err(), "other request");
+        state("failed", "r1", now);
+        assert!(may_stay(&bus, now, false).is_err(), "failed");
+        state("folding", "r1", now);
+        assert_eq!(may_stay(&bus, now, false).unwrap(), "r1");
+        assert!(
+            may_stay(&bus, now, true).is_err(),
+            "the timeout waits for Ready"
+        );
+        state("ready", "r1", now);
+        assert_eq!(may_stay(&bus, now, true).unwrap(), "r1");
+    }
+
+    #[test]
+    fn stay_minutes_default_to_ten() {
+        assert_eq!(stay_minutes(None), 10);
+        assert_eq!(stay_minutes(Some("0")), 10);
+        assert_eq!(stay_minutes(Some("ten")), 10);
+        assert_eq!(stay_minutes(Some("1")), 1);
     }
 
     #[test]

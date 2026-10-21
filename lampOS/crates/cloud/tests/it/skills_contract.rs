@@ -134,6 +134,7 @@ fn the_skills_page_reads_the_agreed_reply_and_its_refusal() {
         off: root.join("off"),
         manage: root.join("m.sock"),
         store: false,
+        addons: false,
     }));
     let started = Instant::now();
     let on = sent(&mut real);
@@ -264,6 +265,7 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
         off: root.join("off"),
         manage,
         store: false,
+        addons: false,
     }));
     let before = sent(&mut real)["data"]["skills"].as_array().unwrap().len();
 

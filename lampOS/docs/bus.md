@@ -582,6 +582,15 @@ each with why in words. `lamp-skills` also subscribes to the topics its
 skills' triggers name; Welcome back's is `humans/faces/tracked`. Without
 the service installed the topic is never made.
 
+## Optional add-on topic (blue, 2026-10-21)
+
+| Topic | Kind | Published by | Intended reader |
+|---|---|---|---|
+| `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | The add-ons' judge, still to come ([addons.md](addons.md)) |
+
+[`AddonProposal`](msgs.md): what a partner's add-on suggests, never an
+order. Without `LAMP_ADDONS=on` the topic is never made.
+
 ## Optional arrival topic (second builder, 2026-10-15)
 
 | Topic | Kind | Published by | Intended reader |
@@ -680,7 +689,8 @@ this API nor ordinary expiry grace establishes consumer retention authorization.
 
 The opt-in core skill uses kept `body/unplug_request` and three short-lived
 receipts: `body/unplug_state`, `expression/unplug_state`, `ring/unplug_state`.
-The request survives service restarts until reboot; each receipt expires after
+The request survives service restarts until reboot or a matching kept
+`body/unplug_cancel` from Skills ("never mind"); each receipt expires after
 500 ms and carries the matching request identifier. [unplug.md](unplug.md)
 defines the payloads, ownership and proof. No readiness reader treats ordinary
 `body/joint_states`, pause or successful publication alone as safe completion.

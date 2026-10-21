@@ -53,13 +53,15 @@ pub fn make(
         models,
         Vec::new(),
         Vec::new(),
+        None,
     )
 }
 
 /// [`make`], with the product's `settings` carried too (#1680):
-/// `min_updater` is then at least [`manifest::SETTINGS_UPDATER`]; and the
+/// `min_updater` is then at least [`manifest::SETTINGS_UPDATER`]; the
 /// image's own files (#1369, crate::image::from_tree), with it then at
-/// least [`manifest::IMAGE_UPDATER`].
+/// least [`manifest::IMAGE_UPDATER`]; and setup's reset plan (#806), with
+/// it then at least [`manifest::RESET_PLAN_UPDATER`].
 #[allow(clippy::too_many_arguments)]
 pub fn make_with(
     binaries: &Path,
@@ -73,6 +75,7 @@ pub fn make_with(
     models: Vec<Model>,
     settings: Vec<Setting>,
     image: Vec<ImageFile>,
+    reset_plan: Option<Setting>,
 ) -> io::Result<Manifest> {
     let min_updater = if models.is_empty() {
         min_updater
@@ -88,6 +91,11 @@ pub fn make_with(
         min_updater
     } else {
         Some(min_updater.unwrap_or(1).max(manifest::IMAGE_UPDATER))
+    };
+    let min_updater = if reset_plan.is_none() {
+        min_updater
+    } else {
+        Some(min_updater.unwrap_or(1).max(manifest::RESET_PLAN_UPDATER))
     };
     let mut files = Vec::new();
     let sums = fs::read_to_string(binaries.join("SHA256SUMS")).ok();
@@ -181,6 +189,7 @@ pub fn make_with(
         models,
         settings,
         image,
+        reset_plan: reset_plan.map(Box::new),
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
@@ -429,10 +438,18 @@ mod tests {
             Vec::new(),
             settings.clone(),
             Vec::new(),
+            Some(crate::install::reset_plan_setting()),
         )
         .unwrap();
         assert_eq!(made.settings, settings);
-        assert_eq!(made.min_updater, Some(manifest::SETTINGS_UPDATER));
+        // With setup's reset plan, in its own field (#806).
+        assert_eq!(made.min_updater, Some(manifest::RESET_PLAN_UPDATER));
+        assert_eq!(
+            made.reset_plan
+                .as_ref()
+                .and_then(|plan| plan.text.as_deref()),
+            Some(crate::install::RESET_PLAN)
+        );
         let written = fs::read(out.join("manifest.json")).unwrap();
         assert_eq!(manifest::parse(&written).unwrap(), made);
         // Every product setting and the tmpfiles, and none of the keys.
@@ -478,6 +495,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             image.clone(),
+            None,
         )
         .unwrap();
         assert_eq!(made.image, image);

@@ -9,7 +9,7 @@ and keeps progress. It never changes microphone or camera permission.
 For privacy, the runner supplies the verified device profile's switch location.
 If the location is missing, the step is unavailable: never guess where it is.
 The invitation is one short sentence the runner gives, about 3-5 s spoken
-("Try my privacy switch <location>: turn it off, then on again."): say only
+("Try my privacy switch <location>: close it, then open it again."): say only
 that. The person may close the switch while it is being said; that counts and
 the switch stops the lamp's words. Never promise a spoken reply while it is
 closed. The runner, not a model report, verifies close and reopen. Opening after five

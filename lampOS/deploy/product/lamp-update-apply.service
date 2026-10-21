@@ -4,7 +4,8 @@
 # that only `lamp-update install` writes, never from /opt/lampOS/update/current, which a round can write. It checks
 # the envelope's signature again with the lamp's own key, writes only the paths a build's settings may name (the
 # expression's and the controls' folders, records.json, the product skills and /etc/tmpfiles.d/lampos.conf), keeps
-# every one the lamp changed, and keeps each file as it was in its records before the first write. With
+# every one the lamp changed, and keeps each file as it was in its records before the first write. Setup's reset plan
+# (#806) is the product's: written over any plan the lamp has, the old one kept in the records, never where none is. With
 # LAMP_UPDATE_IMAGE=on it also writes the image's own files a build carries (#1369: asound.conf, the speaker's level
 # unit, the udev rules, the journal's and logrotate's drop-ins), only where the lamp's is one the image shipped, then
 # reloads systemd and udev. It never restarts or signals journald. Without a request it does nothing. Outside

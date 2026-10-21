@@ -8,10 +8,12 @@ builder's design on [#1685](https://github.com/autonomous-ai/lampOS/issues/1685)
 skill (19 Oct, 07:1x).
 
 **Status:** built, with tests; not tried on a lamp, and out of the product's
-install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach no
-phone yet:** they go on `messages/out` on the lamp's bus, and nothing carries
-that topic off the lamp until `lamp-cloud` takes it and the app team's push
-relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
+install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach the
+phone only with `LAMP_MESSAGES=on`** in `lamp-cloud`: they go on
+`messages/out` on the lamp's bus, and `lamp-cloud` carries each up as the
+backend's unasked news, which it keeps for the owner and pushes to their
+phones ([messages.md](messages.md), "Unasked texts"). Off unless set; not
+yet seen on a lamp.
 
 ## What it does
 
@@ -145,9 +147,12 @@ On a lamp it needs the eyes' `room/presence` (`LAMP_PRESENCE=on`), the ring's
 light requests (`LAMP_LIGHT_REQUESTS=on` in the voice and `lamp-skills`), and
 for the known-face words and your face ending it, `lamp-skills --known-file
 /run/lampos-eyes/known` beside `lamp-eyes --known-file` (both run as
-`lampos`, and the file is 0600). The product's `lamp-skills.service` doesn't
-pass `--known-file` yet: there, the watch knows no face, says "someone I
-don't know" or "someone", and ends only when you say stop.
+`lampos`, and the file is 0600). The product's `lamp-skills.service` gives
+it as `Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known`, not as the
+flag: `--known-file` is as new as guard mode, and an older `lamp-skills`
+would end at its start on it (#2157), where it ignores the line. Without the
+file, the watch knows no face, says "someone I don't know" or "someone", and
+ends only when you say stop.
 
 ## Tests
 
@@ -182,7 +187,8 @@ don't know" or "someone", and ends only when you say stop.
 ## Not shown, and open
 
 - Nothing ran on a lamp: the cases are written, not recorded.
-- Delivery to a phone (above).
+- Delivery to a phone: built (`LAMP_MESSAGES=on`, [messages.md](messages.md)),
+  not yet seen on a lamp and a phone.
 - How the mark and Light out when you leave share the ring when both are
   installed: both ask at skill priority, and which the ring shows is the
   ring's arbitration. Not tried.
