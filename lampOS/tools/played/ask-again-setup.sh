@@ -8,6 +8,7 @@
 #   PLAYED_REMOTE  the stand-in's folder (default /usr/local/lib/played-ask-again; /run may be noexec)
 #   PLAYED_UNITS   where the drop-ins go (default /run/systemd/system)
 #   SYSTEMCTL      systemctl (default systemctl)
+# PLAYED_TASKS (optional) is a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=).
 REMOTE=${PLAYED_REMOTE:-/usr/local/lib/played-ask-again}
 UNITS=${PLAYED_UNITS:-/run/systemd/system}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -19,6 +20,15 @@ fail() { echo "ask-again setup: $1" >&2; exit 1; }
 case "${1:-}" in
 in)
   [ -x "$REMOTE/harness-fixture" ] || fail "no stand-in at $REMOTE/harness-fixture"
+  # lamp-tasks' own ExecStart, and the lamp-tasks to run: the unit's own, or PLAYED_TASKS for this run only. It
+  # must know --sign-in-by-code (#1676): lamp-4ace's lamp-tasks didn't, and crash-looped on the flag (22 Oct 03:1x).
+  exec_line=$($SYSTEMCTL cat lamp-tasks | awk '/^ExecStart=./ { line = substr($0, 11) } END { print line }')
+  case "$exec_line" in *"--harness "*) ;; *) fail "lamp-tasks' ExecStart has no --harness";; esac
+  tasks=${PLAYED_TASKS:-${exec_line%% *}}
+  [ -x "$tasks" ] || fail "no lamp-tasks at $tasks"
+  "$tasks" --help 2>&1 | grep -q -- --sign-in-by-code \
+    || fail "lamp-tasks is older than #2702 ($tasks has no --sign-in-by-code): give TASKS= a lamp-tasks from the fixture's build"
+  exec_line="$tasks ${exec_line#* }"
   # lamp-tasks' own user and group: the stand-in's HOME is theirs (lampos on most lamps, orangepi on lamp-4ace).
   owner=$($SYSTEMCTL show -p User -p Group lamp-tasks) || fail "systemctl show lamp-tasks failed"
   user=$(printf '%s\n' "$owner" | sed -n 's/^User=//p')
@@ -32,9 +42,7 @@ in)
     || fail "writing the stand-in's wrapper failed"
   chmod 0755 "$REMOTE/harness" || fail "chmod of the wrapper failed"
   chown -R "$user:$group" "$home" || fail "chown $user:$group of $home failed"
-  # lamp-tasks' own ExecStart, its --harness swapped for the stand-in, with --sign-in-by-code.
-  exec_line=$($SYSTEMCTL cat lamp-tasks | awk '/^ExecStart=./ { line = substr($0, 11) } END { print line }')
-  case "$exec_line" in *"--harness "*) ;; *) fail "lamp-tasks' ExecStart has no --harness";; esac
+  # Its --harness swapped for the stand-in, with --sign-in-by-code.
   exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--harness [^ ]+#--harness $REMOTE/harness#")
   case "$exec_line" in *--sign-in-by-code*) ;; *) exec_line="$exec_line --sign-in-by-code";; esac
   mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || fail "mkdir of the drop-in folders failed"
@@ -44,7 +52,7 @@ in)
   $SYSTEMCTL daemon-reload && $SYSTEMCTL restart lamp-tasks lamp-voice || {
     rm -f "$TASKS_DROP" "$VOICE_DROP"; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart lamp-tasks lamp-voice
     fail "restarting with the stand-in failed; put back"; }
-  echo "stand-in in: lamp-tasks as $user:$group, its Harness $REMOTE/harness"
+  echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness"
   ;;
 out)
   rm -f "$TASKS_DROP" "$VOICE_DROP"
