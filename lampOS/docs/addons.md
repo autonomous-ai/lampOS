@@ -167,7 +167,7 @@ on a lamp without the head's controls):
 | Talking or speaking | `voice/state` | not `resting`, or nothing fresh (3 s) |
 | A busy room | `room/state` | not `quiet` (`unknown` included), or nothing fresh (3 s) |
 | Colder (a `mood` only) | the proposal | its warmth is below 0: an add-on may warm the lamp, never cool it |
-| The person's light (a `light` only) | `light/command`, `light/state` | the newest `light/command` this boot came from the actions part or the app and `light/state` shows it; with none, the ring shows its own idle light |
+| The person's light (a `light` only) | `light/command`, `light/state`, `mood/state` | the newest `light/command` this boot came from the actions part or the app, and `light/state` shows it (or one of the judge's own glows is over it); with none, the ring shows its own idle light. It stays the person's base for good. Once it **rests**, an add-on light is not dropped but asked for **5 s at most** (`BRIEF_GLOW_US`), and the ring then shows their light again by itself. A light they set **off** never rests: off stays dark. An on light rests when Mood has said `asleep` (on the judge's own boot clock) since they set it, or 12 h have passed (`PERSONS_LIGHT_RESTS_US`, the first builder on #2530, 20:1x, after the lamp-75c9 run). Their next choice is fresh again |
 | Not yet | the act | `say`, `note` or `move` (#2530 part 2) |
 | Late | the proposal's age | judged after its `holds_ms` |
 | Rate (rule 8) | the judge's own memory | its add-on had one kept within 2 minutes, or 10 within the hour; a dropped one is not counted |

@@ -4,7 +4,8 @@
 use lamp_bus::Bus;
 use lamp_msgs::{
     AddonDecision, AddonLight, AddonMood, AddonProposal, ClockStamp, Light, LightRequest,
-    MicrophonePrivacy, MoodNudge, Pause, Priority, Room, RoomState, Voice, VoiceMute, VoiceState,
+    MicrophonePrivacy, MoodNudge, MoodState, Pause, Priority, Room, RoomState, Voice, VoiceMute,
+    VoiceState,
 };
 use std::{
     path::Path,
@@ -290,4 +291,68 @@ fn a_kept_mood_is_said_to_lamp_mood() {
         ("evening-glow", 0.1, 0.05)
     );
     assert_eq!(nudge.until_us - nudge.stamp.at_us, 600_000_000);
+}
+
+/// The first builder on #2530 (20:1x): once the lamp has slept since the
+/// person chose their light, an add-on may lay a brief glow over it, and the
+/// ring then shows theirs again by itself.
+#[test]
+fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let bus = Bus::new(dir.path()).unwrap();
+    let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
+    let _judge = judge(dir.path(), true);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    calm(&bus, true, false);
+    let asleep = MoodState {
+        stamp: ClockStamp {
+            clock_id: "test-boot".into(),
+            at_us: lamp_ipc::monotonic_us(),
+            sequence: 1,
+        },
+        session_id: "s".into(),
+        awake: 0.0,
+        energy: 0.3,
+        warmth: 0.6,
+        asleep: true,
+        attention: None,
+        familiarity: lamp_msgs::Familiarity::Unknown,
+        familiar: None,
+        breath: None,
+    };
+    bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")
+        .unwrap()
+        .publish_json(lamp_ipc::monotonic_us(), &asleep)
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    bus.publisher_declared(
+        AddonProposal::TOPIC,
+        &AddonProposal::declaration(),
+        "skills",
+    )
+    .unwrap()
+    .publish_json(lamp_ipc::monotonic_us(), &glow(lamp_ipc::monotonic_us()))
+    .unwrap();
+    let decision: AddonDecision = said
+        .recv(Duration::from_secs(5))
+        .unwrap()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(decision.choice, "kept", "{decision:?}");
+    assert!(
+        decision.why.contains("the person's own light, which rests"),
+        "{decision:?}"
+    );
+    let request: LightRequest = ring.recv(Duration::ZERO).unwrap().unwrap().parse().unwrap();
+    assert_eq!(request.claim.priority, Priority::Idle);
+    let holds_us = request.claim.until_us - lamp_ipc::monotonic_us();
+    assert!(holds_us <= 5_000_000, "{holds_us}");
 }

@@ -9,7 +9,7 @@ use crate::situation::{TOPICS, Watcher};
 use lamp_bus::{Bus, Message, Publisher, Subscriber};
 use lamp_msgs::{
     AddonDecision, AddonProposal, ExpressionRestState, Light, LightRequest, MicrophonePrivacy,
-    MoodNudge, OnboardingPending, Pause, RoomState, VoiceMute, VoiceState,
+    MoodNudge, MoodState, OnboardingPending, Pause, RoomState, VoiceMute, VoiceState,
 };
 use std::{
     io,
@@ -77,7 +77,7 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         &AddonDecision::declaration(),
         "addons",
     )?;
-    let mut watcher = Watcher::new(lamp_ipc::monotonic_us());
+    let mut watcher = Watcher::new(lamp_ipc::monotonic_us()).on_clock(&clock_id);
     // What was there before it started: the kept values of each topic.
     for topic in TOPICS {
         if let Ok(Some(message)) = bus.latest(topic) {
@@ -119,7 +119,8 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             continue;
         }
         let age_us = now_us.saturating_sub(message.header.at_us);
-        let verdict = judge.judge(&proposal, age_us, &watcher.situation(now_us), now_us);
+        let situation = watcher.situation(now_us);
+        let verdict = judge.judge(&proposal, age_us, &situation, now_us);
         let why = decide(
             &proposal,
             verdict,
@@ -128,6 +129,8 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             Outputs {
                 lights: &mut lights,
                 nudges: &mut nudges,
+                watcher: &mut watcher,
+                over_persons: situation.persons_light,
             },
             &mut report,
         );
@@ -154,10 +157,13 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
     Ok(report)
 }
 
-/// Where a kept act goes: the ring's requests, and Mood's nudges.
+/// Where a kept act goes: the ring's requests, and Mood's nudges; and
+/// whether a light lies over the person's own, which rests, so is brief.
 struct Outputs<'a> {
     lights: &'a mut Publisher,
     nudges: &'a mut Publisher,
+    watcher: &'a mut Watcher,
+    over_persons: bool,
 }
 
 /// One verdict journaled, and a kept light asked of the ring or a kept mood
@@ -179,13 +185,19 @@ fn decide(
         }
         Verdict::Kept => {
             report.kept += 1;
-            match carry::light_request(proposal, clock_id, now_us) {
+            match carry::light_request(proposal, clock_id, now_us, out.over_persons) {
                 Some(request) => match out.lights.publish_json(now_us, &request) {
                     Ok(_) => {
                         report.lights_asked += 1;
+                        out.watcher.glowing_until(request.claim.until_us);
                         let why = format!(
-                            "asked of the ring at idle for {} ms",
-                            (request.claim.until_us - now_us) / 1_000
+                            "asked of the ring at idle for {} ms{}",
+                            (request.claim.until_us - now_us) / 1_000,
+                            if out.over_persons {
+                                ", over the person's own light, which rests"
+                            } else {
+                                ""
+                            }
                         );
                         eprintln!("lamp-addons: kept {named}: {why}");
                         why
@@ -234,9 +246,10 @@ fn take(watcher: &mut Watcher, message: &Message, now_us: u64) {
             .parse()
             .map(|value| watcher.voice(&value, now_us, &message.header.boot)),
         RoomState::TOPIC => message.parse().map(|value| watcher.room(&value, now_us)),
-        "light/command" => message
-            .parse::<Light>()
-            .map(|value| watcher.light_command(&value, &message.header.source)),
+        "light/command" => message.parse::<Light>().map(|value| {
+            watcher.light_command(&value, &message.header.source, message.header.at_us)
+        }),
+        MoodState::TOPIC => message.parse().map(|value| watcher.mood(&value)),
         "light/state" => message.parse().map(|value| watcher.light_state(&value)),
         _ => Ok(()),
     };
