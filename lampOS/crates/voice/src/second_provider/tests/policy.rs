@@ -320,13 +320,19 @@ impl Bench {
     /// The engine as `serve` builds it with the switch: the route's own
     /// runner, which leaves its battery line to the gate, and the gate.
     fn engine(&self, script: Arc<Script>) -> Engine {
+        self.engine_with_cap(script, crate::policy_holds::WAIT)
+    }
+
+    /// [`Bench::engine`], a call waiting at most `cap` for its decision.
+    fn engine_with_cap(&self, script: Arc<Script>, cap: Duration) -> Engine {
         let desk = Desk::new(
             self.decided(),
             self.settings(),
             false,
             Arc::new(|_| Turn::default()),
             crate::second_provider::worker::answered_here(None),
-        );
+        )
+        .with_cap(cap);
         Engine::with_clock(
             script,
             Arc::new(|| "SYSTEM".to_owned().into()),
@@ -462,7 +468,10 @@ async fn a_rounds_held_calls_wait_for_the_policy_together() {
         ),
         ..Script::default()
     });
-    let mut engine = bench.engine(script);
+    // A test's cap, not the lamp's 2 s (#1806): three waits in a row would
+    // be 1.2 s, past the bound below.
+    let cap = Duration::from_millis(400);
+    let mut engine = bench.engine_with_cap(script, cap);
     let began = Instant::now();
     spoken(&mut engine, 1);
     let labels = turn_within(&mut engine, crate::policy_holds::WAIT * 2).await;
@@ -477,11 +486,9 @@ async fn a_rounds_held_calls_wait_for_the_policy_together() {
     ran.sort();
     assert_eq!(ran, ["light_on", "set_timer", "volume_up"]);
     assert!(
-        took >= crate::policy_holds::WAIT
+        took >= cap
             && took
-                < crate::policy_holds::WAIT
-                    + 2 * crate::second_provider::policy::LOOK_EVERY
-                    + Duration::from_millis(300),
+                < cap + 2 * crate::second_provider::policy::LOOK_EVERY + Duration::from_millis(300),
         "one wait for the round, not three: {took:?}"
     );
 }
