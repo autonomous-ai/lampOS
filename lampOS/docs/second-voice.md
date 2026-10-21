@@ -3011,6 +3011,12 @@ status, and one closed before any audio says its close code. An answer that
 isn't audio ends that run as failed (`answer: refused`), never shown. Each run asks three pieces a
 target, at most 20 runs. From this Mac with a made-up key, the relay took
 the upgrade and closed with 4001, and ElevenLabs' own API refused it.
+The first line names the model asked, the one both arms ask for:
+`LAMP_SECOND_SPEECH_SOCKET_MODEL` when set and not blank, as the route's
+socket reads it, so the probe times the model the voice would; else
+`eleven_flash_v2_5`, the socket's default, never `tts_model`.
+`systemd-run` doesn't carry the voice unit's environment, so give the
+unit's `LAMP_SECOND_SPEECH_SOCKET_MODEL` with `-E` when it sets one.
 
 Give `-p LoadCredential=elevenlabs.key:…` only with an ElevenLabs key of
 its own; without it the relay alone is timed:
