@@ -2689,7 +2689,8 @@ mod tests {
     fn at_touch(name: &str) -> (Room, lamp_bus::Publisher, PathBuf) {
         use lamp_msgs::TouchEvent;
         // Short, for the sockets' path limit.
-        let root = PathBuf::from(format!("/tmp/lvo-{name}-{}", std::process::id()));
+        // Not the reminders tests' `/tmp/lvo-`: the crate's unit tests are one process.
+        let root = PathBuf::from(format!("/tmp/lvon-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();

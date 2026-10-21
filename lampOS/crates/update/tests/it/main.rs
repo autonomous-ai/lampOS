@@ -8,3 +8,4 @@
 mod ci_paths;
 mod image_journal;
 mod image_ramlog;
+mod scratch_paths;
