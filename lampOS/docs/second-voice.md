@@ -2180,6 +2180,25 @@ after a take-over, but now for every turn:
   (`called::LEAST_SCORE`, 0.9), which the office's false hearings reach
   (0.93 to 0.997, #829), so a stand-in with a false hearing still counts.
   Narrower than without the switch, not closed.
+- **A face turned to the lamp but silent is nobody turned to it**
+  (`LAMP_TURNED_SPEAKING=on`; with `--attention`). On lamp-4ace on 21 Oct
+  from 14:00, someone at the desk sat in the camera's view turned roughly
+  to the lamp (V1's 60° allowance) and quiet. The busy rule let 33 lines of
+  a played two-person scene out as "someone is turned to the lamp", each
+  keeping the conversation going for the next (scenes 5 5 4, against 1 0 3
+  that morning with nobody in view). With the switch, the eyes' speaking
+  faces (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read as for
+  `LAMP_QUIET_GOING_ON_SAME_ONE`) are read over the line. When a face
+  turned to the lamp read still in at least half the looks, none turned to
+  it read speaking in half, and none turned to it went unread in any look
+  (`speaking_faces::turned_only_silent`), the sign is taken away before
+  the rule reads it: `request N: the only faces turned to the lamp were
+  seen silent through the line: nobody is turned to it
+  (LAMP_TURNED_SPEAKING)`. So it goes for every use of the sign: the busy
+  rule, the name's second sign and the strict call. A mouth the eyes
+  couldn't read keeps the sign, so with their speaking read off nothing
+  changes. Risk: a person turned to the lamp and asking, whose mouth reads
+  still, needs its name in a busy room.
 - **Its own answers keep nothing going** (`LAMP_GOING_ON_NOT_OWN=on`, the
   first builder's 17:2x task on #1722). A conversation goes on, on this
   route, by the thread's window (45 s from the start of any answer of the
