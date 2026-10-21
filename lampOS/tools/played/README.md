@@ -24,7 +24,7 @@ voice is a smoke test: the lamp hears replayed speech worse than a person.
 The day and the follow-ups first wait until the lamp has heard and said
 nothing for 45 seconds (`quiet_gate.sh`).
 
-Four more you can run on their own:
+These you can run on their own:
 
 - `open-name.sh LABEL`, about 3 minutes (#2355): "Hey Lamp, my name is",
   a pause, then a made-up name; does the lamp keep it? It then asks the
@@ -59,6 +59,16 @@ Four more you can run on their own:
   quoted line, and the script counts the kept words it said in order, those
   it changed or added, and any refusal (`$PLAYED_OUT/scenarios/addon-say-LABEL.txt`).
   Its stand-in test is `addon-say-test.sh`.
+- `make-skill.sh LABEL FIXTURE [yes|no|both]`, about 4 minutes an arm
+  (#2424, "An owner makes their own skill"), with a stand-in Harness as
+  `calendar.sh` has, so nothing real starts: a voice asks the lamp for a
+  small skill and says yes to the hand-over; the stand-in answers with a
+  fixed skill, and once the lamp asks "Shall I put it on the lamp?", the
+  voice answers "Yes, put it on." (made, asked, that SHA-256 installed only
+  after the yes, enabled, loaded, removed) or "No, not now." (nothing
+  installed). `LAMP_MAKE_SKILL=on` rides on the stand-in's `/run` drop-ins,
+  removed on exit with any skill it put on. Its stand-in test is
+  `make-skill-test.sh`.
 
 - `cut-in-keeps.sh LABEL [ROUNDS]`, about 15 minutes for 3 rounds each way
   (#2739, `LAMP_CUT_IN_KEEPS_LISTENING`): "Hey Lamp, tell me a long story
