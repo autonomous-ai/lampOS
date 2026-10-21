@@ -131,6 +131,7 @@ const POLICY_KEYS: &[&str] = &[
 /// no other program's name or tag reaches `left-out.json`.
 const PARTS: &[&str] = &[
     "lamp-actions",
+    "lamp-addons",
     "lamp-air",
     "lamp-air-clock",
     "lamp-body",
@@ -657,6 +658,7 @@ const VOICE_STATES: [&str; 4] = ["resting", "listening", "thinking", "speaking"]
 /// name in their own code. Any other topic is counted as `other`, so a topic
 /// name never carries anything else into `left-out.json`.
 const BUS_TOPICS: &[&str] = &[
+    "addon/decision",
     "addon/proposal",
     "air/state",
     "attention/addressed",

@@ -1,0 +1,19 @@
+[package]
+name = "lamp-addons"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+lamp-bus = { path = "../bus" }
+lamp-ipc = { path = "../ipc" }
+lamp-msgs = { path = "../msgs" }
+signal-hook = "0.4"
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile = "3"
+
+[lints]
+workspace = true

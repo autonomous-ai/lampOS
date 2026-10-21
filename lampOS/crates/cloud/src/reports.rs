@@ -101,6 +101,7 @@ pub const SELFTEST_PARTS: &[&str] = &[
 /// (`deploy/product/`). A test holds the two the same.
 pub const UNITS: &[&str] = &[
     "lamp-actions.service",
+    "lamp-addons.service",
     "lamp-air-clock.service",
     "lamp-air.service",
     "lamp-body.service",
