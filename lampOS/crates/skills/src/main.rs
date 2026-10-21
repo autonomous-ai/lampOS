@@ -1164,7 +1164,13 @@ fn observe(
         let mut newest = NEWEST_HEARD
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        *newest = newest.max(Some(turn));
+        // A voice that started again numbers its turns from 1 again: its
+        // turns are newer than any of the boot before (lamp-c0a4, #1871).
+        let boot = &message.header.boot;
+        *newest = match newest.take() {
+            Some((was, newer)) if was == *boot => Some((was, newer.max(turn))),
+            _ => Some((boot.clone(), turn)),
+        };
     }
     let made = engine.observe(
         &message.header.topic,
@@ -2888,21 +2894,24 @@ fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut 
     }
 }
 
-/// The newest turn heard on `voice/heard`, as the main loop read it: the
-/// bus keeps no latest of an event topic. Read before each call (#2179).
-static NEWEST_HEARD: Mutex<Option<u64>> = Mutex::new(None);
+/// The newest turn heard on `voice/heard`, as the main loop read it, with
+/// the voice's boot it was heard from: the bus keeps no latest of an event
+/// topic. Read before each call (#2179).
+static NEWEST_HEARD: Mutex<Option<(String, u64)>> = Mutex::new(None);
 
 /// What ends a search (#1685): the body pushed, the lamp paused, or words
 /// heard. The voice listening is not enough: on lamp-52e6 a line of office
 /// noise, 0 words heard, ended a search after its first look (Fifth's row 3,
 /// #1871). Words of the turn that asked for the search, or an earlier one,
 /// do not end it: on Live the last pieces of the asking line can come after
-/// the call. Without `voice/heard` it ends as a show does, on the voice
-/// listening.
+/// the call. A turn of another voice boot is always later: a voice that
+/// started again numbers from 1. Without `voice/heard` it ends as a show
+/// does, on the voice listening.
 struct SearchStop {
     heard: Option<Subscriber>,
-    /// The turn of the newest words heard as the search began.
-    asked: Option<u64>,
+    /// The turn of the newest words heard as the search began, and the
+    /// voice boot it was heard from.
+    asked: Option<(String, u64)>,
 }
 
 impl SearchStop {
@@ -2913,9 +2922,10 @@ impl SearchStop {
             .subscribe(Speech::TOPICS[0], &format!("skills_search_{n}"))
             .map_err(|error| eprintln!("lamp-skills: voice/heard not read for a search: {error}"))
             .ok();
-        let asked = *NEWEST_HEARD
+        let asked = NEWEST_HEARD
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
         Self { heard, asked }
     }
 
@@ -2926,14 +2936,15 @@ impl SearchStop {
         let Some(heard) = &mut self.heard else {
             return voice_listening(bus).then(|| "the voice is listening to someone".into());
         };
-        let asked = self.asked;
-        let later = |speech: &Speech| match (speech.request, asked) {
-            (Some(turn), Some(asked)) => turn > asked,
+        let asked = self.asked.as_ref();
+        let later = |boot: &str, speech: &Speech| match (speech.request, asked) {
+            (Some(turn), Some((was, asked))) if was == boot => turn > *asked,
             _ => true,
         };
         while let Some(message) = receive(heard, Duration::ZERO) {
+            let boot = message.header.boot.clone();
             if message.parse::<Speech>().is_ok_and(|speech| {
-                later(&speech) && speech.text.chars().any(char::is_alphanumeric)
+                later(&boot, &speech) && speech.text.chars().any(char::is_alphanumeric)
             }) {
                 return Some("someone spoke to the lamp".into());
             }
