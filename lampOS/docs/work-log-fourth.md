@@ -5202,6 +5202,19 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2457, (a):** a tone baseline for each known person, by memory id, at most 8, in memory only. A forget of their face, or of everything, lets it go. Gate 3022/0, with four mutations caught. It's stacked on #2450.
 - **b0802:** Seventh's #2456 widens #2376's at-the-start window to 1.3 s.
 
+## 2026-10-21, 11:21 ICT: #2450 and #2467 merged; (b) built, waiting for the landing; `memory/forgot` built, in its gate
+
+- **Merged into #1712:** #2450 (the voice half of mood, `167325721`) and #2467 (a tone baseline per known person, #2457 folded, `f83353de9`).
+- **(b), Mood reading `voice/tone`** (`LAMP_MOOD_TONE`, mirroring #2353's `LAMP_MOOD_SEEMS`):
+  - a glad line is a smile, a down line someone low, and a surely lively voice half a smile's energy, sharing the smile's cooldown;
+  - Ten's 10:47 agreed: two topics, Mood reading both. Their pin (a line's tone neither adds to nor breaks the face's run) is a test;
+  - it's built and tested on lamp-voice's Mood, with seven mutations caught. It goes onto #1712 once the landing merges lamp-voice in.
+- **`memory/forgot`** (the first builder's yes, 10:5x on #2467):
+  - memory tells each `forget_all` that was done, by the app or by voice, after its answer;
+  - the voice's tone baselines let that person's go;
+  - a name forgotten and enrolled again starts fresh;
+  - five mutations are caught. It's on #1712's `e1410041b`, in its gate.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
