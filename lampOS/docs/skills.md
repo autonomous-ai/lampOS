@@ -158,6 +158,7 @@ must not leave a step silently undone)*.
 | `trigger.during` | no | Local `{ from = "HH:MM", to = "HH:MM" }`, start included and end excluded; overnight windows are allowed. Unknown time holds the trigger back |
 | `trigger.once_per_day` | no | Boolean, false by default. Requires a named trigger and `during`, disallows `each`, and consumes a durable daily chance before Policy or output; needs `LAMP_SKILLS_DAILY_FILE` or `--daily-state` |
 | `trigger.unless_heard` | no | Boolean, false by default. Only with `during`, and not with `each` (an item's run never checks it). Once anything was heard on `voice/heard` since the window opened today, the trigger gives no chance: someone already spoke to the lamp (bedtime-morning's greeting). With `once_per_day`, the day's chance is claimed then and the journal says once `<name> chance let go: spoken to since HH:MM`. With it, `lamp-skills` subscribes to `voice/heard`, which the skill's `[permissions]` topics must list. What was heard is kept in memory: a restart forgets it |
+| `trigger.yields_to` | no | `{ skill = "NAME", trigger = "NAME" }`, with `when = "appears"` on the whole topic (#1672, the first builder's ruling): after a night the lamp rested, this trigger's chance waits for that skill's daily trigger to be judged first, so one greeting comes, not two (Welcome back: `{ skill = "bedtime-morning", trigger = "morning" }`). It waits while, at its moment, the routine manager says a routine's rest began the local day before today, the named skill is loaded and enabled, its named `once_per_day` trigger's `during` contains now, and that trigger's day is neither claimed in the daily journal nor dropped, and only while that trigger holds with its chance still to come (in its `for` or its `wait`), unbroken since this trigger first waited (the reviewer's P2 on #2757): a face it does not hold for, or a hold it lost (a face glancing down past its own `gap`), is not waited for until its window ends. Waiting, the chance is kept, not spent, while the trigger holds, as the `[quiet]` hours keep one; the journal says once `waits: the <trigger> greeting comes first`. When the other trigger takes its chance while this face is there, this face's run is done: `done: <skill>'s <trigger> greeting was this face's hello`. When that chance is dropped (its conditions did not hold within its `wait`) or let go (`unless_heard`), or its window or day passes, the kept chance is taken at the trigger's next message as before. A run taken in that window on that day, by the other trigger's not holding or its chance dropped, claims the other trigger's day in the daily journal, as its own greeting would (the first builder on #2757: one morning moment a day), and the journal says once `<skill> <trigger> chance let go: <this skill> already greeted this morning`; a later face is given this skill's ordinary run, never the other's. A later face, after `absent_for`, is greeted as always. No rested night (or `LAMP_SKILL_ROUTINES` off, which leaves no rest manager), the named skill disabled or not loaded (a routine with `LAMP_SKILL_ROUTINES` off), turned off, snoozed, or unable to act (no ask mode, no journal, a journal fault): it does not wait. A `yields_to` naming no loaded daily trigger is ignored, and the journal says so at each load: `<skill>: yields_to <skill>'s <trigger>, which is not a loaded daily trigger: ignored, it does not wait`. When it was judged is in memory; the night rested is kept with `--state-dir` in `DIR/rested` (the routine manager's, below). After a restart a day claimed in the journal is judged, with no record of when, so nothing waits and nothing is marked done: a face there at the start is no news to an `appears` trigger, and one that comes later is greeted as on any day. Tests (`crates/skills/tests/it/daily_engine.rs`): `a_rested_night_and_a_first_face_greet_once_with_the_morning`, `a_dropped_morning_lets_welcome_back_greet_after_it`, `a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once`, `welcome_backs_hello_after_a_dropped_morning_claims_the_morning`, `a_restart_after_the_morning_greets_nobody_twice`, `a_restart_before_the_morning_still_greets_with_it`, `without_a_rested_night_*`, `without_bedtime_morning_*`, `yields_to_goes_with_an_appears_trigger` |
 | `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. A dot steps into an object: `scores.music` is the `music` of `scores` (#1669, `ears/classes`); an empty step (`scores.`, `.music`) is refused. A field that is not there is null: it never holds for `equals`, `above` or `below`, and holds for `not_equals`. The same goes for `each`, `key`, `rise` and a `[[while]]` field. On `humans/faces/tracked` without them, it holds while a face is in view |
 | `trigger.when` | no | `present` (the default): it holds, and has held for `for`. `appears`: it holds where it did not just before, once each time. `leaves` and `changes` are refused for now |
 | `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Arrival's line for someone at the desk) |
@@ -319,7 +320,15 @@ skills".)
 - `--state-dir DIR` is the part's own folder, where the skills a person
   turned off with a skill's `[stop]` are kept across a restart: `DIR/off`,
   one skill's name a line (#1685). It is read at the start, and the journal
-  says which. Without it, off lasts until the program stops. The product's
+  says which. Without it, off lasts until the program stops. With
+  `LAMP_SKILL_ROUTINES` on, `DIR/rested` keeps the night each routine
+  rested (#1672, #2757): one line a skill, its name and the local day the
+  night began (`bedtime-morning 20453`), nothing about a person. Written
+  whole as `off` is when a rest is first admitted, kept through the
+  morning's wake, and cleared when that skill's next night's rest begins
+  or the skill changes; read at the start, so a restart between the night
+  and its morning still has the morning's wake and a `yields_to` know the
+  lamp rested. The product's
   unit gives `--state-dir /var/lib/lampos-skills-state` with
   `StateDirectory=lampos-skills-state` (mode 0700), the folder #1732's
   daily journal shares.
@@ -549,6 +558,20 @@ chance waits up to a minute while the person stays (`wait = "60s"`, with a 3 s
 lost for under 20 s before it counts an absence; Welcome back counts the
 absence from the last near face, which comes to the same for an arrival after
 five minutes.
+
+**After a rested night** the morning greeting is the welcome back (the first
+builder's ruling on #1672, 22 Oct: on lamp-06c1 at 06:01:14 Welcome back
+spoke, and Bedtime and Morning's morning chance was dropped 20 s later).
+Welcome back's trigger has `yields_to = { skill = "bedtime-morning", trigger
+= "morning" }`: with Bedtime and Morning on, the first face of the morning
+waits while its morning trigger holds or is in its `wait`, until it is
+judged. The hum given is this face's hello; a morning chance dropped or let
+go, or a face it does not hold for, Welcome back greets as before, and its
+hello claims the morning's day: a later face gets Welcome back's hello, never
+the morning's. With
+Bedtime and Morning off (its default), routines off, or no rested night,
+nothing changes ([`trigger.yields_to`](#the-schema-as-lamp-skills-reads-it), and
+[bedtime-morning.md](bedtime-morning.md#one-greeting-after-a-rested-night)).
 
 **With the Policy's gate** (`LAMP_SKILLS_ASK=policy`) the 5 s quiet is not
 enough: the Policy holds every hello asked within 15 s of anything heard or

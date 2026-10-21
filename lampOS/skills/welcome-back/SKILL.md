@@ -12,6 +12,9 @@ people walking past or speak into a conversation.
 
 - **Trigger:** a face on `humans/faces/tracked` where there was none, after
   at least five minutes with nobody; at most once every twenty minutes.
+- **After a rested night:** with Bedtime and Morning on, the first face of
+  the morning waits for its morning greeting, which is the welcome back;
+  if that chance is dropped, the hello comes as usual (`yields_to`, #1672).
 - **Ask:** the Policy's `hello` question, before anything is done.
 - **Do:** look at the face, warm the light (`lights/warm_glow.toml`), and
   give the voice a note to say the hello in its own words.

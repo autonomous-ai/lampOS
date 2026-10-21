@@ -529,6 +529,16 @@ impl Journal {
         Ok(journal)
     }
 
+    /// Whether this day was already consumed for the pair, as last read or
+    /// written: no disk I/O. An invalid key or day is not claimed.
+    pub fn claimed(&self, skill: &str, trigger: &str, day: i64) -> bool {
+        self.state.consumed.iter().any(|entry| {
+            entry.skill == skill
+                && entry.trigger == trigger
+                && entry.days.contains(day).unwrap_or(false)
+        })
+    }
+
     /// Consume this exact day for a stable skill/trigger-name pair. A date
     /// correction can use an unclaimed day, but cannot replay a claimed one
     /// after reload/restart. No key or day is evicted to grant another chance.

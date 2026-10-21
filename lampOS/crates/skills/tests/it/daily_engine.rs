@@ -1019,3 +1019,352 @@ fn a_daily_watch_reset_by_a_silent_camera_says_so_once() {
         "{lines:?}"
     );
 }
+
+/// The real welcome-back folder, as installed.
+fn welcome_back(root: &Path) -> Skill {
+    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/welcome-back");
+    let folder = root.join("welcome-back");
+    fs::create_dir_all(folder.join("lights")).unwrap();
+    for file in ["SKILL.md", "skill.toml", "lights/warm_glow.toml"] {
+        fs::copy(from.join(file), folder.join(file)).unwrap();
+    }
+    load(&folder).unwrap()
+}
+
+/// 2026-01-01, day 0 of [`clock`], in local days since 1970.
+const TODAY: i64 = 20_454;
+
+/// From `from` to `to` (minutes), each second the voice's state (`voice`
+/// of the second of the minute) and a face from `face_at`: each skill's
+/// greetings (runs with calls), in order, and every reason said.
+fn desk(
+    engine: &mut Engine,
+    (from, to): (u64, u64),
+    face_at: u64,
+    voice: impl Fn(u64) -> &'static [u8],
+) -> (Vec<String>, Vec<String>) {
+    let (greetings, said) = desk_with(
+        engine,
+        (from, to),
+        |minute, _| if minute >= face_at { FACE } else { EMPTY },
+        voice,
+    );
+    (
+        greetings.into_iter().map(|(skill, _)| skill).collect(),
+        said,
+    )
+}
+
+/// As [`desk`], with the faces seen from `face` (of the minute and the
+/// second): each greeting with when it came.
+fn desk_with(
+    engine: &mut Engine,
+    (from, to): (u64, u64),
+    face: impl Fn(u64, u64) -> &'static [u8],
+    voice: impl Fn(u64) -> &'static [u8],
+) -> (Vec<(String, u64)>, Vec<String>) {
+    let (mut greetings, mut said) = (Vec::new(), Vec::new());
+    for minute in from..to {
+        for second in 0..60 {
+            let now = us(minute, second);
+            clock(engine, now, 0, minute);
+            engine.observe("voice/state", now, voice(second), None);
+            for run in engine.observe(Faces::TOPIC, now, face(minute, second), None) {
+                said.extend(
+                    run.events
+                        .iter()
+                        .map(|event| format!("{} {}", run.skill, event.why)),
+                );
+                if !run.calls.is_empty() && run.calls != [Call::Ends] {
+                    greetings.push((run.skill, now));
+                }
+            }
+        }
+    }
+    (greetings, said)
+}
+
+fn resting(_: u64) -> &'static [u8] {
+    br#"{"state":"resting"}"#
+}
+
+const MORNING: u64 = 7 * 60 + 10;
+
+/// The first builder's ruling on #1672: after a rested night, the morning
+/// greeting is the welcome back. Either skill first in the folder order.
+#[test]
+fn a_rested_night_and_a_first_face_greet_once_with_the_morning() {
+    for bedtime_first in [true, false] {
+        let root = private_root();
+        let (bedtime, welcome) = (bedtime_morning(root.path()), welcome_back(root.path()));
+        let skills = if bedtime_first {
+            vec![bedtime, welcome]
+        } else {
+            vec![welcome, bedtime]
+        };
+        let mut engine = Engine::new(skills, true)
+            .with_daily_journal(crate::journal(root.path().join("daily.json")));
+        engine.rested(Some(TODAY - 1));
+        let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, resting);
+        assert_eq!(greetings, vec!["bedtime-morning"], "{said:?}");
+        assert!(
+            said.contains(
+                &"welcome-back done: bedtime-morning's morning greeting was this face's hello"
+                    .into()
+            ),
+            "{said:?}"
+        );
+        // Away past welcome-back's five minutes and back at 08:00: the
+        // morning is spent, so welcome-back greets as it always did.
+        let (greetings, said) = desk(&mut engine, (MORNING + 3, 8 * 60 + 1), 8 * 60, resting);
+        assert_eq!(greetings, vec!["welcome-back"], "{said:?}");
+    }
+}
+
+/// The morning's conditions never hold within its minute's wait (the voice
+/// hears something every 20 s): its chance is dropped, and welcome-back,
+/// which waited, greets once after the drop.
+#[test]
+fn a_dropped_morning_lets_welcome_back_greet_after_it() {
+    let root = private_root();
+    let mut engine = Engine::new(
+        vec![bedtime_morning(root.path()), welcome_back(root.path())],
+        true,
+    )
+    .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    engine.rested(Some(TODAY - 1));
+    let voice = |second: u64| -> &'static [u8] {
+        if second.is_multiple_of(20) {
+            br#"{"state":"listening"}"#
+        } else {
+            br#"{"state":"resting"}"#
+        }
+    };
+    let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, voice);
+    assert_eq!(greetings, vec!["welcome-back"], "{said:?}");
+    let waits = said
+        .iter()
+        .position(|why| why == "welcome-back waits: the morning greeting comes first")
+        .expect("said it waits");
+    let dropped = said
+        .iter()
+        .position(|why| why.starts_with("bedtime-morning morning chance dropped"))
+        .expect("the morning was dropped");
+    assert!(waits < dropped, "{said:?}");
+    assert_eq!(
+        said.iter().filter(|why| why.contains("waits")).count(),
+        1,
+        "said once: {said:?}"
+    );
+}
+
+/// No rest that night, or the night before last: welcome-back greets as it
+/// does today, beside the morning, with no wait.
+#[test]
+fn without_a_rested_night_welcome_back_does_not_wait() {
+    for rested in [None, Some(TODAY - 2), Some(TODAY)] {
+        let root = private_root();
+        let mut engine = Engine::new(
+            vec![bedtime_morning(root.path()), welcome_back(root.path())],
+            true,
+        )
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+        engine.rested(rested);
+        let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, resting);
+        assert!(
+            greetings.contains(&"welcome-back".to_owned()),
+            "{rested:?} {said:?}"
+        );
+        assert!(!said.iter().any(|why| why.contains("waits")), "{said:?}");
+    }
+}
+
+/// Bedtime and Morning not loaded (disabled, or a routine with
+/// `LAMP_SKILL_ROUTINES` off): welcome-back is as today, and the journal
+/// says its `yields_to` is ignored.
+#[test]
+fn without_bedtime_morning_welcome_back_does_not_wait() {
+    let root = private_root();
+    let welcome = welcome_back(root.path());
+    let notes = lamp_skills::yield_notes(std::slice::from_ref(&welcome));
+    assert_eq!(
+        notes,
+        vec![
+            "welcome-back: yields_to bedtime-morning's morning, which is not a loaded daily trigger: ignored, it does not wait"
+        ]
+    );
+    let bedtime = bedtime_morning(root.path());
+    assert!(lamp_skills::yield_notes(&[bedtime, welcome.clone()]).is_empty());
+    let mut engine = Engine::new(vec![welcome], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    engine.rested(Some(TODAY - 1));
+    let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, resting);
+    assert_eq!(greetings, vec!["welcome-back"], "{said:?}");
+    assert!(!said.iter().any(|why| why.contains("waits")), "{said:?}");
+}
+
+#[test]
+fn yields_to_goes_with_an_appears_trigger() {
+    let root = private_root();
+    let path = root.path().join("daily-check");
+    manifest(
+        root.path(),
+        "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\nyields_to = { skill = \"bedtime-morning\", trigger = \"morning\" }\n[ask]\npolicy = \"hello\"\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    );
+    for trigger in [
+        "topic = \"humans/faces/tracked\"\npresent = true\nyields_to = { skill = \"bedtime-morning\", trigger = \"morning\" }",
+        "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\nyields_to = { skill = \"Bedtime\", trigger = \"morning\" }",
+        "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\nyields_to = { skill = \"bedtime-morning\", trigger = \"the-morning\" }",
+        "topic = \"humans/faces/tracked\"\nwhen = \"appears\"\nyields_to = { skill = \"bedtime-morning\" }",
+    ] {
+        fs::write(
+            path.join("skill.toml"),
+            granted(&format!(
+                "[trigger]\n{trigger}\n[ask]\npolicy = \"hello\"\n[[do]]\nbody = {{ gesture = \"stretching\" }}\n"
+            )),
+        )
+        .unwrap();
+        let error = load(&path).unwrap_err();
+        assert!(
+            error.contains("yields_to") || error.contains("missing field `trigger`"),
+            "{trigger}: {error}"
+        );
+    }
+}
+
+/// A face at the desk a little farther than the morning's `near`, and one
+/// that looks down at the keyboard every other second (the reviewer's P2 on
+/// #2757). Welcome-back's own `near` is the morning's, so the far face is
+/// greeted by neither and waited for by nothing. The glancing one holds
+/// welcome-back through its 3 s `gap` but never holds the morning its 3 s:
+/// the morning is never judged, and welcome-back greets it once at its
+/// own 3 s, not at 11:00, and the morning never fires.
+#[test]
+fn a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once() {
+    const FAR: &[u8] =
+        br#"{"faces":[{"id":"f1","xmin":0.45,"ymin":0.4,"xmax":0.55,"ymax":0.52,"confidence":0.9}]}"#;
+    for bedtime_first in [true, false] {
+        let root = private_root();
+        let (bedtime, welcome) = (bedtime_morning(root.path()), welcome_back(root.path()));
+        let skills = if bedtime_first {
+            vec![bedtime, welcome]
+        } else {
+            vec![welcome, bedtime]
+        };
+        let mut engine = Engine::new(skills, true)
+            .with_daily_journal(crate::journal(root.path().join("daily.json")));
+        engine.rested(Some(TODAY - 1));
+        let far = |minute, _| if minute >= MORNING { FAR } else { EMPTY };
+        let (greetings, said) = desk_with(&mut engine, (MORNING - 6, MORNING + 3), far, resting);
+        assert!(greetings.is_empty(), "{said:?}");
+        assert!(!said.iter().any(|why| why.contains("waits")), "{said:?}");
+        let glancing = |minute, second: u64| {
+            if minute >= MORNING + 3 && !second.is_multiple_of(2) {
+                FACE
+            } else {
+                EMPTY
+            }
+        };
+        let (greetings, said) = desk_with(&mut engine, (MORNING + 3, 11 * 60), glancing, resting);
+        let names: Vec<_> = greetings.iter().map(|(skill, _)| skill.as_str()).collect();
+        assert_eq!(names, ["welcome-back"], "{said:?}");
+        assert!(
+            greetings[0].1 <= us(MORNING + 3, 10),
+            "greeted at {} s: {said:?}",
+            greetings[0].1 / 1_000_000
+        );
+    }
+}
+
+/// The first builder on #2757: once welcome-back greeted someone in the
+/// morning's window after a rested night, that was the day's morning
+/// moment. Its hello after a dropped morning claims the morning's day in
+/// the journal, said once, so a second face at 09:00 is given
+/// welcome-back's ordinary hello, never the morning's.
+#[test]
+fn welcome_backs_hello_after_a_dropped_morning_claims_the_morning() {
+    let root = private_root();
+    let path = root.path().join("daily.json");
+    let mut engine = Engine::new(
+        vec![bedtime_morning(root.path()), welcome_back(root.path())],
+        true,
+    )
+    .with_daily_journal(crate::journal(&path));
+    engine.rested(Some(TODAY - 1));
+    let voice = |second: u64| -> &'static [u8] {
+        if second.is_multiple_of(20) {
+            br#"{"state":"listening"}"#
+        } else {
+            br#"{"state":"resting"}"#
+        }
+    };
+    let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, voice);
+    assert_eq!(greetings, vec!["welcome-back"], "{said:?}");
+    let let_go = "bedtime-morning morning chance let go: welcome-back already greeted this morning";
+    assert_eq!(
+        said.iter().filter(|why| *why == let_go).count(),
+        1,
+        "{said:?}"
+    );
+    // Away past welcome-back's five minutes and its cooldown, back at 09:00
+    // with the room quiet: welcome-back's hello, and no morning step.
+    let (greetings, said) = desk(&mut engine, (MORNING + 3, 9 * 60 + 1), 9 * 60, resting);
+    assert_eq!(greetings, vec!["welcome-back"], "{said:?}");
+    assert!(!said.iter().any(|why| why == let_go), "{said:?}");
+    // The claim is the journal's, on disk, as the morning's own would be.
+    drop(engine);
+    assert!(crate::journal(&path).claimed("bedtime-morning", "morning", TODAY));
+}
+
+/// The restart question on #2757: lamp-skills restarts after the morning's
+/// hum. The fresh Engine reads the same journal, with the morning's day
+/// claimed, and the night rested as the rest manager reads it back
+/// (`routine::RESTED_FILE`). The face there at the start is no news to
+/// welcome-back's `appears`, and one back two minutes later has not been
+/// away its five: neither skill greets again.
+#[test]
+fn a_restart_after_the_morning_greets_nobody_twice() {
+    for face_at in [MORNING + 3, MORNING + 5] {
+        let root = private_root();
+        let path = root.path().join("daily.json");
+        let mut engine = Engine::new(
+            vec![bedtime_morning(root.path()), welcome_back(root.path())],
+            true,
+        )
+        .with_daily_journal(crate::journal(&path));
+        engine.rested(Some(TODAY - 1));
+        let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 2), MORNING, resting);
+        assert_eq!(greetings, vec!["bedtime-morning"], "{said:?}");
+        drop(engine);
+        let mut engine = Engine::new(
+            vec![bedtime_morning(root.path()), welcome_back(root.path())],
+            true,
+        )
+        .with_daily_journal(crate::journal(&path));
+        engine.rested(Some(TODAY - 1));
+        let (greetings, said) = desk(&mut engine, (MORNING + 3, MORNING + 30), face_at, resting);
+        assert!(greetings.is_empty(), "face at {face_at}: {said:?}");
+    }
+}
+
+/// A restart before the morning fires: the night rested read back, the
+/// first face gets the morning's greeting, once, and welcome-back yields.
+#[test]
+fn a_restart_before_the_morning_still_greets_with_it() {
+    let root = private_root();
+    let path = root.path().join("daily.json");
+    let engine = Engine::new(
+        vec![bedtime_morning(root.path()), welcome_back(root.path())],
+        true,
+    )
+    .with_daily_journal(crate::journal(&path));
+    drop(engine);
+    let mut engine = Engine::new(
+        vec![welcome_back(root.path()), bedtime_morning(root.path())],
+        true,
+    )
+    .with_daily_journal(crate::journal(&path));
+    engine.rested(Some(TODAY - 1));
+    let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, resting);
+    assert_eq!(greetings, vec!["bedtime-morning"], "{said:?}");
+}

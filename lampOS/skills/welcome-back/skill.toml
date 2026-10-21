@@ -21,6 +21,10 @@ for = "3s"                  # there for three seconds without a break
 gap = "3s"                  # a look down at the keyboard does not end it
 wait = "60s"                # a room that talks: kept for a minute while they stay, taken once both conditions hold (#1140)
 cooldown = "20m"
+# After a night the lamp rested, Bedtime and Morning's morning greeting is
+# the welcome back: this face waits until that chance is judged, and is not
+# greeted twice (the first builder's ruling on #1672). Off with that skill.
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
 
 [[while]]                   # nothing heard or said for 5 s: an office's own talk passes in 1 to 4 s (#1140)
 topic = "voice/state"
