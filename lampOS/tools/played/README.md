@@ -66,7 +66,9 @@ Four more you can run on their own:
   same stand-in Harness (`stand-in.sh`) answering with two made-up events.
   The lamp tells them back. The run gets its own targets file, one alias
   (the voice's own) on the stand-in's machine, and the voice gets
-  `LAMP_TASKS_ACCOUNTS=on`. It prints PASS or FAIL for each step: offered,
+  `LAMP_TASKS_ACCOUNTS=on`. It prints PASS or FAIL for each step: asked to
+  confirm (the lamp's own question first, answered once its answer has
+  played; it also passes when the lamp offers at once), offered,
   handed over (the stand-in's `new`), the answer read (its `show`), told,
   and heard whole (not cut short, with both events in the lamp's words).
   `TASKS=` works as for `ask-again.sh`. Nothing reaches a real calendar.
