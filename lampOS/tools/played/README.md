@@ -42,9 +42,9 @@ Four more you can run on their own:
   lamp-tasks is older than #2702 (no `--sign-in-by-code` in the binary) is told so, and
   nothing is played. Give `TASKS=` an ARM64 `lamp-tasks` from the same
   artifact, and it's used for the run only. The lamp side is
-  `ask-again-setup.sh`, run as root, with the stand-in's HOME given to
+  `stand-in.sh`, run as root, with the stand-in's HOME given to
   lamp-tasks' own user. If a setup step fails, it says which, and nothing
-  is played. `ask-again-test.sh` runs that setup against a stand-in
+  is played. `stand-in-test.sh` runs that setup against a stand-in
   `systemctl`, with no lamp and no root: run it after changing the setup.
 - `addon-say.sh LABEL ["the kept text"]`, about 2 minutes (#2675): an
   add-on's quoted say on the second route. A `/run` drop-in turns
@@ -52,6 +52,17 @@ Four more you can run on their own:
   quoted line, and the script counts the kept words it said in order, those
   it changed or added, and any refusal (`$PLAYED_OUT/scenarios/addon-say-LABEL.txt`).
   Its stand-in test is `addon-say-test.sh`.
+
+- `calendar.sh LABEL FIXTURE`, about 4 minutes (#751, "Email, calendar
+  and other connectors, through hand-overs"): "Hey Lamp, what's on my
+  calendar today?" is handed over to the computer's agent, which is the
+  same stand-in Harness (`stand-in.sh`) answering with two made-up events.
+  The lamp tells them back. The run gets its own targets file, one alias
+  (the voice's own) on the stand-in's machine, and the voice gets
+  `LAMP_TASKS_ACCOUNTS=on`. It prints PASS or FAIL for each step: offered,
+  handed over (the stand-in's `new`), the answer read (its `show`), told,
+  and heard whole (not cut short, with both events in the lamp's words).
+  `TASKS=` works as for `ask-again.sh`. Nothing reaches a real calendar.
 
 ## What it needs
 
