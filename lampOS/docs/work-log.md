@@ -1,3 +1,34 @@
+## Current checkpoint: 2026-10-22 02:04 +07, updater review revision pushed; report follow-up in progress
+
+**Ready for lamp-voice: no (#2709, revised native gates pending).**
+The requested simplification is pushed at
+`da054ab0905407ae71d257192edf087c387aa1dc`, rebased onto `d904b0123`.
+It reuses `output_within` and `JOURNAL_WITHIN`; the separate query code,
+cut fixtures and process dev-dependency are gone. Parser and readiness
+behavior stay. Fmt, strict updater Clippy and **286 passed / 0 failed /
+2 ignored / 0 filtered** passed. The two existing ignores are manual/network
+fixtures. Timer-state and handover mutations fail **4/1/0/103** and
+**1/3/0/93** respectively, then restore byte-for-byte before the final gate.
+[Revised evidence](https://github.com/autonomous-ai/lampOS/blob/da054ab0905407ae71d257192edf087c387aa1dc/lampOS/docs/verification/update-self-recovery-20261022/README.md)
+retains the initial implementation's receipts as explicitly historical.
+Independent read found no P1/P2. New ARM64 **39658263337** and Linux
+Clippy **39658263544** are running; the old head's green run is not reused.
+
+**Next: [second-P9](proposals/second-update-recovery-report-20261022.md), assigned
+by First.** A separate Cloud-only timer observation, behind existing reports
+switches and consent, plus installation behavior docs. Implementation and
+fixtures are in progress on `second/update-recovery-report`. No claim of an
+actual pending update and no raw systemd/journal strings in the payload.
+
+#1757 remains ready at its qualified head; Reviewer-lead and Nine are
+reading it. Second-P8 is pushed with **425/0/0/0** and follows #1757's merge.
+#2692 is merged; #2694 and #2462 remain with their merger. #1672 is Seventh's.
+No device action, full local workspace or local ARM64 gate.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 01:56 +07, updater native green; review revision underway
 
 **Ready for lamp-voice: no (#2709, requested P2 revision).** Its initial
