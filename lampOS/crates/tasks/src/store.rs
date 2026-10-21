@@ -598,6 +598,74 @@ impl Store {
 mod tests {
     use super::*;
 
+    /// The stores kept as fixtures, as SQL, one for each change of the
+    /// database's shape, each written by its day's build
+    /// ([`write_a_store_fixture`]). Every later build opens each with its
+    /// snapshot as it was, so an update never leaves a lamp's tasks behind
+    /// (the build row "Updates cover the whole lamp, V3 to V5").
+    #[test]
+    fn each_kept_store_opens_with_its_snapshot() {
+        use std::os::unix::fs::PermissionsExt;
+        let kept: [(&str, &str, &[u8]); 1] = [(
+            "2026-10-21",
+            include_str!("../tests/fixtures/stores/store-2026-10-21.sql"),
+            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+        )];
+        for (day, sql, snapshot) in kept {
+            let root = tempfile::tempdir().unwrap();
+            let dir = root.path().join("private");
+            // The folder as the owner makes it, then the day's database in it.
+            drop(Store::open(&dir).unwrap());
+            let file = dir.canonicalize().unwrap().join(DATABASE);
+            fs::remove_file(&file).unwrap();
+            let db = Connection::open(&file).unwrap();
+            db.execute_batch(sql).unwrap();
+            drop(db);
+            fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+            let store = Store::open(&dir).unwrap_or_else(|error| panic!("{day}: {error}"));
+            assert_eq!(store.load().unwrap().as_deref(), Some(snapshot), "{day}");
+        }
+    }
+
+    /// Writes this build's store, holding the state fixture's snapshot, as
+    /// SQL to the path in `LAMP_TASKS_STORE_FIXTURE`. Run by hand when the
+    /// database's shape changes, keeping the fixtures already kept.
+    #[test]
+    #[ignore = "writes a store fixture: run by hand with LAMP_TASKS_STORE_FIXTURE set"]
+    fn write_a_store_fixture() {
+        let path = std::env::var_os("LAMP_TASKS_STORE_FIXTURE").expect("LAMP_TASKS_STORE_FIXTURE");
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::open(&root.path().join("private")).unwrap();
+        store
+            .commit(include_bytes!(
+                "../tests/fixtures/stores/state-2026-10-21.json"
+            ))
+            .unwrap();
+        let pragma = |name: &str| -> i64 {
+            store
+                .db
+                .query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
+                .unwrap()
+        };
+        let mut sql = format!("PRAGMA page_size = {};\n", pragma("page_size"));
+        let tables: Vec<String> = store
+            .db
+            .prepare("SELECT sql FROM sqlite_schema ORDER BY rowid")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        for table in tables {
+            sql += &format!("{table};\n");
+        }
+        let snapshot = load_snapshot(&store.db).unwrap().unwrap();
+        let hex: String = snapshot.iter().map(|byte| format!("{byte:02x}")).collect();
+        sql += &format!("INSERT INTO state VALUES (1, X'{hex}');\n");
+        sql += &format!("PRAGMA user_version = {};\n", pragma("user_version"));
+        fs::write(path, sql).unwrap();
+    }
+
     #[test]
     fn live_connection_uses_full_sync_delete_journal_and_bounded_pages() {
         let root = tempfile::tempdir().unwrap();

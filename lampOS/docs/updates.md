@@ -1117,6 +1117,13 @@ the part starts. A store it truly can't read (a real schema bump) is set
 aside under a new name with a journal line, and the part starts without
 it.
 
+**And one version back** (the build row "Updates cover the whole lamp, V3 to
+V5", 21 Oct): each store as its day's build wrote it is kept as a
+fixture, and every later build's tests read it. A shape change adds the
+new day's file and keeps the old ones. lamp-tasks is first
+(`crates/tasks/tests/fixtures/stores/`: the state and the database around
+it, as SQL); the other parts follow, by harm.
+
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
 were also checked with temporary tests, since removed. "Unread" marks what
