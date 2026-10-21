@@ -1,0 +1,38 @@
+=== after-compile | exit 0 | 2.415202 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup#lamp-setup@0.1.0","manifest_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup)
+    Finished `test` profile [unoptimized] target(s) in 2.34s
+=== end after-compile ===
+=== after-stop-1 | exit 0 | 0.730230 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.04s
+
+--- stderr ---
+=== end after-stop-1 ===
+=== after-stop-2 | exit 0 | 0.048206 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.03s
+
+--- stderr ---
+=== end after-stop-2 ===
+=== after-stop-3 | exit 0 | 0.048684 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.03s
+
+--- stderr ---
+=== end after-stop-3 ===

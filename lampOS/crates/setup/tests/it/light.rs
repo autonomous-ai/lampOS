@@ -223,13 +223,15 @@ fn the_light_follows_setup_and_lets_the_ring_go_before_the_marker() {
 fn stopping_ends_with_black_and_a_closed_ring() {
     let seen: Seens = Arc::default();
     let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
-    let light = Light::spawn(
+    let light = Light::spawn_with_clock(
         Arc::clone(&status),
         {
             let seen = Arc::clone(&seen);
             move || SetupRing::new(Sink(Arc::clone(&seen)))
         },
         |line| panic!("nothing should be said: {line}"),
+        RETRY,
+        Fast::new(),
     );
     assert!(shows(&seen, white));
     assert!(light.stop());

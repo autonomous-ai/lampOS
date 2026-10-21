@@ -1,0 +1,62 @@
+=== before-compile | exit 0 | 16.230469 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup#lamp-setup@0.1.0","manifest_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling tokio v1.53.1
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling rustix v1.1.5
+   Compiling futures-util v0.3.34
+   Compiling tracing v0.1.44
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/bus)
+   Compiling log v0.4.34
+   Compiling jiff v0.2.38
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/msgs)
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/ipc)
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling hyper-util v0.1.21
+   Compiling tokio-rustls v0.26.6
+   Compiling tower-http v0.6.11
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/local-time)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/ring)
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.5
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/update)
+   Compiling axum v0.8.9
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-setup-light-20261022/lampOS/crates/setup)
+    Finished `test` profile [unoptimized] target(s) in 16.14s
+=== end before-compile ===
+=== before-stop-1 | exit 0 | 2.153627 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 1.37s
+
+--- stderr ---
+=== end before-stop-1 ===
+=== before-stop-2 | exit 0 | 1.401766 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 1.39s
+
+--- stderr ---
+=== end before-stop-2 ===
+=== before-stop-3 | exit 0 | 1.412775 s ===
+--- stdout ---
+
+running 1 test
+test light::stopping_ends_with_black_and_a_closed_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 1.40s
+
+--- stderr ---
+=== end before-stop-3 ===

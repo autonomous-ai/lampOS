@@ -1,0 +1,263 @@
+[
+  {
+    "label": "before-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-setup",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 16.230469,
+    "stdout": "before-compile.stdout",
+    "stderr": "before-compile.stderr"
+  },
+  {
+    "label": "before-stop-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.153627,
+    "stdout": "before-stop-1.stdout",
+    "stderr": "before-stop-1.stderr"
+  },
+  {
+    "label": "before-stop-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.401766,
+    "stdout": "before-stop-2.stdout",
+    "stderr": "before-stop-2.stderr"
+  },
+  {
+    "label": "before-stop-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 1.412775,
+    "stdout": "before-stop-3.stdout",
+    "stderr": "before-stop-3.stderr"
+  },
+  {
+    "label": "after-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-setup",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.415202,
+    "stdout": "after-compile.stdout",
+    "stderr": "after-compile.stderr"
+  },
+  {
+    "label": "after-stop-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.73023,
+    "stdout": "after-stop-1.stdout",
+    "stderr": "after-stop-1.stderr"
+  },
+  {
+    "label": "after-stop-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.048206,
+    "stdout": "after-stop-2.stdout",
+    "stderr": "after-stop-2.stderr"
+  },
+  {
+    "label": "after-stop-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.048684,
+    "stdout": "after-stop-3.stdout",
+    "stderr": "after-stop-3.stderr"
+  },
+  {
+    "label": "mutant-stop-without-black-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-setup",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 4.036793,
+    "stdout": "mutant-stop-without-black-compile.stdout",
+    "stderr": "mutant-stop-without-black-compile.stderr"
+  },
+  {
+    "label": "mutant-stop-without-black",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-b01e1c3e1d834a04",
+      "light::stopping_ends_with_black_and_a_closed_ring",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 0.782849,
+    "stdout": "mutant-stop-without-black.stdout",
+    "stderr": "mutant-stop-without-black.stderr"
+  },
+  {
+    "label": "gate-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 10.813805,
+    "stdout": "gate-fmt.stdout",
+    "stderr": "gate-fmt.stderr"
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-setup",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 11.242349,
+    "stdout": "gate-clippy.stdout",
+    "stderr": "gate-clippy.stderr"
+  },
+  {
+    "label": "gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-setup"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 12.056394,
+    "stdout": "gate-tests.stdout",
+    "stderr": "gate-tests.stderr"
+  },
+  {
+    "label": "gate-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 56.228016,
+    "stdout": "gate-build.stdout",
+    "stderr": "gate-build.stderr"
+  },
+  {
+    "label": "gate-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.067833,
+    "stdout": "gate-diff.stdout",
+    "stderr": "gate-diff.stderr"
+  },
+  {
+    "label": "gate-cloud-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-cloud",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 33.608246,
+    "stdout": "gate-cloud-clippy.stdout",
+    "stderr": "gate-cloud-clippy.stderr"
+  },
+  {
+    "label": "gate-cloud-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-cloud"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 55.903717,
+    "stdout": "gate-cloud-tests.stdout",
+    "stderr": "gate-cloud-tests.stderr"
+  }
+]
