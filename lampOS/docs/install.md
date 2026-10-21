@@ -527,8 +527,12 @@ units stopped:
    motion), prints the file and writes it, never over one already there. It
    holds `--home` and `--folded-arm` as found, `--stand` as lamp-4ace's
    with this lamp's roll and yaw, the default `--pitch-window` checked to
-   hold the rest pitch and to lie inside the pitch servo's own limits, and
-   `--torque on`. It refuses, with why, where the body would refuse the
+   lie inside the pitch servo's own limits, and `--torque on`. A rest pitch
+   a little outside the body's home range is a head on its stop: `--home`
+   takes the nearest edge and the file says so; one farther out is refused,
+   a head off its stop (the range and how far, as the code reads them:
+   [body.md](body.md), on `lamp-body-measure`). The body starts from such a
+   head by waking it home, as it does unless given `--wake off`. It refuses, with why, where the body would refuse the
    poses, and when any joint has torque on (the lamp is then held, not at
    rest). `--gaze` is not in it: it is measured with a face and the camera
    ([body.md](body.md)), and the body runs without it until then: the
