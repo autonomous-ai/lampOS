@@ -436,9 +436,13 @@ fn the_narrow_socket_takes_forget_person_only_and_refuses_the_rest_untouched() {
         assert!(answer.get("entries").is_none() && answer.get("people").is_none());
     }
     assert_eq!(everything(&lamp), before, "a refusal changed the store");
-    // The one request it takes.
+    // The one request it takes, re-encoded before the store sees it (Third
+    // on #2563): a line naming `person` twice reaches the store as the one
+    // id `narrow` read, the last, never as the line that came in, which the
+    // store's own reading would refuse.
+    let twice = format!(r#"{{"op":"forget_person","person":"{P2}","person":"{P1}"}}"#);
     assert_eq!(
-        lamp.ask_narrow(&json!({"op":"forget_person","person":P1}).to_string()),
+        lamp.ask_narrow(&twice),
         json!({"ok":true,"removed":2,"rules":1})
     );
     nothing_for(&lamp, P1, "zebrafish", true);

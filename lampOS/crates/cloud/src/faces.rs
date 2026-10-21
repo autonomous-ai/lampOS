@@ -218,7 +218,20 @@ pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
                 // Eyes that say no word (an older build) said no id either:
                 // the name is then theirs alone.
                 let free = answer["name_id_free"].as_bool().unwrap_or(id.is_none());
-                (removed(&name, &answer)?, id, free)
+                let face = match removed(&name, &answer) {
+                    Ok(face) => face,
+                    // The face is already gone: a face-only remove before,
+                    // or a retry after memory answered `kept`. With
+                    // `entirely`, memory is still asked for the name's id
+                    // when the eyes say nobody else holds it, so the
+                    // person's memory can always be removed (Third's P2 on
+                    // #2563).
+                    Err(_) if entirely && answer["forgot"] == false && free => {
+                        json!({"removed": name, "face": "already gone"})
+                    }
+                    Err(refused) => return Err(refused),
+                };
+                (face, id, free)
             }
             None => return Err("the lamp's eyes did not answer".to_owned()),
         };
@@ -572,6 +585,35 @@ mod tests {
         assert_eq!(left, with_rules(&[&person_id("Mai")]), "only Mai's stays");
     }
 
+    /// Third's P2 on #2563: after "Forget their face", the eyes no longer
+    /// know the face, and a later remove `entirely` still forgets the
+    /// person's memory by their name's id, while nobody else holds it.
+    /// Held by another person, it is refused as before, and so is a face
+    /// only.
+    #[test]
+    fn a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory() {
+        let lan = person_id("Lan");
+        let gone = json!({"forgot": false, "name_id_free": true});
+        let left = kept_after(
+            "gone",
+            json!({"name": "Lan", "entirely": true}),
+            gone,
+            with_rules(&[&lan, &person_id("Mai")]),
+        );
+        assert_eq!(left, with_rules(&[&person_id("Mai")]), "only Mai's stays");
+        let eyes = Eyes {
+            socket: "/nonexistent/who.sock".into(),
+            memory: None,
+        };
+        // Unreachable eyes still refuse; an unknown face's refusal stands
+        // for a face-only remove and for a name another person holds.
+        assert!(remove(&eyes, &json!({"name": "Lan", "entirely": true})).is_err());
+        assert_eq!(
+            removed("Lan", &json!({"forgot": false, "name_id_free": false})),
+            Err("the lamp doesn't know that face".to_owned())
+        );
+    }
+
     /// A remove of "Lan" against eyes that answer `told`, and a memory that
     /// keeps the scopes `kept`: what memory keeps after.
     fn kept_after_removing_lan(
@@ -637,10 +679,19 @@ mod tests {
             socket: who,
             memory: Some(memory),
         };
+        let answer = remove(&eyes, &data).unwrap();
+        assert_eq!(answer["removed"], "Lan", "{answer}");
+        assert_eq!(answer["memory"], "forgotten", "{answer}");
+        // A face already gone says so; a face the eyes forgot now doesn't.
+        let gone = answer.get("face").is_some();
         assert_eq!(
-            remove(&eyes, &data).unwrap(),
-            json!({"removed": "Lan", "memory": "forgotten"})
+            answer.as_object().unwrap().len(),
+            2 + usize::from(gone),
+            "{answer}"
         );
+        if gone {
+            assert_eq!(answer["face"], "already gone", "{answer}");
+        }
         done_tx.send(()).unwrap();
         eyes_side.join().unwrap();
         let left = memory_side.join().unwrap();

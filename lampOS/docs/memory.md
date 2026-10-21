@@ -217,7 +217,10 @@ gives the app one narrow call for it and no read access.
   skipped count; a set-aside newer database goes too (#2067). The person's
   row keeps its id high-water mark, so a stale reference never names a new
   entry. The legacy store removes the person's directory, then the `r-`
-  one's; asking again finishes a removal a failure stopped half way.
+  one's; asking again finishes a removal a failure stopped half way. Such
+  a half-done removal answers a disk error, so `memory/forgot` isn't told
+  until the retry that finishes it; the app's retry still reaches memory
+  with the face already gone (lamp-cloud asks by the name's id).
 - **The narrow socket:** `--forget-socket ABSOLUTE_SOCKET_PATH
   --forget-group NAME` (both or neither; off unless set) opens a second
   socket beside the main one, mode 0660 and owned by group `NAME`, looked up

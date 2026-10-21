@@ -306,7 +306,11 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
 - **`entirely`** (agreed with the mobile app): `true`, or left out as
   before, is the eyes and then memory; `false` is the eyes' forget only,
   and the answer carries `"memory": "not asked"`; any other value is
-  refused before the eyes are asked. `{"entirely": true}` with no name is
+  refused before the eyes are asked. A remove `entirely` of a face the eyes
+  no longer know (after a face-only remove, or a retry after `kept`) still
+  asks memory for the name's id while the eyes say nobody else holds it,
+  and answers `"face": "already gone"` beside `memory` (Third on #2563); a
+  face-only remove of an unknown face is refused as before. `{"entirely": true}` with no name is
   refused by the name's check, ending `; entirely is taken`: that refusal
   is the app's probe for its two choices (Mobile on #2563). A lamp of
   before `entirely` refuses it plainly (and would forget memory too on a
