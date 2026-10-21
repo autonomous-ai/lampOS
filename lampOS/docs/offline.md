@@ -25,12 +25,14 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   unavailable, with why) is declared and registered, and nothing publishes
   it. The place for the voice's own link state.
 - **Recorded failure lines** ([failure-notices.md](failure-notices.md),
-  `--failure-notice-dir`): built, packaged nowhere, no wording approved, and
-  played only for a turn whose request failed. The product unit passes
-  `--failure-notice-dir /etc/lampOS/voice/notices` since #1959, for the Wi-Fi
-  helper's recorded no-Wi-Fi line (`setup.md`, "The no-Wi-Fi line is a
-  recording"); no recording is in that folder yet, so every line there is
-  still silent. The way to say "I can't reach
+  `--failure-notice-dir`): played only for a turn whose request failed. Four
+  are recorded in the second route's voice (#1844, 20 Oct):
+  `provider_unavailable`, `back_online`, `voice_service_unreachable` and the
+  Wi-Fi helper's `wifi_lost`. `lamp-update install` places them, with their
+  manifest, in `/opt/lampOS/voice/notices` from the `notices-2026-10-20`
+  release (`deploy/product/models.json`), and the product unit passes that
+  folder. Before, it passed `/etc/lampOS/voice/notices`, which nothing
+  filled, so every line was silent (lamp-06c1, 20 Oct). The way to say "I can't reach
   the internet" with no internet: a recording on the lamp.
 - **Schedule's trusted clock** (`crates/schedule/src/time.rs`,
   [schedule.md](schedule.md)): elapsed timers run on the boot clock; calendar

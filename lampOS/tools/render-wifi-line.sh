@@ -2,7 +2,7 @@
 # The Wi-Fi helper's no-Wi-Fi line, rendered once in the lamp's own voice (#1959, lampOS/docs/setup.md,
 # "The no-Wi-Fi line is a recording"): the voice's own route, model and voice, the line as one written
 # turn, kept as 24 kHz mono WAV, and the failure-notice manifest that names it with its SHA-256
-# (lampOS/docs/failure-notices.md). The folder it writes goes to /etc/lampOS/voice/notices on a lamp.
+# (lampOS/docs/failure-notices.md). The folder it writes goes into the notices release, which install places in /opt/lampOS/voice/notices (#1844).
 #
 #   tools/render-wifi-line.sh /absolute/private/provider.json NEW_FOLDER [production|test]
 #
