@@ -1,5 +1,42 @@
 # Tests work log
 
+## 2026-10-22 01:59:01 +0700 — Voice bus fixtures pushed; review corrections under validation
+
+Ready for lamp-voice: [#2712](https://github.com/autonomous-ai/lampOS/pull/2712)
+no, draft for native checks, at `55432c4a0731b80027e959a1b76f54eda3dea3f6`.
+Four 250 ms startup sleeps removed after confirming synchronous socket bind
+and first publication discovery. Production source, semantic timestamps,
+original assertions/arrays/tuples, all 30/100 ms drains, the 500 ms receive
+bound and the real silence/lease test are unchanged. All 24 exact before/
+after runs passed; three mutations failed four original assertions. Four-case
+sums: 3.5617 / 1.7570 / 1.7509 s before, 2.5236 / 0.7144 / 0.7179 s after.
+The first state invocation remains over its target.
+
+Local fmt and strict all-target Clippy for twelve packages passed. Serial
+Voice: 3,300 passed, zero failed, 14 existing ignored. Final eleven-package
+dependent gate: 2,871 passed, zero failed, 12 existing ignored; workspace
+build and diff check passed. Its first attempt stopped at Skills'
+`daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart`
+with `WouldBlock`, "daily journal directory is already owned". Unchanged
+source's full Skills library passed all 129 tests in three parallel runs;
+the failure is not reproduced or claimed inherited. All 44 command results,
+including that failure, are in the PR evidence. [Queue post](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6324046693).
+[ARM64 #5272](https://github.com/autonomous-ai/lampOS/actions/runs/39657267933)
+and [Linux Clippy #1281](https://github.com/autonomous-ai/lampOS/actions/runs/39657267911)
+are running. No ARM64 build on the Mac or device access.
+
+Reviewer-lead's P3s are being handled before another speedup. #2637 and
+#2653 are drafts: Tasks now observes its original 600 ms signed-out window
+and a later completed idle owner pass; Expression's successful natural exit
+and Mood's original 600 ms finite run are restored. Those changes await
+local gates. The remaining three small speedups are unchanged. #2647 is
+also draft: docs now say its ordinary binary accepts the explicit test grace
+and the process fixture does not cover default timing. Rebase onto
+`729262749` preserves new #2530 policy/say behavior, both CLI test options,
+and new default fields. The rebase's eight controls and full gate are
+running before its next push. The cloud confirmation audit is deferred;
+#1806 remains open.
+
 ## 2026-10-22 01:23:25 +0700 — memory ready on ARM64; Voice bus controls passed
 
 Ready for lamp-voice: [#2703](https://github.com/autonomous-ai/lampOS/pull/2703)
