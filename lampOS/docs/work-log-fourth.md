@@ -5247,6 +5247,18 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Thirteen's finding (c0a4, 16:0x):** on the duplex route, "forget my face" left the tone baseline. Gemini marks no piece of the person's line finished, so the words check (forget, and the words' valence) never ran there. The fix joins the pieces and reads the line once they stop (300 ms, as Policy's) after its End. Built on `fourth/tone-duplex-words` (`45cd35ef3`): both new tests fail on the code before it, and the before-End one fails without the End wait. It's in its gate.
 - **#2540** is claimed: a successful `remember` marks the frozen note stale, so the next turn asks it again.
 
+## 2026-10-21, 17:55 ICT: #2540 up as #2615; the duplex tone words as #2608, its P3 in its gate; the Queue is #2602
+
+- **#2615 (#2540):** a thing the store keeps with `remember` marks the Days client (`kept_since_note`), and the second route's next turn asks the run's note again. It's the same ask a person change makes, journaled. A refused `remember` and a recall don't re-ask; a confirmed forget already opens a fresh session.
+  - The replay table (#2551, merged) now asks as the route does, and its four `remember` rows are in the note, against the real store.
+  - The mark's unit test and the replay both fail with the mark never set. Gate: 4078 passed, 0 failed.
+- **The duplex tone words** (Thirteen's c0a4 finding): #2600 → #2608, with the reviewer-lead's P2 folded in. Each line now carries the turn it was heard in (`ToneLine`), so two lines never join and a forget is read against its own line's person. Gate on #2608: 3812 passed, 0 failed.
+  - The reviewer-lead's re-read closed the P2 and both P3s. One new P3: words heard just before a lamp line begins are now its first. It's folded and in its gate, and a PR replacing #2608 follows.
+  - The first gate's 5 failures were load-timing tests (motor watchdogs, ring restart ticks). Alone, they passed 3 runs of 3.
+- **#2582** (`LAMP_MOOD_TONE`) and **#2554** (`LAMP_WORKER_SCHEDULING`): read with no open finding, in the merge order. Ten's follow-up for #2582 (a lively voice adds nothing during someone low's quiet) is ready for when it lands.
+- **#2539:** its code is done (#2573 merged); its lamp row is left.
+- **The Queue moved to #2602** at 10:08Z (#1722 full). My watch missed it for about 45 minutes, until a post was refused; it now reads #2602 and my open issues.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5272,7 +5284,7 @@ The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
 `LAMP_VOICE_TONE` (#2427) is off unless set. It was played on lamp-75c9 with nobody there (Ten, 21 Oct: the words' valence passed, the arousal wasn't shown by the tools there), and run with a known face on lamp-c0a4 (Thirteen, 21 Oct: a pass on the second route; on the duplex route no forget, now in its fix).
-`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp.
+`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2615's note re-ask (no switch) and #2608's duplex words were not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
