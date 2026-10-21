@@ -311,6 +311,14 @@ fn a_closed_ring_channel_does_not_create_input_readiness_or_stop_audio_authority
         ring,
     } = peers;
     drop(ring);
+    // A child another test forks as `ring` drops holds a copy of its socket
+    // until its exec (CLOEXEC), so the authority below could still be taken
+    // and the ring stay active (#1569 row 71): sent to until refused first.
+    rig.ring
+        .iter_mut()
+        .next()
+        .unwrap()
+        .send_stop_until_peer_gone();
     let mut controller = Controller::new(new_boot().unwrap(), now());
     let snapshot = controller.snapshot(now()).unwrap();
     assert!(!snapshot.listening_ready(now()));
