@@ -2876,7 +2876,9 @@ every function given, while Live called `remember` and `forget`). In order:
 - "Oh, forget it, never mind." and "Never mind, forget I asked.",
   each right when it does **not** call `forget`, asked while the umbrella is
   kept (the reviewer and the first builder on #2007);
-- "What do you remember about my umbrella?" (`recall`);
+- "What do you remember about my umbrella?", right when it does **not**
+  call `forget`: it was remembered four lines before, so answering from the
+  talk is right, as the lamp-4ace runs did (the first builder on #2063);
 - "Hey Lamp, please forget that." (`forget`), the trial's own line;
 - "What about my umbrella?" (counted);
 - "Remember my keys are on the hook by the door." (`remember`);
@@ -2971,9 +2973,55 @@ keeps as its frozen snapshot (with source ids), under the memory note and
 - **`never-mind`:** "Forget it, never mind." with something kept. It's right
   with anything but `forget` or `remember`.
 
-Each case prints `right=N/M`. The bar is the last line: every case right
-every time. Counts only, no words. Run it like `probe-cache`, where
-lamp-actions runs:
+Each case runs in three arms (#2037, the first builder at 05:23 on #1722). In
+**`quality-today`**, the notes are as a spoken turn has them now. In
+**`quality-fix`**, `MEMORY_USE_NOTE` is added, a proposed note for the three
+causes of the first lamp-4ace run:
+- **Snapshot first:** answer from what the snapshot holds, with no call, and
+  call `recall` only for what it doesn't hold. Both notes said to call
+  `recall` for earlier conversations, which `preference-used` (3/10) followed.
+- **A correction:** told by its words ("actually", "now", "not any more"),
+  its first call is `forget` of the old thing by its source id, then
+  `remember` the new, never words alone. Nothing said what a correction is
+  (`correction-first` 0/10, `correction-kept` 5/10).
+- **Only what is theirs:** say only what `recall` marks theirs. What someone
+  else said in the room is never repeated, named or hinted at; if nothing is
+  theirs, say so. Nothing said so (`earlier-today-said` 0/10).
+
+The first wording of the note, on lamp-4ace (the first builder at 06:18 on
+#2063), took `correction-kept` to 8/8, `correction-first` to 5/9,
+`earlier-today-said` to 4/8 and `preference-used` to 7/9, with the cases
+already right unchanged. The tightened wording at `74341122c` (07:11) took
+both corrections to 10/10, but `preference-used` to 5/9 and
+`earlier-today-said` to 2/10, the room's secret said 8 times. "Say only what
+is marked theirs" was read as all memory, and this snapshot is the room's,
+speaker unknown, so the coffee went unsaid. It is now about what `recall`
+gives, and the snapshot's answer uses its own word.
+
+A third arm, **`quality-marked`**, is the fix with each of `recall`'s things
+not marked theirs carrying `"theirs":false` and `NOT_THEIRS` on itself ("said
+in the room, speaker unknown: not theirs to hear, never repeat it or its
+subject"): the rule beside the words it is about, as the voice's recall
+answer would carry it if it wins, rather than only in the note.
+
+At 09:49 on #2063 (the first builder), two more changes, in both `fix` and
+`marked`:
+- **The preference line opens the use note** (`PREFERENCE_LINE`, ahead of
+  `MEMORY_USE_NOTE`'s correction lines, which stay as they are, both
+  10/10), as the first builder asked (12:11 on #1722). `19096d05d` had it
+  first in the memory section instead, after those lines and beside the
+  snapshot; both places are measured. After Friday's lamp-06c1 run (06:43 on #2176: earlier-today 7/10, the model calling nothing), it also says the snapshot never holds what was said in the conversations, and that a question about the talk, today or before, is `recall`'s.
+- **Today's recall quotes what they said:** a recall of `days_ago` 0 is
+  answered with `said_today`, their heard lines as quoted items, or "nothing
+  said today" (`NOTHING_TODAY`) when none is theirs. The note says to answer
+  only from those quotes, word for word, and to say it didn't hear one when
+  nothing was said.
+
+Each arm and case prints `right=N/M` and, for the wrong runs, why:
+`called-<name>` (the first call, or `none`), `no-word` (a word it needs is
+missing) or `said-never` (it said a word it must not). The last line names
+the arms that got every case right every time. Counts only, no words. Run it
+like `probe-cache`, where lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \
