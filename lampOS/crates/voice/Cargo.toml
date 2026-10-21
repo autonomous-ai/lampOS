@@ -87,3 +87,9 @@ tokio = { version = "=1.53.1", features = ["test-util"] }
 [[example]]
 name = "render_line_second"
 test = true
+
+# The speech-to-text stop path scored on recorded bundles (#828, the Stop
+# words row): its checks run with `cargo test`; it hears only when named.
+[[example]]
+name = "stop_words_stt_replay"
+test = true
