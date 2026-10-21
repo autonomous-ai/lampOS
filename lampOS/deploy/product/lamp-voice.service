@@ -92,6 +92,12 @@ Environment=LAMP_SECOND_STEADY_FIRST=on
 Environment=LAMP_SECOND_CHAT_WARM=on
 Environment=LAMP_SECOND_SPEECH_WARM=on
 Environment=LAMP_SECOND_STT_WARM=on
+# Measured on lamp-4ace on 21 Oct, one evening's played tests, from the end of speech to the lamp's first sound, 13
+# replies each (lamp-runs.md): a median 1.61 s with both, 1.99 s with early finalize off, 1.84 s with the second route's
+# playout start at the unit's 350 ms (set for Live's bursts). The playback gaps were the same at 100 and 350 ms (1.29
+# and 1.36 a reply), and all 12 day lines were answered in each.
+Environment=LAMP_SECOND_EARLY_FINALIZE=on
+Environment=LAMP_SECOND_PLAYOUT_START_MS=100
 # The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
 # (memory.md).
