@@ -1,0 +1,59 @@
+{
+  "head": "4c847099474a8aca5e6c09d5291a3003ec2a47fd",
+  "event": "pull_request",
+  "tested_checkout": "3ff5809553765f1f05e1e495b8d7978a51a5a2f2",
+  "tested_base": "f11099bf81bb692e73cee752b3dedb4d732c55e4",
+  "run": 39542671856,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39542671856",
+  "conclusion": "success",
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "log_sha256": "8ab5db5f0c62a29c11d108c70c8ef2ee830823c1ee621337671d9986cdf58dd9",
+  "warnings": [],
+  "steps": [
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Post Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ]
+}
