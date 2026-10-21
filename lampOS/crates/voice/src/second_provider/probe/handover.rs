@@ -300,9 +300,20 @@ mod tests {
 
     /// The story kept as the route keeps an exchange is told as history:
     /// the person's words, then the lamp's, after the system message.
+    /// The thread is the process's one: it starts fresh, as the probe's
+    /// own process does, since `keep_exchange` keeps the exchange as
+    /// whoever an earlier test left at the lamp, and a forget it left
+    /// pending would drop it before it is told. It is put back after.
     #[test]
     fn the_story_is_told_as_the_exchange_before_the_line() {
         let _one = crate::provider_worker::tests::one_thread();
+        let before = std::mem::take(
+            &mut *crate::thread::THREAD
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        );
+        crate::thread::THREAD.clear_poison();
+        crate::remember::clear_forgotten_thread(&mut crate::thread::Thread::new());
         keep_exchange(STORY, "Once there was a fox.");
         let told = worker::system_message("You are a lamp.", None, "", None, None);
         let history: Vec<(&str, Option<String>)> = told
@@ -310,7 +321,9 @@ mod tests {
             .iter()
             .map(|message| (message.role, message.words().map(str::to_owned)))
             .collect();
-        crate::thread::THREAD.lock().unwrap().forget();
+        *crate::thread::THREAD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = before;
         assert_eq!(
             history,
             vec![
