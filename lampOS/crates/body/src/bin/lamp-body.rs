@@ -1003,6 +1003,16 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         .ok()
         .map(lamp_body::pause_in::PauseIn::on);
     let paused = std::cell::Cell::new(false);
+    // Put to sleep by a hand on its head (`voice/mute`, #1362): it folds
+    // now and takes nothing new until woken. Only with `LAMP_HEAD_TOUCH=on`;
+    // looked at with the moods.
+    let mut sleep = lamp_body::sleep_in::enabled_from_environment()
+        .then(|| lamp_bus::Bus::from_environment().ok())
+        .flatten()
+        .map(lamp_body::sleep_in::SleepIn::on);
+    let asleep = std::cell::Cell::new(false);
+    // Open again after that sleep, told once: it stands at once.
+    let woken = std::cell::Cell::new(false);
     let mut unknown_said = Hush::default();
     // A skill's move sent whole, played as a gesture (docs/body.md).
     let mut moves_sent = lamp_body::moves::Sent::besides(&moves);
@@ -1089,7 +1099,18 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         if latest.is_some_and(|(mood, _)| mood == lamp_body::gesture::Mood::Reading) {
             reading_at = Some(std::time::Instant::now());
         }
-        if paused.get() || unplug.as_ref().is_some_and(|unplug| unplug.latched()) {
+        if let Some(sleep) = sleep.as_mut() {
+            // The voice speaking to a body taken to be asleep has likely
+            // woken: looked at again now, so the lift does not wait.
+            if asleep.get()
+                && latest.is_some_and(|(mood, _)| mood != lamp_body::gesture::Mood::Resting)
+            {
+                sleep.look_now();
+            }
+            asleep.set(sleep.asleep());
+            woken.set(woken.get() || sleep.woken());
+        }
+        if paused.get() || asleep.get() || unplug.as_ref().is_some_and(|unplug| unplug.latched()) {
             return Some((lamp_body::gesture::Mood::Resting, 0));
         }
         latest
@@ -1479,6 +1500,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     .as_ref()
                     .is_some_and(|asked| asked.holding(now_us)),
                 paused: false,
+                asleep: false,
+                woken: woken.take(),
                 // Taken only while the pose is reading (`body.rs`).
                 toward: reading_toward.get(),
                 unplug: false,
@@ -1491,6 +1514,13 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     gesture: asked.gesture,
                     unplug: unplug.as_ref().is_some_and(|unplug| unplug.latched()),
                     ..lamp_body::body::Asked::PAUSED
+                }
+            } else if asleep.get() {
+                // Asleep, the head still takes Expression's sleeping breath.
+                lamp_body::body::Asked {
+                    gesture: asked.gesture,
+                    expression: asked.expression,
+                    ..lamp_body::body::Asked::ASLEEP
                 }
             } else {
                 asked

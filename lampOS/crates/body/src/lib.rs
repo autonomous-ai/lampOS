@@ -30,6 +30,7 @@ pub mod linux;
 #[cfg(any(target_os = "linux", test))]
 pub mod name_in;
 pub mod pause_in;
+pub mod sleep_in;
 
 pub mod calibration;
 pub mod clips;
