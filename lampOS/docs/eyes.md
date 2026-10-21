@@ -233,6 +233,22 @@ camera closed: not permitted` marks the camera shut. A voice service killed
 outright says nothing, and the eyes close on the 1.5 s. The rule is the same as for its ears: the camera may look
 exactly while the microphone may listen.
 
+For the onboarding privacy step the voice may follow its no with
+`{"close_receipt":N}`. Once the camera is shut, after the device's stop has
+returned and never while it is open, the eyes say so on `eyes/camera_closed`
+(`lamp_msgs::CameraClosed`, `{"close":N,"released":true|false}`, with
+`LAMP_BUS=on`): `released` is whether that last stop (STREAMOFF, buffers
+freed, file closed) returned without a fault; a camera not opened since the
+eyes started is released. An ask that comes while the camera is open waits
+for the next close. The eyes hold one ask at a time: a second ask before the
+first is answered replaces it, and the first is never answered. Onboarding
+then reads the first close as camera not proven when its 2 s wait ends,
+which is the safe side. The publisher is kept alive on every turn of the
+eyes' loop, camera open or shut (before, the looks kept only the faces'
+alive, so with the camera open it lapsed), which is how the voice knows
+these eyes give receipts
+([onboarding.md](onboarding.md#physical-privacy-step-841)).
+
 This is a narrower arrangement than the camera worker described in
 [camera-runtime.md](camera-runtime.md), which takes its permission from the
 interaction authority's own camera grant and hands frames to other

@@ -405,6 +405,13 @@ impl EyesLink {
         true
     }
 
+    /// After [`EyesLink::close`]: ask the eyes to say on `eyes/camera_closed`
+    /// that the camera is shut for this close, once it is (#1802).
+    pub fn ask_close_receipt(&mut self, close: u64) {
+        let message = format!(r#"{{"close_receipt":{close}}}"#);
+        let _ = self.socket.send_to(message.as_bytes(), &self.path);
+    }
+
     /// Ask the eyes for one full look (#836), whose still comes marked with
     /// `id`, at its own longer side when one is given (#941). Eyes started
     /// without `--full-look` take it for nothing.
@@ -473,6 +480,29 @@ mod tests {
         assert!(link.close());
         drop(link);
         assert!(started.elapsed() < std::time::Duration::from_millis(50));
+    }
+
+    #[test]
+    fn a_close_receipt_is_asked_for_after_the_no_in_one_exact_datagram() {
+        let path = std::env::temp_dir().join(format!("lamp-eyes-receipt-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let eyes = UnixDatagram::bind(&path).unwrap();
+        eyes.set_nonblocking(true).unwrap();
+        let mut link = EyesLink::to(path.clone()).unwrap();
+        link.permit(true, 0);
+        assert!(link.close());
+        link.ask_close_receipt(42);
+        assert_eq!(
+            told(&eyes),
+            [
+                r#"{"camera":true}"#,
+                r#"{"camera":false}"#,
+                r#"{"close_receipt":42}"#
+            ]
+        );
+        drop(link);
+        assert!(told(&eyes).is_empty());
+        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]
