@@ -1037,6 +1037,28 @@ lifespan. These are software scheduling targets; GPIO/system-call,
 filesystem and scheduler delays are not hard-bounded. No lamp switch-to-gate or
 switch-to-ring latency measurement is claimed here.
 
+**One loop, at real-time priority (#2602).** The switch is read and published
+in the same loop and thread as the hand readers (`Service::step`), with its own
+GPIO request: it shares their pace, never their lines or faults. A hand fault
+never holds it back
+(`a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh`), but a loop
+that doesn't run lapses both
+(`a_loop_that_stalls_for_100_ms_lapses_the_reset_and_the_privacy_reading_together`).
+On lamp-75c9 (21 Oct, twice) the journal said `hand: reset not read`, which
+needs 100 ms between two touch readings, 40 ms before the voice lost the switch,
+and Controls ran at ordinary priority (nice 5) on a core the voice's real-time
+workers also ran on (Nine's `ps`, 20:36). So Controls runs at real-time round-robin priority 30, above the voice's 20
+(`CPUSchedulingPolicy=rr`, `CPUSchedulingPriority=30`, in the product unit and
+lamp-4ace's), with the kernel's real-time throttling as it is. Its step works
+well under 1 ms (0.5 ms the longest on lamp-4ace), and the loop rests at least
+as long as a step worked (`rest_us`), so a slow step never makes it spin.
+Controls' report on `diagnostics` counts the loop's pace beside
+`longest_step_us`: `longest_gap_us` (the longest time between two steps'
+starts), `long_gaps` (gaps of 50 ms or more, past the switch's freshness) and
+`slow_steps` (steps whose own work took 1 ms or more). A long gap is also said
+in the journal, at most once a second: "the loop didn't run for N ms, past the
+privacy reading's 50 ms".
+
 The physical field is independent of top-level hand `ready` and `fault`.
 Base-only touch mode creates the `controls/state` owner when privacy is selected.
 A privacy-only touch profile uses that state owner without inventing a button or
