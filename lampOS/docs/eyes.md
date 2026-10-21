@@ -1345,8 +1345,21 @@ label every 5 s from a builder's notes:
 3. resting again: `neutral`;
 4. a long face, as when tired or low: `negative`;
 5. **reading or working at the desk, concentrating:** `neutral`. Drawn-down
-   brows there must not read `negative` (the first builder's P3 on #2723).
-Then `lamp-seems-measure … --delete`, by reader and confidence. A screen
+   brows there must not read `negative` (the first builder's P3 on #2723);
+6. talking, as to someone at the desk: `neutral`, the mouth moving.
+Then `lamp-seems-measure … --delete`, by reader and confidence.
+`tools/seems-session.sh` runs it (the first builder on #2602, 22 Oct
+03:56):
+- `on`, on the lamp, adds both readers, the log and `LAMP_SEEMS_BROW_LOW`
+  to the eyes' own unit, and `LAMP_MOOD_SEEMS` to Mood, through `/run`
+  drop-ins, and keeps `mood/state` for the session.
+- `labels`, at the person's keyboard, says each stretch in turn. Space
+  labels it, and p, n or u say how they feel instead. No camera frame is
+  taken or kept.
+- `read` prints each stretch's reads by reader and kind and Mood's smiles
+  and quiets, then the measure, which deletes the reads and the labels.
+- `off` puts it all back, and does so by itself after an hour.
+Only the counts go on GitHub. A screen
 face is no stand-in for it: on lamp-75c9 a screen face sits under the 10 px
 line and isn't read.
 
