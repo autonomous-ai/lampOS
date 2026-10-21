@@ -33,6 +33,14 @@ name: lampOS on ARM64
 # the script, this workflow and any other path run every crate. Every binary
 # is still built, and the run's summary says what was tested and why.
 #
+# The cache is lamp-voice's newest build: each of lamp-voice's own runs (and
+# runs by hand) saves it under a key with its commit, even when a test failed,
+# and pull requests restore it and never save. A key on Cargo.lock alone was
+# saved once and never renewed, and each pull request's own 1 GB cache, which
+# no other run could use, pushed the repository past GitHub's 10 GB, so
+# lamp-voice's was thrown out and 6 of 30 pull requests built cold (#1806; the
+# lead, 21 Oct 2026).
+#
 # Without the realtime group the tests take about 4 minutes of test time,
 # mostly quick unit tests, so one runner runs them as many at once as it has
 # cores. Each runner compiles every test binary again (about 5 of its 10
@@ -111,14 +119,18 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - uses: actions/cache@v4
+      - name: restore the cache
+        id: cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}
-          restore-keys: lampos-arm64-u2204-
+          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
@@ -164,6 +176,16 @@ jobs:
           name: lampos-arm64-${{ github.event.pull_request.head.sha || github.sha }}
           path: lampOS/arm64-out/
           retention-days: 7
+      # Never a pull request's (see the top).
+      - name: save the cache
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && matrix.shard == 1 }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: ${{ steps.cache.outputs.cache-primary-key }}
 
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.
