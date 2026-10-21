@@ -698,6 +698,21 @@ mod tests {
         stop_deadline: Duration::from_millis(250),
     };
 
+    /// Waits up to 2 s for the painted frames to be as `enough` says, not a
+    /// fixed time for them (#1806).
+    fn painted_until(frames: &Frames, enough: impl Fn(&[EncodedFrame]) -> bool) {
+        let until = Instant::now() + Duration::from_secs(2);
+        while !enough(&frames.0.lock().unwrap()) {
+            assert!(Instant::now() < until, "not painted in 2 s");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    /// Whether any of the frames lights the ring.
+    fn shows(frames: &[EncodedFrame]) -> bool {
+        frames.iter().any(|frame| *frame != EncodedFrame::black())
+    }
+
     #[test]
     fn a_long_wait_paints_and_ends_black_with_the_painter_gone() {
         let frames = Frames::default();
@@ -900,14 +915,17 @@ mod tests {
             for_at_most: Duration::from_secs(60),
         };
         let asleep = Asleep::start_timed(move || AsleepRing::new(sink), ceiling(48), pulses, QUICK);
-        std::thread::sleep(QUICK.after + Duration::from_millis(300));
+        // Six frames with nothing owed, the 300 ms there were after the face
+        // came up; then until the pulse shows; then eight frames, the 400 ms
+        // there were, to show it has gone.
+        painted_until(&frames, |frames| frames.len() >= 6);
         let before = frames.0.lock().unwrap().len();
         assert!(before > 2, "{before}");
         asleep.owed().tell(Some(Instant::now()));
-        std::thread::sleep(Duration::from_millis(400));
+        painted_until(&frames, |frames| frames[before..].iter().any(pulsing));
         let owed = frames.0.lock().unwrap().len();
         asleep.owed().tell(None);
-        std::thread::sleep(Duration::from_millis(400));
+        painted_until(&frames, |frames| frames.len() >= owed + 8);
         asleep.stop();
         let frames = frames.0.lock().unwrap();
         assert!(
@@ -1157,7 +1175,7 @@ mod tests {
             let frames = Frames::default();
             let sink = frames.clone();
             let light = Asleep::light_with(move || AsleepRing::new(sink), ceiling(48), lit);
-            std::thread::sleep(Duration::from_millis(300));
+            painted_until(&frames, shows);
             if release {
                 light.release();
             } else {
@@ -1187,7 +1205,7 @@ mod tests {
                 true,
             );
             assert!(face.poll(true, false));
-            std::thread::sleep(Duration::from_millis(300));
+            painted_until(&frames, shows);
             assert!(!face.poll(false, opens));
             let last = frames.0.lock().unwrap().last().cloned().unwrap();
             assert_eq!(last == EncodedFrame::black(), black, "opens {opens}");
@@ -1201,7 +1219,7 @@ mod tests {
             Pulses::OWED,
             QUICK,
         );
-        std::thread::sleep(QUICK.after + Duration::from_millis(200));
+        painted_until(&frames, shows);
         face.release();
         assert_eq!(
             *frames.0.lock().unwrap().last().unwrap(),
