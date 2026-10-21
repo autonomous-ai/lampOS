@@ -10,7 +10,7 @@ use crate::answer::{Lamp, QUIET_WHEN_DONE, answer};
 use crate::wire::{Command, Identity, parse};
 use rumqttc::Outgoing;
 use rumqttc::v5::mqttbytes::QoS;
-use rumqttc::v5::mqttbytes::v5::{ConnectProperties, Packet};
+use rumqttc::v5::mqttbytes::v5::{ConnectProperties, LastWill, LastWillProperties, Packet};
 use rumqttc::v5::{AsyncClient, Event, MqttOptions};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -31,6 +31,47 @@ pub const SESSION_EXPIRY_S: u32 = 60;
 /// holds back a packet past this one, so a photo over it gets no answer
 /// rather than `photos::asked`'s refusal: the app sends at most 1 MiB.
 pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + (1 << 20)) as u32;
+
+/// Where lamp-cloud reads whether it leaves the broker a will: `on`, and
+/// nothing else ([`options_with_will`]). Off until the backend reads it
+/// (Backend3 on Queue #2602, 21 Oct 19:4x).
+pub const OFFLINE_WILL_ENVIRONMENT: &str = "LAMP_CLOUD_OFFLINE_WILL";
+/// How long the broker waits, after it finds the lamp's connection lost,
+/// before it says the will. The backend marks a lamp offline only 5 to 8 min
+/// after its last ping or `info` (a check every 3 min, a 5 min bound). With
+/// the will, a killed or stopped lamp-cloud shows offline about 30 s after its
+/// connection closes (it never sends a DISCONNECT), and a lost network or a
+/// power cut within about 2 min (the keepalive's ~90 s, then this). Every
+/// connection asks for a clean start, which ends the old session, so a
+/// reconnect sends the old will at once, followed by this connection's `info`
+/// (the Reviewer on #2636, MQTT v5 3.1.2.5, 3.1.2.10, 3.1.3.2.2).
+pub const WILL_DELAY_S: u32 = 30;
+
+/// [`options`] with the lamp's will: `offline` from `identity`, on its own
+/// reply channel `fd_channel`, at QoS 1, not retained, after
+/// [`WILL_DELAY_S`]. The backend takes an `offline` with the lamp's `id` on
+/// its own channel as the lamp gone, and its next ping or `info` as back.
+/// The will's `time` is when the connection was made.
+pub fn options_with_will(account: &Account, identity: &Identity) -> MqttOptions {
+    let mut options = options(account);
+    let properties = LastWillProperties {
+        delay_interval: Some(WILL_DELAY_S),
+        payload_format_indicator: None,
+        message_expiry_interval: None,
+        content_type: None,
+        response_topic: None,
+        correlation_data: None,
+        user_properties: Vec::new(),
+    };
+    options.set_last_will(LastWill::new(
+        account.fd_channel.as_str(),
+        identity.offline(&now()).to_string(),
+        QoS::AtLeastOnce,
+        false,
+        Some(properties),
+    ));
+    options
+}
 
 /// The client's options for `account`: V1's, with this lamp's keepalive.
 pub fn options(account: &Account) -> MqttOptions {
@@ -395,7 +436,17 @@ async fn session(
     say: &mut impl Say,
     first: Duration,
 ) {
-    let (mut client, mut events) = AsyncClient::new(options(account), 64);
+    // With the switch, the broker is left a will (`options_with_will`), on
+    // the first connection and on every one made again after a Wi-Fi change.
+    let will = lamp.offline_will();
+    let made = || {
+        if will {
+            options_with_will(account, &identity.borrow())
+        } else {
+            options(account)
+        }
+    };
+    let (mut client, mut events) = AsyncClient::new(made(), 64);
     let mut wait = first;
     // Health and crash reports, with their switch (#1683): handed over only
     // while connected, and kept until the broker acknowledges them.
@@ -504,7 +555,7 @@ async fn session(
                 "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
                     .to_owned(),
             );
-            (client, events) = AsyncClient::new(options(account), 64);
+            (client, events) = AsyncClient::new(made(), 64);
             wait = first;
             continue;
         };
@@ -652,6 +703,9 @@ mod tests {
             clean_start: bool,
             expiry: Option<u32>,
             login: Option<(String, String)>,
+            /// The will left with the broker: its topic, message, QoS,
+            /// retain and delay.
+            will: Option<(String, String, u8, bool, Option<u32>)>,
         },
         Subscribe(String),
         Publish(String, String),
@@ -733,7 +787,7 @@ mod tests {
                     };
                     let mut out = BytesMut::new();
                     match packet {
-                        Packet::Connect(connect, _, login) => {
+                        Packet::Connect(connect, will, login) => {
                             CONNECTS
                                 .lock()
                                 .unwrap()
@@ -747,6 +801,15 @@ mod tests {
                                     .as_ref()
                                     .and_then(|p| p.session_expiry_interval),
                                 login: login.map(|l| (l.username, l.password)),
+                                will: will.map(|w| {
+                                    (
+                                        String::from_utf8_lossy(&w.topic).into_owned(),
+                                        String::from_utf8_lossy(&w.message).into_owned(),
+                                        w.qos as u8,
+                                        w.retain,
+                                        w.properties.and_then(|p| p.delay_interval),
+                                    )
+                                }),
                             });
                             if behaves == Broker::SlowConnAck {
                                 tokio::time::sleep(Duration::from_millis(300)).await;
@@ -1339,6 +1402,7 @@ mod tests {
         seen: &Arc<Mutex<Vec<Seen>>>,
         socket: &std::path::Path,
         first: Duration,
+        will: bool,
         until: impl Fn(&[Seen]) -> bool,
     ) -> Vec<String> {
         let (accounts_tx, accounts) = watch::channel(Some(account(port)));
@@ -1353,6 +1417,7 @@ mod tests {
         let lamp = tokio::spawn(async move {
             let mut lamp = Fake {
                 changes: Some(changes),
+                will,
                 ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
@@ -1394,9 +1459,14 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
         let helper = joining_helper(&socket, Duration::from_millis(300), false);
         let (port, seen) = broker(Broker::StaleFirstLateAck, vec![WIFI_SET]).await;
-        let lines = wifi_against(port, &seen, &socket, Duration::from_secs(1), |seen| {
-            wifi_replies(seen).len() >= 2
-        })
+        let lines = wifi_against(
+            port,
+            &seen,
+            &socket,
+            Duration::from_secs(1),
+            false,
+            |seen| wifi_replies(seen).len() >= 2,
+        )
         .await;
         let (joined_at, online_at, online) = helper.join().unwrap();
         assert_eq!(online, "{\"online\":true}\n");
@@ -1458,6 +1528,42 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// #2683 over #2617: with both switches on, the connection made again at
+    /// once on a Wi-Fi `joined` leaves the broker its will too, as the first
+    /// one did, so a lamp whose new network fails afterwards still says
+    /// offline.
+    #[tokio::test]
+    async fn a_connection_made_again_on_a_wifi_join_keeps_its_will() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-will.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let helper = joining_helper(&socket, Duration::from_millis(300), false);
+        let (port, seen) = broker(Broker::StaleFirstLateAck, vec![WIFI_SET]).await;
+        wifi_against(port, &seen, &socket, Duration::from_secs(1), true, |seen| {
+            wifi_replies(seen).len() >= 2
+        })
+        .await;
+        helper.join().unwrap();
+        let seen = seen.lock().unwrap().clone();
+        let wills: Vec<_> = seen
+            .iter()
+            .filter_map(|s| match s {
+                Seen::Connect { will, .. } => Some(will.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(wills.len(), 2, "{seen:?}");
+        for will in &wills {
+            let (topic, message, qos, retain, delay) =
+                will.clone().expect("a will on each connection");
+            assert_eq!(
+                (topic.as_str(), qos, retain, delay),
+                ("fd/d-42", 1, false, Some(WILL_DELAY_S))
+            );
+            assert!(message.contains("\"type\":\"offline\""), "{message}");
+        }
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// The reviewer-lead's P2 on #2617, the backoff: a `joined` that comes
     /// while the lamp waits between refused tries cuts the wait short, one
     /// try at once and then the waits from the first again, not the grown
@@ -1476,9 +1582,14 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2_400));
             GATE.store(true, std::sync::atomic::Ordering::SeqCst);
         });
-        let lines = wifi_against(port, &seen, &socket, Duration::from_millis(100), |seen| {
-            wifi_replies(seen).len() >= 3
-        })
+        let lines = wifi_against(
+            port,
+            &seen,
+            &socket,
+            Duration::from_millis(100),
+            false,
+            |seen| wifi_replies(seen).len() >= 3,
+        )
         .await;
         opener.join().unwrap();
         let (joined_at, _, online) = helper.join().unwrap();
@@ -1854,6 +1965,48 @@ mod tests {
         assert_eq!(connects, 1, "{seen:?}");
     }
 
+    /// `LAMP_CLOUD_OFFLINE_WILL` (Backend3 on Queue #2602, 21 Oct 19:4x):
+    /// with the switch, the connection leaves the broker a will on the lamp's
+    /// own channel, at QoS 1, not retained, after `WILL_DELAY_S`: the
+    /// identity with `"type": "offline"`. Without it, none (the test below).
+    #[tokio::test]
+    async fn with_its_switch_the_broker_is_left_a_will_that_says_offline() {
+        let (port, seen) = broker(Broker::Takes, vec![]).await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                will: true,
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let connected = |seen: &[Seen]| seen.iter().any(|s| matches!(s, Seen::Connect { .. }));
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while !connected(&seen.lock().unwrap()) && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        let seen = seen.lock().unwrap().clone();
+        let Some(Seen::Connect {
+            will: Some((topic, message, qos, retain, delay)),
+            ..
+        }) = seen.first().cloned()
+        else {
+            panic!("no will: {seen:?}");
+        };
+        assert_eq!(
+            (topic.as_str(), qos, retain, delay),
+            ("fd/d-42", 1, false, Some(WILL_DELAY_S))
+        );
+        let said: serde_json::Value = serde_json::from_str(&message).unwrap();
+        assert_eq!(said["type"], "offline");
+        assert_eq!(said["id"], "d-42");
+        assert_eq!(said["generation"], "lamp-v2");
+    }
+
     /// #1396: the lamp connects as V1 does, subscribes to `fa_channel`, says
     /// `info` unasked, and answers each command on `fd_channel`: a kind it
     /// has, and a command it lacks, refused plainly.
@@ -1880,6 +2033,7 @@ mod tests {
                 clean_start: true,
                 expiry: Some(60),
                 login: Some(("lamp".into(), "s3cret-pw".into())),
+                will: None,
             }
         );
         assert!(seen.contains(&Seen::Subscribe("fa/d-42".into())));

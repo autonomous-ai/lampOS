@@ -84,6 +84,12 @@ impl Identity {
         reply
     }
 
+    /// The lamp's will (`crate::online::options_with_will`): the identity
+    /// with `"type": "offline"`, said by the broker once the lamp is gone.
+    pub fn offline(&self, now: &str) -> Value {
+        Value::Object(self.base("offline", now))
+    }
+
     /// The reply to `info`, sent unasked on every connection too.
     pub fn info(&self, now: &str) -> Value {
         Value::Object(self.base("info", now))
