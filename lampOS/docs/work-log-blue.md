@@ -311,3 +311,13 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 
 - First builder (22:53, #2530): no kept `note` as free text on the person's next turn, since that turn has every function. Notes may return later as typed notes (a kind plus bounded values the voice renders). For now `note` is refused at load. Claim withdrawn on #2602.
 - Reviewer-lead P1 on #2675: a quoted line was kept in the voice's thread and replayed as a system note on later turns. Fixed with `keep_written` (no `thread.written`, marked `count_only`), plus a test. Folded as `7d5686692`. The 900-byte P3 needs no change: the proposal's note is capped at 300.
+
+## 21 Oct, 23:1x–23:2x: #2675 read clean; #2640's row passed
+
+- **#2675:** the Reviewer-lead's P3s are fixed by `Thread::quoted`, a mark of its own, so an onboarding sentence keeps its mark and a person's words are kept. Folded as `7662cb711`. Re-read with no finding; it merges after #2667.
+- **lamp-75c9, 23:20–23:27**, on `57920a920`, with root steps by the helper's hand-off:
+  - the room was busy until 23:23:11;
+  - at 23:24:02 and 23:26:02, a probe light was kept at `idle` for 5 s over the person's resting orange, with `light/state` orange throughout;
+  - the rate dropped the rounds between;
+  - the camera's evidence is weak (an overexposed band).
+- The lamp is restored and released to Nine. #2682 strikes the lamp-runs row; the set-off case stays open.
