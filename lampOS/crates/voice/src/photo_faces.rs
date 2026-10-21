@@ -134,6 +134,12 @@ struct WatchState {
 
 impl Watch {
     pub fn start(socket: std::path::PathBuf) -> Self {
+        Self::start_every(socket, LOOK_EVERY)
+    }
+
+    /// [`Self::start`], looking every `every`: a test's short period. The
+    /// lamp's is [`LOOK_EVERY`] (#1806).
+    fn start_every(socket: std::path::PathBuf, every: Duration) -> Self {
         let state = std::sync::Arc::new(Mutex::new(WatchState::default()));
         let shared = state.clone();
         std::thread::spawn(move || {
@@ -154,7 +160,7 @@ impl Watch {
                 {
                     state.asked = Some(name);
                 }
-                if looked.is_none_or(|at| at.elapsed() >= LOOK_EVERY) {
+                if looked.is_none_or(|at| at.elapsed() >= every) {
                     looked = Some(std::time::Instant::now());
                     let found = here_asked(&socket);
                     // The eyes mark a face asked before they answer the
@@ -266,6 +272,9 @@ mod tests {
 
     /// The asked name is one for the process: its tests take turns.
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+    /// A test's look at the eyes: every pass of the watch (100 ms), not the
+    /// lamp's 2 s (#1806).
+    const LOOKS: Duration = Duration::from_millis(100);
     use std::io::{BufRead, BufReader, Write};
 
     /// A stand-in for the eyes' socket: each line asked is kept, each
@@ -466,7 +475,7 @@ mod tests {
             }
         });
         forget_asked();
-        let watch = Watch::start(socket.clone());
+        let watch = Watch::start_every(socket.clone(), LOOKS);
         let looks = || {
             lines
                 .lock()
@@ -476,14 +485,13 @@ mod tests {
                 .count()
         };
         // Driven until `done` says so of the questions said and the eyes'
-        // looks, then four more of the watch's passes (100 ms each) for a
-        // second question to show: not two fixed 4.5 s (#1806). The looks
-        // are the watch's own, every `LOOK_EVERY` of the host's.
+        // looks, then three more of the watch's passes, each a look, for a
+        // second question to show: not two fixed 4.5 s (#1806).
         let drive = |done: &dyn Fn(usize, usize) -> bool| {
             let mut said = 0;
             let until = std::time::Instant::now() + Duration::from_secs(10);
             let mut settled: Option<std::time::Instant> = None;
-            while settled.is_none_or(|at| at.elapsed() < Duration::from_millis(400)) {
+            while settled.is_none_or(|at| at.elapsed() < 3 * LOOKS) {
                 assert!(std::time::Instant::now() < until, "not done in 10 s");
                 if watch.asked().is_some() {
                     said += 1;
@@ -526,13 +534,12 @@ mod tests {
             |_| json!({"photo_here": "Quillo", "asked": true}),
         );
         forget_asked();
-        let watch = Watch::start(socket.clone());
-        // Until the eyes' first answer is taken in, then four of the watch's
-        // passes more, not a fixed 2.5 s (#1806): their mark is in that
-        // answer, and each later look gives the same one.
+        let watch = Watch::start_every(socket.clone(), LOOKS);
+        // Until the eyes' first answer is taken in, then three more of their
+        // looks, not a fixed 2.5 s (#1806): their mark is in each.
         let until = std::time::Instant::now() + Duration::from_secs(5);
         let mut taken: Option<std::time::Instant> = None;
-        while taken.is_none_or(|at| at.elapsed() < Duration::from_millis(400)) {
+        while taken.is_none_or(|at| at.elapsed() < 3 * LOOKS) {
             assert!(std::time::Instant::now() < until, "the eyes never answered");
             assert!(watch.to_ask().is_none());
             assert!(watch.asked().is_none());
