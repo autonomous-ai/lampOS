@@ -5206,6 +5206,9 @@ fn conversation_with_gate(
     // Its words as they come, in memory only, until the last piece: on
     // Live they come in pieces, all of which are counted.
     let mut sentence_heard: Option<String> = None;
+    // What the person is saying, until its last piece, for the onboarding
+    // steps that end on a heard answer (#1722 row 10). Memory only.
+    let mut onboarding_heard = String::new();
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
@@ -6942,6 +6945,16 @@ fn conversation_with_gate(
                 } => {
                     if let Some(turn) = request {
                         answer_audio.words(turn);
+                    } else if let Some(walk) = onboarding.as_mut() {
+                        // ponytail: past 4 KiB a line is not read; an
+                        // answer is far shorter.
+                        if onboarding_heard.len() + text.len() <= 4_096 {
+                            onboarding_heard.push_str(&text);
+                        }
+                        if finished {
+                            walk.heard(&onboarding_heard, monotonic_us());
+                            onboarding_heard.clear();
+                        }
                     }
                     // Words for an answer whose end was sent early are not
                     // the lamp's until it is sure the person has finished:
@@ -9490,6 +9503,12 @@ fn conversation_with_gate(
             );
             body.tell(
                 match phase {
+                    // "Where you sit": between turns the lamp looks at the
+                    // person, its gaze turning the head to them, before it
+                    // asks to be moved (#1722 row 10, rule 8).
+                    None if onboarding.as_ref().is_some_and(|walk| walk.looking()) => {
+                        Some(RingPhase::Listening)
+                    }
                     Some(RingPhase::Speaking) if attending => Some(RingPhase::Listening),
                     Some(RingPhase::Waiting) if about_to_speak => Some(RingPhase::Speaking),
                     // A sound sent on for the model to judge is not something

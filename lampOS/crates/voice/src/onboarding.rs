@@ -67,7 +67,13 @@ const READ_EVERY_US: u64 = 500_000;
 /// The near face, as the hello counts it (`speak_up`), and how far from the
 /// middle of the picture its centre may be (-1 to 1 across and down).
 const NEAR: f32 = 0.14;
-const MIDDLE: f32 = 0.25;
+/// A seated person a lamp looks up at is a little high in its picture: the
+/// lead's chair at about 1 m gave y -0.26 (row 10, 21 October). A
+/// calibration knob, not a law.
+const MIDDLE: f32 = 0.35;
+/// "Where you sit": a face off the middle is looked at (the body's gaze)
+/// this long before the person is asked to turn the lamp.
+const LOOK_FIRST_US: u64 = 5_000_000;
 /// "Where you sit" after its guide, with the nudge on: how far a face's
 /// centre may wander and still be held.
 const STEADY: f32 = 0.1;
@@ -382,6 +388,10 @@ struct Led {
     /// name. Kept here only, never recorded.
     name: Option<String>,
     confirm: Confirm,
+    /// "Where you sit": since when a face has been in view, looked at.
+    looked_since: Option<u64>,
+    /// What of the answers has been heard ([`Onboarding::heard`]).
+    heard: Answers,
 }
 
 /// "Who you are"'s fallback: the name heard, asked back once.
@@ -393,6 +403,14 @@ enum Confirm {
     Asked(Option<bool>),
     /// Said no: asked once more for the name, and no fallback again.
     Over,
+}
+
+/// The answers a step the model leads by talk has heard, never their words.
+#[derive(Clone, Copy, Debug, Default)]
+struct Answers {
+    name: bool,
+    quiet_hours: bool,
+    hello: bool,
 }
 
 struct PrivacyContext {
@@ -1532,6 +1550,69 @@ impl Onboarding {
         self.owed.is_some() || self.led.as_ref().is_some_and(|led| led.asked_us.is_some())
     }
 
+    /// "Where you sit" is being led: the lamp looks at the person (the
+    /// coordinator tells the body it listens, so its gaze turns the head to
+    /// the face in small corrections) before it asks to be moved.
+    pub fn looking(&self) -> bool {
+        self.led
+            .as_ref()
+            .is_some_and(|led| led.step == Step::WhereYouSit && led.asked_us.is_some())
+    }
+
+    /// A finished line the person said (#1722 row 10): the steps the model
+    /// leads by talk end on what is heard too, so a model that forgets its
+    /// `setup_step` call does not fail them; the call stays a second way
+    /// in. "Who you are": a name, then a yes. "Preferences": the quiet
+    /// hours and the hello, each answered. The words are not kept. With the
+    /// nudge on, "who you are" is [`Self::heard_line`]'s alone: its
+    /// asked-back name and yes end the step, keeping the name, so the two
+    /// never both end it (the first builder on #2526).
+    pub fn heard(&mut self, text: &str, now_us: u64) {
+        let nudge = self.nudge;
+        let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) else {
+            return;
+        };
+        let words = words_of(text);
+        let done = match led.step {
+            Step::WhoYouAre if nudge => false,
+            Step::WhoYouAre => {
+                if led.heard.name && agrees(&words) {
+                    true
+                } else if names_someone(text, &words) {
+                    led.heard.name = true;
+                    false
+                } else {
+                    // "No" to the name the lamp checked: not known.
+                    if refuses(&words) {
+                        led.heard.name = false;
+                    }
+                    false
+                }
+            }
+            Step::Preferences => {
+                let heard = &mut led.heard;
+                if words
+                    .iter()
+                    .any(|word| matches!(word.as_str(), "hello" | "hi" | "greet"))
+                    || (heard.quiet_hours && (agrees(&words) || refuses(&words)))
+                {
+                    heard.hello = true;
+                } else if quiet_hours(&words) {
+                    heard.quiet_hours = true;
+                }
+                heard.quiet_hours && heard.hello
+            }
+            _ => false,
+        };
+        if done {
+            let step = led.step;
+            self.records
+                .push(json!({"kind":"onboarding_heard","step":step.name(),
+                    "name_kept":(step == Step::WhoYouAre).then_some(false),"at_us":now_us}));
+            self.finish(step, Outcome::Done, None, now_us);
+        }
+    }
+
     /// What to record in the session, since last asked.
     pub fn take_records(&mut self) -> Vec<Value> {
         std::mem::take(&mut self.records)
@@ -1846,8 +1927,19 @@ impl Onboarding {
         if step != Step::WhereYouSit {
             if now_us.saturating_sub(asked_us) >= STEP_GIVE_UP_US && quiet_us >= TIMED_OUT_QUIET_US
             {
+                // A name heard and never taken back is known, call or not.
+                // The name's words are not kept: the record says so.
+                let named = step == Step::WhoYouAre && led.heard.name;
                 self.nudge_record(false, now_us);
-                self.finish(step, Outcome::Failed, None, now_us);
+                let outcome = if named {
+                    self.records
+                        .push(json!({"kind":"onboarding_heard","step":step.name(),
+                        "name_kept":false,"at_us":now_us}));
+                    Outcome::Done
+                } else {
+                    Outcome::Failed
+                };
+                self.finish(step, outcome, None, now_us);
                 return None;
             }
             let (nudge, answers) = step.nudge().filter(|_| self.nudge)?;
@@ -1896,6 +1988,7 @@ impl Onboarding {
         // body's gaze kept nudging the head, so it was never still for 3 s
         // (row 10 try 4 on lamp-52e6).
         let guided = led.guided_us.is_some_and(|at| at > asked_us);
+        led.looked_since = face.and(led.looked_since.or(Some(now_us)));
         let settled = self.nudge && guided;
         let released = self.released;
         let held = if settled {
@@ -1933,10 +2026,18 @@ impl Onboarding {
             self.owed = Some(SIT_FAILED);
             return None;
         }
+        // A face off the middle is looked at first, as a creature turns to
+        // someone (rule 8): the person is asked to turn the lamp only once
+        // its own look has had time and still has them off the middle.
+        let looked = led
+            .looked_since
+            .is_some_and(|since| now_us.saturating_sub(since) >= LOOK_FIRST_US);
+        let off_middle = face.is_some_and(|face| face.size >= NEAR);
         if held.is_none()
             && can_speak
             && quiet_us >= GUIDE_EVERY_US
             && led.guided_us == Some(asked_us)
+            && (!off_middle || looked)
         {
             led.guided_us = Some(now_us);
             let note = match face {
@@ -2118,6 +2219,85 @@ const HEAD: [&str; 3] = ["base_yaw", "head_pitch", "head_roll"];
 const ARRIVED_RADIANS: f64 = 6.0 * std::f64::consts::TAU / 4_096.0;
 /// Slower than this is not turning (the full look's line).
 const STILL_RADIANS_A_SECOND: f64 = 25.0 * std::f64::consts::TAU / 4_096.0;
+
+const YES: [&str; 11] = [
+    "yes", "yeah", "yep", "sure", "ok", "okay", "fine", "right", "correct", "please", "alright",
+];
+const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
+
+fn agrees(words: &[String]) -> bool {
+    words.iter().any(|word| YES.contains(&word.as_str()))
+        && !words.iter().any(|word| NO.contains(&word.as_str()))
+}
+
+fn refuses(words: &[String]) -> bool {
+    words.iter().any(|word| NO.contains(&word.as_str()))
+}
+
+/// Words that follow "I'm", "it's", "call me" or "my name is" without
+/// being a name: "I'm fine", "it's okay", "I'm not sure" (the first
+/// builder's P2 on #2526). The lamp's own name too.
+/// ponytail: "lamp" stands for the lamp's name; read the configured name if
+/// a lamp is ever called something else.
+const NOT_A_NAME: [&str; 14] = [
+    "fine", "good", "okay", "ok", "not", "sure", "here", "ready", "sorry", "just", "back", "busy",
+    "tired", "lamp",
+];
+/// What a line of only a word or two is when it is not a name.
+const NOT_A_NAME_ALONE: [&str; 8] = ["what", "huh", "hmm", "um", "uh", "hey", "hi", "hello"];
+
+fn not_a_name(word: &str) -> bool {
+    NOT_A_NAME.contains(&word) || YES.contains(&word) || NO.contains(&word)
+}
+
+/// "Call me Marie", "my name is Marie", "I'm Marie", or the name alone,
+/// never a question.
+/// ponytail: English only, as the notes are; a word list, not a parser.
+fn names_someone(text: &str, words: &[String]) -> bool {
+    let at = |i: usize| words.get(i).map(String::as_str);
+    let after = (0..words.len()).find_map(|i| match (at(i), at(i + 1)) {
+        (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
+            Some(i + 2)
+        }
+        (Some("i'm" | "it's"), _) => Some(i + 1),
+        _ => None,
+    });
+    match after {
+        Some(i) => at(i).is_some_and(|word| !not_a_name(word)),
+        None => {
+            (1..=2).contains(&words.len())
+                && !text.contains('?')
+                && !words
+                    .iter()
+                    .any(|word| not_a_name(word) || NOT_A_NAME_ALONE.contains(&word.as_str()))
+        }
+    }
+}
+
+/// An answer about the hours to keep quiet: a time, a part of the day, or none.
+fn quiet_hours(words: &[String]) -> bool {
+    const WHEN: [&str; 14] = [
+        "quiet",
+        "night",
+        "morning",
+        "evening",
+        "afternoon",
+        "hour",
+        "hours",
+        "o'clock",
+        "am",
+        "pm",
+        "noon",
+        "midnight",
+        "after",
+        "before",
+    ];
+    words.iter().any(|word| {
+        WHEN.contains(&word.as_str())
+            || NO.contains(&word.as_str())
+            || word.chars().any(|c| c.is_ascii_digit())
+    })
+}
 
 /// Whether the head is still: every head joint within [`ARRIVED_RADIANS`]
 /// of its goal, turning slower than [`STILL_RADIANS_A_SECOND`], and asked
@@ -3114,6 +3294,152 @@ mod tests {
         let sat = &room.walk.kept().steps["where_you_sit"];
         assert_eq!(sat.outcome, Outcome::Done);
         assert_eq!(sat.framing, Some(beside));
+    }
+
+    #[test]
+    fn the_leads_seat_at_about_a_metre_passes_without_a_guide() {
+        // Row 10 on lamp-52e6 (21 October): the lead's chair, a little high.
+        let chair = Framing {
+            size: 0.15,
+            x: 0.05,
+            y: -0.26,
+        };
+        let mut room = Room::new("chair");
+        assert_eq!(room.wait(7 * S, Some(chair)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.walk.kept().steps["where_you_sit"].framing, Some(chair));
+    }
+
+    #[test]
+    fn a_face_at_the_edge_is_looked_at_before_the_lamp_asks_to_be_turned() {
+        let edge = Framing {
+            size: 0.2,
+            x: 0.95,
+            y: 0.0,
+        };
+        let mut room = Room::new("edge");
+        assert_eq!(room.wait(4 * S, Some(edge)), [SIT_NOTE]);
+        // The lamp looks at the person: its body is told it listens.
+        assert!(room.walk.looking());
+        // Out of view, then back at the edge after the guide's quiet: the
+        // lamp's own look comes first ...
+        assert_eq!(room.wait(6 * S, None), NONE);
+        assert_eq!(room.wait(4 * S, Some(edge)), NONE);
+        assert!(room.walk.looking());
+        // ... and only then is the person asked to turn it.
+        assert_eq!(room.wait(2 * S, Some(edge)), [SIT_TURN]);
+        assert!(room.walk.looking());
+    }
+
+    #[test]
+    fn a_name_said_and_confirmed_ends_who_you_are_with_no_call() {
+        let mut room = Room::new("heard-name");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.walk.heard("Yes. That's fine.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // The model's call after it changes nothing.
+        report(&room.walk, "who_you_are", "failed");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // Without the nudge, `heard` alone ended it, once, the name unkept.
+        let records = room.walk.take_records();
+        let of_who = |kind: &str| {
+            records
+                .iter()
+                .filter(|line| line["kind"] == kind && line["step"] == "who_you_are")
+                .filter(|line| kind != "onboarding_step" || line["outcome"].is_string())
+                .count()
+        };
+        assert_eq!(of_who("onboarding_step"), 1, "{records:?}");
+        assert_eq!(of_who("onboarding_heard"), 1, "{records:?}");
+    }
+
+    /// The first builder on #2526: with the nudge on, both of the
+    /// coordinator's readers hear each line, and "who you are" ends once,
+    /// through `heard_line`'s asked-back name and yes, with the name kept;
+    /// `heard` leaves it alone.
+    #[test]
+    fn with_the_nudge_a_heard_name_ends_who_you_are_once_and_is_kept() {
+        let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Marie?\" Nothing more.)";
+        let mut room = at_who("one-path", true);
+        room.walk.lamp_said();
+        let say = |room: &mut Room, line: &str| {
+            room.walk.heard_line(line);
+            room.walk.heard(line, room.at);
+        };
+        say(&mut room, "I'm Marie.");
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
+        assert_eq!(room.wait(6 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [asked]);
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        say(&mut room, "Yes.");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        let records = room.walk.take_records();
+        let of_who = |kind: &str| -> Vec<&Value> {
+            records
+                .iter()
+                .filter(|line| line["kind"] == kind && line["step"] == "who_you_are")
+                .filter(|line| kind != "onboarding_step" || line["outcome"].is_string())
+                .collect()
+        };
+        assert_eq!(of_who("onboarding_step").len(), 1, "{records:?}");
+        assert!(of_who("onboarding_heard").is_empty(), "{records:?}");
+        assert_eq!(of_who("onboarding_nudge")[0]["name_confirmed"], true);
+    }
+
+    // The first builder's P2 on #2526: none of these is a name, so a yes
+    // after it, or the give-up, never ends the step as done.
+    #[test]
+    fn a_line_that_is_not_a_name_never_ends_who_you_are() {
+        let mut room = Room::new("not-a-name");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        for line in [
+            "I'm not sure",
+            "I'm fine",
+            "it's okay",
+            "I'm here",
+            "What?",
+            "Sorry?",
+            "Hmm",
+            "Hey Lamp",
+            "Coffee?",
+            "I'm not telling",
+        ] {
+            room.walk.heard(line, room.at);
+            room.walk.heard("Yes, that's fine.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), None, "{line}");
+        }
+        // A name taken back by a no is not known either.
+        room.walk.heard("Call me Marie.", room.at);
+        room.walk.heard("No.", room.at);
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
+    }
+
+    #[test]
+    fn both_preferences_heard_end_the_step_with_no_call() {
+        let mut room = Room::new("heard-preferences");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        // A misheard line answers nothing.
+        room.walk.heard("Who's the flight doctor?", room.at);
+        room.walk
+            .heard("Please stay quiet after ten at night.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Preferences), None);
+        room.walk
+            .heard("Yes, you can say hello in the morning.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
     }
 
     #[test]
