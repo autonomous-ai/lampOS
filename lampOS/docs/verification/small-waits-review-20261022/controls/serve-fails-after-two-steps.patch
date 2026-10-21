@@ -1,0 +1,12 @@
+--- a/lampOS/crates/expression/src/main.rs
++++ b/lampOS/crates/expression/src/main.rs
+@@ -373,6 +373,9 @@
+             .as_ref()
+             .map_or(0, |r| r.lost.load(Ordering::Relaxed));
+         let output = service.step(lamp_ipc::monotonic_us, runtime::unix_ms());
++        if service.counts.steps >= 2 {
++            return Err("mutation: serve failed after two steps".into());
++        }
+         if let Some(recorder) = &recorder {
+             recorder.record(output.state.stamp.at_us, output);
+         }

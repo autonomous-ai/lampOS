@@ -1,0 +1,128 @@
+Original combined stdout/stderr streams. Byte lengths and SHA-256 values are indexed in provenance.json.
+
+BEGIN ORIGINAL STREAM timing-before-lamp-expression-1 (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 9.28s
+
+END ORIGINAL STREAM timing-before-lamp-expression-1
+BEGIN ORIGINAL STREAM timing-before-lamp-expression-2 (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 9.39s
+
+END ORIGINAL STREAM timing-before-lamp-expression-2
+BEGIN ORIGINAL STREAM timing-before-lamp-expression-3 (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 8.77s
+
+END ORIGINAL STREAM timing-before-lamp-expression-3
+BEGIN ORIGINAL STREAM timing-before-lamp-mood-1 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689277771) panicked at crates/mood/tests/it/program.rs:220:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 5.84s
+
+END ORIGINAL STREAM timing-before-lamp-mood-1
+BEGIN ORIGINAL STREAM timing-before-lamp-mood-2 (178 bytes)
+
+running 1 test
+test program::only_lamp_mood_on_starts_it_as_enable_does ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 0.90s
+
+END ORIGINAL STREAM timing-before-lamp-mood-2
+BEGIN ORIGINAL STREAM timing-before-lamp-mood-3 (178 bytes)
+
+running 1 test
+test program::only_lamp_mood_on_starts_it_as_enable_does ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 0.18s
+
+END ORIGINAL STREAM timing-before-lamp-mood-3
+BEGIN ORIGINAL STREAM timing-final-lamp-expression-1 (193 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 11.02s
+
+END ORIGINAL STREAM timing-final-lamp-expression-1
+BEGIN ORIGINAL STREAM timing-final-lamp-expression-2 (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 9.64s
+
+END ORIGINAL STREAM timing-final-lamp-expression-2
+BEGIN ORIGINAL STREAM timing-final-lamp-expression-3 (193 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 11.11s
+
+END ORIGINAL STREAM timing-final-lamp-expression-3
+BEGIN ORIGINAL STREAM timing-final-lamp-mood-1 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689538212) panicked at crates/mood/tests/it/program.rs:219:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 8.01s
+
+END ORIGINAL STREAM timing-final-lamp-mood-1
+BEGIN ORIGINAL STREAM timing-final-lamp-mood-2 (178 bytes)
+
+running 1 test
+test program::only_lamp_mood_on_starts_it_as_enable_does ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 1.00s
+
+END ORIGINAL STREAM timing-final-lamp-mood-2
+BEGIN ORIGINAL STREAM timing-final-lamp-mood-3 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689664719) panicked at crates/mood/tests/it/program.rs:219:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 1.44s
+
+END ORIGINAL STREAM timing-final-lamp-mood-3

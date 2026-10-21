@@ -1,0 +1,56 @@
+Original combined stdout/stderr streams. Byte lengths and SHA-256 values are indexed in provenance.json.
+
+BEGIN ORIGINAL STREAM serve-fails-after-started-before (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 0.64s
+
+END ORIGINAL STREAM serve-fails-after-started-before
+BEGIN ORIGINAL STREAM serve-fails-after-started-final (649 bytes)
+
+running 1 test
+
+thread 'alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time' (689776485) panicked at crates/expression/tests/it/alive_replay.rs:390:5:
+lamp-expression: started mode=shadow clock_id=test root=/tmp/al-76125-0/b
+lamp-expression: mutation: serve failed after started
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... FAILED
+
+failures:
+
+failures:
+    alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 274 filtered out; finished in 0.65s
+
+END ORIGINAL STREAM serve-fails-after-started-final
+BEGIN ORIGINAL STREAM serve-fails-after-two-steps-before (192 bytes)
+
+running 1 test
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 274 filtered out; finished in 0.66s
+
+END ORIGINAL STREAM serve-fails-after-two-steps-before
+BEGIN ORIGINAL STREAM serve-fails-after-two-steps-final (651 bytes)
+
+running 1 test
+
+thread 'alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time' (689780633) panicked at crates/expression/tests/it/alive_replay.rs:390:5:
+lamp-expression: started mode=shadow clock_id=test root=/tmp/al-77253-0/b
+lamp-expression: mutation: serve failed after two steps
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time ... FAILED
+
+failures:
+
+failures:
+    alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 274 filtered out; finished in 0.43s
+
+END ORIGINAL STREAM serve-fails-after-two-steps-final

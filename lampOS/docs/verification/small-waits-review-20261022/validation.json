@@ -1,0 +1,37 @@
+{
+  "json_files_parsed": 4,
+  "readme_local_links_checked": 15,
+  "raw_streams_verified_byte_for_byte": 24,
+  "raw_bundles_with_closing_markers": 4,
+  "manual_whitespace_and_eof_checked_files": [
+    "README.md",
+    "candidate.patch",
+    "controls/serve-fails-after-started.patch",
+    "controls/serve-fails-after-two-steps.patch",
+    "provenance.json",
+    "range-diff.txt",
+    "raw/final-gates.txt",
+    "raw/old-controls.txt",
+    "raw/old-parent-exact.txt",
+    "raw/old-timings.txt",
+    "results.json",
+    "source-proof.json",
+    "validation.json"
+  ],
+  "each_untracked_file_checked_with_git_diff_no_index_check": true,
+  "preserved_results": {"old_timing_samples":12,"old_timing_failures":3,"old_final_timing_failures":2,"whole_parent_passes":3,"exact_parent_same_signature_failures":3,"wrong_old_control_passes":2,"intended_restored_control_failures":2,"current_gate_passes":5,"current_tests_passed":1522,"current_tests_ignored":5,"current_tests_failed":0},
+  "tracked_source_files_unchanged": 6146,
+  "tracked_source_tree_sha256": "e904812b2d48a9290edd614e4cdf0212cb43762fd58d48c4f77e153a62cf050d",
+  "reviewed_file_hashes_unchanged": true,
+  "repository_write_scope": "only this new proof folder",
+  "cargo_run_during_packaging": false,
+  "commit_or_push": false,
+  "external_success_or_compile_streams_hash_verified": 14,
+  "external_references_explicitly_nonportable": true,
+  "test_source_changed_by_compaction": false,
+  "patch_checks_completed_before_compaction": [
+    {"patch":"controls/serve-fails-after-started.patch","check":"git apply --check against original old-base Expression main","exit":0},
+    {"patch":"controls/serve-fails-after-two-steps.patch","check":"git apply --check against original old-base Expression main","exit":0},
+    {"patch":"candidate.patch","check":"git apply --unidiff-zero --reverse --check against tested candidate","exit":0}
+  ]
+}

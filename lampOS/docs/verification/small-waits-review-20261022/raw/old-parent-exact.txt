@@ -1,0 +1,56 @@
+Original combined stdout/stderr streams. Byte lengths and SHA-256 values are indexed in provenance.json.
+
+BEGIN ORIGINAL STREAM pre-pr-exact-1 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689720671) panicked at crates/mood/tests/it/program.rs:219:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 6.70s
+
+END ORIGINAL STREAM pre-pr-exact-1
+BEGIN ORIGINAL STREAM pre-pr-exact-2 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689721902) panicked at crates/mood/tests/it/program.rs:219:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 6.40s
+
+END ORIGINAL STREAM pre-pr-exact-2
+BEGIN ORIGINAL STREAM pre-pr-exact-3 (542 bytes)
+
+running 1 test
+
+thread 'program::only_lamp_mood_on_starts_it_as_enable_does' (689723635) panicked at crates/mood/tests/it/program.rs:219:9:
+UTC: mood: Mood bus I/O did not stop; exit this process before restarting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test program::only_lamp_mood_on_starts_it_as_enable_does ... FAILED
+
+failures:
+
+failures:
+    program::only_lamp_mood_on_starts_it_as_enable_does
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out; finished in 5.83s
+
+END ORIGINAL STREAM pre-pr-exact-3
