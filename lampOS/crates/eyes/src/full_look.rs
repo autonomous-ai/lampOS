@@ -397,7 +397,44 @@ fn fit_within(
     let rgb = decoder
         .decode()
         .map_err(|error| format!("jpeg: {error:?}"))?;
-    let (mut rgb, mut size) = shrink(&rgb, (width, height), longest);
+    let (rgb, size) = shrink(&rgb, (width, height), longest);
+    encode_within(rgb, size, most_bytes)
+}
+
+/// The working frame from the look's own picture, already decoded and
+/// shrunk to 320 across (`--sight-from-look`): only an encode, where
+/// [`working`] decodes the full frame a second time and shrinks it (5.9
+/// against 0.72 ms on an x86 laptop, about 41 ms a look on lamp-4ace, Ten on
+/// #2602, 22 Oct 05:4x).
+pub fn working_from_picture(picture: &crate::picture::Picture) -> Result<Vec<u8>, String> {
+    use crate::picture::{HEIGHT, WIDTH};
+    let (across, down) = picture.filled;
+    if across == 0 || down == 0 || picture.planes.len() != 3 * WIDTH * HEIGHT {
+        return Err("no picture".into());
+    }
+    // The planes are blue, green and red; the encoder takes red first.
+    let plane = WIDTH * HEIGHT;
+    let mut rgb = Vec::with_capacity(across * down * 3);
+    for y in 0..down {
+        for x in 0..across {
+            let at = y * WIDTH + x;
+            rgb.extend([2, 1, 0].map(|channel| {
+                picture.planes[channel * plane + at]
+                    .clamp(0.0, 255.0)
+                    .round() as u8
+            }));
+        }
+    }
+    encode_within(rgb, (across, down), crate::kept::MOST_BYTES).map(|(jpeg, _)| jpeg)
+}
+
+/// Red, green and blue bytes encoded at the best quality that fits in
+/// `most_bytes`, shrunk further if none does.
+fn encode_within(
+    mut rgb: Vec<u8>,
+    mut size: (usize, usize),
+    most_bytes: usize,
+) -> Result<(Vec<u8>, (usize, usize)), String> {
     let encode = |rgb: &[u8], (across, down): (usize, usize), quality: u8| {
         let mut out = Vec::new();
         jpeg_encoder::Encoder::new(&mut out, quality)
@@ -991,6 +1028,58 @@ mod tests {
         assert!(small.len() <= most);
         assert_eq!(fit(&small, most).unwrap(), (small.clone(), (320, 240)));
         assert!(fit(b"not a jpeg", most).is_err());
+    }
+
+    /// `--sight-from-look`: the working frame made from the look's own
+    /// decoded picture is the one `working` makes, 320 by 240 and a whole
+    /// JPEG under the sight file's bound, with the same picture in it (its
+    /// mean colour within a few greys), for an encode alone.
+    #[test]
+    fn the_working_frame_from_the_looks_picture_is_the_same_frame() {
+        let decode = |jpeg: &[u8]| {
+            let mut decoder = JpegDecoder::new_with_options(
+                jpeg,
+                DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGB),
+            );
+            let rgb = decoder.decode().unwrap();
+            (rgb, decoder.dimensions().unwrap())
+        };
+        let mean = |rgb: &[u8], channel: usize| {
+            rgb.iter()
+                .skip(channel)
+                .step_by(3)
+                .map(|v| f64::from(*v))
+                .sum::<f64>()
+                / (rgb.len() / 3) as f64
+        };
+        let frame = camera_frame(1_280, 960, 90);
+        let shrunk = working(&frame).unwrap();
+        let picture = crate::picture::Picture::from_jpeg(&frame).unwrap();
+        let from_look = working_from_picture(&picture).unwrap();
+        assert!(crate::kept::whole_jpeg(&from_look));
+        assert!(from_look.len() <= crate::kept::MOST_BYTES);
+        let ((a, a_size), (b, b_size)) = (decode(&shrunk), decode(&from_look));
+        assert_eq!(a_size, (320, 240));
+        assert_eq!(b_size, (320, 240));
+        for channel in 0..3 {
+            assert!(
+                (mean(&a, channel) - mean(&b, channel)).abs() < 4.0,
+                "channel {channel}: {} against {}",
+                mean(&a, channel),
+                mean(&b, channel)
+            );
+        }
+        // Red stays red: the planes are blue first, the JPEG red first.
+        let red = vec![[250u8, 10, 10]; 320 * 240].concat();
+        let picture = crate::picture::Picture::from_rgb(&red, 320, 240).unwrap();
+        let (rgb, _) = decode(&working_from_picture(&picture).unwrap());
+        assert!(mean(&rgb, 0) > 200.0 && mean(&rgb, 2) < 60.0);
+        // No picture, no frame.
+        let empty = crate::picture::Picture {
+            planes: Vec::new(),
+            filled: (0, 0),
+        };
+        assert!(working_from_picture(&empty).is_err());
     }
 
     #[test]
