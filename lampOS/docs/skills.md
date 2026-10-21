@@ -500,6 +500,17 @@ skills".)
   `voice/state`, `body/joint_states`, from their `at_unix_ms`). So do the
   socket timeouts to the other parts (the say service, the actions part, a
   tool's caller), which bound a peer that keeps its own time.
+  Guard-mode fixtures wait for their exact `skills/events` mark-shown
+  transition before publishing a visit. After a 120 s or 600 s clock skip,
+  they first observe the mark becoming unconfirmed, then refresh it and
+  wait for the new shown event. A skip acknowledgement alone does not say
+  that the ring feedback has been read: several skips can be answered in
+  one call before that work. The 30 s confirmation test retains its
+  original 500 ms quiet drain after each 10 s skip, checking every renewal
+  and at least three in total. That observation allowance does not prove
+  the renewal thread has armed its next wait. The paused-light test keeps
+  the original 500 ms allowance after light-on as an explicit no-text
+  observation, followed by the original 300 ms check after the next visit.
 
 `lamp-update install` puts it on a home lamp (#811): the product unit
 `deploy/product/lamp-skills.service`, every product skill in

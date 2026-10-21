@@ -1,0 +1,112 @@
+===== BEGIN ignore-initial-mark =====
+Command: cargo test -q -p lamp-skills --test it skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face -- --exact --nocapture
+Exit: 101; wall_s: 17.6539; bytes: 1231; SHA256: 1842c21d934fcb2b86024e4529712732ea247eb83ce173f4452aa93b6567a663
+Raw merged stdout/stderr follows:
+
+running 1 test
+lamp-skills: skills from /tmp/gmttv4lq/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: keep_watch with {"turn":"on"} not run: I keep an eye on things only when someone asks me out loud, at the lamp.
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it knows
+
+thread 'skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face' (689670935) panicked at crates/skills/tests/it/skills.rs:8789:5:
+guard mode did not say "its mark shows: counting visits" at initial or re-asked mark
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face --- FAILED
+
+failures:
+
+failures:
+    skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 6.12s
+
+error: test failed, to rerun pass `-p lamp-skills --test it`
+===== END ignore-initial-mark =====
+
+===== BEGIN ignore-refreshed-mark =====
+Command: cargo test -q -p lamp-skills --test it skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face -- --exact --nocapture
+Exit: 101; wall_s: 17.3707; bytes: 1441; SHA256: a78dc5e286f83ce68e74e0a8536e73cf20ea4c20a8f482c7c0fde91dd7b6ac34
+Raw merged stdout/stderr follows:
+
+running 1 test
+lamp-skills: skills from /tmp/gmUeqrNr/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: keep_watch with {"turn":"on"} not run: I keep an eye on things only when someone asks me out loud, at the lamp.
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it knows
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+
+thread 'skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face' (689672471) panicked at crates/skills/tests/it/skills.rs:8789:5:
+guard mode did not say "its mark shows: counting visits" at refresh after expiry
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face --- FAILED
+
+failures:
+
+failures:
+    skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 6.25s
+
+error: test failed, to rerun pass `-p lamp-skills --test it`
+===== END ignore-refreshed-mark =====
+
+===== BEGIN gate-skills =====
+Command: cargo test -q -p lamp-skills
+Exit: 101; wall_s: 126.3606; bytes: 2736; SHA256: 84b1f6c51df68bb99c68eb4d6560b6842444ed9ba350ddaa8e5ff9899d47c08c
+Raw merged stdout/stderr follows:
+
+running 137 tests
+...................................................... 54/137
+routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window --- FAILED
+.... 59/137
+routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence --- FAILED
+routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended --- FAILED
+........... 72/137
+routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable --- FAILED
+.............................................................test routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night has been running for over 60 seconds
+test routine::tests::a_sound_with_a_face_in_view_does_not_settle_again has been running for over 60 seconds
+test routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once has been running for over 60 seconds
+...
+failures:
+
+---- routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window stdout ----
+
+thread 'routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window' (689685564) panicked at crates/skills/src/routine.rs:1160:14:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence stdout ----
+
+thread 'routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence' (689685772) panicked at crates/skills/src/routine.rs:1368:63:
+called `Option::unwrap()` on a `None` value
+
+---- routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended stdout ----
+
+thread 'routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended' (689685547) panicked at crates/skills/src/routine.rs:1160:14:
+called `Option::unwrap()` on a `None` value
+
+---- routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable stdout ----
+
+thread 'routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable' (689688616) panicked at crates/skills/src/routine.rs:1589:59:
+called `Option::unwrap()` on a `None` value
+
+
+failures:
+    routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended
+    routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window
+    routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence
+    routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable
+
+test result: FAILED. 133 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 99.93s
+
+error: test failed, to rerun pass `-p lamp-skills --lib`
+===== END gate-skills =====
+
+=== end of retained failure output ===

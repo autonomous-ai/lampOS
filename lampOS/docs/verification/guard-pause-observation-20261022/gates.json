@@ -1,0 +1,92 @@
+{
+  "head": "7c3396ba3588cce61bf1c1736cda646fb4793d9d",
+  "freshened": 1329,
+  "source_files": 6155,
+  "source_sha256": "3da491eb9da6218f7aca4c452ed40e28c8132ab77c0178d1bdef4464926952d0",
+  "target": "/private/tmp/tests-codex-1569-target",
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started": "2026-10-22T01:40:59.090406+00:00",
+      "seconds": 10.69960228400305,
+      "exit": 0,
+      "log": "fmt.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started": "2026-10-22T01:41:10.506636+00:00",
+      "seconds": 36.38764677476138,
+      "exit": 0,
+      "log": "clippy.txt",
+      "sha256": "84a2249015a6637c6fdeea84ebe3477d62de4d87487f424c3f8417bffb8e5870",
+      "summaries": []
+    },
+    {
+      "name": "skills-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline"
+      ],
+      "started": "2026-10-22T01:41:48.424896+00:00",
+      "seconds": 110.38159201527014,
+      "exit": 0,
+      "log": "skills-tests.txt",
+      "sha256": "86bd6ac2b16fbb906773352e6e404941ca9bd08918dd19a682c4dc67a8e9a530",
+      "summaries": [
+        "test result: ok. 138 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s",
+        "test result: ok. 270 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.21s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "workspace-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline"
+      ],
+      "started": "2026-10-22T01:43:40.627037+00:00",
+      "seconds": 69.48956106370315,
+      "exit": 0,
+      "log": "workspace-build.txt",
+      "sha256": "6764ee66df739007335c951d4021ab3b9c625ad58f3d5e9d25297d169db7e8b6",
+      "summaries": []
+    }
+  ],
+  "status": "passed",
+  "source_unchanged": true,
+  "base": "a498ecc030a9c28419aef3b7de89486664868440",
+  "candidate_note": "The recorded HEAD 7c3396ba3 had the three tracked follow-up edits uncommitted during these gates. The following hashes identify the tested contents.",
+  "source_hashes": {
+    "lampOS/crates/skills/tests/it/skills.rs": "f80631639a5b9ffefa183be5f0372ced437710391ffbe7a10100bf174f5a5c24",
+    "lampOS/docs/skills.md": "a055860d0c3d8f882d8b646f801c12ec072cc039a9b6ea5d8eea12dd9567ab8d",
+    "lampOS/docs/verification/guard-mark-acks-20261022/README.md": "3b70b84f6a36f242f1c9e34a5af11b3f520ff35dfd224d49a92c946f083cc47f"
+  },
+  "aggregate_algorithm": "SHA256 of Python json.dumps(sorted tracked lampOS path->SHA256 map, sort_keys=True), default separators, encoded UTF-8",
+  "external_log_directory": "/private/tmp/tests-codex-guard-review-20261022/p3-light-pause/local",
+  "runner_sha256": "2debd30cfd3e06a8c20a03901869e8a005ac7326fd153b7d94d17d99277c07f5"
+}
