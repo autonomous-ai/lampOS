@@ -9,7 +9,11 @@
 //! time are tested where they live: the decision budget in `admission`, the
 //! tail and the staleness of hearing in `turn_taking`.
 use super::*;
-use crate::{activity::START_BLOCKS, admission::Hold, turn_taking::HEARING_STALE_US};
+use crate::{
+    activity::START_BLOCKS,
+    admission::Hold,
+    turn_taking::{FORGIVE_FRUITLESS_US, HEARING_STALE_US},
+};
 use lamp_audio::{
     duplex::Confirmation,
     evidence::{EchoEvidence, EchoMatch, Level},
@@ -1781,4 +1785,152 @@ fn clearing_observation_storage_does_not_erase_the_open_yield_identity() {
     assert_eq!(ends[0]["owner"], serde_json::to_value(old).unwrap());
     assert_eq!(ends[0]["starvation_excluded"], false);
     assert_eq!(h.old(), old);
+}
+
+/// Capture blocks a second on the scenario clock (2 ms a block), against
+/// which the fruitless yields are forgiven.
+const BLOCKS_A_SECOND: usize = 500;
+
+/// A long story with two asides over it early on, each a yield the lamp
+/// went on after ("What was that?"), as on lamp-4ace on 20 October; then
+/// the story plays on to `gap_s` after the second aside began.
+fn story_after_two_asides(keeps_listening: bool, gap_s: usize) -> Harness {
+    let mut h = Harness::new(TurnTaking::Duplex, 40_000);
+    if keeps_listening {
+        h.mask.keep_listening();
+    }
+    h.blocks(200, 0.99, Some(evidence(0, OWN)));
+    for aside in 0..2 {
+        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        h.blocks(40, 0.1, Some(evidence(40, None)));
+        let spent = ONSET + 2 + 29 + 40;
+        let story = if aside == 0 {
+            2 * BLOCKS_A_SECOND
+        } else {
+            gap_s * BLOCKS_A_SECOND
+        };
+        h.blocks(story - spent, 0.99, Some(evidence(0, OWN)));
+    }
+    let (counts, fallen_back) = h.mask.duplex_summary().unwrap();
+    assert_eq!(counts, (2, 0, 2));
+    assert_eq!(
+        fallen_back,
+        gap_s * 1_000_000 < FORGIVE_FRUITLESS_US as usize
+    );
+    h
+}
+
+/// Someone speaks `blocks` blocks over the story at `score`. Its sound dies
+/// away only once the lamp has stopped for them. Then, if they stopped it,
+/// they go quiet until it goes on; whether it was let in is returned.
+fn a_line_over_the_story(h: &mut Harness, blocks: usize) -> bool {
+    let mut quiet: u8 = 0;
+    let mut accepted = false;
+    for _ in 0..blocks {
+        let shares = if quiet >= 30 { None } else { OVER };
+        let tick = h.block(0.9, Some(evidence(quiet, shares)));
+        accepted |= tick.accepted.is_some();
+        if accepted {
+            return true;
+        }
+        if tick.dispatched.is_none() || quiet > 0 {
+            quiet = quiet.saturating_add(1);
+        }
+    }
+    if quiet > 0 {
+        for _ in 0..80 {
+            let shares = if quiet >= 30 { None } else { Some((10, 0)) };
+            h.block(0.1, Some(evidence(quiet, shares)));
+            quiet = quiet.saturating_add(1).min(40);
+        }
+    }
+    false
+}
+
+/// #2602, "Cutting in" (the first builder at 04:13, 22 Oct): with
+/// `LAMP_CUT_IN_KEEPS_LISTENING=on` a person who tries a third time, soon
+/// after two asides the lamp went on after, still stops the story, as a
+/// person stops for someone who keeps trying; and from 20 s on as before.
+#[test]
+fn with_keeps_listening_a_third_line_soon_after_two_asides_stops_the_story() {
+    for gap_s in [5, 10, 30] {
+        let mut h = story_after_two_asides(true, gap_s);
+        let old = h.old();
+        assert!(a_line_over_the_story(&mut h, 200), "{gap_s} s after");
+        assert_eq!(h.events("duplex_yield").len(), 3, "{gap_s} s after");
+        assert_eq!(h.events("duplex_commit").len(), 1, "{gap_s} s after");
+        assert_ne!(h.old(), old, "{gap_s} s after: the story went on");
+        assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    }
+}
+
+/// The switch off: the old rule. Within 20 s of the second aside the third
+/// line makes no yield and no candidate, and the story plays on to the end
+/// of it; 21 s on, the forgiven yield lets it in.
+#[test]
+fn without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard() {
+    for (gap_s, heard) in [(5, false), (19, false), (21, true)] {
+        let mut h = story_after_two_asides(false, gap_s);
+        let old = h.old();
+        let candidates = h.events("input_candidate").len();
+        assert_eq!(a_line_over_the_story(&mut h, 200), heard, "{gap_s} s after");
+        assert_eq!(h.old() != old, heard, "{gap_s} s after");
+        if !heard {
+            assert_eq!(h.events("duplex_yield").len(), 2, "{gap_s} s after");
+            assert_eq!(h.events("input_candidate").len(), candidates);
+        }
+    }
+}
+
+/// With the switch, the lamp's own sound is never a cut-in: its voice the
+/// render explains, and a voice it can't explain yet because the lamp's
+/// sound has not been found again since it went on, however long either
+/// lasts. A word or a cough over the story is not one either.
+#[test]
+fn with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in() {
+    let mut h = story_after_two_asides(true, 5);
+    let old = h.old();
+    let candidates = h.events("input_candidate").len();
+    let ticks = h.blocks(3_000, 0.99, Some(evidence(0, OWN)));
+    assert_eq!(dispatched(&ticks), 3_000);
+    // A word over the story, 250 ms: shorter than one who keeps going.
+    let mut ticks = h.blocks(25, 0.9, Some(evidence(0, OVER)));
+    ticks.extend(h.blocks(500, 0.99, Some(evidence(0, OWN))));
+    assert_eq!(dispatched(&ticks), 525);
+    assert_eq!(h.events("duplex_yield").len(), 2);
+    assert!(ticks.iter().all(|tick| tick.accepted.is_none()));
+    assert_eq!(h.old(), old);
+    // A third aside the lamp goes on after: its own sound starts unmatched.
+    // One harness at a time: each holds the scenario clock.
+    drop(h);
+    let mut h = story_after_two_asides(true, 5);
+    let old = h.old();
+    assert!(!a_line_over_the_story(&mut h, 60));
+    assert_eq!(h.events("duplex_resume").len(), 3);
+    let ticks = h.blocks(1_000, 0.95, Some(evidence(0, Some((0, 0)))));
+    assert_eq!(dispatched(&ticks), 1_000, "the lamp yielded to itself");
+    assert_eq!(h.events("duplex_yield").len(), 3);
+    assert!(ticks.iter().all(|tick| tick.accepted.is_none()));
+    assert_eq!(h.events("input_candidate").len(), candidates + 1);
+    assert_eq!(h.old(), old);
+}
+
+/// With the switch, a voice over the story that keeps going and is never
+/// a line (a television) pauses it at most twice more before 20 s forgives
+/// one: after that the story falls back as it did without the switch.
+#[test]
+fn with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more() {
+    let mut h = story_after_two_asides(true, 3);
+    let old = h.old();
+    for _ in 0..4 {
+        assert!(!a_line_over_the_story(&mut h, 60));
+        h.blocks(BLOCKS_A_SECOND, 0.99, Some(evidence(0, OWN)));
+    }
+    assert_eq!(h.events("duplex_yield").len(), 2 + 2);
+    assert_eq!(h.events("duplex_resume").len(), 2 + 2);
+    assert_eq!(h.old(), old);
+    assert!(h.events("turn_finished").is_empty());
 }
