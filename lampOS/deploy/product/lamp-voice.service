@@ -152,7 +152,7 @@ Environment=LAMP_TASKS_DIR=/run/lampos-tasks
 Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
 # News of work handed over is timed by the Task news skill (lampOS/skills/task-news): the voice keeps the
 # words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
-# News of a task that stopped or asks something has no skill yet: the voice tells it after those 10 s.
+# The skill takes news of a task that stopped or asks something too (#1722).
 Environment=LAMP_TASK_NEWS=skill
 Environment=LAMP_SCHEDULE_TOOLS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and

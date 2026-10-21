@@ -1,0 +1,69 @@
+# A question, then the work's end, each told once (lamp-tasks follows a
+# question for an hour and keeps what the agent ends with, #2543). Someone
+# in view from 39 s. Tasks 5 (claude) and 6 (codex) work from 10 s.
+# - Task 5 asks at 40 s: a look, a curious tilt and the news. The person
+#   answers at their computer; at 70 s its entry in `settled` turns to idle:
+#   the done run, a look, the sway and the news. Still idle at 90 s and
+#   165 s, gone at 190 s: nothing more.
+# - Task 6 asks at 45 s and is still asking at 70 s and 90 s: told once. It
+#   leaves `settled` at 165 s, its two minutes over, unanswered. At 300 s it
+#   comes back as idle, answered later: the done run. Gone at 420 s.
+[[expect]]
+at = "40s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "40s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "40s"
+call = "say"
+args = { from = "tasks", task = 5 }
+
+[[expect]]
+at = "45s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "45s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "45s"
+call = "say"
+args = { from = "tasks", task = 6 }
+
+[[expect]]
+at = "70s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "70s"
+call = "body.gesture"
+args = { gesture = "happy" }
+
+[[expect]]
+at = "70s"
+call = "say"
+args = { from = "tasks", task = 5 }
+
+[[expect]]
+at = "300s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "300s"
+call = "body.gesture"
+args = { gesture = "happy" }
+
+[[expect]]
+at = "300s"
+call = "say"
+args = { from = "tasks", task = 6 }

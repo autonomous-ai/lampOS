@@ -1,6 +1,6 @@
 ---
 name: task-news
-description: When work the lamp handed to Claude Code or Codex comes back, the lamp tells the person once, briefly, who did it; done with a small glad sway, failed with a gentle droop and a slightly dimmer light, asking whether to try again.
+description: When work the lamp handed to Claude Code or Codex comes back, the lamp tells the person once, briefly, who did it; done with a small glad sway, failed with a gentle droop and a slightly dimmer light, asking whether to try again; stopped with a look; asking something with a look and a curious tilt.
 ---
 
 # Task news
@@ -11,7 +11,8 @@ comes back: look up, say it in a line, and leave it there.
 
 - **Trigger:** a task coming into `tasks/status`'s `settled` list (#1048,
   where a task whose agent settled stays for two minutes) as `idle` (its
-  agent finished: done) or `failed`, each task on its own. A task already
+  agent finished: done), `failed`, `stopped` or `needs_input` (its agent
+  stopped to ask the person something: asking), each task on its own. A task already
   there when the lamp starts is not told again. Two tasks done one after the
   other are two pieces of news, each told on its own, never put together.
 - **Ask:** the Policy's `news` question (#958), before anything is done.
@@ -22,6 +23,14 @@ comes back: look up, say it in a line, and leave it there.
   while it droops and speaks, then given back, and the news: what failed, in
   a plain sentence, and whether to try again. Never a red ring: the lamp
   shows feelings in its own light only.
+- **Stopped:** look at the person if a face is in view, and the news, what
+  the agent last said. No sway, no droop: it only ended.
+- **Asking:** look at the person if a face is in view, a curious tilt
+  (`curious`), and the news: what the agent is waiting on them for.
+- **Asking, then done:** lamp-tasks follows a question for an hour and
+  keeps what the agent ends with (#2543), so the task's entry turns from
+  `needs_input` to `idle` (or comes back as `idle` after its two minutes):
+  the question is told once, then the end once.
 
 The words are the voice's (`say = { from = "tasks" }`, #1033): it keeps the
 news of work handed over, who did it and what came back, and tells each
@@ -38,7 +47,6 @@ the skill asked. This skill asks the moment the work settles (an item's run
 cannot wait), and its ask is gone 20 s later: news that settled while
 nobody was there, or long before a talk ended, is told by the voice when it
 can be, at once, without the sway.
-News of work that stopped, or that asks something, has no trigger here: the
-voice tells it after those 10 s. The voice's own timing of the news
+The voice's own timing of the news
 (`crates/voice/src/task_news.rs`) is taken out once this has done 5 of 5 on
 lamp-4ace.

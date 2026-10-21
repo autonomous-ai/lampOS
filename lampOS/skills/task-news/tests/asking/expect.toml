@@ -1,0 +1,18 @@
+# Someone in view at 39 s. Task 12 (codex) is working at 10 s and is in
+# `settled` as needs_input at 40 s: its agent stopped to ask the person
+# something. A look, a curious tilt and the news, asked of the voice. The
+# same question still listed at 60 s is not told again; it leaves at 160 s.
+[[expect]]
+at = "40s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "40s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "40s"
+call = "say"
+args = { from = "tasks", task = 12 }

@@ -1,0 +1,13 @@
+# Someone in view at 39 s. Task 11 (claude) is working at 10 s and is in
+# `settled` as stopped at 40 s: a look at the person and the news, asked of
+# the voice, which keeps the words. No sway, no droop and no light: the work
+# only ended. It leaves `settled` at 160 s: nothing.
+[[expect]]
+at = "40s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "40s"
+call = "say"
+args = { from = "tasks", task = 11 }
