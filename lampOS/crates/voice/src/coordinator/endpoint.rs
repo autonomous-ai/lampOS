@@ -39,6 +39,32 @@ fn short_verdict_blocks(value: Option<&str>, least: u16) -> u16 {
     }
 }
 
+/// The switch that lowers the commit's floor (`ConfirmPolicy::least_speech_blocks`)
+/// to a number of milliseconds of speech, and counts the line's start toward
+/// it (`ConfirmPolicy::count_start`): off unless an integer from
+/// [`LEAST_SPEECH_LEAST_MS`] to the profile's own floor (800 ms with the
+/// lamp's `--end-silence-ms 600`). On lamp-4ace a third of whole played day
+/// lines ended as `silence_fallback: short`, never asked, at 600 ms, not the
+/// 400 ms commit (the first builder on #2602, 22 Oct 04:28). The floor was
+/// for "Hey Lamp," alone (about 0.6 s), taken for a finished turn at 400 ms
+/// on 14 Oct; the call's wait (`--call-wait-ms`, #782) now holds a line
+/// that is only the name.
+pub const LEAST_SPEECH_SWITCH: &str = "LAMP_ENDPOINT_LEAST_SPEECH_MS";
+
+/// The lowest floor the switch takes: 0.2 s, the short lines' own
+/// ([`SHORT_VERDICT_BLOCKS`]), under which a click or a cough's scrap would
+/// be committed.
+pub const LEAST_SPEECH_LEAST_MS: u16 = 200;
+
+/// The floor, in ms of speech, the switch's `value` asks for under the
+/// profile's own `least` blocks: none unless an integer of milliseconds
+/// from [`LEAST_SPEECH_LEAST_MS`] to `least`'s.
+fn least_speech_ms(value: Option<&str>, least: u16) -> Option<u16> {
+    value
+        .and_then(|value| value.trim().parse::<u16>().ok())
+        .filter(|ms| (LEAST_SPEECH_LEAST_MS..=least.saturating_mul(10)).contains(ms))
+}
+
 /// The switch that starts the fast worker with ONNX Runtime's threads not
 /// spinning while they wait for work (#1608): off unless `on`. The worker
 /// runs at the voice's real-time priority, where a spinning thread holds its
@@ -166,6 +192,24 @@ impl EndpointRig {
         // record of the policy says which was in force.
         if let Some(commit) = endpoint.commit_blocks {
             policy.commit_blocks = commit;
+        }
+        // A lower floor, the line's start counted toward it
+        // (`LAMP_ENDPOINT_LEAST_SPEECH_MS`, #2602); first, so the short
+        // lines' floor below is taken under it.
+        let asked = std::env::var(LEAST_SPEECH_SWITCH).ok();
+        match least_speech_ms(asked.as_deref(), policy.least_speech_blocks) {
+            Some(ms) => {
+                policy = policy.with_floor_ms(ms);
+                eprintln!(
+                    "lamp-voice: a line of {ms} ms of speech or more, its start counted, ends on a complete verdict at the {} ms commit ({LEAST_SPEECH_SWITCH})",
+                    u64::from(policy.commit_blocks) * 10
+                );
+            }
+            None if asked.is_some() => eprintln!(
+                "lamp-voice: {LEAST_SPEECH_SWITCH} is not a whole number of ms from {LEAST_SPEECH_LEAST_MS} to {}; the commit's floor stays",
+                u64::from(policy.least_speech_blocks) * 10
+            ),
+            None => {}
         }
         // A line too short for that floor is asked too, and its verdict ends
         // it no sooner (`LAMP_ENDPOINT_SHORT_VERDICT`, #2135).
@@ -319,6 +363,47 @@ mod tests {
             ..ConfirmPolicy::responsive()
         };
         assert!(policy.validate().is_ok());
+    }
+
+    /// #2602: the floor is lowered only by a whole number of ms from 200 to
+    /// the profile's own (800 with the responsive profile's 80 blocks); unset,
+    /// not a number, under 200 or over the profile's, it stays. The short
+    /// lines' floor taken under it still passes the policy's check.
+    #[test]
+    fn the_floor_is_lowered_only_by_ms_from_200_to_the_profiles() {
+        for (value, taken) in [
+            (None, None),
+            (Some(""), None),
+            (Some("on"), None),
+            (Some("500ms"), None),
+            (Some("0.5"), None),
+            (Some("-500"), None),
+            (Some("199"), None),
+            (Some("810"), None),
+            (Some("200"), Some(200)),
+            (Some("600"), Some(600)),
+            (Some(" 500 "), Some(500)),
+            (Some("800"), Some(800)),
+        ] {
+            assert_eq!(least_speech_ms(value, 80), taken, "{value:?}");
+        }
+        // The parity profile has no floor to lower.
+        assert_eq!(least_speech_ms(Some("600"), 0), None);
+        // What it sets: the floor, the start counted, and the short lines'
+        // floor under it, before and after `LAMP_ENDPOINT_SHORT_VERDICT`.
+        for ms in [200, 500, 800] {
+            let mut policy = ConfirmPolicy {
+                short_verdict_blocks: SHORT_VERDICT_BLOCKS,
+                ..ConfirmPolicy::responsive()
+            }
+            .with_floor_ms(ms);
+            assert_eq!(policy.least_speech_blocks, ms / 10);
+            assert!(policy.count_start);
+            assert!(policy.validate().is_ok(), "{ms}");
+            policy.short_verdict_blocks =
+                short_verdict_blocks(Some("on"), policy.least_speech_blocks);
+            assert!(policy.validate().is_ok(), "{ms}");
+        }
     }
 
     /// #1608: `--no-spin` only with the switch, and only for the fast worker.

@@ -513,7 +513,7 @@ impl TurnDetector {
             self.waiting = false;
             self.waited = false;
             if let Some(confirmation) = self.confirmation.as_mut() {
-                confirmation.begin(&self.prefix);
+                confirmation.begin(&self.prefix, self.speech_blocks);
             }
             return Activity::Start(self.prefix.drain(..).collect());
         }
@@ -744,6 +744,15 @@ pub struct ConfirmPolicy {
     /// at 07:16: of 23 uncertain Ends on lamp-4ace, 12 were 0.745 to 0.888,
     /// and none was followed by speech within 1 s).
     pub recheck_uncertain: bool,
+    /// The utterance's start counts toward `least_speech_blocks`: the
+    /// confirmation's count begins at the speech blocks the detector already
+    /// heard to start the line (its [`START_BLOCKS`] run), not at 0
+    /// (`LAMP_ENDPOINT_LEAST_SPEECH_MS`, the first builder on #2602, 22 Oct
+    /// 04:28). Without it the six start blocks never count, so a line needs
+    /// 0.86 s of speech, not the floor's 0.8 s, to be asked. Absent from the
+    /// policy's record when off, so that record is as before.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub count_start: bool,
 }
 
 impl Default for ConfirmPolicy {
@@ -759,6 +768,7 @@ impl Default for ConfirmPolicy {
             least_speech_blocks: 0,
             short_verdict_blocks: 0,
             recheck_uncertain: false,
+            count_start: false,
         }
     }
 }
@@ -774,6 +784,20 @@ impl ConfirmPolicy {
             // 0.6 s), shorter than most questions.
             least_speech_blocks: 80,
             ..Self::default()
+        }
+    }
+
+    /// The commit's floor at `ms` of speech, the line's start counted toward
+    /// it (`LAMP_ENDPOINT_LEAST_SPEECH_MS`, the first builder on #2602, 22 Oct
+    /// 04:28), and the short lines' floor kept under it. The switch takes
+    /// only 200 ms up to the profile's own floor; this is what it then sets.
+    pub fn with_floor_ms(self, ms: u16) -> Self {
+        let least = ms / 10;
+        Self {
+            least_speech_blocks: least,
+            short_verdict_blocks: self.short_verdict_blocks.min(least),
+            count_start: true,
+            ..self
         }
     }
 
@@ -821,6 +845,16 @@ pub struct EndpointDecision {
     /// floor counts two (the reviewer's P3 on #2380). Absent when none.
     #[serde(skip_serializing_if = "is_zero")]
     pub short_asks: u16,
+    /// The utterance's speech as the confirmation counted it at the
+    /// decision (its speech blocks, 10 ms each; with
+    /// [`ConfirmPolicy::count_start`] its start's too): what the commit's
+    /// floor (`least_speech_blocks`) was held against, so each End says how
+    /// far under it a `silence_fallback: short` line was (the first builder
+    /// on #2602, 22 Oct 04:28: on lamp-4ace a third of whole played day lines
+    /// ended that way, at 600 ms, not the 400 ms commit). Absent for a
+    /// decision the confirmation didn't make.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speech_ms: Option<u64>,
     /// The first verdict's probability, when a second asked of an uncertain
     /// one ended the line (`ConfirmPolicy::recheck_uncertain`). Absent
     /// otherwise.
@@ -842,6 +876,7 @@ impl EndpointDecision {
             verdict: None,
             call_wait_ms: None,
             short_asks: 0,
+            speech_ms: None,
             rechecked_from: None,
         }
     }
@@ -924,8 +959,14 @@ impl Confirmation {
         }
     }
 
-    fn begin(&mut self, prefix: &VecDeque<ObservedAudio>) {
+    /// A new utterance, begun with `prefix`; `start_speech` is the speech
+    /// blocks the detector counted to start it, which count toward the
+    /// floor only with [`ConfirmPolicy::count_start`].
+    fn begin(&mut self, prefix: &VecDeque<ObservedAudio>, start_speech: u16) {
         self.cancel();
+        if self.policy.count_start {
+            self.speech_blocks = start_speech;
+        }
         for frame in prefix {
             self.retain(&frame.samples);
         }
@@ -1110,6 +1151,7 @@ impl Confirmation {
             }
         }
         let short_asks = self.short_asks;
+        let speech_ms = Some(u64::from(self.speech_blocks) * 10);
         let (first, rechecked_from) = (self.first, self.rechecked_from);
         let decide = |basis, heard: Option<Heard>, fallback| EndpointDecision {
             basis,
@@ -1119,6 +1161,7 @@ impl Confirmation {
             verdict: heard.map(|heard| heard.trace),
             call_wait_ms: None,
             short_asks,
+            speech_ms,
             rechecked_from,
         };
         match self.pause {
