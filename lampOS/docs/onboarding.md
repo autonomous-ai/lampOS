@@ -139,7 +139,12 @@ both steps were `not_available` with every switch set).
 ## Starting and redoing
 
 It starts the first time the voice runs with the switch on and no step kept
-yet, and someone is at the lamp. A walk left half done (they walked off,
+yet, and someone is at the lamp. Each step begins after 3 s of quiet: no voice
+the detector calls speech, words or none, no words heard and none of the
+lamp's own, as [speaking-first.md](speaking-first.md) ("When") counts it. A
+request that heard no words holds it only through its speech, not through
+its end's silence or the wait for an answer (on lamp-52e6 on 21 October the
+lamp's fan had kept the privacy step from ever being offered). A walk left half done (they walked off,
 the voice restarted) goes on at the first step with no outcome.
 
 "Lamp, let's redo the setup": the model calls `redo_setup`, every outcome

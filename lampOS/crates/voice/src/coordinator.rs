@@ -5380,6 +5380,9 @@ fn conversation_with_gate(
                 continue;
             }
             observe_provider_output(&mut cloud, reply, &event)?;
+            if words_heard(&event) {
+                last_turn_us = monotonic_us();
+            }
             match event {
                 ProviderOutput::ReminderDeferred {
                     request,
@@ -7787,10 +7790,23 @@ fn conversation_with_gate(
             words.close();
         }
         // The one thing the lamp says unasked. Only from rest: nothing
-        // being heard, nothing owed, a provider ready to take the turn.
-        if reply.is_some() || admission.owns_stream() {
+        // being heard, nothing owed, a provider ready to take the turn
+        // (each consumer checks that itself). The quiet they wait out is
+        // talk's: the lamp speaking, the person's words heard
+        // (`words_heard`), or any voice the detector calls speech
+        // (`last_speech_us`), words or none: a line in a language the route
+        // takes no words from is still someone talking. The rest of a
+        // request, its end's silence and the wait for an answer that never
+        // comes aloud, does not hold it: on lamp-52e6 on 21 October a fan's
+        // sound opened 11 wordless requests in 2 minutes, and the 3 s the
+        // onboarding walk waits for never came.
+        if reply
+            .as_ref()
+            .is_some_and(|current| current.playback.is_some())
+        {
             last_turn_us = clock;
         }
+        last_turn_us = last_turn_us.max(last_speech_us);
         // The look the lamp said it would take, as soon as it has finished
         // saying so. Someone speaking first takes the turn and the look is
         // dropped; so is one that could not begin within fifteen seconds of being asked for.
@@ -9500,6 +9516,15 @@ impl AnswerAudio {
     fn decided_at(&self, turn: u64) -> Option<u64> {
         self.decided.filter(|(of, _)| *of == turn).map(|(_, at)| at)
     }
+}
+
+/// Whether `output` carries the person's words: a transcript of what was
+/// heard (no request) with at least one word in it: talk, which ends the
+/// quiet the lamp's own unasked turns wait for (`last_turn_us`), as the
+/// detector's own speech does.
+fn words_heard(output: &ProviderOutput) -> bool {
+    matches!(output, ProviderOutput::Transcript { request: None, text, .. }
+        if !crate::not_speech::plain_words(text).is_empty())
 }
 
 fn reminder_quiet(
