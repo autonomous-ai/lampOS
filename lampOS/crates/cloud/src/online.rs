@@ -1360,17 +1360,29 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    struct JoiningHelper {
+        finish: std::sync::mpsc::Sender<()>,
+        thread: std::thread::JoinHandle<(std::time::Instant, std::time::Instant, String)>,
+    }
+
+    impl JoiningHelper {
+        fn join(self) -> std::thread::Result<(std::time::Instant, std::time::Instant, String)> {
+            // The scenario has stopped and awaited lamp-cloud. Keep its
+            // helper socket open until then, and preserve any helper panic.
+            let _ = self.finish.send(());
+            self.thread.join()
+        }
+    }
+
     /// A fake `lamp-setup wifi` on `socket`: it proves the new network
     /// `after` its request and says `joined`, then waits for `{"online":
     /// true}`; with `back`, it then goes back and says so. It hands back
-    /// when it said `joined` and when it heard `online`.
-    fn joining_helper(
-        socket: &std::path::Path,
-        after: Duration,
-        back: bool,
-    ) -> std::thread::JoinHandle<(std::time::Instant, std::time::Instant, String)> {
+    /// when it said `joined` and when it heard `online`, after the scenario
+    /// releases its socket with `join`.
+    fn joining_helper(socket: &std::path::Path, after: Duration, back: bool) -> JoiningHelper {
         let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
-        std::thread::spawn(move || {
+        let (finish, finished) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
             use std::io::{BufRead, Write};
             let (mut stream, _) = listener.accept().unwrap();
             let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
@@ -1389,10 +1401,18 @@ mod tests {
                     .write_all(b"{\"refused\":\"the app did not confirm the new Wi-Fi within 120 s; the lamp is back on its old Wi-Fi\"}\n")
                     .unwrap();
             }
-            // Held open: lamp-cloud waits for the app's confirmation.
-            std::thread::sleep(Duration::from_secs(3));
+            // Held open while lamp-cloud waits for the app's confirmation.
+            // A failed scenario drops the sender; a stuck one fails this
+            // bound, which exceeds wifi_against's ten-second deadline.
+            match finished.recv_timeout(Duration::from_secs(15)) {
+                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    panic!("Wi-Fi scenario did not release its helper within 15 s")
+                }
+            }
             (joined_at, online_at, online)
-        })
+        });
+        JoiningHelper { finish, thread }
     }
 
     /// The lamp with the Wi-Fi's switch against `port` until `until` holds,

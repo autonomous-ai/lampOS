@@ -1,0 +1,10 @@
+--- a/lampOS/crates/cloud/src/online.rs
++++ b/lampOS/crates/cloud/src/online.rs
+@@ -526,6 +526,7 @@
+                         // lamp is back online.
+                         if connected && let Some(changes) = &changes {
+                             for outcome in changes.take() {
++                                changes.acked(&outcome);
+                                 let reply = outcome.reply(&me, &now()).to_string();
+                                 let tag = Tagged::Change(outcome.clone());
+                                 if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {

@@ -1,0 +1,137 @@
+=== before-compile | exit 0 | 49.584496 s ===
+--- stdout (tested compiler artifact and build-finished only) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud#lamp-cloud@0.1.0","manifest_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_cloud","src_path":"/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-0bb7cfbb9243c9ec","fresh":false}
+{"reason":"build-finished","success":true}
+--- stderr ---
+   Compiling serde v1.0.229
+   Compiling tokio v1.53.1
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/ipc)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/third_party/sonora)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/turn-owner)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/ring)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/audio)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/near-call)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/turn-end-wire)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/voice-processes)
+   Compiling rustls-webpki v0.102.8
+   Compiling tokio-rustls v0.26.6
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling tokio-util v0.7.20
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.21
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/schedule)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/lean)
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.5
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/body)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/gemini)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/health)
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/update)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/controls)
+   Compiling axum v0.8.9
+   Compiling tokio-stream v0.1.19
+   Compiling rumqttc v0.25.1
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/voice)
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/setup)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/actions)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/skills)
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-cloud-helper-20261022/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized] target(s) in 49.50s
+=== end before-compile ===
+=== before-stale-ack-1 | exit 0 | 5.242295 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-stale-ack-1 ===
+=== before-will-1 | exit 0 | 4.387485 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-will-1 ===
+=== before-backoff-1 | exit 0 | 6.200784 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 6.18s
+
+--- stderr ---
+=== end before-backoff-1 ===
+=== before-stale-ack-2 | exit 0 | 4.387866 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-stale-ack-2 ===
+=== before-will-2 | exit 0 | 4.387293 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-will-2 ===
+=== before-backoff-2 | exit 0 | 6.199942 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 6.18s
+
+--- stderr ---
+=== end before-backoff-2 ===
+=== before-stale-ack-3 | exit 0 | 4.385936 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-stale-ack-3 ===
+=== before-will-3 | exit 0 | 4.385401 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 4.37s
+
+--- stderr ---
+=== end before-will-3 ===
+=== before-backoff-3 | exit 0 | 6.197675 s ===
+--- stdout ---
+
+running 1 test
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 142 filtered out; finished in 6.18s
+
+--- stderr ---
+=== end before-backoff-3 ===

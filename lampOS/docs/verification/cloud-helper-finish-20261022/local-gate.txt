@@ -1,0 +1,41 @@
+=== gate-fmt | exit 0 | 10.023568 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-fmt ===
+=== gate-clippy | exit 0 | 37.628411 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-clippy ===
+=== gate-tests | exit 0 | 19.846650 s ===
+--- stdout ---
+
+running 143 tests
+..................................................................................i.... 87/143
+........................................................
+test result: ok. 142 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 9.68s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- stderr ---
+=== end gate-tests ===
+=== gate-build | exit 0 | 55.807988 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-build ===
+=== gate-diff | exit 0 | 0.038423 s ===
+--- stdout ---
+--- stderr ---
+=== end gate-diff ===
