@@ -1750,7 +1750,14 @@ pub fn serve(
                 (sessions.told_for(&person), person)
             }
         };
+        // A line held only by a known face's gap is told no one's memory
+        // note: it may not be theirs (the reviewer's P2 on #2449). Its
+        // exchanges, the conversation as it stood, are told as before.
+        let held = lease
+            .and_then(crate::memory_scope::ScopeLease::scope)
+            .is_some_and(crate::memory_scope::ScopeSnapshot::held);
         let memory = match &socket {
+            _ if held => String::new(),
             // Every request here is built afresh from the thread and the
             // session's snapshot: a new session is a fresh context (#2176
             // row 1b).

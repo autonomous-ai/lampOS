@@ -5068,15 +5068,92 @@ async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
     assert!(withheld[0].is_empty(), "the seen line is told everything");
     assert_eq!(
         withheld[1],
-        [crate::remember::RECALL],
-        "the held line, no recall"
+        super::MEMORY_CALLS,
+        "the held line, no memory call"
     );
+    assert!(withheld[1].contains(&crate::remember::RECALL));
     assert_eq!(
         hits.load(Ordering::Relaxed),
         1,
         "hits for the seen line only"
     );
     std::fs::remove_file(&path).unwrap();
+}
+
+/// The reviewer's P2 on #2449: on a line held only by a gap, a memory call
+/// the model makes anyway (a forget asked in words, a `remember`) runs for
+/// no one: the scoped runner is never called with the held scope, and the
+/// call is told why.
+#[tokio::test]
+async fn a_memory_call_on_a_gap_held_line_runs_for_no_one() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    for name in [
+        crate::remember::FORGET_EVERYTHING,
+        crate::remember::REMEMBER,
+    ] {
+        let path =
+            std::env::temp_dir().join(format!("twelve-gap-call-{}-{name}", std::process::id()));
+        std::fs::write(&path, "A").unwrap();
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Hello.".to_owned()),
+                    Ok("Forget everything you know about me.".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("Hi."), Ok(ChatEvent::Done)],
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call("c1", name, json!({}))])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("I can't do that right now."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let ran = Arc::new(Mutex::new(Vec::new()));
+        let running = ran.clone();
+        let runner: ScopedToolRunner = Arc::new(move |_, _, name, _, _: ScopeLease| {
+            running.lock().unwrap().push(name);
+            Box::pin(async { json!({"ok":true}) })
+        });
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        engine.memory_answered(1, Instant::now());
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        engine.submit(start(2));
+        assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        turn(&mut engine).await;
+        assert!(
+            ran.lock().unwrap().is_empty(),
+            "{name}: {:?}",
+            ran.lock().unwrap()
+        );
+        // Told why, in the round after the call.
+        let asked = script.asked.lock().unwrap();
+        let told = format!("{:?}", asked.last().unwrap());
+        assert!(told.contains("can't see who is talking"), "{name}: {told}");
+        std::fs::remove_file(&path).unwrap();
+    }
 }
 
 #[tokio::test]

@@ -1440,11 +1440,14 @@ a gap, only while all of these hold:
 - **A held line is answered from the conversation as it stood** (the first
   builder's 22:10 and 01:43 on #2265): someone who left within that window
   may not be the one speaking. A line whose scope is kept only by the gap
-  (`ScopeSnapshot::held`) is not told `recall`, memory's read and search
-  (`Services::chat_without`), is told no memory hits
+  (`ScopeSnapshot::held`) is declared none of the functions that read or
+  write someone's memory, rules or face (`recall` and its search,
+  `remember`, `forget`, `forget_everything`, the rules' and the face's;
+  `Services::chat_without`), and any of them written anyway is refused and
+  told why (`run_tool`). It is told no memory note and no memory hits
   (`LAMP_SECOND_MEMORY_HITS`), and its scope runs no one's held forget
-  (`forget_asker`, #2340). Its words still go to the person counted at the
-  lamp's thread, as before.
+  (`forget_asker`, #2340); the reviewer's P2 on #2449. It is told the
+  conversation as it stood, its exchanges, as before.
 - **Within the gap:** up to 8 s (`GAP`) past the face's last fresh
   sighting, which is the known file's 3 s freshness, so up to about 11 s
   after the eyes last saw it, and up to 8 s past the lamp's last answer to

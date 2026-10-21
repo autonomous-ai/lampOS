@@ -3888,8 +3888,23 @@ type SightRead = (
     Option<(String, String)>,
 );
 
-/// Memory's read, never declared to a line held only by a known face's gap.
-const MEMORY_READS: &[&str] = &[crate::remember::RECALL];
+/// Every function that reads or writes someone's memory, their rules or
+/// their face, never declared to or run for a line held only by a known
+/// face's gap (the reviewer's P2 on #2449): it may not be theirs.
+const MEMORY_CALLS: &[&str] = &[
+    crate::remember::RECALL,
+    crate::remember::REMEMBER,
+    crate::remember::FORGET,
+    crate::remember::FORGET_EVERYTHING,
+    crate::rules::KEEP_RULE,
+    crate::rules::FORGET_RULE,
+    crate::rules::LIST_RULES,
+    crate::known_faces::REMEMBER,
+    crate::known_faces::FORGET,
+];
+
+/// What a memory call on a gap-held line is told instead of running.
+const HELD_MEMORY_CALL: &str = "I can't see who is talking just now, so I can't look up, keep or forget anything for anyone. Say so, and ask them to come back where I can see them.";
 
 /// Whether this turn's scope is a known face's kept only by its held gap
 /// (`LAMP_FACE_GAP_HOLD`): someone who left within 8 s of the lamp's last
@@ -3902,15 +3917,15 @@ fn held_by_gap(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
         .is_some_and(crate::memory_scope::ScopeSnapshot::held)
 }
 
-/// The turn's chat: every function, or without memory's read for a line
-/// held only by a gap ([`held_by_gap`]).
+/// The turn's chat: every function, or none of memory's for a line held
+/// only by a gap ([`held_by_gap`]).
 fn chat_for(
     shared: &Shared,
     scope: Option<&crate::memory_scope::ScopeLease>,
     messages: Vec<Message>,
 ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
     if held_by_gap(scope) {
-        shared.services.chat_without(messages, MEMORY_READS)
+        shared.services.chat_without(messages, MEMORY_CALLS)
     } else {
         shared.services.chat(messages)
     }
@@ -4136,6 +4151,14 @@ async fn run_tool(
     call: &net::ToolCall,
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Value {
+    // A memory call on a line held only by a gap runs for no one, however
+    // it was asked: not declared to it, and refused if written anyway.
+    if held_by_gap(scope) && MEMORY_CALLS.contains(&call.name.as_str()) {
+        eprintln!(
+            "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
+        );
+        return serde_json::json!({ "error": HELD_MEMORY_CALL });
+    }
     match (&shared.scoped_tools, scope) {
         (Some(run), Some(scope)) => {
             run(
