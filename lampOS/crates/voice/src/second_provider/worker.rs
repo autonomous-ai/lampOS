@@ -1785,10 +1785,24 @@ pub fn serve(
             // After a stop, the next turn opens one, so journalling can go on
             // (Friday's P1 on #2226). After a quiet, the same synchronous ask
             // a person change makes, within the note's 300 ms
-            // (`remember::told_for_fresh_session`).
-            Some(socket) if days => sessions.frozen(opens_anew(changed) || quiet, |session| {
-                crate::remember::told_for_fresh_session(socket, session, person.as_deref(), true)
-            }),
+            // (`remember::told_for_fresh_session`). After something kept,
+            // the same ask, so it's in the run's next turns (#2540).
+            Some(socket) if days => {
+                let kept = crate::remember::kept_since_note();
+                if kept {
+                    eprintln!(
+                        "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
+                    );
+                }
+                sessions.frozen(opens_anew(changed) || quiet || kept, |session| {
+                    crate::remember::told_for_fresh_session(
+                        socket,
+                        session,
+                        person.as_deref(),
+                        true,
+                    )
+                })
+            }
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
         };

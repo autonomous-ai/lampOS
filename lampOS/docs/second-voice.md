@@ -1009,6 +1009,21 @@ order is kept. A written turn is the same from the chat on.
   `worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again`,
   and the thread told after a quiet in
   `worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules`.
+  - **After something kept** (#2540, from Fourth's replay of the forgotten
+    name on #1722): a `remember` the store keeps, told or not, marks the
+    run's note (`DaysClient::kept_since_note`). The run's next turn asks it
+    again, the same ask, so a name told mid-run is in that run's later
+    turns, not only in a recall the model may never ask once the 300 s of
+    exchanges have gone by.
+  - **Its journal** says "something was kept: this turn asks the memory's
+    note again", once for each turn that asks again.
+  - **Not asked again:** a `remember` the store refused, and a recall. A
+    confirmed forget already opens a fresh session (`wants_fresh_session`).
+  - **No switch:** it costs one note ask per turn after a keep. Tests:
+    `remember::tests::a_thing_kept_marks_the_note_to_be_asked_again_once`,
+    and the replay table in `memory/tests/it/voice_name.rs`, where a name
+    kept with `remember` and asked a minute later in the same run is now in
+    the note.
 - **Each turn is logged** as "lamp-voice second: request N ...": the words
   heard and how long after the line, the state of the words at the line's
   end (above), each chat round's first event (the first text or tool

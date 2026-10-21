@@ -9,8 +9,11 @@
 //! What this drives is memory: the store, its notes and its recall. What the
 //! second route itself does with them is read from its code and named in
 //! the table's last column: it asks a session's note once and keeps it
-//! (`Sessions::frozen`), asks again only for a new person, after ten quiet
-//! minutes with `LAMP_MEMORY_REOPEN_QUIET`, or after a restart; and it never
+//! (`Sessions::frozen`), asks again for a new person, after something kept
+//! with `remember` (#2540: `DaysClient::kept_since_note`, which the replay
+//! asks as the route does), after ten quiet minutes with
+//! `LAMP_MEMORY_REOPEN_QUIET`, or after a restart; and, without
+//! `LAMP_SECOND_FACE_NAME` (#2539, off unless set), it never
 //! tells the model the known face's name (the Live route does, with
 //! `known_faces::note`), so a name kept only with `remember_my_face`, in the
 //! eyes, is never told here.
@@ -169,9 +172,10 @@ enum Kept {
 /// When "what's my name?" is asked, and whose note the second route has then.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Asked {
-    /// A minute later, the same run of turns: the note asked before it.
+    /// A minute later, the same run of turns: the note asked before it, or
+    /// asked again when something was kept since (#2540).
     SameRun,
-    /// After ten quiet minutes, `LAMP_MEMORY_REOPEN_QUIET` off: the same note.
+    /// After ten quiet minutes, `LAMP_MEMORY_REOPEN_QUIET` off: as `SameRun`.
     QuietOff,
     /// After ten quiet minutes, the switch on: a new note, theirs.
     QuietOn,
@@ -214,7 +218,18 @@ fn replay(kept: Kept, asked: Asked) -> (bool, bool) {
     }
     // The note the second route has when they ask, and whose scope asks.
     let (note, asker) = match asked {
-        Asked::SameRun | Asked::QuietOff => (first.unwrap(), Some(person.clone())),
+        Asked::SameRun | Asked::QuietOff => {
+            // Asked again, as the route asks it, when something was kept
+            // since (#2540).
+            let note = if client.kept_since_note() {
+                client
+                    .open_session_within(2, SESSION, Some(&person))
+                    .unwrap()
+            } else {
+                first.unwrap()
+            };
+            (note, Some(person.clone()))
+        }
         Asked::QuietOn => (
             client
                 .open_session_within(2, SESSION, Some(&person))
@@ -257,13 +272,13 @@ fn a_told_name_against_each_way_a_run_of_turns_ends() {
     use Kept::*;
     let expected = [
         // (kept, asked, in the note, found by a recall)
-        (Theirs, SameRun, false, true),
-        (Theirs, QuietOff, false, true),
+        (Theirs, SameRun, true, true),
+        (Theirs, QuietOff, true, true),
         (Theirs, QuietOn, true, true),
         (Theirs, Restart, true, true),
         (Theirs, RoomsNote, false, false),
-        (Rooms, SameRun, false, true),
-        (Rooms, QuietOff, false, true),
+        (Rooms, SameRun, true, true),
+        (Rooms, QuietOff, true, true),
         (Rooms, QuietOn, true, true),
         (Rooms, Restart, true, true),
         (Rooms, RoomsNote, true, true),
