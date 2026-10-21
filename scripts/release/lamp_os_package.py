@@ -35,6 +35,12 @@ DEVELOPMENT_BINARIES = {'lamp-audio', 'lamp-body-inspect', 'lamp-ipc-probe',
 # also sits beside lamp-body, as lamp-body-worker does.
 PROVISIONING_BINARIES = {'lamp-body-measure', 'lamp-body-mood'}
 SEATED_MEASURE_UNIT = 'lamp-body-measure.service'
+# From a source with lamp-first-stand.service (lampOS #2396), the generic package
+# also runs it: a seated lamp asks for its first stand once someone is near, and
+# stands on a touch held a second (`lamp-body-measure first-stand`, beside lamp-body).
+FIRST_STAND_UNIT = 'lamp-first-stand.service'
+# Units of the generic package's own, with no product unit to take a bus from.
+GENERIC_ONLY_UNITS = (SEATED_MEASURE_UNIT, FIRST_STAND_UNIT)
 PROVISION_SETTINGS = ('voice-provider.json', 'controls.json', 'controls-pins.json')
 # The adapter's prepare runs `lamp-keeper prepare` (lamp-voice #1094); its usage
 # line is the build's own statement that the command exists.
@@ -170,7 +176,7 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         raise ValueError('version must be major.minor.patch')
     generic = profile is None
     if generic:
-        seated = [SEATED_MEASURE_UNIT] if (Path(source) / 'deploy/units' / SEATED_MEASURE_UNIT).exists() else []
+        seated = [unit for unit in GENERIC_ONLY_UNITS if (Path(source) / 'deploy/units' / unit).exists()]
         profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated,
                    'required_paths': ['/etc/lampOS/voice/provider.json',
                        '/etc/lampOS/controls/controls.json', '/etc/lampOS/controls/controls-pins.json']}
@@ -256,7 +262,7 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             data = read_file(binaries, name)
             check_elf(data, name)
             add(f'tools/{name}', data, True)
-            if name == 'lamp-body-measure' and SEATED_MEASURE_UNIT in units:
+            if name == 'lamp-body-measure' and set(GENERIC_ONLY_UNITS) & set(units):
                 add(f'runtime/body/{binary_hashes["lamp-body"]}/{name}', data, True)
         for name in PROVISION_SETTINGS:
             data = read_file(source, f'deploy/product/settings/{name}')
@@ -309,8 +315,9 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             text = text.replace('[Service]', '[Service]\nEnvironment=LD_LIBRARY_PATH=@RELEASE_ROOT@/lib', 1)
         if generic and unit == 'lamp-policy.service':
             text = generic_policy(text, read_file(source, 'deploy/product/lamp-policy.service').decode())
-        # The seated read is a oneshot with no product unit and no bus.
-        if generic and unit.startswith('lamp-') and unit.endswith('.service') and unit != SEATED_MEASURE_UNIT:
+        # The seated read and the first stand have no product unit; the first stand
+        # names its bus root itself.
+        if generic and unit.startswith('lamp-') and unit.endswith('.service') and unit not in GENERIC_ONLY_UNITS:
             text = generic_bus(unit, text, read_file(source, f'deploy/product/{unit}').decode())
         for key, value in mapping.items():
             text = text.replace(f'@{key}@', value)

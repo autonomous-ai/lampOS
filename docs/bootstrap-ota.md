@@ -1675,7 +1675,13 @@ seated (`--home`, the pitch window and `--torque on`, no stand), before the
 first body start. The body then moves the head and base only until a person
 confirms its first stand. A read it refuses (torque on) keeps the body from
 starting, and it never turns torque off. From an older source the ZIP is as
-before. `lamp-memory-fixture`,
+before. Built from a source that has `deploy/units/lamp-first-stand.service`
+(lampOS #2396), the generic ZIP also carries that unit, with the same tool
+beside `lamp-body`. The unit runs `lamp-body-measure first-stand` as root.
+- Once someone is near a seated lamp, the lamp asks for its first stand.
+- A touch held a second is the yes. The arm then stands as the factory's
+  steps stand it, and `/etc/lampOS/body/lamp.env` is written.
+- Nothing moves without the yes. The unit takes no bus from a product unit. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
 `lamp-same-voice pairs` measurement CLI are development tools and are excluded. `lamp-station` (the production station's bench tool) is excluded the same way. `lamp-body-mood` is a factory tool carried with `lamp-body-measure` under `tools/`, and `lamp-peek` is carried without a unit. A lampOS source with `lampOS/deploy/package-binaries.json` (lamp-voice #2481) classifies its own binaries there (`core`, `optional`, `provisioning`, `development`), and the packager follows it. Then a new binary needs no change on main. The lists above are kept only for sources from before that file. A name in two lists, or a `core` part the packager cannot place yet, still fails packaging.
 Unknown binaries still fail packaging so a new runtime cannot be silently

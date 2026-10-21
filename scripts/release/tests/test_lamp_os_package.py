@@ -131,6 +131,25 @@ class PackageTest(unittest.TestCase):
         self.assertNotIn('lamp-body-measure', manifest['binaries'])
         self.assertTrue({'SERVO_DEVICE', 'MOTOR_LOCK_DIR', 'LAMP_USER'} <= set(placeholders))
 
+    def test_generic_runs_the_first_stand_when_the_source_has_it(self):
+        # lampOS #2396: a seated lamp's first stand, confirmed at the lamp, runs
+        # the tool beside lamp-body as root, and takes no bus from a product unit.
+        self.write_generic_units()
+        self.write_source('deploy/units/' + pkg.FIRST_STAND_UNIT, (
+            '[Unit]\nConditionHost=@UNIT_ID@\n[Service]\nType=simple\nRemainAfterExit=yes\nUser=root\n'
+            'ExecStart=/opt/lampOS/body/@BODY_SHA256@/lamp-body-measure first-stand '
+            '--device @SERVO_DEVICE@ --unit-id @UNIT_ID@ --lock-directory @MOTOR_LOCK_DIR@ '
+            '--body-user @LAMP_USER@\n').encode())
+        manifest = self.build_generic()
+        self.assertIn(pkg.FIRST_STAND_UNIT, manifest['units'])
+        body = manifest['binaries']['lamp-body']
+        with zipfile.ZipFile(self.output) as archive:
+            names = archive.namelist()
+            unit = archive.read('units/' + pkg.FIRST_STAND_UNIT).decode()
+        self.assertIn(f'runtime/body/{body}/lamp-body-measure', names)
+        self.assertIn(f'@RELEASE_ROOT@/runtime/body/{body}/lamp-body-measure first-stand', unit)
+        self.assertNotIn('LAMP_BUS', unit)
+
     def build_generic(self):
         return pkg.package(self.source, self.binaries, self.assets, None, '1.2.3', self.output, self.adapter, self.libraries, 'a' * 40)
 
