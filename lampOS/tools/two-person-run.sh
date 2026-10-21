@@ -24,7 +24,8 @@
 #
 # Set-up and put-back, on any exit: a drop-in under /run (removed, the voice
 # restarted), the stand-in stopped and its folder removed. The drop-in sets
-# LAMP_SECOND_SCOPED_CONTEXT=on and the stand-in's socket; the worker's own
+# LAMP_SECOND_SCOPED_CONTEXT=on, LAMP_CAMERA_FOLLOWS_EYES=on (without which every
+# turn is the room's, #2233) and the stand-in's socket; the worker's own
 # environment is checked for the switch before the first line.
 #
 # Environment: LAMP (ssh target, sudo there), LAMP_SH (a command that runs
@@ -73,7 +74,7 @@ put_back() {
 trap put_back EXIT
 trap 'exit 130' INT TERM HUP
 
-on_lamp "mkdir -p '$RUN_DIR' && chmod 0755 '$RUN_DIR' && : >'$RUN_DIR/who' && mkdir -p '$(dirname "$DROPIN")' && printf '[Service]\nEnvironment=LAMP_SECOND_SCOPED_CONTEXT=on\nEnvironment=LAMP_EYES_WHO_SOCKET=$RUN_DIR/who.sock\n' >'$DROPIN' && systemctl daemon-reload && systemctl restart lamp-voice" ||
+on_lamp "mkdir -p '$RUN_DIR' && chmod 0755 '$RUN_DIR' && : >'$RUN_DIR/who' && mkdir -p '$(dirname "$DROPIN")' && printf '[Service]\nEnvironment=LAMP_SECOND_SCOPED_CONTEXT=on\nEnvironment=LAMP_CAMERA_FOLLOWS_EYES=on\nEnvironment=LAMP_EYES_WHO_SOCKET=$RUN_DIR/who.sock\n' >'$DROPIN' && systemctl daemon-reload && systemctl restart lamp-voice" ||
   { echo "the drop-in could not be set" >&2; exit 3; }
 # A unit of its own, so it outlives the ssh session that starts it (a
 # background job under `ssh sudo` ends with it: Fifth's run on #2165).

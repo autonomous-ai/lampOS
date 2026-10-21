@@ -86,6 +86,9 @@ Environment=LAMP_SECOND_SCOPED_CONTEXT=on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
 # (memory.md).
 Environment=LAMP_CAMERA_FOLLOWS_EYES=on
+# A line another face was seen speaking is the room's, not the known person's (#2008, with lamp-eyes'
+# LAMP_EYES_SPEAKING): "seeing who speaks", which the lead's decision puts on with scoped context.
+Environment=LAMP_SECOND_SPEAKING_FACE=on
 Environment=LAMP_NAME_NOTE=on
 Environment=LAMP_NAME_NOTE_BUSY=face
 Environment=LAMP_EXPRESSION_OUT=on
