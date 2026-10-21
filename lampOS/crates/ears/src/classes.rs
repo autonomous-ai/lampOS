@@ -139,6 +139,9 @@ const RETAIN: usize = 2 * RATE as usize;
 pub struct Block {
     samples: [i16; BLOCK],
     stamp: CaptureStamp,
+    /// The voice said, freshly, that the lamp was speaking as this block
+    /// was captured: its own sound may be in it.
+    own: bool,
 }
 
 impl Drop for Block {
@@ -177,12 +180,14 @@ pub fn handoff() -> (Handoff, Intake) {
 
 impl Handoff {
     /// Only a block whose own permit and fence still hold is copied. A full
-    /// queue drops it and marks the worker's window overloaded.
+    /// queue drops it and marks the worker's window overloaded. `own`: the
+    /// voice said, freshly, that the lamp was speaking as it was captured.
     pub fn offer(
         &self,
         samples: &[i16; BLOCK],
         gate: &PublicationGate,
         stamp: CaptureStamp,
+        own: bool,
         now_us: u64,
     ) -> bool {
         if stamp.captured_at_us > now_us || !gate.allows(stamp.permit, stamp.fence, now_us) {
@@ -191,6 +196,7 @@ impl Handoff {
         match self.sender.try_send(Block {
             samples: *samples,
             stamp,
+            own,
         }) {
             Ok(()) => true,
             Err(TrySendError::Full(_)) => {
@@ -446,6 +452,8 @@ pub struct Patch {
     pub end_us: u64,
     pub capture_epoch: u64,
     pub fence: u64,
+    /// A block of it was captured while the lamp was speaking (#1757's read).
+    pub own: bool,
 }
 
 /// The samples of one uninterrupted capture era, from the next patch's start.
@@ -454,6 +462,8 @@ pub struct Patch {
 pub struct Window {
     samples: Vec<f32>,
     times: VecDeque<u64>,
+    /// Beside each block's time, whether the lamp was speaking as it came.
+    own: VecDeque<bool>,
     base: usize,
     first_frame: usize,
     era: Option<Era>,
@@ -483,6 +493,7 @@ impl Window {
         self.samples.fill(0.0);
         self.samples.clear();
         self.times.clear();
+        self.own.clear();
         self.base = 0;
         self.first_frame = 0;
         self.era.take().is_some()
@@ -537,6 +548,7 @@ impl Window {
         self.samples
             .extend(block.samples.iter().map(|&x| f32::from(x) / 32768.0));
         self.times.push_back(stamp.captured_at_us);
+        self.own.push_back(block.own);
         if self.samples.len() > RETAIN {
             self.purge();
             return purged.or(Some(SoundUnavailable::Overloaded));
@@ -575,6 +587,7 @@ impl Window {
             end_us: self.times[last],
             capture_epoch: era.epoch,
             fence: era.fence,
+            own: self.own.range(first..=last).any(|&own| own),
         })
     }
 
@@ -590,6 +603,7 @@ impl Window {
         self.samples[..blocks * BLOCK].fill(0.0);
         self.samples.drain(..blocks * BLOCK);
         self.times.drain(..blocks);
+        self.own.drain(..blocks);
         self.base += blocks * BLOCK;
     }
 }
@@ -754,9 +768,16 @@ pub fn serve(
                                 capture_epoch: patch.capture_epoch,
                             },
                             scores,
-                            // Ears' speaking flag maps a stale voice state to
-                            // false, so it is not evidence of a quiet lamp.
-                            own_voice: OwnVoiceEvidence::Unknown,
+                            // A patch the lamp spoke into is its own sound
+                            // (Laugh glance's guard, docs/skills.md). One it
+                            // didn't is still no evidence of a quiet lamp:
+                            // ears' speaking flag maps a stale voice state to
+                            // false, so it stays unknown.
+                            own_voice: if patch.own {
+                                OwnVoiceEvidence::Present
+                            } else {
+                                OwnVoiceEvidence::Unknown
+                            },
                         },
                         fence: patch.fence,
                     });
