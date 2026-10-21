@@ -18,6 +18,10 @@ use std::{
     net::{TcpListener, TcpStream},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::Duration,
 };
@@ -173,15 +177,23 @@ fn by_hand(
 /// `node` agent's `GET /v1/models` once counted as a second fetch (#1569 row
 /// 61). So only a request from lamp-skills' fetch (`User-Agent:
 /// lamp-update`) is answered and counted.
-fn serve(answers: Vec<Vec<u8>>) -> (u16, thread::JoinHandle<usize>) {
+///
+/// It stops after 3 s with nothing more asked, or at [`Served::join`]: the
+/// test's asks have returned by then, so a fetch of theirs has connected,
+/// and one more look takes it.
+fn serve(answers: Vec<Vec<u8>>) -> (u16, Served) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     listener.set_nonblocking(true).unwrap();
-    let handle = thread::spawn(move || {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopped = Arc::clone(&stop);
+    let thread = thread::spawn(move || {
         let mut taken = 0;
         let until = std::time::Instant::now() + Duration::from_secs(3);
         for answer in answers {
             let mut socket = loop {
+                // Read before the look, so the look comes after the stop.
+                let stopping = stopped.load(Ordering::SeqCst);
                 match listener.accept() {
                     Ok((mut socket, _)) => {
                         socket.set_nonblocking(false).unwrap();
@@ -201,7 +213,7 @@ fn serve(answers: Vec<Vec<u8>>) -> (u16, thread::JoinHandle<usize>) {
                             break socket;
                         }
                     }
-                    Err(_) if std::time::Instant::now() < until => {
+                    Err(_) if !stopping && std::time::Instant::now() < until => {
                         thread::sleep(Duration::from_millis(5));
                     }
                     Err(_) => return taken,
@@ -212,7 +224,44 @@ fn serve(answers: Vec<Vec<u8>>) -> (u16, thread::JoinHandle<usize>) {
         }
         taken
     });
-    (port, handle)
+    (port, Served { stop, thread })
+}
+
+/// The Store [`serve`] runs.
+struct Served {
+    stop: Arc<AtomicBool>,
+    thread: thread::JoinHandle<usize>,
+}
+
+impl Served {
+    /// How many requests the Store answered, once it is stopped.
+    fn join(self) -> thread::Result<usize> {
+        self.stop.store(true, Ordering::SeqCst);
+        self.thread.join()
+    }
+}
+
+/// A server on a free local port that answers `answer` to whatever
+/// connects, at once and without reading: plain HTTP where TLS is spoken.
+/// It answers everyone for 3 s, so a stranger first (#1569 row 61) still
+/// leaves one for lamp-skills.
+fn answers_at_once(answer: Vec<u8>) -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    listener.set_nonblocking(true).unwrap();
+    thread::spawn(move || {
+        let until = std::time::Instant::now() + Duration::from_secs(3);
+        while std::time::Instant::now() < until {
+            match listener.accept() {
+                Ok((mut socket, _)) => {
+                    socket.set_nonblocking(false).unwrap();
+                    let _ = socket.write_all(&answer);
+                }
+                Err(_) => thread::sleep(Duration::from_millis(5)),
+            }
+        }
+    });
+    port
 }
 
 /// A 200 with `body`.
@@ -248,13 +297,25 @@ fn ask(
     port: u16,
     request: serde_json::Value,
 ) -> (serde_json::Value, bool) {
+    ask_waiting(skills, key_file, port, request, package::ASKED_LOCK_WAIT)
+}
+
+/// [`ask`], with the helper waiting at most `wait` for a held folder (the
+/// lamp's `ASKED_LOCK_WAIT`).
+fn ask_waiting(
+    skills: &Path,
+    key_file: &Path,
+    port: u16,
+    request: serde_json::Value,
+    wait: Duration,
+) -> (serde_json::Value, bool) {
     let mut channel = Local(port);
     let mut output = Vec::new();
     let done = package::asked(
         skills,
         // No skill the lamp made is asked for here.
         &skills.with_extension("made"),
-        package::ASKED_LOCK_WAIT,
+        wait,
         Some(Store {
             key_file: key_file.to_path_buf(),
             channel: &mut channel,
@@ -692,7 +753,7 @@ fn the_real_helper_refuses_on_its_own() {
         format!("not installed: {}", package::NOT_A_STORE_URL)
     );
     // A server that answers in plain HTTP where TLS is spoken.
-    let (port, _) = serve(vec![ok(b"not a package")]);
+    let port = answers_at_once(ok(b"not a package"));
     let (answer, success) = ask_binary(
         format!(
             "{}\n",
@@ -849,10 +910,11 @@ fn a_catalogue_entry_installs_only_the_package_it_names() {
 }
 
 /// While another run holds the skills folder, an install from the Store
-/// waits for it at most `ASKED_LOCK_WAIT` once the package is fetched and
-/// checked, then refuses busy with nothing written, as a remove does; with
-/// the fetch's own bound that is under `lamp-cloud`'s 40 s for an install.
-/// A hold given back within the wait lets the install go on.
+/// waits for it at most its wait (the lamp's `ASKED_LOCK_WAIT`, here a
+/// short one) once the package is fetched and checked, then refuses busy
+/// with nothing written, as a remove does; with the fetch's own bound that
+/// is under `lamp-cloud`'s 40 s for an install. A hold given back within the
+/// wait lets the install go on.
 #[test]
 fn an_install_waits_for_a_held_folder_only_so_long_then_writes_nothing() {
     use std::time::Instant;
@@ -864,13 +926,14 @@ fn an_install_waits_for_a_held_folder_only_so_long_then_writes_nothing() {
     let held = fs::File::open(&skills).unwrap();
     held.lock().unwrap();
     let (port, _) = serve(vec![ok(&bytes)]);
+    let wait = Duration::from_millis(300);
     let asked = Instant::now();
-    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    let (answer, done) = ask_waiting(&skills, &key_file, port, install(URL), wait);
     let waited = asked.elapsed();
     assert!(!done);
     assert_eq!(refused(&answer), package::BUSY);
     assert!(
-        waited >= package::ASKED_LOCK_WAIT && waited < Duration::from_secs(5),
+        waited >= wait && waited < wait + Duration::from_secs(1),
         "{waited:?}"
     );
     assert_eq!(left(&skills), ["dance"]);
