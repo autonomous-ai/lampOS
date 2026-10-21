@@ -62,7 +62,7 @@ Ready for lamp-voice: no (diagnostic read only; no policy change).
 
 ## 2026-10-21–22 — privacy worker expiry ride — PR #2695
 
-Ready for lamp-voice: no (native Linux gates pending).
+Ready for lamp-voice: yes (both native Linux gates passed; device check with First).
 
 - First builder's 22:15 assignment on #2602, following Eighth's 22:11
   evidence: the worker's own `physical privacy source expired` ends the
@@ -94,10 +94,21 @@ Ready for lamp-voice: no (native Linux gates pending).
   [39641927087](https://github.com/autonomous-ai/lampOS/actions/runs/39641927087)
   and x86 Clippy run
   [39641927106](https://github.com/autonomous-ai/lampOS/actions/runs/39641927106)
-  are running on the PR head.
+  passed for this head. Both used merge checkout `dd8c6a4` with base
+  `b87b3e91ad04b5811fe441efa118773d33416630`. ARM64 built the release
+  binaries and ran 6,222 nextest tests across the selected 12 crates,
+  including their realtime tests: all passed, one Voice journal test
+  reported leaky, 28 skipped. Four doc tests, `relay_signals` and the 12
+  own-harness process tests passed. Every new worker regression passed,
+  with no fixture-precondition retry recorded. The unchanged light-call
+  test passed natively too. The PR retains the host failure and the native
+  journal LEAK and example-name collision warnings.
 - Posted on [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322004474).
   The short-gap tests show denied leases and no admitted frames; they do not
   claim the capture descriptor closed before its existing authority lease.
+- Native results posted on
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322229530),
+  and the PR is out of draft. `cargo clean` removed 26.4 GiB after the gate.
 - No lamp access; the native ARM64 PR run is the target build/test gate.
 
 ## 2026-10-14 — expression — taken
