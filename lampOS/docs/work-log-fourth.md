@@ -5610,6 +5610,46 @@ new head's native gates. #2665 and #2638 are merged.
   on Queue #2602 and continues the current review and native gates;
   another builder's open memory/lean work was not duplicated.
 
+## 2026-10-22, 00:55 ICT: final report head native-green; all silence follow-ups published
+
+Ready for lamp-voice: yes (#2684, #2691, #2697). #2665 and #2638
+are merged.
+
+- **#2684**, exact head `3f40260c7ba1ab7c5fb02f477b4b10efb30a4312`,
+  passed native ARM64 **39645965557** in **11m8s**: **9778 passed,
+  zero failed, 63 skipped**, plus four doc tests, the relay harness
+  and twelve process tests. Workspace Clippy **39645965628** passed
+  in **2m34s**. The existing passing
+  `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`
+  again had a leak diagnostic, retained in the evidence.
+- Artifact **12368212048** is
+  `lampos-arm64-3f40260c7ba1ab7c5fb02f477b4b10efb30a4312`, ZIP SHA-256
+  `1b6ba60435567307da53bef90626608debe381f11fceb9e4934b713e0ca6801d`.
+  Both final native watch processes completed with exit 0; no quiet
+  handle or previous-head run was treated as success. The exact-head
+  gates and counts are posted on the PR and Queue #2602.
+- Independent final reader/CLI inspection found no actionable defect in
+  identity pairing, duplicate exclusion, widened >300 ms arithmetic,
+  bounded input handling, output privacy or partial-evidence exit status.
+  It verified source hashes and existing 11 reader plus four CLI test
+  results; this was read-only, not another Cargo run. The three review
+  P3s remain folded into the one task commit.
+- The **1303.071 ms first launch / 316.480 ms repeat** remains a miss
+  against the one-second reporting target. Native success does not
+  change that observation. The CLI source has no startup network call
+  or worker initialization; that read does not identify the unassigned
+  wall-time cause. Full local counts, base distinctions, earlier first-
+  launch miss and the socket-denied attempt remain in the prior entries
+  and the committed verification README.
+- #2691 and #2697 keep the qualified heads and counts in the preceding
+  entries. All six task/log worktrees are clean. No source changes or
+  speculative runtime policy were added after the final audit.
+- Fourth posted free for the next named code slice after the 00:34
+  request. First still owns the real cue pair; Third owns the six yield
+  cases and their missing original hearing/build/flag context. Fourth
+  has no lamp and made no device/provider request. No implementation
+  remains uncommitted or unpublished.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
