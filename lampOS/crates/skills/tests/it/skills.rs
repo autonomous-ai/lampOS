@@ -6384,6 +6384,9 @@ struct ToolProgram {
     /// Each call to the actions part, in order.
     lights: mpsc::Receiver<String>,
     voice: lamp_bus::Publisher,
+    /// The voice's `voice/heard` publisher: one voice boot until
+    /// [`ToolProgram::restart_voice`].
+    heard: std::sync::Mutex<Option<lamp_bus::Publisher>>,
     _running: Running,
 }
 
@@ -6396,23 +6399,28 @@ impl ToolProgram {
 
     /// `text` heard on `voice/heard` as part of turn `request`.
     fn heard_in(&self, text: &str, request: Option<u64>) {
-        let bus = Bus::new(self._dir.path().join("bus")).unwrap();
-        bus.publisher_declared(
-            lamp_msgs::Speech::TOPICS[0],
-            &lamp_msgs::Speech::declaration(),
-            "voice",
-        )
-        .unwrap()
-        .publish_json(
-            1,
-            &lamp_msgs::Speech {
-                text: text.into(),
-                finished: true,
-                locale: None,
-                request,
-            },
-        )
-        .unwrap();
+        let mut heard = self.heard.lock().unwrap();
+        heard
+            .get_or_insert_with(|| {
+                Bus::new(self._dir.path().join("bus"))
+                    .unwrap()
+                    .publisher_declared(
+                        lamp_msgs::Speech::TOPICS[0],
+                        &lamp_msgs::Speech::declaration(),
+                        "voice",
+                    )
+                    .unwrap()
+            })
+            .publish_json(
+                1,
+                &lamp_msgs::Speech {
+                    text: text.into(),
+                    finished: true,
+                    locale: None,
+                    request,
+                },
+            )
+            .unwrap();
     }
 
     /// With the skill `name` of `toml` and its `shows/`, the light shown
@@ -6499,8 +6507,15 @@ impl ToolProgram {
             mood,
             lights,
             voice,
+            heard: std::sync::Mutex::new(None),
             _running: running,
         }
+    }
+
+    /// The voice starts again: its next `voice/heard` is another boot, and
+    /// it numbers its turns from 1 again.
+    fn restart_voice(&self) {
+        self.heard.lock().unwrap().take();
     }
 
     /// The model's call of `name` with `args`, as the voice makes it.
@@ -7185,6 +7200,26 @@ fn a_line_with_no_words_does_not_end_a_search() {
     assert!(!program.poses(Duration::from_secs(1)).is_empty());
     // Words end it.
     program.heard("stop");
+    program.clock.skip(Duration::from_millis(300));
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(600)),
+        ["blue"]
+    );
+}
+
+/// lamp-c0a4 (#1871, 21 Oct): the voice started again during a search's
+/// life, numbering its turns from 1, while lamp-skills ran on. A person's
+/// words of that new boot end the search, though their turn number is
+/// lower than the one that asked.
+#[test]
+fn words_after_the_voice_starts_again_end_a_search() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    program.heard_in("lamp, can you look for my keys", Some(7));
+    assert_eq!(program.call("look_for", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["white"]);
+    assert!(!program.poses(Duration::from_secs(1)).is_empty());
+    program.restart_voice();
+    program.heard_in("never mind", Some(1));
     program.clock.skip(Duration::from_millis(300));
     assert_eq!(
         program.colours_within(1, Duration::from_millis(600)),
