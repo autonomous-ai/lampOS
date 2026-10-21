@@ -21,8 +21,8 @@ of the lines addressed to a similar name.
 
 ## The process
 
-    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--not-while-speaking on|off] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
-    lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
+    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--not-while-speaking on|off] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
+    lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -31,6 +31,7 @@ of the lines addressed to a similar name.
 | `--least` | The score from which the name counts as heard, from 0.5 to 1 | 0.9 |
 | `--not-while-speaking` | `on`: a hearing that began while `voice/state` said `speaking`, or within 0.6 s after, is not said ("Not its own voice") | off: every hearing is said |
 | `--quiet-below` | A level in dBFS, from -90 to -30: the models rest while the last 2.03 s held no sample this loud ("Resting while the room is quiet") | off: the models always run |
+| `--step-ms` | 80, 40, 20 or 10: a step's score is the highest of 80 / `--step-ms` grids of steps, each this much later than the one before, so a name that falls between two steps of 80 ms is scored where it lies ("Where the steps fall", #694). The models' work grows about as many times | 80: one grid, as always |
 | `--rescue-model` | A second name model of `name.onnx`'s shape, outside the models directory: where `name.onnx` reached `--rescue-gate` at a step or in the 1 s before it, that step's score is the higher of the two ("A second model to rescue a call", #1546). Refused unless its SHA-256 is `--rescue-sha256` | off: no second model |
 | `--rescue-sha256` | The rescue model's SHA-256, 64 lower-case hex digits; required with `--rescue-model` | — |
 | `--rescue-gate` | A score from 0.05 to 0.95 | 0.5 |
@@ -101,6 +102,41 @@ classifier trained on generated speech of people saying "Hey Lamp" and
 "Lamp ơi", and of people saying other things. The files are not in the
 repository; they are installed beside the program, and
 `lamp-name check` runs them over a file of sound where they are.
+
+### Where the steps fall (`--step-ms`, #694)
+
+The second model takes 76 frames at a time, a new one every 8 frames
+(80 ms), so where those steps fall on a word moves its score, and by a lot
+for a call near the bar. On lamp-75c9's own microphone (21 Oct, a laptop
+playing "Hey Lamp, my name is Alex." in Piper voices, the lamp's
+`mic2/audio` recorded), each line moved by 0, 10, … 70 ms scored, at 80 ms:
+one 0.82 0.04 0.10 0.09 **0.96** 0.28 0.14 0.09; another 0.85 0.63 **0.97**
+0.92 0.96 0.56 0.70 0.24. A strong call is above 0.97 wherever it falls.
+That is what lost lamp-4ace's 03:11 call, not the 10–90 ms of the first
+word the microphone path clips (#694).
+
+With `--step-ms`, `80 / STEP_MS` grids run on the same sound, each
+`--step-ms` later than the one before (`hear::Grids`). A step's score is the
+highest of the first grid's for it and each later grid's newest, which is
+of the step before and whole before the first grid's. So there is still
+one score every 80 ms, and the hearing, the rescue's gate and the minute
+line count steps as before; the first step after a start has the first
+grid's alone. Frames are 10 ms, so only `--step-ms 10` tries every place a
+word can fall; 20 tries every other one.
+
+The 15 lines, each at the 8 places (hits at 0.9, of 40 a condition):
+
+| `--step-ms` | after a quiet minute | 1 s after another line | after the lamp's reply | `check` on a laptop, ms a step |
+|---|---|---|---|---|
+| 80 | 27 | 15 | 38 | 4.6 |
+| 40 | 30 | 20 | 40 | 6.6 |
+| 20 | 32 | 24 | 40 | 13.4 |
+| 10 | 32 | 32 | 40 | 22.9 |
+
+At 10 the score no longer depends on where the word falls; the 8 misses
+left in each of the first two are one voice the model scores 0.65–0.80
+wherever it lies, whose clean file scores 0.84: its reach, not the step.
+Off (80) until its cost is measured on a lamp beside a voice turn.
 
 A name that is said raises the score for several steps in a row. That is
 one hearing (`src/said.rs`): it is said once, when the score falls again

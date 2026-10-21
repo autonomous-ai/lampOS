@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
@@ -24,6 +24,9 @@ const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs
   --least       the score from which the name counts as heard, 0.5 to 1 (0.9)
   --quiet-below a level in dBFS, -90 to -30: the models rest while the last 2.03 s held
                 no sample this loud, and give the same scores when one comes (off)
+  --step-ms     80, 40, 20 or 10: a step's score is the highest of 80 / STEP_MS grids, each this
+                much later than the one before, so a name between two steps of 80 ms is
+                scored where it lies (#694); the models' work grows as many times (80)
   --stop-least  also run stop.onnx (beside the others, SHA-256 checked) on the same numbers,
                 and publish stop/heard at the step its score first reaches this, 0.5 to 1;
                 then nothing new for 1 s (#828, docs/stop-word.md). Off unless set
@@ -56,6 +59,8 @@ struct Arguments {
     microphone: String,
     least: f32,
     quiet_below: Option<f32>,
+    /// `--step-ms`: the grids a step's score is the highest of (`hear::Grids`).
+    step_ms: usize,
     /// `--stop-least`: the stop model's bar, and with it the model.
     stop_least: Option<f32>,
     /// `--rescue-model`, its SHA-256 and its gate.
@@ -136,7 +141,7 @@ impl RescueGiven {
 
 fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, String> {
     let (mut models, mut microphone, mut least, mut bus) = (None, None, None, None);
-    let (mut quiet_below, mut stop_least) = (None, None);
+    let (mut quiet_below, mut stop_least, mut step_ms) = (None, None, None);
     let mut rescue = RescueGiven::default();
     let mut not_while_speaking = None;
     while let Some(option) = arguments.next() {
@@ -174,6 +179,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             }
             "--quiet-below" => quiet_below.replace(bar(&value)?).is_some(),
             "--stop-least" => stop_least.replace(stop_bar(&value)?).is_some(),
+            "--step-ms" => step_ms.replace(step_of(&value)?).is_some(),
             "--not-while-speaking" => not_while_speaking
                 .replace(match value.as_str() {
                     "on" => true,
@@ -199,11 +205,21 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
         microphone: microphone.unwrap_or_else(|| "mic2".to_owned()),
         least: least.unwrap_or(DEFAULT_LEAST),
         quiet_below,
+        step_ms: step_ms.unwrap_or(80),
         stop_least,
         rescue: rescue.done()?,
         not_while_speaking: not_while_speaking.unwrap_or(false),
         bus,
     }))
+}
+
+/// `--step-ms`'s step: one of `hear::STEPS_MS`.
+fn step_of(value: &str) -> Result<usize, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|ms| lamp_name::hear::STEPS_MS.contains(ms))
+        .ok_or_else(|| "--step-ms is 80, 40, 20 or 10".to_owned())
 }
 
 /// `--stop-least`'s score.
@@ -299,7 +315,9 @@ fn renew(heard: &mut Publisher, rising: &mut Publisher) {
 
 fn run(arguments: &Arguments) -> io::Result<()> {
     let started = Instant::now();
-    let mut models = Hearer::load(&arguments.models).map_err(io::Error::other)?;
+    let mut models = Hearer::load(&arguments.models)
+        .and_then(|models| models.with_step_ms(arguments.step_ms))
+        .map_err(io::Error::other)?;
     if arguments.stop_least.is_some() {
         models = models
             .with_stop(&arguments.models)
@@ -347,13 +365,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         .transpose()?;
     let mut speaking = Speaking::default();
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} step_ms={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
         arguments.least,
         arguments
             .quiet_below
             .map_or("off".to_owned(), |db| format!("{db}dBFS")),
+        arguments.step_ms,
         arguments
             .stop_least
             .map_or("off".to_owned(), |score| score.to_string()),
@@ -611,12 +630,15 @@ fn samples_of(bytes: &[u8]) -> Vec<i16> {
 fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
     let CheckOptions {
         quiet_below,
+        step_ms,
         stop_least,
         rescue: given,
         files,
     } = options;
     let directory = std::path::Path::new(models);
-    let mut loaded = Hearer::load(directory).map_err(io::Error::other)?;
+    let mut loaded = Hearer::load(directory)
+        .and_then(|loaded| loaded.with_step_ms(*step_ms))
+        .map_err(io::Error::other)?;
     if stop_least.is_some() {
         loaded = loaded.with_stop(directory).map_err(io::Error::other)?;
     }
@@ -685,15 +707,18 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
 #[derive(Debug, PartialEq)]
 struct CheckOptions<'a> {
     quiet_below: Option<f32>,
+    step_ms: usize,
     stop_least: Option<f32>,
     rescue: Option<RescueModel>,
     files: &'a [String],
 }
 
-/// `check`'s options before its files: `--quiet-below`, `--stop-least` and
-/// the three `--rescue-*`, each at most once, in any order.
+/// `check`'s options before its files: `--quiet-below`, `--step-ms`,
+/// `--stop-least` and the three `--rescue-*`, each at most once, in any
+/// order.
 fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
     let (mut quiet_below, mut stop_least, mut files) = (None, None, rest);
+    let mut step_ms = None;
     let mut rescue = RescueGiven::default();
     loop {
         match files {
@@ -705,6 +730,10 @@ fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
                 stop_least = Some(stop_bar(value)?);
                 files = more;
             }
+            [option, value, more @ ..] if option == "--step-ms" && step_ms.is_none() => {
+                step_ms = Some(step_of(value)?);
+                files = more;
+            }
             [option, value, more @ ..] if option.starts_with("--rescue-") => {
                 if !rescue.take(option, value)? {
                     return Err(format!("unknown option {option}"));
@@ -714,6 +743,7 @@ fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
             _ => {
                 return Ok(CheckOptions {
                     quiet_below,
+                    step_ms: step_ms.unwrap_or(80),
                     stop_least,
                     rescue: rescue.done()?,
                     files,
@@ -828,6 +858,7 @@ mod tests {
                 microphone: "mic2".into(),
                 least: 0.9,
                 quiet_below: None,
+                step_ms: 80,
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
@@ -843,6 +874,7 @@ mod tests {
                 microphone: "mic1".into(),
                 least: 0.999,
                 quiet_below: None,
+                step_ms: 80,
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
@@ -892,6 +924,7 @@ mod tests {
             check_options(&plain).unwrap(),
             CheckOptions {
                 quiet_below: None,
+                step_ms: 80,
                 stop_least: None,
                 rescue: None,
                 files: &plain[..]
@@ -902,6 +935,35 @@ mod tests {
         // to read as an option.
         let twice = words("--stop-least 0.9 --stop-least 0.95 a.wav");
         assert_eq!(check_options(&twice).unwrap().files.len(), 3);
+    }
+
+    /// `--step-ms` (#694): 80 unless given, 40, 20 or 10 when it is, in the
+    /// program and in `check`; any other step is refused.
+    #[test]
+    fn the_step_is_read_in_the_program_and_in_check() {
+        assert_eq!(of("--models /m --step-ms 40").unwrap().unwrap().step_ms, 40);
+        assert_eq!(of("--step-ms 20 --models /m").unwrap().unwrap().step_ms, 20);
+        assert_eq!(of("--models /m --step-ms 10").unwrap().unwrap().step_ms, 10);
+        assert_eq!(
+            of("--models /m --step-ms 30").unwrap_err(),
+            "--step-ms is 80, 40, 20 or 10"
+        );
+        assert_eq!(
+            of("--models /m --step-ms 40 --step-ms 40").unwrap_err(),
+            "--step-ms was given twice"
+        );
+        let words = |text: &str| {
+            text.split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        };
+        let given = words("--step-ms 40 --quiet-below -50 a.wav");
+        let read = check_options(&given).unwrap();
+        assert_eq!(
+            (read.step_ms, read.quiet_below, read.files.len()),
+            (40, Some(-50.0), 1)
+        );
+        assert!(check_options(&words("--step-ms 30 a.wav")).is_err());
     }
 
     /// `--rescue-model` (#1546): its SHA-256 is required with it, the gate
