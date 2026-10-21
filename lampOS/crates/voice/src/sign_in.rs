@@ -184,7 +184,9 @@ pub fn tools() -> Vec<Tool> {
             description: "Sign this lamp in to the person's Harness, so it can hand work to \
                           their own computer. Call it only when the person asks to sign the lamp \
                           in, or to set up hand-overs to their computer. It gives a code to say \
-                          and where they type it."
+                          and where they type it. If they ask for the code again, call it again: \
+                          while the sign-in is open it gives back the same code. Never say a \
+                          sign-in code's digits from memory."
                 .into(),
             parameters: None,
             silent: false,
@@ -651,12 +653,15 @@ pub fn leaving_text(request: Option<u64>, text: String) -> String {
     let Ok(mut marked) = MARKED.lock() else {
         return text;
     };
-    if !marked.requests.contains(&request)
-        || text == SAID_LINE
-        || text == HELD_LINE
-        || text.is_empty()
-    {
+    if text == SAID_LINE || text == HELD_LINE || text.is_empty() {
         return text;
+    }
+    // Not marked: the model may still say the code or the account from
+    // what it guesses or recalls ("Three one five eight three" on
+    // lamp-75c9, 21 Oct, asked for the code again in a request of its
+    // own): taken out as from the person's words (#2602 finding 5).
+    if !marked.requests.contains(&request) {
+        return scrub_piece(&text);
     }
     if !marked.lined.insert(request) {
         String::new()
@@ -925,6 +930,13 @@ mod tests {
 
     #[test]
     fn the_code_is_said_in_two_groups_and_the_email_slowly() {
+        // Said again only through the tool, never from memory (#2602
+        // finding 5).
+        let start = &tools()[0].description;
+        assert!(
+            start.contains("call it again") && start.contains("Never say"),
+            "{start}"
+        );
         assert_eq!(code_to_say("12345678"), "1 2 3 4, 5 6 7 8");
         assert_eq!(code_to_say("1234567"), "1 2 3 4, 5 6 7");
         assert_eq!(code_to_say("1234"), "1 2 3 4");
@@ -1296,6 +1308,13 @@ mod tests {
         assert_eq!(lamp(8, "Shall I sign in as planted dash"), SAID_LINE);
         assert_eq!(lamp(8, " jarvis at example dot invalid?"), "");
         assert_eq!(lamp(9, "It's 10 past 4."), "It's 10 past 4.");
+        // An unmarked request that says the code anyway (asked for it again,
+        // lamp-75c9, 21 Oct) has it taken out, as the person's words.
+        assert_eq!(lamp(10, "Four eight two one, three nine"), "a sign-in code");
+        assert_eq!(
+            lamp(10, " at planted-jarvis, yes."),
+            " at their account, yes."
+        );
         // The person's words, in pieces, in all their forms.
         for (piece, kept) in [
             ("It said 4 8 2", "It said a sign-in code"),

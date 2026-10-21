@@ -1617,8 +1617,14 @@ them and before they are sent (`sign_in::leaving`, `leaving_text`):
   same conversation under a new session number, so it is held too; a
   marked request cut before its first word holds its session as well. Only
   a fresh connection never heard it, so its words are kept again. The second route needs none of this: its
-  history has only the one line, so it can't say the code again without
-  `sign_in_computer`, which marks its request;
+  history has only the one line;
+- **the lamp's words of any other request** are scrubbed as the person's
+  are (below). On lamp-75c9 on 21 October, asked "what was the sign-in code
+  again?" in a request of its own, the second route's model said "Three one
+  five eight three", kept as said (#2602 finding 5). `sign_in_computer`'s
+  description now tells the model to call it again for the code, which
+  gives back the open sign-in's code in a marked request, and never to say
+  a code's digits from memory;
 - **the person's words**: any run of three or more of the code's digits in
   its order, as digits ("4 8 2", "48213907") or words ("four eight two"),
   says "a sign-in code"; the account's name and its domain, each as written
