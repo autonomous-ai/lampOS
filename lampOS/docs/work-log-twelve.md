@@ -492,3 +492,5 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   missing test is #2494. #2226 shown on lamp-c0a4's Live route: forget →
   journal stopped → a fresh session 3 min later on a reconnect → resumed →
   next exchange journalled. Evidence on #2491; c0a4 put back.
+- #2494 merged into lamp-voice (bd43346de); its worktree removed. c0a4 rows
+  booked 15:45–17:30 on #1722, after Thirteen.
