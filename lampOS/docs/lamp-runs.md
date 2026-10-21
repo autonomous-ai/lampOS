@@ -115,13 +115,13 @@ Seventh borrows it this morning. Fifth offered (07:4x on #1722) to take runs the
 |---|---|---|---|---|
 | `LAMP_SECOND_SKILL_LOOK` and the "Look for my keys" row | #941, #1871 | ~~"Lamp, where are my keys?" with look-for-things installed: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees~~ (the first builder's four cases passed on lamp-c0a4, 21 Oct 13:3x, Thirteen on #1871: found at the first look, found to one side, not found and stopped, ended by "stop"; a push wasn't shown, and c0a4's side looks don't turn the base, as its gaze isn't measured). | person at the arm | #1712 |
 | `LAMP_ADDRESSED` | #792 | Played on a lamp that faces its seat (lamp-4ace's seat is sideways, #763). | nothing (played) | #1712 |
-| `LAMP_HEAD_TOUCH` | #849 | Tap to speaker under 150 ms, the hum by ear, `head_gap_ms` recorded. | a hand on the head | #1712 |
-| `LAMP_HEAD_TAP_CUE_DBFS` | #849 | The tap's hum level tuned by ear (-35 is unmeasured). | a hand on the head; an ear | #1712 |
-| `lamp-expression --head-touch` | #849 | Shown with the voice's `LAMP_HEAD_TOUCH`. | a hand on the head | lamp-voice |
-| `LAMP_RESTORED_MUTE` | #997 | `kill -9` while listening, then one head tap opens it; a held mute stays. | a hand on the head | #1712 |
+| `LAMP_HEAD_TOUCH` | #849 | ~~Tap to speaker under 150 ms, the hum by ear, `head_gap_ms` recorded~~ (passed on lamp-c0a4, 21 Oct 14:5x, Thirteen on #849: the tap's acquisition to the hum's first write 14.1 ms). | a hand on the head | #1712 |
+| `LAMP_HEAD_TAP_CUE_DBFS` | #849 | The tap's hum level tuned by ear (-35 is unmeasured). Too quiet at -35 dBFS on lamp-c0a4 (Thirteen on #849, 21 Oct 14:5x): a louder level is still to be found. | a hand on the head; an ear | #1712 |
+| `lamp-expression --head-touch` | #849 | ~~Shown with the voice's `LAMP_HEAD_TOUCH`~~ (passed on lamp-c0a4, 21 Oct 14:5x, Thirteen on #849: the person saw the lamp look up). | a hand on the head | lamp-voice |
+| `LAMP_RESTORED_MUTE` | #997 | ~~`kill -9` while listening, then one head tap opens it; a held mute stays~~ (passed on lamp-c0a4, 21 Oct 15:1x, Thirteen on #997: back muted, one tap to listening in about 370 ms, a sleep mute kept). | a hand on the head | #1712 |
 | `lamp-voice --controls-mute` | commit 5f9914314 | Once the two above pass: a crash brings the voice up muted and a tap opens it. | a hand on the head | #1712 |
 | `LAMP_GUARD_NEVER_LISTENED` | #1567 | `arecord -D hw:device_micro2 …` held across a voice restart comes up unmuted with the line; the capture worker killed while listening still restores muted. | nothing | #1712 |
-| `LAMP_RING_ASLEEP` | #1025 | Sleep by a hand on the head, photographed. | a hand on the head; a photo | #1712 |
+| `LAMP_RING_ASLEEP` | #1025 | Sleep by a hand on the head, photographed. Shown by eye on lamp-c0a4 (Thirteen on #1025, 21 Oct 15:0x: a dim warm ring asleep, hold to sleep and tap to wake work); the photo is still owed. | a hand on the head; a photo | #1712 |
 | `LAMP_STOP_TOLD` | #1148 | A hand or head stop, then the next request is told it was stopped. | a hand on the head | #1712 |
 | `LAMP_CONTROLS_WAIT` | #705 | `pidstat -t -w` on `serve` before and after; a press or a head touch still stops at once. | a hand on the head | #1712 |
 | `LAMP_CAPTURE_WAIT` | #705 | The same build with and without, `LAMP_STALLS=on`: `pidstat` on the capture worker with nobody talking, then four talking turns with no stall line and no lapsed lease. | nothing (played) | #1712 |
