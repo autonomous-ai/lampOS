@@ -5294,6 +5294,62 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2638's rerun** on its base was green, and Ten's played run passed. It now needs a rebase after #2577.
 - **Paused** at the owner's word, until they say resume. Next: #2638's rebase, then who was here's words.
 
+## 2026-10-21, 23:1x ICT: resumed by the owner; #2665 and #2638 folded, rebased and pushed; continuing the silences
+
+Ready for lamp-voice: no — the new heads' native ARM64 and x86 Clippy gates are running.
+
+- The owner lifted the pause and confirmed joining.md's builder rule:
+  commit and push Fourth's own branches without asking. Both exact-lease
+  force-pushes succeeded; no replacement PR was needed.
+- **#2665**, `179d587612610a55d19f3e2957a35ebf3ba36475`, on
+  `bc2f62fca65dac6f01fcf91fec878fb3eb8d5eee`: the review P2 is folded into
+  its one commit. A ready wait sound leaves three seconds after its
+  configured time, so 3000 gives a 6000 ms total deadline and 4000 gives
+  7000 ms; the default 1500/4500 ms is unchanged. Without a ready clip,
+  the bound is the later of the configured cue and 3000 ms. The P3 test
+  comment is corrected too. The folded patch's rebase is `=`.
+  - Retained Mac gate: **3864 passed, 0 failed, 14 existing ignored**;
+    fmt, workspace Clippy with `-D warnings` and workspace build passed.
+    Linux ARM64 cross-target Clippy/build passed. The old-deadline
+    mutation fails the new 4000 ms test; cancelling at 5000 ms drops the
+    stream on the next scheduler yield. These are paused-clock tests,
+    not acoustic measurements.
+  - Post-rebase fmt and six focused cue tests passed. New native ARM64
+    run **39631878567**, x86 Clippy **39631878521**.
+- **#2638**, `79e629968d5fc6ea757adb3dd805c51d63573c96`, on the same base:
+  #2577's nudge and tone keep independent input/event streams, ordering,
+  shared caps and the nudge's fade/deadline. Two regressions cover their
+  simultaneous delivery in both orders and tone on/off. The known lively
+  voice during a quiet remains the separate P3.
+  - Retained Mac gate: **725 passed, 0 failed, 2 existing ignored**;
+    Linux mood **117/0/2**, Linux ARM64 cross-build, fmt/workspace
+    Clippy/build passed. The local bus timing probe passed: 101 cues,
+    p95 26.688 ms from authored cue publication to matching state,
+    against 50 ms; spawn to first state 627.892 ms. No new lamp result.
+  - Post-rebase fmt and mood **117/0/2** passed; all seven mood Rust files
+    match the validated source. New native ARM64 **39632139928**, x86
+    Clippy **39632140012**. The first focused rerun needed local Unix
+    socket permission; after that permission it passed.
+- Exact commands and full local logs are retained in
+  `/private/tmp/fourth-cue-review-20261021-checks/` and
+  `/private/tmp/fourth-mood-reconcile-20261021/`; the counts and heads
+  are on their PRs and Queue #2602.
+- **Silences mid-answer, taken again** (the first builder's 19:4x task):
+  the raw terminal events correct the earlier denominator. Of 46 gaps
+  over 300 ms, **21 resumed and 25 were cancelled**. The earlier 24
+  counted only cancellations matched to a yield and missed one cancelled
+  gap with no journal turn. The 21 resumed comprise 13 cue gaps, six
+  yielded then resumed (Third's), one slow second speech piece on a reused
+  connection and one tool-round gap. No new-connection cause was found.
+  - Next is a counts-only Rust `lamp-voice-eval answer-gaps` reader for
+    the lamp comparison: separate resumed/cancelled/incomplete evidence
+    and distinct gap-bearing replies, without spoken content or an
+    invented total-answer denominator. The slow-second-piece test path
+    is being checked too. The before/after lamp run stays with the first
+    builder; Fourth has no lamp.
+  - Who-was-here remains Seventh's, and the own-line continuation fix
+    remains El's, as assigned while Fourth was paused.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
