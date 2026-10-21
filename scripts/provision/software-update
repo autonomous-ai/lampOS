@@ -13,6 +13,8 @@ HAL_DIR="/opt/hal"
 HAL_UV_MIN="${HAL_UV_MIN:-0.6.6}"
 HAL_UV_PIN="${HAL_UV_PIN:-0.12.23}"
 HAL_UV_HOME="${HAL_UV_HOME:-/usr/local/lib/autonomous/uv}"
+# HAL reads ROBOT.md from 0.1.2; older HAL only opens DEVICE.md and will not start without it.
+DEVICE_HAL_MIN="${DEVICE_HAL_MIN:-0.1.2}"
 
 # The helper stays embedded so updater refresh remains a single-file operation.
 service_transaction() {
@@ -1205,6 +1207,23 @@ PY
   fi
 }
 
+# Refuse a profile the installed HAL cannot load, before anything is stopped or replaced.
+# A profile that still ships DEVICE.md, or a device without HAL, has nothing to break.
+device_profile_hal_compatible() {
+  local profile="$1" installed
+  [ ! -f "$profile/DEVICE.md" ] || return 0
+  [ -d "$HAL_DIR" ] || return 0
+  installed=$(cli_semver <"$HAL_DIR/VERSION_HAL" 2>/dev/null || true)
+  if [ -z "$installed" ]; then
+    echo "Device profile needs HAL >= $DEVICE_HAL_MIN, but the installed HAL version is unreadable; profile unchanged" >&2
+    return 1
+  fi
+  if [ "$(printf '%s\n%s\n' "$DEVICE_HAL_MIN" "$installed" | sort -V | head -n 1)" != "$DEVICE_HAL_MIN" ]; then
+    echo "Device profile needs HAL >= $DEVICE_HAL_MIN (ROBOT.md); installed HAL $installed reads only DEVICE.md. Update HAL first; profile unchanged" >&2
+    return 1
+  fi
+}
+
 check_device_profile() {
   progress_report checking
   [ -f "$DEVICE_DEST/ROBOT.md" ] || return 1
@@ -2082,6 +2101,7 @@ elif [ "$APP" = "device" ]; then
   unzip -o -q "$ZIP_TMP" -d "$DIR_TMP"
   [ -f "$DIR_TMP/ROBOT.md" ] || { echo "No ROBOT.md in device profile"; exit 1; }
   [ -d "$DEST" ] || { echo "No installed device profile at $DEST"; exit 1; }
+  device_profile_hal_compatible "$DIR_TMP" || exit 1
   HARDWARE_PROFILE=""
   [ ! -e /etc/autonomous/hardware-profile ] || HARDWARE_PROFILE=$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' /etc/autonomous/hardware-profile) \
     || { echo "Cannot read hardware profile selection" >&2; exit 1; }

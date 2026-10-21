@@ -390,6 +390,15 @@ profile thất bại. Check lỗi sẽ tự phục hồi profile trước đó v
 thái service cũ. Dùng `software-update rollback device` khi operator rollback;
 version profile bị loại sau đó sẽ bị chặn.
 
+Trước khi dừng bất cứ thứ gì, updater kiểm tra HAL đang cài có load được profile
+mới không. HAL đọc `ROBOT.md` từ 0.1.2 (`DEVICE_HAL_MIN`); HAL cũ hơn chỉ mở
+`DEVICE.md` và không khởi động được nếu thiếu file này. Vì vậy profile không có
+`DEVICE.md` bị từ chối khi `/opt/hal/VERSION_HAL` thấp hơn 0.1.2 hoặc không đọc
+được: update thất bại với "Device profile needs HAL >= 0.1.2 … Update HAL first;
+profile unchanged", và không service, file hay recovery journal nào bị đụng tới.
+Mỗi lần thử vẫn tải lại package cho tới khi HAL được update. Máy không có
+`/opt/hal`, hoặc profile vẫn kèm `DEVICE.md`, không bị ảnh hưởng.
+
 ### Override phần cứng tùy chọn
 
 OS đọc tên trên một dòng trong `/etc/autonomous/hardware-profile`. Thiếu file,

@@ -398,6 +398,15 @@ fails the profile update. A failed check restores the previous profile and
 its prior service state automatically. Use `software-update rollback device` for
 an operator rollback; the rejected device-profile version is then blocked.
 
+Before stopping anything, the updater checks that the installed HAL can load the
+new profile. HAL reads `ROBOT.md` from 0.1.2 (`DEVICE_HAL_MIN`); older HAL opens
+only `DEVICE.md` and does not start without it. A profile without `DEVICE.md` is
+therefore refused when `/opt/hal/VERSION_HAL` is below 0.1.2 or unreadable: the
+update fails with "Device profile needs HAL >= 0.1.2 … Update HAL first; profile
+unchanged", and no service, file or recovery journal is touched. The download is
+repeated on each attempt until HAL is updated. A device without `/opt/hal`, or a
+profile that still ships `DEVICE.md`, is not affected.
+
 ### Optional hardware overrides
 
 The OS reads the single-line name in `/etc/autonomous/hardware-profile`.
