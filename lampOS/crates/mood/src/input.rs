@@ -1,11 +1,11 @@
 //! Bounded, metadata-only bus inputs. This adapter performs no I/O and keeps
 //! no transcript, face list, sensor recording, or durable user history.
-use crate::engine::{Event, EventKind, FaceTarget};
+use crate::engine::{Event, EventKind, FaceTarget, ToneKind, tone_kind};
 use lamp_bus::{Declaration, Kind, Message};
 use lamp_msgs::{
     AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, HumanFamiliar,
     HumanSeems, MoodNudge, NameHeard, ScheduleDue, SeemsKind, Speech, SuddenSound, Voice,
-    VoiceState,
+    VoiceState, VoiceTone,
 };
 use std::{collections::BTreeSet, fmt};
 
@@ -40,7 +40,7 @@ impl InputSpec {
     }
 }
 
-pub const INPUTS: [InputSpec; 12] = [
+pub const INPUTS: [InputSpec; 13] = [
     InputSpec {
         topic: VoiceState::TOPIC,
         type_name: VoiceState::TYPE,
@@ -144,10 +144,23 @@ pub const INPUTS: [InputSpec; 12] = [
         source: "addons",
         max_age_ms: 3_000,
     },
+    // How a line sounded (#1722): once a line, when its words come, good
+    // for 5 s. Taken only with `LAMP_MOOD_TONE=on`
+    // ([`InputAdapter::with_tone`]).
+    InputSpec {
+        topic: VoiceTone::TOPIC,
+        type_name: VoiceTone::TYPE,
+        version: VoiceTone::VERSION,
+        kind: Kind::Event,
+        source: "voice",
+        max_age_ms: 5_000,
+    },
 ];
 
 /// The switch for how the near face seems as an input (#1671): `on` only.
 pub const SEEMS_ENVIRONMENT: &str = "LAMP_MOOD_SEEMS";
+/// The switch for how a line sounded as an input (#1722): `on` only.
+pub const TONE_ENVIRONMENT: &str = "LAMP_MOOD_TONE";
 
 /// Reasons contain no payload values or words and are safe to count. A failed
 /// source is optional: the runtime leaves the other inputs running.
@@ -258,6 +271,8 @@ enum Payload {
     Familiar(HumanFamiliar),
     Seems(SeemsKind),
     Nudge(MoodNudge),
+    /// What a line's tone counts as, if anything: only the kind is kept.
+    Tone(Option<ToneKind>),
 }
 
 impl Payload {
@@ -288,6 +303,8 @@ pub struct InputAdapter {
     counts: InputCounts,
     /// How the near face seems is taken (`LAMP_MOOD_SEEMS=on`).
     seems: bool,
+    /// How a line sounded is taken (`LAMP_MOOD_TONE=on`).
+    tone: bool,
 }
 
 impl InputAdapter {
@@ -308,6 +325,7 @@ impl InputAdapter {
             reminders_exhausted: false,
             counts: InputCounts::default(),
             seems: false,
+            tone: false,
         })
     }
 
@@ -316,6 +334,14 @@ impl InputAdapter {
     /// it is read.
     pub fn with_seems(mut self, on: bool) -> Self {
         self.seems = on;
+        self
+    }
+
+    /// Take how a line sounded (#1722, `LAMP_MOOD_TONE=on`); without it the
+    /// runtime doesn't subscribe, and any message is ignored before it is
+    /// read.
+    pub fn with_tone(mut self, on: bool) -> Self {
+        self.tone = on;
         self
     }
 
@@ -383,7 +409,9 @@ impl InputAdapter {
             .position(|spec| spec.topic == message.header.topic)
             .ok_or(InputError::UnknownTopic)?;
         let spec = INPUTS[index];
-        if spec.topic == HumanSeems::TOPIC && !self.seems {
+        if (spec.topic == HumanSeems::TOPIC && !self.seems)
+            || (spec.topic == VoiceTone::TOPIC && !self.tone)
+        {
             return Ok(Vec::new());
         }
         let (mut observed_us, mut valid_until_us) = envelope(message, spec, now_us, now_unix_ms)?;
@@ -540,6 +568,7 @@ impl InputAdapter {
             Payload::Seems(kind) => Some(EventKind::Seems(
                 (kind != SeemsKind::Unsure).then_some(kind),
             )),
+            Payload::Tone(kind) => kind.map(EventKind::Tone),
             Payload::Name(value) => (value.score >= 0.9).then_some(EventKind::Name),
             Payload::Nudge(value) => Some(EventKind::Nudge {
                 energy_milli: (value.energy * 1_000.0).round() as i16,
@@ -733,6 +762,19 @@ fn parse(message: &Message, index: usize) -> Result<Payload, InputError> {
             let value: MoodNudge = message.parse().map_err(malformed)?;
             value.check().map_err(|_| InputError::InvalidPayload)?;
             Payload::Nudge(value)
+        }
+        12 => {
+            // Numbers in their ranges, or nothing; the request and the
+            // numbers go no further than the kind.
+            let value: VoiceTone = message.parse().map_err(malformed)?;
+            let within = |value: f32, low: f32| value.is_finite() && (low..=1.0).contains(&value);
+            if !within(value.arousal, -1.0)
+                || !within(value.sure, 0.0)
+                || value.valence.is_some_and(|valence| !within(valence, -1.0))
+            {
+                return Err(InputError::InvalidPayload);
+            }
+            Payload::Tone(tone_kind(value.arousal, value.sure, value.valence))
         }
         _ => return Err(InputError::UnknownTopic),
     })

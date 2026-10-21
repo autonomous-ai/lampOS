@@ -29,7 +29,7 @@ const WARMTH_CAP: f64 = 0.85;
 const AIR_REDUCTION: f64 = 0.08;
 const SLEEP_THRESHOLD: f64 = 0.25;
 const CHANGE_DELTA: f64 = 0.01;
-const EVENT_STREAMS: usize = 14;
+const EVENT_STREAMS: usize = 15;
 /// How someone near seems (#1671, `LAMP_MOOD_SEEMS`): small, like a pet's,
 /// and nothing kept of anyone. A smile is two `positive` reads in a row
 /// (about 4 s); someone low, three `negative` (about 6 s).
@@ -44,6 +44,45 @@ pub const SMILE_COOLDOWN_US: u64 = 120 * SECOND_US;
 /// energy a step lower, unless they smile or nobody is near.
 pub const QUIET_US: u64 = 2 * MINUTE_US;
 const QUIET_REDUCTION: f64 = 0.10;
+/// How a line sounded, from the voice's `voice/tone` (`LAMP_MOOD_TONE`):
+/// glad words count as a smile, down words as someone low, and a sure,
+/// lively voice with neither as half a smile's energy and no warmth. Every
+/// brightening shares the smile's cooldown, so a smile and a glad line
+/// together add once.
+pub const TONE_GLAD: f32 = 0.5;
+pub const TONE_DOWN: f32 = -0.5;
+/// A glad line in a flat, calm voice, surely read, isn't taken for glad.
+pub const TONE_FLAT: f32 = -0.3;
+pub const TONE_LIVELY: f32 = 0.6;
+/// How sure the voice must be of its arousal for it to count.
+pub const TONE_SURE: f32 = 0.6;
+const LIVELY_ENERGY: f64 = SMILE_ENERGY / 2.0;
+
+/// What a line's tone counts as, if anything.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToneKind {
+    Glad,
+    Low,
+    Lively,
+}
+
+/// A line's arousal (calm -1 to lively +1), how sure of it, and its words'
+/// valence (down -1 to glad +1), as `voice/tone` tells them, against the
+/// bars: down words are low, glad words glad unless the voice was surely
+/// flat, and with no such words a surely lively voice is lively. A value
+/// that isn't a number counts for nothing.
+pub fn tone_kind(arousal: f32, sure: f32, valence: Option<f32>) -> Option<ToneKind> {
+    let surely = |bar: bool| sure.is_finite() && sure >= TONE_SURE && arousal.is_finite() && bar;
+    match valence {
+        Some(valence) if valence <= TONE_DOWN => Some(ToneKind::Low),
+        Some(valence) if valence >= TONE_GLAD && !surely(arousal < TONE_FLAT) => {
+            Some(ToneKind::Glad)
+        }
+        None if surely(arousal >= TONE_LIVELY) => Some(ToneKind::Lively),
+        _ => None,
+    }
+}
 
 /// An add-on's nudge moves energy or warmth this much at most (#2530, the
 /// first builder's bound), inside the clamps that hold without it...
@@ -115,6 +154,9 @@ pub enum EventKind {
         warmth_milli: u16,
         until_us: u64,
     },
+    /// How a line sounded (#1722, the voice's `voice/tone`), as it counts
+    /// ([`tone_kind`]).
+    Tone(ToneKind),
 }
 
 impl EventKind {
@@ -134,6 +176,7 @@ impl EventKind {
             Self::Familiar(_) => 11,
             Self::Seems(_) => 12,
             Self::Nudge { .. } => 13,
+            Self::Tone(_) => 14,
         }
     }
 }
@@ -592,6 +635,7 @@ impl Engine {
                 });
             }
             EventKind::Nudge { .. } => {}
+            EventKind::Tone(kind) => self.tone(now_us, observed, kind),
             EventKind::Air(co2) => {
                 let high_since_us = co2.filter(|ppm| *ppm >= 1_200).map(|_| {
                     self.air
@@ -622,23 +666,56 @@ impl Engine {
         match self.seems_run {
             Some((SeemsKind::Positive, SMILE_READS)) => {
                 self.quiet_until_us = None;
-                if self
-                    .last_smile_us
-                    .is_none_or(|last| observed.saturating_sub(last) >= SMILE_COOLDOWN_US)
-                {
-                    self.last_smile_us = Some(observed);
-                    self.energy_pulse = (self.energy_pulse
-                        + SMILE_ENERGY * decay(now_us - observed, ENERGY_HALF_LIFE_US))
-                    .min(ENERGY_CAP - BASE_ENERGY + self.air_reduction);
-                    self.warm(observed, SMILE_WARMTH);
-                }
+                self.brighten(now_us, observed, SMILE_ENERGY, SMILE_WARMTH);
             }
-            Some((SeemsKind::Negative, LOW_READS)) => {
-                self.quiet_until_us = Some(observed.saturating_add(QUIET_US));
-                self.energy_pulse = 0.0;
-            }
+            Some((SeemsKind::Negative, LOW_READS)) => self.keep_quiet(observed),
             _ => {}
         }
+    }
+
+    /// How a line sounded (#1722): a glad line is a smile, a low one
+    /// someone low, and a lively one half a smile's energy, as the face's
+    /// are. A low line with no face near is nothing, and isn't kept for a
+    /// face that comes after (the reviewer-lead's P3 on #2570). Nothing of
+    /// the line is kept.
+    fn tone(&mut self, now_us: u64, observed: u64, kind: ToneKind) {
+        if self.asleep {
+            return;
+        }
+        match kind {
+            ToneKind::Glad => {
+                self.quiet_until_us = None;
+                self.brighten(now_us, observed, SMILE_ENERGY, SMILE_WARMTH);
+            }
+            ToneKind::Lively => self.brighten(now_us, observed, LIVELY_ENERGY, 0.0),
+            ToneKind::Low if self.face.is_some() => self.keep_quiet(observed),
+            ToneKind::Low => {}
+        }
+    }
+
+    /// A smile, or a glad or lively line: `energy` and `warmth`, at most once
+    /// in [`SMILE_COOLDOWN_US`] between them all.
+    fn brighten(&mut self, now_us: u64, observed: u64, energy: f64, warmth: f64) {
+        if self
+            .last_smile_us
+            .is_some_and(|last| observed.saturating_sub(last) < SMILE_COOLDOWN_US)
+        {
+            return;
+        }
+        self.last_smile_us = Some(observed);
+        self.energy_pulse = (self.energy_pulse
+            + energy * decay(now_us - observed, ENERGY_HALF_LIFE_US))
+        .min(ENERGY_CAP - BASE_ENERGY + self.air_reduction);
+        if warmth > 0.0 {
+            self.warm(observed, warmth);
+        }
+    }
+
+    /// Someone low, by their face or their words: two minutes' quiet while a
+    /// face is near, and a startle's energy let go.
+    fn keep_quiet(&mut self, observed: u64) {
+        self.quiet_until_us = Some(observed.saturating_add(QUIET_US));
+        self.energy_pulse = 0.0;
     }
 
     fn company_at(&self, at_us: u64) -> bool {
