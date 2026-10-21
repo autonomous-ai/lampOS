@@ -1475,6 +1475,7 @@ What the body does with the request:
   lamp-body: step N gesture stretching dropped: busy, conversation (asked by skill:stretch-break)
   lamp-body: step N gesture stretching ended: by conversation
   lamp-body: step N gesture stretching ended: by a hand
+  lamp-body: step N gesture stretching ended: by a hand (the hand from a test input, --hold-from)
   lamp-body: dropped from the mood socket, not a mood or a gesture this body has: {"gesture":"dance"}
   ```
 
@@ -1683,7 +1684,9 @@ so they are the conversation's.
   it never begins after the ease out. On lamp-c0a4 on 21 October a
   skill's `stretching` played on 3 s after the person spoke. A hand on the arm is left to the arm's
   own rules (in the tests the lamp folds away from it, which ends the
-  gesture with no `ended` line).
+  gesture with no `ended` line). After a hand has shown this once on a
+  lamp, a test input can stand in for it (`--hold-from`, below in "Giving
+  way to a hand"; off in every product unit).
 
 The journal line says who asked, when the datagram said (`(asked by
 skill:stretch-break)`). Without the switch, a gesture asked while another
@@ -1787,6 +1790,7 @@ four rows, "Without it" is what `off` leaves.
 | `--look-at-name on` (default) | the lamp's name heard on the bus taken as being spoken to for two seconds, and with nobody in view one small glance once it stands (see "Turning to a call") | a call is not taken | on or off |
 | `--idle on` (default) | a standing lamp at rest shifts a little now and then | off | on or off |
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped | on or off |
+| `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |
 
@@ -2472,6 +2476,39 @@ suit lamp-4ace's or lamp-52e6's servos, and what the temperature of a
 joint held for minutes does with and without it. The measurements task 24
 asks for (by hand, standing and folded, through a kitchen scale) have not
 been made.
+
+### Test input: --hold-from (#2668)
+
+`--hold-from ABSOLUTE_FILE` is for tests on a lamp only, so a row a hand
+on the head has shown once can run again with no person there. No product
+unit passes it, and a test checks every file under `deploy/`
+(`nothing_deployed_passes_hold_from`). The file's first word is read at
+most every 100 ms (`hold_in::LOOK_EVERY`, a small read, never waited on):
+`held` is the head's pitch held by a hand; `free`, any other word, an
+empty file or none is no hand, and a file removed is a hand let go.
+
+While it says `held`, the body takes the head as held exactly where a
+joint that gave way would count (`in_hand_now`): a skill's or idle
+gesture playing ends `ended: by a hand`, eased out, one waiting or asked
+is dropped as held (`dropped: held by a hand`, or `dropped: a hand holds
+it` with `--arbitration` off), no shift at rest starts, and the head's
+pitch keeps the goal it has, asked nothing, as a hand's hold pins it.
+Nothing of the giving way itself runs: no torque is written, no servo's
+load or tracking is judged differently, nothing is counted as given way
+or released by a hand, and the other joints follow the mood as ever. When
+it says anything else the hand is gone on the next step, and the head
+moves on from where it was held, no jump. It holds through a pause or a
+hand's sleep, as a real hand would.
+
+The journal says at start `lamp-body: hold from a test input: FILE
+(--hold-from, a test flag no product unit passes)`, then `step N hold from
+a test input: the head's pitch held by a hand` and `... the hand lets go`
+as it changes, and each `ended`/`dropped` line about a hand while it holds
+ends `(the hand from a test input, --hold-from)`, so a lamp's result can
+name it. `body/gesture` says the same as for a real hand. Tests:
+`a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out`,
+`a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input`,
+and `hold_in`'s own for the file.
 
 ## Letting go under overload
 
