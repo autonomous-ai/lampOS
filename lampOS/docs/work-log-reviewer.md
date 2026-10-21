@@ -4,6 +4,40 @@
 
 Newest first. Times from `date` (+07).
 
+13:25 #2479 (El): all three P3s closed on 40c485cb0; first builder's.
+13:21 Merged #2497 (Tests, scratch folders split) as bbbfd4ce9
+13:18 #2497 (Tests, two test pairs' scratch folders split): first read, no finding; mine on green ARM64.
+13:13 #1757: re-push c74b0f710 is a rebase + two docs; my P2 stands.
+13:13 #1757: gate turned P3 2 into a P2 (a failed speaker/state publish ends lamp-actions before a mute; its test flakes 3/4); not mergeable.
+13:07 #2496 (Sixth, laugh glance while listening): first read; P2 the owner asked 'never while someone is talking to it', and listening also covers that; allow listening only when the laugh opened it; first builder's.
+13:02 #2487: both P3s closed on a6600d0ba.
+13:02 #2137 (Eighth): re-read of 6c5f8ae9a, P2 2 closed (the hold moves on a resumed link, set at mark time); first builder's.
+13:02 #1757 (Second, requested music, +30k): scoped read (not whole), no P1/P2, three P3s; first builder's.
+13:01 #2069: folded a1bd7ee9e, my new P3 closed (60 s bound + check line); first builder's.
+12:58 #2439 (Jarvis): rebased a541f50f8, both P3s closed, merges clean; first builder's; #2446 after it.
+12:56 #1948 (Seventh's camera receipt, 1a363773c with the 52e6 run's two fixes): re-read, no P1/P2, two P3s; first builder's.
+12:53 #2492: P3 closed in 338565fc3 (150 ms).
+12:48 #2462 (Second): re-read of 18318e115, my P2 (key in an environment limited to lamp-voice) and three P3s closed; first builder's.
+12:48 #2069: rebased onto lamp-voice, own two commits same patch; fold to one still needed.
+12:47 #2480: lamp-voice's 2nd run after it kept 5880/5888 times, 11 crates rebuilt, release build 1m50s (was 4m18s), green.
+12:47 #2069 (Fifth, unplug never-mind, retargeted onto lamp-voice): first read; carries #2478's commit (conflicts in 14 files), own two commits need one fold; my 20 Oct P2 and P3s closed; new P3 (latched and silent for good after a never mind when something never lets go); first builder's.
+12:46 #2494 (twelve, a forget-about's lost write pinned, #2226's P3): first read, no finding; mine on green ARM64.
+12:45 Merged #2490 (Tests, eyes people file scored) as 6b5caf5ee
+12:44 #2490 (Tests, the eyes' people file with familiarity scored): first read, no finding; merging.
+12:43 #2466: P2 fixed in 040f08e64 (LookTurns(2)); fold to one. #2493 (Fourth, #2488 folded): same patch, 18 files; first builder's.
+12:42 Merged #2489 (Tests, kept tests compare kept keys) as 02519162b
+12:39 #2492 (Ten, a photo face asked once): first read, no P1/P2, P3 test 250 ms vs 300 ms deadline; first builder's (consent ask).
+12:34 #2491 (Reviewer-lead's rebase of #2226): same patch, 8 files; Reviewer-lead's merge.
+12:32 #2475 folded to c210d9adb (tree = 9cc45f956); first builder's.
+12:28 #2489 (Tests, kept tests compare kept keys only): first read, no finding; mine on green ARM64.
+12:25 #2487 (Third, onto #1712, a hand's sleep is heard): first read, no P1/P2, two P3s (a late breath cut to a tick; lift at 2.5 s untested); first builder's.
+12:11 #2488: three P3s closed in eb3f65b3a; fold to a new PR coming.
+12:02 Merged #2481 (Migrate, package-binaries list checked in CI) as 796d53b24
+11:58 #2479 (El, onto #1712, named-ask heard forms): late first read (draft unposted 40 min); no P1/P2, three P3s (codecs+get, 'K,' as ask, bare 'Ask Claude Code?'); first builder's.
+11:58 #2462 (Second, signed publication of update builds, off by default): first read; conflicts with lamp-voice since #2480; P2 the signing key as a repo secret is readable by any branch's workflow (use an environment limited to lamp-voice); three P3s; first builder's.
+11:57 #2488 (Fourth, onto #1712, memory/forgot event + tone baselines): first read, no P1/P2, three P3s (check() takes any short name; loop wiring unpinned; bus.md kind); first builder's.
+11:54 Merged #2486 (Tests, delivery ledger kept) as aac3902c8
+11:54 #2486 (Tests, the voice's delivery ledger kept + #2473's P3): read, no P1/P2, P3 whole-value compare fails on a harmless added field; merging.
 11:50 Merged #2477 (Eighth, follow-up of my P3s on #2307/#2309) as 80fce0bb7
 11:50 #2439: asked Reviewer-lead to refile under rule 3 (rebase asked 10:19); #2446 waits behind it.
 11:42 Merged #2480 (Tests, CI builds only what changed) as c95450f62
