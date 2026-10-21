@@ -1220,9 +1220,21 @@ fn marked(mut answer: Value) -> Value {
     answer
 }
 
+/// `remember`'s kept answer as the model is told it: with `replaces`
+/// ([`REPLACES_ENVIRONMENT`], #2510), also the kept thing's `id` (the new
+/// one, or the one kept already), so a correction in a later turn of the
+/// session can name it as `replaces`; it is this scope's, and the session's
+/// sources hold it, so the store's shown check takes it. Off, as before.
+pub(crate) fn told_kept(mut told: Value, id: u64, replaces: bool) -> Value {
+    if replaces && told["remembered"] == true {
+        told["id"] = json!(id);
+    }
+    told
+}
+
 /// What to tell the model for the memory's answer. `None` for one that is
 /// not the answer to that request.
-fn answer_for(
+pub(crate) fn answer_for(
     name: &str,
     answer: &Value,
     now_unix_ms: u64,
@@ -2933,16 +2945,20 @@ impl DaysClient {
                     ),
                 }
             }
-            let ids = if call.name == REMEMBER && told["remembered"] == true {
+            let (told, ids) = if call.name == REMEMBER && told["remembered"] == true {
                 let Some(id) = answer["id"]
                     .as_u64()
                     .filter(|id| *id > 0 && *id <= i64::MAX as u64)
                 else {
                     return lost((gone(), false));
                 };
-                vec![(person.map(str::to_owned), id)]
+                let replaces = self.replaces.load(Ordering::Acquire);
+                (
+                    told_kept(told, id, replaces),
+                    vec![(person.map(str::to_owned), id)],
+                )
             } else {
-                vec![]
+                (told, vec![])
             };
             // Kept, told or not: the store has it now (#2540).
             if !ids.is_empty() {
@@ -8970,7 +8986,7 @@ mod tests {
         let green = json!({"text":"Her favourite colour is green.","replaces":8});
         assert_eq!(
             run(green.clone()),
-            (json!({"remembered":true,"replaced":8}), true)
+            (json!({"remembered":true,"replaced":8,"id":9}), true)
         );
         let (told, answered) = run(json!({"text":"Her favourite colour is red.","replaces":77}));
         assert!(answered);
@@ -9029,7 +9045,11 @@ mod tests {
                 Some(&EAST),
                 None,
             );
-            assert_eq!(told, (json!({"remembered":true}), true), "{replaces}");
+            assert_eq!(
+                told,
+                (json!({"remembered":true,"id":10}), true),
+                "{replaces}"
+            );
         }
         for line in served.join().unwrap() {
             let sent: Value = serde_json::from_str(&line).unwrap();
@@ -9062,7 +9082,17 @@ mod tests {
         let (socket, served) = memory_lines("replaces-heard", 4, answer);
         let client = DaysClient::new(socket.clone()).unwrap();
         client.replaces.store(true, Ordering::Release);
-        let run = |call: &ToolCall| client.run_at(call, FIRST_READ, NOW, Some(&EAST), None);
+        // Each kept thing is told its id (tested on its own in
+        // `with_the_replaces_switch_a_thing_kept_this_session_is_told_by_id_and_replaced`);
+        // this test is about what is replaced, so the id is checked, then left out.
+        let run = |call: &ToolCall| {
+            let (mut told, answered) = client.run_at(call, FIRST_READ, NOW, Some(&EAST), None);
+            if told["remembered"] == true {
+                assert!(told["id"].as_u64().is_some(), "{told}");
+                told.as_object_mut().unwrap().remove("id");
+            }
+            (told, answered)
+        };
         assert!(run(&call(RECALL, json!({"about":"colour"}))).1);
         let green = call(
             REMEMBER,
@@ -9163,6 +9193,166 @@ mod tests {
         assert!(context.shown(Some(MAI)).is_empty());
         drop(context);
         assert_eq!(served.join().unwrap().len(), 1);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510, `LAMP_MEMORY_REPLACES`: a thing kept in this session is told
+    /// with its id, so a correction in a later turn can name it: the store,
+    /// sent that id as shown, replaces it, and the old one is no longer
+    /// active (no recall finds it). Kept already (`once`), the kept one's id.
+    #[test]
+    fn with_the_replaces_switch_a_thing_kept_this_session_is_told_by_id_and_replaced() {
+        static REPLACED: AtomicBool = AtomicBool::new(false);
+        fn answer(request: &Value) -> Value {
+            let shown = |id: u64| {
+                request["shown"]
+                    .as_array()
+                    .is_some_and(|shown| shown.contains(&json!(id)))
+            };
+            match (request["op"].as_str(), request["replaces"].as_u64()) {
+                (Some("remember"), None) if request["once"] == true => {
+                    json!({"ok":true,"id":8,"existing":true})
+                }
+                (Some("remember"), None) => json!({"ok":true,"id":8}),
+                (Some("remember"), Some(8)) if shown(8) && !REPLACED.load(Ordering::Acquire) => {
+                    REPLACED.store(true, Ordering::Release);
+                    json!({"ok":true,"id":9,"replaced":8})
+                }
+                (Some("remember"), Some(_)) => {
+                    json!({"ok":false,"error":"refused","reason":"not_shown","message":"x"})
+                }
+                (Some("search"), _) => {
+                    let (id, text) = if REPLACED.load(Ordering::Acquire) {
+                        (9, "Her favourite colour is green.")
+                    } else {
+                        (8, "Her favourite colour is violet.")
+                    };
+                    json!({"ok":true,"entries":[{"kind":"kept","id":id,"at_unix_ms":NOW-DAY,"text":text}]})
+                }
+                _ => json!({"ok":false}),
+            }
+        }
+        let (socket, served) = memory("replaces-kept-id", 5, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |args| client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None);
+        // Turn 1: kept, and told its id.
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is violet."})),
+            (json!({"remembered":true,"id":8}), true)
+        );
+        // Turn 2: the correction names it, and the store was shown it.
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is green.","replaces":8})),
+            (json!({"remembered":true,"replaced":8,"id":9}), true)
+        );
+        // The old one is not active: recall finds only the new one.
+        let (found, _) = client.run_at(
+            &call(RECALL, json!({"about":"colour"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            None,
+        );
+        assert_eq!(found["found"].as_array().unwrap().len(), 1, "{found}");
+        assert_eq!(found["found"][0]["source_id"], 9, "{found}");
+        // Kept already (remember-once): the kept one's id, so it too can be
+        // corrected.
+        client.remember_once.store(true, Ordering::Release);
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is violet."})),
+            (
+                json!({"remembered":true,"note":"That was already kept.","id":8}),
+                true
+            )
+        );
+        // A second correction of 8 is the store's to refuse: it was replaced.
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is red.","replaces":8})),
+            (not_replaced(), true)
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent[1]["replaces"], 8);
+        assert_eq!(sent[1]["shown"], json!([8]));
+        assert_eq!(sent[4]["shown"], json!([8, 9]));
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510: off, `remember`'s answer carries no id, as before, though the
+    /// store answers one, and a kept-already one none either.
+    #[test]
+    fn without_the_replaces_switch_remember_is_told_no_id() {
+        let (socket, served) = memory("replaces-off-no-id", 2, |request| {
+            if request["once"] == true {
+                json!({"ok":true,"id":24,"existing":true})
+            } else {
+                json!({"ok":true,"id":25})
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(!client.replaces.load(Ordering::Acquire));
+        let run = || {
+            let args = json!({"text":"takes coffee black"});
+            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None)
+        };
+        assert_eq!(run(), (json!({"remembered": true}), true));
+        client.remember_once.store(true, Ordering::Release);
+        assert_eq!(
+            run(),
+            (
+                json!({"remembered": true, "note": "That was already kept."}),
+                true
+            )
+        );
+        assert_eq!(served.join().unwrap().len(), 2);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510: a thing kept for one scope is told by id to that scope's turn
+    /// alone, and joins only its shown: the room's correction can never name
+    /// someone's, nor theirs the room's.
+    #[test]
+    fn a_kept_id_is_shown_only_to_its_own_scope() {
+        const MAI: &str = "p-0123456789abcdef";
+        fn answer(request: &Value) -> Value {
+            match (request["person"].as_str(), request["replaces"].as_u64()) {
+                (Some(_), None) => json!({"ok":true,"id":8}),
+                (None, None) => json!({"ok":true,"id":10}),
+                (_, Some(_)) => {
+                    json!({"ok":false,"error":"refused","reason":"not_shown","message":"x"})
+                }
+            }
+        }
+        let (socket, served) = memory("replaces-kept-scope", 4, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |args, person| {
+            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), person)
+        };
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is violet."}), Some(MAI)),
+            (json!({"remembered":true,"id":8}), true)
+        );
+        assert_eq!(
+            run(json!({"text":"The spare key is in the drawer."}), None),
+            (json!({"remembered":true,"id":10}), true)
+        );
+        {
+            let context = client.context.lock().unwrap();
+            assert_eq!(context.shown(Some(MAI)), [8]);
+            assert_eq!(context.shown(None), [10]);
+        }
+        // Each correction is sent with its own scope's shown alone.
+        let _ = run(json!({"text":"It is green.","replaces":8}), None);
+        let _ = run(json!({"text":"It is in the car.","replaces":10}), Some(MAI));
+        let sent = served.join().unwrap();
+        assert_eq!(sent[2]["shown"], json!([10]));
+        assert!(sent[2].get("person").is_none());
+        assert_eq!(sent[3]["shown"], json!([8]));
+        assert_eq!(sent[3]["person"], MAI);
+        drop(client);
         std::fs::remove_file(&socket).unwrap();
     }
 

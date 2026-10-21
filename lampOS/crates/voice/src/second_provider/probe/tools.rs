@@ -267,6 +267,11 @@ fn deepseek_route(
 }
 
 pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io::Result<()> {
+    // `remember` declared and answered as the unit's environment has it
+    // (#2510): `replaces` only with `LAMP_MEMORY_REPLACES=on`.
+    crate::remember::switch_replaces(
+        std::env::var(crate::remember::REPLACES_ENVIRONMENT).as_deref() == Ok("on"),
+    );
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character = provider.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?
@@ -353,6 +358,20 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
         super::says_kept::LINES.len()
     );
     for line in super::says_kept::verdict(&super::says_kept::ask(&today, &character, runs).await) {
+        println!("{line}");
+    }
+    println!(
+        "tools: a correction of a thing kept earlier in the session, {} lines, {runs} runs each, replaces {} (#2510)",
+        super::kept_earlier::LINES.len(),
+        if crate::remember::replaces_on() {
+            "on"
+        } else {
+            "off"
+        }
+    );
+    for line in
+        super::kept_earlier::verdict(&super::kept_earlier::ask(&today, &character, runs).await)
+    {
         println!("{line}");
     }
     Ok(())
