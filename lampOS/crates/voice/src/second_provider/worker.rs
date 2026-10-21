@@ -4091,6 +4091,9 @@ impl Heeding {
         {
             self.began_over = over_the_lamps_voice.then_some(request);
         }
+        if matches!(heard, Heard::BeganOverTheWaitSound) {
+            self.began_over = None;
+        }
         let Some(voices) = self.voices.as_mut() else {
             return;
         };
@@ -4098,6 +4101,8 @@ impl Heeding {
             Heard::Began {
                 over_the_lamps_voice,
             } => voices.began(request, !over_the_lamps_voice),
+            // The wait sound is in its first samples: no print.
+            Heard::BeganOverTheWaitSound => voices.began(request, false),
             Heard::Samples(samples) => voices.heard(request, samples),
             Heard::Ended => voices.ended(request),
         }

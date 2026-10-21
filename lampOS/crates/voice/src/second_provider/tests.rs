@@ -2353,6 +2353,88 @@ async fn a_slow_first_round_makes_one_soft_sound_and_waits_longer() {
     assert_eq!(before_words(&sent(&mut written).await), 0);
 }
 
+/// A Start begun over the lamp's sound, as the coordinator tells one.
+fn start_over(request: u64) -> ProviderInput {
+    match start(request) {
+        ProviderInput::Start {
+            request,
+            session,
+            privacy_generation,
+            continues,
+            continues_cut_off,
+            over_the_lamp,
+            after_stop,
+            follows_on,
+            heard_of_cut,
+            ..
+        } => ProviderInput::Start {
+            request,
+            session,
+            privacy_generation,
+            continues,
+            continues_cut_off,
+            over_the_lamp,
+            after_stop,
+            follows_on,
+            over_the_lamps_voice: true,
+            heard_of_cut,
+        },
+        _ => unreachable!(),
+    }
+}
+
+/// The first builder on #2602 (lamp-4ace, 21 Oct 18:36): a person paused
+/// mid-request, the wait sound played, and they went on 130 ms later, over
+/// it. A line begun over nothing of the lamp's but the last request's wait
+/// sound, sounding still, is begun in the clear (the conversation, the
+/// room's talk and the cut-in note), but unprinted: the sound is in its first
+/// samples. One begun over an answer piece is a cut-in as before.
+#[tokio::test(start_paused = true)]
+async fn a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear() {
+    let began = Arc::new(Mutex::new(Vec::new()));
+    let hearing = |began: &Arc<Mutex<Vec<(u64, &'static str)>>>| -> Hearing {
+        let began = began.clone();
+        Arc::new(move |request, heard| {
+            let how = match heard {
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                } => "clear",
+                Heard::Began {
+                    over_the_lamps_voice: true,
+                } => "over the lamp",
+                Heard::BeganOverTheWaitSound => "clear, unprinted",
+                _ => return,
+            };
+            began.lock().unwrap().push((request, how));
+        })
+    };
+    let mut engine = waiting(None, vec![vec![], vec![]]).hearing(hearing(&began));
+    spoken_turn(&mut engine);
+    // The wait sound's first packet: it is sounding when the line begins.
+    while !matches!(engine.next().await, ProviderOutput::Audio { .. }) {}
+    engine.submit(start_over(2));
+    assert_eq!(
+        *began.lock().unwrap(),
+        [(1, "clear"), (2, "clear, unprinted")]
+    );
+
+    // Over an answer's piece: a cut-in.
+    let answered = Arc::new(Mutex::new(Vec::new()));
+    let mut engine = waiting(
+        Some(Duration::from_millis(2_000)),
+        vec![vec![text("It is noon."), Ok(ChatEvent::Done)], vec![]],
+    )
+    .hearing(hearing(&answered));
+    spoken_turn(&mut engine);
+    let heard = sent(&mut engine).await;
+    assert!(heard.contains(&"said".to_owned()), "{heard:?}");
+    engine.submit(start_over(2));
+    assert_eq!(
+        *answered.lock().unwrap(),
+        [(1, "clear"), (2, "over the lamp")]
+    );
+}
+
 fn written_turn(request: u64, words: &str) -> ProviderInput {
     written(request, words)
 }
