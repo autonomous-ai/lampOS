@@ -63,6 +63,8 @@ owner's rules for this part:
 | `--act attention` | "Is this said to the lamp?" is published with `shadow: false`, for the voice to hold the lamp's actions by ([below](#acting-on-the-lamps-actions---act-attention-800)) | shadow |
 | `--rules` | The progress and hello questions, and with `--gate` the moment question, obey what the people at the lamp asked about it speaking first (`memory/rules`, [above](#a-persons-rules-about-speaking-first-813)). Needs `--progress` or `--hello` | not listened to |
 | `--gate` | Also answer a skill that asks (`skills/ask`) whether the lamp may say hello, tell news or start something itself ([below](#hello-on-arrival-say-hello-now-752)). Needs `--hello` and `--act hello` | not listened to |
+| `--addons` | Also answer an add-on's say past its judge (`addon/ask`, [addons.md](addons.md), #2530 part 2) by the moment question ([below](#hello-on-arrival-say-hello-now-752)), `about` `addon`. Needs `--gate` | not listened to |
+| `--act addon` | An add-on's say decisions act (`shadow` false). Needs `--addons` | shadow |
 
 A wrong or missing option prints the usage and exits with 2. So does a
 `--log-dir` that cannot be made, or that its group or everyone can enter. A
@@ -1988,6 +1990,20 @@ the voice's own hello waits. With `--gate`, which needs `--hello` and
   `moment::tests::a_reminder_is_decided_at_once_behind_a_question_out_and_another_ask`.
 - An ask that fails its check (a skill's name, a known act, a hello
   without its minutes and seconds) is passed over.
+- **An add-on's say** (`--addons`, #2530 part 2): the add-ons' judge
+  (`lamp-addons`) puts a say that passed its own rules to the policy as an
+  `AddonAsk` on `addon/ask`: the proposal's number, the add-on's name, its
+  `why` and how `sure` it is, never its words. It is put to the moment
+  question as something `unprompted`, with the same hard rule, kept rules,
+  question and fallback, shown the add-on's name and "say one short line an
+  add-on on the lamp suggests, about: `why`". Its decision has `about`
+  `addon`, names the `proposal` (no `ask`) and is `shadow` unless
+  `--act addon`. The judge acts only on `say_now` that is not shadow.
+  Counted as `addon_asks` in the diagnostics, with `--addons` only, and
+  the start line says `addons=true`. Like `skills/ask`, any publisher's
+  message is read; one not from the judge names no proposal it waits for,
+  so its answer acts on nothing. Tests: `moment::tests::an_add_ons_say_is_decided_about_addon_naming_its_proposal`,
+  `add_ons_are_answered_with_the_gate_and_act_when_asked`.
 
 The diagnostics add `skill_asks` (asks taken), and `moment_decided`,
 `moment_said`, `moment_held_talking` and `moment_late`, with `--gate` only

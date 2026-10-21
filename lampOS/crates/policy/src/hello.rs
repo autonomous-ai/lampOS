@@ -132,6 +132,10 @@ pub struct Options {
     /// `hello`, `lamp-policy --gate`, #939), as it answers the voice's
     /// arrivals. Off unless set.
     pub gate: bool,
+    /// With the gate, it also answers an add-on's say (`addon/ask`,
+    /// `lamp-policy --addons`, #2530 part 2), by the moment question. Off
+    /// unless set.
+    pub addons: bool,
     /// It obeys what the people at the lamp asked about speaking first
     /// (`memory/rules`, `lamp-policy --rules`, [`crate::rules`], #813), and
     /// so does the moment question beside it. Off unless set.
@@ -154,6 +158,7 @@ impl Options {
             at_most_every: AT_MOST_EVERY,
             act: false,
             gate: false,
+            addons: false,
             rules: false,
             quiet_to_the_lamp: false,
         }
@@ -526,6 +531,11 @@ impl Hello {
         self.rules.set(rules);
     }
 
+    /// Whether it answers add-ons' says ([`Options::addons`]).
+    pub fn answers_addons(&self) -> bool {
+        self.options.gate && self.options.addons
+    }
+
     /// Whether it answers skills' asks ([`Options::gate`]).
     pub fn answers_skills(&self) -> bool {
         self.options.gate
@@ -544,6 +554,18 @@ impl Hello {
     /// The moment question's counts, if it runs.
     pub fn moment_totals(&self) -> Option<crate::moment::Totals> {
         self.moment.as_ref().map(crate::moment::Moment::totals)
+    }
+
+    /// An add-on's say (`addon/ask`, `--addons`, #2530 part 2), put to the
+    /// moment question. False when there is none to take it.
+    pub fn asked_addon(&mut self, ask: &lamp_msgs::AddonAsk, now: Instant) -> bool {
+        match self.moment.as_mut() {
+            Some(moment) => {
+                moment.asked_addon(ask, now);
+                true
+            }
+            None => false,
+        }
     }
 
     /// A skill's ask of news, of anything else unprompted or of a reminder,

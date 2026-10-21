@@ -27,8 +27,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Notice, Publisher, Subscriber};
 use lamp_msgs::{
-    Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk, Speech, TaskStatus,
-    Voice, VoiceArrival, VoiceState, VoiceTurn,
+    AddonAsk, Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk, Speech,
+    TaskStatus, Voice, VoiceArrival, VoiceState, VoiceTurn,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -117,6 +117,8 @@ pub struct Totals {
     pub unreadable: u64,
     /// Skills' asks taken (`--gate`, #939).
     pub skill_asks: u64,
+    /// Add-ons' says asked about (`addon/ask`, `--addons`).
+    pub addon_asks: u64,
     /// Decisions whose second judgement (`--attention-next`, #1040) came to
     /// another choice.
     pub attention_next_differs: u64,
@@ -1468,6 +1470,12 @@ impl Policy<'_> {
                 } else {
                     report
                 };
+                // Only with `--addons`.
+                let report = if hello.answers_addons() {
+                    report.with("addon_asks", self.totals.addon_asks)
+                } else {
+                    report
+                };
                 let report = match hello.moment_totals() {
                     Some(moment) => {
                         let report = report
@@ -1737,6 +1745,13 @@ fn run_inner<D: Decider + Send + 'static>(
         }
         _ => None,
     };
+    // Nor, without `--addons`, the add-ons' says (#2530 part 2).
+    let mut addon_asks = match hello.as_ref() {
+        Some(hello) if hello.answers_addons() => {
+            Some(Ear::new(bus, AddonAsk::TOPIC, AddonAsk::TYPE)?)
+        }
+        _ => None,
+    };
     let judge_name = decider.name().to_owned();
     let (judges, judge_log) = match local {
         Some(local_options) => (
@@ -1971,6 +1986,21 @@ fn run_inner<D: Decider + Send + 'static>(
                 }
             }
             skill_asks.source(policy.say);
+        }
+        // An add-on's say past its judge, with `--addons` only: put to the
+        // moment question, its decision `about` `addon`. Only the add-ons'
+        // judge writes `addon/ask`.
+        if let Some(addon_asks) = addon_asks.as_mut() {
+            for ask in addon_asks.take::<AddonAsk>(Duration::ZERO, unreadable, policy.say) {
+                if ask.check().is_err() {
+                    continue;
+                }
+                policy.totals.addon_asks += 1;
+                if let Some(hello) = policy.hello.as_mut() {
+                    hello.asked_addon(&ask, now);
+                }
+            }
+            addon_asks.source(policy.say);
         }
         // How the work handed over is going, with `--progress` only.
         if let Some(tasks) = tasks.as_mut() {

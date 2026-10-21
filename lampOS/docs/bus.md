@@ -587,7 +587,7 @@ the service installed the topic is never made.
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | `lamp-addons`, the add-ons' judge ([addons.md](addons.md)) |
-| `addon/ask` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | `lamp-policy` (part 2's next PR): an add-on's say to judge, with no words |
+| `addon/ask` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | `lamp-policy` with `--gate --addons`: an add-on's say to judge, with no words |
 | `addon/decision` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | People, the journal and the app: each proposal kept or dropped, and why |
 | `mood/nudge` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | `lamp-mood`: a kept add-on's mood, held inside Mood's own bounds until its end (#2530) |
 
