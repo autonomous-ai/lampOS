@@ -24,7 +24,8 @@ pub const CLOSE_RETRY_MS: u64 = 60_000;
 pub const CLOSE_TRIES: u8 = 3;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
-/// agent has finished or asks something, and for at most a day.
+/// agent has finished or asks something, and for at most a day. After that
+/// it is followed a while longer ([`WATCH_FOLLOW_MS`], [`WATCH_QUESTION_MS`]).
 pub const WATCH_EARLY_MS: u64 = 30_000;
 pub const WATCH_EARLY_FOR_MS: u64 = 600_000;
 pub const WATCH_LATER_MS: u64 = 120_000;
@@ -38,6 +39,13 @@ pub const WATCH_CONFIRM_MS: u64 = 10_000;
 /// neither `show` nor Harness's own `wait` can tell (#1145 review). A
 /// different answer it ends with later is kept as a new observation.
 pub const WATCH_FOLLOW_MS: u64 = 600_000;
+/// How long the watch goes on, every [`WATCH_LATER_MS`], after it kept a
+/// question for the person (`needs-input`): they answer it at their
+/// computer, maybe much later, and what the agent then ends with is told
+/// too. On lamp-75c9 on 21 Oct Claude Code first asked to trust its new
+/// folder; the person trusted it at the computer, the agent finished, and
+/// the lamp never said so.
+pub const WATCH_QUESTION_MS: u64 = 3_600_000;
 
 /// The newest store kept aside, or none; a folder that can't be read says
 /// nothing rather than stopping the part.
@@ -2309,23 +2317,28 @@ fn watched_age(task: &Task, now: &Clock) -> Option<Option<u64>> {
     Some(age)
 }
 
-/// Whether the watch still looks at `task` after it kept an idle answer:
-/// that answer is its newest observation, kept in this boot at most
-/// [`WATCH_FOLLOW_MS`] ago, with room for another. A question, a stop or a
-/// failure ends it. What progress reads ([`Engine::watched`]) is unchanged.
+/// Whether the watch still looks at `task` after it kept an idle answer or
+/// a question for the person: that is its newest observation, kept in this
+/// boot at most [`WATCH_FOLLOW_MS`] ago for an answer, or
+/// [`WATCH_QUESTION_MS`] for a question, with room for another. A stop or a
+/// failure ends it. The same question seen again is only counted, never
+/// told twice. What progress reads ([`Engine::watched`]) is unchanged.
 fn following(task: &Task, now: &Clock) -> bool {
     let Some(newest) = task.observations.last() else {
         return false;
     };
+    let within = match newest.data.state.as_str() {
+        "idle" if settled(&newest.data) => WATCH_FOLLOW_MS,
+        "needs-input" => WATCH_QUESTION_MS,
+        _ => return false,
+    };
     task.dispatch.state == DispatchState::Accepted
         && task.observations.len() < MAX_OBSERVATIONS
-        && newest.data.state == "idle"
-        && settled(&newest.data)
         && newest.observed.boot_id == now.boot_id
         && now
             .monotonic_ms
             .saturating_sub(newest.observed.monotonic_ms)
-            <= WATCH_FOLLOW_MS
+            <= within
 }
 
 fn take(counter: &mut u64) -> Result<u64, Error> {
@@ -5039,7 +5052,8 @@ mod tests {
         let observations = &engine.state.tasks[0].observations;
         assert_eq!(observations.len(), 2);
         assert_eq!(observations[1].data.answer, "Done: slept 25 s.");
-        // A question ends the following at once.
+        // A question is kept, and followed on: the person answers it at
+        // the computer (lamp-75c9, 21 Oct).
         at += WATCH_LATER_MS;
         let question = Observation {
             state: "needs-input".into(),
@@ -5047,7 +5061,94 @@ mod tests {
         };
         look(&mut engine, at, question);
         assert_eq!(engine.state.tasks[0].observations.len(), 3);
+        assert!(!engine.watch(&clock(at + WATCH_LATER_MS - 1)).unwrap());
+        // A stop ends it.
+        at += WATCH_LATER_MS;
+        let stopped = Observation {
+            state: "stopped".into(),
+            ..data("Stopped.")
+        };
+        look(&mut engine, at, stopped);
+        assert_eq!(engine.state.tasks[0].observations.len(), 4);
         assert!(!engine.watch(&clock(at + WATCH_LATER_MS)).unwrap());
+    }
+
+    /// lamp-75c9, 21 Oct: Claude Code first asked to trust its new folder,
+    /// which the lamp told; the person trusted it at the computer, the agent
+    /// finished, and the lamp never said so, since a question ended the
+    /// watch. Now the watch goes on after a question, every two minutes for
+    /// up to an hour: the question seen again is only counted, work in
+    /// progress is passed over, and the answer it ends with is kept (after
+    /// its second look) to be told.
+    #[test]
+    fn after_a_question_the_watch_goes_on_and_keeps_what_the_agent_ends_with() {
+        let (mut engine, _) = opened();
+        accepted(&mut engine, 10);
+        let look = |engine: &mut Engine<Memory>, at: u64, seen: Observation| {
+            assert!(engine.watch(&clock(at)).unwrap());
+            let job = engine.begin_observation(&clock(at)).unwrap().unwrap();
+            engine.finish_observation(&job, seen, &clock(at)).unwrap();
+        };
+        let question = Observation {
+            state: "needs-input".into(),
+            ..data("")
+        };
+        let mut at = 10 + WATCH_EARLY_MS;
+        look(&mut engine, at, question.clone());
+        let task = |engine: &Engine<Memory>| engine.state.tasks[0].clone();
+        assert_eq!(task(&engine).observations.len(), 1);
+        // Not looked at sooner than every two minutes.
+        assert!(!engine.watch(&clock(at + WATCH_LATER_MS - 1)).unwrap());
+        // Still waiting: the same question, only counted.
+        at += WATCH_LATER_MS;
+        look(&mut engine, at, question);
+        assert_eq!(task(&engine).observations.len(), 1);
+        assert_eq!(task(&engine).observations[0].seen_count, 2);
+        // Answered at the computer: at work, passed over.
+        at += WATCH_LATER_MS;
+        look(
+            &mut engine,
+            at,
+            Observation {
+                state: "working".into(),
+                ..data("Writing the tests.")
+            },
+        );
+        assert_eq!(task(&engine).observations.len(), 1);
+        // Done: kept after its second look, as the newest, to be told.
+        at += WATCH_LATER_MS;
+        look(&mut engine, at, data("All three tests pass."));
+        at += WATCH_CONFIRM_MS;
+        look(&mut engine, at, data("All three tests pass."));
+        let observations = task(&engine).observations;
+        assert_eq!(observations.len(), 2);
+        assert_eq!(observations[1].data.answer, "All three tests pass.");
+        assert!(observations[1].told.is_none());
+        // A question left unanswered is followed for an hour, then left.
+        let (mut waiting, _) = opened();
+        accepted(&mut waiting, 10);
+        let asked_at = 10 + WATCH_EARLY_MS;
+        look(
+            &mut waiting,
+            asked_at,
+            Observation {
+                state: "needs-input".into(),
+                ..data("Which folder?")
+            },
+        );
+        assert!(waiting.watch(&clock(asked_at + WATCH_QUESTION_MS)).unwrap());
+        let job = waiting
+            .begin_observation(&clock(asked_at + WATCH_QUESTION_MS))
+            .unwrap()
+            .unwrap();
+        waiting
+            .observation_failed(&job, "timeout", &clock(asked_at + WATCH_QUESTION_MS))
+            .unwrap();
+        assert!(
+            !waiting
+                .watch(&clock(asked_at + WATCH_QUESTION_MS + WATCH_LATER_MS))
+                .unwrap()
+        );
     }
 
     #[test]
@@ -5069,7 +5170,7 @@ mod tests {
             .finish_observation(&job, at_work, &clock(30))
             .unwrap();
         assert_eq!(engine.state.tasks[0].observations.len(), 1);
-        // The agent stops to ask: settled, kept, and the watch stops.
+        // The agent stops to ask: settled and kept.
         assert!(engine.watch(&clock(30 + WATCH_EARLY_MS)).unwrap());
         // The asked read's receipt went with it: the same request again is
         // refused, never run a second time.
@@ -5090,7 +5191,28 @@ mod tests {
             .finish_observation(&job, question, &clock(40 + WATCH_EARLY_MS))
             .unwrap();
         assert_eq!(engine.state.tasks[0].observations.len(), 2);
-        assert!(!engine.watch(&clock(40 + 10 * WATCH_LATER_MS)).unwrap());
+        // Followed on for the person's answer, then left.
+        assert!(
+            engine
+                .watch(&clock(40 + WATCH_EARLY_MS + WATCH_LATER_MS))
+                .unwrap()
+        );
+        let job = engine
+            .begin_observation(&clock(40 + WATCH_EARLY_MS + WATCH_LATER_MS))
+            .unwrap()
+            .unwrap();
+        engine
+            .observation_failed(
+                &job,
+                "timeout",
+                &clock(40 + WATCH_EARLY_MS + WATCH_LATER_MS),
+            )
+            .unwrap();
+        assert!(
+            !engine
+                .watch(&clock(41 + WATCH_EARLY_MS + WATCH_QUESTION_MS))
+                .unwrap()
+        );
         // A task handed over more than a day ago in this boot is left.
         let (mut old, _) = opened();
         accepted(&mut old, 10);

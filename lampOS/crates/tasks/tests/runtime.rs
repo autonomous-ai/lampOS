@@ -1044,7 +1044,9 @@ fn a_task_the_watch_finds_settled_moves_in_one_value_survives_a_restart_and_leav
         again.settled[0].at_unix_ms
     );
     // Nothing more is read or published until the two minutes are up; then
-    // it leaves, with no request and no read.
+    // it leaves, with no request. The watch looks once more, as it follows a
+    // question for the person's answer (lamp-75c9, 21 Oct): one read, which
+    // finds the same question and lists nothing again.
     let (reads, listings) = (
         s.counts.reads.load(Ordering::SeqCst),
         s.counts.listings.load(Ordering::SeqCst),
@@ -1066,7 +1068,7 @@ fn a_task_the_watch_finds_settled_moves_in_one_value_survives_a_restart_and_leav
             s.counts.reads.load(Ordering::SeqCst),
             s.counts.listings.load(Ordering::SeqCst)
         ),
-        (reads, listings)
+        (reads + 1, listings)
     );
 }
 

@@ -1267,8 +1267,15 @@ used only to say it.
   finishes.done" on lamp-75c9), so when it begins with the task's earlier
   idle answer, the voice is told only what comes after (`went_on` in
   `task_news.rs`). A
-  question, a stop or a failure kept, or a task's four observations, end
-  it; what progress reads (`tasks/status`) is unchanged. Otherwise, once
+  question kept (`needs-input`) is followed the same way, every 2 minutes
+  for up to an hour (`WATCH_QUESTION_MS`): the person answers it at their
+  computer, maybe much later, and what the agent then ends with is kept and
+  told. The same question seen again is only counted, and work in progress
+  is passed over. On lamp-75c9 on 21 October, Claude Code first asked to
+  trust its new folder. The lamp told the question, the person trusted it at
+  the computer, and the agent finished, but the lamp never said so, since a
+  question then ended the watch. A stop or a failure kept, or a task's four
+  observations, end it; what progress reads (`tasks/status`) is unchanged. Otherwise, once
   such an observation is kept, the watch leaves that task.
   An asked read's receipt that a watch read replaces is dropped: a retry of
   that request finds the revision moved on and is refused, never run twice.
