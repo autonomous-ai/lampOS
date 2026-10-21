@@ -72,6 +72,7 @@ pub mod early_finalize;
 mod endpoint;
 mod hand;
 mod holding;
+mod key_refusals;
 mod notices;
 mod second;
 mod service;
@@ -4257,6 +4258,7 @@ fn conversation_with_gate(
     // began to be heard answering it.
     let mut asked_in_busy_room: Option<u64> = None;
     let mut busy_answer_since: Option<(u64, u64)> = None;
+    let mut key_refusals = key_refusals::KeyRefusals::default();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -5487,6 +5489,7 @@ fn conversation_with_gate(
                 continue;
             }
             observe_provider_output(&mut cloud, reply, &event)?;
+            key_refusals.observe(&event, monotonic_us());
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
             }
@@ -7794,6 +7797,7 @@ fn conversation_with_gate(
             );
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
             bus.set_ring_off(rig.ring.off_for_good());
+            bus.set_chat_key_refused(key_refusals.said(clock));
             bus.report(
                 cloud.available(),
                 cloud.refusal(),

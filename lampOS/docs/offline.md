@@ -34,7 +34,14 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   10 minutes (`.key-refused` beside the sessions; any other end removes it),
   so one 401/403 from a proxy, or a key being changed, is asked again after
   the usual restart. A change in the voice's settings folder (a key put
-  right from setup or the app) ends the wait early.
+  right from setup or the app) ends the wait early. A chat service that
+  refuses the key turn by turn (the second route's 401/403) leaves the link
+  up, so it is said beside the report (`coordinator/key_refusals.rs`, the
+  lead on #1711): "the chat service refused this lamp's key: it needs a
+  working key, from setup or the app's own keys", with `refused: "key"`,
+  after two refused turns in a row, or one with no answered turn 120 s
+  later; the first answered turn clears it. A single refused turn is only a
+  journal line.
 - **`voice/link`** (`crates/msgs/src/lib.rs`, `VoiceLink`: ready or
   unavailable, with why) is declared and registered, and nothing publishes
   it. The place for the voice's own link state.
