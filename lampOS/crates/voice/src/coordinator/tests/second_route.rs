@@ -2872,6 +2872,74 @@ fn each_lines_tone_is_told_with_its_own_words() {
     );
 }
 
+/// A line that goes on from the one before, begun just after its End with
+/// the lamp not yet answering, is read over both and told once, under its
+/// own turn, with both lines' words (the first builder on #2602, 21 Oct
+/// 21:49): the line before is not told, and the baseline takes it in once.
+#[test]
+fn a_line_that_goes_on_from_the_one_before_is_read_and_told_once() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("I'm so happy today"),
+        // The first line's answer is held, so the second begins with the
+        // lamp silent.
+        second_waits_first: true,
+        // Each line's words as it begins, so the second's come too.
+        hears_at_start: true,
+        speak_again: Some(When::Ended(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let ends: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| {
+            (
+                end["turn"].clone(),
+                end["tone"]["tone"]["blocks"].clone(),
+                end["tone"]["baseline_lines"].clone(),
+                end["tone"]["went_on_from"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(ends.len(), 2, "{}", run.summary());
+    assert_eq!(ends[0].2, json!(1));
+    assert_eq!(ends[0].3, Value::Null);
+    // The second is read over both lines' blocks, and taken in as the
+    // baseline's first line, not its second.
+    assert_eq!(ends[1].0, json!(2));
+    assert!(
+        ends[1].1.as_u64().unwrap() >= ends[0].1.as_u64().unwrap() + 30,
+        "{ends:?}"
+    );
+    assert_eq!(ends[1].2, json!(1), "{ends:?}");
+    assert_eq!(ends[1].3, json!(1), "{ends:?}");
+    let told: Vec<_> = run
+        .events("voice_tone")
+        .into_iter()
+        .map(|told| {
+            (
+                told["turn"].clone(),
+                told["words"].clone(),
+                told["valence"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [(json!(2), json!(true), json!(1.0))],
+        "{}",
+        run.summary()
+    );
+}
+
 /// A known person's lines are read against their own baseline, and their
 /// words asking the lamp to forget their face let it go: the line after
 /// starts their baseline again.

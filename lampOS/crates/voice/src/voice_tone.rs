@@ -53,6 +53,15 @@ const PRE_ROLL_US: u64 = 400_000;
 /// A block more than this after the one before isn't joined to it: the
 /// pitch frame starts again.
 const JOINED_US: u64 = 15_000;
+/// A line begun this soon after the one before it ended goes on from it:
+/// the voice's own window for a line that goes on
+/// ([`crate::second_provider::CARRY_AFTER_END`], 1.5 s), so the two can't
+/// drift. Its
+/// tone is read over both, from the first one's first speech to the second
+/// one's last, so a pause in the middle of a line doesn't make it two
+/// readings (the first builder on #2602, 21 Oct 21:49, from lamp-75c9's
+/// played calm lines, read the right way only in their second half).
+pub const GOES_ON_US: u64 = crate::second_provider::CARRY_AFTER_END.as_micros() as u64;
 /// A minute of speech: a line's blocks past it aren't taken.
 const MOST_BLOCKS: usize = 6_000;
 /// Syllable peaks in the speech's energy: at least 80 ms apart, and over
@@ -99,6 +108,11 @@ pub struct ToneMeter {
     /// speech.
     blocks: Vec<Block>,
     in_line: bool,
+    /// The line read last, and when it ended, kept for [`GOES_ON_US`] in
+    /// case the next line goes on from it.
+    ended: Option<(u64, Vec<Block>)>,
+    /// Whether the line now in hand went on from the one before.
+    went_on: bool,
 }
 
 impl ToneMeter {
@@ -114,6 +128,17 @@ impl ToneMeter {
             self.in_line = true;
             self.blocks
                 .retain(|kept| at_us.saturating_sub(kept.at_us) <= PRE_ROLL_US);
+            if let Some((ended_us, mut before)) = self.ended.take()
+                && at_us.saturating_sub(ended_us) <= GOES_ON_US
+            {
+                // It goes on from the line before: that line's blocks
+                // first, then what came between, as the pre-roll is.
+                let last = before.last().map_or(0, |block| block.at_us);
+                before.extend(self.blocks.drain(..).filter(|kept| kept.at_us > last));
+                before.truncate(MOST_BLOCKS);
+                self.blocks = before;
+                self.went_on = true;
+            }
         }
         if self
             .last_at_us
@@ -151,13 +176,39 @@ impl ToneMeter {
     }
 
     /// The line's tone, if a line began and was long enough to read; and
-    /// the meter is ready for the next line either way.
-    pub fn finish(&mut self) -> Option<Tone> {
+    /// the meter is ready for the next line either way. The line ended at
+    /// `ended_us` is kept for [`GOES_ON_US`], for a next line that goes on
+    /// from it.
+    pub fn finish(&mut self, ended_us: u64) -> Option<Tone> {
         let blocks = std::mem::take(&mut self.blocks);
         let in_line = std::mem::take(&mut self.in_line);
+        self.went_on = false;
         self.frame.clear();
         self.since_pitch = 0;
         self.last_at_us = None;
+        self.ended = in_line.then(|| (ended_us, blocks.clone()));
+        Self::tone_of(&blocks, in_line)
+    }
+
+    /// Whether the line in hand goes on from the one before: its reading is
+    /// then over both, and the one before is not a line of its own.
+    pub fn going_on(&self) -> bool {
+        self.went_on
+    }
+
+    /// Whether a next line could still go on from the one read last: the
+    /// lamp hasn't answered, and it hasn't been let go.
+    pub fn may_go_on(&self) -> bool {
+        self.ended.is_some()
+    }
+
+    /// The lamp has begun to answer: no line after this goes on from the
+    /// one before.
+    pub fn answered(&mut self) {
+        self.ended = None;
+    }
+
+    fn tone_of(blocks: &[Block], in_line: bool) -> Option<Tone> {
         let levels: Vec<f32> = blocks.iter().map(|block| block.level_db).collect();
         let energy: Vec<f32> = blocks.iter().map(|block| block.energy).collect();
         let mut pitches: Vec<f32> = blocks.iter().filter_map(|block| block.pitch).collect();
@@ -180,9 +231,11 @@ impl ToneMeter {
         })
     }
 
-    /// Lets go of the line in hand, as a line abandoned does.
+    /// Lets go of the line in hand, as a line abandoned does, and of the
+    /// one before: nothing goes on from either.
     pub fn clear(&mut self) {
-        let _ = self.finish();
+        let _ = self.finish(0);
+        self.ended = None;
     }
 }
 
@@ -355,7 +408,7 @@ pub enum Whose {
 /// written, and all of it goes at a restart. The eyes' known person is the
 /// face at the lamp, not always the one speaking: someone unknown talking
 /// beside them is read against theirs.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Baselines {
     room: Baseline,
     /// The one heard longest ago first.
@@ -576,7 +629,7 @@ mod tests {
         for (at, block) in blocks.iter().enumerate() {
             meter.speech_block(at as u64 * 10_000, block, true);
         }
-        meter.finish()
+        meter.finish(blocks.len() as u64 * 10_000)
     }
 
     /// The meter reads a voice's pitch, its spread, its level and its pace
@@ -644,18 +697,83 @@ mod tests {
         at += 600_000;
         feed(&mut meter, &mut at, &calm, true);
         feed(&mut meter, &mut at, &lively, false);
-        assert_eq!(meter.finish(), Some(alone));
+        assert_eq!(meter.finish(at), Some(alone));
         // Speech that runs on into the line: its last 400 ms is the line's.
+        let mut meter = ToneMeter::default();
         let mut at = 0;
         feed(&mut meter, &mut at, &lively, false);
         feed(&mut meter, &mut at, &calm, true);
-        let joined = meter.finish().unwrap();
+        let joined = meter.finish(at).unwrap();
         assert_eq!(joined.blocks, 150 + 40, "{joined:?}");
         assert!(joined.pitch_hz > alone.pitch_hz, "{joined:?}");
         // No line began: nothing.
+        let mut meter = ToneMeter::default();
         let mut at = 0;
         feed(&mut meter, &mut at, &calm, false);
-        assert_eq!(meter.finish(), None);
+        assert_eq!(meter.finish(at), None);
+    }
+
+    /// A calm line cut in two by a pause, its second half begun within
+    /// [`GOES_ON_US`] of the first's end, is read as the one line it is
+    /// (the first builder on #2602, from lamp-75c9's played calm lines):
+    /// both halves' blocks, the tone the whole line has. Begun later, or
+    /// after the lamp answered, the second half is a line of its own.
+    #[test]
+    fn a_line_cut_in_two_by_a_pause_is_read_as_one() {
+        let calm = voice(120.0, 1.0, -26.0, 3.0, 2.0);
+        let whole = tone_of(&calm).unwrap();
+        let (first, second) = calm.split_at(calm.len() / 2);
+        let halves = |pause_us: u64, answered: bool| {
+            let mut meter = ToneMeter::default();
+            let mut at = 0;
+            for block in first {
+                meter.speech_block(at, block, true);
+                at += 10_000;
+            }
+            let first_tone = meter.finish(at + 600_000);
+            if answered {
+                meter.answered();
+            }
+            at += pause_us;
+            for block in second {
+                meter.speech_block(at, block, true);
+                at += 10_000;
+            }
+            let going_on = meter.going_on();
+            (first_tone, going_on, meter.finish(at + 600_000))
+        };
+        let (first_tone, going_on, joined) = halves(800_000, false);
+        assert!(
+            first_tone.is_some(),
+            "each half is a line long enough to read"
+        );
+        assert!(going_on);
+        let joined = joined.unwrap();
+        assert_eq!(joined.blocks, whole.blocks, "{joined:?}");
+        assert!((joined.pitch_hz - whole.pitch_hz).abs() < 1.0, "{joined:?}");
+        assert!((joined.level_db - whole.level_db).abs() < 0.5, "{joined:?}");
+        assert!(
+            (joined.spread_st - whole.spread_st).abs() < 0.3,
+            "{joined:?}"
+        );
+        // Its pace counts speech, not the pause.
+        assert!((joined.pace_hz - whole.pace_hz).abs() < 0.5, "{joined:?}");
+        // Begun past the window: the second half alone.
+        let (_, going_on, alone) = halves(600_000 + GOES_ON_US + 10_000, false);
+        assert!(!going_on);
+        assert_eq!(alone.unwrap().blocks, whole.blocks / 2);
+        // The lamp answered between: the second half alone too.
+        let (_, going_on, alone) = halves(800_000, true);
+        assert!(!going_on);
+        assert_eq!(alone.unwrap().blocks, whole.blocks / 2);
+        // A line let go (a sound) leaves nothing to go on from.
+        let mut meter = ToneMeter::default();
+        for (at, block) in first.iter().enumerate() {
+            meter.speech_block(at as u64 * 10_000, block, true);
+        }
+        meter.clear();
+        meter.speech_block(1_200_000, &second[0], true);
+        assert!(!meter.going_on());
     }
 
     /// Against a person's own calm lines, a livelier line reads lively and a
