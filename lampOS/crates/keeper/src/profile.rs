@@ -45,8 +45,11 @@ const PARTS: [&str; 9] = [
     "actions",
     "memory",
 ];
-/// The generic controls run without `--touch`, which refuses these keys.
-const TOUCH_ONLY_PINS: [&str; 2] = ["reset", "legacy_head"];
+/// The generic controls run without `--touch`, which refuses these keys, and
+/// without `LAMP_PRIVACY_CONTROLS=on`, which a `privacy` section needs: the
+/// product's pins carry it since #2143, and lamp-controls refused to start
+/// on a moved lamp-a63e with it (#2396's run, 21 Oct).
+const GENERIC_REFUSED_PINS: [&str; 3] = ["reset", "legacy_head", "privacy"];
 /// The settings the package carries in `provision/`, where each goes, and its mode.
 const SETTINGS: [(&str, &str, u32); 3] = [
     (
@@ -356,11 +359,12 @@ fn poses_gaze_is_model(poses: &str) -> bool {
     poses.ends_with(&format!("--gaze {MODEL_GAZE}"))
 }
 
-/// The pins file without the keys only `--touch` takes.
+/// The pins file without the keys the generic controls refuse: `--touch`'s
+/// and the privacy switch's.
 pub fn generic_pins(text: &str) -> Result<String, String> {
     let mut pins: serde_json::Map<String, serde_json::Value> =
         serde_json::from_str(text).map_err(|error| format!("controls-pins.json: {error}"))?;
-    for key in TOUCH_ONLY_PINS {
+    for key in GENERIC_REFUSED_PINS {
         pins.remove(key);
     }
     serde_json::to_string_pretty(&pins)
@@ -600,7 +604,7 @@ mod tests {
         dir.file("/release/provision/controls.json", "{\"touch\":false}\n");
         dir.file(
             "/release/provision/controls-pins.json",
-            "{\"button\":12,\"reset\":7,\"legacy_head\":3}\n",
+            "{\"button\":12,\"reset\":7,\"legacy_head\":3,\"privacy\":{\"line\":9}}\n",
         );
         dir
     }
@@ -730,7 +734,11 @@ mod tests {
         let pins =
             fs::read_to_string(on(&lamp.0, "/etc/lampOS/controls/controls-pins.json")).unwrap();
         assert!(
-            pins.contains("button") && !pins.contains("reset") && !pins.contains("legacy_head")
+            pins.contains("button")
+                && !pins.contains("reset")
+                && !pins.contains("legacy_head")
+                && !pins.contains("privacy"),
+            "{pins}"
         );
     }
 
