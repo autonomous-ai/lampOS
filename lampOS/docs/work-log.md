@@ -1,3 +1,42 @@
+## Current checkpoint: 2026-10-22 00:34 +07, full-journal startup regression pushed
+
+**Ready for lamp-voice: no (#2692, new-head native checks running).**
+Head `624c98887c3f613a95c5315cf60007226e1df698` is one commit on
+`second/skills-journal`, rebased cleanly onto `a8e0c83fe`. The runtime guard
+is unchanged; the added process test proves Skills starts and answers
+valid/refusal/valid calls while its external journal is already full and
+stays unread. The Mac formatting and strict Skills Clippy checks pass;
+**389 passed / 0 failed / 0 ignored / 0 filtered**, exit 0.
+
+[Verification](https://github.com/autonomous-ai/lampOS/tree/624c98887c3f613a95c5315cf60007226e1df698/lampOS/docs/verification/skills-journal-backpressure-20261022)
+keeps the corrected guard-removal control (**0/1**, no tools within 20.01 s),
+the restored journal module (**3/0**), source hashes and all gate summaries.
+The first fixture attempt stalled in a Mac send before child startup and
+was terminated; its failed receipt is retained. Preparation now fills the
+unshared socket in nonblocking mode, then restores blocking before spawn;
+the final fullness probe changes mode only after child cleanup.
+
+The full stream held 8,192 bytes. Preparation through tools publication
+took 16,124 us; connect through replies took 132 / 93 / 79 us. These are
+host observations, not device latency. The thirty-second deadline is
+checked, not a hard total-runtime watchdog. The earlier Mac **387/1** and
+old-head native success remain separate.
+
+[ARM64 39644702150](https://github.com/autonomous-ai/lampOS/actions/runs/39644702150)
+and [x86 Clippy 39644702241](https://github.com/autonomous-ai/lampOS/actions/runs/39644702241)
+are the current-head native gates. The PR stays draft until both pass.
+
+**Ready for lamp-voice: yes (#1757 and #2694).** Their heads, native
+counts and remaining review/lamp boundaries are unchanged below. Queue
+#2602 has the new head and counts. The next named Skills/Music product
+slice is requested; a read-only diagnosis of Music's retained packaging
+refusal continues alongside native qualification. #2462 stays with its
+merger. No full local gate, local ARM64 build or device action was run.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 00:20 +07, Music and both Skills changes native-green
 
 **Ready for lamp-voice: yes (#1757, review and the first builder's lamp acceptance remain).**
