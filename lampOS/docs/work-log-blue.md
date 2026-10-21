@@ -119,3 +119,17 @@ Ready for lamp-voice: merged (#2514, `7db3a3497`, by the first builder at 14:54)
   the judge (rules for every act, an acting Jev question for a say, the mood
   nudge input and the say service's context line), off unless
   `LAMP_ADDONS=on`.
+
+## 2026-10-21 — #2530 taken: the add-on judge
+
+Ready for lamp-voice: no
+
+- The first builder's go (14:5x, #1722): #2530, `builder:blue`. Part 1, one
+  PR: the rules for every act, a light through the arbitration at `Skill`
+  priority or below, and a bounded, decaying mood nudge on `lamp-mood`.
+  Part 2, the say with an acting Jev question and the say service's context
+  line, only after part 1 has run on lamp-75c9; the Jev question is posted
+  on #2530 for the first builder's read before it is built. Each part gets a
+  lamp-75c9 run and a `lamp-runs.md` row. All off unless `LAMP_ADDONS=on`.
+- Claimed at 15:0x: `status:taken`, "taken by blue · session b602ea5d… ·
+  lamp-75c9"; the first taken line is blue's.
