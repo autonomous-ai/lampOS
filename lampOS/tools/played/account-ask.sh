@@ -1,0 +1,142 @@
+#!/bin/zsh
+# The played kit's account asks (#751, "Email, calendar and other connectors, through hand-overs"), end to end with a
+# stand-in Harness, sourced by calendar.sh and email.sh with KIND (the run's name), ASK (the line played), PLAN (the
+# fixture's plan, its `show` the made-up answer) and WORDS (two words of that answer the lamp must say). The ask is
+# handed over to the computer's agent, the stand-in answers, and the lamp tells it back. Nothing reaches a real
+# Harness or account: lamp-tasks gets lamp-tasks-harness-fixture as its Harness (stand-in.sh) and a targets file for
+# the run, one alias, the voice's own, on the fixture's machine; the voice gets LAMP_TASKS_ACCOUNTS=on (the person's
+# calendar and email are asked of their computer's agent, #1676). All through /run drop-ins put back when this ends,
+# and by a reboot. Hand-overs fail while it runs.
+# PLAYS SOUND IN THE ROOM. About 4 minutes. Needs `sudo -n` on the lamp and the lamp's voice quiet for 45 s.
+# argv: LABEL FIXTURE, FIXTURE being an ARM64 lamp-tasks-harness-fixture (from a lampOS ARM64 run's artifact).
+# TASKS=PATH (optional): an ARM64 lamp-tasks from the same build, for a lamp whose own is older (as ask-again.sh).
+# Prints PASS or FAIL for each step: asked to confirm (the lamp's own question before a hand-over, answered "Yes,
+# please." once its answer has played; passed too when it offers at once), offered (start_agent_task), handed over
+# (the stand-in's `new`), the answer read (its `show`), told (the news), and heard whole: not cut short, and both
+# WORDS in the lamp's words.
+: ${KIND:?} ${ASK:?} ${PLAN:?} ${WORDS[2]:?}
+cd "${0:A:h}" || exit 9
+. ./settings.sh
+L=${1:?LABEL}
+FIXTURE=${2:?FIXTURE: an ARM64 lamp-tasks-harness-fixture}
+[[ -f $FIXTURE ]] || { echo "no file at $FIXTURE" >&2; exit 2; }
+[[ -z ${TASKS:-} || -f $TASKS ]] || { echo "no file at TASKS=$TASKS" >&2; exit 2; }
+RATE=${LAMP_SAY_RATE:-185}
+OUT="$PLAYED_OUT/scenarios/$KIND-$L.txt"
+REMOTE=/usr/local/lib/played-stand-in   # /run may be noexec; this folder is removed when the run ends
+./lamp_ssh 'sudo -n true' </dev/null || { echo "the lamp's user needs sudo -n" >&2; exit 2; }
+./quiet_gate.sh 45 || { echo "the lamp is not quiet: nothing played" >&2; exit 3; }
+
+
+line() {  # VOICE TEXT: say it from this Mac's speaker, made once and kept
+  local f="$PLAYED_OUT/prompts/generated/$KIND-$(print -rn -- "$1|$2" | md5 -q).aiff"
+  [[ -s $f ]] || say -v "$1" -r "$RATE" -o "$f" "$2"
+  print "$(date +%H:%M:%S) PLAY $1: $2" | tee -a "$OUT"
+  afplay "$f"
+}
+journal() {  # the voice's and lamp-tasks' lines since this run began
+  ./lamp_ssh "sudo -n journalctl -u lamp-voice -u lamp-tasks --since @$START --no-pager -o short-iso" </dev/null
+}
+called() {  # how many times the stand-in was called with OPERATION so far: one number
+  local n
+  n=$(./lamp_ssh "sudo -n grep -c '\"args\":\[\"$1\"' $REMOTE/home/calls.jsonl || true" </dev/null 2>/dev/null)
+  print -r -- "${n:-0}"
+}
+wait_for() {  # PATTERN SECONDS: wait until the journal has a line matching PATTERN; print it
+  local until=$(( $(date +%s) + $2 )) hit
+  while (( $(date +%s) < until )); do
+    hit=$(journal | grep -E -- "$1" | tail -1)
+    [[ -n $hit ]] && { print -r -- "$hit"; return 0; }
+    sleep 1
+  done
+  return 1
+}
+answered() {  # how many of the lamp's answers have played to their end in this session: one number
+  local n
+  n=$(./lamp_ssh 'sudo -n sh -c '"'"'d=/var/lib/lampOS/voice/sessions; s=$(ls -t $d | head -n 1); cat $d/$s/metadata/events-*.jsonl | grep "\"kind\":\"turn_finished\"" | grep -c "\"outcome\":\"audio_written" || true'"'" </dev/null 2>/dev/null)
+  print -r -- "${n:-0}"
+}
+wait_answered() {  # COUNT SECONDS: wait until more than COUNT of the lamp's answers have played to their end
+  local until=$(( $(date +%s) + $2 ))
+  while (( $(date +%s) < until )); do
+    (( $(answered) > $1 )) && { print "the lamp's answer played to its end"; return 0; }
+    sleep 1
+  done
+  return 1
+}
+wait_called() {  # OPERATION SECONDS: wait until the stand-in was called with OPERATION
+  local until=$(( $(date +%s) + $2 ))
+  while (( $(date +%s) < until )); do
+    (( $(called "$1") > 0 )) && { print "the stand-in's $1 was called"; return 0; }
+    sleep 2
+  done
+  return 1
+}
+
+print "$KIND $L  $(date -u +%Y-%m-%dT%H:%M:%SZ)  fixture $(shasum -a 256 "$FIXTURE" | cut -c1-16)" | tee "$OUT"
+./lamp_ssh "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
+print -r -- "$PLAN" | ./lamp_ssh "sudo -n tee $REMOTE/plan.json >/dev/null" || exit 9
+SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_TARGET=auto PLAYED_VOICE_ENV=LAMP_TASKS_ACCOUNTS=on"
+if [[ -n ${TASKS:-} ]]; then
+  print "lamp-tasks for this run: $(shasum -a 256 "$TASKS" | cut -c1-12)" | tee -a "$OUT"
+  ./lamp_ssh "sudo -n tee $REMOTE/lamp-tasks >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-tasks" < "$TASKS" || exit 9
+  SETUP_ENV="$SETUP_ENV PLAYED_TASKS=$REMOTE/lamp-tasks"
+fi
+
+# The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens. A setup that fails says which
+# step and stops here: nothing is played.
+put_back() {
+  ./lamp_ssh "sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out" < stand-in.sh
+}
+trap 'put_back 2>&1 | tee -a "$OUT"' EXIT
+if ! ./lamp_ssh "sudo -n env $SETUP_ENV sh -s -- in" < stand-in.sh >> "$OUT" 2>&1; then
+  tail -2 "$OUT" >&2
+  echo "$KIND $L: the stand-in's setup failed; nothing was played (see $OUT)" | tee -a "$OUT" >&2
+  exit 9
+fi
+tail -2 "$OUT"
+sleep 20
+START=$(./lamp_ssh 'date +%s' </dev/null)
+
+typeset -A result
+check() {  # NAME LINE-OR-EMPTY; kept here, not in a pipe's subshell
+  if [[ -n $2 ]]; then result[$1]=PASS; else result[$1]=FAIL; fi
+  print -r -- "${result[$1]} $1${2:+: ${2:0:200}}" | tee -a "$OUT"
+}
+# The ask. The lamp may first ask whether the computer's agent should look (its own confirm before a hand-over,
+# lamp-4ace 22 Oct 05:0x), or offer the hand-over at once: either passes "asked to confirm".
+before=$(answered)
+line Samantha "$ASK"
+offered=$(wait_for 'asked for start_agent_task' 12)
+if [[ -n $offered ]]; then
+  check "asked to confirm" "not needed: offered at once"
+else
+  check "asked to confirm" "$(wait_answered $before 40)"
+  [[ ${result[asked to confirm]} == PASS ]] && { sleep 1; line Samantha "Yes, please."; }
+  offered=$(wait_for 'asked for start_agent_task' 40)
+fi
+check "offered" "$offered"
+# Its read-back ends with "Shall I start it?": the yes once it has played to its end.
+if [[ ${result[offered]} == PASS ]]; then
+  before=$(answered)
+  wait_answered $before 40 >/dev/null
+  sleep 1
+  line Samantha "Yes, please."
+fi
+check "handed over" "$(wait_called new 40)"
+check "the answer read" "$(wait_called show 90)"
+told=$(wait_for 'telling news from the work handed over' 120)
+check "told" "$told"
+# Heard whole: not cut short, and the lamp's own words have both made-up items.
+sleep 25
+words=$(./lamp_ssh 'sudo -n sh -c '"'"'d=/var/lib/lampOS/voice/sessions; s=$(ls -t $d | head -n 1); grep -h "\"kind\":\"transcript\"" $d/$s/metadata/events-*.jsonl'"'" </dev/null)
+cut=$(journal | grep -E 'news \(.*\) was cut short' | tail -1)
+said=""
+[[ -n $told && -z $cut ]] && print -r -- "$words" | grep -qi -- "${WORDS[1]}" && print -r -- "$words" | grep -qi -- "${WORDS[2]}" \
+  && said="both said (${WORDS[1]}, ${WORDS[2]}), not cut short"
+check "heard whole" "$said"
+[[ -n $cut ]] && print -r -- "  cut short: ${cut:0:200}" | tee -a "$OUT"
+journal | grep -E 'start_agent_task|confirm_agent_task|telling news|cut short' | cut -c1-220 >> "$OUT"
+fails=${#${(M)${(v)result}:#FAIL}}
+print "$KIND $L: ${#result} checks, $fails failed. Lines and the journal's hand-over lines: $OUT" | tee -a "$OUT"
+exit $(( fails > 0 ))
