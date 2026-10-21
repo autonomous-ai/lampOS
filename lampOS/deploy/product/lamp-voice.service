@@ -79,10 +79,12 @@ Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 Environment=LAMP_SECOND_LOOK=on
 # Each turn told and kept for the person (or the room) admitted with its request, not the session's owner: the lead's
-# decision of 21 Oct on #1711, after the two-person run on lamp-52e6 (11 of 12, nothing crossed; #1895, #2233). That run
-# had LAMP_CAMERA_FOLLOWS_EYES=on, which this unit doesn't set: without it every turn is the room's, so this changes
-# nothing yet (switches.md).
+# decision of 21 Oct on #1711, after the two-person run on lamp-52e6 (11 of 12, nothing crossed; #1895, #2233).
 Environment=LAMP_SECOND_SCOPED_CONTEXT=on
+# The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
+# a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
+# (memory.md).
+Environment=LAMP_CAMERA_FOLLOWS_EYES=on
 Environment=LAMP_NAME_NOTE=on
 Environment=LAMP_NAME_NOTE_BUSY=face
 Environment=LAMP_EXPRESSION_OUT=on

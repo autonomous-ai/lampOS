@@ -1370,15 +1370,19 @@ read. With the eyes a process of their own (`LAMP_EYES_PERMIT_SOCKET`, no
 camera of the voice's own), they may look exactly while the microphone is
 permitted, and with `LAMP_CAMERA_FOLLOWS_EYES=on` (off unless set) the
 coordinator says so in the authority (`eyes_look_with_the_microphone`); a
-mute denies both. Without it, as on every product lamp today, the camera is
-never permitted there, and every turn on both routes is the room's. **Turned
-on, it starts per-person memory and #764's per-person Live sessions on a
-product lamp**: Live opens a new session between turns when the person at
+mute denies both. Without it the camera is never permitted there, and every
+turn on both routes is the room's. **The product's voice unit sets it, so a
+product lamp has per-person memory and #764's per-person Live sessions**: Live opens a new session between turns when the person at
 the lamp changes, telling it only that person's thread and kept things, and
 on the second route with `LAMP_SECOND_SCOPED_CONTEXT=on` each heard turn is
 the person's the eyes name. On lamp-52e6 (#1895, 20 Oct) the two-person run
 went from 0 of 12, every turn the room's and codes crossing, to 11 of 12
-with no code crossed (the one miss an answer too late).
+with no code crossed (the one miss an answer too late). Run again on 21 Oct
+(#2402): voices with no face stayed the room's (7 of 7), and once the lamp
+remembered a face, that person's turns were theirs. **A name told before the
+lamp knows the face ("remember my face") is the room's**: "my name is …"
+from someone not yet known lands in the room's memory, for everyone in the
+house, so the owner's first words begin with "remember my face".
 
 Off, a turn is told and kept as before, for the person the session was opened
 for.
