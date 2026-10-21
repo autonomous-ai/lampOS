@@ -1687,6 +1687,21 @@ so they are the conversation's.
   gesture with no `ended` line). After a hand has shown this once on a
   lamp, a test input can stand in for it (`--hold-from`, below in "Giving
   way to a hand"; off in every product unit).
+- With `LAMP_GESTURE_PAUSE=on` (#2602; off unless exactly `on`), turning to
+  `listening` only **pauses** it: eased to a hold where it is over the
+  same 0.7 s, its own clock standing still, as a creature stops
+  mid-stretch to hear. It **ends** when the lamp answers, the mood
+  `thinking` or `speaking`, or when the hold reaches 3 s, `ended: by
+  conversation`, eased out as above. If the mood goes back to `resting`
+  within 3 s with no answer (music, a cough, a line not said to the lamp),
+  it **goes on** from where it was held: its clip is taken up from the
+  point the hold carried it to, and the arm eases into it from still over
+  0.7 s, never swinging back to where it paused. A
+  conversation begun straight in `thinking` or `speaking` ends it at once,
+  and a hand on the head ends it at once, paused or not. `body/gesture`
+  says only the end; a pause and a going-on are not said, since nothing
+  that reads it has a word for them. It goes on in the product after one
+  lamp run with someone at the arm (the first builder, 22 Oct).
 
 The journal line says who asked, when the datagram said (`(asked by
 skill:stretch-break)`). Without the switch, a gesture asked while another
