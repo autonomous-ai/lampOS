@@ -1,0 +1,110 @@
+[
+  {
+    "preflight": 1,
+    "integration_base": "bc31e93d85997e3cab98b52b04da6ec9ff6b6fb3",
+    "source_manifest_sha256": "3e279bef6ad61f67fcb0542a3c4094aa65dde6645cf6907ad7009c7f5363751d",
+    "finding": "Compilation stopped on three Reports fixture fields added by the current base. The fixtures were adapted without changing production Reports semantics.",
+    "stages": [
+      {
+        "stage": "voice-integration",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "second_provider::tests::music_",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "seconds": 94.25,
+        "summaries": [],
+        "raw_log_sha256": "b94ecbca2340c9d267785fdaf98e4a5d3f78d57ec5cd0d8b5dd03c4e704397eb",
+        "result_lines": []
+      }
+    ]
+  },
+  {
+    "preflight": 2,
+    "integration_base": "bc31e93d85997e3cab98b52b04da6ec9ff6b6fb3",
+    "source_manifest_sha256": "a01a9be3393a7178d5fdcf18437539bb611fd84734050bbb3788ae876be2cf31",
+    "finding": "Voice integration passed. A new recording-gap negative failed: recording gaps are tracked separately from provider speech gaps. The production completion/news proof was corrected to require both counters to be zero.",
+    "stages": [
+      {
+        "stage": "voice-integration",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "second_provider::tests::music_",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "seconds": 104.01,
+        "summaries": [
+          [
+            "8",
+            "0",
+            "0",
+            "0",
+            "2650"
+          ]
+        ],
+        "raw_log_sha256": "d1c4736422ad331da21370961fbcaca87e48ebbcf088bca0a811ee528f47a758",
+        "result_lines": [
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 2650 filtered out; finished in 0.04s"
+        ]
+      },
+      {
+        "stage": "voice-audio",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "requested_audio",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "seconds": 1.97,
+        "summaries": [
+          [
+            "47",
+            "1",
+            "0",
+            "0",
+            "2610"
+          ]
+        ],
+        "raw_log_sha256": "c3b33410011838d4ac011227a2684296fd3328f1e2a2d8b689e00a9cd9b27dcf",
+        "result_lines": [
+          "test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 2610 filtered out; finished in 1.65s"
+        ]
+      }
+    ],
+    "independent_skills_check": {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 24.16,
+      "raw_log_sha256": "8f6b61997cc1f70de897ef7e4d04a4f4188d011d409f78bd024dc032a945bc6f",
+      "result_lines": [
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s"
+      ]
+    }
+  }
+]

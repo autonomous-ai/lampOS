@@ -1,0 +1,11 @@
+--- original/crates/skills/src/requested_audio.rs
++++ public_digest/crates/skills/src/requested_audio.rs
+@@ -345,7 +345,7 @@
+         {
+             return Err("audio definition changed".into());
+         }
+-        if (recording.stamp != self.verified.sound || self.sha256 != self.verified.sound_sha256)
++        if recording.stamp != self.verified.sound
+             && package::sha256_hex(&recording.bytes(read)?) != self.sha256
+         {
+             return Err("audio file changed".into());

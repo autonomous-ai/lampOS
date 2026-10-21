@@ -1,0 +1,208 @@
+{
+  "byte_length": 1026862,
+  "copied_from_commit": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+  "file_count": 25,
+  "files": [
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261020/README.md",
+      "byte_length": 3876,
+      "git_blob_sha1": "61826fb23cecf6f793471bce51188f7f4d0d787c",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261020/README.md",
+      "sha256": "adc3dde519476834d5966feb7b0b6460f29e3d8480d5034f8babcce1510dfeef"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261020/consumers.json",
+      "byte_length": 3244,
+      "git_blob_sha1": "668b0b8caaf237c059bc92aa2b3ba06bb3b7be2f",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261020/consumers.json",
+      "sha256": "4e8872ab8a7f51d14a697b3c8b5f42262c30a5559cf6c31782e19a78a9edfa30"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261020/host.json",
+      "byte_length": 49752,
+      "git_blob_sha1": "eedbdd26040a18283c064b49b56af491489ec540",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261020/host.json",
+      "sha256": "e4af3b310772b45b2e4f1b26cac0653a9af09cf1c775aa778781788d2fb55abf"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261020/preflights.json",
+      "byte_length": 3208,
+      "git_blob_sha1": "a2da988b87f4b7d5d9236e44e7f91bec32b2f59a",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261020/preflights.json",
+      "sha256": "c4e0eea115b1dfe7a44050fad8ed4f494be648fd2c66988cb8a835c0985e7fc8"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261020/source-files.json",
+      "byte_length": 257990,
+      "git_blob_sha1": "0e28d5b16faee19c4cbab03f087eb0cc8b79e727",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261020/source-files.json",
+      "sha256": "e7b6896ec76683e4ecbc7f435892526d23b54f1256ab9cb854a78dd755fa9abb"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/README.md",
+      "byte_length": 3801,
+      "git_blob_sha1": "a0e1f4ea4437c2341ebc023dd8bd60ad3ed83dab",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/README.md",
+      "sha256": "4c3e8c64d8c1f126aeef874bd7b2f1949406fe280c2f94df6635eb7484619968"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/consumers.json",
+      "byte_length": 6800,
+      "git_blob_sha1": "2f3618b14670c7ef8ebd57478123debc9206d373",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/consumers.json",
+      "sha256": "7a0c6f9fbc309e143be41f3b22cdbea5b4b4987c07c077c1add6e56a6f1af4d0"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/host.json",
+      "byte_length": 38603,
+      "git_blob_sha1": "6bd2deb9cb9a835fc20247cc3ae568c1911f971a",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/host.json",
+      "sha256": "b7d3cfa0c54618c2488043f5e9f6fb2fc0fdf552070bdc5227a25a5f26dfd2a8"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/scan-timing.json",
+      "byte_length": 1328,
+      "git_blob_sha1": "a7fcd30e5d78339040c9a91a0ffe3b4c29e8e958",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/scan-timing.json",
+      "sha256": "c32ef16f49dfddf9df050225be6bf87b146ce23c2727656ea3723b7953ae4288"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/setup-intermittent.json",
+      "byte_length": 26681,
+      "git_blob_sha1": "0963ac54b9f5b0428ab97e2c0c98417c9770efa6",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/setup-intermittent.json",
+      "sha256": "28072663ae330ef6467ef4de1f206a14c91e3ff7b74d7e5afd03a8477ec7b54d"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021-current/source-files.json",
+      "byte_length": 266398,
+      "git_blob_sha1": "1bb3a19ed249773728a8dc2725bda04e8e73fa09",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021-current/source-files.json",
+      "sha256": "9ca44209809f5d86ef7463893df6dc29773530b8856511e53ff9e8f08fe69480"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/README.md",
+      "byte_length": 4638,
+      "git_blob_sha1": "3c35ce0a6306ad5817902b2c28706988138308c9",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/README.md",
+      "sha256": "dd85293f237ff6ea5b18f3f73b4bfe29cb32abaea7183b1ca3bf57c4da7bc0bf"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/consumers.json",
+      "byte_length": 6791,
+      "git_blob_sha1": "724688c8fe39ab5f59f442d6e4c8ec410bb9d298",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/consumers.json",
+      "sha256": "79e507b9b44736f9e9aea138e9c72f0d9273e766c542ca2aa34345e19b1b93d7"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/host.json",
+      "byte_length": 38958,
+      "git_blob_sha1": "ee1a4d7831b5b9e64e6d8c0745a39e5145c96f8e",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/host.json",
+      "sha256": "7ccf949f605e7bf36870028afcfb96309aa846cb8e84e01751aae6f331c38ab7"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/copyback.patch",
+      "byte_length": 654,
+      "git_blob_sha1": "85ad77d8dbf3da435009ac767f7ec9ec16f2e449",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/copyback.patch",
+      "sha256": "acac7da6f9284819c4345db18e29fdd2e169cc14ad8dba3c0be65bb11d24505e"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/ctime.patch",
+      "byte_length": 451,
+      "git_blob_sha1": "6a8d21a330c2d6335ebe2623a5c83fa19e32f0ca",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/ctime.patch",
+      "sha256": "75203aa26f84873c5a320153812ae13dcfe08ce1272d9885ff85f768b0720070"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/parent_identity.patch",
+      "byte_length": 656,
+      "git_blob_sha1": "f9004a710060642325863f070ff49388990cecc1",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/parent_identity.patch",
+      "sha256": "40163fb2cf8ce2fddbc02d02c4721b469a57eb84b64ab3a12ffe358e9ed4df8a"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/public_digest.patch",
+      "byte_length": 497,
+      "git_blob_sha1": "aceb027035425bb7da56e294e3492ca338d52eff",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/public_digest.patch",
+      "sha256": "d5dbf425dec683c20e67f4cf368eefbe52ae3d10813b7f3f661dae57a89e7ac2"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/stale_success.patch",
+      "byte_length": 822,
+      "git_blob_sha1": "85320238b8f2591ea1f87993724538cc5252fff2",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/mutations/stale_success.patch",
+      "sha256": "eec31e1bb5e8f8cc0db7117f95fce4313aa7e0b4761cbf89836508d6c57e3228"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-1.json",
+      "byte_length": 8389,
+      "git_blob_sha1": "7ac45d16953c4fc019d23f8446ef3cf3a2cde612",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-1.json",
+      "sha256": "a3550025d159d49779301d32e5acdb08eccd6f92bd9cafc20e18833b9aab0007"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-2.json",
+      "byte_length": 8389,
+      "git_blob_sha1": "e6deb1691990a3f3a47eb5baeff66ce3a9a85da7",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-2.json",
+      "sha256": "ac90f13531a327dc849b9e1c4d8735d3377ae23434ef148afe5e6d88b620d31f"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-3.json",
+      "byte_length": 11786,
+      "git_blob_sha1": "76b8419e7342bc156bba2ee1b3150f633d52dbeb",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/preflight-3.json",
+      "sha256": "f2f4de6cdf659e39b1e44317b2f6557270bb6827425329ac20620e512c4bbcae"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/scan-benchmark.json",
+      "byte_length": 4605,
+      "git_blob_sha1": "058228ca427a259827b3c090a1852d2df8985ee2",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/scan-benchmark.json",
+      "sha256": "c8a74862fbabf7b2b32008f4c5d8f901e22a74858f53ff97e23425b0654ab2ba"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/scan-mutations.json",
+      "byte_length": 15684,
+      "git_blob_sha1": "4d8a5e0b4613ce86e98364f29b46b403c36aa72b",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/scan-mutations.json",
+      "sha256": "c1df9110cc14ca96a65fff2e2dc8f4ad1f4617d371b70f40e74fedbf70bbefa7"
+    },
+    {
+      "archived_path": "lampOS/docs/verification/requested-audio-host-20261021/source-files.json",
+      "byte_length": 262861,
+      "git_blob_sha1": "a945fe56cb6b911c5ef8f10f720fdb60f73fabd8",
+      "mode": "100644",
+      "original_path": "lampOS/docs/verification/requested-audio-host-20261021/source-files.json",
+      "sha256": "a84c5521dce32b76489881e98d8d270ab3f0082f6e5bb7ef8065ab9eca50a3f0"
+    }
+  ],
+  "source_repository": "https://github.com/autonomous-ai/lampOS"
+}

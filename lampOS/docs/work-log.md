@@ -13,7 +13,44 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-21, corrected Music and publication heads
+## Current checkpoint: 2026-10-21, Actions correction and historical archive
+
+Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is back in
+**draft** at `c74b0f710ecac48f8668c6ab8258777788068c0a`, rebased onto
+`bd43346de29bba069f741baa3eb32d03c6d5794f`. A reviewer reproduced a P2:
+a failed optional speaker-state heartbeat exits Actions before a later
+physical mute can be served. The correction and deterministic regression
+are in progress. The forced heartbeat-before-call regression fails against
+the unchanged runtime at the intended serving assertion (**0 passed,
+1 failed, 19 filtered**). A separate virtual-clock Voice test covers the
+original retained snapshot deadline and prevents an expired ticket reviving.
+Fresh complete host and native qualification must follow the source freeze.
+[Draft acknowledgement](https://github.com/autonomous-ai/lampOS/pull/1757#issuecomment-6309509650),
+[Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309624362).
+
+The previous rebased head's
+[ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39553990174) and
+[x86](https://github.com/autonomous-ai/lampOS/actions/runs/39553990144) jobs
+passed. Those results do not close the independently reproduced P2.
+The documentation now distinguishes reminder handoff from the recording's
+60-second cap, and records that synchronous Skills scans can delay ordinary
+calls. Host timing does not establish physical-lamp CPU or IPC latency.
+
+The [historical verification archive](verification/requested-audio-archive-20261021/README.md)
+preserves **25 files / 1,026,862 bytes**, with byte hashes and original paths.
+It retains failed runs and source reconstruction dependencies. After this
+archive is published, the feature branch can replace incoming links with
+immutable archive URLs and remove the historical folders from its diff.
+The current full-content evidence remains with the feature.
+
+Release publication [#2462](https://github.com/autonomous-ai/lampOS/pull/2462)
+remains ready at `18318e115cd0cb35ebea571132ec3eafc5f651b6`. The reviewer
+closed its P2 and three P3s; host **35 + 12 + 7** checks and native **9,121
+passed (one leaky), 62 skipped**, four doctests and 12 own-harness checks
+are recorded below. Publication stays disabled. Reviewer merge is pending;
+the workflow/docs completion and wider OTA handoff follow the actual merge.
+
+## Previous checkpoint: 2026-10-21, corrected Music and publication heads
 
 Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
 `ae3384f301c364938eb02afb23e68096b2d0825e`, one commit on

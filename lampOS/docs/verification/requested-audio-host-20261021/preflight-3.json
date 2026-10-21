@@ -1,0 +1,290 @@
+{
+  "status": "failed",
+  "integration_base": "892b1d3233efb1f339ca60e64e4004b40659e006",
+  "source_only": true,
+  "separate_fresh_target_directories": true,
+  "source_tree_sha256": "d29d39f68aeefae7a96d11abd7113fa6464b47ab3eb684253964fe81c1d8c602",
+  "source_file_count": 2152,
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "selected_packages": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-audio",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-camera",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-environment",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-peek",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-ring",
+    "lamp-schedule",
+    "lamp-selftest",
+    "lamp-settings",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-sound-fixtures",
+    "lamp-station",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-turn-owner",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "test_roots": {
+    "tests": "source-only copy; every selected crate except lamp-update",
+    "checkout_tests": "original checkout; all lamp-update tests, including its parent image fixture"
+  },
+  "portability_limitation": "lamp-update tests/image_journal.rs and tests/image_ramlog.rs read robots/lamp/rootfs outside lampOS; that complete crate is tested in the checkout without filtering any test. The workspace build and all other selected tests run from the source-only copy.",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 4.64,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0,
+        "summaries": 0
+      },
+      "result_lines": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 133.29,
+      "raw_log_sha256": "928e45ee947f359dcb3fdef1a6d6bc32e2b1799740bbbe96c7624c08bd1d6c84",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 0,
+        "summaries": 0
+      },
+      "result_lines": []
+    },
+    {
+      "stage": "skills_scan_files",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--lib",
+        "requested_audio::file_checks",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 48.77,
+      "raw_log_sha256": "598b7551b5b8b7c038f1c5769529afbd09f6cfe19cbb4ad0fbf99c47d20c2556",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 97,
+        "summaries": 1
+      },
+      "result_lines": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 97 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "skills_scan_cost",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "sixteen_maximum_recordings_have_zero_read_stable_scan_measurements",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 11.21,
+      "raw_log_sha256": "1cfe3d00ebc30e6dfc4aa0d6a5e5da60f5339d1d4f5ae66357c04151fa96e101",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 29,
+        "summaries": 1
+      },
+      "result_lines": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 7.19s"
+      ]
+    },
+    {
+      "stage": "voice_integration",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::tests::music_",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 73.31,
+      "raw_log_sha256": "bcd25bd1e9404d6ee8649dc6446c0e91e605b64eb2cb2fab6323390d35ce862a",
+      "counts": {
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 2724,
+        "summaries": 1
+      },
+      "result_lines": [
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 2724 filtered out; finished in 0.06s"
+      ]
+    },
+    {
+      "stage": "voice_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 1.81,
+      "raw_log_sha256": "fa24dc46a2f073a991cabb1e23a51a8f566189ea5c2dd371bce11d91e63b3833",
+      "counts": {
+        "passed": 49,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 2687,
+        "summaries": 1
+      },
+      "result_lines": [
+        "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 2687 filtered out; finished in 1.61s"
+      ]
+    },
+    {
+      "stage": "skills_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 8.71,
+      "raw_log_sha256": "39fe1ca3617e9990eb8677174f9a0c874e43cf396d3600ddf8f4b2ad1872237b",
+      "counts": {
+        "passed": 29,
+        "failed": 1,
+        "ignored": 0,
+        "filtered_out": 0,
+        "summaries": 1
+      },
+      "result_lines": [
+        "test result: FAILED. 29 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.55s"
+      ]
+    }
+  ],
+  "full_suite_totals_excluding_focused_repeats": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0
+  },
+  "inputs": {
+    "lampOS/crates/actions/src/caps_service.rs": "c0cb095e376bf5b42780b222d4c013da0e3e2b2e906f79b4de007f333daa1104",
+    "lampOS/crates/actions/src/lib.rs": "3b90139f3af028083b5ffcfc45107b7d76b1f138a7e4ea8f85097a2111ae3e6c",
+    "lampOS/crates/actions/src/main.rs": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+    "lampOS/crates/actions/src/server.rs": "aa4eca25e16bcd594ac864302e604605bc449a139c48c25be2e04a1fa6020e32",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "13f017aa44f2abc817be76365b5b2fcba9d579417f7daab4e79f078c600cbd72",
+    "lampOS/crates/actions/tests/speaker_state.rs": "8406f85cdb9c76be58e462b6e9b12f715c12d71bbc7b221c0d6d7cd154a74445",
+    "lampOS/crates/msgs/src/lib.rs": "65b137bc28f4084c609dd3fdc0c961072195c10c1208c02713a8f1f0dd24dae1",
+    "lampOS/crates/msgs/src/requested_audio.rs": "289bb4ee3bea350a23dd9bf1ebb32c81199e602ba3e8f02018eaacbdadb61c80",
+    "lampOS/crates/msgs/src/speaker_state.rs": "1012463d9e90e2b099281e165b937a5d2e55fbb465cdadf105a60b1a86533986",
+    "lampOS/crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "lampOS/crates/skills/src/lib.rs": "09f5f2fda500b30b9fa33dda6dd74d10c461993d7ee1f9e892776a6edf52394b",
+    "lampOS/crates/skills/src/main.rs": "6e1feb3bfe8e74cf9592abd9407e18ca1dd11cf5862e9f161f3c5dab5e6c3749",
+    "lampOS/crates/skills/src/requested_audio.rs": "a3e43f85ced95bc66fa75c6e9d8536a2ffa4c6822bb438a234cb9077036c64b8",
+    "lampOS/crates/skills/tests/requested_audio.rs": "c1605950f21e653c70d1bcd0e112bf8d12a36fa2dc18490d536ec5eaa83b5ceb",
+    "lampOS/crates/voice-eval/src/export.rs": "eb533a2d5fe0344f6dcac075d3f2e6577f70e41e8fd68a3533b7b647a3813ad8",
+    "lampOS/crates/voice/src/coordinator.rs": "db7ecbb246b5728492e458144b52ba93259e95125d40e598683aedf36753ecf1",
+    "lampOS/crates/voice/src/coordinator/cloud.rs": "a9cd04f630b468613790b6d80b0cc445949a3dbb2f09f0c22292b8671ec673a0",
+    "lampOS/crates/voice/src/coordinator/hand.rs": "23304e21fc597be2cc9fef0e852cdefac7a3ca1febf4c105b349df4a657de1f4",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "478b812c821640fd0778bdc95ca6947da2ca54ab6da56c19669a2a324cf628e8",
+    "lampOS/crates/voice/src/coordinator/requested_media.rs": "df4893753b8156e641e76a97c149a7363853e06ce91eba6f0574334cb1873a69",
+    "lampOS/crates/voice/src/coordinator/second.rs": "d8534bceeaa99775d89c4758f2dba185038b0e395bfea8cfeb8634de47f11ea2",
+    "lampOS/crates/voice/src/coordinator/speaker_tone.rs": "a805e6fd30388d43257ef5ded04f6bcb635e6dba48785b5ae0abca6b834c33ee",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "908611780ef34a6dbbce42f7e5a8108f782f8afa82c087b499f291a7de852f35",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "0411fba1ee110e4d993a979e1e093e2f4ee1750c2db9e2659355ed8936ba29c5",
+    "lampOS/crates/voice/src/fixture_provider.rs": "f81662e26af721c360979e99b8983de522616b11c432a29924b4ee3d15030624",
+    "lampOS/crates/voice/src/lib.rs": "6b7654ee7cb255a5efd95b6e13adaf68befb9491d06d68568c9083a16e58f289",
+    "lampOS/crates/voice/src/provider_worker.rs": "9560d101eeb7c79571cddbeb84e47d7582077f3e9e11ebc46891b522b8d1b474",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "a131618a7be87e24f3837e052bc41d60a19fd19bb8e2b1fc7444009dfacd4b1e",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "cd75a942242195af6f2a258949b27717123a8cad7772d8bd0fc949d03e32c81f",
+    "lampOS/crates/voice/src/requested_audio.rs": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "434fd42169d6ee2a16fe4b5988734b68822df79895241934ce50c17152f014fe",
+    "lampOS/crates/voice/src/say.rs": "e263389229c16149ccd00388121d04357319ec1f2296ef1f5d49daea8ddb880f",
+    "lampOS/crates/voice/src/second_provider.rs": "2779006ecfc0f05e254252d0ef3b10d587387ef35ab51f95cd90444662af155c",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "f9bb8be83e89eaa67e94e14b6fd30a5e44d7c2e8fd8c1f74e5a604e325d115b4",
+    "lampOS/crates/voice/src/second_provider/tests/music_current.rs": "1a2a14322613688baebe04eaf2cb5e4b876de0744abd31818a8f72545b74b664",
+    "lampOS/crates/voice/src/second_provider/tests/music_policy.rs": "07060512f5841d0e9e000957d6771795f5178f973adcc1fa426d8d53a3034640",
+    "lampOS/crates/voice/src/second_provider/tests/music_scope.rs": "0c9c4097c9ac6ac8fea84329e27d50c48e41a327309daaf4e12be7a7610ab026",
+    "lampOS/crates/voice/src/second_provider/tests/music_warm_name.rs": "aee7ac72ba8863a1ed694fa5dc364866aad1afc80804323490f2040920514806",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "1f325eeb0fee5657d80dc7a73c7f890a879102802029328ef4fe6bab26e32e00",
+    "lampOS/crates/voice/src/tools.rs": "46a133c720f9649f190ad4651fd49233129197e42c811217a7b30d54c6f2b887",
+    "lampOS/examples/relaxing-music/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "lampOS/examples/relaxing-music/PROVENANCE.md": "7510ee01ce0a28d3f62c2e5185b16d1bdb9fd937eede66b71e7f4417d6514a54",
+    "lampOS/examples/relaxing-music/README.md": "b8b58c617c7c60b444f80dc5236d0d5f1d50e3cfb74e815a909755740180ed1e",
+    "lampOS/examples/relaxing-music/SKILL.md": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+    "lampOS/examples/relaxing-music/score.rs": "d0bcc0f5553b61b2b46697fb8ee33d5f657e423d78f55a8fb66a59afc5249ad9",
+    "lampOS/examples/relaxing-music/skill.toml": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b"
+  }
+}

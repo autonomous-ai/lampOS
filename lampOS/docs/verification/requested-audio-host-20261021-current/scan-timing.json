@@ -1,0 +1,41 @@
+{
+  "integration_base": "99f2ecfcd4ebb3b9279750bee42f219c0c4895ed",
+  "source_tree_sha256": "3313ed7eaec67ba7279ccf0f38ccbf2c44b9fb5493c9302c1df66439e53514d9",
+  "profile": "host debug",
+  "boundary": "Scan::unchanged after loading; excludes fixture creation, loading, cloning, cache copyback and logging",
+  "samples": [
+    {
+      "round": 0,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 0,
+      "elapsed_ns": 1277500,
+      "phase": "first"
+    },
+    {
+      "round": 1,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 0,
+      "elapsed_ns": 707583,
+      "phase": "repeat"
+    },
+    {
+      "round": 2,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 0,
+      "elapsed_ns": 702833,
+      "phase": "repeat"
+    }
+  ],
+  "raw_log_sha256": "a20d56aafd0cd0bc89c9826b1ef5b9b41afe86c845949c1a0f3426dec558701f",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 6.98s"
+  ],
+  "baseline_record": "../requested-audio-host-20261021/scan-benchmark.json",
+  "limitations": "Three samples on one host. No cold-cache, whole-loop, native ARM64, acoustic-onset or lamp result."
+}

@@ -1,0 +1,17 @@
+--- original/crates/skills/src/requested_audio.rs
++++ parent_identity/crates/skills/src/requested_audio.rs
+@@ -122,14 +122,5 @@
+ impl PlainFile {
+     fn stable(&self) -> Result<(), String> {
+-        for (path, identity) in &self.parents {
+-            let meta = fs::symlink_metadata(path).map_err(|_| "audio folder missing")?;
+-            if !meta.is_dir()
+-                || meta.file_type().is_symlink()
+-                || (meta.dev(), meta.ino()) != *identity
+-            {
+-                return Err("audio folder changed while checking".into());
+-            }
+-        }
+         let opened = self
+             .file
+             .metadata()
