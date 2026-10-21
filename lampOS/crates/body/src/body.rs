@@ -4061,7 +4061,18 @@ fn run_on<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
-        unplug_latched |= asked_now.unplug || bus.runtime.recovery_inhibited();
+        let latched_now = asked_now.unplug || bus.runtime.recovery_inhibited();
+        // A matching "never mind" cleared the latch: it stands as when spoken
+        // to, through the ordinary guarded rise. A keeper pause still wins.
+        if unplug_latched
+            && !latched_now
+            && !asked_now.paused
+            && let Some(up) = standing
+        {
+            awake_until = Some(now + up.awake);
+            unplug_previous = None;
+        }
+        unplug_latched = latched_now;
         if unplug_latched {
             asked_now = Asked {
                 unplug: true,

@@ -1978,6 +1978,9 @@ fn tool_call(
     out: &mut Publisher,
     runner: &Runner,
 ) {
+    if name == lamp_skills::unplug::STAY_TOOL {
+        return stay_call((name, args, reply, admission), engine, runner);
+    }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
@@ -2298,6 +2301,18 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
         Ok(request) => request,
         Err(error) => return format!("unplug preparation could not start: {error}"),
     };
+    // Only for a request this process made: a repeated call keeps its timer.
+    if since == began {
+        let (sockets, bus, request) = (sockets.clone(), bus.clone(), request.clone());
+        let minutes = unplug::stay_minutes(std::env::var(unplug::STAY_ENVIRONMENT).ok().as_deref());
+        std::thread::spawn(move || {
+            if let Some(outcome) =
+                stay_after(&sockets, &bus, &request, Duration::from_secs(minutes * 60))
+            {
+                eprintln!("lamp-skills: unplug not taken in {minutes} min: {outcome}");
+            }
+        });
+    }
     let failure = loop {
         match unplug::read(bus, &request, since, clock::now_us()) {
             Ok(Progress::Ready) => {
@@ -2322,6 +2337,160 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     // Resuming automatically could raise the arm after the person heard a reply.
     let outcome = say_unplug_failure(skill, sockets);
     format!("unplug preparation failed: {failure}; {outcome}")
+}
+
+/// "Never mind": refused at once unless the unplug skill is loaded with its
+/// grants and the latch can be cancelled now; the line and the cancel follow
+/// on their own thread.
+fn stay_call((name, args, reply, admission): ToolAsk, engine: &Engine, runner: &Runner) {
+    use lamp_skills::unplug;
+    let sockets = runner.sockets_for(unplug::SKILL);
+    let checked = if !engine
+        .skills()
+        .iter()
+        .any(lamp_skills::Skill::prepares_unplug)
+    {
+        Err("Preparing to unplug is not enabled.".to_owned())
+    } else if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
+        Err(why)
+    } else {
+        unplug::may_stay(&runner.bus, clock::now_us(), false)
+    };
+    if !admission.commit() {
+        return;
+    }
+    let request = match checked {
+        Ok(request) => request,
+        Err(why) => {
+            eprintln!("lamp-skills: {name} with {args} not run: {why}");
+            let _ = reply.send(json!({ "error": why }));
+            return;
+        }
+    };
+    let _ = reply.send(json!({
+        "next": "Say nothing. The lamp says it will stay, then gets back up by itself."
+    }));
+    let bus = runner.bus.clone();
+    std::thread::spawn(move || {
+        let outcome = stay(&sockets, &bus, &request, unplug::STAY_LINE);
+        eprintln!("lamp-skills: {name}: {outcome}");
+    });
+}
+
+/// The line first; only once it has begun is the cancel published, and the
+/// body waits a further 3 s before any motion. A line never begun cancels
+/// nothing: a person mid-unplug must hear it before the arm moves.
+fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    let mut cancelled = None;
+    let outcome = say(
+        &sockets.say,
+        "staying plugged in",
+        lamp_skills::unplug::SKILL,
+        json!({"note": line, "priority": 8}),
+        &[],
+        || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
+    );
+    match cancelled {
+        Some(Ok(())) if failed_after_cancel(bus, request) => format!(
+            "{outcome}; cancel published for {request}; it then failed: {}",
+            say_check(sockets)
+        ),
+        Some(Ok(())) => format!("{outcome}; cancel published for {request}"),
+        Some(Err(error)) => format!("{outcome}; the cancel was not published: {error}"),
+        None => format!("{outcome}; nothing cancelled: the line was not begun"),
+    }
+}
+
+/// After a cancel, whether the body failed this request instead of standing
+/// (it fails 60 s after the cancel with no fresh proof). It stops looking
+/// once the body's state for it is 2 s old (it stood) or another's, and
+/// after 65 s whatever it reads.
+fn failed_after_cancel(bus: &Bus, request: &str) -> bool {
+    let until = clock::now_us() + 65_000_000;
+    while clock::now_us() < until {
+        let Some(message) = bus.latest(lamp_body::unplug::State::TOPIC).ok().flatten() else {
+            return false;
+        };
+        let Ok(state) = message.parse::<lamp_body::unplug::State>() else {
+            return false;
+        };
+        if state.request != request
+            || clock::now_us().saturating_sub(message.header.at_us) > 2_000_000
+        {
+            return false;
+        }
+        if state.phase == lamp_body::unplug::Phase::Failed {
+            return true;
+        }
+        clock::sleep(Duration::from_millis(500));
+    }
+    false
+}
+
+fn say_check(sockets: &Sockets) -> String {
+    say(
+        &sockets.say,
+        "unplug needs checking",
+        lamp_skills::unplug::SKILL,
+        json!({"note": lamp_skills::unplug::CHECK_LINE, "priority": 8}),
+        &[],
+        || {},
+    )
+}
+
+/// The timeout: after `wait` of unbroken Ready with this process up, the
+/// same cancel with its own line, once. A look that is not Ready (stale, or
+/// still folding) starts the wait again. Never from Failed: a preparation
+/// that fails after it was Ready (a hand on the arm before any cancel) says
+/// once that it needs to be checked, and nothing stands it up.
+fn stay_after(sockets: &Sockets, bus: &Bus, request: &str, wait: Duration) -> Option<String> {
+    use lamp_skills::unplug;
+    let mut ready_since: Option<u64> = None;
+    let mut was_ready = false;
+    loop {
+        let now = clock::now_us();
+        match lamp_body::unplug::in_force(bus, Some("skills")) {
+            Ok(Some(live)) if live.request == request => {}
+            // Cancelled, replaced or unreadable: nothing of ours to time out.
+            _ => return None,
+        }
+        match unplug::may_stay(bus, now, true) {
+            Ok(_) => {
+                was_ready = true;
+                if ready_for(&mut ready_since, true, now, wait) {
+                    return Some(stay(sockets, bus, request, unplug::TIMEOUT_LINE));
+                }
+            }
+            // Failed, however old: it stays down until it is inspected. A
+            // failure before Ready was said by the preparation itself.
+            Err(_)
+                if bus
+                    .latest(lamp_body::unplug::State::TOPIC)
+                    .ok()
+                    .flatten()
+                    .and_then(|message| message.parse::<lamp_body::unplug::State>().ok())
+                    .is_some_and(|state| {
+                        state.request == request && state.phase == lamp_body::unplug::Phase::Failed
+                    }) =>
+            {
+                return was_ready.then(|| say_check(sockets));
+            }
+            Err(_) => {
+                ready_for(&mut ready_since, false, now, wait);
+            }
+        }
+        clock::sleep(Duration::from_millis(500));
+    }
+}
+
+/// One look of the timer at `now`: whether `wait` of unbroken Ready has
+/// passed. A look that is not Ready starts the wait again.
+fn ready_for(ready_since: &mut Option<u64>, ready: bool, now: u64, wait: Duration) -> bool {
+    if !ready {
+        *ready_since = None;
+        return false;
+    }
+    now.saturating_sub(*ready_since.get_or_insert(now)) >= wait.as_micros() as u64
 }
 
 fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
@@ -3701,6 +3870,211 @@ mod tests {
                 io::ErrorKind::WouldBlock
             );
         }
+    }
+
+    /// A latched request and the body's fresh state for it, as the body has them.
+    fn latched(bus: &Bus, phase: &str) {
+        let mut request = bus
+            .publisher_declared(
+                lamp_body::unplug::Request::TOPIC,
+                &lamp_body::unplug::Request::declaration(),
+                "skills",
+            )
+            .unwrap();
+        request.publish_json(1, &json!({"request": "r1"})).unwrap();
+        let mut body = bus
+            .publisher_declared(
+                lamp_body::unplug::State::TOPIC,
+                &lamp_body::unplug::State::declaration(),
+                "body",
+            )
+            .unwrap();
+        body.publish_json(
+            clock::now_us(),
+            &json!({"request": "r1", "phase": phase, "why": ""}),
+        )
+        .unwrap();
+    }
+
+    fn cancels(bus: &Bus) -> Option<u64> {
+        bus.latest(lamp_body::unplug::CANCEL_TOPIC)
+            .unwrap()
+            .map(|message| message.header.seq)
+    }
+
+    /// A say service that answers each line `begun` then `spoken`, noting for
+    /// each whether the cancel was already published when the line arrived.
+    fn voice(listener: UnixListener, bus: Bus) -> std::thread::JoinHandle<Vec<(String, bool)>> {
+        listener.set_nonblocking(false).unwrap();
+        std::thread::spawn(move || {
+            let mut heard = Vec::new();
+            listener.set_nonblocking(true).unwrap();
+            let until = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < until {
+                let Ok((stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
+                heard.push((
+                    asked["note"].as_str().unwrap().to_owned(),
+                    cancels(&bus).is_some(),
+                ));
+                let mut stream = &stream;
+                writeln!(stream, "{}", json!({"event": "begun"})).unwrap();
+                writeln!(stream, "{}", json!({"outcome": "spoken"})).unwrap();
+            }
+            heard
+        })
+    }
+
+    #[test]
+    fn never_mind_says_its_line_before_the_cancel_that_moves_the_body() {
+        let dir = tempfile::Builder::new()
+            .prefix("us")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "folding");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let request = lamp_skills::unplug::may_stay(&bus, clock::now_us(), false).unwrap();
+        let outcome = stay(&sockets, &bus, &request, lamp_skills::unplug::STAY_LINE);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::STAY_LINE.to_owned(), false)],
+            "the line reached the voice before any cancel"
+        );
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// The reviewer on #2069 (new P3): a body that fails after the cancel
+    /// (no proof within 60 s) is said to need checking, once.
+    #[test]
+    fn a_failure_after_the_cancel_says_it_needs_checking() {
+        let dir = tempfile::Builder::new()
+            .prefix("uc")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let failing = {
+            let bus = bus.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                latched(&bus, "failed");
+            })
+        };
+        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        failing.join().unwrap();
+        assert!(outcome.contains("it then failed"), "{outcome}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [
+                (lamp_skills::unplug::STAY_LINE.to_owned(), false),
+                (lamp_skills::unplug::CHECK_LINE.to_owned(), true)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_line_never_begun_cancels_nothing() {
+        let dir = tempfile::Builder::new()
+            .prefix("un")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = stay(&sockets, &bus, "r1", lamp_skills::unplug::STAY_LINE);
+        assert!(outcome.contains("nothing cancelled"), "{outcome}");
+        assert!(cancels(&bus).is_none());
+    }
+
+    #[test]
+    fn the_timeout_fires_once_and_never_from_failed() {
+        let dir = tempfile::Builder::new()
+            .prefix("ut")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let sockets = nowhere(dir.path(), unplug_grants());
+        latched(&bus, "failed");
+        assert_eq!(stay_after(&sockets, &bus, "r1", Duration::ZERO), None);
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let fired = stay_after(&sockets, &bus, "r1", Duration::ZERO).unwrap();
+        assert!(fired.contains("cancel published for r1"), "{fired}");
+        // Once cancelled, it is over: a second timer finds nothing to do.
+        assert_eq!(stay_after(&sockets, &bus, "r1", Duration::ZERO), None);
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::TIMEOUT_LINE.to_owned(), false)]
+        );
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// The reviewer on #2069 (P3 2): Ready at minute 0, lost and Ready again
+    /// at 9:30, stands 10 minutes after 9:30, not at 10:00.
+    #[test]
+    fn the_timer_counts_unbroken_minutes_ready() {
+        let min = |m: f64| (m * 60_000_000.0) as u64;
+        let wait = Duration::from_secs(600);
+        let mut since = None;
+        assert!(!ready_for(&mut since, true, 0, wait));
+        assert!(!ready_for(&mut since, false, min(9.0), wait), "a gap");
+        assert!(!ready_for(&mut since, true, min(9.5), wait));
+        assert!(!ready_for(&mut since, true, min(10.0), wait));
+        assert!(!ready_for(&mut since, true, min(19.4), wait));
+        assert!(ready_for(&mut since, true, min(19.5), wait));
+    }
+
+    /// The first builder on #2069 (P2): a hand on the arm before any cancel
+    /// fails a Ready preparation; the timer then says it needs to be checked,
+    /// once, and cancels nothing.
+    #[test]
+    fn a_failure_after_ready_says_it_needs_checking_and_never_stands() {
+        let dir = tempfile::Builder::new()
+            .prefix("uf")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let sockets = nowhere(dir.path(), unplug_grants());
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let failing = {
+            let bus = bus.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(200));
+                latched(&bus, "failed");
+            })
+        };
+        let said = stay_after(&sockets, &bus, "r1", Duration::from_secs(600)).unwrap();
+        failing.join().unwrap();
+        assert!(said.contains("spoken"), "{said}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(lamp_skills::unplug::CHECK_LINE.to_owned(), false)]
+        );
+        assert_eq!(cancels(&bus), None);
     }
 
     #[test]

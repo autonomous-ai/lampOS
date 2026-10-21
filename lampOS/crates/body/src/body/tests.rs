@@ -11036,9 +11036,10 @@ fn a_base_held_gently_by_a_hand_is_not_sent_back_into_it() {
     assert_eq!(pushed_back, 0, "{report:?}");
 }
 
-/// A single unplug request cancels the 90-second awake window and remains
-/// authoritative over later speaking, directed reading holds, name, face,
-/// expression and skill input.
+/// An unplug request cancels the 90-second awake window and, while it is in
+/// force (the adapter's latch, read every step), stays authoritative over
+/// later speaking, directed reading holds, name, face, expression and skill
+/// input.
 #[test]
 fn unplug_folds_now_and_latches_over_later_inputs() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(25));
@@ -11048,7 +11049,6 @@ fn unplug_folds_now_and_latches_over_later_inputs() {
     let time = clock.time.clone();
     let watched = clock.time.clone();
     let mood_at = clock.time.clone();
-    let mut requested = false;
     let mut frames = Vec::new();
     let report = run_alive(
         &mut lamp,
@@ -11068,8 +11068,7 @@ fn unplug_folds_now_and_latches_over_later_inputs() {
             ))
         },
         move || {
-            let unplug = !requested && time.get() >= Duration::from_secs(8);
-            requested |= unplug;
+            let unplug = time.get() >= Duration::from_secs(8);
             Asked {
                 unplug,
                 called: true,
@@ -11459,4 +11458,68 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
         !safe,
         "unplug target must remain the explicit calibrated home"
     );
+}
+
+/// A matching "never mind" clears the adapter's latch: the folded lamp stands
+/// again through the ordinary rise, as when spoken to; a keeper pause wins.
+#[test]
+fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
+    for paused in [false, true] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(40));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let mood_at = clock.time.clone();
+        let watched = clock.time.clone();
+        let mut frames = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits::FOLDED,
+            Some(HOME),
+            Some(standing(100, 90)),
+            None,
+            // Spoken to only before the request: standing again afterwards
+            // is the release's own wake window, not a mood's.
+            move || {
+                Some(if mood_at.get() < Duration::from_secs(8) {
+                    (Mood::Speaking, 80)
+                } else {
+                    (Mood::Resting, 0)
+                })
+            },
+            move || {
+                let at = time.get();
+                let latched = at >= Duration::from_secs(8) && at < Duration::from_secs(16);
+                Asked {
+                    unplug: latched,
+                    paused: paused && at >= Duration::from_secs(16),
+                    ..Asked::default()
+                }
+            },
+            |glimpse| frames.push((watched.get(), *glimpse)),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        let between = |from: u64, to: u64| {
+            frames
+                .iter()
+                .filter(move |(at, _)| {
+                    *at >= Duration::from_secs(from) && *at < Duration::from_secs(to)
+                })
+                .map(|(_, frame)| frame.stand)
+        };
+        assert!(between(0, 8).any(|stand| stand > 0.9), "stood before");
+        assert!(
+            between(14, 16).all(|stand| stand == 0.0),
+            "folded while latched"
+        );
+        if paused {
+            assert!(
+                between(16, 40).all(|stand| stand == 0.0),
+                "a pause keeps it down"
+            );
+        } else {
+            assert!(between(16, 40).any(|stand| stand > 0.9), "stood again");
+        }
+    }
 }

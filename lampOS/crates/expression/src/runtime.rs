@@ -1197,6 +1197,33 @@ mod unplug_tests {
     }
 
     #[test]
+    fn a_matching_skills_cancel_hands_the_body_back() {
+        let mut fixture = Fixture::new(true, true);
+        fixture.request("ready", "r1");
+        let latched = |fixture: &Fixture| fixture.service.unplug.as_ref().unwrap().latched;
+        fixture.step(unix_ms());
+        assert!(latched(&fixture));
+        let bus = fixture.bus.clone();
+        let cancel = |source: &str, request: &str| {
+            bus.publisher(lamp_body::unplug::CANCEL_TOPIC, Kind::Latest, source)
+                .unwrap()
+                .publish_json(1_000_000, &serde_json::json!({ "request": request }))
+                .unwrap();
+        };
+        cancel("expression", "r1");
+        cancel("skills", "r0");
+        fixture.step(unix_ms());
+        assert!(
+            latched(&fixture),
+            "foreign or other-request cancels keep the latch"
+        );
+        cancel("skills", "r1");
+        let output = fixture.step(unix_ms());
+        assert!(!latched(&fixture), "the body is handed back");
+        assert!(!output.state.behaviours.contains(&"asleep".into()));
+    }
+
+    #[test]
     fn closed_privacy_and_failed_light_publication_never_acknowledge() {
         let mut fixture = Fixture::new(true, true);
         fixture.request("ready", "r1");
