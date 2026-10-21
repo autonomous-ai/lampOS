@@ -31,6 +31,13 @@ Four more you can run on their own:
   lamp to forget the three names.
 - `twopeople829.sh ROUNDS LABEL`, about 4 minutes a round: the two-person
   scenes alone.
+- `quietroom.sh TRIALS LABEL`, about 1.5 minutes a trial (#2650/#2663,
+  `LAMP_SAME_VOICE_CALLER_ONLY`): a caller's named question, then one
+  second voice's statement not for the lamp, inside the conversation's
+  window; trials 70 s apart, so the room stays quiet (the two-person scenes
+  make it busy by themselves). It prints whether each statement was
+  answered, and the count. Run it with the switch off and on in the same
+  quiet hour.
 - `ask-again.sh LABEL FIXTURE`, about 3 minutes (#2702): a sign-in's
   question cut short is asked again 30 s later, then heard whole, and the
   yes after it is taken. It uses a stand-in Harness, so nothing signs in for
