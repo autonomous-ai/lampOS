@@ -1,6 +1,7 @@
 //! `lamp-voice-eval`'s integration tests, one module a file, built as one binary
 //! so the crate is linked once for them, not once a file (#1806).
 mod acceptance_boundaries;
+mod answer_gaps;
 mod answer_review;
 mod audit_final_dispatch;
 mod audit_importer;

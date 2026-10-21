@@ -13536,15 +13536,7 @@ fn handle_playback_gap(
     else {
         return Err(io::Error::other("expected playback gap event").into());
     };
-    if gap.first_sample.epoch == 0
-        || gap.first_sample.epoch != gap.end_sample.epoch
-        || gap.zero_frames == 0
-        || gap.end_sample.frame.checked_sub(gap.first_sample.frame) != Some(gap.zero_frames)
-        || gap.started_at_us == 0
-        || gap.last_zero_accepted_at_us < gap.started_at_us
-        || observed_at_us < gap.last_zero_accepted_at_us
-        || (phase == PlaybackGapPhase::Started && gap.zero_frames > 240)
-    {
+    if !gap.is_valid_receipt(phase, observed_at_us) {
         return Err(io::Error::other("invalid accepted playback gap receipt").into());
     }
     let current = reply.as_mut().filter(|reply| reply.owner == gap.owner);
@@ -15321,6 +15313,58 @@ mod tests {
         assert!(final_chunk);
         assert_eq!(&samples[..73], &[9; 73]);
         assert!(samples[73..].iter().all(|sample| *sample == 0));
+    }
+
+    #[test]
+    fn invalid_playback_gap_receipts_leave_the_reply_and_trace_unchanged() {
+        let (_, mut current, _) = active_reply();
+        current.pcm = vec![7; 240].into();
+        let gap = crate::wire::PlaybackGap {
+            owner: current.owner,
+            first_sample: lamp_audio::ownership::PlaybackCursor { epoch: 1, frame: 0 },
+            end_sample: lamp_audio::ownership::PlaybackCursor {
+                epoch: 1,
+                frame: 240,
+            },
+            started_at_us: 100,
+            last_zero_accepted_at_us: 100,
+            zero_frames: 240,
+        };
+        let mut reply = Some(current);
+        let mut trace = SessionState::default();
+        for phase in [
+            PlaybackGapPhase::Started,
+            PlaybackGapPhase::Resumed,
+            PlaybackGapPhase::Cancelled,
+        ] {
+            let mut invalid = gap;
+            match phase {
+                PlaybackGapPhase::Started => {
+                    invalid.end_sample.frame = 241;
+                    invalid.zero_frames = 241;
+                }
+                PlaybackGapPhase::Resumed => invalid.end_sample.epoch = 2,
+                PlaybackGapPhase::Cancelled => invalid.last_zero_accepted_at_us = 101,
+            }
+            assert!(
+                handle_playback_gap(
+                    &mut reply,
+                    None,
+                    &mut trace,
+                    WorkerEvent::PlaybackGap {
+                        phase,
+                        gap: invalid,
+                        observed_at_us: 100
+                    },
+                    false,
+                    None,
+                )
+                .is_err()
+            );
+            assert!(trace.is_empty());
+            assert_eq!(reply.as_ref().unwrap().playback_gaps, 0);
+            assert_eq!(reply.as_ref().unwrap().pcm, vec![7; 240]);
+        }
     }
 
     #[test]

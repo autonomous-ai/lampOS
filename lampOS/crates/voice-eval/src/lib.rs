@@ -11,6 +11,7 @@
 //! playing several synthetic voices cannot establish spatial speaker
 //! discrimination.
 pub mod annotations;
+pub mod answer_gaps;
 pub mod canary;
 pub mod cost;
 pub mod endpoint;

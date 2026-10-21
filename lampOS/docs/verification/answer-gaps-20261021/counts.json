@@ -1,0 +1,93 @@
+{
+  "files": [
+    {
+      "evidence_complete": true,
+      "excluded_identities": 0,
+      "incomplete": {
+        "distinct_replies": 0,
+        "gaps": 0
+      },
+      "input": "7d22bb8a22634c90a316b33da953842c.timing.jsonl",
+      "over_300_ms": {
+        "cancelled": {
+          "distinct_replies": 12,
+          "gaps": 12
+        },
+        "distinct_replies": 19,
+        "resumed": {
+          "distinct_replies": 9,
+          "gaps": 11
+        }
+      },
+      "paired_terminals": {
+        "cancelled": 15,
+        "resumed": 18
+      },
+      "playback_gap_records": 66,
+      "problems": {
+        "duplicate_starts": 0,
+        "duplicate_terminals": 0,
+        "input_error": null,
+        "invalid_gap": 0,
+        "invalid_record": 0,
+        "malformed_json": 0,
+        "mismatched_terminals": 0,
+        "no_gap_records": false,
+        "orphan_terminals": 0
+      },
+      "raw_phases": {
+        "cancelled": 15,
+        "resumed": 18,
+        "started": 33,
+        "unknown": 0
+      },
+      "records_read": 12689
+    },
+    {
+      "evidence_complete": true,
+      "excluded_identities": 0,
+      "incomplete": {
+        "distinct_replies": 0,
+        "gaps": 0
+      },
+      "input": "3afa5034d9e34e1a9b7a0edc27cb64d5.timing.jsonl",
+      "over_300_ms": {
+        "cancelled": {
+          "distinct_replies": 13,
+          "gaps": 13
+        },
+        "distinct_replies": 23,
+        "resumed": {
+          "distinct_replies": 10,
+          "gaps": 10
+        }
+      },
+      "paired_terminals": {
+        "cancelled": 13,
+        "resumed": 19
+      },
+      "playback_gap_records": 64,
+      "problems": {
+        "duplicate_starts": 0,
+        "duplicate_terminals": 0,
+        "input_error": null,
+        "invalid_gap": 0,
+        "invalid_record": 0,
+        "malformed_json": 0,
+        "mismatched_terminals": 0,
+        "no_gap_records": false,
+        "orphan_terminals": 0
+      },
+      "raw_phases": {
+        "cancelled": 13,
+        "resumed": 19,
+        "started": 32,
+        "unknown": 0
+      },
+      "records_read": 10694
+    }
+  ],
+  "sample_rate_hz": 24000,
+  "threshold_comparison": "strictly_greater",
+  "threshold_ms": 300
+}

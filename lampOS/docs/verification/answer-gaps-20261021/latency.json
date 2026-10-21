@@ -1,0 +1,80 @@
+{
+  "boundary": "Python monotonic immediately before subprocess.run through captured stdout and child exit; includes process launch, reads of both full timing JSONL files, parse, and JSON formatting; debug binary; first real-data invocation and immediate repeat, no disk-cache flush",
+  "bytes": 8173590,
+  "measurements": [
+    {
+      "run": "first",
+      "elapsed_ms": 329.098,
+      "exit_code": 0,
+      "total_records": 23383,
+      "gap_records": 130
+    },
+    {
+      "run": "repeat",
+      "elapsed_ms": 320.181,
+      "exit_code": 0,
+      "total_records": 23383,
+      "gap_records": 130
+    }
+  ],
+  "review_before_rebase": {
+    "base": "b87b3e91ad04b5811fe441efa118773d33416630",
+    "target_ms": 1000,
+    "first_launch_met_target": false,
+    "measurements": [
+      {
+        "run": "first",
+        "elapsed_ms": 1339.043,
+        "exit_code": 0,
+        "byte_identical_to_committed_counts": true,
+        "total_records": 23383,
+        "gap_records": 130
+      },
+      {
+        "run": "repeat",
+        "elapsed_ms": 322.414,
+        "exit_code": 0,
+        "byte_identical_to_committed_counts": true,
+        "total_records": 23383,
+        "gap_records": 130
+      }
+    ]
+  },
+  "review_after_rebase": {
+    "boundary": "Host monotonic immediately before subprocess.run through captured JSON stdout and child exit; includes process launch, both full timing JSONL files, parsing and formatting; debug binary; first invocation of post-rebase build over inputs and immediate repeat, no disk-cache flush. Child CPU from differences in resource.getrusage(RUSAGE_CHILDREN); remaining wall time is unassigned, not attributed to a cause.",
+    "target_ms": 1000,
+    "build_parent": "4efcf4eb0cda0ef730d30658572f49da7592a0b8",
+    "bytes": 8173590,
+    "measurements": [
+      {
+        "run": "first",
+        "elapsed_ms": 1303.071,
+        "child_user_ms": 300.775,
+        "child_system_ms": 5.711,
+        "exit_code": 0,
+        "byte_identical_to_committed_counts": true,
+        "total_records": 23383,
+        "gap_records": 130
+      },
+      {
+        "run": "repeat",
+        "elapsed_ms": 316.48,
+        "child_user_ms": 304.402,
+        "child_system_ms": 8.939,
+        "exit_code": 0,
+        "byte_identical_to_committed_counts": true,
+        "total_records": 23383,
+        "gap_records": 130
+      }
+    ],
+    "binary_sha256": "b4688064cc61de138836850ee423ca8167a93517b461dd084da2543cb8c7cf1b",
+    "binary_bytes": 36089432,
+    "counts_sha256": "cdfb702d50b3c7d9f6b34c6b75985663e9e812d1315235523c934606ed25e124",
+    "source_sha256": {
+      "lampOS/crates/voice/src/wire.rs": "cd56c6d7d5e6c464646d7ec29a957d6378a054c08716cbc32b7e9a67cb3b1442",
+      "lampOS/crates/voice/src/coordinator.rs": "1edc93ba79384745e390e762c5ab96faf1cfb603153500a224e6e7d77b90db92",
+      "lampOS/crates/voice-eval/src/answer_gaps.rs": "2ba43490baa6d9d2c45a48e319a8f6fc75a44c2052ee461a9f719bf9a21490f6"
+    },
+    "first_launch_met_target": false
+  }
+}

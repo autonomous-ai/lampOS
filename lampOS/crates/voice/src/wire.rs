@@ -307,6 +307,23 @@ pub struct PlaybackGap {
     pub zero_frames: u64,
 }
 
+impl PlaybackGap {
+    /// Validate an accepted-zero receipt at its worker observation time.
+    /// A start carries at most the first 240-frame render block; a terminal
+    /// receipt carries all accepted zeros. Origin, listening policy and current
+    /// reply ownership remain the caller's separate concerns.
+    pub fn is_valid_receipt(&self, phase: PlaybackGapPhase, observed_at_us: u64) -> bool {
+        self.first_sample.epoch != 0
+            && self.first_sample.epoch == self.end_sample.epoch
+            && self.zero_frames != 0
+            && self.end_sample.frame.checked_sub(self.first_sample.frame) == Some(self.zero_frames)
+            && self.started_at_us != 0
+            && self.last_zero_accepted_at_us >= self.started_at_us
+            && observed_at_us >= self.last_zero_accepted_at_us
+            && (phase != PlaybackGapPhase::Started || self.zero_frames <= 240)
+    }
+}
+
 /// Stable typed reasons for every failure reachable through BoundaryGuard::check.
 /// Other authority failures still fail closed; their text is never interpreted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -765,6 +782,101 @@ impl ReceiveOrder {
         self.sequence = packet.sequence;
         self.sent_at_us = packet.sent_at_us;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod playback_gap_receipt_tests {
+    use super::*;
+
+    fn receipt(frames: u64) -> PlaybackGap {
+        PlaybackGap {
+            owner: serde_json::from_value(serde_json::json!({
+                "boot": vec![1; 16], "turn": 1, "generation": 1
+            }))
+            .unwrap(),
+            first_sample: PlaybackCursor { epoch: 1, frame: 0 },
+            end_sample: PlaybackCursor {
+                epoch: 1,
+                frame: frames,
+            },
+            started_at_us: 100,
+            last_zero_accepted_at_us: 100,
+            zero_frames: frames,
+        }
+    }
+
+    #[test]
+    fn the_start_is_at_most_one_block_but_terminal_receipts_can_grow() {
+        for phase in [
+            PlaybackGapPhase::Started,
+            PlaybackGapPhase::Resumed,
+            PlaybackGapPhase::Cancelled,
+        ] {
+            for frames in [0, 1, 239, 240, 241, 7200, u64::MAX] {
+                assert_eq!(
+                    receipt(frames).is_valid_receipt(phase, 100),
+                    frames != 0 && (phase != PlaybackGapPhase::Started || frames <= 240),
+                    "phase {phase:?}, frames {frames}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn epoch_and_cursor_length_must_identify_the_accepted_frames() {
+        let valid = receipt(240);
+        assert!(valid.is_valid_receipt(PlaybackGapPhase::Started, 100));
+        for case in 0..5 {
+            let mut gap = valid;
+            match case {
+                0 => {
+                    gap.first_sample.epoch = 0;
+                    gap.end_sample.epoch = 0;
+                }
+                1 => gap.end_sample.epoch = 2,
+                2 => gap.end_sample.frame = 239,
+                3 => gap.end_sample.frame = 241,
+                _ => {
+                    gap.first_sample.frame = u64::MAX;
+                    gap.end_sample.frame = 239;
+                }
+            }
+            for phase in [
+                PlaybackGapPhase::Started,
+                PlaybackGapPhase::Resumed,
+                PlaybackGapPhase::Cancelled,
+            ] {
+                assert!(
+                    !gap.is_valid_receipt(phase, 100),
+                    "case {case}, phase {phase:?}"
+                );
+            }
+        }
+        let mut at_cursor_end = valid;
+        at_cursor_end.first_sample.frame = u64::MAX - 240;
+        at_cursor_end.end_sample.frame = u64::MAX;
+        assert!(at_cursor_end.is_valid_receipt(PlaybackGapPhase::Started, 100));
+    }
+
+    #[test]
+    fn timestamps_allow_equality_but_not_zero_start_or_regression() {
+        for phase in [
+            PlaybackGapPhase::Started,
+            PlaybackGapPhase::Resumed,
+            PlaybackGapPhase::Cancelled,
+        ] {
+            let mut gap = receipt(240);
+            assert!(gap.is_valid_receipt(phase, 100));
+            assert!(!gap.is_valid_receipt(phase, 99));
+            gap.started_at_us = 0;
+            assert!(!gap.is_valid_receipt(phase, 100));
+            gap.started_at_us = 101;
+            assert!(!gap.is_valid_receipt(phase, 101));
+            gap.last_zero_accepted_at_us = 101;
+            assert!(gap.is_valid_receipt(phase, 101));
+            assert!(gap.is_valid_receipt(phase, u64::MAX));
+        }
     }
 }
 
