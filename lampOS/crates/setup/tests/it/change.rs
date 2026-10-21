@@ -357,6 +357,68 @@ fn run(config: &Config, enable: bool, line: &str) -> (Value, String) {
     )
 }
 
+/// On the socket systemd hands over, only lamp-cloud may ask, as for the
+/// keys: a peer that isn't it (here, this test, outside
+/// `lamp-cloud.service`) is refused before its line is read, and nothing
+/// is changed. Standard input that isn't a socket is the helper run by hand
+/// (the test above).
+#[test]
+fn a_socket_peer_that_is_not_lamp_cloud_is_refused_and_nothing_changes() {
+    use std::io::Read;
+    use std::os::unix::net::UnixStream;
+    let root = Root::new();
+    let config = root.config();
+    let file = config
+        .name
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("serve.json");
+    fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+    let before = fs::read_to_string(&config.name).ok();
+    for helper in ["change", "wifi"] {
+        let (mut ours, theirs) = UnixStream::pair().unwrap();
+        let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-setup"))
+            .args([helper, "--config"])
+            .arg(&file)
+            .arg("--enable")
+            .stdin(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        ours.write_all(b"{\"person_name\": \"Lan\"}\n").unwrap();
+        drop(ours);
+        let mut stdout = String::new();
+        child
+            .stdout
+            .take()
+            .unwrap()
+            .read_to_string(&mut stdout)
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success(), "{helper}");
+        let reply: Value = serde_json::from_str(stdout.trim()).unwrap();
+        assert_eq!(
+            reply,
+            json!({"refused": "only the app's link may change the lamp's settings"}),
+            "{helper}"
+        );
+        let journal = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            journal.contains("refused: the peer is not lamp-cloud.service"),
+            "{helper}: {journal}"
+        );
+        assert!(!journal.contains("Lan"), "{journal}");
+    }
+    assert_eq!(
+        fs::read_to_string(&config.name).ok(),
+        before,
+        "nothing changed"
+    );
+}
+
 #[test]
 fn the_helper_answers_one_line_and_never_journals_a_name() {
     let root = Root::new();

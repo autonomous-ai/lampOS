@@ -97,6 +97,19 @@ pub fn peer_is_asker() -> bool {
     false
 }
 
+/// Whether a helper on a socket systemd hands over (the change, Wi-Fi and
+/// keys helpers' `Accept=yes` units) must refuse its peer before reading its
+/// line: standard input is a socket and its peer isn't in [`ASKER_UNIT`].
+/// Standard input that isn't a socket is the helper run by hand, by root,
+/// which already may do anything the helper does.
+pub fn socket_peer_refused() -> bool {
+    let stdin = std::io::stdin();
+    let socket = rustix::fs::fstat(&stdin).is_ok_and(|stat| {
+        rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::Socket
+    });
+    socket && !peer_is_asker()
+}
+
 /// A service a person may bring their own key for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Service {

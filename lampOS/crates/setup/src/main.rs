@@ -293,6 +293,18 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         return Err("change takes --config, --bus-root and --enable".into());
     }
     let config = serve_config(&config_path)?;
+    // Only lamp-cloud may ask on the socket, as for the keys: any other
+    // peer is refused before its line is read.
+    if lamp_setup::keys::socket_peer_refused() {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: change refused: the peer is not {}",
+            lamp_setup::keys::ASKER_UNIT
+        );
+        return Ok(true);
+    }
     let mut line = String::new();
     io::stdin()
         .lock()
@@ -371,7 +383,7 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
         out.flush()?;
         eprintln!(
             "lamp-setup: keys refused: the peer is not {}",
-            keys::ASKER_UNIT
+            lamp_setup::keys::ASKER_UNIT
         );
         return Ok(true);
     }
@@ -426,6 +438,10 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
     Ok(true)
 }
 
+/// The change and Wi-Fi helpers' refusal to a socket peer that isn't
+/// lamp-cloud (`keys::socket_peer_refused`).
+const NOT_THE_CLOUD: &str = "only the app's link may change the lamp's settings";
+
 /// `wifi`: one Wi-Fi change from `lamp-cloud`, on the socket systemd hands
 /// over as standard input and output (`lamp-setup-wifi@.service`).
 fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
@@ -437,6 +453,18 @@ fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std:
         return Err("wifi takes --config and --enable".into());
     }
     let config = serve_config(&config_path)?;
+    // Only lamp-cloud may ask on the socket, and so confirm, as for the
+    // keys: any other peer is refused before its line is read.
+    if lamp_setup::keys::socket_peer_refused() {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: wifi refused: the peer is not {}",
+            lamp_setup::keys::ASKER_UNIT
+        );
+        return Ok(true);
+    }
     let mut line = String::new();
     io::stdin()
         .lock()

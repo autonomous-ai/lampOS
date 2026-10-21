@@ -497,9 +497,13 @@ standard input and output. It reads one line (at most 4 KiB), answers
 changed (below). It checks every request itself, whoever connects: exactly
 one of `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
 Without `--enable` every request is refused, "changes after setup are off",
-and nothing is written. **The socket's group is the gate:** the unit always
-passes `--enable`, so once installed any `lampos` process can ask for these
-changes; `LAMP_SETTINGS_CHANGE` only decides whether `lamp-cloud` asks. A
+and nothing is written. **Only `lamp-cloud` may ask:** the socket's group lets
+a `lampos` process connect, and the helper then takes its peer's credentials
+(`SO_PEERCRED`) and refuses any peer outside `lamp-cloud.service`'s cgroup,
+before its line is read, with `{"refused": "only the app's link may change the
+lamp's settings"}` and nothing changed (`keys::socket_peer_refused`, as the keys
+helper does). Run by hand, its standard input not a socket, it takes the line
+as before. `LAMP_SETTINGS_CHANGE` decides whether `lamp-cloud` asks. A
 refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8
 characters)"); a zone is said.
@@ -536,9 +540,10 @@ less what the radio needs: the network (the broker's check), netlink, and
 writes to `/etc` (the Wi-Fi file and V1's `device-sta-mode`, which edits
 `/etc/dhcpcd.conf`), `/run` and the real `/tmp` (`wpa_cli`'s reply socket, so
 no `PrivateTmp`). The names' helper has `PrivateNetwork=yes` and could not.
-**The socket's group is the gate:** the unit always passes `--enable`, so once
-installed any `lampos` process can ask for a Wi-Fi change, and only one whose
-broker the new network reaches is kept. One line in,
+**Only `lamp-cloud` may ask, and so confirm:** a peer outside
+`lamp-cloud.service`'s cgroup is refused before its line is read, as for the
+change helper above. A change is kept only when its broker is reached on the
+new network and the app confirms it. One line in,
 `{"wifi": {"ssid", "password", "broker": "host:port"}}`, checked with setup's
 own `wpa_conf` and its page's words (`serve::refused_words`); one line out at
 the end, `{"done": {"ssid"}}` or `{"refused": why}`.
