@@ -1929,18 +1929,25 @@ pub fn serve(
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only): searched in the scope the
     // turn's note is told for, the known face's or the room's, within
-    // `HITS_WITHIN`, and told as notes, never as sources. Not with
-    // `LAMP_SECOND_SCOPED_CONTEXT`, whose per-line lease it doesn't read yet.
+    // `HITS_WITHIN`, and told as notes, never as sources. With
+    // `LAMP_SECOND_SCOPED_CONTEXT`, in the request's own admitted scope (its
+    // lease, narrowed to the room when another face spoke it), as its context
+    // is told: never the sticky session's person.
     match (crate::remember::hits_on(), hits_socket) {
-        (true, Some(socket)) if days && !scoped_context_from_environment() => {
+        (true, Some(socket)) if days => {
             eprintln!(
                 "lamp-voice second: each spoken turn is told what memory holds that may fit its words ({})",
                 crate::remember::HITS_ENVIRONMENT
             );
             let who = hits_who;
-            engine = engine.remembering(Arc::new(move |request, heard| {
+            engine = engine.remembering(Arc::new(move |request, heard, lease| {
                 let started = Instant::now();
-                let Some(person) = hits_person(&hits_sessions, who.as_deref(), started) else {
+                let person = match lease {
+                    // Revoked: nothing is asked for it.
+                    Some(lease) => Some(lease.scope()?.person().map(str::to_owned)),
+                    None => hits_person(&hits_sessions, who.as_deref(), started),
+                };
+                let Some(person) = person else {
                     eprintln!(
                         "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
                     );
@@ -1976,7 +1983,7 @@ pub fn serve(
             }));
         }
         (true, _) => eprintln!(
-            "lamp-voice second: memory isn't told on each turn: {} needs the Days memory and no LAMP_SECOND_SCOPED_CONTEXT",
+            "lamp-voice second: memory isn't told on each turn: {} needs the Days memory",
             crate::remember::HITS_ENVIRONMENT
         ),
         (false, _) => {}

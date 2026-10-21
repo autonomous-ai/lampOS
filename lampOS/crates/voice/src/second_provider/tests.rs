@@ -2074,7 +2074,7 @@ async fn memory_told_on_the_early_words_keeps_the_prepared_round() {
     let counted = asked_memory.clone();
     let mut engine = engine
         .preparing(true)
-        .remembering(Arc::new(move |_, words: &str| {
+        .remembering(Arc::new(move |_, words: &str, _| {
             counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             words.contains("name").then(|| "MEMORY NOTE".to_owned())
         }));
@@ -6069,6 +6069,10 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
             .push(lease.scope().unwrap().person().map(str::to_owned));
         Box::pin(async { json!({"ok":true}) })
     });
+    // Memory's hits for each line (`LAMP_SECOND_MEMORY_HITS`): asked in
+    // the line's own scope, the room's once another face spoke it.
+    let hits: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let hit = hits.clone();
     let eyes = Arc::new(SpeakingFaces::default());
     let mut engine = engine
         .with_memory_scope(
@@ -6080,6 +6084,15 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
             })),
         )
         .seeing_who_speaks(eyes.clone(), path.clone())
+        .remembering(Arc::new(move |_, _, lease: Option<&ScopeLease>| {
+            hit.lock().unwrap().push(
+                lease
+                    .and_then(|lease| lease.scope())
+                    .and_then(|scope| scope.person())
+                    .map(str::to_owned),
+            );
+            None
+        }))
         .announcing(false);
     engine.memory_camera(true, 1);
     cache.replace(
@@ -6133,6 +6146,11 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
     }
     let a = crate::remember::person_id("A");
     assert_eq!(*scopes.lock().unwrap(), [None, Some(a.clone()), None]);
+    assert_eq!(
+        *hits.lock().unwrap(),
+        [None, Some(a.clone()), None],
+        "memory's hits are asked in each line's own scope"
+    );
     let asked = script.asked.lock().unwrap();
     let room = Message::system("for None");
     let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
