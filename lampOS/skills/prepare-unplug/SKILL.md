@@ -14,7 +14,10 @@ folded joints are physically settled, and Expression must publish the asleep
 presentation, before a separate short voice confirmation is requested. Missing,
 stale, mismatched or failed evidence never authorizes that confirmation.
 
-Preparation inhibits movement until reboot, including name calls, gestures and
-the readiness speech itself. A failed or interrupted attempt does not resume
-motors. If the body cannot confirm the fold, keep power connected and have the
+Preparation inhibits movement, including name calls, gestures and the
+readiness speech itself, until reboot or a "never mind": the reserved
+`stay_plugged_in` tool, refused unless preparation is latched, or 10
+unbroken minutes Ready (`LAMP_UNPLUG_STAY_MIN`). The skill says it will stay before the
+body, after its own checks, stands again. A failed or interrupted attempt does
+not resume motors. If the body cannot confirm the fold, keep power connected and have the
 operator inspect it. This is not an operating-system shutdown command.

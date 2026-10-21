@@ -1962,6 +1962,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 "tool {tool:?}: a lowercase letter, then at most 47 lowercase letters, digits and _"
             ));
         }
+        if tool == unplug::STAY_TOOL {
+            return Err(format!(
+                "tool {tool:?} is reserved for the unplug cancel of prepare-unplug"
+            ));
+        }
         if description.len() > 1_024 {
             return Err("a skill with a tool has a description of at most 1,024 bytes".into());
         }
@@ -5091,6 +5096,15 @@ pub fn tools_file(skills: &[Skill]) -> Value {
                 "parameters": {"type": "object", "properties": properties}
             }));
         }
+    }
+    // "Never mind" is declared whenever the unplug skill is loaded, so a Live
+    // session that asked for the unplug already has it; with no latch in
+    // force the call is refused (`unplug::may_stay`). It moves the body.
+    if skills.iter().any(Skill::prepares_unplug)
+        && !tools.iter().any(|tool| tool["name"] == unplug::STAY_TOOL)
+    {
+        tools.push(unplug::stay_tool());
+        moving.push(unplug::STAY_TOOL);
     }
     if moving.is_empty() {
         json!({ "tools": tools })

@@ -10523,6 +10523,14 @@ fn unplug_is_only_an_explicit_single_step_and_admission_is_never_readiness() {
     let valid = include_str!("../../../../skills/prepare-unplug/skill.toml");
     let skill = load(&skill_with(dir.path(), "prepare-unplug", valid)).unwrap();
     assert!(skill.triggers.is_empty());
+    // "Never mind" is declared with the skill, latch or not (#2069 P3 1),
+    // and moves the body, so never for a text from the app.
+    let tools = tools_file(std::slice::from_ref(&skill));
+    assert_eq!(tools["tools"][1]["name"], "stay_plugged_in");
+    assert_eq!(
+        tools["body"],
+        serde_json::json!(["prepare_to_unplug", "stay_plugged_in"])
+    );
     let mut engine = Engine::new(vec![skill], true);
     let run = engine
         .tool("prepare_to_unplug", &serde_json::json!({}), 1)
@@ -10570,6 +10578,18 @@ fn unplug_operation_rejects_an_ordinary_skill_name_and_an_alias_tool() {
             "{why}"
         );
     }
+}
+
+#[test]
+fn no_skill_may_take_the_reserved_never_mind_tool() {
+    let dir = tempfile::tempdir().unwrap();
+    let why = load(&skill_with(
+        dir.path(),
+        "desk-rest",
+        "tool = \"stay_plugged_in\"\n\n[[do]]\nsay = \"Hi.\"\n",
+    ))
+    .unwrap_err();
+    assert!(why.contains("reserved"), "{why}");
 }
 
 #[test]

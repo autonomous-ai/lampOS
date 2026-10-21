@@ -677,7 +677,8 @@ this API nor ordinary expiry grace establishes consumer retention authorization.
 
 The opt-in core skill uses kept `body/unplug_request` and three short-lived
 receipts: `body/unplug_state`, `expression/unplug_state`, `ring/unplug_state`.
-The request survives service restarts until reboot; each receipt expires after
+The request survives service restarts until reboot or a matching kept
+`body/unplug_cancel` from Skills ("never mind"); each receipt expires after
 500 ms and carries the matching request identifier. [unplug.md](unplug.md)
 defines the payloads, ownership and proof. No readiness reader treats ordinary
 `body/joint_states`, pause or successful publication alone as safe completion.
