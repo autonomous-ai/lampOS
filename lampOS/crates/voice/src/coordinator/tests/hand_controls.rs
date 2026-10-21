@@ -683,6 +683,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         provider,
         privacy,
         privacy_controls: false,
+        capture_held: false,
         privacy_receipts: false,
         ring: None.into(),
         camera: None,
@@ -800,6 +801,8 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
             speaker: false,
             privacy: false,
             privacy_said_us: None,
+            authorities: Vec::new(),
+            chunk_times: Vec::new(),
             peer,
             input: Some(input),
             pid,
@@ -1086,6 +1089,16 @@ fn run_until_error(
 
 /// What one run of the loop left.
 struct Ran {
+    /// When each authority reached the capture's side, on the stepped
+    /// clock (#2602). Empty on the host's clock.
+    capture_authorities: Vec<u64>,
+    /// When each speaker chunk reached the speaker's side (stepped only).
+    chunk_times: Vec<u64>,
+    /// When each authority reached the speaker's side (stepped only).
+    speaker_authorities: Vec<u64>,
+    /// When each authority reached the rig's camera's side, with
+    /// `RIG_CAMERA` (stepped only).
+    camera_authorities: Vec<u64>,
     error: String,
     /// When the loop ended, on the clock it ran on.
     ended_us: u64,
@@ -1114,6 +1127,18 @@ thread_local! {
     /// freshness that otherwise ends it at 50 ms. Unset, it says nothing,
     /// as before (#1362's hold tests).
     static PRIVACY_FRESH_UNTIL: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// Within this span, on the scenario clock, the privacy worker kept
+    /// fresh says nothing: a gap in the switch's readings (#2602).
+    static PRIVACY_SILENT: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
+    /// The loop's rig on the Controls privacy route, where a gap may be
+    /// ridden (#2602). Unset, the direct route, as before.
+    static RIG_PRIVACY_CONTROLS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// From this time, on the scenario clock, the privacy worker kept fresh
+    /// says the switch is closed.
+    static PRIVACY_CLOSED_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// The loop's rig with a camera of its own, whose side records each
+    /// authority it is given (#2602, the first builder's P1 on #2623).
+    static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// A fixture worker's side read on the stepped clock, as the thread in
@@ -1124,6 +1149,10 @@ struct SteppedPeer {
     /// fresh, and when it last said the switch open.
     privacy: bool,
     privacy_said_us: Option<u64>,
+    /// When each authority reached this side, on the scenario clock.
+    authorities: Vec<u64>,
+    /// When each speaker chunk reached this side.
+    chunk_times: Vec<u64>,
     peer: WorkerChannels,
     input: Option<std::process::ChildStdin>,
     pid: u32,
@@ -1152,9 +1181,14 @@ impl SteppedPeer {
                     return crate::scenario_clock::wait_child_exited(self.pid, bound);
                 }
                 Control::Authority { snapshot } if self.speaker && self.keeping => {
+                    self.authorities.push(monotonic_us());
                     self.told.push(snapshot)
                 }
-                Control::Authority { .. } => {}
+                Control::Authority { .. } => {
+                    if self.keeping {
+                        self.authorities.push(monotonic_us());
+                    }
+                }
                 // A loop kept running past the privacy freshness (#1362's
                 // hold tests) gets as far as asking for capture: nothing is
                 // owed back.
@@ -1167,6 +1201,9 @@ impl SteppedPeer {
             && PRIVACY_FRESH_UNTIL
                 .with(std::cell::Cell::get)
                 .is_some_and(|until| now_us < until)
+            && !PRIVACY_SILENT
+                .with(std::cell::Cell::get)
+                .is_some_and(|(from, to)| (from..to).contains(&now_us))
             && self
                 .privacy_said_us
                 .is_none_or(|said| now_us >= said + 5_000)
@@ -1175,12 +1212,15 @@ impl SteppedPeer {
             self.peer.control.send(WorkerEvent::Privacy {
                 receipt: None,
                 acquired_at_us: now_us,
-                muted: false,
+                muted: PRIVACY_CLOSED_FROM
+                    .with(std::cell::Cell::get)
+                    .is_some_and(|from| now_us >= from),
             })?;
         }
         if self.speaker {
             while let Some(chunk) = self.peer.data.receive::<SpeakerChunk>().unwrap() {
                 if self.keeping {
+                    self.chunk_times.push(monotonic_us());
                     self.chunks.push(chunk);
                 }
             }
@@ -1258,6 +1298,27 @@ fn run_loop_ringed(
         }
         None => (None, None),
     };
+    // A camera of the rig's own, only when a test asks (#2602): last of the
+    // sides, so the others keep their places.
+    let (camera, camera_peer) = if RIG_CAMERA.with(std::cell::Cell::get) {
+        let (worker, peer, input) = fixture(&directory.path, "camera");
+        pids.push(worker.fixture_pid());
+        let source = VisualSource {
+            socket: directory.path.join("camera.frames"),
+            camera: worker.boot,
+            source: "desk".into(),
+            width: 320,
+            height: 240,
+            max_frame_bytes: 128 * 1024,
+        };
+        (
+            // Opening for the whole run: the side never answers a start.
+            Some(OptionalCamera::new(worker, source).opening_until(u64::MAX)),
+            Some((false, peer, input)),
+        )
+    } else {
+        (None, None)
+    };
     let mut rig = Rig {
         expression_out: None,
         second: None,
@@ -1268,10 +1329,11 @@ fn run_loop_ringed(
         capture,
         provider,
         privacy,
-        privacy_controls: false,
+        privacy_controls: RIG_PRIVACY_CONTROLS.with(std::cell::Cell::get),
+        capture_held: false,
         privacy_receipts: false,
         ring: ring.into(),
-        camera: None,
+        camera,
         motor: None,
         ring_channel_ceiling,
         diagnostic_directory: None,
@@ -1315,6 +1377,7 @@ fn run_loop_ringed(
     ]
     .into_iter()
     .chain(ring_peer)
+    .chain(camera_peer)
     .collect::<Vec<_>>();
     let (mut threads, mut stepped, mut scope) = (Vec::new(), None, None);
     if clocking == Clocking::Stepped {
@@ -1331,6 +1394,8 @@ fn run_loop_ringed(
                     // The fourth side: speaker, capture, provider, privacy.
                     privacy: index == 3,
                     privacy_said_us: None,
+                    authorities: Vec::new(),
+                    chunk_times: Vec::new(),
                     peer,
                     input: Some(input),
                     pid,
@@ -1486,14 +1551,31 @@ fn run_loop_ringed(
         Err(error),
     );
     let (mut told, mut chunks) = (Vec::new(), Vec::new());
+    let (mut capture_authorities, mut chunk_times) = (Vec::new(), Vec::new());
+    let (mut camera_authorities, mut speaker_authorities) = (Vec::new(), Vec::new());
+    let with_camera = RIG_CAMERA.with(std::cell::Cell::get);
     for peer in threads {
         let (peer, peer_told, peer_chunks) = peer.join().unwrap();
         drop(peer);
         told.extend(peer_told);
         chunks.extend(peer_chunks);
     }
-    for peer in stepped.map(|shared| shared.take()).unwrap_or_default() {
+    let stepped_peers = stepped.map(|shared| shared.take()).unwrap_or_default();
+    let last = stepped_peers.len().saturating_sub(1);
+    for (index, peer) in stepped_peers.into_iter().enumerate() {
         assert!(peer.stopped, "mock peer did not receive Stop");
+        // In the order made: speaker, capture, provider, privacy, the ring
+        // if any, the camera if any.
+        if index == 0 {
+            speaker_authorities = peer.authorities.clone();
+        }
+        if index == 1 {
+            capture_authorities = peer.authorities.clone();
+        }
+        if with_camera && index == last {
+            camera_authorities = peer.authorities.clone();
+        }
+        chunk_times.extend(peer.chunk_times);
         told.extend(peer.told);
         chunks.extend(peer.chunks);
     }
@@ -1509,6 +1591,10 @@ fn run_loop_ringed(
     drop(scope.take());
     fs::remove_dir(&directory.path).unwrap();
     Ran {
+        capture_authorities,
+        chunk_times,
+        speaker_authorities,
+        camera_authorities,
         error: message,
         ended_us,
         trace,
@@ -2031,6 +2117,266 @@ fn a_hands_sleep_takes_the_persons_light_from_the_bus() {
         crate::ring_face::Lit::of(true, "warm", 3)
     );
     let _ = std::fs::remove_dir_all(&root);
+}
+
+/// The loop on the Controls privacy route with the switch read open every
+/// 5 ms for `fresh_us`, silent in `silent` (from the loop's start), closed
+/// from `closed_from` if given, and `LAMP_PRIVACY_GAP_RIDE` `ride`, from a
+/// reply under way (#2602). What it left, and when it began.
+fn gap_run(ride: bool, fresh_us: u64, silent: (u64, u64), closed_from: Option<u64>) -> (Ran, u64) {
+    let began = std::cell::Cell::new(0);
+    // Read as the rig and the loop are made, before the controls are.
+    RIG_PRIVACY_CONTROLS.with(|on| on.set(true));
+    TEST_PRIVACY_GAP_RIDE.with(|on| on.set(ride));
+    let ran = run_loop_with(
+        // A tap long gone: nothing the controls ask.
+        || {
+            let now = monotonic_us();
+            began.set(now);
+            PRIVACY_FRESH_UNTIL.with(|until| until.set(Some(now + fresh_us)));
+            PRIVACY_SILENT.with(|span| span.set(Some((now + silent.0, now + silent.1))));
+            PRIVACY_CLOSED_FROM.with(|from| from.set(closed_from.map(|at| now + at)));
+            HandControls::with_test_tap("test-hand-clock", now - 10_000_000).unwrap()
+        },
+        || {
+            let (owner, current, _) = active_reply();
+            (owner, Some(current))
+        },
+        false,
+        Clocking::Stepped,
+    );
+    RIG_PRIVACY_CONTROLS.with(|on| on.set(false));
+    TEST_PRIVACY_GAP_RIDE.with(|on| on.set(false));
+    PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
+    PRIVACY_SILENT.with(|span| span.set(None));
+    PRIVACY_CLOSED_FROM.with(|from| from.set(None));
+    (ran, began.get())
+}
+
+/// A privacy gap's mark in the trace: its time and how long it lasted.
+fn gap_marks(ran: &Ran, state: &str) -> Vec<(u64, Option<u64>)> {
+    ran.trace
+        .iter()
+        .filter(|row| row["kind"] == "privacy_gap" && row["state"] == state)
+        .map(|row| (row["at_us"].as_u64().unwrap(), row["lasted_us"].as_u64()))
+        .collect()
+}
+
+/// #2602 (finding 3, the first builder's (B) at 17:4x;
+/// `LAMP_PRIVACY_GAP_RIDE=on`): a 300 ms gap in the switch's readings with
+/// the switch unchanged doesn't end the conversation. From the lapse the
+/// reply under way is cut and not resumed, the capture's authority isn't
+/// renewed (its lease lapses), and nothing is said; a fresh reading that
+/// says open renews it and the conversation goes on. A later gap that
+/// outlasts a second ends it as before.
+#[test]
+fn a_short_gap_in_the_switchs_readings_is_ridden_and_the_conversation_goes_on() {
+    let (ran, began) = gap_run(true, 1_500_000, (300_000, 600_000), None);
+    let started = gap_marks(&ran, "began");
+    let reopened = gap_marks(&ran, "reopened");
+    let ended = gap_marks(&ran, "ended");
+    assert_eq!(started.len(), 2, "two gaps: {:?}", started);
+    assert_eq!(reopened.len(), 1, "{reopened:?}");
+    let (gap_at, _) = started[0];
+    let (open_at, lasted) = reopened[0];
+    // Noticed within the 50 ms freshness of the last reading at 300 ms, and
+    // open again once the readings after 600 ms are steady: the gate's
+    // 60 ms, as for the first grant.
+    assert!(
+        (began + 300_000..began + 400_000).contains(&gap_at),
+        "{}",
+        gap_at - began
+    );
+    assert!(
+        (began + 660_000..began + 700_000).contains(&open_at),
+        "{}",
+        open_at - began
+    );
+    assert_eq!(lasted, Some(open_at - gap_at));
+    // The reply under way was cut there, and nothing was said in the gap.
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "turn_finished" && row["outcome"] == "privacy_gap"),
+        "the reply cut"
+    );
+    assert!(ran.left.is_none(), "not resumed");
+    // The speaker was told in the pass the gap began, not the next one.
+    assert!(
+        ran.speaker_authorities.contains(&gap_at),
+        "the speaker told late: {:?}",
+        ran.speaker_authorities
+            .iter()
+            .filter(|at| **at >= gap_at)
+            .map(|at| at - gap_at)
+            .take(3)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        ran.chunk_times
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at))
+    );
+    // The capture's lease lapsed: no authority reached it from the gap's
+    // start to its reopen, and renewal came back with the fresh reading.
+    assert!(
+        ran.capture_authorities
+            .iter()
+            .all(|at| !(gap_at..open_at).contains(at)),
+        "renewed in the gap: {:?}",
+        ran.capture_authorities
+            .iter()
+            .filter(|at| (gap_at..open_at).contains(at))
+            .map(|at| at - gap_at)
+            .collect::<Vec<_>>()
+    );
+    assert!(ran.capture_authorities.iter().any(|at| *at >= open_at));
+    // The second gap, after the readings stop at 1.5 s, lasted its second
+    // and ended the conversation as before.
+    assert_eq!(ended.len(), 1, "{ended:?}");
+    assert!(
+        ended[0].1.unwrap() >= crate::privacy_gap::RIDE_US,
+        "{ended:?}"
+    );
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "privacy_gap" && row["why"] == "no fresh reading")
+    );
+    assert!(ran.error.contains("freshness lost"), "{}", ran.error);
+}
+
+/// #2602, the first builder's P1s on #2623: with the rig's camera and the
+/// eyes' link both there, a ridden gap gives neither a yes. The eyes are
+/// told no as it begins and hear no yes until it reopens; the camera gets
+/// no authority from its start to its reopen; the loop gives both it again
+/// after.
+#[test]
+fn a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens() {
+    let said = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let nobody = std::path::PathBuf::from(format!("/tmp/lvw-eyes-{}.sock", std::process::id()));
+    TEST_EYES.with(|eyes| {
+        *eyes.borrow_mut() = Some(
+            crate::body_link::EyesLink::to(nobody)
+                .unwrap()
+                .logging(said.clone()),
+        )
+    });
+    RIG_CAMERA.with(|on| on.set(true));
+    let (ran, _) = gap_run(true, 1_500_000, (300_000, 600_000), None);
+    RIG_CAMERA.with(|on| on.set(false));
+    TEST_EYES.with(|eyes| eyes.borrow_mut().take());
+    let (gap_at, _) = gap_marks(&ran, "began")[0];
+    let (open_at, _) = gap_marks(&ran, "reopened")[0];
+    let said = said.lock().unwrap().clone();
+    let in_gap = |at: &u64| (gap_at..open_at).contains(at);
+    assert!(
+        said.iter().any(|(yes, at)| *yes && *at < gap_at),
+        "{said:?}"
+    );
+    assert!(
+        said.iter().any(|(yes, at)| !*yes && *at == gap_at),
+        "no at the gap's start: {said:?}"
+    );
+    assert!(
+        said.iter().all(|(yes, at)| !*yes || !in_gap(at)),
+        "a yes in the gap: {said:?}"
+    );
+    assert!(
+        said.iter().any(|(yes, at)| *yes && *at >= open_at),
+        "{said:?}"
+    );
+    assert!(
+        ran.camera_authorities.iter().any(|at| *at < gap_at),
+        "the camera was given it before: {:?}",
+        ran.camera_authorities
+    );
+    assert!(
+        ran.camera_authorities.iter().all(|at| !in_gap(at)),
+        "the camera in the gap: {:?}",
+        ran.camera_authorities
+            .iter()
+            .filter(|at| in_gap(at))
+            .map(|at| at - gap_at)
+            .collect::<Vec<_>>()
+    );
+    // Renewed again after the reopen (a real camera given none for 250 ms
+    // has ended itself by then: `WORKER_INITIAL_AUTHORITY_US`).
+    assert!(ran.camera_authorities.iter().any(|at| *at >= open_at));
+    assert!(
+        !ran.trace
+            .iter()
+            .any(|row| row["kind"] == "camera_unavailable"),
+        "the camera stayed up until the gap"
+    );
+}
+
+/// #2602 (the first builder's P3 on #2623): the microphone's retention
+/// heartbeat counts from a ridden gap's reopen, so a reopen near the gap's
+/// second leaves capture its whole 1.5 s to come back.
+#[test]
+fn the_retention_heartbeat_counts_from_a_gaps_reopen() {
+    let last = 1_000_000;
+    let reopened = last + 950_000;
+    assert!(!retention_expired(None, reopened, u64::MAX));
+    assert!(!retention_expired(Some(last), 0, last + CAPTURE_GAP_US - 1));
+    assert!(retention_expired(Some(last), 0, last + CAPTURE_GAP_US));
+    assert!(!retention_expired(
+        Some(last),
+        reopened,
+        last + CAPTURE_GAP_US
+    ));
+    assert!(!retention_expired(
+        Some(last),
+        reopened,
+        reopened + CAPTURE_GAP_US - 1
+    ));
+    assert!(retention_expired(
+        Some(last),
+        reopened,
+        reopened + CAPTURE_GAP_US
+    ));
+    // A frame retained after the reopen counts from itself.
+    let later = reopened + 10_000;
+    assert!(!retention_expired(
+        Some(later),
+        reopened,
+        later + CAPTURE_GAP_US - 1
+    ));
+}
+
+/// #2602: off, the same gap ends the conversation at its lapse, as always.
+#[test]
+fn without_the_switch_a_gap_in_the_readings_ends_the_conversation_as_before() {
+    let (ran, began) = gap_run(false, 1_500_000, (300_000, 600_000), None);
+    assert!(gap_marks(&ran, "began").is_empty());
+    assert!(ran.error.contains("freshness lost"), "{}", ran.error);
+    assert!(
+        (began + 300_000..began + 400_000).contains(&ran.ended_us),
+        "{}",
+        ran.ended_us - began
+    );
+}
+
+/// #2602: a fresh reading that says closed in a ridden gap is the physical
+/// mute, as before: never reopened.
+#[test]
+fn a_closed_switch_read_in_a_ridden_gap_is_the_mute() {
+    let (ran, _) = gap_run(true, 1_500_000, (300_000, 500_000), Some(500_000));
+    assert_eq!(gap_marks(&ran, "began").len(), 1);
+    assert!(gap_marks(&ran, "reopened").is_empty());
+    // Its end is marked as every exit in a gap is.
+    assert_eq!(gap_marks(&ran, "ended").len(), 1);
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "privacy_gap" && row["why"] == "read closed")
+    );
+    assert!(
+        ran.trace.iter().any(|row| row["kind"] == "physical_mute"),
+        "the mute: {}",
+        ran.error
+    );
 }
 
 /// #1371, and the reviewer and Jarvis on #1376: the muted wait's own

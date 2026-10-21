@@ -1421,6 +1421,7 @@ fn run(script: Script) -> Run {
         provider: spawn(workers.role),
         privacy: spawn("privacy"),
         privacy_controls: false,
+        capture_held: false,
         privacy_receipts: false,
         ring: Some(spawn("ring")).into(),
         camera: None,

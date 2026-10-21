@@ -80,6 +80,14 @@ impl OptionalCamera {
             head_grant: None,
         }
     }
+    /// A test's camera already asked to start and opening until `until_us`,
+    /// so a side that never answers keeps it up (#2602).
+    #[cfg(test)]
+    pub(super) fn opening_until(mut self, until_us: u64) -> Self {
+        self.start_sent = true;
+        self.opening_until_us = Some(until_us);
+        self
+    }
     pub(super) fn retain_head_frames(&mut self, frames: crate::head_qualification::Frames) {
         self.head_frames = Some(frames);
     }
@@ -629,6 +637,7 @@ mod tests {
             provider,
             privacy,
             privacy_controls: false,
+            capture_held: false,
             privacy_receipts: false,
             ring: None.into(),
             camera: Some(camera),
