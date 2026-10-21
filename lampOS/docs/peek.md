@@ -55,7 +55,7 @@ turns 0.03 ms. Not yet timed on a lamp.
 
 For comparing two sessions stage by stage (the first builder, 22 Oct: day
 lines whose median grew from 1.59 s to 2.06 s), `tools/day-stages.sh
-[--turns 3,5,7] [--last N] SESSION [SESSION_B]` reads a session's
+[--turns 3,5,7] [--last N] [--lines [GAP_MS]] SESSION [SESSION_B]` reads a session's
 `metadata/events-*.jsonl` (its folder, its `metadata/`, or one file; a copy
 with text blanked does). One row a turn, in ms: **wait**, end of speech to
 the line's end; **words**, **cue**, **chat** and **audio** after the line's
@@ -72,6 +72,21 @@ the first's. Of a record it keeps only `kind` and these fields:
   marked `e`), so all count from the decision;
 - `answer_first_audio`: `after_decision_ms`;
 - `speaker_first_write`: the turn's earliest `at_us` (a wait cue counts).
+
+A folder's `events-0..3.jsonl` are one run's rolling segments (one turn's
+records can span two), so turns are joined across them by number; a voice
+restart is a new session folder, and two sessions are never merged.
+
+`--lines [GAP_MS]` (the first builder, 22 Oct: twelve day lines heard as
+23 turns against 18) then groups the kept turns (after `--turns` and
+`--last`) into the lines said: in time order, a turn whose speech start
+(`input_admitted.prefix_first_host_read_us`, else its `at_us`) is less than
+GAP_MS (default 2000) after the previous turn's end of speech is the same
+line. One row a line: its first turn, its turns, each turn's
+`endpoint.basis` (`-` if none) and whether it was answered
+(`answer_first_audio`). Under it: `lines N`, `heard as 2+ turns M (turns in
+them K)`, the bases that ended a line's non-last parts (fragment ends) and
+all turn ends; with two sessions, one line comparing "heard as 2+ turns".
 
 Tests: `tools/day-stages-test.sh`. Needs `jq`.
 

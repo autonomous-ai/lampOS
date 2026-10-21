@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for day-stages.sh with no lamp: two made-up sessions of timing
+# Tests for day-stages.sh with no lamp: three made-up sessions of timing
 # records, as the voice writes them (coordinator.rs), and the tables checked.
 # Run: lampOS/tools/day-stages-test.sh
 set -uo pipefail
@@ -98,6 +98,66 @@ check "a table for each" bash -c '[[ $(grep -c "^### " <<<"$1") == 3 ]]' _ "$out
 check "the second's rows" has "| 2 | 1010 | 300 | 250 | 1200 | 1600 | 2410 |"
 check "the second's medians" has "| median | 810 | 400 | 250 | 1100 | 1500 | 2210 |"
 check "the median difference per stage" has "| +200 | +150 | - | +400 | +395 | +905 |"
+
+# Session C, for --lines: turns 1 and 2 one line said with a 400 ms pause
+# (turn 1 cut on silence_fallback, unanswered), turn 3 a line of its own
+# 10 s later. Turn 2's records sit in two segments, as the service rolls
+# them; it was admitted twice (again after an early end), the earliest is
+# its speech start. Turn 3 has no prefix read, so its admission counts.
+C=$T/sessions/c
+mkdir -p "$C/metadata"
+cat >"$C/metadata/events-0.jsonl" <<'EVENTS'
+{"kind":"input_admitted","turn":1,"at_us":1300000,"prefix_first_host_read_us":1000000,"admission_basis":"vad"}
+{"kind":"local_endpoint","turn":1,"at_us":2700000,"last_block_host_read_us":2600000,"includes_silence_wait_ms":600,"endpoint":{"basis":"silence_fallback","silence_ms":600}}
+{"kind":"transcript","turn":1,"at_us":2800000,"text":"zebrafish half"}
+{"kind":"input_admitted","turn":2,"at_us":2600000,"prefix_first_host_read_us":2400000}
+EVENTS
+cat >"$C/metadata/events-1.jsonl" <<'EVENTS'
+{"kind":"input_admitted","turn":2,"at_us":3900000,"prefix_first_host_read_us":3800000,"admission_basis":"continued_after_early_end"}
+{"kind":"local_endpoint","turn":2,"at_us":4700000,"last_block_host_read_us":4600000,"includes_silence_wait_ms":600,"endpoint":{"basis":"model_complete","silence_ms":600}}
+{"kind":"answer_first_audio","turn":2,"at_us":5500000,"after_decision_ms":800}
+{"kind":"input_admitted","turn":3,"at_us":14000000,"prefix_first_host_read_us":null}
+{"kind":"local_endpoint","turn":3,"at_us":15600000,"last_block_host_read_us":15500000,"includes_silence_wait_ms":500,"endpoint":{"basis":"silence","silence_ms":500}}
+{"kind":"answer_first_audio","turn":3,"at_us":16500000,"after_decision_ms":900}
+EVENTS
+
+out=$("$SCRIPT" --lines "$C" 2>&1)
+status=$?
+echo "$out"
+check "--lines exits 0, the session not taken as its gap" test "$status" -eq 0
+check "--lines: the stage table still comes first" has "| 2 | 700 | - | - | - | 800 | - |"
+check "--lines: the default gap" has "#### heard lines (gap 2000 ms)"
+check "--lines: two turns 400 ms apart are one line, over two segments" has "| 1 | 1,2 | silence_fallback,model_complete | -,y |"
+check "--lines: a turn 10 s later is its own line" has "| 3 | 3 | silence | y |"
+check "--lines: how many lines" has "lines 2"
+check "--lines: heard as 2+ turns" has "heard as 2+ turns 1 (turns in them 2)"
+check "--lines: the fragment's ending basis" has "fragment ends: silence_fallback 1"
+check "--lines: every turn's ending basis" has "turn ends: model_complete 1, silence 1, silence_fallback 1"
+check "--lines: no word heard" hasnt zebrafish
+
+out=$("$SCRIPT" --lines 300 "$C" 2>&1)
+check "a 300 ms gap splits them" has "heard as 2+ turns 0 (turns in them 0)"
+check "a 300 ms gap: three lines" has "lines 3"
+check "a 300 ms gap: the gap shown" has "#### heard lines (gap 300 ms)"
+check "a 300 ms gap: no fragment" has "fragment ends: none"
+out=$("$SCRIPT" --lines=300 "$C" 2>&1)
+check "--lines=300 is the same" has "lines 3"
+
+out=$("$SCRIPT" --turns 1,3 --lines "$C" 2>&1)
+check "--lines groups only the kept turns" has "heard as 2+ turns 0 (turns in them 0)"
+check "--lines with --turns: turn 1 alone" has "| 1 | 1 | silence_fallback | - |"
+
+out=$("$SCRIPT" --lines "$A" "$C" 2>&1)
+status=$?
+check "--lines, two sessions exit 0" test "$status" -eq 0
+check "--lines, two sessions: a lines table each" bash -c '[[ $(grep -c "^#### heard lines" <<<"$1") == 2 ]]' _ "$out"
+check "--lines, two sessions: no speech start, no joining" has "| 4 | 4 | - | y |"
+check "--lines, two sessions: the comparison" has "heard as 2+ turns: first 0, second 1 (+1)"
+
+out=$("$SCRIPT" --lines 0 "$C" 2>&1)
+check "--lines 0 is a usage error" test $? -eq 2
+out=$("$SCRIPT" --lines=x "$C" 2>&1)
+check "--lines=x is a usage error" test $? -eq 2
 
 out=$("$SCRIPT" 2>&1)
 check "no session is a usage error" test $? -eq 2
