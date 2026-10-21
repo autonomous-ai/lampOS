@@ -69,6 +69,13 @@ pub const STAND_WAIT: Duration = Duration::from_secs(34);
 /// every part is running (45 s, V1's `software-update`, from activation)
 /// never meets the body stopped for a stand.
 pub const SETTLE: Duration = Duration::from_secs(120);
+/// After its SIGTERM, a body run by hand is given this long to ease back,
+/// fold and let go before it is killed: it folds in about 6 s (lamp-body's
+/// "folded in 6.0 s"), and nothing must cut that short (Jarvis on #2541).
+pub const FOLD_WAIT: Duration = Duration::from_secs(20);
+/// A hand still on the head after the yes is waited off this long before
+/// the stand begins, so that any touch while it moves is a stop.
+pub const HANDS_OFF_WAIT: Duration = Duration::from_secs(10);
 /// How often the touch is looked at.
 pub const LOOK_EVERY: Duration = Duration::from_millis(100);
 
@@ -88,6 +95,15 @@ impl Touches {
             hold_us,
             armed: false,
             since_us: None,
+        }
+    }
+
+    /// One that counts a touch from the first look: for the stop, once the
+    /// hands were seen off the controls.
+    pub fn armed(hold_us: u64) -> Self {
+        Self {
+            armed: true,
+            ..Self::new(hold_us)
         }
     }
 
@@ -131,6 +147,52 @@ impl ControlsLost {
         }
         let since = *self.since_us.get_or_insert(now_us);
         now_us.saturating_sub(since) >= CONTROLS_LOST_US
+    }
+}
+
+/// A body run by hand as its own process (`setpriv` execs it, so this pid
+/// is the body's: nothing between passes the signal on and kills it 2 s
+/// later, as `runuser` does; Jarvis on #2541). However its run ends, early
+/// return or not, a body still running is sent SIGTERM, which eases the arm
+/// back, folds it and lets it go, and is waited for up to [`FOLD_WAIT`]; only
+/// past that is it killed. So no body is left holding the servo lock, and
+/// none is cut short mid-fold.
+#[cfg(unix)]
+pub struct HandRun(pub std::process::Child);
+
+#[cfg(unix)]
+impl HandRun {
+    /// Ask it to stop and wait for it, at most `within`; whether it ended
+    /// by itself.
+    pub fn stop_within(&mut self, within: Duration) -> bool {
+        if !matches!(self.0.try_wait(), Ok(None)) {
+            let _ = self.0.wait();
+            return true;
+        }
+        if let Some(pid) = rustix::process::Pid::from_raw(self.0.id() as i32) {
+            let _ = rustix::process::kill_process(pid, rustix::process::Signal::TERM);
+        }
+        let asked = std::time::Instant::now();
+        while asked.elapsed() < within {
+            if !matches!(self.0.try_wait(), Ok(None)) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        eprintln!(
+            "lamp-first-stand: the body did not end within {} s of its stop: killed",
+            within.as_secs()
+        );
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+        false
+    }
+}
+
+#[cfg(unix)]
+impl Drop for HandRun {
+    fn drop(&mut self) {
+        self.stop_within(FOLD_WAIT);
     }
 }
 
@@ -257,9 +319,16 @@ impl Record {
     }
 
     pub fn write(&self, path: &Path) -> io::Result<()> {
+        use std::io::Write;
         let new = path.with_extension("json.new");
-        fs::write(&new, serde_json::to_vec_pretty(self)?)?;
-        fs::rename(&new, path)
+        let mut file = fs::File::create(&new)?;
+        file.write_all(&serde_json::to_vec_pretty(self)?)?;
+        file.sync_all()?;
+        fs::rename(&new, path)?;
+        if let Some(parent) = path.parent() {
+            fs::File::open(parent)?.sync_all()?;
+        }
+        Ok(())
     }
 
     /// Whether the lamp may ask now, `now_unix_ms`: never once it has
@@ -304,7 +373,7 @@ mod run {
             net::UnixDatagram,
             net::UnixStream,
         },
-        process::{Child, Command, Stdio},
+        process::{Command, Stdio},
         sync::mpsc,
         thread,
         time::{Instant, SystemTime, UNIX_EPOCH},
@@ -423,7 +492,10 @@ mod run {
         };
         let mut touches = Touches::new(HOLD_US);
         let mut begun: Option<Instant> = None;
-        let mut spoken = false;
+        // The yes counts only once the ask's words have ended (the first
+        // builder on #2541): a hand on the head while the lamp speaks, a
+        // pet, is not taken for an answer to what it hasn't finished saying.
+        let mut spoken: Option<Instant> = None;
         let started = Instant::now();
         loop {
             match told.try_recv() {
@@ -433,21 +505,24 @@ mod run {
                 }
                 Ok(Said::Outcome(outcome)) if outcome == "spoken" => {
                     say("the ask was spoken");
-                    spoken = true;
+                    spoken = Some(Instant::now());
                 }
+                // Not said to its end: no yes is taken for words not heard.
                 Ok(Said::Outcome(outcome)) => {
-                    if begun.is_none() {
-                        say(&format!(
-                            "the ask was not said: {outcome}; asked again later"
-                        ));
-                        return None;
-                    }
+                    say(&format!(
+                        "the ask was not said to its end: {outcome}; asked again later"
+                    ));
+                    return None;
                 }
                 Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => {}
             }
-            let Some(at) = begun else {
+            let Some(at) = spoken else {
                 if started.elapsed() > Duration::from_millis(SAY_EXPIRES_MS + 10_000) {
-                    say("the ask was never begun; asked again later");
+                    say(if begun.is_some() {
+                        "the ask was begun and never finished; asked again later"
+                    } else {
+                        "the ask was never begun; asked again later"
+                    });
                     return None;
                 }
                 thread::sleep(LOOK_EVERY);
@@ -460,13 +535,8 @@ mod run {
             }
             if now_us >= ANSWER_US {
                 say(&format!(
-                    "no touch within {} s{}; nothing moves",
-                    ANSWER_US / 1_000_000,
-                    if spoken {
-                        ""
-                    } else {
-                        " (the ask was begun and not finished)"
-                    }
+                    "no touch within {} s of the ask; nothing moves",
+                    ANSWER_US / 1_000_000
                 ));
                 return Some(false);
             }
@@ -485,14 +555,24 @@ mod run {
         }
     }
 
-    fn as_body(options: &Options, program: &Path) -> Command {
-        let mut command = Command::new("runuser");
-        command.args(["-u", &options.body_user, "--"]).arg(program);
+    /// The program as the body's user, with its groups (the servo port's
+    /// `dialout`): `setpriv` execs it, so the child's pid is the program's
+    /// own and a signal reaches it alone (Jarvis on #2541).
+    fn as_body(options: &Options, program: &Path) -> io::Result<Command> {
+        let user = nix::unistd::User::from_name(&options.body_user)
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::other("the body's user is not there"))?;
+        let mut command = Command::new("setpriv");
         command
+            .arg(format!("--reuid={}", user.uid))
+            .arg(format!("--regid={}", user.gid))
+            .args(["--init-groups", "--"])
+            .arg(program);
+        Ok(command)
     }
 
     fn rest_read(options: &Options, file: &Path) -> io::Result<(bool, String)> {
-        let output = as_body(options, &options.measure)
+        let output = as_body(options, &options.measure)?
             .arg("--device")
             .arg(&options.device)
             .args(["--unit-id", &options.unit_id])
@@ -513,24 +593,6 @@ mod run {
         Stopped,
     }
 
-    /// A body run by hand: however its run ends, early return or not, it
-    /// is sent SIGTERM, which eases the arm back and lets it go, and waited
-    /// for, so no body is left holding the servo lock (the reviewer-lead on
-    /// #2541). A body that has ended already is only reaped.
-    struct Body(Child);
-
-    impl Drop for Body {
-        fn drop(&mut self) {
-            if let Ok(None) = self.0.try_wait() {
-                let _ = nix::sys::signal::kill(
-                    nix::unistd::Pid::from_raw(self.0.id() as i32),
-                    nix::sys::signal::Signal::SIGTERM,
-                );
-            }
-            let _ = self.0.wait();
-        }
-    }
-
     /// `steps.sh`'s `body_once`: the body on a private mood socket; with a
     /// share, told "listening" once and given [`STAND_WAIT`], then SIGTERM
     /// eases it back and lets it go. A touch while it runs stops it.
@@ -543,7 +605,7 @@ mod run {
     ) -> io::Result<Ran> {
         let log = fs::File::create(dir.join("body.log"))?;
         let mood = dir.join("mood.sock");
-        let mut command = as_body(options, &options.body);
+        let mut command = as_body(options, &options.body)?;
         command
             .arg("--device")
             .arg(&options.device)
@@ -590,7 +652,7 @@ mod run {
                 command.args(["--wake", "off"]);
             }
         }
-        let mut body = Body(
+        let mut body = HandRun(
             command
                 .stdin(Stdio::null())
                 .stdout(log.try_clone()?)
@@ -647,8 +709,18 @@ mod run {
         std::os::unix::fs::lchown(&dir, Some(user.uid.as_raw()), Some(user.gid.as_raw()))?;
         let read = dir.join("lamp.env");
         let (read_ok, said) = rest_read(options, &read)?;
-        // A stop needs the yes let go first, then a new touch.
-        let mut stop = Touches::new(0);
+        // The yes hand off the controls before anything moves, so that any
+        // touch while it moves is a stop (Jarvis on #2541).
+        let off = Instant::now();
+        while touch_now(bus) != Some(false) {
+            if off.elapsed() >= HANDS_OFF_WAIT {
+                return Err(io::Error::other(
+                    "a hand stayed on the head or a button, or the controls were not known: nothing moved",
+                ));
+            }
+            thread::sleep(LOOK_EVERY);
+        }
+        let mut stop = Touches::armed(0);
         if !read_ok {
             if !said.contains("has torque on") {
                 return Err(io::Error::other("lamp-body-measure refused the rest read"));
@@ -826,6 +898,49 @@ mod tests {
         assert!(!stop.observe(Some(true), 0));
         assert!(!stop.observe(Some(false), 200_000));
         assert!(stop.observe(Some(true), 300_000));
+    }
+
+    #[test]
+    fn an_armed_stop_takes_the_first_touch() {
+        let mut stop = Touches::armed(0);
+        assert!(!stop.observe(Some(false), 0));
+        assert!(stop.observe(Some(true), 100_000));
+        assert!(Touches::armed(0).observe(Some(true), 0));
+    }
+
+    /// Jarvis on #2541: a body asked to stop is waited for while it folds,
+    /// never killed 2 s in. A stand-in that takes 3 s to end on SIGTERM.
+    #[cfg(unix)]
+    #[test]
+    fn a_stopped_body_is_waited_for_while_it_folds() {
+        let child = std::process::Command::new("/bin/sh")
+            .args([
+                "-c",
+                "trap 'sleep 3; exit 7' TERM; while :; do sleep 0.1; done",
+            ])
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        let mut run = HandRun(child);
+        let asked = std::time::Instant::now();
+        assert!(
+            run.stop_within(Duration::from_secs(10)),
+            "it ended by itself"
+        );
+        assert!(asked.elapsed() >= Duration::from_millis(2_900));
+        assert_eq!(run.0.wait().unwrap().code(), Some(7));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_body_that_never_ends_is_killed_past_its_bound() {
+        let child = std::process::Command::new("/bin/sh")
+            .args(["-c", "trap '' TERM; while :; do sleep 0.1; done"])
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        let mut run = HandRun(child);
+        assert!(!run.stop_within(Duration::from_millis(500)));
     }
 
     #[test]
