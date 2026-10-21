@@ -3255,10 +3255,14 @@ The probe runs no function, so "kept" means a valid keeping call:
 `remember` with a non-empty `text`, or `keep_rule` with a non-empty `rule`
 (declared only when the lamp has rules on, so the probe has only
 `remember`). A claim is one of `CLAIMS` in the request's words, matched as
-whole words after folding (lower case, no accents, đ as d, as the memory's
-search folds): "I'll remember", "noted", "I've updated", "đã ghi nhớ",
-"sẽ nhớ", "đã cập nhật" and the like. "Got it" alone is not a claim. Each
-request is, in this order:
+whole words after folding (lower case, with accents and đ kept, since a
+tone mark changes a Vietnamese word): "I'll remember", "I've noted",
+"I've updated", "đã ghi nhớ", "đã cập nhật" and the like. A bare "noted"
+is a claim only when it opens a clause ("Noted.", "Got it, noted"), so "as
+you noted" is not. "Sẽ nhớ", "đã nhớ" and "nhớ rồi" are claims only after
+mình, tôi or em ("mình sẽ nhớ", "tôi đã nhớ", "em nhớ rồi"), so "bạn nhớ
+rồi" is not. "Got it" alone is not a claim. Each request is, in this
+order:
 - `called-remember`: any call in it keeps.
 - `said-kept-no-call`: **the defect**, a claim with no keeping call (with
   no call, or with another one such as `forget`).
