@@ -4,6 +4,7 @@ use lamp_controls::{
     input::{InputError, Level as PinLevel, Observation, PinReader},
     mpr121,
     mute::MuteRecord,
+    pace::{Pace, rest_us},
     pins::{Lines, Pin, Pull},
     privacy::{LineReader, Source},
     receiver::Receiver,
@@ -11,7 +12,7 @@ use lamp_controls::{
     touch::{StripSample, TouchOutput},
     touch_pins::{HEAD_ITEM, HeadLines, TouchPinsConfig},
     touch_receiver::TouchReceiver,
-    touch_runtime::{DRAIN_LIMIT, Pace, Service, rest_us},
+    touch_runtime::{DRAIN_LIMIT, Service},
 };
 use lamp_msgs::{
     ClockStamp, ControlFault, ControlGesture, ControlsState, Diagnostic, Gesture, Level,
@@ -1320,8 +1321,8 @@ fn a_long_gap_between_steps_is_counted_and_said_at_most_once_a_second() {
 }
 
 /// #2602 (the first builder's guard for Controls at priority 30): a step
-/// whose own work takes 1 ms or more is counted in health (`slow_steps`),
-/// and the loop rests at least as long as the work, so it never spins.
+/// whose elapsed time takes 1 ms or more is counted in health (`slow_steps`),
+/// and the loop rests at least as long as its CPU work, so it never spins.
 #[test]
 fn a_slow_step_is_counted_and_the_loop_rests_at_least_its_work() {
     let mut rig = Rig::new(true);
@@ -1337,10 +1338,11 @@ fn a_slow_step_is_counted_and_the_loop_rests_at_least_its_work() {
     });
     assert!(rig.service.counts.longest_step_us >= 1_000);
     assert_eq!(rig.service.pace.slow_steps, 1);
-    assert_eq!(rest_us(100, 1_000), 900);
-    assert_eq!(rest_us(500, 1_000), 500);
-    assert_eq!(rest_us(800, 1_000), 800);
-    assert_eq!(rest_us(5_000, 1_000), 5_000);
+    assert_eq!(rest_us(100, 100, 1_000), 900);
+    assert_eq!(rest_us(500, 500, 1_000), 500);
+    assert_eq!(rest_us(800, 800, 1_000), 800);
+    assert_eq!(rest_us(5_000, 5_000, 1_000), 5_000);
+    assert_eq!(rest_us(30_000, 200, 1_000), 200);
 }
 
 /// #2602 (the first builder, 20:3x): Controls runs at real-time round-robin
@@ -1370,6 +1372,8 @@ fn controls_runs_at_real_time_priority_above_the_voice() {
     ] {
         assert_eq!(setting(controls, "CPUSchedulingPolicy="), Some("rr"));
         assert_eq!(priority(controls), 30);
+        // The hand's strip worker must not fall below the voice's priority.
+        assert_eq!(setting(controls, "CPUSchedulingResetOnFork="), None);
         assert!(priority(controls) > priority(voice));
         // Niceness means nothing at real-time priority.
         assert_eq!(setting(controls, "Nice="), None);

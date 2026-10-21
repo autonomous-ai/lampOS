@@ -7,6 +7,7 @@ pub mod head_discovery;
 pub mod input;
 pub mod mpr121;
 pub mod mute;
+pub mod pace;
 pub mod pins;
 pub mod privacy;
 pub mod receiver;

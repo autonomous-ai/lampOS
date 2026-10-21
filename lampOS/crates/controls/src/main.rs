@@ -1,7 +1,7 @@
 use lamp_bus::Bus;
 use lamp_controls::{
     engine::Config,
-    replay,
+    pace, replay,
     runtime::{self, MissingPins, Service},
 };
 use std::{
@@ -15,8 +15,6 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    thread,
-    time::Duration,
 };
 
 const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE] [--touch-from FILE]\n\
@@ -637,13 +635,10 @@ fn serve(
             .seconds
             .is_none_or(|seconds| lamp_ipc::monotonic_us() - started < seconds * 1_000_000)
     {
-        let began = lamp_ipc::monotonic_us();
-        let output = service.step(lamp_ipc::monotonic_us);
-        hands.note(began, &output);
-        let elapsed = lamp_ipc::monotonic_us().saturating_sub(began);
-        if elapsed < service.poll_us() {
-            thread::sleep(Duration::from_micros(service.poll_us() - elapsed));
-        }
+        pace::run_step(service.poll_us(), |began| {
+            let output = service.step(lamp_ipc::monotonic_us);
+            hands.note(began, &output);
+        });
     }
     for id in signal_ids {
         signal_hook::low_level::unregister(id);
@@ -923,15 +918,10 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
             .seconds
             .is_none_or(|seconds| lamp_ipc::monotonic_us() - started < seconds * 1_000_000)
     {
-        let began = lamp_ipc::monotonic_us();
-        let output = service.step(lamp_ipc::monotonic_us);
-        hands.note_reset(began, &output, service.reset_refused());
-        let elapsed = lamp_ipc::monotonic_us().saturating_sub(began);
-        // Never less than the step's own work: at real-time priority a slow
-        // step never makes the loop spin (#2602).
-        thread::sleep(Duration::from_micros(
-            lamp_controls::touch_runtime::rest_us(elapsed, service.poll_us()),
-        ));
+        pace::run_step(service.poll_us(), |began| {
+            let output = service.step(lamp_ipc::monotonic_us);
+            hands.note_reset(began, &output, service.reset_refused());
+        });
     }
     let worker = service.strip.as_mut().map(Worker::shutdown);
     let recording = service.finish_recording();
