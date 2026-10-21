@@ -1,3 +1,50 @@
+## Current checkpoint: 2026-10-22 00:20 +07, Music and both Skills changes native-green
+
+**Ready for lamp-voice: yes (#1757, review and the first builder's lamp acceptance remain).**
+Music head `0a878cd4d9d44867b2971e70c118244f0c21ad38` passed
+[ARM64 39638544014](https://github.com/autonomous-ai/lampOS/actions/runs/39638544014):
+**9,903 passed (one leaky), 0 failed, 63 skipped**, plus four doc tests,
+`relay_signals` and 12 own-harness tests. x86 Clippy 39638543959 passed.
+[Native evidence](verification/requested-audio-native-20261022/README.md)
+records the tested merge and exact matches for all 86 historical failures
+(**85 PASS, one LEAK**). The five-crate Mac **4,665/0/14** and post-rebase
+Skills **421/0/0** results remain separate. The feature stays off in shipped units.
+
+**Ready for lamp-voice: yes (#2692, first builder's default-change integration path).**
+Skills journal head `54e0b5e1e0d2097b7db2b8fcbc27d6520e871089` passed
+[ARM64 39639679042](https://github.com/autonomous-ai/lampOS/actions/runs/39639679042):
+**9,750 passed (one leaky), 0 failed, 63 skipped**, plus four doc tests,
+`relay_signals` and 12 own-harness tests. x86 Clippy 39639679055 passed.
+[Native evidence](verification/skills-journal-native-20261022/README.md)
+keeps the Mac **387 passed / 1 failed** result visible. Both new real-process
+journal tests and the unchanged unplug scenario pass natively.
+
+**Ready for lamp-voice: yes (#2694).** Unplug fixture head
+`1ffd3f3b4ee3ad0b5714a591e3d89bc40c751e37` passed
+[ARM64 39640912728](https://github.com/autonomous-ai/lampOS/actions/runs/39640912728):
+**9,752 passed (one leaky), 0 failed, 63 skipped**, plus four doc tests,
+`relay_signals` and 12 own-harness tests. The corrected test passed in
+**0.139 s**. x86 Clippy 39640912678 passed. The Mac formatting and strict
+Skills Clippy gates pass; **386 passed / 0 failed / 0 ignored / 0 filtered**.
+[Native evidence](verification/unplug-fixture-native-20261022/README.md)
+records the exact merge. The sole fixture correction clears inherited
+nonblocking mode before its unchanged two-second read timeout; every
+receipt-order assertion remains.
+
+**Next: Skills journal backpressure coverage audit.** Queue #2602 has the
+recommendation and request for the next named Skills/Music slice. No
+unblocked Second task was available. Inspect the existing relay and
+service coverage for an open-but-not-reading journal before deciding
+whether a service regression is missing. No duplicate test or unrelated
+runtime change is presumed.
+
+The known leaky pass in all three native runs is the Voice journal test, recorded
+separately. No lamp was touched. #2462 stays with its merger. Queue #2602 has
+the current heads and command counts; next work continues while reviews run.
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 00:01 +07, Music rebased and Skills journal published
 
 **Ready for lamp-voice: no; Music #1757 is ready for review with its new-head

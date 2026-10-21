@@ -1,0 +1,995 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-22 00:17 +07",
+  "pull_request": 1757,
+  "head": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "tested_merge": "ec437b94a7201ab851b001ef736e13a0f8c2c415",
+  "merge_base": "a7dbfcc2cd8b2b1cbfa4cdfae2309599c5224aa1",
+  "native_run": {
+    "id": 39638544014,
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39638544014",
+    "event": "pull_request",
+    "head_sha": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "created_at": "2026-10-21T16:51:33Z",
+    "updated_at": "2026-10-21T17:13:36Z"
+  },
+  "x86_clippy": {
+    "id": 39638543959,
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39638543959",
+    "head_sha": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1
+  },
+  "log": {
+    "name": "second-music-arm64-39638544014.log",
+    "bytes": 2349891,
+    "lines": 11250,
+    "sha256": "56a3943f8e4a1c77bc6773c2c527a5cd8a022eb70ac8531f919a6465b8792a03",
+    "retrieval": "gh run view 39638544014 --repo autonomous-ai/lampOS --log"
+  },
+  "checkout_line": "HEAD is now at ec437b9 Merge 0a878cd4d9d44867b2971e70c118244f0c21ad38 into a7dbfcc2cd8b2b1cbfa4cdfae2309599c5224aa1",
+  "nextest": {
+    "summary": "Summary [ 166.548s] 9903 tests run: 9903 passed (1 leaky), 63 skipped",
+    "line": 10463,
+    "passed": 9903,
+    "failed": 0,
+    "skipped": 63,
+    "leaky_passes": [
+      {
+        "line": 8630,
+        "result": "LEAK [   0.222s] (8072/9903) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      }
+    ]
+  },
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0,
+    "results": [
+      {
+        "target": "lamp_actions",
+        "line": 10842,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_addons",
+        "line": 10848,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_air",
+        "line": 10854,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_audio",
+        "line": 10860,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_body",
+        "line": 10866,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_bus",
+        "line": 10874,
+        "summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_camera",
+        "line": 10881,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_cloud",
+        "line": 10887,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_controls",
+        "line": 10893,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ears",
+        "line": 10899,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_environment",
+        "line": 10905,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_expression",
+        "line": 10911,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_eyes",
+        "line": 10917,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_gemini",
+        "line": 10923,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_health",
+        "line": 10929,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ipc",
+        "line": 10936,
+        "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_keeper",
+        "line": 10943,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_local_time",
+        "line": 10950,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_memory",
+        "line": 10961,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_mood",
+        "line": 10967,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_msgs",
+        "line": 10974,
+        "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_name",
+        "line": 10981,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_near_call",
+        "line": 10987,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_observer",
+        "line": 10993,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_peek",
+        "line": 10999,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_policy",
+        "line": 11005,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_records",
+        "line": 11011,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ring",
+        "line": 11017,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_same_voice",
+        "line": 11023,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_schedule",
+        "line": 11029,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_selftest",
+        "line": 11035,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_settings",
+        "line": 11041,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_setup",
+        "line": 11047,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_skills",
+        "line": 11053,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_sound_fixtures",
+        "line": 11059,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_station",
+        "line": 11065,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_surround",
+        "line": 11071,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_tasks",
+        "line": 11077,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_end",
+        "line": 11083,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_end_wire",
+        "line": 11089,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_owner",
+        "line": 11095,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_update",
+        "line": 11101,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice",
+        "line": 11107,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice_eval",
+        "line": 11113,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice_processes",
+        "line": 11119,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "relay_signals": "ok",
+  "own_harness": "test result: 12 passed; 0 failed",
+  "artifacts": [
+    {
+      "id": 12365990523,
+      "name": "lampos-arm64-0a878cd4d9d44867b2971e70c118244f0c21ad38",
+      "size_in_bytes": 112806871,
+      "expired": false,
+      "digest": "sha256:8423bc5f2514b6dcf0fc2cb1b8cbf819780a1f2ced50ab0434f02a6f6f04d8be"
+    }
+  ],
+  "limits": [
+    "GitHub reports the artifact digest; its payload was not downloaded or independently hashed here.",
+    "This is a native GitHub Linux ARM64 run, not a physical lamp or acoustic measurement.",
+    "Historical failed Mac and local Linux results remain separate and unchanged."
+  ],
+  "historical_86_on_candidate": {
+    "match_method": "Exact package and test name on nextest status rows before its summary; exactly one match required.",
+    "counts": {
+      "PASS": 85,
+      "LEAK": 1,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "SKIP": 0
+    },
+    "tests": [
+      {
+        "package": "lamp-cloud",
+        "target": "lamp-cloud",
+        "target_kind": "lib",
+        "test": "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for",
+        "status": "PASS",
+        "line": 1717
+      },
+      {
+        "package": "lamp-cloud",
+        "target": "lamp-cloud",
+        "target_kind": "lib",
+        "test": "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute",
+        "status": "PASS",
+        "line": 1728
+      },
+      {
+        "package": "lamp-tasks",
+        "target": "lamp-tasks::harness",
+        "target_kind": "test",
+        "test": "changed_executable_after_preflight_proves_new_was_not_spawned",
+        "status": "PASS",
+        "line": 6015
+      },
+      {
+        "package": "lamp-tasks",
+        "target": "lamp-tasks::harness",
+        "target_kind": "test",
+        "test": "executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused",
+        "status": "PASS",
+        "line": 6023
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal",
+        "status": "PASS",
+        "line": 6732
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+        "status": "PASS",
+        "line": 6780
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+        "status": "PASS",
+        "line": 6784
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+        "status": "PASS",
+        "line": 6782
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once",
+        "status": "PASS",
+        "line": 6781
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps",
+        "status": "PASS",
+        "line": 6849
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps",
+        "status": "PASS",
+        "line": 6783
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted",
+        "status": "PASS",
+        "line": 6785
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup",
+        "status": "PASS",
+        "line": 6786
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening",
+        "status": "PASS",
+        "line": 6788
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement",
+        "status": "PASS",
+        "line": 6789
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released",
+        "status": "PASS",
+        "line": 6792
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch",
+        "status": "PASS",
+        "line": 6790
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return",
+        "status": "PASS",
+        "line": 6794
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap",
+        "status": "PASS",
+        "line": 6797
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant",
+        "status": "PASS",
+        "line": 6795
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+        "status": "PASS",
+        "line": 6796
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+        "status": "PASS",
+        "line": 6798
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+        "status": "PASS",
+        "line": 6799
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+        "status": "PASS",
+        "line": 6800
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+        "status": "PASS",
+        "line": 6804
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+        "status": "PASS",
+        "line": 6801
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+        "status": "PASS",
+        "line": 6802
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+        "status": "PASS",
+        "line": 6803
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+        "status": "PASS",
+        "line": 6806
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+        "status": "PASS",
+        "line": 6805
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+        "status": "PASS",
+        "line": 6807
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit",
+        "status": "PASS",
+        "line": 6820
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+        "status": "PASS",
+        "line": 6808
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue",
+        "status": "PASS",
+        "line": 6809
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write",
+        "status": "PASS",
+        "line": 6810
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released",
+        "status": "PASS",
+        "line": 6811
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority",
+        "status": "PASS",
+        "line": 6812
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token",
+        "status": "PASS",
+        "line": 6813
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping",
+        "status": "PASS",
+        "line": 6821
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+        "status": "PASS",
+        "line": 6829
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+        "status": "PASS",
+        "line": 6839
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure",
+        "status": "PASS",
+        "line": 6838
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn",
+        "status": "PASS",
+        "line": 6840
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained",
+        "status": "PASS",
+        "line": 7866
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure",
+        "status": "PASS",
+        "line": 7868
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it",
+        "status": "PASS",
+        "line": 7869
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned",
+        "status": "PASS",
+        "line": 7875
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace",
+        "status": "PASS",
+        "line": 7870
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps",
+        "status": "PASS",
+        "line": 7873
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child",
+        "status": "PASS",
+        "line": 7882
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod",
+        "status": "PASS",
+        "line": 7883
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract",
+        "status": "PASS",
+        "line": 7876
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on",
+        "status": "PASS",
+        "line": 7908
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only",
+        "status": "PASS",
+        "line": 7880
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+        "status": "PASS",
+        "line": 7881
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker",
+        "status": "PASS",
+        "line": 7888
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+        "status": "PASS",
+        "line": 8615
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+        "status": "PASS",
+        "line": 8604
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "status": "LEAK",
+        "line": 8630
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader",
+        "status": "PASS",
+        "line": 9351
+      },
+      {
+        "package": "lamp-voice",
+        "target": "lamp-voice",
+        "target_kind": "lib",
+        "test": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out",
+        "status": "PASS",
+        "line": 9354
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+        "status": "PASS",
+        "line": 6369
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_build_put_back_puts_the_product_skills_back",
+        "status": "PASS",
+        "line": 6374
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+        "status": "PASS",
+        "line": 6403
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+        "status": "PASS",
+        "line": 6393
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_new_updater_that_confirms_keeps_its_switch",
+        "status": "PASS",
+        "line": 6394
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_new_updater_that_exits_at_once_is_put_back",
+        "status": "PASS",
+        "line": 6402
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_new_updater_that_refuses_every_manifest_is_put_back",
+        "status": "PASS",
+        "line": 6404
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_round_after_install_keeps_lamp_updates_own_folder",
+        "status": "PASS",
+        "line": 6407
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+        "status": "PASS",
+        "line": 6420
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_round_by_hand_keeps_the_folder_it_runs_from",
+        "status": "PASS",
+        "line": 6409
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+        "status": "PASS",
+        "line": 6405
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_round_places_the_builds_product_skills_and_keeps_the_lamps_own",
+        "status": "PASS",
+        "line": 6412
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "a_self_json_from_a_later_version_still_reads",
+        "status": "PASS",
+        "line": 6423
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "an_old_updater_climbs_one_updater_a_round",
+        "status": "PASS",
+        "line": 6424
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "an_unreadable_self_json_with_both_builds_known_is_put_back",
+        "status": "PASS",
+        "line": 6426
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+        "status": "PASS",
+        "line": 6430
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+        "status": "PASS",
+        "line": 6434
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "install_writes_the_fallback_and_no_round_touches_it",
+        "status": "PASS",
+        "line": 6448
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "lamp_update_back_puts_back_an_unreadable_self_json",
+        "status": "PASS",
+        "line": 6440
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "no_second_round_begins_while_lamp_updates_own_switch_waits",
+        "status": "PASS",
+        "line": 6452
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+        "status": "PASS",
+        "line": 6435
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "the_fallback_reads_a_self_json_written_by_a_later_updater",
+        "status": "PASS",
+        "line": 6453
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+        "status": "PASS",
+        "line": 6441
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+        "status": "PASS",
+        "line": 6473
+      },
+      {
+        "package": "lamp-update",
+        "target": "lamp-update::round",
+        "target_kind": "test",
+        "test": "with_the_switch_off_lamp_update_never_switches_itself",
+        "status": "PASS",
+        "line": 6496
+      }
+    ]
+  }
+}
