@@ -3139,6 +3139,26 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
     marks no piece's end before `close_socket`, so it would need the
     answer's end told to the voice, and `keep_alive` while the chat is
     slow.
+- **Tried twice and left off: the socket is slower than a kept HTTP
+  connection on both lamps** (the first builder on #2602, 22 Oct 04:09).
+  - **At the piece** (the dialogue socket above, #2658): on lamp-4ace it
+    never opened inside its 400 ms, 16 of 16 (`connect timed out`). Its
+    upgrade alone takes 481 ms at p50 on lamp-c0a4 (503 at p90,
+    `probe-cascade --wire --socket`), so a fixed 400 ms always misses.
+    Even when it opens, the upgrade plus its first audio (319 ms) is about
+    800 ms, against HTTP's 298 ms.
+  - **At the line's start** (#2729, closed): the socket opened when the
+    person's line began, and a dialogue one was kept alive and waited for
+    as long as recent upgrades took. On lamp-c0a4 it was open 595–768 ms
+    after the line began and ready for every piece (v4 14 of 14, Flash 12
+    of 12). The answer's first sound was still later than over HTTP,
+    p50 3325 ms (HTTP), 3424 ms (Flash on the socket) and 3957 ms (v4 on
+    the socket), from the end of speech, 12 played lines an arm.
+  - **Why:** a socket that is already open still gives its first audio
+    later than a kept HTTP connection does (lamp-4ace: 633 ms on the
+    socket against 298 ms over HTTP). So opening it sooner doesn't help.
+    Speech is about 0.5 s of an answer's 2.5 s, and the chat's first event
+    (about 1.6 s) is where time is to be won.
 
 ### How much the prompt cache holds (`probe-cache`)
 
