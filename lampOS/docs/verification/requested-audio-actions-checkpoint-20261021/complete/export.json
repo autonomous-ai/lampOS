@@ -1,0 +1,62 @@
+{
+  "archived_baseline_sha256": "9ca44209809f5d86ef7463893df6dc29773530b8856511e53ff9e8f08fe69480",
+  "archived_baseline_url": "https://raw.githubusercontent.com/autonomous-ai/lampOS/d2e171f9ac5af88955e631812fa0038b24fa1af8/lampOS/docs/verification/requested-audio-host-20261021-current/source-files.json",
+  "checkout_identity_note": "The checkout HEAD identifies the starting checkout only. Uncommitted corrections were included in the frozen working tree; the source delta and its hash qualify those exact bytes. The old checkout commit alone is not this verification result.",
+  "completed_process_exit_code": 1,
+  "files": {
+    "consumers.json": {
+      "bytes": 15153,
+      "sha256": "1c3ef0c58dc47961827c56bd1f802ff281e361fdf36f24a9994ae6100c2f46dc"
+    },
+    "example.json": {
+      "bytes": 1409,
+      "sha256": "e06b1157f4b7c1a8a30c44f310a83526acf3beddb199d76af41af562691dd386"
+    },
+    "handoff-timing.json": {
+      "bytes": 2462,
+      "sha256": "e3e11c678f92085a9de411335b0598a93b51112a9d87b79ee16a34a6669bf563"
+    },
+    "host.json": {
+      "bytes": 40702,
+      "sha256": "cc153dd0c6e4df4b63620bb615f23552fd23a61cee4e4009a03b4c5b7ee85ca8"
+    },
+    "scan-timing.json": {
+      "bytes": 2999,
+      "sha256": "c3784a9ddfe70b8c0405c75d66289883d219866352ff1bc9e8cdf9be84c7ec6d"
+    },
+    "source-check.json": {
+      "bytes": 1366,
+      "sha256": "5cf5cd859714f5795d0708675dfa346c73d0d41c5685377399e02fb5f5ec44d9"
+    },
+    "source-delta.json": {
+      "bytes": 11846,
+      "sha256": "64a6bf4b333683a4f4945ebe40bb8599e0690a1b430d59630ee54ec1357be740"
+    }
+  },
+  "gate_passed": false,
+  "integration_base": "bd43346de29bba069f741baa3eb32d03c6d5794f",
+  "raw_input_receipts_sha256": {
+    "second-music-actions-p2-full-20261021-1-consumer-source-files.json": "f36368d9568fab87012545a4b36e3ce487cd993027b8a6fe7f80754d5c7e4afc",
+    "second-music-actions-p2-full-20261021-1-consumers.json": "92eea8782893e5035815ed4fe69db4adee4e9fb4b3e94d4b8ad23a05dc9c003b",
+    "second-music-actions-p2-full-20261021-1-host-config.json": "957cff1b8e72bfbd519cfb351b503275adbb4893d44427652180cfb4a190cb2b",
+    "second-music-actions-p2-full-20261021-1-host-example.json": "87752a3939e5159b17afbebe8c48c0325673d91698241c1765860e08535c28b9",
+    "second-music-actions-p2-full-20261021-1-host-source-check.json": "c41ff609f19209b75c301942963fad78f4d83341b469a0c9baeee0cc819b7ab3",
+    "second-music-actions-p2-full-20261021-1-host-source-copy.json": "f36368d9568fab87012545a4b36e3ce487cd993027b8a6fe7f80754d5c7e4afc",
+    "second-music-actions-p2-full-20261021-1-host.json": "d9f5dc843b0723f8a92222d6e0d9f36362a1ec4fa4b062075d681b4e3fa2759a"
+  },
+  "scope": "Compact structured records only. No raw logs, whole source map, generated audio, package or binary was copied. No tests were rerun during export.",
+  "source_check_verified": true,
+  "source_delta_added_paths": 24,
+  "source_delta_changed_paths": 92,
+  "source_delta_removed_paths": 0,
+  "source_file_count": 2204,
+  "source_head_at_freeze": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+  "source_tree_sha256": "1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40",
+  "status": "finished gate export",
+  "uncommitted_correction_files_sha256": {
+    "lampOS/crates/actions/src/server.rs": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b",
+    "lampOS/crates/actions/src/speaker_state.rs": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c",
+    "lampOS/crates/actions/tests/speaker_state.rs": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "0333c076ff2ec57d0ede43aaa1808c223013fda1efc714e0f8727a91ad8601e5"
+  }
+}

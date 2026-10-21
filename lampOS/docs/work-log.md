@@ -1,3 +1,56 @@
+## Current checkpoint: 2026-10-21, frozen Actions correction and release rebase pending
+
+**Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757): ready: no.**
+The Actions correction is frozen and uncommitted; the remote PR remains in
+draft at `c74b0f710ecac48f8668c6ab8258777788068c0a`. A failed optional
+speaker-state publisher now stays disabled until restart while ordinary
+mute, volume and light calls keep serving. Caps observation and fatal
+storage checks remain active. The
+[exact four-file correction](verification/requested-audio-actions-checkpoint-20261021/correction.json)
+is available for the pending reviewer reread.
+
+The [complete host gate](verification/requested-audio-actions-checkpoint-20261021/README.md)
+finished **FAILED, exit 1: 8,773 passed, 1 failed, 48 ignored, 0 filtered**
+across the 36 complete consumer suites. All 17 stages completed. Workspace
+formatting, strict all-target Clippy, workspace build, renderer, package and
+disposable installation passed. The **23-test Actions speaker suite** and
+the **actual Voice Ticket expiry/no-revival regression** passed. All **2,204**
+frozen source inputs still match aggregate
+`1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40`.
+
+The sole failure is inherited from the Eyes fixture:
+`seems_log::tests::a_failed_write_is_said_once` opens `/dev/full` at
+`crates/eyes/src/seems_log.rs:312`; this Darwin host returns `NotFound`
+before the write assertions. The entire Eyes crate is unchanged from
+integration base `bd43346de29bba069f741baa3eb32d03c6d5794f`.
+[Diagnosis and historical native evidence](verification/requested-audio-actions-checkpoint-20261021/eyes-diagnosis.json)
+preserve the failure. It was neither rerun nor skipped. This is a
+found-not-mine fixture issue for the Eyes owner and integration coordinator,
+associated with [#2306](https://github.com/autonomous-ai/lampOS/pull/2306).
+The earlier c74 Linux ARM64 pass does not qualify the uncommitted correction.
+
+**Release publication [#2462](https://github.com/autonomous-ai/lampOS/pull/2462):
+rebase pending.** Its remote head remains
+`18318e115cd0cb35ebea571132ec3eafc5f651b6`. The
+[07:57 UTC review](https://github.com/autonomous-ai/lampOS/pull/2462#issuecomment-6311014902)
+reports a conflict only in `updates.md`, with both sides to be retained.
+The [latest Queue instruction](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6311686611)
+requires rebasing onto `lamp-voice` after
+[#1712](https://github.com/autonomous-ai/lampOS/pull/1712) lands. That landing
+is now merged as `533b1dae07c812cf0a11af52aed788904a7761d2`; the
+[integration hold is lifted](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6311788436)
+and the rebase is in progress in a separate worktree. The earlier
+closed review findings and green native results remain historical; the
+rebased source needs fresh qualification and review. Only the actual merge
+permits closing [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)
+and the wider update handoff, after that rebase and qualification.
+
+This documentation checkpoint records evidence and pending work only. It
+does not qualify or commit runtime changes, enable Music on a device, or
+enable release publication. The complete earlier log is preserved below.
+
+---
+
 # The second builder's log
 
 The second builder's own record, on `lamp-second`, which only it writes

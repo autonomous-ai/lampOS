@@ -1,0 +1,36 @@
+{
+  "audio_played": false,
+  "bytes": 2304044,
+  "channels": 1,
+  "device_access": false,
+  "duration_seconds": 48,
+  "frames": 1152000,
+  "installed_files_match_staged": true,
+  "package_bytes": 2333184,
+  "package_members": [
+    "lamp-skill.json",
+    "relaxing-music/LICENSE",
+    "relaxing-music/PROVENANCE.md",
+    "relaxing-music/README.md",
+    "relaxing-music/SKILL.md",
+    "relaxing-music/relaxing.wav",
+    "relaxing-music/score.rs",
+    "relaxing-music/skill.toml"
+  ],
+  "package_sha256": "61618d4ae247536efcfaaa1cb5bf4c4a584e720a9958ebb45b2045bb5c484d35",
+  "peak_absolute_sample": 900,
+  "profile": "host debug",
+  "rate_hz": 24000,
+  "sample_bits": 16,
+  "staged_files_sha256": {
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "PROVENANCE.md": "7510ee01ce0a28d3f62c2e5185b16d1bdb9fd937eede66b71e7f4417d6514a54",
+    "README.md": "b8b58c617c7c60b444f80dc5236d0d5f1d50e3cfb74e815a909755740180ed1e",
+    "SKILL.md": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+    "relaxing.wav": "134362ab72a19c143c627dbd438f3d17ceabe9c6923bad6f1ea3f7d5fb9579fa",
+    "score.rs": "d0bcc0f5553b61b2b46697fb8ee33d5f657e423d78f55a8fb66a59afc5249ad9",
+    "skill.toml": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b"
+  },
+  "status": "verified",
+  "wav_sha256": "134362ab72a19c143c627dbd438f3d17ceabe9c6923bad6f1ea3f7d5fb9579fa"
+}
