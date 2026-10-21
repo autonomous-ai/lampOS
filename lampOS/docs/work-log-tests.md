@@ -1,5 +1,34 @@
 # Tests work log
 
+## 2026-10-21 23:58:47 +0700 — add-on judge ready; 19.064 s to 0.648 s on native ARM64
+
+Ready for lamp-voice: [#2647](https://github.com/autonomous-ai/lampOS/pull/2647)
+yes, pending review, at `0f961123bae4ef804acd04ac53db6e074d2dd161`.
+
+Native [build and test on Linux ARM64 #5208](https://github.com/autonomous-ai/lampOS/actions/runs/39637726292)
+passed in 5m53s: 9,740 passed (one leaky), 63 skipped, in 156.967 s,
+plus passing doc/own-harness checks. Linux all-target
+[Clippy #1217](https://github.com/autonomous-ai/lampOS/actions/runs/39637726326)
+passed in 2m25s on the same head. All nine judge cases passed; the original
+eight totaled 0.648 s (all nine 0.661 s), including product-lamp 0.120 s
+and switch-off 0.016 s. Their earlier ARM64 #5191 values were 19.064 s,
+5.401 s and 4.160 s respectively. The two native runs have different
+integration bases and runner executions; the PR retains the controlled
+same-base Mac series. Whole-job build/cache time is not attributed to
+the fixture change. [Extracted native rows](verification/addons-judge-grace-20261021/arm64-after-5208.json).
+
+Posted [the ready result on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6321645478).
+No ARM64 build ran on the Mac; no lamp was contacted. #2679 remains ready
+with its separately recorded native result. The six Tests PRs checked
+have no unanswered review comments or threads as of this check.
+
+The next branch, `tests/1806-addon-trigger-ack`, starts at `f349d63c7`.
+It replaces the skills add-on pair's 300 ms processing sleeps with each
+trigger's Done event when enabled and the existing post-load zero-skip
+acknowledgement when disabled. It retains both absence drains and every
+original assertion. Baseline timings passed 3/3 each; the new timings,
+three mutation controls and local gate are running before publication.
+
 ## 2026-10-21 23:47:21 +0700 — reminder ready on ARM64; judge startup wait pushed
 
 Ready for lamp-voice: [#2679](https://github.com/autonomous-ai/lampOS/pull/2679)

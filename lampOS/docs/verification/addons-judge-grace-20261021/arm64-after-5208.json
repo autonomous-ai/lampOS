@@ -1,0 +1,54 @@
+{
+  "run": "https://github.com/autonomous-ai/lampOS/actions/runs/39637726292",
+  "head": "0f961123bae4ef804acd04ac53db6e074d2dd161",
+  "job_wall_s": 353,
+  "original_eight_sum_s": 0.648,
+  "nine_sum_s": 0.661,
+  "tests": [
+    {
+      "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "seconds": 0.119,
+      "status": "PASS"
+    },
+    {
+      "test": "a_kept_light_is_said_kept_on_addon_decision",
+      "seconds": 0.12,
+      "status": "PASS"
+    },
+    {
+      "test": "a_kept_mood_is_said_to_lamp_mood",
+      "seconds": 0.016,
+      "status": "PASS"
+    },
+    {
+      "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "seconds": 0.12,
+      "status": "PASS"
+    },
+    {
+      "test": "over_a_persons_light_that_rests_a_glow_is_asked_briefly",
+      "seconds": 0.017,
+      "status": "PASS"
+    },
+    {
+      "test": "the_mute_grace_override_is_described_and_bounded_for_tests",
+      "seconds": 0.013,
+      "status": "PASS"
+    },
+    {
+      "test": "a_proposal_not_from_lamp_skills_is_not_judged",
+      "seconds": 0.119,
+      "status": "PASS"
+    },
+    {
+      "test": "without_the_switch_nothing_runs_and_nothing_is_asked",
+      "seconds": 0.016,
+      "status": "PASS"
+    },
+    {
+      "test": "the_persons_own_light_wins_and_nothing_is_asked",
+      "seconds": 0.121,
+      "status": "PASS"
+    }
+  ]
+}
