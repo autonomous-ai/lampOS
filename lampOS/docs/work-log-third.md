@@ -60,9 +60,9 @@ Ready for lamp-voice: no (diagnostic read only; no policy change).
   capture-block count, source-read elapsed time and decision delay at each
   boundary. The privacy-worker fix remains first while its gates run.
 
-## 2026-10-21 — privacy worker expiry ride — taken
+## 2026-10-21–22 — privacy worker expiry ride — PR #2695
 
-Ready for lamp-voice: no.
+Ready for lamp-voice: no (native Linux gates pending).
 
 - First builder's 22:15 assignment on #2602, following Eighth's 22:11
   evidence: the worker's own `physical privacy source expired` ends the
@@ -71,8 +71,33 @@ Ready for lamp-voice: no.
   claimed the fix. Sixth separately owns the refused-socket crash.
 - Behind `LAMP_PRIVACY_GAP_RIDE`, keep the worker reading after expiry and
   report `Unavailable` for up to `RIDE_US`. Test a 60 ms Controls silence,
-  began/reopened events in one conversation, closed microphones through the
+  began/reopened events in one conversation, no admitted frames during the
   gap, timeout past the bound, and unchanged behavior with the switch off.
+- Pushed [PR #2695](https://github.com/autonomous-ai/lampOS/pull/2695), head
+  `b854c0755524f995ab87adfe38141c7cca06c09f`, from
+  `third/privacy-worker-gap-ride` onto `lamp-voice`, based on `07ce0a6c4`
+  including Sixth's #2678. Exactly 11 code/test/doc files, one commit.
+- The worker's budget starts at the last accepted acquisition's 50 ms
+  expiry, after it has already granted a lease. An unavailable event comes
+  before queued recovery; both worker and coordinator enforce the original
+  one-second limit through the 60 ms stable-open gate. Startup, physical LOW,
+  publisher replacement and invalid evidence keep their closed behavior.
+- Host fmt, workspace all-target Clippy and workspace build passed. The
+  full 12-crate affected/dependent test gate completed with 6,147 passed,
+  one failed, 26 ignored. Every privacy test passed. The unchanged light-call
+  timing test's median was 36.775 ms against 25 ms; its exact executable
+  passed alone at 3.562 ms with no source or bound change. Both results and
+  exact commands are retained in the PR; the full gate was not rerun.
+- Linux-only tests exercise the actual worker on repeated 60 ms gaps,
+  a 250 ms late publication, an isolated HIGH that cannot renew the budget,
+  startup without a grant and a real LOW. Native ARM64 run
+  [39641927087](https://github.com/autonomous-ai/lampOS/actions/runs/39641927087)
+  and x86 Clippy run
+  [39641927106](https://github.com/autonomous-ai/lampOS/actions/runs/39641927106)
+  are running on the PR head.
+- Posted on [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322004474).
+  The short-gap tests show denied leases and no admitted frames; they do not
+  claim the capture descriptor closed before its existing authority lease.
 - No lamp access; the native ARM64 PR run is the target build/test gate.
 
 ## 2026-10-14 — expression — taken
