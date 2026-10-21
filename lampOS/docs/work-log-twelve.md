@@ -483,3 +483,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   merged; #2449 onto #1712: its follow-up (a gap-held line told no recall,
   no hits, no held forget), with #2265 cherry-picked. Friday's #2367 took
   ROOM_NOT_ASKER; my local start dropped.
+- #2449: the reviewer's P2 (a gap-held line runs no memory/rule/face
+  function and is told no note). #2226: the reviewer-lead's P1 (my fold had
+  undone #2443's thread pin) rebuilt on lamp-voice as `04bc8d040`, P3s in.
+  #2063 folded. Status table to the first builder; free: twelve.
