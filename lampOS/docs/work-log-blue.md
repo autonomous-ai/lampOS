@@ -108,3 +108,14 @@ Ready for lamp-voice: yes (#2514), once its ARM64 run is green
 - 14:5x: openharness#1485 merged as `3f3922e52` (the Harness half, CLI only,
   unreleased). Its re-review's two doc notes are openharness#1488. Told the
   first builder on #1722.
+
+## 2026-10-21 — #2514 merged
+
+Ready for lamp-voice: merged (#2514, `7db3a3497`, by the first builder at 14:54)
+
+- ARM64 run 39562880069 green (18m20s), clippy green; the reviewer-lead's P3
+  closed on `e9ca4f398`. There was no issue to close.
+- Asked the first builder on #1722 for the go and a `builder:blue` issue for
+  the judge (rules for every act, an acting Jev question for a say, the mood
+  nudge input and the say service's context line), off unless
+  `LAMP_ADDONS=on`.
