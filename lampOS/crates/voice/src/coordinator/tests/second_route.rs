@@ -146,6 +146,12 @@ struct Script {
     /// What the second route heard the person say, as its recogniser
     /// gives it before the answer: a transcript with no request (#1670).
     second_hears: Option<&'static str>,
+    /// `second_hears` as the duplex route gives a line: word by word, with
+    /// no piece marked finished (Gemini's input transcript, policy.md).
+    hears_in_pieces: bool,
+    /// With `hears_in_pieces`, the pieces come as the line begins, before
+    /// its End, not after it.
+    hears_at_start: bool,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
     /// A murmur of two capture frames, too short to be a turn: the room is
@@ -247,6 +253,8 @@ impl Script {
             walk: false,
             second_cue: 0,
             second_hears: None,
+            hears_in_pieces: false,
+            hears_at_start: false,
             speak_again: None,
             murmur: None,
             hand_stop: None,
@@ -837,6 +845,28 @@ impl Peers {
         });
     }
 
+    /// What the person said (`second_hears`): whole and finished, as the
+    /// second route's recogniser gives it, or in pieces with none finished.
+    fn hears(&mut self, index: usize, text: &'static str) {
+        let pieces = self.script.hears_in_pieces;
+        let queued = &mut self.peers[index].queued;
+        if pieces {
+            for piece in text.split_inclusive(' ') {
+                queued.push_back(ProviderOutput::Transcript {
+                    request: None,
+                    text: piece.into(),
+                    finished: false,
+                });
+            }
+        } else {
+            queued.push_back(ProviderOutput::Transcript {
+                request: None,
+                text: text.into(),
+                finished: true,
+            });
+        }
+    }
+
     fn tick_provider(&mut self, index: usize) {
         let live = self.peers[index].role == "provider";
         for _ in 0..64 {
@@ -881,6 +911,12 @@ impl Peers {
                         session,
                         waiting_for_barrier: false,
                     });
+                    if !live
+                        && self.script.hears_at_start
+                        && let Some(text) = self.script.second_hears
+                    {
+                        self.hears(index, text);
+                    }
                 }
                 // Alone, the second route answers the lamp's own turns as
                 // the Live route would, with its own samples.
@@ -1059,18 +1095,10 @@ impl Peers {
                             self.audio(index, request, self.script.second_cue, CUE);
                         }
                         // The first request's words only, when it waits.
-                        if let Some(text) = self
-                            .script
-                            .second_hears
-                            .filter(|_| !self.script.second_waits_first)
-                        {
-                            self.peers[index]
-                                .queued
-                                .push_back(ProviderOutput::Transcript {
-                                    request: None,
-                                    text: text.into(),
-                                    finished: true,
-                                });
+                        if let Some(text) = self.script.second_hears.filter(|_| {
+                            !self.script.second_waits_first && !self.script.hears_at_start
+                        }) {
+                            self.hears(index, text);
                         }
                         if let Some(text) = self.script.second_says {
                             self.peers[index]
@@ -2890,6 +2918,94 @@ fn a_known_persons_baseline_goes_when_they_ask_to_forget_their_face() {
         [
             (json!(false), json!("person")),
             (json!(false), json!("person"))
+        ],
+        "{}",
+        run.summary()
+    );
+}
+
+/// Thirteen on #1722 (21 Oct): the duplex route hears a line in pieces and
+/// marks none finished, so a line's words are read whole once its pieces
+/// stop. Asked in pieces to forget their face, a known person's baseline
+/// goes, as when the line comes whole.
+#[test]
+fn a_forget_heard_in_pieces_lets_the_baseline_go() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = Some("p-jim".into()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("Please forget my face"),
+        hears_in_pieces: true,
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|person| *person.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let lines: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| end["tone"]["baseline_lines"].clone())
+        .collect();
+    assert_eq!(lines, [json!(1), json!(1)], "{}", run.summary());
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [
+            (json!("words"), json!("person")),
+            (json!("words"), json!("person"))
+        ],
+        "{}",
+        run.summary()
+    );
+}
+
+/// Pieces heard while the line is still being said are its words: they are
+/// kept until its End, and its tone is told with them, never the line
+/// before's.
+#[test]
+fn pieces_heard_before_a_lines_end_are_its_words() {
+    let _one = super::pilot_faults::one_session();
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("I'm so happy today"),
+        hears_in_pieces: true,
+        hears_at_start: true,
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    run.assert_clean();
+    let told: Vec<_> = run
+        .events("voice_tone")
+        .into_iter()
+        .map(|told| {
+            (
+                told["turn"].clone(),
+                told["words"].clone(),
+                told["valence"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        told,
+        [
+            (json!(1), json!(true), json!(1.0)),
+            (json!(2), json!(true), json!(1.0))
         ],
         "{}",
         run.summary()

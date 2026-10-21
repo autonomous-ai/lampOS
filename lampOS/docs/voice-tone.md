@@ -104,6 +104,14 @@ isn't taken here: it sends a person's voice to a server for every line.
 - **When:** the meter is read at the line's End and the baseline takes it in
   then; the tone is told when the line's words come (the second route's
   final words, `Transcript` with no request), with their valence.
+  - **The duplex route** hears a line in pieces and marks none finished
+    (Gemini's input transcript, as in [policy.md](policy.md)). Its pieces
+    are put end to end, up to 4 KiB, and read as one line once none has
+    come for 300 ms, as Policy's utterance is, and the line in hand has
+    ended. So pieces heard before a line's End wait for it. The forget
+    reads the same whole line (Thirteen's c0a4 run on #1722, 21 Oct: before
+    this, a forget there never let the baseline go, and no duplex line was
+    told with its words).
   - Words heard while another line is the lamp's are taken for that line's,
     so a reading still waiting for its own is told without them.
   - A line whose words never come is told without them at the next End.
@@ -145,6 +153,11 @@ settle with this one (#1722).
   - each line's tone is told with its own words, under its own turn, and the
     second is read against the first;
   - a known person's baseline goes when they ask to forget their face;
+  - the same, asked in pieces with none marked finished, as the duplex route
+    hears it (`a_forget_heard_in_pieces_lets_the_baseline_go`);
+  - pieces heard while a line is still being said are its words: kept until
+    its End, and told with its reading, never the line before's
+    (`pieces_heard_before_a_lines_end_are_its_words`);
   - a name memory forgot (`memory/forgot`) starts a fresh baseline when
     enrolled again, and a rules scope memory forgot changes nothing;
   - the loop reads memory's forget from a real bus (`ForgotIn` on a test
@@ -161,4 +174,7 @@ With `LAMP_VOICE_TONE=on` and the person at the desk:
 2. the same sentence read calm, then excited, three times each: the
    arousal's sign each time (`voice_tone` records);
 3. a glad line and a down one: the valence's sign;
-4. the voice part's CPU over the run, beside the same run off.
+4. the voice part's CPU over the run, beside the same run off;
+5. on the duplex route too, with a known face: "forget my face" is a
+   `voice_tone_forgot` with `by: words`, the next line's `baseline_lines`
+   is 1, and a glad line's `voice_tone` has `words: true`.
