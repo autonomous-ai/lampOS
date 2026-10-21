@@ -156,7 +156,9 @@ ever held two windows in a row over 0.3. In 16.8 minutes of people talking
 **Parked (21 Oct):** no skill reads `scores.laughter` now: the owner never
 asked to listen for other people laughing, so the laugh glance is off and
 kept (`skills/laugh-glance`, held out of the product by
-`install::NOT_PRODUCT_SKILLS`). The score is still published.
+`install::NOT_PRODUCT_SKILLS`). The score is still published. Install never
+removes a skill, so a copy already put on a lamp by hand (#2399's trial) stays
+and still acts with `LAMP_EARS_CLASSES=on` until its folder is removed.
 
 **Through a lamp's microphone** (lamp-52e6, #2399, 21 Oct, `tools/joys-scores.sh`
 with `KEEP_DIR`, from a speaker beside the lamp in a talking office): laughs
