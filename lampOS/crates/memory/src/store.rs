@@ -1094,6 +1094,20 @@ impl Store {
         Ok(Some(removed))
     }
 
+    /// Empty one person's memory and their rules scope (`Person::rules`):
+    /// the app's removal of the person (`docs/memory.md`, "Forgetting a
+    /// person"). The removed entries, then the removed rules. Files have no
+    /// transaction: a failure between the two leaves the rules, and asking
+    /// again finishes it.
+    pub fn forget_person(&mut self, person: &Person) -> io::Result<(u64, u64)> {
+        let rules = person.rules().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "the person has no rules scope")
+        })?;
+        let removed = self.forget_all(Some(person))?;
+        let ruled = self.forget_all(Some(&rules))?;
+        Ok((removed, ruled))
+    }
+
     /// Empty one person's memory, or with `None` everyone's. Every file in
     /// the directory goes, read or not, and the directory with them. The
     /// count is of the entries that could be read.

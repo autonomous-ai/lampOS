@@ -242,6 +242,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         for answer in [
             json!({"people": ["Lan"], "waiting": ["Bo"]}),
             json!({"forgot": true}),
+            json!({"forgot": true}),
         ] {
             let (stream, _) = listener.accept().unwrap();
             let mut line = String::new();
@@ -301,11 +302,25 @@ fn the_faces_page_reads_names_and_removes_one() {
     // This lamp gives lamp-cloud no memory socket.
     assert_eq!(removed["data"]["memory"], "kept", "{removed}");
     assert!(is(&removed["data"]["reason"], Type::Text), "{removed}");
+    // The face only (`"entirely": false`): memory is not asked, and says so.
+    let face_only = reply(
+        &mut real,
+        "face.remove",
+        json!({"name": "Bo", "entirely": false}),
+    );
+    assert_eq!(face_only["status"], "success", "{face_only}");
+    assert_eq!(face_only["data"]["memory"], "not asked", "{face_only}");
+    // The app's probe for `entirely`: no name, refused by the name's check
+    // and not "not on this lamp", and the eyes are not asked.
+    let probe = reply(&mut real, "face.remove", json!({"entirely": true}));
+    assert_ne!(probe["status"], "success", "{probe}");
+    assert!(!probe.to_string().contains("not on this lamp"), "{probe}");
     assert_eq!(
         eyes.join().unwrap(),
         [
             json!({"list": true, "waiting": true}),
-            json!({"forget": "Lan"})
+            json!({"forget": "Lan"}),
+            json!({"forget": "Bo"})
         ]
     );
     // Without the switch, neither is on this lamp.

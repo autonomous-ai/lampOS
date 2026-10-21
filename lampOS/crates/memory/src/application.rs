@@ -12,9 +12,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days] [--bus-root ABSOLUTE_DIR]";
+const USAGE: &str = "usage: lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days] [--bus-root ABSOLUTE_DIR] [--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME]";
 
-const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nSee docs/memory.md.";
+const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nWith it, each forget of everything kept under a person is told on memory/forgot.\n--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME (both or neither) opens a\nsecond socket, mode 0660 and owned by group NAME from /etc/group, that takes only\n{\"op\":\"forget_person\",\"person\":ID}: the app's removal of a person.\nSee docs/memory.md.";
 
 #[derive(Debug, Eq, PartialEq)]
 struct Arguments {
@@ -25,6 +25,8 @@ struct Arguments {
     zone: Option<String>,
     memory_days: bool,
     bus_root: Option<PathBuf>,
+    /// The app's narrow socket and the group it is for: both or neither.
+    forget: Option<(PathBuf, String)>,
 }
 
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, &'static str> {
@@ -32,6 +34,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut dir, mut socket, mut keep_days, mut utc_offset_minutes) = (None, None, None, None);
     let mut memory_days = false;
     let (mut bus_root, mut zone) = (None, None);
+    let (mut forget_socket, mut forget_group) = (None::<PathBuf>, None::<String>);
     while let Some(key) = args.next() {
         if key == "--help" {
             let alone = dir.is_none()
@@ -41,6 +44,8 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && zone.is_none()
                 && !memory_days
                 && bus_root.is_none()
+                && forget_socket.is_none()
+                && forget_group.is_none()
                 && args.next().is_none();
             return if alone {
                 Ok(None)
@@ -64,6 +69,8 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                     | "--utc-offset-minutes"
                     | "--zone"
                     | "--bus-root"
+                    | "--forget-socket"
+                    | "--forget-group"
             )
         );
         if !known {
@@ -74,6 +81,15 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
             Some("--dir") if dir.is_none() => dir = Some(PathBuf::from(value)),
             Some("--socket") if socket.is_none() => socket = Some(PathBuf::from(value)),
             Some("--bus-root") if bus_root.is_none() => bus_root = Some(PathBuf::from(value)),
+            Some("--forget-socket") if forget_socket.is_none() => {
+                forget_socket = Some(PathBuf::from(value));
+            }
+            Some("--forget-group") if forget_group.is_none() => {
+                let name = value.to_str().filter(|name| {
+                    !name.is_empty() && !name.contains([':', '\n']) && !name.trim().is_empty()
+                });
+                forget_group = Some(name.ok_or("--forget-group is a group's name")?.to_owned());
+            }
             Some("--zone") if zone.is_none() => {
                 let name = value.to_str().filter(|name| !name.is_empty());
                 zone = Some(
@@ -99,6 +115,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
             _ => return Err("an option was given twice"),
         }
     }
+    let forget = match (forget_socket, forget_group) {
+        (Some(socket), Some(group)) => Some((socket, group)),
+        (None, None) => None,
+        _ => return Err("--forget-socket and --forget-group are both given or neither"),
+    };
     if zone.is_some() && utc_offset_minutes.is_some() {
         return Err("--zone and --utc-offset-minutes are one or the other");
     }
@@ -110,12 +131,21 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         zone,
         memory_days,
         bus_root,
+        forget,
     };
     if !arguments.dir.is_absolute() || !arguments.socket.is_absolute() {
         return Err("--dir and --socket are absolute paths");
     }
     if arguments.socket.file_name().is_none() {
         return Err("--socket is the path of a socket file");
+    }
+    if let Some((socket, _)) = &arguments.forget {
+        if !socket.is_absolute() || socket.file_name().is_none() {
+            return Err("--forget-socket is the absolute path of a socket file");
+        }
+        if *socket == arguments.socket {
+            return Err("--forget-socket is not the --socket path");
+        }
     }
     if arguments
         .bus_root
@@ -146,6 +176,10 @@ fn run(
     // The socket first, so that a second process started by mistake stops
     // here, before it has touched the store; the store before `ready`.
     let mut server = Server::bind(&arguments.socket)?;
+    // The app's narrow socket, for one group: `forget_person` only.
+    if let Some((socket, group)) = &arguments.forget {
+        server = server.forget_socket(socket, lamp_memory::server::group_named(group)?)?;
+    }
     // Each forget of everything kept under a person is told on the bus
     // (`memory/forgot`), for the lamp's other parts to let theirs go too.
     if let Some(root) = arguments.bus_root.as_ref() {

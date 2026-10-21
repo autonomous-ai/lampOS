@@ -11,6 +11,12 @@
 //! person means every person, and only `forget_all` and `status` take it:
 //! there is no request that gives one person's memory in answer to another.
 //!
+//! `forget_person` forgets one person the eyes know (`p-` and 16 hex
+//! digits, `lamp_msgs::known::is_person_id`) and their rules scope
+//! together, and answers counts only. It is the one request the app's
+//! narrow socket lets through ([`narrow`], `docs/memory.md` "Forgetting a
+//! person").
+//!
 //! [`answer`] also makes the one line that is logged for a request. It
 //! names the request, the person and the counts. It never has a word of
 //! what was remembered, asked for or refused in it: the log is read by
@@ -32,13 +38,14 @@ pub const MOST_RECALL_BYTES: u64 = 16_384;
 /// How many bytes of kept text are given when the request does not say.
 pub const KEPT_BYTES: u64 = 4096;
 
-const OPS: [&str; 7] = [
+const OPS: [&str; 8] = [
     "append",
     "remember",
     "kept",
     "recall",
     "forget_last",
     "forget_all",
+    "forget_person",
     "status",
 ];
 
@@ -125,6 +132,12 @@ pub enum Request {
         #[serde(default)]
         person: Who,
     },
+    /// Everything of one person the eyes know and their rules scope: the
+    /// app's removal of the person. Only a `p-` id is taken.
+    ForgetPerson {
+        #[serde(default)]
+        person: Who,
+    },
     Status {
         #[serde(default)]
         person: Who,
@@ -151,6 +164,11 @@ pub enum Response {
     Emptied {
         removed: u64,
     },
+    /// How many entries and rules `forget_person` removed.
+    ForgotPerson {
+        removed: u64,
+        rules: u64,
+    },
     Status {
         people: Vec<Status>,
     },
@@ -170,6 +188,10 @@ impl Serialize for Response {
             Self::Recalled { entries } => map.serialize_entry("entries", entries)?,
             Self::Forgot { removed } => map.serialize_entry("removed", removed)?,
             Self::Emptied { removed } => map.serialize_entry("removed", removed)?,
+            Self::ForgotPerson { removed, rules } => {
+                map.serialize_entry("removed", removed)?;
+                map.serialize_entry("rules", rules)?;
+            }
             Self::Status { people } => map.serialize_entry("people", people)?,
             Self::Refused { error, message } => {
                 map.serialize_entry("error", error)?;
@@ -205,6 +227,18 @@ fn not_added(refused: Refused) -> Response {
 fn person_of(id: &str) -> Result<Person, Response> {
     Person::new(id)
         .ok_or_else(|| refuse("bad_person", "a person id is 1 to 32 of a-z, 0-9, _ and -"))
+}
+
+/// The one person the eyes know that `forget_person` is for: a `p-` id,
+/// never the room, a rules scope or every person.
+fn known_person(who: Who) -> Result<Person, Response> {
+    match who {
+        Who::Id(id) if lamp_msgs::known::is_person_id(&id) => person_of(&id),
+        _ => Err(refuse(
+            "bad_person",
+            "forget_person takes the id of one person the eyes know",
+        )),
+    }
 }
 
 /// The one person a request is for.
@@ -246,6 +280,7 @@ impl Request {
             Self::Recall { .. } => "recall",
             Self::ForgetLast { .. } => "forget_last",
             Self::ForgetAll { .. } => "forget_all",
+            Self::ForgetPerson { .. } => "forget_person",
             Self::Status { .. } => "status",
         }
     }
@@ -260,7 +295,8 @@ impl Request {
             | Self::Kept { person, .. }
             | Self::Recall { person, .. }
             | Self::ForgetLast { person, .. }
-            | Self::ForgetAll { person } => (person, Person::EVERYONE),
+            | Self::ForgetAll { person }
+            | Self::ForgetPerson { person } => (person, Person::EVERYONE),
             Self::Status { person } => (person, "*"),
         };
         match who {
@@ -303,6 +339,9 @@ impl Response {
                 format!("ok removed=1 kind={kind} id={}", removed.id)
             }
             Self::Emptied { removed } => format!("ok removed={removed}"),
+            Self::ForgotPerson { removed, rules } => {
+                format!("ok removed={removed} rules={rules}")
+            }
             Self::Status { people } => {
                 let sum = |count: fn(&Status) -> u64| people.iter().map(count).sum::<u64>();
                 format!(
@@ -403,6 +442,10 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
                 removed: store.forget_all(person.as_ref()).map_err(disk)?,
             }
         }
+        Request::ForgetPerson { person } => {
+            let (removed, rules) = store.forget_person(&known_person(person)?).map_err(disk)?;
+            Response::ForgotPerson { removed, rules }
+        }
         Request::Status { person } => {
             let person = match person {
                 Who::Unsaid | Who::All => None,
@@ -433,7 +476,8 @@ pub struct Answer {
     /// A successful append, remember or append_linked committed a new record.
     /// Reads and removals do not establish that adding records works.
     pub wrote: bool,
-    /// A `forget_all` that was done: whose. Not on the wire or in the log.
+    /// A `forget_all` or `forget_person` that was done: whose. Not on the
+    /// wire or in the log.
     pub forgot: Option<Forgot>,
 }
 
@@ -450,6 +494,11 @@ pub fn answer(store: &mut Store, line: &[u8], now_unix_ms: u64) -> Answer {
                 Request::ForgetAll {
                     person: Who::Id(id),
                 } => Some(Forgot::One(id.clone())),
+                // The person, by their id; their rules scope goes in the
+                // same request and is not told apart.
+                Request::ForgetPerson {
+                    person: Who::Id(id),
+                } => Some(Forgot::One(id.clone())),
                 _ => None,
             };
             let response = handle(store, request, now_unix_ms);
@@ -464,7 +513,12 @@ pub fn answer(store: &mut Store, line: &[u8], now_unix_ms: u64) -> Answer {
                     }
                 ),
                 wrote: matches!(&response, Response::Added { .. }),
-                forgot: forgets.filter(|_| matches!(&response, Response::Emptied { .. })),
+                forgot: forgets.filter(|_| {
+                    matches!(
+                        &response,
+                        Response::Emptied { .. } | Response::ForgotPerson { .. }
+                    )
+                }),
             }
         }
         // A line that is no request has no op worth naming: what stands
@@ -498,6 +552,45 @@ pub fn too_long() -> Answer {
         wrote: false,
         forgot: None,
     }
+}
+
+/// What the app's narrow socket lets through: `{"op":"forget_person",
+/// "person":ID}` with those two keys only and the id of one person the eyes
+/// know, re-encoded so nothing else in the line reaches the store. Anything
+/// else is the refusal to send back, and the store is never asked.
+pub fn narrow(line: &[u8]) -> Result<Vec<u8>, Answer> {
+    let refused = |error: &'static str, message: &str| {
+        let refusal = refuse(error, message);
+        Answer {
+            line: refusal.line(),
+            log: format!("forget socket: {}", refusal.outcome()),
+            storage_fault: false,
+            wrote: false,
+            forgot: None,
+        }
+    };
+    let value: serde_json::Value = serde_json::from_slice(line)
+        .map_err(|_| refused("not_allowed", "this socket takes forget_person only"))?;
+    let object = value
+        .as_object()
+        .filter(|object| {
+            object.len() == 2
+                && object.get("op").and_then(serde_json::Value::as_str) == Some("forget_person")
+        })
+        .ok_or_else(|| refused("not_allowed", "this socket takes forget_person only"))?;
+    let person = object
+        .get("person")
+        .and_then(serde_json::Value::as_str)
+        .filter(|id| lamp_msgs::known::is_person_id(id))
+        .ok_or_else(|| {
+            refused(
+                "bad_person",
+                "forget_person takes the id of one person the eyes know",
+            )
+        })?;
+    Ok(serde_json::json!({"op": "forget_person", "person": person})
+        .to_string()
+        .into_bytes())
 }
 
 #[cfg(test)]
@@ -552,6 +645,102 @@ mod tests {
             forgot(&mut store, json!({"op":"status","person":null})),
             None
         );
+    }
+
+    /// `forget_person` (the app's removal of a person): done, it says the
+    /// person's `p-` id, its rules scope not told apart; refused, nothing.
+    /// Only a `p-` id is taken, never the room, an `r-` scope or every
+    /// person, and its answer is counts only.
+    #[test]
+    fn a_forget_person_that_was_done_says_whose_and_takes_only_a_known_persons_id() {
+        let (_scratch, mut store) = Scratch::new("forget-person");
+        let p1 = "p-0123456789abcdef";
+        for line in [
+            json!({"op":"remember","person":p1,"at_unix_ms":NOW_MS,"text":"tea"}),
+            json!({"op":"remember","person":"r-0123456789abcdef","at_unix_ms":NOW_MS,"text":"[quiet] hush"}),
+        ] {
+            let said = answer(&mut store, line.to_string().as_bytes(), NOW_MS).line;
+            let said: serde_json::Value = serde_json::from_str(&said).unwrap();
+            assert_eq!(said["ok"], true, "{said}");
+        }
+        let done = answer(
+            &mut store,
+            json!({"op":"forget_person","person":p1})
+                .to_string()
+                .as_bytes(),
+            NOW_MS,
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&done.line).unwrap(),
+            json!({"ok":true,"removed":1,"rules":1})
+        );
+        assert_eq!(done.forgot, Some(Forgot::One(p1.into())));
+        assert!(!done.log.contains("tea") && !done.log.contains("hush"));
+        for refused in [
+            json!({"op":"forget_person"}),
+            json!({"op":"forget_person","person":null}),
+            json!({"op":"forget_person","person":"everyone"}),
+            json!({"op":"forget_person","person":"r-0123456789abcdef"}),
+            json!({"op":"forget_person","person":"mai"}),
+            json!({"op":"forget_person","person":"NOT AN ID"}),
+        ] {
+            let said = answer(&mut store, refused.to_string().as_bytes(), NOW_MS);
+            assert!(
+                said.line.contains(r#""error":"bad_person""#),
+                "{refused}: {}",
+                said.line
+            );
+            assert_eq!(said.forgot, None, "{refused}");
+        }
+    }
+
+    /// The app's narrow socket lets through `forget_person` of a known
+    /// person's id and nothing else, re-encoded.
+    #[test]
+    fn the_narrow_check_lets_through_one_forget_person_and_nothing_else() {
+        let p1 = "p-0123456789abcdef";
+        let through =
+            narrow(format!(r#"{{ "person" : "{p1}", "op":"forget_person" }}"#).as_bytes())
+                .unwrap_or_else(|refused| panic!("{}", refused.line));
+        assert_eq!(
+            String::from_utf8(through).unwrap(),
+            json!({"op":"forget_person","person":p1}).to_string()
+        );
+        for (line, error) in [
+            (
+                json!({"op":"recall","person":p1}).to_string(),
+                "not_allowed",
+            ),
+            (json!({"op":"status"}).to_string(), "not_allowed"),
+            (
+                json!({"op":"forget_all","person":p1}).to_string(),
+                "not_allowed",
+            ),
+            (
+                json!({"op":"forget_person","person":p1,"also":1}).to_string(),
+                "not_allowed",
+            ),
+            (json!({"op":"forget_person"}).to_string(), "not_allowed"),
+            ("not json".into(), "not_allowed"),
+            (json!([1]).to_string(), "not_allowed"),
+            (
+                json!({"op":"forget_person","person":"r-0123456789abcdef"}).to_string(),
+                "bad_person",
+            ),
+            (
+                json!({"op":"forget_person","person":7}).to_string(),
+                "bad_person",
+            ),
+        ] {
+            let refused = narrow(line.as_bytes()).expect_err(&line);
+            assert!(
+                refused.line.contains(&format!(r#""error":"{error}""#)),
+                "{line}: {}",
+                refused.line
+            );
+            assert_eq!(refused.forgot, None);
+            assert!(!refused.wrote && !refused.storage_fault);
+        }
     }
 
     /// A directory of this test's own, with the store's directory in it, so

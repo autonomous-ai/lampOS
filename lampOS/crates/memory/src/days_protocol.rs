@@ -240,6 +240,21 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
         Request::ForgetAll { person } => value(Response::Emptied {
             removed: store.forget_all(some(person, false)?.as_ref())?,
         }),
+        // The app's removal of a person: theirs and their rules scope in
+        // one transaction (`Days::forget_person`). Counts only.
+        Request::ForgetPerson { person } => {
+            let person = match person {
+                Who::Id(id) if lamp_msgs::known::is_person_id(&id) => one(Who::Id(id))?,
+                _ => {
+                    return Err(Error::new(
+                        "bad_person",
+                        "forget_person takes the id of one person the eyes know",
+                    ));
+                }
+            };
+            let (removed, rules) = store.forget_person(&person)?;
+            json!({"ok":true,"removed":removed,"rules":rules})
+        }
         Request::Status { person } => value(Response::Status {
             people: store.status(some(person, true)?.as_ref())?,
         }),
@@ -392,6 +407,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "recall",
             "forget_last",
             "forget_all",
+            "forget_person",
             "status",
         ];
         if !NEW.contains(&name) && !OLD.contains(&name) {
@@ -404,6 +420,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             Some(Value::String(s)) if Person::new(s).is_some() => s.clone(),
             _ => "?".into(),
         };
+
         // #2176: a recall with a span or the second version is the new one.
         let wider = name == "recall"
             && ["day_from", "day_to", "recall_v2"]
@@ -444,9 +461,12 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             false,
         ),
     };
-    // A `forget_all` that was done, for `memory/forgot`: `*` is every
-    // person's.
-    let forgot = (done && op == "forget_all").then(|| match who.as_str() {
+    // A `forget_all` or `forget_person` that was done, for `memory/forgot`:
+    // `*` is every person's. A `forget_person` that was done is of a `p-`
+    // id; its rules scope went with it and is not told apart.
+    let forgot = (done && matches!(op.as_str(), "forget_all" | "forget_person")).then(|| match who
+        .as_str()
+    {
         "*" => protocol::Forgot::Every,
         id => protocol::Forgot::One(id.into()),
     });
@@ -539,6 +559,53 @@ mod tests {
             forgot(&mut store, json!({"op":"status","person":null})),
             None
         );
+    }
+
+    /// `forget_person` (the app's removal of a person): done, it says the
+    /// person's `p-` id, its rules scope not told apart; refused, nothing.
+    /// Only a `p-` id is taken, never the room, an `r-` scope or every
+    /// person, and its answer is counts only.
+    #[test]
+    fn a_forget_person_that_was_done_says_whose_and_takes_only_a_known_persons_id() {
+        let (_scratch, mut store) = Scratch::new("forget-person");
+        let p1 = "p-0123456789abcdef";
+        for line in [
+            json!({"op":"remember","person":p1,"at_unix_ms":NOW_MS,"text":"tea"}),
+            json!({"op":"remember","person":"r-0123456789abcdef","at_unix_ms":NOW_MS,"text":"[quiet] hush"}),
+        ] {
+            let said = answer(&mut store, line.to_string().as_bytes(), NOW_MS).line;
+            let said: serde_json::Value = serde_json::from_str(&said).unwrap();
+            assert_eq!(said["ok"], true, "{said}");
+        }
+        let done = answer(
+            &mut store,
+            json!({"op":"forget_person","person":p1})
+                .to_string()
+                .as_bytes(),
+            NOW_MS,
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&done.line).unwrap(),
+            json!({"ok":true,"removed":1,"rules":1})
+        );
+        assert_eq!(done.forgot, Some(Forgot::One(p1.into())));
+        assert!(!done.log.contains("tea") && !done.log.contains("hush"));
+        for refused in [
+            json!({"op":"forget_person"}),
+            json!({"op":"forget_person","person":null}),
+            json!({"op":"forget_person","person":"everyone"}),
+            json!({"op":"forget_person","person":"r-0123456789abcdef"}),
+            json!({"op":"forget_person","person":"mai"}),
+            json!({"op":"forget_person","person":"NOT AN ID"}),
+        ] {
+            let said = answer(&mut store, refused.to_string().as_bytes(), NOW_MS);
+            assert!(
+                said.line.contains(r#""error":"bad_person""#),
+                "{refused}: {}",
+                said.line
+            );
+            assert_eq!(said.forgot, None, "{refused}");
+        }
     }
 
     #[test]

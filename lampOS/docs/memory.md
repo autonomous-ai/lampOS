@@ -179,8 +179,10 @@ participants separately before advancing time or claiming evidence.
 With `--bus-root`, each `forget_all` that was done is told on
 `memory/forgot` (`lamp_msgs::MemoryForgot`), so the lamp's other parts let
 what they keep under that person go too (the first builder, 10:5x on #2467).
-That covers a forget asked by the app (lamp-cloud's `faces.rs`) and one
-asked by voice (`forget_everything`).
+A `forget_person` that was done is told the same way, with the person's id
+([Forgetting a person](#forgetting-a-person)). That covers a forget asked by
+the app (lamp-cloud's `faces.rs`) and one asked by voice
+(`forget_everything`).
 - **What it says:** the person's id only (`p-…`, `r-…` for their rules,
   `everyone` for the room's), or no person for a forget of every person.
   Never a name or anything kept: a forget of any other id memory takes (a
@@ -200,6 +202,44 @@ asked by voice (`forget_everything`).
   forget, every person's, and four that aren't told, one of them an id
   memory doesn't make), and each protocol's
   `only_a_forget_all_that_was_done_says_whose`.
+
+## Forgetting a person
+
+The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,
+[cloud.md](cloud.md)) forgets them entirely, not only their face. Memory
+gives the app one narrow call for it and no read access.
+
+- **The request:** `{"op":"forget_person","person":ID}`. With
+  `--memory-days`, `Days::forget_person` erases the person's entries and
+  every rule in their `r-` scope in **one SQLite transaction**, the same
+  erase as `forget_all` of each: entries, their search rows, links,
+  follow-ups, jobs, session notes (emptied and invalidated), and the
+  skipped count; a set-aside newer database goes too (#2067). The person's
+  row keeps its id high-water mark, so a stale reference never names a new
+  entry. The legacy store removes the person's directory, then the `r-`
+  one's; asking again finishes a removal a failure stopped half way.
+- **The narrow socket:** `--forget-socket ABSOLUTE_SOCKET_PATH
+  --forget-group NAME` (both or neither; off unless set) opens a second
+  socket beside the main one, mode 0660 and owned by group `NAME`, looked up
+  in `/etc/group` at the start (an unknown group ends the start). The main
+  socket stays 0600. A line on it must be exactly
+  `{"op":"forget_person","person":ID}`, those two keys and an id of the
+  shape above; it is re-encoded before the store sees it
+  (`protocol::narrow`). Anything else (`recall`, `search`, `kept`, `status`,
+  `forget_all`, an extra key, non-JSON) is
+  `{"ok":false,"error":"not_allowed",...}`, and a bad id `bad_person`,
+  without the store being asked anything. Both sockets are served by the
+  one loop, a request at a time.
+- **Told:** a `forget_person` that was done is told on `memory/forgot` with
+  the person's `p-` id, as a `forget_all` of that id is
+  ([below](#forgets-told-on-the-bus-memoryforgot)). Its rules scope went in
+  the same request and is not told apart. A refused one is not told.
+- **Not done here:** the household's `room_sounds` consent is not removed,
+  and `memory/rules` is not published again.
+- **Tests:** `tests/forget_person.rs` (a real Days server and the legacy
+  store: nothing left for the person or their rules scope, another person's
+  and the room's unchanged; the narrow socket's refusals, modes and bus
+  telling), and the protocols' `forget_person` unit tests.
 
 ## On the disk
 
@@ -242,6 +282,7 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
     {"op":"recall","query":"coffee","day":null,"limit":8,"max_bytes":4096}
     {"op":"forget_last","kind":"kept"}
     {"op":"forget_all","person":null}
+    {"op":"forget_person","person":"p-0123456789abcdef"}
     {"op":"status"}
 
 - `append`, `remember`: `{"ok":true,"id":3}`. `heard` or `said` may be left out.
@@ -262,6 +303,11 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
 - `forget_all` empties one person's directory, unreadable lines included:
   `{"ok":true,"removed":14}`. With `"person":null`, everyone's; every other
   request but `status` refuses `null`.
+- `forget_person` empties one person the eyes know and their rules scope
+  (`r-` for `p-`) together: `{"ok":true,"removed":14,"rules":2}`, counts
+  only. It takes only an id of `lamp_msgs::known::is_person_id`'s shape
+  (`p-` and 16 hex digits, maybe `-N`); the room, an `r-` scope, `null` or
+  any other id is `bad_person` ([Forgetting a person](#forgetting-a-person)).
 - `status`: `people`, each `{person, exchanges, kept, bytes, oldest_day,
   newest_day, skipped_lines}`, everyone's unless one is named.
 

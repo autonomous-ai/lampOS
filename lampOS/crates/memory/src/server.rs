@@ -14,6 +14,13 @@
 //! for two seconds at most, and makes whoever comes next wait that long: a
 //! client should close when it has its answer.
 //!
+//! A second socket, the app's narrow one (`--forget-socket`, `docs/memory.md`
+//! "Forgetting a person"), can be opened beside it for one group: mode 0660,
+//! and it takes `forget_person` only ([`protocol::narrow`]). Both are
+//! served in turn by the same loop, so the store still does one thing at a
+//! time. A `forget_person` from either is told on `memory/forgot` as a
+//! `forget_all` is.
+//!
 //! A file `ready` beside the socket says the process has its store open and
 //! is taking requests. Both are removed when the server ends in good order.
 //! A process that is killed leaves both; the next one clears them as it
@@ -23,6 +30,7 @@ use crate::{
     protocol::{self, MOST_LINE_BYTES},
     store::Store,
 };
+use rustix::event::{PollFd, PollFlags};
 use std::{
     fs::{self, DirBuilder, OpenOptions, Permissions},
     io::{self, Read, Write},
@@ -86,6 +94,8 @@ pub struct Server {
     stop: Arc<AtomicBool>,
     /// Where a forget is told (`memory/forgot`), with `--bus-root`.
     forgot: Option<Mutex<ForgotOut>>,
+    /// The app's narrow socket, and its path.
+    forget: Option<(UnixListener, PathBuf)>,
 }
 
 /// Ends a running server from another thread.
@@ -112,68 +122,114 @@ fn gone(removed: io::Result<()>) -> io::Result<()> {
     }
 }
 
+/// The directory a socket path is in.
+fn directory_of(socket: &Path) -> io::Result<&Path> {
+    socket
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "the socket path has no directory",
+            )
+        })
+}
+
+/// Listen at `socket` with `mode`, and with `group` as its group when
+/// given. `cleared` runs once the path is known to be free, before the
+/// socket is made.
+fn listen(
+    socket: &Path,
+    tag: &str,
+    mode: u32,
+    group: Option<u32>,
+    cleared: impl FnOnce() -> io::Result<()>,
+) -> io::Result<UnixListener> {
+    let directory = directory_of(socket)?;
+    // The socket is made under another name and moved here, so nothing
+    // below would notice a path too long for a client to connect to.
+    SocketAddr::from_pathname(socket)?;
+    match fs::symlink_metadata(socket) {
+        Ok(found) if found.file_type().is_socket() => {
+            if UnixStream::connect(socket).is_ok() {
+                return Err(io::Error::new(
+                    io::ErrorKind::AddrInUse,
+                    format!("another process is answering on {}", socket.display()),
+                ));
+            }
+            fs::remove_file(socket)?;
+        }
+        Ok(_) => {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                format!("{} is there and is not a socket", socket.display()),
+            ));
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    cleared()?;
+    // A socket file is made with whatever mode the process's mask
+    // leaves, and anyone that mode lets in could connect before it is
+    // changed. So the socket is made where nobody else can reach, given
+    // its mode and group, and only then moved to its path: it is never
+    // there with any other mode.
+    let private = directory.join(format!(".{tag}{}", std::process::id()));
+    let bound = private.join("s");
+    let _ = fs::remove_file(&bound);
+    let _ = fs::remove_dir(&private);
+    DirBuilder::new().mode(0o700).create(&private)?;
+    let listener = UnixListener::bind(&bound).and_then(|listener| {
+        if let Some(group) = group {
+            rustix::fs::chown(&bound, None, Some(rustix::fs::Gid::from_raw(group)))?;
+        }
+        fs::set_permissions(&bound, Permissions::from_mode(mode))?;
+        fs::rename(&bound, socket)?;
+        Ok(listener)
+    });
+    let _ = fs::remove_file(&bound);
+    let _ = fs::remove_dir(&private);
+    listener
+}
+
+/// The gid of the group called `name` in `/etc/group`.
+pub fn group_named(name: &str) -> io::Result<u32> {
+    group_in(&fs::read_to_string("/etc/group")?, name).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("there is no group {name} in /etc/group"),
+        )
+    })
+}
+
+/// The gid of `name` in the text of a group file: `name:password:gid:members`.
+fn group_in(file: &str, name: &str) -> Option<u32> {
+    file.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        (fields.next() == Some(name))
+            .then(|| fields.nth(1)?.trim().parse().ok())
+            .flatten()
+    })
+}
+
 impl Server {
     /// Take the socket path. A socket file nobody answers on, left by a
     /// process that was killed, is replaced; one that is answered, or
     /// anything at the path that is not a socket, is a reason not to start.
     pub fn bind(socket: &Path) -> io::Result<Self> {
-        let directory = socket
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "the socket path has no directory",
-                )
-            })?;
-        // The socket is made under another name and moved here, so nothing
-        // below would notice a path too long for a client to connect to.
-        SocketAddr::from_pathname(socket)?;
-        match fs::symlink_metadata(socket) {
-            Ok(found) if found.file_type().is_socket() => {
-                if UnixStream::connect(socket).is_ok() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::AddrInUse,
-                        format!("another process is answering on {}", socket.display()),
-                    ));
-                }
-                fs::remove_file(socket)?;
-            }
-            Ok(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    format!("{} is there and is not a socket", socket.display()),
-                ));
-            }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
+        let directory = directory_of(socket)?;
         let ready = directory.join("ready");
-        gone(fs::remove_file(&ready))?;
-        // A socket file is made with whatever mode the process's mask
-        // leaves, and anyone that mode lets in could connect before it is
-        // changed. So the socket is made where nobody else can reach, given
-        // its mode, and only then moved to its path: it is never there with
-        // any mode but 0600.
-        let private = directory.join(format!(".m{}", std::process::id()));
-        let bound = private.join("s");
-        let _ = fs::remove_file(&bound);
-        let _ = fs::remove_dir(&private);
-        DirBuilder::new().mode(0o700).create(&private)?;
-        let listener = UnixListener::bind(&bound).and_then(|listener| {
-            fs::set_permissions(&bound, Permissions::from_mode(0o600))?;
-            fs::rename(&bound, socket)?;
-            Ok(listener)
-        });
-        let _ = fs::remove_file(&bound);
-        let _ = fs::remove_dir(&private);
+        let listener = listen(socket, "m", 0o600, None, || {
+            gone(fs::remove_file(directory.join("ready")))
+        })?;
         Ok(Self {
-            listener: listener?,
+            listener,
             socket: socket.into(),
             ready,
             patience: PATIENCE,
             stop: Arc::new(AtomicBool::new(false)),
             forgot: None,
+            forget: None,
         })
     }
 
@@ -182,6 +238,26 @@ impl Server {
     pub fn telling_forgets(mut self, out: ForgotOut) -> Self {
         self.forgot = Some(Mutex::new(out));
         self
+    }
+
+    /// Open the app's narrow socket too, mode 0660 and owned by the group
+    /// `group` (a gid): it takes `forget_person` only. The same care as the
+    /// main socket: a stale one is replaced, and it is never at its path
+    /// with any other mode.
+    pub fn forget_socket(mut self, socket: &Path, group: u32) -> io::Result<Self> {
+        directory_of(socket)?;
+        if socket == self.socket {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "the forget socket is not the memory socket",
+            ));
+        }
+        let listener = listen(socket, "f", 0o660, Some(group), || Ok(()))?;
+        // Polled together: neither may block the loop on a client that left.
+        listener.set_nonblocking(true)?;
+        self.listener.set_nonblocking(true)?;
+        self.forget = Some((listener, socket.into()));
+        Ok(self)
     }
 
     /// Wait this long for a client and no longer.
@@ -234,20 +310,56 @@ impl Server {
             health.serving();
         }
         loop {
-            let accepted = self.listener.accept();
+            let (accepted, narrow) = self.accept()?;
             if self.stop.load(Ordering::Relaxed) {
                 return Ok(());
             }
             match accepted {
-                Ok((stream, _)) => self.serve(&stream, store, clock, log, health),
+                Ok((stream, _)) => self.serve(&stream, narrow, store, clock, log, health),
                 Err(error)
                     if matches!(
                         error.kind(),
-                        io::ErrorKind::Interrupted | io::ErrorKind::ConnectionAborted
+                        io::ErrorKind::Interrupted
+                            | io::ErrorKind::ConnectionAborted
+                            | io::ErrorKind::WouldBlock
                     ) => {}
                 Err(error) => return Err(error),
             }
         }
+    }
+
+    /// The next client, and whether it came on the narrow socket. With one
+    /// socket, a plain blocking accept; with two, whichever is ready first.
+    fn accept(&self) -> io::Result<(io::Result<(UnixStream, SocketAddr)>, bool)> {
+        let Some((forget, _)) = &self.forget else {
+            return Ok((self.listener.accept(), false));
+        };
+        let mut fds = [
+            PollFd::new(&self.listener, PollFlags::IN),
+            PollFd::new(forget, PollFlags::IN),
+        ];
+        match rustix::event::poll(&mut fds, None) {
+            Ok(_) => {}
+            Err(rustix::io::Errno::INTR) => {
+                return Ok((Err(io::ErrorKind::Interrupted.into()), false));
+            }
+            Err(error) => return Err(error.into()),
+        }
+        // The main socket first: the stopper knocks there.
+        let (listener, narrow) = if !fds[0].revents().is_empty() {
+            (&self.listener, false)
+        } else {
+            (forget, true)
+        };
+        // Both listeners are non-blocking here, so a client gone between
+        // the poll and the accept never holds the loop. A stream accepted
+        // from one is set back to blocking, as one from `accept` always is
+        // on Linux and is not on every system.
+        let accepted = listener.accept().and_then(|(stream, address)| {
+            stream.set_nonblocking(false)?;
+            Ok((stream, address))
+        });
+        Ok((accepted, narrow))
     }
 
     /// Answer this client's requests until it closes, goes quiet or stops
@@ -255,6 +367,7 @@ impl Server {
     fn serve(
         &self,
         stream: &UnixStream,
+        narrow: bool,
         store: &mut (impl Memory + ?Sized),
         clock: &mut dyn FnMut() -> u64,
         log: &mut dyn FnMut(&str),
@@ -263,19 +376,13 @@ impl Server {
         let mut held = Vec::new();
         loop {
             let answer = match self.line(stream, &mut held) {
-                Line::Whole(line) => {
-                    if let Some(health) = health {
-                        let ticket = health.begin(&line);
-                        let answer = store.answer(&line, clock());
-                        let ended = health.answered_at();
-                        health.finish(ticket, ended, &answer, store.health_counts());
-                        // A forget, or a stamp older than `keep_days`, removes it (#2067).
-                        health.set_aside(store.set_aside());
-                        answer
-                    } else {
-                        store.answer(&line, clock())
-                    }
-                }
+                // The narrow socket's line is checked and re-encoded before
+                // the store sees it; a refusal never reaches the store.
+                Line::Whole(line) if narrow => match protocol::narrow(&line) {
+                    Ok(line) => self.answer(&line, store, clock, health),
+                    Err(refusal) => refusal,
+                },
+                Line::Whole(line) => self.answer(&line, store, clock, health),
                 Line::TooLong => protocol::too_long(),
                 Line::Late { unfinished: true } => {
                     log("a client did not finish its request in time and was dropped");
@@ -312,6 +419,27 @@ impl Server {
                     return;
                 }
             }
+        }
+    }
+
+    /// The store's answer to one request line, measured when reporting.
+    fn answer(
+        &self,
+        line: &[u8],
+        store: &mut (impl Memory + ?Sized),
+        clock: &mut dyn FnMut() -> u64,
+        health: Option<&crate::health::State>,
+    ) -> protocol::Answer {
+        if let Some(health) = health {
+            let ticket = health.begin(line);
+            let answer = store.answer(line, clock());
+            let ended = health.answered_at();
+            health.finish(ticket, ended, &answer, store.health_counts());
+            // A forget, or a stamp older than `keep_days`, removes it (#2067).
+            health.set_aside(store.set_aside());
+            answer
+        } else {
+            store.answer(line, clock())
         }
     }
 
@@ -401,5 +529,23 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.ready);
         let _ = fs::remove_file(&self.socket);
+        if let Some((_, forget)) = &self.forget {
+            let _ = fs::remove_file(forget);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_group_is_found_by_its_whole_name_only() {
+        let file = "root:x:0:\nlamp-app:x:1001:lamp\nlamp:x:1000:\nbroken:x:\n";
+        assert_eq!(group_in(file, "lamp-app"), Some(1001));
+        assert_eq!(group_in(file, "lamp"), Some(1000));
+        assert_eq!(group_in(file, "lamp-ap"), None);
+        assert_eq!(group_in(file, "broken"), None);
+        assert_eq!(group_in(file, "x"), None);
     }
 }
