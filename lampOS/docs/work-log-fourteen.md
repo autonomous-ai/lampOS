@@ -657,3 +657,14 @@ Ready for lamp-voice: yes (already in)
   once its ARM64 run is green, then runs #2194's steps 1–8.
 - #2194's app-side (ecm-sds-mobile#17 + #19) and lamp-side are both in
   now; what's left is Mobile's end-to-end pass on real hardware.
+
+## 2026-10-21 — #2194 closed on its code
+
+Ready for lamp-voice: yes (already in, see above)
+
+- First builder, 07:15: closed #2194 on its code. Both sides are in —
+  ecm-sds-mobile#17+#19 (app) and lampOS#2360 (lamp, merged into
+  lamp-voice at `d90cc8b8e`). Mobile's hardware try on lamp-0c89 goes
+  on #1396 instead, not #2194.
+- Nothing further from Fourteen here unless #1396's try turns up a gap
+  in the app side.
