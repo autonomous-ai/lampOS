@@ -206,9 +206,9 @@ installed, installable ones as apps; `tests/install.rs` holds the two
 equal, Laugh glance parked out of both): twenty folders are installed,
 eleven enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
-Night sleep (#940) is enabled but inert: when the lamp sleeps at night, moved out of
-Expression ([alive.md](alive.md#night-sleep-is-a-skill)); its switches stay
-off for now, so Expression's built-in sleep runs.
+Night sleep (#940) is on: when the lamp sleeps at night, moved out of
+Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
+built-in sleep as the fallback for one release.
 Startle (#2822) is the startle's move, Expression's glance at a sudden
 sound: Expression reads its `[startle]` when it starts and plays it as its
 reflex ([expression.md](expression.md#the-startle-a-glance-at-a-sudden-sound));
@@ -318,9 +318,10 @@ with `StateDirectory=lampos-skills-state`; Actions is given
 `StateDirectoryMode=0700` and run as `lampos`; systemd creates and owns these
 directories when their services start. Install writes the unit declarations,
 not the runtime journals. The paths do not enable a feature.
-`LAMP_SKILL_ROUTINES` (Skills) and `LAMP_REST_REQUESTS` (Expression) stay off
-in the product units for now, so Night sleep (#940) is inert and
-Expression's built-in sleep runs (the switch-on is a later PR); `LAMP_OUTPUT_CAPS` remains unset, and Bedtime
+`LAMP_SKILL_ROUTINES` (Skills) and `LAMP_REST_REQUESTS` (Expression) are on
+in the product units for Night sleep (#940): its rest leased to Expression
+and its claim on the night, with Expression's built-in sleep as the
+fallback for one release; `LAMP_OUTPUT_CAPS` remains unset, and Bedtime
 and Morning remains disabled. Actions
 requires its caps directory only when `LAMP_OUTPUT_CAPS=on`.
 The paths come as `Environment=` lines, not as the binaries' `--daily-state`

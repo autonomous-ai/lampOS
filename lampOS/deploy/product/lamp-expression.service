@@ -15,8 +15,9 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=5
-# Night sleep is a skill (#940), but LAMP_REST_REQUESTS stays off here for now: Expression's
-# built-in sleep keeps every lamp's nights until the rest handover lands; the switch-on is a later PR.
+# Night sleep is a skill (#940): Expression takes the night-sleep skill's rest while lamp-skills
+# claims the night, and with no fresh claim sleeps by its own schedule, a fallback for one release.
+Environment=LAMP_REST_REQUESTS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
 ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock
 Restart=on-failure
