@@ -247,6 +247,15 @@ pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
         }
         None => json!({"memory": "kept", "reason": "the lamp's memory isn't given to lamp-cloud"}),
     };
+    // With the face already gone, memory was asked by the name's id only: a
+    // person renamed under `LAMP_MEMORY_STABLE_ID` keeps theirs under their
+    // first name's id, which nothing could look up. So the app is told
+    // `by name only`, never that everything is gone (Third's P3 on #2563).
+    let memory = if told["face"] == "already gone" && memory["memory"] == "forgotten" {
+        json!({"memory": "by name only"})
+    } else {
+        memory
+    };
     if let (Some(told), Some(memory)) = (told.as_object_mut(), memory.as_object()) {
         told.extend(memory.clone());
     }
@@ -681,9 +690,11 @@ mod tests {
         };
         let answer = remove(&eyes, &data).unwrap();
         assert_eq!(answer["removed"], "Lan", "{answer}");
-        assert_eq!(answer["memory"], "forgotten", "{answer}");
-        // A face already gone says so; a face the eyes forgot now doesn't.
+        // A face already gone says so, and that memory was asked by the
+        // name only; a face the eyes forgot now says neither.
         let gone = answer.get("face").is_some();
+        let memory = if gone { "by name only" } else { "forgotten" };
+        assert_eq!(answer["memory"], memory, "{answer}");
         assert_eq!(
             answer.as_object().unwrap().len(),
             2 + usize::from(gone),
