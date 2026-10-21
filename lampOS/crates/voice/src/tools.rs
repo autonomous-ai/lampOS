@@ -1238,17 +1238,27 @@ fn run_call_with_scope(
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
-        Route::Faces(socket, switches) => (
-            "the eyes",
-            crate::known_faces::run_for(
-                socket,
-                call,
-                *switches,
-                lease
-                    .and_then(|lease| lease.scope())
-                    .and_then(|scope| scope.person()),
-            ),
-        ),
+        Route::Faces(socket, switches) => {
+            let person = lease
+                .and_then(|lease| lease.scope())
+                .and_then(|scope| scope.person());
+            // "Forget my face": nothing heard or saved before it follows
+            // anyone (`LAMP_MEMORY_FOLLOWS_FACE`), whatever its outcome.
+            if call.name == crate::known_faces::FORGET {
+                crate::follows_face::forgot();
+            }
+            let told = crate::known_faces::run_for(socket, call, *switches, person);
+            // A face saved in a line of the room's: the caller's own lines
+            // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
+            if call.name == crate::known_faces::REMEMBER
+                && person.is_none()
+                && told.0["ok"] == true
+                && let Some(name) = told.0["remembered"].as_str()
+            {
+                crate::remember::face_saved(request, &crate::known_faces::memory_person(name));
+            }
+            ("the eyes", told)
+        }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
         Route::ReportsStop(held) => (
