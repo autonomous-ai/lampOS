@@ -137,6 +137,10 @@ fn topic_is_additive_and_json_roundtrips() {
         lamp_msgs::declaration_of(MicrophonePrivacy::TOPIC),
         Some(MicrophonePrivacy::declaration())
     );
+    assert_eq!(
+        lamp_msgs::declaration_of(lamp_msgs::CameraClosed::TOPIC),
+        Some(lamp_msgs::CameraClosed::declaration())
+    );
     assert!(
         !lamp_msgs::first_topics()
             .iter()

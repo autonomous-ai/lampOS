@@ -2264,6 +2264,26 @@ fn last_blocks(judged: &VecDeque<(u8, u8, bool)>) -> Value {
     })
 }
 
+/// The onboarding walk's part of a physical mute: its close candidate, and
+/// its records (the camera ask among them) written to the trace now, since
+/// the mute ends the cycle before the loop would take them. Memory only.
+fn mute_onboarding(
+    trace: &mut SessionState,
+    walk: Option<&mut crate::onboarding::Onboarding>,
+    proof: Option<&crate::wire::PrivacyReceipt>,
+    at_us: u64,
+    eyes: Option<&mut crate::body_link::EyesLink>,
+) -> Result<Option<crate::onboarding::privacy::Checkpoint>> {
+    let (Some(walk), Some(proof)) = (walk, proof) else {
+        return Ok(None);
+    };
+    let (checkpoint, records) = walk.take_close_candidate_telling(proof, at_us, eyes);
+    for line in records {
+        record(trace, line)?;
+    }
+    Ok(checkpoint)
+}
+
 fn record(trace: &mut SessionState, event: Value) -> Result<()> {
     trace.record(event).map_err(Into::into)
 }
@@ -4883,11 +4903,13 @@ fn conversation_with_gate(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
                                 )?;
-                                let onboarding = onboarding.as_mut().and_then(|walk| {
-                                    onboarding_privacy_receipt.as_ref().and_then(|proof| {
-                                        walk.take_close_candidate(proof, observed_at_us)
-                                    })
-                                });
+                                let onboarding = mute_onboarding(
+                                    trace,
+                                    onboarding.as_mut(),
+                                    onboarding_privacy_receipt.as_ref(),
+                                    observed_at_us,
+                                    eyes_link.as_mut(),
+                                )?;
                                 return Err(Box::new(PhysicalMute {
                                     observed_at_us,
                                     onboarding,
@@ -4913,11 +4935,13 @@ fn conversation_with_gate(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
                     )?;
-                    let onboarding = onboarding.as_mut().and_then(|walk| {
-                        onboarding_privacy_receipt
-                            .as_ref()
-                            .and_then(|proof| walk.take_close_candidate(proof, at_us))
-                    });
+                    let onboarding = mute_onboarding(
+                        trace,
+                        onboarding.as_mut(),
+                        onboarding_privacy_receipt.as_ref(),
+                        at_us,
+                        eyes_link.as_mut(),
+                    )?;
                     return Err(Box::new(PhysicalMute {
                         observed_at_us: at_us,
                         onboarding,
