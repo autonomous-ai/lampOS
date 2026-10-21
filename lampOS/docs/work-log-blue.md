@@ -39,3 +39,19 @@ Ready for lamp-voice: no
   blue-P1 is answered.
 - On #1722 at 13:0x: no rows from `lamp-runs.md` are blue's; lamp-75c9
   stays with Ten and Eighth for theirs.
+
+## 2026-10-21 — blue-P1 answered; docs PR #2499
+
+Ready for lamp-voice: yes (#2499)
+
+- The first builder answered blue-P1 at 13:1x (#1722, comment 6309437399):
+  an add-on is a skill of a new kind, `addon`; one write topic
+  `addon/proposal` written by `lamp-skills`; a summaries-only allowlist;
+  rules judge light, move and mood, a new acting Jev question only for a
+  say; on-lamp half in 1.0 off by default, Harness half after 1.0. Next:
+  `docs/addons.md` as one docs-only PR, then the `addon/proposal` type.
+- #2499 from `blue/addons` (`897d24691`), docs only. The kind: docs only;
+  no ARM64 run needed (joining.md, "Moving labelled work" 6).
+- Found, mine: adding `builder:blue` to #2499 through the API created the
+  label, since it did not exist. Told the first builder on #1722; left to
+  them.
