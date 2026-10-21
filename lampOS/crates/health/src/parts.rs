@@ -477,6 +477,7 @@ pub fn part_known_as(part: &str) -> &str {
         "air" => "the air sensor",
         "storage" => "the SD card",
         "board" => "the computer",
+        "voice_route" => "the voice's connection",
         other => other,
     }
 }
@@ -626,6 +627,34 @@ pub fn same_but_for_ages(a: &Health, b: &Health, stale_after: Duration) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every part the self-test checks has a name a person knows (#1681).
+    #[test]
+    fn every_self_test_part_has_a_known_name() {
+        assert_eq!(part_known_as("voice_route"), "the voice's connection");
+        for part in [
+            "voice_mic",
+            "room_mic",
+            "speaker",
+            "camera",
+            "touch",
+            "touch_by_hand",
+            "button",
+            "ring",
+            "head_move",
+            "base_yaw",
+            "shoulder",
+            "elbow",
+            "head_roll",
+            "head_pitch",
+            "air",
+            "storage",
+            "board",
+            "voice_route",
+        ] {
+            assert_ne!(part_known_as(part), part, "{part}");
+        }
+    }
 
     const STALE: Duration = Duration::from_secs(5);
 

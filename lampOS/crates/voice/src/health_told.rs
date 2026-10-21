@@ -150,8 +150,14 @@ pub fn note(parts: &[String]) -> String {
     if parts.len() > MOST_NAMED {
         named.push_str(&format!(" and {} more", parts.len() - MOST_NAMED));
     }
+    // With more than one, "how are you?" named only the first (#1681).
+    let each = if parts.len() > 1 {
+        ", and then name each of them"
+    } else {
+        ""
+    };
     format!(
-        "(For you to know, not to answer: not working right in you now: {named}. Say so only if someone asks how you are or what's wrong; never bring it up yourself.)"
+        "(For you to know, not to answer: not working right in you now: {named}. Say so only if someone asks how you are or what's wrong{each}; never bring it up yourself.)"
     )
 }
 
@@ -170,14 +176,21 @@ fn names_of(item: &HealthItem) -> Vec<String> {
 }
 
 /// The parts named after `failing: ` in the self-test's message, each up
-/// to its ` (REASON)`, without a leading "the ".
+/// to its ` (REASON)`, without a leading "the ", which a possessive name
+/// keeps ("the voice's connection").
 fn failed_in(message: &str) -> Vec<String> {
     let Some((_, mut rest)) = message.split_once(" failing: ") else {
         return Vec::new();
     };
     let mut names = Vec::new();
     while let Some((name, tail)) = rest.split_once(" (") {
-        names.push(name.strip_prefix("the ").unwrap_or(name).to_owned());
+        let bare = name.strip_prefix("the ").filter(|bare| {
+            !bare
+                .split(' ')
+                .next()
+                .is_some_and(|word| word.ends_with("'s"))
+        });
+        names.push(bare.unwrap_or(name).to_owned());
         match tail.split_once("), ") {
             Some((_, next)) => rest = next,
             None => break,
@@ -543,6 +556,54 @@ mod tests {
         }
         drop(says);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// For "how are you?" with two parts, the model named only the first
+    /// (#1681): with more than one, it is told to name each of them.
+    #[test]
+    fn two_parts_are_each_to_be_named_and_one_reads_as_before() {
+        let two = note(&[
+            "voice's connection".into(),
+            "volume and light commands".into(),
+        ]);
+        assert!(two.contains("name each of them"), "{two}");
+        assert!(two.contains("never bring it up yourself"), "{two}");
+        let one = note(&["camera".to_owned()]);
+        assert_eq!(
+            one,
+            "(For you to know, not to answer: not working right in you now: camera. Say so only if someone asks how you are or what's wrong; never bring it up yourself.)"
+        );
+    }
+
+    /// The self-test's `voice_route` is told by its known name, with its
+    /// article, and never as the raw token.
+    #[test]
+    fn the_voice_route_is_told_as_the_voices_connection() {
+        let mut told = HealthTold::<u8>::default();
+        let failed = health(
+            vec![
+                item(
+                    "selftest",
+                    Level::Error,
+                    &format!(
+                        "1 part failing: {} (the second route's drop-in is missing)",
+                        lamp_health::parts::part_known_as("voice_route")
+                    ),
+                    90_000,
+                ),
+                item("actions", Level::Error, "not answering", 0),
+            ],
+            0,
+        );
+        told.seen(Some(&failed), 0);
+        told.seen(Some(&failed), 30 * SEC);
+        let note = told.due(&1).unwrap();
+        assert!(
+            note.contains("in you now: the voice's connection, volume and light commands."),
+            "{note}"
+        );
+        assert!(note.contains("name each of them"), "{note}");
+        assert!(!note.contains("voice_route"), "{note}");
     }
 
     #[test]
