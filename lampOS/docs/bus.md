@@ -586,7 +586,8 @@ the service installed the topic is never made.
 
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
-| `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | The add-ons' judge, still to come ([addons.md](addons.md)) |
+| `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | `lamp-addons`, the add-ons' judge ([addons.md](addons.md)) |
+| `addon/decision` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | People, the journal and the app: each proposal kept or dropped, and why |
 
 [`AddonProposal`](msgs.md): what a partner's add-on suggests, never an
 order. Without `LAMP_ADDONS=on` the topic is never made.

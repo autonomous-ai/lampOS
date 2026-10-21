@@ -212,9 +212,65 @@ fn version(text: &str) -> bool {
         })
 }
 
-/// The add-ons' optional topic, apart from the first topics.
+/// What the add-ons' judge said of one proposal (`addon/decision`, #2530):
+/// kept or dropped, by which rule, and why in words for the journal and a
+/// person reading the bus. The add-on and its act are named; no words of the
+/// proposal's note are said again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddonDecision {
+    /// The proposal's number ([`AddonProposal::proposal`]).
+    pub proposal: u64,
+    pub addon: String,
+    pub act: String,
+    /// `kept` or `dropped`.
+    pub choice: String,
+    /// What decided: `rule` in part 1; `jev` for a say in part 2.
+    pub by: String,
+    /// Why, in at most 200 bytes.
+    pub why: String,
+}
+
+impl AddonDecision {
+    pub const TYPE: &str = "lamp_msgs/AddonDecision";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "addon/decision";
+    pub const CHOICES: [&str; 2] = ["kept", "dropped"];
+    pub const BY: [&str; 2] = ["rule", "jev"];
+
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        let invalid = |why: &str| Err(Invalid(why.into()));
+        if self.proposal == 0 {
+            return invalid("a decision names its proposal's number");
+        }
+        if !addon_name(&self.addon) {
+            return invalid("an add-on's name is 1 to 64 lowercase letters, digits and hyphens");
+        }
+        if !ADDON_ACTS.contains(&self.act.as_str()) {
+            return invalid("an act is say, light, move, mood or note");
+        }
+        if !Self::CHOICES.contains(&self.choice.as_str()) {
+            return invalid("a choice is kept or dropped");
+        }
+        if !Self::BY.contains(&self.by.as_str()) {
+            return invalid("a decision is by rule or jev");
+        }
+        if self.why.is_empty() || self.why.len() > 200 || self.why.chars().any(char::is_control) {
+            return invalid("why is 1 to 200 bytes on one line");
+        }
+        Ok(())
+    }
+}
+
+/// The add-ons' optional topics, apart from the first topics.
 pub fn addon_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(AddonProposal::TOPIC, AddonProposal::declaration())]
+    vec![
+        (AddonProposal::TOPIC, AddonProposal::declaration()),
+        (AddonDecision::TOPIC, AddonDecision::declaration()),
+    ]
 }
 
 #[cfg(test)]
@@ -411,6 +467,55 @@ mod tests {
         for proposal in wrong {
             assert!(proposal.check().is_err(), "{proposal:?}");
         }
+    }
+
+    #[test]
+    fn a_decision_is_checked_and_names_no_words() {
+        let kept = AddonDecision {
+            proposal: 7,
+            addon: "evening-glow".into(),
+            act: "light".into(),
+            choice: "kept".into(),
+            by: "rule".into(),
+            why: "the lamp is calm".into(),
+        };
+        assert_eq!(kept.check(), Ok(()));
+        assert_eq!(
+            serde_json::to_string(&kept).unwrap(),
+            r#"{"proposal":7,"addon":"evening-glow","act":"light","choice":"kept","by":"rule","why":"the lamp is calm"}"#
+        );
+        for wrong in [
+            AddonDecision {
+                proposal: 0,
+                ..kept.clone()
+            },
+            AddonDecision {
+                choice: "maybe".into(),
+                ..kept.clone()
+            },
+            AddonDecision {
+                by: "partner".into(),
+                ..kept.clone()
+            },
+            AddonDecision {
+                act: "dance".into(),
+                ..kept.clone()
+            },
+            AddonDecision {
+                why: String::new(),
+                ..kept.clone()
+            },
+            AddonDecision {
+                why: "a\nb".into(),
+                ..kept.clone()
+            },
+        ] {
+            assert!(wrong.check().is_err(), "{wrong:?}");
+        }
+        assert_eq!(
+            crate::declaration_of(AddonDecision::TOPIC),
+            Some(AddonDecision::declaration())
+        );
     }
 
     #[test]

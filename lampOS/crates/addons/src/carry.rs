@@ -1,0 +1,120 @@
+//! What a kept proposal becomes (#2530 part 1): a request to the part that
+//! owns the output, never a write of the judge's own. A light is asked of the
+//! ring on `light/request` at [`Priority::Idle`], below every skill, the
+//! conversation, safety and a person: at `Skill` an add-on's newer claim would
+//! push a skill's own glow aside, since the ring shows the newest of equals.
+//! The judge keeps one asker per add-on, `addon:<name>`; its claim lapses by
+//! itself at the proposal's `holds_ms` (at most 30 s), and a person's own
+//! light is over it at once.
+use lamp_msgs::{AddonProposal, Claim, Light, LightRequest, Priority};
+
+/// The claim's source for an add-on's light: one a partner's skill cannot
+/// take, as a skill's is `skill:<name>`.
+pub fn source(addon: &str) -> String {
+    let mut source = format!("addon:{addon}");
+    source.truncate(64);
+    source
+}
+
+/// The ring's request for a kept `light` proposal, on `clock_id` at
+/// `now_us`, holding as long as the proposal does (at most
+/// [`Claim::MOST_US`]). `None` for any other act, or a light that does not
+/// pass the ring's own check.
+pub fn light_request(
+    proposal: &AddonProposal,
+    clock_id: &str,
+    now_us: u64,
+) -> Option<LightRequest> {
+    let light = proposal.light.as_ref()?;
+    let holds_us = (u64::from(proposal.holds_ms) * 1_000).min(Claim::MOST_US);
+    let request = LightRequest {
+        claim: Claim {
+            source: source(&proposal.addon),
+            priority: Priority::Idle,
+            clock_id: clock_id.into(),
+            until_us: now_us + holds_us,
+        },
+        light: Light::new(true, &light.colour, light.level).ok()?,
+        pattern: light.pattern,
+        fade_ms: None,
+    };
+    request.check().ok().map(|()| request)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lamp_msgs::{AddonLight, AddonMood, LightPattern, PatternKind};
+
+    fn glow() -> AddonProposal {
+        AddonProposal {
+            proposal: 7,
+            addon: "evening-glow".into(),
+            version: "1.0.0".into(),
+            act: "light".into(),
+            why: "evening".into(),
+            sure: 0.6,
+            holds_ms: 30_000,
+            light: Some(AddonLight {
+                colour: "warm".into(),
+                level: 2,
+                pattern: Some(LightPattern {
+                    kind: PatternKind::Breathe,
+                    period_ms: 8_000,
+                    low: 1,
+                }),
+            }),
+            gesture: None,
+            mood: None,
+            note: None,
+        }
+    }
+
+    #[test]
+    fn a_kept_light_is_asked_of_the_ring_at_idle_for_as_long_as_it_holds() {
+        let request = light_request(&glow(), "boot-a", 1_000).unwrap();
+        assert_eq!(request.claim.source, "addon:evening-glow");
+        assert_eq!(request.claim.priority, Priority::Idle);
+        assert_eq!(request.claim.clock_id, "boot-a");
+        assert_eq!(request.claim.until_us, 1_000 + 30_000_000);
+        assert!(request.claim.holds_at("boot-a", 1_000));
+        assert!(
+            !request.claim.holds_at("boot-b", 1_000),
+            "another boot's clock"
+        );
+        assert_eq!(request.light, Light::new(true, "warm", 2).unwrap());
+        assert_eq!(request.pattern.unwrap().period_ms, 8_000);
+        // Below every skill, so a skill's glow is never pushed aside.
+        assert!(request.claim.priority < Priority::Skill);
+    }
+
+    #[test]
+    fn a_shorter_proposal_holds_shorter_and_only_a_light_is_asked() {
+        let short = AddonProposal {
+            holds_ms: 5_000,
+            ..glow()
+        };
+        assert_eq!(
+            light_request(&short, "b", 0).unwrap().claim.until_us,
+            5_000_000
+        );
+        let lift = AddonProposal {
+            act: "mood".into(),
+            light: None,
+            mood: Some(AddonMood {
+                energy: Some(0.1),
+                warmth: None,
+                for_ms: 600_000,
+            }),
+            ..glow()
+        };
+        assert!(light_request(&lift, "b", 0).is_none());
+    }
+
+    #[test]
+    fn the_source_stays_within_a_claims_sixty_four() {
+        let long = "a".repeat(64);
+        assert_eq!(source(&long).len(), 64);
+        assert!(source(&long).starts_with("addon:"));
+    }
+}

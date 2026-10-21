@@ -8,9 +8,15 @@ shaped by the first builder's answer the same day
 `addon` kind and its load-time refusals, the read allowlist,
 `lamp_msgs::AddonProposal` on `addon/proposal`, and `lamp-skills` writing it
 within the rate limits below (`crates/msgs/src/addon.rs`,
-`crates/skills/src/addon.rs`). **Not built yet:** the judge, the mood nudge
-input, the say service's context line, and everything after 1.0. Nothing
-reads `addon/proposal` yet, so a proposal changes nothing on a lamp.
+`crates/skills/src/addon.rs`). The judge's part 1 (#2530): `lamp-addons`,
+its own process (`crates/addons`, `deploy/product/lamp-addons.service`),
+which reads `addon/proposal` and the lamp's state, keeps or drops each
+proposal by the rules below, asks the ring for a kept light at `Idle`, and
+says every verdict on `addon/decision` (below, "The judge as built").
+**Not built yet:** carrying out a kept mood (a nudge input on `lamp-mood`,
+waiting for the first builder's word, #2530), the say with its Jev question
+and the say service's context line (#2530 part 2), and everything after
+1.0.
 
 ## Why
 
@@ -139,9 +145,43 @@ proposal every 10 s and 20 an hour; at most 4 `say` proposals an hour
 across all add-ons (built, `crates/skills/src/addon.rs`); at most 2
 waiting for a decision (with the judge). A proposal over a limit is not
 published, and the run's `skills/events` says why. A kept proposal holds
-for its `holds_ms` and is then given back, as a skill's light is.
+for its `holds_ms`, and its claim then lapses by itself.
 
-## The judge
+## The judge as built (#2530 part 1)
+
+`lamp-addons serve`, off unless `LAMP_ADDONS=on` (or `--enable`): without it
+it opens nothing and publishes nothing. It reads `addon/proposal` (only from
+`lamp-skills`, the source every proposal must have) and these topics, each
+taken the cautious way when never read or no longer fresh, except where
+nothing said is the lamp's ordinary state (the pause, and the sleep mute
+on a lamp without the head's controls):
+
+| Rule | Read from | Dropped when |
+|---|---|---|
+| Privacy | `voice/privacy` | the voice does not permit capture now, or nothing fresh (1 s) |
+| Pause | `lamp/pause` | paused; never said is not paused, as `lamp-keeper` means it ([keeper.md](keeper.md)) |
+| Asleep | `voice/mute`, `expression/rest_state` | muted for sleep, or the rest skill resting (its word fresh within 1 s), or a mute once said gone stale (3 s). The voice says its mute every second only with the head's controls on (`LAMP_HEAD_TOUCH`, `--controls-mute`); with none said 3 s after the judge starts, the rest skill alone tells sleep |
+| Setting up | `onboarding/pending` | its last word holds an invitation: setup owns the light and the voice while it runs a step |
+| Talking or speaking | `voice/state` | not `resting`, or nothing fresh (3 s) |
+| A busy room | `room/state` | not `quiet` (`unknown` included), or nothing fresh (3 s) |
+| The person's light (a `light` only) | `light/command`, `light/state` | the newest `light/command` this boot came from the actions part or the app and `light/state` shows it; with none, the ring shows its own idle light |
+| Not yet | the act | `say`, `note` or `move` (#2530 part 2) |
+| Late | the proposal's age | judged after its `holds_ms` |
+| Rate (rule 8) | the judge's own memory | its add-on had one kept within 2 minutes, or 10 within the hour; a dropped one is not counted |
+
+A kept `light` becomes one `LightRequest` on `light/request` from
+`addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on
+the boot's clock: every skill, the conversation, safety and a person
+outrank it, and the ring stays the light's one writer. A kept `mood` is
+said kept and not carried out until `lamp-mood` takes a nudge. Every
+verdict is a journal line and an `AddonDecision` on `addon/decision`
+(`proposal`, `addon`, `act`, `choice` kept or dropped, `by` rule, `why`).
+The policy's own `policy/decisions` stays `lamp-policy`'s alone (the first
+builder, #2530). Not handled yet: a person's light restored from disk at
+boot (`LAMP_LIGHT_KEEP=on`, not set on the product) was not set this boot,
+so an add-on's light can show over it for up to 30 s.
+
+## The judge as designed
 
 The policy ([policy.md](policy.md)) gets one new question, asked for each
 proposal and answered on `policy/decisions` with the proposal's number.

@@ -1,0 +1,39 @@
+# lampOS add-ons' judge: reads the proposals partners' add-ons make on addon/proposal, keeps or drops
+# each by rules (privacy, pause, asleep, someone talking, a busy room, the person's own light), and
+# asks the ring for a kept light at Idle, below every skill, the conversation, safety and a person
+# (lampOS/docs/addons.md, #2530). It writes nothing to any actuator itself.
+# The product unit (lampOS/docs/install.md). Off unless set: a drop-in turns it on,
+#   [Service]
+#   Environment=LAMP_ADDONS=on
+# with the same line in lamp-skills.service and lamp-cloud.service. Off, it exits at once with
+# nothing touched, and stays inactive.
+[Unit]
+Description=lampOS add-ons' judge (lamp-addons)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-voice.service lamp-skills.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=10
+ExecStart=/opt/lampOS/addons/current/lamp-addons serve --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=10s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-addons
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

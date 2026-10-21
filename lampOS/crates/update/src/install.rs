@@ -113,6 +113,11 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-tasks.service",
         include_str!("../../../deploy/product/lamp-tasks.service"),
     ),
+    // The add-ons' judge (#2530); off unless set.
+    (
+        "lamp-addons.service",
+        include_str!("../../../deploy/product/lamp-addons.service"),
+    ),
     // The lamp's inner state (#1670); off unless set.
     (
         "lamp-mood.service",

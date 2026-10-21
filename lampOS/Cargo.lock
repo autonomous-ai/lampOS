@@ -1706,6 +1706,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-addons"
+version = "0.1.0"
+dependencies = [
+ "lamp-bus",
+ "lamp-ipc",
+ "lamp-msgs",
+ "serde_json",
+ "signal-hook",
+ "tempfile",
+]
+
+[[package]]
 name = "lamp-air"
 version = "0.1.0"
 dependencies = [
