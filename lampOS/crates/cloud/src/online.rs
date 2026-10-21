@@ -1415,15 +1415,15 @@ mod tests {
         JoiningHelper { finish, thread }
     }
 
-    /// The lamp with the Wi-Fi's switch against `port` until `until` holds,
-    /// or 10 s; then the lines it said.
+    /// The lamp with the Wi-Fi's switch against `port` until `until` holds
+    /// of what the broker saw and the lines said, or 10 s; then the lines.
     async fn wifi_against(
         port: u16,
         seen: &Arc<Mutex<Vec<Seen>>>,
         socket: &std::path::Path,
         first: Duration,
         will: bool,
-        until: impl Fn(&[Seen]) -> bool,
+        until: impl Fn(&[Seen], &[String]) -> bool,
     ) -> Vec<String> {
         let (accounts_tx, accounts) = watch::channel(Some(account(port)));
         let (_identity_tx, me) = watch::channel(identity());
@@ -1444,7 +1444,9 @@ mod tests {
             run(accounts, me, &mut lamp, &mut say, first).await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-        while !until(&seen.lock().unwrap()) && tokio::time::Instant::now() < deadline {
+        while !until(&seen.lock().unwrap(), &lines.lock().unwrap())
+            && tokio::time::Instant::now() < deadline
+        {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         drop(accounts_tx);
@@ -1485,7 +1487,14 @@ mod tests {
             &socket,
             Duration::from_secs(1),
             false,
-            |seen| wifi_replies(seen).len() >= 2,
+            // The broker's count, and the client's line for its ack, which
+            // can come after it.
+            |seen, lines| {
+                wifi_replies(seen).len() >= 2
+                    && lines
+                        .iter()
+                        .any(|line| line.contains("wifi.joined success, request_id r-7: acked"))
+            },
         )
         .await;
         let (joined_at, online_at, online) = helper.join().unwrap();
@@ -1558,9 +1567,14 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
         let helper = joining_helper(&socket, Duration::from_millis(300), false);
         let (port, seen) = broker(Broker::StaleFirstLateAck, vec![WIFI_SET]).await;
-        wifi_against(port, &seen, &socket, Duration::from_secs(1), true, |seen| {
-            wifi_replies(seen).len() >= 2
-        })
+        wifi_against(
+            port,
+            &seen,
+            &socket,
+            Duration::from_secs(1),
+            true,
+            |seen, _| wifi_replies(seen).len() >= 2,
+        )
         .await;
         helper.join().unwrap();
         let seen = seen.lock().unwrap().clone();
@@ -1608,7 +1622,14 @@ mod tests {
             &socket,
             Duration::from_millis(100),
             false,
-            |seen| wifi_replies(seen).len() >= 3,
+            // The broker's count, and the client's line for its ack, which
+            // can come after it.
+            |seen, lines| {
+                wifi_replies(seen).len() >= 3
+                    && lines
+                        .iter()
+                        .any(|line| line.contains("wifi.set failure, request_id r-7: acked"))
+            },
         )
         .await;
         opener.join().unwrap();
