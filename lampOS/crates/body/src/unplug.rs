@@ -985,22 +985,40 @@ mod tests {
                 .map(|message| message.parse::<State>().unwrap())
                 .map(|state| (state.phase, state.why))
         };
-        let samples = |for_ms: u64| {
-            for _ in 0..for_ms / 20 {
-                adapter.sample(true, None);
+        // Each phase is waited for, sampling every 20 ms or not, up to 2 s
+        // (the reviewer-lead's P3 on #2548): a loaded runner can stall either
+        // thread past `FRESH_US`, and a fixed window then ends before the
+        // 500 ms of proof (#1569 row 67). Failing on the way is never waited
+        // out. How long each took, from its first sample.
+        let until = |want: Phase, sampling: bool| {
+            let began = std::time::Instant::now();
+            loop {
+                if sampling {
+                    adapter.sample(true, None);
+                }
+                if let Some((now, why)) = phase() {
+                    if now == want {
+                        return (why, began.elapsed());
+                    }
+                    assert_ne!(now, Phase::Failed, "waiting for {want:?}: {why}");
+                }
+                assert!(
+                    began.elapsed() < Duration::from_secs(2),
+                    "no {want:?} in 2 s: {:?}",
+                    phase()
+                );
                 thread::sleep(Duration::from_millis(20));
             }
         };
-        samples(900);
-        assert_eq!(phase().unwrap().0, Phase::Ready);
-        thread::sleep(Duration::from_millis(300));
-        assert_eq!(phase().unwrap().0, Phase::Folding, "a gap is not Ready");
-        samples(900);
-        assert_eq!(phase().unwrap().0, Phase::Ready, "Ready again");
+        // Never Ready before half a second of samples.
+        let (_, took) = until(Phase::Ready, true);
+        assert!(took >= Duration::from_micros(SETTLE_US), "{took:?}");
+        // A gap is not Ready, and not a failure.
+        until(Phase::Folding, false);
+        let (_, took) = until(Phase::Ready, true);
+        assert!(took >= Duration::from_micros(SETTLE_US), "again {took:?}");
         adapter.sample(false, Some(3));
-        thread::sleep(Duration::from_millis(150));
-        let (phase, why) = phase().unwrap();
-        assert_eq!(phase, Phase::Failed);
+        let (why, _) = until(Phase::Failed, false);
         assert!(why.contains("a joint moved"), "{why}");
         drop(adapter);
         let _ = std::fs::remove_dir_all(root);
