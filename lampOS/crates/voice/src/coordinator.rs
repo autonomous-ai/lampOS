@@ -4538,6 +4538,105 @@ fn tone_forgotten(
     )
 }
 
+/// The most of a person's line kept to read its words: far more than a
+/// sentence. A piece that would pass it is left out.
+const TONE_LINE_BYTES: usize = 4_096;
+/// A line's last pieces can come a while after its End, as the recogniser
+/// catches up: none for this long after it, and the line is over. The next
+/// line beginning ends it at once, whatever the quiet, so a pause the
+/// person makes is never what splits a line (the reviewer-lead's P3 on
+/// #2600).
+const TONE_LINE_QUIET_US: u64 = 1_000_000;
+
+/// The person's line, its pieces end to end, for its tone and a forget
+/// (Thirteen's duplex finding on #1722): the turn of the lamp's line it was
+/// heard in, and when its last piece came. A piece heard in another turn's
+/// line, or none, begins another (the reviewer-lead's P2 on #2600), so two
+/// lines never join, nor does a line's forget wait past the next one's End.
+#[derive(Debug, Default)]
+struct ToneLine {
+    words: String,
+    turn: Option<u64>,
+    last_us: Option<u64>,
+}
+
+impl ToneLine {
+    /// A piece heard at `now_us` while `turn` is the lamp's line. The line
+    /// before, if it was heard in another turn's, is given back to be read
+    /// first.
+    fn heard(
+        &mut self,
+        piece: &str,
+        turn: Option<u64>,
+        now_us: u64,
+    ) -> Option<(String, Option<u64>)> {
+        let before = (self.last_us.is_some() && self.turn != turn).then(|| self.take());
+        if self.words.len() + piece.len() <= TONE_LINE_BYTES {
+            self.words.push_str(piece);
+        }
+        self.turn = turn;
+        self.last_us = Some(now_us);
+        before
+    }
+
+    /// Whether the line is over at `now_us`, with `turn` the lamp's line
+    /// now and `ended` whether its End has come: the turn it was heard in is
+    /// no longer the lamp's (another began, or it was let go), or no piece
+    /// has come for [`TONE_LINE_QUIET_US`] once its End has. Pieces heard
+    /// while a line is still being said wait for its End.
+    fn over(&self, now_us: u64, turn: Option<u64>, ended: bool) -> bool {
+        self.last_us.is_some_and(|last| {
+            self.turn != turn || (ended && now_us.saturating_sub(last) >= TONE_LINE_QUIET_US)
+        })
+    }
+
+    /// The line's words and the turn they were heard in; a new line begun.
+    fn take(&mut self) -> (String, Option<u64>) {
+        self.last_us = None;
+        (std::mem::take(&mut self.words), self.turn.take())
+    }
+}
+
+/// The person's line is over. The reading waiting for its words is told
+/// with them when it is the reading of the line they were heard in
+/// (`heard_in`): words heard while another line is the lamp's are that
+/// line's, so the waiting one is told without them. And asked to forget
+/// their face, or everything, their own baseline goes (the room's for
+/// someone not known), or every one. The words decide, before any function
+/// runs. Never the words or the person.
+fn tone_line_over(
+    line: &str,
+    heard_in: Option<u64>,
+    pending: &mut Option<(u64, crate::voice_tone::Reading)>,
+    baselines: &mut crate::voice_tone::Baselines,
+    person: Option<&str>,
+    out: Option<&mut crate::bus_out::ToneOut>,
+    trace: &mut SessionState,
+) -> Result<()> {
+    if let Some((turn, reading)) = pending.take() {
+        let words = (heard_in == Some(turn)).then_some(line);
+        tell_tone(trace, out, turn, reading, words)?;
+    }
+    let Some(forget) = crate::voice_tone::forgets(line) else {
+        return Ok(());
+    };
+    let all = forget == crate::voice_tone::Forget::All;
+    if all {
+        baselines.forget_all();
+    } else {
+        baselines.forget(person);
+    }
+    record(
+        trace,
+        json!({"kind":"voice_tone_forgot","all":all,"by":"words",
+            "whose":(!all).then_some(if person.is_some() {
+                crate::voice_tone::Whose::Person
+            } else {
+                crate::voice_tone::Whose::Room
+            }),"at_us":monotonic_us()}),
+    )
+}
+
 /// A line's tone told, in the session record and on the bus: with its
 /// words' valence, or `words` `None` when they never came. Never the words.
 fn tell_tone(
@@ -5032,6 +5131,10 @@ fn conversation_with_gate(
     }
     // A line's reading, waiting for its words: its turn and when it ended.
     let mut tone_pending: Option<(u64, crate::voice_tone::Reading)> = None;
+    // The person's line so far: the duplex route hears a line in pieces and
+    // marks none finished (Thirteen on #1722, 21 Oct), so a line's words
+    // are put together to be read whole.
+    let mut tone_line = ToneLine::default();
     // The voice's own timing, for the part that plans what the lamp shows
     // (docs/expression.md). Only if that is switched on.
     let mut expression_out = rig
@@ -6433,49 +6536,37 @@ fn conversation_with_gate(
                     {
                         walk.heard_line(&text);
                     }
-                    // The line's words: its tone is told now, with their
-                    // valence. Words heard while another line is the
-                    // lamp's are that line's, so a reading waiting for
-                    // its own is told without them. Never the words.
-                    if request.is_none()
-                        && finished
-                        && let Some((turn, reading)) = tone_pending.take()
-                    {
-                        let words = reply
-                            .as_ref()
-                            .is_some_and(|current| current.owner.turn() == turn);
-                        tell_tone(
-                            trace,
-                            tone_out.as_mut(),
-                            turn,
-                            reading,
-                            words.then_some(text.as_str()),
-                        )?;
-                    }
-                    // Asked to forget their face, or everything: their own
-                    // baseline goes (the room's for someone not known), or
-                    // every one. The words decide, before any function
-                    // runs. Never the words or the person.
-                    if request.is_none()
-                        && finished
-                        && tone_meter.is_some()
-                        && let Some(forget) = crate::voice_tone::forgets(&text)
-                    {
-                        let all = forget == crate::voice_tone::Forget::All;
-                        if all {
-                            tone_baselines.forget_all();
-                        } else {
-                            tone_baselines.forget(tone_person.as_deref());
+                    // The person's line, its pieces end to end: read for
+                    // its tone and a forget once it is over, at a piece
+                    // marked finished (the second route's whole line) or
+                    // once its pieces stop (below, `TONE_LINE_QUIET_US`).
+                    if request.is_none() && tone_meter.is_some() {
+                        let turn = reply.as_ref().map(|current| current.owner.turn());
+                        if let Some((words, heard_in)) =
+                            tone_line.heard(&text, turn, monotonic_us())
+                        {
+                            tone_line_over(
+                                &words,
+                                heard_in,
+                                &mut tone_pending,
+                                &mut tone_baselines,
+                                tone_person.as_deref(),
+                                tone_out.as_mut(),
+                                trace,
+                            )?;
                         }
-                        record(
-                            trace,
-                            json!({"kind":"voice_tone_forgot","all":all,"by":"words",
-                                "whose":(!all).then_some(if tone_person.is_some() {
-                                    crate::voice_tone::Whose::Person
-                                } else {
-                                    crate::voice_tone::Whose::Room
-                                }),"at_us":monotonic_us()}),
-                        )?;
+                        if finished {
+                            let (words, heard_in) = tone_line.take();
+                            tone_line_over(
+                                &words,
+                                heard_in,
+                                &mut tone_pending,
+                                &mut tone_baselines,
+                                tone_person.as_deref(),
+                                tone_out.as_mut(),
+                                trace,
+                            )?;
+                        }
                     }
                     // A line whose words end before a name, its answer
                     // unheard: a sound begun just after its end goes on
@@ -9991,6 +10082,27 @@ fn conversation_with_gate(
             for person in forgot.forgotten(clock) {
                 tone_forgotten(&mut tone_baselines, person.as_deref(), trace, clock)?;
             }
+        }
+        // The person's line is over once the lamp's line it was heard in is
+        // no longer the lamp's, or its pieces have stopped after that line's
+        // End ([`ToneLine::over`]).
+        if tone_line.over(
+            clock,
+            reply.as_ref().map(|current| current.owner.turn()),
+            reply
+                .as_ref()
+                .is_none_or(|current| current.local_input_ended),
+        ) {
+            let (words, heard_in) = tone_line.take();
+            tone_line_over(
+                &words,
+                heard_in,
+                &mut tone_pending,
+                &mut tone_baselines,
+                tone_person.as_deref(),
+                tone_out.as_mut(),
+                trace,
+            )?;
         }
         // A hello that is due and could be begun; with
         // `LAMP_HELLO_ASKS_POLICY=on` the policy is asked first and it
