@@ -5449,6 +5449,40 @@ Ready for lamp-voice: yes (#2665, #2684). #2638 is already merged.
   lamp-4ace. Fourth has no lamp and made no provider or device request.
   No speculative connection pool or other runtime policy was added.
 
+## 2026-10-22, 00:0x ICT: slow-second-piece regression pushed as #2691
+
+Ready for lamp-voice: no (#2691) — native ARM64 is running. #2665 and
+#2684 remain ready; #2638 is merged.
+
+- **#2691**, draft, `97ac4f27f460e2e88a7cc2cf2a48a2cc8d41069a`, is
+  one commit on `07ce0a6c4` on `fourth/slow-second-piece`. Only the
+  existing second-provider test fixture, its new regression and
+  `docs/verification/slow-second-piece-20261021/README.md` change.
+  No production behavior, default or runtime switch changes.
+- The first packet is delivered promptly while the second is explicitly
+  held; a notification proves that the third is already ready. The
+  ready successor and completion cannot pass the hold. Release delivers
+  the remaining packets and words exactly once in order; retirement
+  drops the held stream without stale output. The 2970 ms hold is on
+  Tokio's paused clock, not a measured acoustic delay.
+- Local gate: **3280 passed, zero failed, 14 existing ignored**, across
+  six Voice test targets, in **598.809 seconds**. The focused regression
+  passed before and after restoring the order mutation; the mutation
+  failed at the intended hold/order assertion. Formatting, scoped
+  all-target Clippy with warnings denied and workspace build passed
+  (the build took **106.963 seconds**). `cargo-nextest` is unavailable on
+  this Mac; the complete local gate used `cargo test` instead.
+- Native workspace Clippy **39639670347** passed on this exact head.
+  Native ARM64 **39639670528** is running. The PR body has the final
+  local commands and counts; full logs, the mutation patch and source
+  fingerprints are in `/private/tmp/fourth-slow-second-piece-checks/`.
+  The README records that the workspace build was still running when
+  the draft was published; its completed result is on the PR.
+- Current heads and counts are on Queue #2602. First still owns the
+  real paired lamp-4ace comparison; Fourth made no device or provider
+  request. The remaining observed slow service does not justify a
+  connection pool or another runtime change.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
