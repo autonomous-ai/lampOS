@@ -1,9 +1,9 @@
 # lampOS controls: the button and the touch pads: what a hand did, on the bus (lampOS/docs/controls.md).
 # The product unit (lampOS/docs/install.md). --touch is the path that publishes controls/touch with the
 # reset button held 5 s, which lamp-setup-reset's watch-reset acts on (El on #705, 2026-10-16: without it
-# the reset button did nothing). The head pads are on controls/touch too, which the product's voice and
-# Expression do not read yet (no LAMP_HEAD_TOUCH, no --head-touch); "legacy_head" in the pins keeps a pat
-# the old engine's Pet on controls/gesture, which wakes a lamp asleep at night (the reviewer on #1167).
+# the reset button did nothing). The head pads are on controls/touch too, which the product's voice
+# (LAMP_HEAD_TOUCH) and Expression (--head-touch) read (#711); so the pins have no "legacy_head", which
+# would give a pat to the old engine as well (docs/controls.md).
 [Unit]
 Description=lampOS controls (lamp-controls)
 PartOf=lampos.target

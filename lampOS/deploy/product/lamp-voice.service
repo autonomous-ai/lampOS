@@ -24,7 +24,7 @@ Group=root
 Slice=lampos-voice.slice
 WorkingDirectory=/
 UMask=0077
-ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US
+ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --controls-mute /var/lib/lampOS/voice/mute/record.json --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US
 # The lines recorded in the lamp's own voice, loaded once at start (lampOS/docs/failure-notices.md): the offline line,
 # back online, the voice service's line and the Wi-Fi helper's no-Wi-Fi line, placed by lamp-update install from
 # deploy/product/models.json (#1844). With no directory or no manifest every notice stays silent, and
@@ -92,10 +92,9 @@ Environment=LAMP_KERNEL_CLOCK=on
 Environment=LAMP_SESSION_FACT=on
 # Switched on lamp-4ace through 16 and 17 October and run there all day; several only in the groups of #1238's
 # census, so their lamp record is that day's running, not a run of their own (install.md).
-# Not here: the stop words and the voice link (lamp-4ace's alone), the office's own (its Harness target, its say group), and
-# head touch, which needs Controls' and Expression's flags too (#711); those that need another part's flag the product
-# doesn't pass (the Policy holding actions, its hello and progress news, the full look, a restored mute); and "that
-# was weird", a builder's review tool whose marks the reset doesn't wipe (#1332's review).
+# Not here: the stop words and the voice link (lamp-4ace's alone), the office's own (its Harness target, its say group); those that need
+# another part's flag the product doesn't pass (the Policy holding actions, its hello and progress news, the full
+# look); and "that was weird", a builder's review tool whose marks the reset doesn't wipe (#1332's review).
 Environment=LAMP_TOOL_LEAD_IN=on
 Environment=LAMP_WAIT_KEEPS_ANSWER=on
 Environment=LAMP_STOP_TOLD=on
@@ -115,6 +114,13 @@ Environment=LAMP_START_OFFLINE=on
 # LAMP_REACH_PROBE: an outage of the route's services is said as no link too, never dropped in silence.
 Environment=LAMP_OFFLINE_VOICE=on
 Environment=LAMP_RING_ASLEEP=on
+# Head touch (#711), whole: a tap on the head stops the answer or calls the lamp, a hand kept 3 s puts it to sleep
+# with the microphones off (--controls-mute, its record in /var/lib/lampOS/voice/mute), and a tap opens a mute the
+# restart guard left after a fault (LAMP_RESTORED_MUTE). It goes with Expression's --head-touch and the pins without
+# legacy_head, as install's head_touch_comes_whole_and_never_beside_the_old_engines_head holds. Merged only after
+# a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
+Environment=LAMP_HEAD_TOUCH=on
+Environment=LAMP_RESTORED_MUTE=on
 Environment=LAMP_OTHER_LANGUAGE=sorry
 Environment=LAMP_NAME_IN_PASSING=ignored
 # An answer plays only when the lamp was spoken to, and the reply to its own news (outside a busy room), a question

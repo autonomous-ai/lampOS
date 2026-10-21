@@ -30,6 +30,7 @@
     "/var/lib/lampOS/voice/near-call.json",
     "/var/lib/lampOS/voice/made-skills",
     "/var/lib/lampOS/light",
+    "/var/lib/lampOS/voice/mute",
     "/run/lampos-voice/thread.json",
     "/etc/lampOS/voice/credential",
     "/etc/lampOS/voice/own",

@@ -16,7 +16,8 @@ Group=lampos
 Slice=lampos-parts.slice
 Nice=5
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
-ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock
+# --head-touch: the head leans into a hand, sleeps on a hold, wakes on a tap (#711), with the voice's head touch.
+ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock --head-touch
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
