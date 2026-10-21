@@ -203,6 +203,28 @@ mod tests {
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
+    /// #2396: the generic voice unit starts the light ring's worker with the
+    /// product's ceiling, so a lamp moved from V1 lights its ring.
+    #[test]
+    fn the_generic_voice_runs_the_ring_as_the_product_does() {
+        let exec = |unit: &str| {
+            unit.lines()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .unwrap()
+                .to_owned()
+        };
+        let product = exec(include_str!("../../../deploy/product/lamp-voice.service"));
+        let generic = exec(include_str!("../../../deploy/units/lamp-voice.service"));
+        let ceiling = |exec: &str| {
+            exec.split_whitespace()
+                .skip_while(|word| *word != "--ring-channel-ceiling")
+                .nth(1)
+                .map(str::to_owned)
+        };
+        assert!(ceiling(&product).is_some(), "{product}");
+        assert_eq!(ceiling(&generic), ceiling(&product), "{generic}");
+    }
+
     #[test]
     fn lamp_4aces_own_units_are_read() {
         // As they are in the repository: what the lamp runs.
