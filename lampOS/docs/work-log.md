@@ -13,7 +13,7 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-21, Music cache correction and release CI
+## Current checkpoint: 2026-10-21, Music correction and release ready for review
 
 Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
 `6f4e5ceea0df9f47ec211e5649dedf075507a7d6`; release workflow
@@ -21,10 +21,10 @@ Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
 `f41a24c185df9e1b9e612ed1c7e573cd44631b48`. Music is one commit on
 `99f2ecfcd4ebb3b9279750bee42f219c0c4895ed`; the release workflow is one on
 `64cefadfca797cfd259048197a64add4dd6b8681`, preserving the newer integration
-cache policy. Both remain draft. Music failed its native cache regression and
-is being corrected; release ARM64 is pending. Their current x86 strict
+cache policy. Music remains draft after its native cache regression failure.
+Release ARM64 passed and #2462 is ready for reviewer integration. Their x86 strict
 workspace/all-target Clippy runs passed without warnings.
-[Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6308117257).
+[Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6308319095).
 Review follow-up and the next assigned task remain in this builder loop.
 
 ### Music
@@ -72,9 +72,11 @@ tests not run after fail-fast. The failure is
 its same-size audio rewrite was incorrectly classified as unchanged. This is
 Music's cache correctness failure, separate from unchanged Setup's intermittent
 test. The native log has no stamp values, so the precise filesystem timing is
-unmeasured. The correction must require a new content hash after timestamp
-settlement before metadata-only reuse; unsupported filesystem/clock contracts
-will keep hashing. No blind CI rerun or fixture-only sleep is being used.
+unmeasured. Review also found that writable memory mappings defeat a general
+settled-timestamp proof. The correction therefore removes metadata-only reuse
+and hashes all current bytes with the existing optimized SHA-256 backend.
+Its focused scan and complete gates are pending. No blind CI rerun or
+fixture-only sleep is being used.
 [Failed-run receipt](verification/second-current-checkpoint-20261021/music-native-failure.json).
 [x86 39542590328](https://github.com/autonomous-ai/lampOS/actions/runs/39542590328)
 passed on merge `d84cdfb50866bd867f0f92bf22a972e5e936633f`, base
@@ -110,7 +112,17 @@ Current Cargo metadata contains **46 binaries + 2 selected examples**.
 [Host receipt](https://github.com/autonomous-ai/lampOS/blob/f41a24c185df9e1b9e612ed1c7e573cd44631b48/lampOS/docs/verification/update-release-host-20261021.json).
 
 Current [ARM64 39543873384](https://github.com/autonomous-ai/lampOS/actions/runs/39543873384)
-is running. Current [x86 39543873388](https://github.com/autonomous-ai/lampOS/actions/runs/39543873388)
+passed on merge `36f4b77b5f84edbddfff53038a91d8f0b944c66f`, base
+`707e02c30cff5d9802ab7e5cfeab77621ca6992d`: **9,069 passed (one leaky),
+61 skipped**, four doctests, 12 own-harness tests and relay signals. Native
+helper output was **29 tests in 0.163 s**, **12 in 0.702 s** and **6 in
+0.290 s**, all OK. It packaged **46 current binaries + 2 selected examples**
+with complete checksums, then uploaded artifact **12321073400**. Publication
+was skipped. The known Voice journal-test leak and four shared-example
+filename warnings remain recorded; exported selected examples use their own
+target directory. Go/Web/Python checks passed.
+[Current complete native receipt](verification/second-current-checkpoint-20261021/release-rebased-arm64.json).
+Current [x86 39543873388](https://github.com/autonomous-ai/lampOS/actions/runs/39543873388)
 passed on merge `36f4b77b5f84edbddfff53038a91d8f0b944c66f`, base
 `707e02c30cff5d9802ab7e5cfeab77621ca6992d`, with no warnings;
 [current receipt](verification/second-current-checkpoint-20261021/release-rebased-clippy.json).

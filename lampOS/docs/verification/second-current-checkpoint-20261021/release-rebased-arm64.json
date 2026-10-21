@@ -1,0 +1,152 @@
+{
+  "head": "f41a24c185df9e1b9e612ed1c7e573cd44631b48",
+  "event": "pull_request",
+  "tested_checkout": "36f4b77b5f84edbddfff53038a91d8f0b944c66f",
+  "tested_base": "707e02c30cff5d9802ab7e5cfeab77621ca6992d",
+  "checkout_note": "Pull-request run tests the GitHub merge commit; the artifact is named for the PR head.",
+  "run": 39543873384,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39543873384",
+  "conclusion": "success",
+  "nextest_passed": 9069,
+  "nextest_leaky": 1,
+  "nextest_skipped": 61,
+  "doc_tests": 4,
+  "own_harness_tests": 12,
+  "relay_signals_ok": true,
+  "log_sha256": "077ebefdd1a3591229208e659d41dedac0546991de164db017bc161fc7d932e6",
+  "warnings": [
+    "warning: output filename collision at lampOS/target/release/examples/progress_cost",
+    "warning: output filename collision at lampOS/target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at lampOS/target/release/examples/replay_cost",
+    "warning: output filename collision at lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "steps": [
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "publication failure tests (offline, no signing secret)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "restore the cache",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build the two selected artifact examples without filename collisions",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "which crates a pull request tests",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "export only current Cargo targets and their SHA-256",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "save the cache",
+      "conclusion": "skipped"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "publication_and_artifact_result_lines": [
+    "Ran 29 tests in 0.163s",
+    "OK",
+    "Ran 12 tests in 0.702s",
+    "OK",
+    "Ran 6 tests in 0.290s",
+    "OK",
+    "        LEAK [   0.222s] (7462/9069) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "Packaged 46 current workspace binaries and 2 selected examples with complete SHA256SUMS",
+    "Artifact lampos-arm64-f41a24c185df9e1b9e612ed1c7e573cd44631b48.zip successfully finalized. Artifact ID 12321073400",
+    "Artifact lampos-arm64-f41a24c185df9e1b9e612ed1c7e573cd44631b48 has been successfully uploaded! Final size is 111046340 bytes. Artifact ID is 12321073400",
+    "Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/39543873384/artifacts/12321073400"
+  ],
+  "native_python_tests": {
+    "artifact_provenance": 12,
+    "publisher": 29,
+    "real_cli": 6
+  },
+  "exported_current_binaries": 46,
+  "exported_selected_examples": 2,
+  "publication_job": {
+    "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+    "conclusion": "skipped",
+    "job_id": 119043595939
+  },
+  "artifact": {
+    "id": 12321073400,
+    "name": "lampos-arm64-f41a24c185df9e1b9e612ed1c7e573cd44631b48",
+    "bytes": 111046340,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39543873384/artifacts/12321073400"
+  },
+  "generic_ci": "Go, Web and Python checks passed on both PR run 39543873391 and branch run 39543868919."
+}
