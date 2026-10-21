@@ -3,7 +3,7 @@
 //! `info` carries it, and `sent_at` set once and kept on every send again,
 //! since the backend drops a duplicate by `(device, seq, sent_at)`. A field
 //! renamed or retyped here is `lamp-report/2`.
-use lamp_cloud::reports::{Places, Reports, Seen, topic};
+use lamp_cloud::reports::{Lamp, Places, Reports, Seen, Sources, topic};
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -156,4 +156,59 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         assert!(reply["since"].is_string() || reply["since"].is_null());
         assert!(reply["queued"].is_u64());
     }
+}
+
+/// A health report from a lamp whose systemd shows `timer` for
+/// `lamp-update-back.timer`, with the self-update switch as given (#2709's
+/// follow-up): a stand-in `systemctl` prints it.
+fn health_with_timer(name: &str, update_self: bool, timer: &str) -> Value {
+    use std::os::unix::fs::PermissionsExt;
+    let places = places(name);
+    let systemctl = places.boot_id.with_file_name("systemctl");
+    std::fs::write(&systemctl, format!("#!/bin/sh\nprintf '{timer}'\n")).unwrap();
+    std::fs::set_permissions(&systemctl, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut lamp = Lamp::new(None);
+    lamp.systemctl = systemctl;
+    lamp.update_self = update_self;
+    let seen = Seen {
+        waits: lamp.waits(),
+        ..Seen::default()
+    };
+    let mut reports = Reports::open(places);
+    reports.health(1_792_382_400, None, &seen).unwrap();
+    serde_json::from_str(&reports.due("dev-42")[0].1).unwrap()
+}
+
+const NO_TIMER: &str = "LoadState=not-found\\nUnitFileState=\\nActiveState=inactive\\n";
+const ARMED: &str = "LoadState=loaded\\nUnitFileState=enabled\\nActiveState=active\\n";
+
+#[test]
+fn a_lamp_without_the_armed_way_back_says_lamp_update_waits() {
+    let health = health_with_timer("wait-no-timer", true, NO_TIMER);
+    assert_eq!(
+        health["waits"],
+        serde_json::json!({
+            "lamp-update.service":
+                "independent recovery is not ready: no armed lamp-update-back.timer"
+        })
+    );
+    assert_eq!(health["schema"], "lamp-report/1");
+    // Enabled but not started: still not armed.
+    let stopped = ARMED.replace("ActiveState=active", "ActiveState=inactive");
+    let health = health_with_timer("wait-stopped", true, &stopped);
+    assert!(health["waits"].is_object());
+}
+
+#[test]
+fn a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits() {
+    assert!(
+        health_with_timer("wait-armed", true, ARMED)
+            .get("waits")
+            .is_none()
+    );
+    assert!(
+        health_with_timer("wait-off", false, NO_TIMER)
+            .get("waits")
+            .is_none()
+    );
 }
