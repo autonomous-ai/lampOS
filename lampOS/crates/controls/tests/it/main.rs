@@ -21,6 +21,7 @@ mod runtime;
 mod strip;
 mod touch;
 mod touch_calibrate;
+mod touch_from;
 mod touch_pins;
 mod touch_program;
 mod touch_receiver;
