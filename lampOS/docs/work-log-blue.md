@@ -204,3 +204,32 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
     `lamp-addons`, `lamp-skills` and `lamp-mood` match its SHA256SUMS.
   - Run copies of both examples load in `lamp-skills test`.
   - Waiting on lamp-75c9's lock (Eighth).
+
+## 2026-10-21 17:1x — part 2's design answered; part 1's run sheet
+
+- **The first builder on part 2 (#2530, 17:1x): the design is right.**
+  Build it after part 1's lamp run.
+  - **Q-A, yes:** `lamp-policy` writes `about: "addon"` on
+    `policy/decisions`, with an optional `proposal`. Check the voice's
+    reader filters on `about`, and test that the voice ignores an `addon`
+    decision on Live and on the second route.
+  - **Q-B, the typed grant path:**
+    - a kept say is the skill's own note, and only with a declared say
+      grant (as #2596's `say.from`);
+    - the note is quoted and marked untrusted;
+    - a kept `note` is a `try_context` line, never spoken;
+    - all behind `LAMP_ADDON_SAY=on`, and shadow until `--act addon`.
+- **The Queue is now #2602:** #1722 is full.
+- **Part 1's run sheet:** posted on #2530 (6313491829), with six rows:
+  - the light kept;
+  - the mood kept;
+  - the person's light wins;
+  - each reachable never once;
+  - the rate cap;
+  - restore.
+
+  Not tried on the lamp: privacy closed, asleep and onboarding (each
+  with why).
+- **lamp-75c9:** asked its holders on #2602 for a slot after 18:00. I
+  cancelled my waiting acquire so as not to take the lamp before then.
+- **#2553:** next in the reviewer-lead's merge queue (17:17).
