@@ -417,3 +417,8 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - The steps follow `calendar.sh`: the lamp's confirm or an offer at once.
   - The test covers both orders and passes; the SHA-256 mutant fails it.
   - Folded as `7efb56173`.
+- **#2745, the Reviewer-lead's P2 (06:2x):** in the yes arm, a skill put on before the yes was failed but left on the lamp.
+  - Fixed: the early skill goes into `PUT_ON` in both arms.
+  - The stand-in's folder is removed if an upload fails before setup.
+  - New test cases `early` and `plan-fails`; the mutant fails `early`.
+  - Folded as `8cf682a0d`. The first builder runs it on 4ace only after Eighth's store-of-its-own fix.
