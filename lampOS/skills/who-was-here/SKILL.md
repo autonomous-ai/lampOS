@@ -44,6 +44,10 @@ What it keeps, and what it never does:
 It needs the eyes to say `room/presence` (`LAMP_PRESENCE=on`); without it
 the lamp says it can't tell.
 
+Its words are its own: every line of the record the model is told is in
+its `skill.toml`'s `[history.words]`, put together from slots (#940,
+`docs/skills.md`).
+
 An installable skill: its owner puts it on the lamp (`lamp-skills
 install`) and takes it off. Not in the product yet.
 

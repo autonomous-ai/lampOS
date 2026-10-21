@@ -10738,6 +10738,37 @@ fn a_watch_from_before_its_words_says_the_built_in_ones_for_one_release() {
     assert_eq!(older.words, lamp_skills::watch::Words::built_in());
 }
 
+/// #940's third move: who was here's words are its own `[history.words]`.
+/// A copy from before them, which a lamp keeps since who was here is
+/// installable, says the built-in ones for one release, marked so
+/// lamp-skills' journal says so; a line with a slot not its own is refused.
+#[test]
+fn a_history_from_before_its_words_says_the_built_in_ones_for_one_release() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = include_str!("../../../../skills/who-was-here/skill.toml");
+    let own = load(&skill_with(dir.path(), "who-was-here", toml)).unwrap();
+    let own = own.history.unwrap();
+    assert!(!own.built_in_words);
+    assert_eq!(own.words, lamp_skills::visits::Words::built_in());
+    let older = &toml[..toml.find("\n# What it says (#940)").unwrap()];
+    let older = load(&skill_with(
+        &dir.path().join("older"),
+        "who-was-here",
+        older,
+    ))
+    .unwrap();
+    let older = older.history.unwrap();
+    assert!(older.built_in_words);
+    assert_eq!(older.words, lamp_skills::visits::Words::built_in());
+    let bad = toml.replace("someone = \"someone\"", "someone = \"{who}\"");
+    assert_ne!(bad, toml);
+    let why = load(&skill_with(&dir.path().join("bad"), "who-was-here", &bad)).unwrap_err();
+    assert!(
+        why.contains("[history.words] someone has the slots"),
+        "{why}"
+    );
+}
+
 #[test]
 fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
     let dir = tempfile::tempdir().unwrap();

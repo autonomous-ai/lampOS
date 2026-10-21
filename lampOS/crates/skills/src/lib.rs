@@ -365,6 +365,10 @@ pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
 struct HistoryFile {
     topic: String,
     within: String,
+    /// What the record says, in the skill's own words
+    /// ([`visits::Words`]); a file from before them says the built-in
+    /// ones, for one release.
+    words: Option<visits::Words>,
 }
 
 /// `[again]`: within `within` of the tool's last run, a call runs only if
@@ -1352,8 +1356,8 @@ pub struct Skill {
     /// A search a person asked for (#1685): its calls are one run's looks.
     pub search: Option<Search>,
     /// With `[history]`: how far back a call is told who was at the lamp
-    /// (#1685).
-    pub history_us: Option<u64>,
+    /// (#1685), and in what words (#940).
+    pub history: Option<visits::History>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// The most runs it starts itself a local day.
@@ -1448,7 +1452,7 @@ impl Skill {
             )
             .chain(looks.then(|| (Faces::TOPIC.to_owned(), "a look at a face")))
             .chain(
-                self.history_us
+                self.history
                     .is_some()
                     .then(|| (RoomPresence::TOPIC.to_owned(), "[history]")),
             )
@@ -3196,7 +3200,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     };
     // Who was at the lamp (#1685): a person asks, so a tool alone starts
     // it, and it reads `room/presence` alone, which carries times only.
-    let history_us = match &file.history {
+    let history = match file.history {
         None => None,
         Some(history) => {
             if file.tool.is_none() || !triggers.is_empty() {
@@ -3215,7 +3219,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             if !(60_000_000..=visits::KEPT_US).contains(&within_us) {
                 return Err("[history] within is 1m to 24h: what the lamp keeps".into());
             }
-            Some(within_us)
+            Some(visits::History {
+                within_us,
+                built_in_words: history.words.is_none(),
+                words: history
+                    .words
+                    .map_or_else(|| Ok(visits::Words::built_in()), visits::Words::checked)?,
+            })
         }
     };
     // The words are the grant's: a skill granted it says them all, and no
@@ -3250,7 +3260,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         again,
         still,
         search,
-        history_us,
+        history,
         quiet,
         most_a_day: file.most_a_day,
         active,
@@ -4429,10 +4439,9 @@ impl Engine {
     /// lamp's record of who was at it over its `within` (#1685): each time
     /// of day when the local time is known, and how long ago.
     fn told_history(&self, skill: &Skill, calls: Vec<Call>, now_us: u64) -> Vec<Call> {
-        let Some(within_us) = skill.history_us else {
+        let Some(history) = &skill.history else {
             return calls;
         };
-        let ago = visits::ago(now_us);
         // The mark of someone the lamp knows only for a skill that may know
         // a known face (`known_faces`); any other is told "someone".
         let marked = self.known_file.is_some() && skill.permissions.known_faces;
@@ -4443,12 +4452,10 @@ impl Engine {
         };
         let record = self.visits.told_as(
             now_us,
-            within_us,
-            |at_us| match self.local_minute(at_us) {
-                Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
-                None => ago(at_us),
-            },
+            history.within_us,
+            visits::when(now_us, |at_us| self.local_minute(at_us), &history.words),
             telling,
+            &history.words,
         );
         calls
             .into_iter()

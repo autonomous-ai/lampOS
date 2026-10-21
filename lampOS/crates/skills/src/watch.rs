@@ -184,47 +184,61 @@ impl Words {
     /// Each is words of 1 to [`crate::MOST_WORDS_BYTES`] bytes with no
     /// control characters, with exactly the slots it may have, each once.
     fn checked(self) -> Result<Self, String> {
-        for (name, text, slots) in [
-            ("on", &self.on, &[][..]),
-            ("on_unknown", &self.on_unknown, &[]),
-            ("already_on", &self.already_on, &[]),
-            ("on_again", &self.on_again, &[]),
-            ("off", &self.off, &[]),
-            ("was_off", &self.was_off, &[]),
-            ("not_asked", &self.not_asked, &[]),
-            ("no_mark", &self.no_mark, &[]),
-            ("blind", &self.blind, &[]),
-            ("paused", &self.paused, &[]),
-            ("stopped", &self.stopped, &[]),
-            ("visit", &self.visit, &["at", "long", "who"]),
-            ("known", &self.known, &[]),
-            ("unknown", &self.unknown, &[]),
-            ("someone", &self.someone, &[]),
-            ("at", &self.at, &["time"]),
-            ("under_a_minute", &self.under_a_minute, &[]),
-            ("a_minute", &self.a_minute, &[]),
-            ("minutes", &self.minutes, &["minutes"]),
-        ] {
-            if text.trim().is_empty()
-                || text.len() > crate::MOST_WORDS_BYTES
-                || text.chars().any(char::is_control)
-            {
-                return Err(format!(
-                    "[watch.words] {name} is words, 1 to {} bytes, with no control characters",
-                    crate::MOST_WORDS_BYTES
-                ));
-            }
-            let mut found = slots_in(text)
-                .ok_or_else(|| format!("[watch.words] {name} has a brace that opens no slot"))?;
-            found.sort_unstable();
-            if found != slots {
-                return Err(format!(
-                    "[watch.words] {name} has the slots {slots:?}, each once, and no others"
-                ));
-            }
-        }
+        checked_words(
+            "[watch.words]",
+            &[
+                ("on", &self.on, &[][..]),
+                ("on_unknown", &self.on_unknown, &[]),
+                ("already_on", &self.already_on, &[]),
+                ("on_again", &self.on_again, &[]),
+                ("off", &self.off, &[]),
+                ("was_off", &self.was_off, &[]),
+                ("not_asked", &self.not_asked, &[]),
+                ("no_mark", &self.no_mark, &[]),
+                ("blind", &self.blind, &[]),
+                ("paused", &self.paused, &[]),
+                ("stopped", &self.stopped, &[]),
+                ("visit", &self.visit, &["at", "long", "who"]),
+                ("known", &self.known, &[]),
+                ("unknown", &self.unknown, &[]),
+                ("someone", &self.someone, &[]),
+                ("at", &self.at, &["time"]),
+                ("under_a_minute", &self.under_a_minute, &[]),
+                ("a_minute", &self.a_minute, &[]),
+                ("minutes", &self.minutes, &["minutes"]),
+            ],
+        )?;
         Ok(self)
     }
+}
+
+/// Each line of a skill's own words (`section`, #940) is words of 1 to
+/// [`crate::MOST_WORDS_BYTES`] bytes with no control characters, with
+/// exactly its slots, sorted, each once.
+pub(crate) fn checked_words(
+    section: &str,
+    lines: &[(&str, &String, &[&str])],
+) -> Result<(), String> {
+    for (name, text, slots) in lines {
+        if text.trim().is_empty()
+            || text.len() > crate::MOST_WORDS_BYTES
+            || text.chars().any(char::is_control)
+        {
+            return Err(format!(
+                "{section} {name} is words, 1 to {} bytes, with no control characters",
+                crate::MOST_WORDS_BYTES
+            ));
+        }
+        let mut found = slots_in(text)
+            .ok_or_else(|| format!("{section} {name} has a brace that opens no slot"))?;
+        found.sort_unstable();
+        if found != *slots {
+            return Err(format!(
+                "{section} {name} has the slots {slots:?}, each once, and no others"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The `{name}` slots in `text`, in order; none for a brace that opens no
