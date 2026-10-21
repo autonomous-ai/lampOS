@@ -17,6 +17,10 @@ minutes expires the attempt; it is not successful evidence. Other steps keep
 the runner's 90-second timeout after 20 seconds of quiet. Skipping and redoing
 remain the runner's existing tools, not new functions of this skill.
 
+The runner also ends "who you are" on a name heard and a yes after it, and
+"preferences" on both answers heard; call `setup_step` all the same, as the
+notes say. A report for a step the runner has already ended changes nothing.
+
 For how they sound, each invitation is one prompt: ask the person to stay in
 their usual seat and call the lamp's name once, then stay quiet. Never say the
 lamp's own name in the prompt. The runner, not a model report, judges each call
