@@ -1,3 +1,47 @@
+## Current checkpoint: 2026-10-22 00:01 +07, Music rebased and Skills journal published
+
+**Ready for lamp-voice: no; Music #1757 is ready for review with its new-head
+ARM64 run still pending.** Current head
+`0a878cd4d9d44867b2971e70c118244f0c21ad38` is on `f349d63c7`.
+The clean rebase is `=`; upstream #2674's history field change required one
+assertion update in Music's own test. No authored runtime change. Formatting,
+strict Skills Clippy and **421 passed / 0 failed / 0 ignored / 0 filtered**
+passed after rebasing. The earlier five-crate **4,665 / 0 / 14** gate and all
+86 baseline comparisons remain separate in the
+[verification](https://github.com/autonomous-ai/lampOS/tree/0a878cd4d9d44867b2971e70c118244f0c21ad38/lampOS/docs/verification/requested-audio-mac-20261021-3).
+[x86 Clippy 39638543959](https://github.com/autonomous-ai/lampOS/actions/runs/39638543959)
+is green; [ARM64 39638544014](https://github.com/autonomous-ai/lampOS/actions/runs/39638544014)
+is running. The first builder's lamp acceptance remains.
+
+**Ready for lamp-voice: no (#2692, native gate pending).** Skills journal
+head `54e0b5e1e0d2097b7db2b8fcbc27d6520e871089` installs the existing IPC
+relay before argument handling. The exact baseline runtime loses its
+post-break tool refusal; both guarded real-process tests pass. Formatting
+and strict Skills Clippy pass. The complete Skills command reports
+**387 passed / 1 failed / 0 ignored / 0 filtered**, exit 101. The untouched
+unplug fixture got `WouldBlock` reading an accepted Say stream. One exact
+baseline and one guarded comparison both passed; they do not replace the
+failed full gate. [Evidence](https://github.com/autonomous-ai/lampOS/tree/54e0b5e1e0d2097b7db2b8fcbc27d6520e871089/lampOS/docs/verification/skills-journal-20261021)
+retains all results. No lamp or playback was used.
+
+**Taken: second-P7, the separate unplug fixture correction.** Work starts
+on `second/unplug-fixture` from `56cfc3983`: explicitly restore blocking
+mode on the accepted test connection while keeping the two-second timeout
+and every receipt-order assertion. #2320 fixed this Darwin inheritance
+family in two other fixtures. No exact-test claim or open PR was found;
+Queue #2602 carries the recommendation and request for the next assignment.
+No runtime behavior changes in this piece.
+
+| Proposal | Scope | Current state |
+|---|---|---|
+| second-P6 | Skills survives a failed journal stream | #2692 published; native gate pending |
+| second-P7 | Unplug fixture handles inherited nonblocking sockets | Taken; deterministic control and narrow fix |
+
+Release #2462 stays with the merger and does not hold this work. The previous
+checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21 23:43 +07, Music pushed and next independent Skills fix taken
 
 **Ready for lamp-voice: no; #1757 is published for review and its new-head native gate is running.**
