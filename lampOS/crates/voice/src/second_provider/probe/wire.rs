@@ -1505,6 +1505,16 @@ pub fn socket_less_http(label: &str, socket: &Kept, http: &Kept) -> String {
     )
 }
 
+/// The model `--wire --socket` asks for: `LAMP_SECOND_SPEECH_SOCKET_MODEL`
+/// when set and not blank, as the route's socket reads it (`Tts::new`), so
+/// the probe times the model the voice would; else ElevenLabs' default, as
+/// the socket's is (`Tts::socket_model`), never the config's `tts_model`.
+fn socket_model(environment: Option<String>) -> String {
+    environment
+        .filter(|model| !model.trim().is_empty())
+        .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned())
+}
+
 /// `--wire --socket`: each run, each target, one piece on a kept HTTP
 /// connection as the route sends them, and another of the same length on a
 /// speech socket opened [`SOCKET_AHEAD`] before it, the two in turn first.
@@ -1519,10 +1529,8 @@ fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
         );
         return Ok(());
     }
-    let model = config
-        .tts_model
-        .clone()
-        .unwrap_or_else(|| net::default_model(TtsProvider::ElevenLabs).to_owned());
+    let model =
+        socket_model(std::env::var(crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT).ok());
     let voice = config.tts_voice.as_deref();
     let mut targets: Vec<(&'static str, String, String)> = Vec::new();
     if on_elevenlabs(&config.tts_base_url) {
@@ -1631,6 +1639,25 @@ fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    /// `--wire --socket` asks for the socket's own model when it is set,
+    /// as the route's socket does; blank or unset, the default, as the
+    /// socket's is.
+    #[test]
+    fn socket_model_prefers_the_socket_switch() {
+        assert_eq!(
+            socket_model(Some("eleven_v4_turbo".to_owned())),
+            "eleven_v4_turbo"
+        );
+        assert_eq!(
+            socket_model(Some("  ".to_owned())),
+            net::default_model(TtsProvider::ElevenLabs)
+        );
+        assert_eq!(
+            socket_model(None),
+            net::default_model(TtsProvider::ElevenLabs)
+        );
+    }
 
     /// A chat request of `body` to `url`, as the route's key header gives it.
     fn wired(url: &reqwest::Url, body: &[u8]) -> Wired {
