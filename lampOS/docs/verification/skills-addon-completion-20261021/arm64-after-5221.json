@@ -1,0 +1,37 @@
+{
+  "run": 39640557447,
+  "head": "bd53fd51c56bea9763bcf7bb211024321a7c75f7",
+  "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-21T17:14:39.5854621Z      Summary [ 159.601s] 9752 tests run: 9752 passed (1 leaky), 63 skipped",
+  "rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.005,
+      "binary": "lamp-skills::it",
+      "test": "addon::only_an_add_on_proposes"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.005,
+      "binary": "lamp-skills::it",
+      "test": "addon::the_documents_examples_load_as_add_ons_that_propose"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.006,
+      "binary": "lamp-skills::it",
+      "test": "addon::the_loader_refuses_an_add_on_anything_but_proposing"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.625,
+      "binary": "lamp-skills::it",
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.666,
+      "binary": "lamp-skills::it",
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on"
+    }
+  ]
+}

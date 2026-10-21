@@ -1,5 +1,34 @@
 # Tests work log
 
+## 2026-10-22 00:19:50 +0700 — skills add-on completion ready on native ARM64
+
+Ready for lamp-voice: [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)
+yes, pending review, at `bd53fd51c56bea9763bcf7bb211024321a7c75f7`.
+
+Exact-head [build and test on Linux ARM64 #5221](https://github.com/autonomous-ai/lampOS/actions/runs/39640557447)
+passed in 10m06s: 9,752 passed (one leaky), 63 skipped, nextest 159.601 s,
+plus doc and own-harness checks. [Linux Clippy #1230](https://github.com/autonomous-ai/lampOS/actions/runs/39640557462)
+passed in 2m26s. Enabled/disabled fixture times were 0.666/0.625 s,
+1.291 s combined, compared with 1.568/1.822 s (3.390 s) on #5191.
+The native runs differ in base and runner; the PR retains controlled
+same-base Mac measurements and all three failing mutation controls.
+Job duration includes build/cache effects and is not credited to this change.
+[Extracted native rows](verification/skills-addon-completion-20261021/arm64-after-5221.json).
+
+Posted the ready result on [Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322109755).
+#2679 and #2647 are also ready with their recorded exact-head green results.
+No ARM64 build on the Mac, no device access, and no uncommitted task source.
+
+Fresh full-main [ARM64 #5220](https://github.com/autonomous-ai/lampOS/actions/runs/39639887119)
+at `b87b3e91ad04b5811fe441efa118773d33416630`: 9,752 unique results,
+23 existing realtime exclusions, 128 tests at least 1 s totaling 213.726 s,
+and 10 at least 3 s outside realtime. This is a current integration
+observation while our PRs remain unmerged, not a new controlled comparison
+or completion of #1806. The original 212.6 to 187.3 s census belongs to its
+previously recorded runs. The next cloud reconnect case is being checked
+against existing cloud PRs before editing; no three-second body-fold
+assertion is shortened.
+
 ## 2026-10-22 00:08:24 +0700 — skills add-on pair pushed as #2693
 
 Ready for lamp-voice: no — [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)
