@@ -306,3 +306,8 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   route's next spoken turn. Its shape is posted on #2530 for a read; I build
   it at 23:20 without an answer.
 - **lamp-75c9:** Eighth, then Ten, then blue (#2640's row), then Nine.
+
+## 21 Oct, 23:0x: no kept note, and #2675's P1
+
+- First builder (22:53, #2530): no kept `note` as free text on the person's next turn, since that turn has every function. Notes may return later as typed notes (a kind plus bounded values the voice renders). For now `note` is refused at load. Claim withdrawn on #2602.
+- Reviewer-lead P1 on #2675: a quoted line was kept in the voice's thread and replayed as a system note on later turns. Fixed with `keep_written` (no `thread.written`, marked `count_only`), plus a test. Folded as `7d5686692`. The 900-byte P3 needs no change: the proposal's note is capped at 300.
