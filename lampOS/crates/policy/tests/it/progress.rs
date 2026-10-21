@@ -120,6 +120,17 @@ impl Rig {
 
     /// With `rules`, as `lamp-policy --rules`.
     fn all(name: &str, utc_offset_minutes: Option<i32>, act: bool, rules: bool) -> Self {
+        Self::noting_every(name, utc_offset_minutes, act, rules, ms(1_500))
+    }
+
+    /// [`Rig::all`], a progress note asked about at most every `note_every`.
+    fn noting_every(
+        name: &str,
+        utc_offset_minutes: Option<i32>,
+        act: bool,
+        rules: bool,
+        note_every: Duration,
+    ) -> Self {
         // `lpg-`, not program.rs's `lpp-`: since #1806 both files run in one
         // process, so a name used in each (`act`) would share one bus and
         // each test would hear the other's policy.
@@ -171,7 +182,7 @@ impl Rig {
         let progress = progress::Options {
             deadline: ms(900),
             local: utc_offset_minutes.map(|minutes| Arc::new(progress::LocalTime::Offset(minutes))),
-            note_every: ms(1_500),
+            note_every,
             quiet_for: ms(400),
             act,
             rules,
@@ -521,7 +532,8 @@ fn never_while_anyone_is_talking_to_the_lamp() {
 
 #[test]
 fn acting_a_say_now_goes_out_for_real_while_the_attention_question_stays_shadow() {
-    let mut rig = Rig::with("act", None, true);
+    // A note every 300 ms, not 1.5 s, for the wait below (#1806).
+    let mut rig = Rig::noting_every("act", None, true, false, ms(300));
     rig.work(AgentState::Working, 0, &[]);
     rig.work(AgentState::Working, 1, &[Sign::TestsPass]);
     let _ = rig.shown();
@@ -563,7 +575,8 @@ fn acting_a_say_now_goes_out_for_real_while_the_attention_question_stays_shadow(
     // lamp began itself, not again as a note: the next question shows none
     // until the voice speaks.
     rig.voice(Voice::Resting);
-    thread::sleep(ms(1_600));
+    // Past `note_every` (300 ms) and `quiet_for` (400 ms) after the speech.
+    thread::sleep(ms(450));
     rig.work(AgentState::Working, 2, &[Sign::TestsPass, Sign::Done]);
     let state = rig.shown();
     assert_eq!(
