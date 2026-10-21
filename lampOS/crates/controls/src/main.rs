@@ -19,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE]\n\
+const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE] [--touch-from FILE]\n\
 lamp-controls replay --input FILE --config FILE --clock-id ID [--touch --pins FILE] [--enable] [--output FILE] [--until-us N]\n\
 lamp-controls probe --pins FILE\n\
 lamp-controls discover-head --seconds N [--rest-seconds R]\n\
@@ -40,6 +40,8 @@ Without --touch, no new reader, touch topic or gesture interpretation is selecte
 Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; absent/off never opens chip 1.\n\
 --privacy-from FILE is for tests on a lamp only: the privacy section's slide is read from FILE instead (open, closed,\n\
 gap for no reading, fault for an unreadable switch), and the journal says so. No product unit passes it.\n\
+--touch-from FILE is for tests on a lamp only, with --touch: the head pads are read from FILE instead of their lines\n\
+(the touched pads' names, or none), at their own poll; the journal says so. No product unit passes it.\n\
 LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
 and serve's controls/state says no_privacy_slide at the route's cadence. Replay under it is as off.\n\
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
@@ -68,6 +70,8 @@ struct Args {
     replay: Option<PathBuf>,
     /// `serve --privacy-from FILE`: the slide read from a test input.
     privacy_from: Option<PathBuf>,
+    /// `serve --touch --touch-from FILE`: the head pads read from a test input.
+    touch_from: Option<PathBuf>,
 }
 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
@@ -109,6 +113,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
                 "--seconds",
                 "--touch",
                 "--privacy-from",
+                "--touch-from",
             ]
             .contains(&option.as_str()),
             "replay" => [
@@ -166,6 +171,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             "--record" => out.record = Some(value.into()),
             "--replay" => out.replay = Some(value.into()),
             "--privacy-from" => out.privacy_from = Some(value.into()),
+            "--touch-from" => out.touch_from = Some(value.into()),
             "--clock-id" => out.clock = Some(value),
             "--bus-root" => {
                 let path = PathBuf::from(value);
@@ -245,6 +251,9 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
     }
     if out.touch && out.pins.is_none() {
         return Err("--touch needs --pins with explicit per-unit wiring".into());
+    }
+    if out.touch_from.is_some() && !out.touch {
+        return Err("--touch-from needs --touch and head pads in --pins".into());
     }
     if out.command == "replay" && out.pins.is_some() && !out.touch && !privacy_selected() {
         return Err("replay accepts --pins only with --touch".into());
@@ -705,6 +714,64 @@ fn touch_reader(
     Err("touch hardware requires Linux; replay opens no hardware".into())
 }
 
+/// `--touch-from FILE` (#2602): the GPIO reader with the head pads' lines read
+/// from FILE ([`lamp_controls::pins::FileLines`]); the buttons and reset stay
+/// on their lines. Its reader session says `test-input`, so every TouchEvent
+/// and the touch state name the source.
+fn touch_from_reader(
+    wiring: &lamp_controls::touch_pins::TouchPinsConfig,
+    clock: &str,
+    path: &std::path::Path,
+) -> Result<Box<dyn lamp_controls::input::PinReader>, Box<dyn std::error::Error>> {
+    let (pins, config) = wiring
+        .gpio_config()
+        .ok_or("--touch-from needs --touch and head pads in --pins")?;
+    let mut others = pins.clone();
+    others.head_pads.clear();
+    let others = if others.buttons.is_empty() {
+        None
+    } else {
+        match open_lines(&others) {
+            Ok(lines) => Some(lines),
+            Err(error) => {
+                return Ok(Box::new(lamp_controls::touch_pins::FailedGpio::new(
+                    error.to_string(),
+                )));
+            }
+        }
+    };
+    eprintln!(
+        "lamp-controls: head pads from a test input: {}, not their lines (--touch-from, a test flag no product unit passes)",
+        path.display()
+    );
+    let lines = lamp_controls::pins::FileLines::new(path, pins.head_pads.clone(), others);
+    Ok(Box::new(lamp_controls::pins::LinePins::new(
+        lines,
+        pins,
+        &config,
+        clock,
+        format!(
+            "touch-test-input-{}-{}",
+            std::process::id(),
+            lamp_ipc::monotonic_us()
+        ),
+    )?))
+}
+
+#[cfg(target_os = "linux")]
+fn open_lines(
+    pins: &lamp_controls::pins::PinsConfig,
+) -> io::Result<Box<dyn lamp_controls::pins::Lines>> {
+    Ok(Box::new(lamp_controls::pins::GpioLines::open(pins)?))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn open_lines(
+    _: &lamp_controls::pins::PinsConfig,
+) -> io::Result<Box<dyn lamp_controls::pins::Lines>> {
+    Err(io::Error::other("touch hardware requires Linux"))
+}
+
 fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std::error::Error>> {
     use lamp_controls::{
         strip_worker::Worker, touch_pins, touch_pins::TouchPinsConfig, touch_runtime,
@@ -725,6 +792,9 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         }
         (wiring, config)
     };
+    if args.touch_from.is_some() && wiring.head_pads.is_empty() {
+        return Err("--touch-from needs --touch and head pads in --pins".into());
+    }
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(unselected_privacy().into());
     }
@@ -792,8 +862,10 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         None if no_slide_selected() => PrivacyRoute::NoSlide,
         None => PrivacyRoute::None,
     };
-    let head_lines = head_lines(&wiring);
-    let gpio = touch_reader(&wiring, clock)?;
+    let (head_lines, gpio) = match &args.touch_from {
+        Some(path) => (None, touch_from_reader(&wiring, clock, path)?),
+        None => (head_lines(&wiring), touch_reader(&wiring, clock)?),
+    };
     let bus = if let Some(root) = args.bus_root {
         Bus::new(root)?
     } else {
