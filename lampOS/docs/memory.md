@@ -691,6 +691,15 @@ the unchanged legacy client, used unless the new Days client is selected.
     always writes its new version.
   - Off, the functions, the hit lines and every request are as before; a
     `replaces` the model gives is not sent.
+  - **A thing kept in the same session can be corrected:** an ok
+    `remember` is told with the kept id, `{"remembered":true,"id":8}` (with
+    `replaced` or the kept-already note beside it; kept already by
+    `LAMP_MEMORY_REMEMBER_ONCE`, the kept one's id). Before it, the answer
+    had no id, so "actually it's green now" after a violet kept a turn
+    earlier was sent with a guessed `replaces` the store refused: 0/10 in
+    the probe (`probe/kept_earlier.rs`), English and Vietnamese. The id is
+    the caller's own scope's, already one of the session's sources, so it
+    is in that scope's `shown` and never another's. Off, no id, as before.
   - Tests: `days_protocol::tests::a_correction_replaces_a_kept_thing_this_session_was_shown_by_link`,
     `remember::tests::with_the_replaces_switch_a_correction_is_sent_with_what_was_shown`,
     `remember::tests::without_the_replaces_switch_the_functions_and_hit_lines_are_as_before`,
@@ -699,6 +708,9 @@ the unchanged legacy client, used unless the new Days client is selected.
     `remember::tests::a_replaces_out_of_the_id_range_is_not_sent`,
     `remember::tests::a_correction_with_the_context_busy_is_told_gone_and_sends_nothing`,
     `remember::tests::a_resumed_session_forgets_the_hits_told_before`,
+    `remember::tests::with_the_replaces_switch_a_thing_kept_this_session_is_told_by_id_and_replaced`,
+    `remember::tests::without_the_replaces_switch_remember_is_told_no_id`,
+    `remember::tests::a_kept_id_is_shown_only_to_its_own_scope`,
     `remember::tests::a_correction_kept_as_heard_does_not_replace_the_old_fact`,
     `remember::heard::tests::the_call_is_held_against_the_words_heard_in_its_own_line` and
     `remember::heard::tests::the_model_is_told_what_was_kept_only_when_it_was`.

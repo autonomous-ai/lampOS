@@ -246,7 +246,10 @@ impl KeptLine {
 }
 
 /// One request: every call it made, and its words.
-async fn asked(chat: &Chat, messages: &[net::Message]) -> net::Result<(Vec<ToolCall>, String)> {
+pub(super) async fn asked(
+    chat: &Chat,
+    messages: &[net::Message],
+) -> net::Result<(Vec<ToolCall>, String)> {
     let mut stream = chat.send(messages).await?;
     let (mut calls, mut words) = (Vec::new(), String::new());
     while let Some(event) = stream.next().await? {

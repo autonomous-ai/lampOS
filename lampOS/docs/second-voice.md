@@ -3402,6 +3402,17 @@ It prints one line for each line with its outcomes, then the totals:
 the keep lines, and `control-false-calls=N/M`, the controls that called
 `remember`. Of the claim's words, only whether they matched is counted.
 
+**Then a correction of a thing kept earlier in the session**
+(`probe/kept_earlier.rs`, #2510). With an empty note, one turn keeps
+"violet" (`remember`, answered as the voice answers the store's
+`{"ok":true,"id":8}`), and the next says "actually it's green now"
+(`kept-earlier`, and `vi-kept-earlier` in Vietnamese). With
+`LAMP_MEMORY_REPLACES=on` in the probe's environment, `remember` takes
+`replaces` and its answer carries the kept id, so the only id the model
+can name is the one that answer gave. Each line prints how many requests
+called `remember`, gave `replaces=8`, gave any `replaces`, and claimed a
+keeping with no call.
+
 Run it like `probe-cache`, where lamp-actions runs:
 
 ```sh
