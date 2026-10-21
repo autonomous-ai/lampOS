@@ -186,6 +186,7 @@ fn selected_previous_ids_must_be_distinct_current_observations() {
                     category: Category::Preference,
                     source_ids: vec![source],
                     supersedes: None,
+                    on: None,
                 }],
             },
         )
@@ -221,6 +222,7 @@ fn selected_previous_ids_must_be_distinct_current_observations() {
                     category: Category::Preference,
                     source_ids: vec![correction],
                     supersedes: Some(observed),
+                    on: None,
                 }],
             },
         )

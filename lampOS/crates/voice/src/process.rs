@@ -910,6 +910,10 @@ fn worker_command(
             role,
             var(crate::remember::THREADS_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_events_worker_environment(
+            role,
+            var(crate::remember::EVENTS_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_forget_all_worker_environment(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
@@ -1148,6 +1152,17 @@ fn memory_threads_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::THREADS_ENVIRONMENT, "on"))
+}
+
+// The dated events (#1693), passed the same narrow way: the exact `on`, to
+// the two routes that tell a follow-up (`remember::told_for_session`); the
+// second's observation pass dates them.
+fn memory_events_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::EVENTS_ENVIRONMENT, "on"))
 }
 
 // The room's kept things told as someone in the room's (#2176), passed the
@@ -1533,6 +1548,12 @@ mod tests {
                         "LAMP_MEMORY_THREADS",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The dated events (#1693) reach both routes too.
+                    (
+                        memory_events_worker_environment,
+                        "LAMP_MEMORY_EVENTS",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // So does forgetting everything (#1693).
                     (
                         memory_forget_all_worker_environment,
@@ -1720,6 +1741,7 @@ mod tests {
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
+                    crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
@@ -1831,6 +1853,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EARLY_WORDS=on",
+                    "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
@@ -1856,6 +1879,7 @@ mod tests {
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",

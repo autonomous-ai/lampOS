@@ -101,6 +101,7 @@ fn proposal(text: &str, sources: &[u64], supersedes: Option<u64>) -> Proposal {
         category: Category::Preference,
         source_ids: sources.to_vec(),
         supersedes,
+        on: None,
     }
 }
 
@@ -1629,6 +1630,271 @@ fn the_follow_up_request_answers_for_a_person_and_refuses_the_room() {
     assert_eq!(answer, json!({"ok":true,"follow_up":null}));
     let (answer, _) = request(&mut store, json!({"op":"follow_up"}), NOW + 3 * DAY);
     assert_eq!(answer["ok"], false, "{answer}");
+}
+
+/// Monday 2026-10-19, noon UTC (the tests' lamp keeps UTC).
+const MONDAY: u64 = NOW + 6 * DAY;
+
+/// An open thread of a known person's, said at `now`, about the day `on`.
+fn dated(
+    store: &mut Days,
+    person: &Person,
+    now: u64,
+    text: &str,
+    on: Option<&str>,
+    category: Category,
+) -> Result<u64, lamp_memory::days::Error> {
+    store.maintain(now).unwrap();
+    let said = store.append(person, now, text, "Oh, nice", &[]).unwrap();
+    let job = store
+        .conversation_end(
+            person,
+            &format!("e{now}-{}", NEXT.fetch_add(1, Ordering::Relaxed)),
+            &[said],
+        )
+        .unwrap();
+    let mut out = output(text, &[said], None);
+    out.observations[0].category = category;
+    out.observations[0].on = on.map(str::to_owned);
+    store.tidy_apply(person, &job.job, &out).map(|ids| ids[0])
+}
+
+fn wedding(store: &mut Days, person: &Person) -> u64 {
+    dated(
+        store,
+        person,
+        MONDAY,
+        "Sister's wedding is on Saturday",
+        Some("2026-10-24"),
+        Category::Thread,
+    )
+    .unwrap()
+}
+
+fn event_rows(scratch: &Scratch) -> u64 {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row("SELECT count(*) FROM event_days", [], |r| r.get(0))
+        .unwrap()
+}
+
+/// #1693: with `events`, a wedding on Saturday, said on Monday, is not
+/// asked about before it or on its day, is asked about on Sunday with its
+/// day, and never again.
+#[test]
+fn an_event_is_asked_about_after_its_day_once() {
+    let scratch = Scratch::new("event-after");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    // Tuesday, Wednesday, Friday, Saturday noon and Saturday's last minute.
+    for at in [
+        MONDAY + DAY,
+        MONDAY + 2 * DAY,
+        MONDAY + 4 * DAY,
+        MONDAY + 5 * DAY,
+        MONDAY + 5 * DAY + 12 * 3_600_000 - 60_000,
+    ] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    // Sunday the 25th, just after midnight.
+    store.maintain(MONDAY + 5 * DAY + 12 * 3_600_000).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap(),
+        Some(
+            json!({"id":id,"category":"thread","text":"Sister's wedding is on Saturday","on":"2026-10-24"})
+        )
+    );
+    for at in [MONDAY + 8 * DAY, MONDAY + 12 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+}
+
+/// A due dated one comes before a newer undated one; the undated one is
+/// given the next day, by its own rules.
+#[test]
+fn a_due_event_comes_before_a_newer_undated_thread() {
+    let scratch = Scratch::new("event-first");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    let commute = thread(&mut store, &minh, MONDAY + 5 * DAY, "Tired of the commute");
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["id"],
+        id
+    );
+    store.maintain(MONDAY + 7 * DAY + 3_600_000).unwrap();
+    let given = store.follow_up_with(&minh, true).unwrap().unwrap();
+    assert_eq!(given["id"], commute);
+    assert_eq!(given.get("on"), None, "an undated one has no day");
+}
+
+/// Fourteen days after its day is the last it is asked about; fifteen, never.
+#[test]
+fn an_event_is_not_asked_about_fifteen_days_after_it() {
+    let scratch = Scratch::new("event-late");
+    let mut store = scratch.open(60, NOW);
+    let (minh, mai) = (person("p-minh"), person("p-mai"));
+    wedding(&mut store, &minh);
+    let hers = wedding(&mut store, &mai);
+    // The 24th, plus 14 days: 2026-11-07, still asked about.
+    store.maintain(MONDAY + 19 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&mai, true).unwrap().unwrap()["id"],
+        hers
+    );
+    // Plus 15 days: 2026-11-08.
+    store.maintain(MONDAY + 20 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+}
+
+/// A dated follow-up is given only in the scope that kept it: never to
+/// another person, nor to the room, even when due; once to its own.
+#[test]
+fn an_event_is_given_only_to_the_person_who_said_it() {
+    let scratch = Scratch::new("event-scope");
+    let mut store = scratch.open(30, NOW);
+    let (minh, mai) = (person("p-minh"), person("p-mai"));
+    let id = wedding(&mut store, &minh);
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
+    assert_eq!(
+        store
+            .follow_up_with(&Person::everyone(), true)
+            .unwrap_err()
+            .code,
+        "bad_person"
+    );
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","events":true}),
+        MONDAY + 6 * DAY,
+    );
+    assert_eq!(answer["ok"], false, "{answer}");
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["id"],
+        id
+    );
+    store.maintain(MONDAY + 8 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+    assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
+}
+
+/// `on` that is not a day, is before its evidence's day, is more than 60
+/// days after it, or is on a preference refuses the result, nothing kept.
+#[test]
+fn a_bad_event_day_refuses_the_result() {
+    let scratch = Scratch::new("event-refused");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    for (on, category) in [
+        ("Saturday", Category::Thread),
+        ("2026-02-30", Category::Thread),
+        ("2026-10-24 ", Category::Promise),
+        ("2026-10-18", Category::Thread),
+        ("2026-12-19", Category::Promise),
+        ("2026-10-24", Category::Preference),
+    ] {
+        let error = dated(&mut store, &minh, MONDAY, "Wedding", Some(on), category).unwrap_err();
+        assert_eq!(error.code, "bad_request", "{on}");
+    }
+    assert_eq!(event_rows(&scratch), 0);
+    // The evidence's own day and 60 days after it are days.
+    for on in ["2026-10-19", "2026-12-18"] {
+        dated(
+            &mut store,
+            &minh,
+            MONDAY,
+            "Wedding",
+            Some(on),
+            Category::Promise,
+        )
+        .unwrap();
+    }
+    assert_eq!(event_rows(&scratch), 2);
+    // Over the protocol, `on` beside the proposal's other fields.
+    let said = store
+        .append(&minh, MONDAY, "Exam on Friday", "Good luck", &[])
+        .unwrap();
+    let job = store.conversation_end(&minh, "exam", &[said]).unwrap();
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"tidy_apply","person":"p-minh","job":job.job,"observations":[{"text":"Exam on Friday","category":"thread","source_ids":[said],"supersedes":null,"on":"2026-10-23"}]}),
+        MONDAY,
+    );
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(event_rows(&scratch), 3);
+}
+
+/// Without `events`, the same store answers as before: the day is passed
+/// over, the thread given the next day, with no `on`.
+#[test]
+fn without_events_a_follow_up_ignores_event_days() {
+    let scratch = Scratch::new("event-off");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh"}),
+        MONDAY + DAY,
+    );
+    assert_eq!(
+        answer,
+        json!({"ok":true,"follow_up":{"id":id,"category":"thread","text":"Sister's wedding is on Saturday"}})
+    );
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh","events":false}),
+        MONDAY + 6 * DAY,
+    );
+    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
+    // With `events` over the protocol: the 25th, but it was given already.
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh","events":true}),
+        MONDAY + 6 * DAY,
+    );
+    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
+}
+
+/// Forgetting by id, everything, or the person leaves no event day.
+#[test]
+fn forgetting_leaves_no_event_day() {
+    let scratch = Scratch::new("event-forget");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    assert_eq!(event_rows(&scratch), 1);
+    store.forget(&minh, id).unwrap();
+    assert_eq!(event_rows(&scratch), 0, "forget");
+    wedding(&mut store, &minh);
+    store.forget_all(Some(&minh)).unwrap();
+    assert_eq!(event_rows(&scratch), 0, "forget_all");
+    wedding(&mut store, &minh);
+    store.forget_person(&minh).unwrap();
+    assert_eq!(event_rows(&scratch), 0, "forget_person");
+}
+
+/// A store made before `event_days` gets it on open, and its threads are
+/// asked about as undated ones.
+#[test]
+fn a_store_without_event_days_opens_and_answers() {
+    let scratch = Scratch::new("event-old");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = thread(&mut store, &minh, MONDAY, "Sister's wedding is on Saturday");
+    drop(store);
+    scratch.sql("DROP TABLE event_days;");
+    let mut store = scratch.open(30, MONDAY + DAY);
+    assert_eq!(event_rows(&scratch), 0);
+    let given = store.follow_up_with(&minh, true).unwrap().unwrap();
+    assert_eq!((given["id"].as_u64(), given.get("on")), (Some(id), None));
+    wedding(&mut store, &minh);
+    assert_eq!(event_rows(&scratch), 1);
 }
 
 /// #1693 (2): a pass that found nothing worth keeping, or failed, closes its

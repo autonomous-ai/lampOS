@@ -34,6 +34,50 @@ pub(crate) fn civil(days: i64) -> (i64, usize, i64) {
     (year, month as usize, day)
 }
 
+/// The count of days since 1970-01-01 of a `YYYY-MM-DD`, as the memory
+/// names a day; nothing for anything else or a day no calendar has.
+pub(crate) fn day_of(name: &str) -> Option<i64> {
+    let bytes = name.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes
+            .iter()
+            .enumerate()
+            .all(|(at, byte)| at == 4 || at == 7 || byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let (year, month, day): (i64, i64, i64) = (
+        name[..4].parse().ok()?,
+        name[5..7].parse().ok()?,
+        name[8..].parse().ok()?,
+    );
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    let shifted_year = if month <= 2 { year - 1 } else { year };
+    let era = shifted_year.div_euclid(400);
+    let year_of_era = shifted_year.rem_euclid(400);
+    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    // A 31 February is no day: it must read back as itself.
+    (civil(days) == (year, month as usize, day)).then_some(days)
+}
+
+/// A day as a person says it: its weekday, the day and the month
+/// ("Saturday 24 October").
+pub(crate) fn day_said(days: i64) -> String {
+    let (_, month, day) = civil(days);
+    format!("{} {day} {}", weekday(days), MONTHS[month - 1])
+}
+
+/// The weekday of a count of days since 1970-01-01.
+pub(crate) fn weekday(days: i64) -> &'static str {
+    DAYS[days.rem_euclid(7) as usize]
+}
+
 const DAYS: [&str; 7] = [
     "Thursday",
     "Friday",
@@ -642,6 +686,34 @@ fn here() -> Option<(Vec<u8>, i64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A day the memory names reads back as the day it is, and as a person
+    /// says it; what is no day is nothing (#1693, `LAMP_MEMORY_EVENTS`).
+    #[test]
+    fn a_named_day_is_read_back_and_said_as_a_person_would() {
+        assert_eq!(day_of("1970-01-01"), Some(0));
+        let saturday = day_of("2026-10-24").unwrap();
+        assert_eq!(civil(saturday), (2026, 10, 24));
+        assert_eq!(day_said(saturday), "Saturday 24 October");
+        assert_eq!(weekday(day_of("2026-10-21").unwrap()), "Wednesday");
+        assert_eq!(
+            day_said(day_of("2028-02-29").unwrap()),
+            "Tuesday 29 February"
+        );
+        for bad in [
+            "2026-02-30",
+            "2027-02-29",
+            "2026-13-01",
+            "2026-00-10",
+            "2026-1-24",
+            "24/10/2026",
+            "2026-10-24T00",
+            "+026-10-24",
+            "",
+        ] {
+            assert_eq!(day_of(bad), None, "{bad}");
+        }
+    }
 
     #[test]
     fn a_clock_is_unset_only_with_the_switch_on_and_no_set_from_the_kernel() {

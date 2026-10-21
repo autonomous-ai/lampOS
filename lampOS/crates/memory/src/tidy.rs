@@ -87,6 +87,11 @@ pub struct Proposal {
     pub category: Category,
     pub source_ids: Vec<u64>,
     pub supersedes: Option<u64>,
+    /// #1693: the local day, `YYYY-MM-DD`, a `thread` or `promise` is
+    /// about (a wedding on Saturday), from its evidence's day to 60 days
+    /// after it. Checked and kept by `Days::tidy_apply`; absent, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -437,6 +442,7 @@ mod tests {
                 category: Category::Preference,
                 source_ids: vec![2],
                 supersedes: Some(1),
+                on: None,
             }],
         }
     }

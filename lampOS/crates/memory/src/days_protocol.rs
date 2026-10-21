@@ -87,6 +87,10 @@ enum Extra {
     FollowUp {
         #[serde(default)]
         person: Who,
+        /// #1693: an observation with an event day is asked about after
+        /// it, first (`Days::follow_up_with`). Without it, as before.
+        #[serde(default)]
+        events: bool,
     },
     ConversationEnd {
         #[serde(default)]
@@ -350,8 +354,8 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             store.session_close(&one(person)?, &session)?;
             json!({"ok":true})
         }
-        Extra::FollowUp { person } => {
-            json!({"ok":true,"follow_up":store.follow_up(&one(person)?)?})
+        Extra::FollowUp { person, events } => {
+            json!({"ok":true,"follow_up":store.follow_up_with(&one(person)?,events)?})
         }
         Extra::ConversationEnd {
             person,
