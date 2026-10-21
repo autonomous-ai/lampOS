@@ -6,7 +6,7 @@
 # after ten plain lines for the baseline. The voice's records then say whether
 # the arousal and the valence read the right way.
 #
-#   lampOS/tools/tone-lines.sh play > played.tsv     # on a Mac beside the lamp
+#   lampOS/tools/tone-lines.sh play > played.tsv     # on a Mac or Linux beside the lamp
 #   lampOS/tools/tone-lines.sh read EVENTS [played.tsv]
 #
 # play: each line as "Hey Lamp, ..." so it is answered, the lamp's name always
@@ -37,12 +37,38 @@
 # talking. Played lines are a first check only: a person's own voice is the
 # row's real one ("played lines pass, real people fail").
 #
-# Environment: SAY (say), VOICE (Samantha), GAP (15), LAMP_WORD ("Hey Lamp,"),
-# DRY (1: print the rows without speaking or waiting).
+# On Linux, with no `say` (lamp-75c9's laptop), it speaks with speech-dispatcher's
+# `spd-say` instead (or with SAY=spd-say): the lamp's name plainly, then the
+# sentence with `spd-say`'s own rate, pitch, pitch range and volume, calm or
+# lively as `say`'s are (Ten, #1722 15:2x). Each waits for the speech to end.
+#
+# With SAY=piper (PIPER_MODEL, a Piper voice's .onnx; PIPER, its binary, `piper`
+# by default) each line is spoken to a file, the sentence made calm or lively by
+# ffmpeg (calm: 10 dB quieter, pitch 13% lower, slower; lively: pitch 15% higher,
+# quicker), joined to the plainly said name with no gap, and played with
+# `pw-play` (or `aplay`). This is the Linux mode to use: on lamp-75c9 (21 Oct)
+# `spd-say`'s volume setting did not reach espeak-ng, so its calm and lively came
+# out equally loud (-19.3 against -19.9 dB at the laptop's mic), and the meter
+# read 4 of 6 the wrong way.
+#
+# Environment: SAY (say, else spd-say; or piper), VOICE (Samantha; with
+# spd-say, its synthesis voice, e.g. female1, and none by default), GAP (15),
+# LAMP_WORD ("Hey Lamp,"), DRY (1: print the rows without speaking or waiting).
 set -euo pipefail
 
-SAY=${SAY:-say}
-VOICE=${VOICE:-Samantha}
+if [ -z "${SAY:-}" ]; then
+  if command -v say >/dev/null 2>&1 || ! command -v spd-say >/dev/null 2>&1; then
+    SAY=say
+  else
+    SAY=spd-say
+  fi
+fi
+PIPER_MODE=0
+case "$(basename "$SAY")" in
+  spd-say) SPD=1; VOICE=${VOICE:-} ;;
+  piper) SPD=0; PIPER_MODE=1; PIPER=${PIPER:-piper}; VOICE=${VOICE:-} ;;
+  *) SPD=0; VOICE=${VOICE:-Samantha} ;;
+esac
 GAP=${GAP:-15}
 LAMP_WORD=${LAMP_WORD:-"Hey Lamp,"}
 DRY=${DRY:-0}
@@ -52,6 +78,77 @@ DRY=${DRY:-0}
 SENTENCE="I think we could go to the park later today."
 CALM="[[rate 140]][[volm 0.4]][[pbas 38]][[pmod 4]]"
 LIVELY="[[rate 230]][[volm 1.0]][[pbas 62]][[pmod 70]]"
+# The same for `spd-say`, each from -100 to 100: slow, low, flat and quieter;
+# quick, high, moving and full.
+SPD_CALM="-r -45 -p -45 -R -90 -i -40"
+SPD_LIVELY="-r 55 -p 45 -R 90 -i 100"
+# The same as ffmpeg filters on Piper's speech, at the voice's own sample rate
+# (its `.onnx.json`: 22050 Hz for medium and high voices, 16000 for low ones),
+# so a pitch is shifted by the share it says (the reviewer-lead's P3 on #2535).
+if [ "$PIPER_MODE" = 1 ]; then
+  : "${PIPER_MODEL:?tone-lines: PIPER_MODEL is the Piper voice}"
+  RATE=$(python3 -I -c 'import json, sys; print(int(json.load(open(sys.argv[1]))["audio"]["sample_rate"]))' \
+    "$PIPER_MODEL.json" 2>/dev/null) || {
+    echo "tone-lines: no sample rate in $PIPER_MODEL.json" >&2
+    exit 2
+  }
+  PIPER_CALM="volume=-10dB,asetrate=$RATE*0.87,aresample=$RATE,atempo=0.95"
+  PIPER_LIVELY="asetrate=$RATE*1.15,aresample=$RATE,atempo=1.05"
+  # One working folder, removed however the run ends.
+  WORK=$(mktemp -d)
+  trap 'rm -rf "$WORK"' EXIT
+fi
+
+# Piper speaks `$2` into the file `$1`; a Piper that fails says why.
+piper_wav() {
+  if ! printf '%s\n' "$2" | "$PIPER" -m "$PIPER_MODEL" -f "$1" >/dev/null 2>"$WORK/piper.err"; then
+    echo "tone-lines: piper failed:" >&2
+    cat "$WORK/piper.err" >&2
+    exit 1
+  fi
+}
+
+# With Piper, the line made ready in `$WORK/line.wav` before it is played, so
+# its time is taken just before the sound (the reviewer-lead's P3 on #2535).
+piper_line() {
+  local kind=$1 words=$2 filter
+  piper_wav "$WORK/name.wav" "$LAMP_WORD"
+  piper_wav "$WORK/words.wav" "$words"
+  case "$kind" in
+    calm) filter=$PIPER_CALM ;;
+    lively) filter=$PIPER_LIVELY ;;
+    *) filter=anull ;;
+  esac
+  # Nothing here may read stdin: it is `play`'s list of lines.
+  ffmpeg -nostdin -hide_banner -loglevel error -y -i "$WORK/name.wav" -i "$WORK/words.wav" \
+    -filter_complex "[1:a]$filter,aresample=$RATE[w];[0:a][w]concat=n=2:v=0:a=1" "$WORK/line.wav"
+}
+
+# Says one line: with `say`, the controls embedded after the lamp's name; with
+# `spd-say`, the name plainly, then the words with the kind's own settings.
+speak() {
+  local kind=$1 controls=$2 words=$3 voice=() flags=()
+  if [ "$PIPER_MODE" = 1 ]; then
+    # Made ready by `piper_line` already.
+    if command -v pw-play >/dev/null 2>&1; then
+      pw-play "$WORK/line.wav" </dev/null
+    else
+      aplay -q "$WORK/line.wav" </dev/null
+    fi
+  elif [ "$SPD" = 1 ]; then
+    [ -n "$VOICE" ] && voice=(-t "$VOICE")
+    case "$kind" in
+      calm) read -r -a flags <<<"$SPD_CALM" ;;
+      lively) read -r -a flags <<<"$SPD_LIVELY" ;;
+    esac
+    # `${a[@]+"${a[@]}"}`: an empty array under `set -u` aborts macOS's bash
+    # 3.2 (the reviewer-lead's P3 on #2535).
+    "$SAY" -w ${voice[@]+"${voice[@]}"} "$LAMP_WORD"
+    "$SAY" -w ${voice[@]+"${voice[@]}"} ${flags[@]+"${flags[@]}"} "$words"
+  else
+    "$SAY" -v "$VOICE" "$LAMP_WORD $controls$words"
+  fi
+}
 
 lines() {
   local plain
@@ -83,10 +180,13 @@ play() {
   # collapse.
   while IFS='|' read -r kind controls words; do
     n=$((n + 1))
+    if [ "$DRY" != 1 ] && [ "$PIPER_MODE" = 1 ]; then
+      piper_line "$kind" "$words"
+    fi
     at=$(date -u +%FT%TZ)
     printf '%d\t%s\t%s\t%s\n' "$n" "$kind" "$at" "$words"
     if [ "$DRY" != 1 ]; then
-      "$SAY" -v "$VOICE" "$LAMP_WORD $controls$words"
+      speak "$kind" "$controls" "$words"
       sleep "$GAP"
     fi
   done < <(lines)
