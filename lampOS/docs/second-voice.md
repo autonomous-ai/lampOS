@@ -3230,8 +3230,49 @@ At 09:49 on #2063 (the first builder), two more changes, in both `fix` and
 Each arm and case prints `right=N/M` and, for the wrong runs, why:
 `called-<name>` (the first call, or `none`), `no-word` (a word it needs is
 missing) or `said-never` (it said a word it must not). The last line names
-the arms that got every case right every time. Counts only, no words. Run it
-like `probe-cache`, where lamp-actions runs:
+the arms that got every case right every time. Counts only, no words.
+
+**Then says kept** (`probe/says_kept.rs`, #2510). It counts turns where
+the lamp's words say it kept, noted or updated something but no `remember`
+was called, before any wording change makes "kept" come only from the
+store's answer. Each line is a fresh session asked as `quality-today` asks
+a case: the spoken turn's notes, the memory note and what is kept as its
+frozen snapshot, then the line. Five **`keep`** lines state or correct a
+fact the person wants kept:
+- `umbrella-green`: "My umbrella is green now, not violet." (the violet
+  umbrella kept)
+- `sister-lan`: "Remember my sister's name is Lan."
+- `no-sugar`: "I don't take sugar any more." ("Takes coffee with sugar."
+  kept)
+- `vi-no-coffee`: "Nhớ giùm tôi là tôi không uống cà phê."
+- `vi-green`: "À giờ tôi thích màu xanh lá." ("Thích màu tím." kept)
+
+Three **`control`** lines keep nothing: `control-time` ("What time is
+it?"), `control-weather` ("Nice weather today.") and `vi-control-weather`
+("Hôm nay trời đẹp quá.").
+
+The probe runs no function, so "kept" means a valid keeping call:
+`remember` with a non-empty `text`, or `keep_rule` with a non-empty `rule`
+(declared only when the lamp has rules on, so the probe has only
+`remember`). A claim is one of `CLAIMS` in the request's words, matched as
+whole words after folding (lower case, no accents, đ as d, as the memory's
+search folds): "I'll remember", "noted", "I've updated", "đã ghi nhớ",
+"sẽ nhớ", "đã cập nhật" and the like. "Got it" alone is not a claim. Each
+request is, in this order:
+- `called-remember`: any call in it keeps.
+- `said-kept-no-call`: **the defect**, a claim with no keeping call (with
+  no call, or with another one such as `forget`).
+- `bad-args`: a `remember` or `keep_rule` whose arguments the store would
+  refuse, and no claim.
+- `called-<name>`: another call (the first), and no claim.
+- `words`: no call and no claim.
+
+It prints one line for each line with its outcomes, then the totals:
+`said-kept-no-call` over every line (the defect), `called-remember=N/M` on
+the keep lines, and `control-false-calls=N/M`, the controls that called
+`remember`. Of the claim's words, only whether they matched is counted.
+
+Run it like `probe-cache`, where lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \

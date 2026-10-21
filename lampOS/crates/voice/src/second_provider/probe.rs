@@ -40,6 +40,7 @@ use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, sear
 pub mod cache;
 pub mod handover;
 pub mod quality;
+pub mod says_kept;
 pub mod tools;
 pub mod wire;
 use crate::second_config::{
