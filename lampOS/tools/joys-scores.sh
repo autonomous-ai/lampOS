@@ -46,7 +46,9 @@
 #
 # The recording (scores, face boxes and the voice's state; no sound, no
 # picture) is deleted at the end, whatever happens. It prints counts and
-# numbers only.
+# numbers only. With KEEP_DIR set, its sound scores alone
+# (`ears_classes.jsonl`, no face, no voice state) are copied there first, for a
+# replay of the skill's bars over them (#2399).
 #
 # The sound is the person's to choose, free to use, its source noted beside
 # the numbers posted: a laugh track and a music track, each at least 2 min.
@@ -60,6 +62,7 @@
 # (lamp-skills, from PATH), BUS_ROOT (/run/lampos-bus), UNIT_DIR
 # (/run/systemd/system), ROOM_SOUNDS
 # (/var/lib/lampOS/consent/room-sounds.json), QUIET_S (120), TRACK_S (120), OVER_S (30),
+# KEEP_DIR (none: nothing kept),
 # SYSTEMCTL (systemctl); and for the tests, NOW_FILE (a file holding the wall
 # clock in ms) and SLEEP (sleep). Its own work is always a new folder from
 # mktemp, never one given, since it is deleted at the end.
@@ -175,11 +178,17 @@ echo "SAY: one line to someone else in the room, over $TRACK, now (not to the la
 T3=$(now_ms)
 wait "$RECORDER" 2>/dev/null || true
 RECORDER=
+if [[ -n ${KEEP_DIR:-} ]]; then
+  mkdir -p "$KEEP_DIR" && cp "$OUT/rec/ears_classes.jsonl" "$KEEP_DIR/" &&
+    echo "the sound scores kept in $KEEP_DIR/ears_classes.jsonl"
+fi
 
 # Each message as "at_unix_ms payload", its payload decoded.
 decoded() { # decoded FILE
   [[ -f $1 ]] || return 0
-  grep '"payload_b64"' "$1" | while IFS= read -r line; do
+  # A topic with nothing on it is no message, not a failure (under pipefail
+  # it ended the run before its `asked:` line, #2399 on lamp-52e6).
+  { grep '"payload_b64"' "$1" || true; } | while IFS= read -r line; do
     local at payload
     at=$(grep -o '"at_unix_ms": *[0-9]*' <<<"$line" | grep -o '[0-9]*$')
     payload=$(grep -o '"payload_b64": *"[^"]*"' <<<"$line" | sed 's/.*"\([^"]*\)"$/\1/' | base64 -d 2>/dev/null || true)

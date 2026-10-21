@@ -415,6 +415,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             )
         }
     })();
+    let done = result.is_ok();
     let (response, outcome, storage_fault, wrote) = match result {
         Ok(response) => {
             let count = response
@@ -435,18 +436,25 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             false,
         ),
     };
+    // A `forget_all` that was done, for `memory/forgot`: `*` is every
+    // person's.
+    let forgot = (done && op == "forget_all").then(|| match who.as_str() {
+        "*" => protocol::Forgot::Every,
+        id => protocol::Forgot::One(id.into()),
+    });
     protocol::Answer {
         line: response.to_string(),
         log: format!("{op} person={who} {outcome}"),
         storage_fault,
         wrote,
+        forgot,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{days::DATABASE, store::Options};
+    use crate::{days::DATABASE, protocol::Forgot, store::Options};
     use std::{fs, path::PathBuf};
 
     const NOW: u64 = 1_791_892_800_000;
@@ -480,6 +488,49 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    const NOW_MS: u64 = NOW;
+
+    /// `memory/forgot` (#2467's follow-up): only a `forget_all` that was
+    /// done says whose: one person's id, "everyone" when unsaid, every
+    /// person's for `null`. A refused one, and every other op, says nothing.
+    #[test]
+    fn only_a_forget_all_that_was_done_says_whose() {
+        let (_scratch, mut store) = Scratch::new("forgot");
+        let forgot = |store: &mut _, line: serde_json::Value| {
+            answer(store, line.to_string().as_bytes(), NOW_MS).forgot
+        };
+        assert_eq!(
+            forgot(
+                &mut store,
+                json!({"op":"forget_all","person":"p-0123456789abcdef"})
+            ),
+            Some(Forgot::One("p-0123456789abcdef".into()))
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all"})),
+            Some(Forgot::One("everyone".into()))
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all","person":null})),
+            Some(Forgot::Every)
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all","person":"NOT AN ID"})),
+            None
+        );
+        assert_eq!(
+            forgot(
+                &mut store,
+                json!({"op":"forget_last","person":"p-0123456789abcdef"})
+            ),
+            None
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"status","person":null})),
+            None
+        );
     }
 
     #[test]

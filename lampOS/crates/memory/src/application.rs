@@ -58,7 +58,12 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         let known = matches!(
             key.to_str(),
             Some(
-                "--dir" | "--socket" | "--keep-days" | "--utc-offset-minutes" | "--zone" | "--bus-root"
+                "--dir"
+                    | "--socket"
+                    | "--keep-days"
+                    | "--utc-offset-minutes"
+                    | "--zone"
+                    | "--bus-root"
             )
         );
         if !known {
@@ -140,7 +145,15 @@ fn run(
 ) -> io::Result<()> {
     // The socket first, so that a second process started by mistake stops
     // here, before it has touched the store; the store before `ready`.
-    let server = Server::bind(&arguments.socket)?;
+    let mut server = Server::bind(&arguments.socket)?;
+    // Each forget of everything kept under a person is told on the bus
+    // (`memory/forgot`), for the lamp's other parts to let theirs go too.
+    if let Some(root) = arguments.bus_root.as_ref() {
+        match lamp_memory::forgot::ForgotOut::on(root) {
+            Ok(out) => server = server.telling_forgets(out),
+            Err(_) => log("forgets are not told: the bus could not be opened"),
+        }
+    }
     let mut reporter = arguments.bus_root.as_ref().and_then(|root| {
         start_reporter(
             root.clone(),

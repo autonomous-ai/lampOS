@@ -23,6 +23,10 @@ lamp-skills`, which runs every skill's cases).
 | `a-second-piece-within-half-an-hour-gets-nothing` | A minute of music, six minutes quiet (rearmed), two minutes of a second piece | Pass: one sway at 20 s only (`cooldown = "30m"`) |
 | `music-under-the-bar-gets-nothing` | Five minutes of music scored 0.55 | Pass: nothing (`above = 0.6`) |
 | `a-mute-in-the-music-starts-it-over` | 12 s of music, 10 s muted (`unavailable`), then music | Pass: one sway at 42 s, not 20 s (the mute is past `gap = "5s"`) |
+| `jazz-through-lamp-52e6s-microphone` | lamp-52e6's own scores (#2399): 20 s of an empty office, 120 s of a jazz vocal track, 30 s of a line over it; the voice resting beside it | Pass: one sway at 43 s, 22 s into the track (its dips under 0.6 stay within the gap) |
 
-The threshold (0.6) is provisional: no score is measured on a lamp yet
-(`docs/sound-events.md`). How the sway looks is for the lamp check.
+The threshold (0.6, 20 s, a 5 s gap) holds through lamp-52e6's microphone
+(#2399, 21 Oct): the piano and jazz tracks from a speaker beside it each got
+one sway, and its empty office and a line over the music none.
+`jazz-through-lamp-52e6s-microphone` is that run's own scores. How the
+sway looks is for the lamp check.

@@ -19,6 +19,7 @@
 //! A process that is killed leaves both; the next one clears them as it
 //! starts.
 use crate::{
+    forgot::ForgotOut,
     protocol::{self, MOST_LINE_BYTES},
     store::Store,
 };
@@ -31,7 +32,7 @@ use std::{
     },
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
@@ -83,6 +84,8 @@ pub struct Server {
     ready: PathBuf,
     patience: Duration,
     stop: Arc<AtomicBool>,
+    /// Where a forget is told (`memory/forgot`), with `--bus-root`.
+    forgot: Option<Mutex<ForgotOut>>,
 }
 
 /// Ends a running server from another thread.
@@ -170,7 +173,15 @@ impl Server {
             ready,
             patience: PATIENCE,
             stop: Arc::new(AtomicBool::new(false)),
+            forgot: None,
         })
+    }
+
+    /// Tell each forget of everything kept under a person on the bus
+    /// (`memory/forgot`), once its asker has its answer.
+    pub fn telling_forgets(mut self, out: ForgotOut) -> Self {
+        self.forgot = Some(Mutex::new(out));
+        self
     }
 
     /// Wait this long for a client and no longer.
@@ -273,11 +284,24 @@ impl Server {
                 Line::Late { unfinished: false } | Line::Closed => return,
             };
             log(&answer.log);
+            let forgot = answer.forgot;
             let mut line = answer.line.into_bytes();
             line.push(b'\n');
+            let sent = self.send(stream, &line);
+            // Done either way, so told either way: after the answer, so the
+            // asker never waits for the bus.
+            if let (Some(forgot), Some(out)) = (forgot, self.forgot.as_ref()) {
+                let told = out
+                    .lock()
+                    .map_err(|_| io::Error::other("poisoned"))
+                    .and_then(|mut out| out.tell(&forgot));
+                if told.is_err() {
+                    log("a forget could not be told on the bus (memory/forgot)");
+                }
+            }
             // What was asked has been done either way; only the answer is
             // lost.
-            match self.send(stream, &line).map_err(|error| error.kind()) {
+            match sent.map_err(|error| error.kind()) {
                 Ok(()) => {}
                 Err(io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
                     log("a client did not take its answer in time and was dropped");

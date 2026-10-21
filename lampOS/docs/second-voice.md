@@ -1705,7 +1705,17 @@ after a take-over, but now for every turn:
   answered). The busy-room battery on lamp-4ace is its check.
 - **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
   `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live, and
-  only as the lamp's only voice (a standby beside Live loads none). The
+  only as the lamp's only voice (a standby beside Live loads none). Here
+  `LAMP_QUIET_GOING_ON_SAME_ONE=on` or `LAMP_GOING_ON_NOT_OWN=on` start it
+  too, without `LAMP_SPOKEN_TO`: their sign of someone else reads its
+  prints, and lamp-52e6 ran them with no print all run (#2341). Without
+  `LAMP_SPOKEN_TO` the prints feed only that sign: this check
+  (`Heeding::voice_going_on`) ends no conversation, so a person's own short
+  follow-up that reads low still goes on. With none of the
+  three the journal says "the same voice is judged only with
+  LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE or LAMP_GOING_ON_NOT_OWN on:
+  not judged". Tests: `worker::tests::same_voice_starts_for_the_rules_that_read_it`,
+  `worker::tests::a_low_print_without_spoken_to_keeps_the_conversation_going`. The
   worker starts the same `lamp-same-voice` child; the engine hands it every
   chunk of a spoken line (`Engine::hearing`), of which `Voices` keeps the
   first ones to print (a line begun over the lamp's voice is not printed),
@@ -1870,8 +1880,9 @@ after a take-over, but now for every turn:
   down to 0.35, other voices up to 0.29); no print, a line begun over the
   lamp's voice or under 1.5 s, is never another voice and goes on (02:19).
   #829's own check reads the same bar (one bar since the first builder's
-  03:50 on #1722; [same-voice.md](same-voice.md)) and holds a line under it
-  before this rule reads it; with the eyes' speaking faces
+  03:50 on #1722; [same-voice.md](same-voice.md)) and, with
+  `LAMP_SPOKEN_TO`, holds a line under it before this rule reads it
+  (without it the print feeds only this rule, #2428); with the eyes' speaking faces
   (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from `humans/faces/tracked` on
   the bus), a face seen speaking it not turned to the lamp, none of them the answered
   caller's, whether or not the caller's face is known (the first builder at
@@ -2286,6 +2297,38 @@ after a take-over, but now for every turn:
   after them. The journal says `request N answered a look with nothing
   called`. The next place the note asks for is looked at: the note's
   turn is the search's own.
+- **The search walks on, with `LAMP_SECOND_LOOK_WALK=on`** (off unless
+  set; only with `LAMP_SECOND_SKILL_LOOK=on` and `LAMP_SECOND_LOOK_NOTE=on`;
+  step 4 of look-for-things on this route). If the note is left too (its
+  turn's answer, or the next look's in the same search, called nothing),
+  the lamp walks on by itself: the worker tells a search's note turn left
+  so as it tells a look's (`LookNoCall`; `Engine::walking_looks`), and the
+  coordinator (`coordinator::look_note`), under the note's gates (the
+  answer played whole, a second of fresh quiet), calls the search's skill
+  itself, with the call the model made (`LookAsked`'s `call`: its name, the
+  skill's own or `use_skill`, and its arguments) and the next place in
+  `look_note::WALK_ORDER`: left, right, far_left, far_right, then the desk,
+  each skipped if the search already asked it (its first look's place is
+  the call's `place`, or the desk). The call goes on a thread of its own
+  through the voice's own call path (`tools::run_call`, to lamp-skills'
+  `call.sock`, at most 1.5 s), so nothing waits on it and the lamp's speech
+  is never delayed. A picture cannot come back as a call's result on this
+  route, so a look in the skill's answer is taken as a skill's look is
+  (the eyes asked at once, as nothing is playing) and goes as the search's
+  next `lamp_looks` turn, marked as the search's, with "(You looked to the
+  left; the picture is that look.)" and the skill's "When the picture
+  comes:" note after the look's question: the finding stays the model's.
+  The skill's refusal past its looks (look-for-things' `[search]`
+  `give_up`, an error) goes once as a written turn, `look_walk_gave_up`,
+  and the search is over; with no place left the walk asks once more with
+  its newest place, so a search of five places ends with that line (the
+  desk's look and four walked: five looks). A `look_for(found)` from the
+  model is a call, so no `LookNoCall` follows and nothing is walked. The
+  walk stops at the voice's 8 looks and when its places are spent, and at
+  once if the person speaks, another turn begins, the session changes, or
+  a stop by hand or a pause comes; each step is `look_walk_asked` with
+  `place`, each end `look_walk_dropped` with `why`. The journal says `a
+  search's note answered with nothing called is told to the coordinator`.
 - **Live route only, so not on this route:**
   the head tap for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).

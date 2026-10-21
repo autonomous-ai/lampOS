@@ -107,6 +107,9 @@ enum When {
     Ended(usize),
     /// The speaker has accepted this many chunks.
     Accepted(usize),
+    /// Alone, the second route has been sent this many look turns: the
+    /// coordinator has committed them, whatever the host's pace.
+    LookTurns(usize),
 }
 
 #[derive(Clone)]
@@ -132,6 +135,12 @@ struct Script {
     look_answers: &'static [LookAnswer],
     /// Alone, how the second route answers the look's note.
     note_answer: LookAnswer,
+    /// The place the person named for the search's first look, or none
+    /// (the desk).
+    first_place: Option<&'static str>,
+    /// `LAMP_SECOND_LOOK_WALK`: the second route tells a note's turn left
+    /// with no call too.
+    walk: bool,
     /// Packets of a wait cue the second route plays before its words.
     second_cue: usize,
     /// What the second route heard the person say, as its recogniser
@@ -234,6 +243,8 @@ impl Script {
             own_look: false,
             look_answers: &[],
             note_answer: LookAnswer::Other,
+            first_place: None,
+            walk: false,
             second_cue: 0,
             second_hears: None,
             speak_again: None,
@@ -434,6 +445,13 @@ impl Peer {
     }
 }
 
+thread_local! {
+    /// Memory, telling the voice it forgot a person once this many Ends have
+    /// been sent (`memory/forgot`), on the bus `TEST_FORGOT_IN` reads.
+    static TEST_MEMORY_FORGETS: std::cell::RefCell<Option<(usize, String, lamp_bus::Publisher)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 struct Peers {
     script: Script,
     peers: Vec<Peer>,
@@ -486,6 +504,24 @@ impl Peers {
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        let ended = self.ended.len();
+        TEST_MEMORY_FORGETS.with(|slot| {
+            if slot
+                .borrow()
+                .as_ref()
+                .is_some_and(|(after, ..)| ended >= *after)
+                && let Some((_, person, mut memory)) = slot.borrow_mut().take()
+            {
+                memory
+                    .publish_json(
+                        monotonic_us(),
+                        &lamp_msgs::MemoryForgot {
+                            person: Some(person),
+                        },
+                    )
+                    .unwrap();
+            }
+        });
         if self
             .script
             .say_at_frame
@@ -504,6 +540,7 @@ impl Peers {
                 When::Settled(count) => self.settled >= count,
                 When::Ended(count) => self.ended.len() >= count,
                 When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
             };
             if due {
                 self.script.speak_again = None;
@@ -515,6 +552,7 @@ impl Peers {
                 When::Settled(count) => self.settled >= count,
                 When::Ended(count) => self.ended.len() >= count,
                 When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
             };
             if due {
                 self.script.murmur = None;
@@ -908,10 +946,15 @@ impl Peers {
                                             "the turn is one the lamp wrote itself".to_owned()
                                         }),
                                         search: true,
+                                        // A place these tests do not read.
+                                        call: None,
                                     });
                             }
                             self.audio(index, request, packets, if live { LIVE } else { SECOND });
-                            if answer == Some(LookAnswer::Nothing) {
+                            // As the engine: a note's turn left so is
+                            // told only with the walk (`walking_looks`).
+                            let told = look || self.script.walk;
+                            if answer == Some(LookAnswer::Nothing) && told {
                                 self.peers[index]
                                     .queued
                                     .push_back(ProviderOutput::LookNoCall { request, session });
@@ -998,6 +1041,17 @@ impl Peers {
                                     session: self.second_session,
                                     dropped: None,
                                     search: !self.script.own_look,
+                                    // The skill's call, at the place the
+                                    // person named, or none: the desk.
+                                    call: (!self.script.own_look).then(|| {
+                                        crate::provider_worker::SearchCall {
+                                            name: "look_for".into(),
+                                            args: self.script.first_place.map_or_else(
+                                                || json!({}),
+                                                |place| json!({"place": place}),
+                                            ),
+                                        }
+                                    }),
                                 });
                         }
                         // A wait cue first: audio with no words.
@@ -1087,6 +1141,7 @@ impl Peers {
                                     session,
                                     dropped: None,
                                     search: false,
+                                    call: None,
                                 });
                             self.audio(index, request, packets, LIVE);
                             self.finish(index, request);
@@ -1116,6 +1171,7 @@ impl Peers {
                                 session: 1,
                                 dropped: None,
                                 search: false,
+                                call: None,
                             });
                             match answer {
                                 Live::LookSilent => {
@@ -2293,6 +2349,230 @@ fn without_the_switch_a_look_left_gets_no_note() {
     assert!(run.events("look_note_dropped").is_empty());
 }
 
+/// look-for-things' give-up line (`[search] give_up`), as lamp-skills
+/// refuses a look past its five with it.
+const GIVE_UP: &str = "That was the last look. Say kindly, in a few words, that you can't see it from here, and do not look again.";
+/// The skill's note for each look's picture.
+const PICTURE: &str = "say in a few words what you see.";
+
+/// lamp-skills' look-for-things as the walk calls it: each call one look,
+/// the search's first (the model's) counted, and past `[search] looks = 5`
+/// its give-up line as an error. The places the walk asked, in order.
+fn fake_skill() -> (super::look_note::SkillCaller, Arc<Mutex<Vec<String>>>) {
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let places = asked.clone();
+    let skill: super::look_note::SkillCaller = Arc::new(move |call, _| {
+        assert_eq!(call.name, "look_for");
+        let mut places = places.lock().unwrap();
+        places.push(call.args["place"].as_str().unwrap().to_owned());
+        if places.len() + 1 > 5 {
+            (json!({"error": GIVE_UP}), true)
+        } else {
+            (
+                json!({"next": format!("Say only \"Let me take a look.\" now. When the picture comes: {PICTURE}"),
+                    "look": true}),
+                true,
+            )
+        }
+    });
+    (skill, asked)
+}
+
+/// A skill's search on the second route alone with the note and, `walk`
+/// on or off, the walk (`LAMP_SECOND_LOOK_WALK`), its skill `fake_skill`:
+/// the run, and the places the walk asked the skill for.
+fn walk(
+    walk: bool,
+    look_answers: &'static [LookAnswer],
+    first_place: Option<&'static str>,
+    speak_again: Option<When>,
+) -> (Run, Vec<String>) {
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-walk-{}.jpg",
+        std::process::id()
+    ));
+    let (skill, asked) = fake_skill();
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(true);
+    TEST_LOOK_WALK.set(walk);
+    TEST_WALK_SKILL.with(|walk| *walk.borrow_mut() = Some(skill));
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers,
+        note_answer: LookAnswer::Nothing,
+        first_place,
+        walk,
+        speak_again,
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(4_000),
+        written: Written::Said(6),
+        limit: Duration::from_secs(50),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_WALK_SKILL.with(|walk| *walk.borrow_mut() = None);
+    TEST_LOOK_WALK.set(false);
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    let asked = asked.lock().unwrap().clone();
+    (run, asked)
+}
+
+/// The places the walk recorded asking for, in order.
+fn walked(run: &Run) -> Vec<String> {
+    run.events("look_walk_asked")
+        .into_iter()
+        .map(|e| e["place"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// The give-up lines the second route was sent.
+fn give_ups(run: &Run) -> usize {
+    run.seen
+        .second
+        .iter()
+        .filter(|input| matches!(input, ProviderInput::Written { text, .. } if text == GIVE_UP))
+        .count()
+}
+
+/// (a) The first builder's step 4 for look-for-things (20 Oct): the model
+/// never calls again. The desk's look, the note, then the lamp walks on by
+/// itself, left, right, far_left, far_right, each look's picture sent as
+/// the search's next look turn naming its place; the skill refuses the
+/// sixth with its give-up line, which goes once. Five looks in all.
+#[test]
+fn a_search_the_model_never_calls_again_walks_five_looks_and_gives_up_once() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing; 5], None, None);
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 5, "{}", run.summary());
+    assert_eq!(look_notes(&run).len(), 1);
+    let places = ["left", "right", "far_left", "far_right", "far_right"];
+    assert_eq!(asked, places, "{}", run.summary());
+    assert_eq!(walked(&run), places);
+    // Each walk's look turn names its place and carries the skill's note,
+    // and is the search's own.
+    let texts: Vec<&String> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written {
+                text,
+                look: true,
+                search: true,
+                ..
+            } => Some(text),
+            _ => None,
+        })
+        .collect();
+    // The first is the desk's, the model's own.
+    assert_eq!(texts.len(), 5, "{}", run.summary());
+    assert!(!texts[0].contains("You looked"));
+    for (text, toward) in texts[1..].iter().zip([
+        "to the left",
+        "to the right",
+        "far to the left",
+        "far to the right",
+    ]) {
+        assert!(
+            text.contains(&format!("(You looked {toward}; the picture is that look.)")),
+            "{text}"
+        );
+        assert!(text.contains(PICTURE), "{text}");
+    }
+    assert_eq!(run.events("look_full_still").len(), 5);
+    assert_eq!(give_ups(&run), 1, "{}", run.summary());
+    assert_eq!(run.events("look_walk_gave_up").len(), 1);
+    assert!(
+        run.events("look_walk_dropped").is_empty(),
+        "{:?}",
+        run.events("look_walk_dropped")
+    );
+    assert!(run.events("look_dropped").is_empty());
+}
+
+/// (b) The model says found (`look_for(found)`, a call) in the answer to
+/// the walk's left look: the search is over, nothing more is walked.
+#[test]
+fn a_search_found_after_the_walks_first_look_walks_no_further() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing, LookAnswer::Other], None, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 2, "{}", run.summary());
+    assert_eq!(asked, ["left"]);
+    assert_eq!(walked(&run), ["left"]);
+    assert_eq!(give_ups(&run), 0);
+    assert!(run.events("look_walk_gave_up").is_empty());
+}
+
+/// (c) The person speaks as the walk's left look's answer plays: the walk
+/// stops there, for that reason, and asks the skill for nothing more. The
+/// speech is keyed to the left look's turn reaching the second route (its
+/// second look turn), not to a chunk count: keyed to the note's last chunk,
+/// it raced the walk's skill call on its own thread, and a slow host heard
+/// the person before the left look was taken (CI ARM64, PR #2466).
+#[test]
+fn the_person_speaking_stops_the_walk() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(
+        true,
+        &[LookAnswer::Nothing; 5],
+        None,
+        Some(When::LookTurns(2)),
+    );
+    run.assert_clean();
+    assert_eq!(asked, ["left"], "{}", run.summary());
+    assert_eq!(look_turns(&run).len(), 2, "{}", run.summary());
+    let dropped: Vec<_> = run
+        .events("look_walk_dropped")
+        .into_iter()
+        .map(|e| e["why"].clone())
+        .collect();
+    assert_eq!(
+        dropped,
+        [json!("the person is speaking")],
+        "{}",
+        run.summary()
+    );
+    assert_eq!(give_ups(&run), 0);
+}
+
+/// (d) Without `LAMP_SECOND_LOOK_WALK`: the note alone, as in step 2. The
+/// skill is never called by the lamp.
+#[test]
+fn without_the_switch_a_search_gets_only_its_note() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(false, &[LookAnswer::Nothing; 5], None, None);
+    run.assert_clean();
+    assert_eq!(look_turns(&run).len(), 1, "{}", run.summary());
+    assert_eq!(look_notes(&run).len(), 1);
+    assert!(asked.is_empty());
+    assert!(walked(&run).is_empty());
+    assert!(run.events("look_walk_dropped").is_empty());
+    assert_eq!(give_ups(&run), 0);
+}
+
+/// (e) Places already looked at are skipped: a search the person began at
+/// the left walks on right, far_left, far_right, then the desk it has not
+/// looked at, and the skill's give-up line ends it after five looks.
+#[test]
+fn the_walk_skips_the_place_the_person_named() {
+    let _one = super::pilot_faults::one_session();
+    let (run, asked) = walk(true, &[LookAnswer::Nothing; 5], Some("left"), None);
+    run.assert_clean();
+    assert_eq!(asked[..3], ["right", "far_left", "far_right"]);
+    assert_eq!(asked, ["right", "far_left", "far_right", "desk", "desk"]);
+    assert!(!asked.iter().any(|place| place == "left"));
+    assert_eq!(look_turns(&run).len(), 5, "{}", run.summary());
+    assert_eq!(give_ups(&run), 1);
+}
+
 #[test]
 fn without_a_second_route_the_packets_and_records_are_as_before() {
     let _one = super::pilot_faults::one_session();
@@ -2611,6 +2891,119 @@ fn a_known_persons_baseline_goes_when_they_ask_to_forget_their_face() {
             (json!(false), json!("person")),
             (json!(false), json!("person"))
         ],
+        "{}",
+        run.summary()
+    );
+}
+
+/// The first builder at 10:5x on #2467: memory has forgotten a known person
+/// (`memory/forgot`, from the app or by voice), so their tone baseline goes.
+/// Enrolled again under the same name, their next line starts a fresh one.
+/// A rules scope memory forgot (`r-`) is no voice, and changes nothing.
+#[test]
+fn a_name_memory_forgot_starts_a_fresh_tone_baseline_when_enrolled_again() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let rules = format!("r-{}", &person[2..]);
+    let lines = |forgot: Option<String>| {
+        TEST_VOICE_TONE.with(|on| on.set(true));
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+        TEST_TONE_FORGOT.with(|told| *told.borrow_mut() = VecDeque::from([None, forgot]));
+        let run = run(Script {
+            only: true,
+            second: false,
+            voiced: true,
+            second_hears: Some("What a nice day"),
+            speak_again: Some(When::Settled(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_TONE_FORGOT.with(|told| told.borrow_mut().clear());
+        TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+        TEST_VOICE_TONE.with(|on| on.set(false));
+        run.assert_clean();
+        let lines: Vec<_> = run
+            .events("local_endpoint")
+            .into_iter()
+            .map(|end| end["tone"]["baseline_lines"].clone())
+            .collect();
+        let forgot: Vec<_> = run
+            .events("voice_tone_forgot")
+            .into_iter()
+            .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+            .collect();
+        (lines, forgot, run.summary())
+    };
+    let (kept, none, summary) = lines(None);
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+    let (fresh, forgot, summary) = lines(Some(person.clone()));
+    assert_eq!(fresh, [json!(1), json!(1)], "{summary}");
+    assert_eq!(forgot, [(json!("memory"), json!("person"))], "{summary}");
+    let (kept, none, summary) = lines(Some(rules));
+    assert_eq!(kept, [json!(1), json!(2)], "{summary}");
+    assert!(none.is_empty(), "{summary}");
+}
+
+/// The reviewer's P3 2 on #2488: the voice's loop reads memory's forgets
+/// from the bus itself (`ForgotIn` beside the hello's watch, not a test
+/// seam at the End): memory tells it forgot a known person after their first
+/// line, and their second line starts a fresh baseline.
+#[test]
+fn the_loop_reads_memorys_forget_from_the_bus_and_the_next_line_starts_fresh() {
+    let _one = super::pilot_faults::one_session();
+    let person = lamp_msgs::known::person_id("Jim");
+    let root = PathBuf::from(format!("/tmp/lv-forgot-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    TEST_FORGOT_IN.with(|slot| {
+        *slot.borrow_mut() = Some(crate::bus_out::ForgotIn::on(&bus).unwrap());
+    });
+    let memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    TEST_MEMORY_FORGETS.with(|slot| *slot.borrow_mut() = Some((1, person.clone(), memory)));
+    TEST_VOICE_TONE.with(|on| on.set(true));
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = Some(person.clone()));
+    let run = run(Script {
+        only: true,
+        second: false,
+        voiced: true,
+        second_hears: Some("What a nice day"),
+        speak_again: Some(When::Settled(1)),
+        turns: 2,
+        turn_taking: TurnTaking::VadOnly,
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_TONE_PERSON.with(|known| *known.borrow_mut() = None);
+    TEST_VOICE_TONE.with(|on| on.set(false));
+    let told = TEST_MEMORY_FORGETS
+        .with(|slot| slot.borrow_mut().take())
+        .is_none();
+    TEST_FORGOT_IN.with(|slot| *slot.borrow_mut() = None);
+    let _ = std::fs::remove_dir_all(&root);
+    run.assert_clean();
+    assert!(told, "memory's forget was never told");
+    let lines: Vec<_> = run
+        .events("local_endpoint")
+        .into_iter()
+        .map(|end| end["tone"]["baseline_lines"].clone())
+        .collect();
+    assert_eq!(lines, [json!(1), json!(1)], "{}", run.summary());
+    let forgot: Vec<_> = run
+        .events("voice_tone_forgot")
+        .into_iter()
+        .map(|forgot| (forgot["by"].clone(), forgot["whose"].clone()))
+        .collect();
+    assert_eq!(
+        forgot,
+        [(json!("memory"), json!("person"))],
         "{}",
         run.summary()
     );

@@ -7,6 +7,7 @@
 //! travel on.
 pub mod days;
 pub mod days_protocol;
+pub mod forgot;
 pub mod health;
 pub mod health_counts;
 pub mod protocol;
