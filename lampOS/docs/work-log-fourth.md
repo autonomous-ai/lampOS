@@ -5350,6 +5350,73 @@ Ready for lamp-voice: no — the new heads' native ARM64 and x86 Clippy gates ar
   - Who-was-here remains Seventh's, and the own-line continuation fix
     remains El's, as assigned while Fourth was paused.
 
+## 2026-10-21, 23:4x ICT: mood merged; cue rebased again; continuing-answer counter published
+
+Ready for lamp-voice: no — #2665's new rebase and #2684 await their native
+ARM64 gates. #2638 passed both gates and is merged.
+
+- **#2638**, head `79e629968d5fc6ea757adb3dd805c51d63573c96`, merged by
+  the reviewer-lead as `824aa77d983f7b21e4ea7bbc6cc7435169ad0fb5`.
+  Native ARM64 **39632139928** passed **9722 tests, zero failed, 63
+  skipped**; workspace Clippy **39632140012** passed. The retained local
+  counts and the Mac bus probe are in the preceding entry and on the PR.
+  The lively-during-quiet P3 remains separate; no new lamp run was made.
+- **#2665**, current head `3e52d435f567d6a1f28665360936614d58a74f22`,
+  is one commit on `07ce0a6c4f255f22bb39cdf40b83fb27def0c684` after
+  the reviewer-lead's #2672 drift request. Its exact-lease force-push
+  succeeded. The folded patch's rebase is `=`. Relative to the preceding
+  green head `72d9418cb`, the only authored changes are the two remaining
+  count references in `lamp-runs.md` and `switches.md`: **13 of 21 resumed
+  gaps**, with **25 cancelled** counted separately.
+  - The preceding head's native ARM64 **39632869355** passed **9717
+    tests, zero failed, 63 skipped**; workspace Clippy **39632869416**
+    passed. These qualify that earlier head, not the new rebase.
+  - After the new rebase: formatting passed; the six `wait_sound`
+    regressions passed, zero failed; all-target voice Clippy with
+    warnings denied passed. Exact commands, the retained **3864/0/14
+    ignored** full local gate and range-diff are on the PR and in
+    `/private/tmp/fourth-cue-review-20261021-checks/`.
+  - Current native ARM64 **39636846326** and workspace Clippy
+    **39636846685** are running. The sound-relative deadline and missing
+    clip/cancellation semantics are unchanged. First's 1500/3000 ms
+    paired lamp-4ace comparison remains owed.
+- Both earlier native runs above marked the same passing test leaky:
+  `lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal`.
+  It is recorded on the PRs, with no unrelated source change.
+- **#2684**, draft, head `b89414abc74af03e6340d57a1d8c055d71f0af0b`:
+  `lamp-voice-eval answer-gaps FILE... [--json]` reproduces the timing
+  exports' counts without words. Only this explicit command runs it;
+  no lamp runtime behavior or defaults change. It pairs each start and
+  terminal by the full owner and start time, uses zero frames for the
+  strict 300 ms threshold, and keeps resumed, cancelled and incomplete
+  evidence separate. Repeated gaps are distinct from affected replies.
+  Invalid, duplicated or missing receipts never become a clean report.
+  - Full local evaluator gate: **622 passed, zero failed or ignored**
+    (377 library, seven binary, 238 integration), formatting, scoped
+    all-target Clippy and workspace build passed. After the `=` rebase
+    onto `07ce0a6c4`: **14 focused tests passed**, formatting and Clippy
+    passed, and the command's JSON still matches the committed recount.
+  - Evidence is in `docs/verification/answer-gaps-20261021/` on that
+    branch; full logs in `/private/tmp/fourth-answer-gaps-checks/`.
+    The two exports give **11 resumed / 12 cancelled** and **10 / 13**
+    over 300 ms. Their 65 starts all pair; no receipt problems. One reply
+    in the first export had three resumed gaps, so gap and reply counts
+    must remain separate.
+  - The debug command read both whole exports (23,383 JSONL records,
+    8,173,590 bytes) in **329.098 ms first, 320.181 ms repeated**, against
+    a one-second reporting target. This includes process launch through
+    captured output and exit; the disk cache was not flushed. These are
+    Mac reporting times, not lamp voice latency.
+  - Native ARM64 **39636433392** is running; workspace Clippy
+    **39636432392** passed. The PR stays draft until the native gate passes.
+- **Next, in progress:** the original task's fake slow-second-piece
+  regression. Existing coverage delays the first piece; the new paused
+  clock case holds the second after the first is delivered while the
+  third is already ready, checking order, completion and retirement.
+  No runtime change is justified by the one 2970 ms reused-connection
+  request. The six yielded-then-resumed gaps stay with Third, and the
+  actual before/after lamp run stays with First.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
