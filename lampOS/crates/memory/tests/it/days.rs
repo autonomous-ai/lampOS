@@ -2208,6 +2208,78 @@ fn forgetting_a_kept_thing_removes_its_day() {
     assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
 }
 
+/// A kept thing `once` finds again over the protocol at `at`, with `on`:
+/// its id, and that nothing new was written.
+fn kept_once_on(store: &mut Days, at: u64, text: &str, on: &str) -> u64 {
+    let (answer, _) = request(
+        store,
+        json!({"op":"remember","person":"p-minh","at_unix_ms":at,"text":text,"once":true,"on":on}),
+        at,
+    );
+    assert_eq!(answer["ok"], true, "{answer}");
+    answer["id"].as_u64().unwrap()
+}
+
+/// The day kept for `person`'s entry `id`, of any kind.
+fn day_of(scratch: &Scratch, person: &str, id: u64) -> Option<String> {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row(
+            "SELECT d.day FROM entries e JOIN event_days d ON d.rid=e.rid WHERE e.person=?1 AND e.id=?2",
+            rusqlite::params![person, id],
+            |r| r.get(0),
+        )
+        .optional()
+        .unwrap()
+}
+
+/// Reviewer-lead P3 on #2680: a weekly "dentist on Friday" said again with
+/// `once` for a later Friday takes that day and is followed up once after
+/// it, as after the first; an earlier or the same day changes nothing.
+#[test]
+fn a_weekly_kept_thing_said_again_for_a_later_day_is_followed_up_again() {
+    let scratch = Scratch::new("kept-weekly");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    const DENTIST: &str = "Dentist on Friday.";
+    // Monday 19 October: Friday 23.
+    let id = kept_once_on(&mut store, MONDAY, DENTIST, "2026-10-23");
+    store.maintain(MONDAY + 5 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["on"],
+        "2026-10-23"
+    );
+    // Sunday 25: next Friday, the 30th; the same kept thing.
+    assert_eq!(
+        kept_once_on(&mut store, MONDAY + 6 * DAY, DENTIST, "2026-10-30"),
+        id
+    );
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-30")
+    );
+    // Monday 26: the same day, then an earlier one, change nothing.
+    for on in ["2026-10-30", "2026-10-28"] {
+        assert_eq!(kept_once_on(&mut store, MONDAY + 7 * DAY, DENTIST, on), id);
+        assert_eq!(
+            day_of(&scratch, "p-minh", id).as_deref(),
+            Some("2026-10-30"),
+            "{on}"
+        );
+    }
+    for at in [MONDAY + 7 * DAY, MONDAY + 10 * DAY, MONDAY + 11 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
+    }
+    store.maintain(MONDAY + 12 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap(),
+        Some(json!({"id":id,"category":"kept","text":DENTIST,"on":"2026-10-30"}))
+    );
+    store.maintain(MONDAY + 14 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+}
+
 /// Another person and the room never get a kept thing's day; the room's
 /// own dated kept thing is never given to anyone.
 #[test]

@@ -459,7 +459,11 @@ impl Days {
     /// `event_days` for the kept entry when it is a real day from the local
     /// day of `at` to [`EVENT_WITHIN_DAYS`] after it ([`kept_day`]); any
     /// other `on` is dropped and the fact kept undated. A kept thing that
-    /// is found already (`once`) gains the day only when it has none.
+    /// is found already (`once`) gains the day when it has none, and takes
+    /// it when it is later than the one it has (a weekly "dentist on
+    /// Friday" said again for next Friday); then its follow-up row goes, so
+    /// the new day is followed up once in turn. An earlier or the same day
+    /// changes nothing. The sources and the day commit together.
     pub fn remember_on(
         &mut self,
         person: &Person,
@@ -472,13 +476,29 @@ impl Days {
         let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         if once && let Some(id) = self.kept_already(person, &text)? {
-            self.link_sources(person, id, from)?;
+            let tx = self.db.transaction()?;
+            link_sources(&tx, person, id, from)?;
             if let Some(on) = on {
-                self.db.execute(
-                    "INSERT OR IGNORE INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
-                    params![person.as_str(), id, on.to_string()],
+                let rid: i64 = tx.query_row(
+                    "SELECT rid FROM entries WHERE person=?1 AND id=?2",
+                    params![person.as_str(), id],
+                    |r| r.get(0),
                 )?;
+                // Days are `YYYY-MM-DD`, so text order is day order.
+                let moved = tx.execute(
+                    "UPDATE event_days SET day=?2 WHERE rid=?1 AND day<?2",
+                    params![rid, on.to_string()],
+                )?;
+                if moved > 0 {
+                    tx.execute("DELETE FROM follow_ups WHERE rid=?", [rid])?;
+                } else {
+                    tx.execute(
+                        "INSERT OR IGNORE INTO event_days(rid,day) VALUES(?1,?2)",
+                        params![rid, on.to_string()],
+                    )?;
+                }
             }
+            tx.commit()?;
             return Ok((id, true));
         }
         self.kept_room(person)?;
@@ -614,24 +634,6 @@ impl Days {
         Ok(None)
     }
 
-    /// Links `from`, validated as a new remember's are, to the kept thing
-    /// `id` that `once` found (#2176): forgetting it then removes this
-    /// conversation's exchanges too. Links it already has stay one.
-    fn link_sources(&mut self, person: &Person, id: u64, from: &[u64]) -> Result<()> {
-        if from.is_empty() {
-            return Ok(());
-        }
-        let tx = self.db.transaction()?;
-        validate_sources(&tx, person, from, false)?;
-        for source in from {
-            tx.execute(
-                "INSERT OR IGNORE INTO sources(child,parent) SELECT c.rid,p.rid FROM entries c JOIN entries p ON p.person=c.person WHERE c.person=?1 AND c.id=?2 AND p.id=?3",
-                params![person.as_str(), id, source],
-            )?;
-        }
-        tx.commit()?;
-        Ok(())
-    }
     // The one private writer of an exchange or a kept entry: each argument
     // is a column or its links.
     #[allow(clippy::too_many_arguments)]
@@ -1889,6 +1891,21 @@ fn generation(db: &Connection, person: &Person) -> Result<u64> {
         |r| r.get(0),
     )?)
 }
+/// Links `from`, validated as a new remember's are, to the kept thing `id`
+/// that `once` found (#2176): forgetting it then removes this
+/// conversation's exchanges too. Links it already has stay one. Inside the
+/// caller's transaction, with the day it may take ([`Days::remember_on`]).
+fn link_sources(tx: &Transaction<'_>, person: &Person, id: u64, from: &[u64]) -> Result<()> {
+    validate_sources(tx, person, from, false)?;
+    for source in from {
+        tx.execute(
+            "INSERT OR IGNORE INTO sources(child,parent) SELECT c.rid,p.rid FROM entries c JOIN entries p ON p.person=c.person WHERE c.person=?1 AND c.id=?2 AND p.id=?3",
+            params![person.as_str(), id, source],
+        )?;
+    }
+    Ok(())
+}
+
 fn validate_sources(db: &Connection, person: &Person, ids: &[u64], required: bool) -> Result<()> {
     if ids.len() > 64
         || (required && ids.is_empty())

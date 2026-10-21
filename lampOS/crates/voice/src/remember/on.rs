@@ -2,14 +2,21 @@
 //!
 //! The model works out the day ("my sister's wedding is on Saturday" said
 //! on Monday 19 October is `on: "2026-10-24"`), and the voice keeps it only
-//! when the words heard in that line name a day it can come from
-//! ([`names_a_day`]): a weekday; today, tonight, tomorrow, the day after
-//! tomorrow; next or this week, a weekend; a month with a day number; a
-//! numeric date. Anything else, a line not heard at the lamp included, has
-//! its `on` dropped before the memory is asked: a day is never guessed
-//! from a sentence that names none. What is left must be a real day from
-//! the lamp's local today to [`WITHIN_DAYS`] after it ([`day_within`]), as
-//! the memory's own check of an event day.
+//! when the words heard in that line name that same day ([`names_the_day`],
+//! against the lamp's local today): a weekday `on` falls on, within the
+//! next 7 days, or 8 to 14 days on after "next"; today or tonight, `on` is
+//! today; tomorrow, today and one; the day after tomorrow, today and two;
+//! a weekend, a Saturday or Sunday within two weeks; this week or next
+//! week, `on` within that Monday-to-Sunday week; a month with a day
+//! number, `on`'s month and day; a numeric date, two or three numbers
+//! joined by `/` or `-` that read as `on`, day first or month first ("3/4
+//! cup" agrees only with 3 April or 4 March). Anything else, a day the
+//! words name that `on` is not and a line not heard at the lamp included,
+//! has its `on` dropped before the memory is asked: a day is never guessed
+//! from a sentence that names none, nor taken from one that names
+//! another. What is left must be a real day from the lamp's local today to
+//! [`WITHIN_DAYS`] after it ([`day_within`]), as the memory's own check of
+//! an event day.
 use lamp_gemini::ToolCall;
 use lamp_local_time::LocalTime;
 use serde_json::Value;
@@ -27,7 +34,8 @@ pub const DESCRIBED: &str = " When what they ask you to keep is about a day they
 /// `on`'s parameter description.
 pub const PARAMETER: &str = "Only when they named the day: that day, YYYY-MM-DD.";
 
-const WEEKDAYS: &[&str] = &[
+/// Weekdays, Monday first, and their plurals ("on Fridays").
+const WEEKDAYS: [&str; 7] = [
     "monday",
     "tuesday",
     "wednesday",
@@ -35,123 +43,223 @@ const WEEKDAYS: &[&str] = &[
     "friday",
     "saturday",
     "sunday",
-    "mondays",
-    "tuesdays",
-    "wednesdays",
-    "thursdays",
-    "fridays",
-    "saturdays",
-    "sundays",
 ];
-/// Words that name a day by themselves.
-const DAY_WORDS: &[&str] = &["today", "tonight", "tomorrow", "weekend"];
-/// Months, with their short forms; never "may", the verb as often as the
-/// month, nor "mar", "jun", "jul" alone, which are names.
-const MONTHS: &[&str] = &[
-    "january",
-    "february",
-    "march",
-    "april",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-    "jan",
-    "feb",
-    "apr",
-    "aug",
-    "sep",
-    "sept",
-    "oct",
-    "nov",
-    "dec",
+/// Months, January first, with their short forms; never "may", the verb
+/// as often as the month, nor "mar", "jun", "jul" alone, which are names.
+const MONTHS: &[(&str, usize)] = &[
+    ("january", 1),
+    ("february", 2),
+    ("march", 3),
+    ("april", 4),
+    ("june", 6),
+    ("july", 7),
+    ("august", 8),
+    ("september", 9),
+    ("october", 10),
+    ("november", 11),
+    ("december", 12),
+    ("jan", 1),
+    ("feb", 2),
+    ("apr", 4),
+    ("aug", 8),
+    ("sep", 9),
+    ("sept", 9),
+    ("oct", 10),
+    ("nov", 11),
+    ("dec", 12),
 ];
-/// Vietnamese: words that name a day by themselves, two-word phrases.
-const VI_PHRASES: &[[&str; 2]] = &[
-    ["hôm", "nay"],
-    ["tối", "nay"],
-    ["ngày", "mai"],
-    ["ngày", "kia"],
-    ["tuần", "sau"],
-    ["tuần", "tới"],
-    ["tuần", "này"],
-    ["cuối", "tuần"],
-    ["chủ", "nhật"],
-];
-/// Vietnamese weekdays after "thứ": hai (Monday) to bảy (Saturday).
-const VI_WEEKDAYS: &[&str] = &[
-    "hai", "ba", "tư", "năm", "sáu", "bảy", "2", "3", "4", "5", "6", "7",
+/// Vietnamese weekdays after "thứ": hai (Monday) to bảy (Saturday), as
+/// days after Monday.
+const VI_WEEKDAYS: &[(&str, i64)] = &[
+    ("hai", 0),
+    ("ba", 1),
+    ("tư", 2),
+    ("năm", 3),
+    ("sáu", 4),
+    ("bảy", 5),
+    ("2", 0),
+    ("3", 1),
+    ("4", 2),
+    ("5", 3),
+    ("6", 4),
+    ("7", 5),
 ];
 
 /// A day number: 1 to 31, bare or with its ordinal ending ("24th").
-fn day_number(word: &str) -> bool {
+fn day_number(word: &str) -> Option<i64> {
     let digits = word.trim_end_matches(|c: char| c.is_ascii_alphabetic());
     let ending = &word[digits.len()..];
-    matches!(ending, "" | "st" | "nd" | "rd" | "th")
+    let number = digits.parse::<i64>().ok()?;
+    (matches!(ending, "" | "st" | "nd" | "rd" | "th")
         && !digits.is_empty()
         && digits.len() <= 2
-        && digits.parse::<u32>().is_ok_and(|n| (1..=31).contains(&n))
+        && (1..=31).contains(&number))
+    .then_some(number)
 }
 
-/// A numeric date: two or three groups of digits joined by `/` or `-`
-/// ("24/10", "10-24-2026", "2026-10-24").
-fn numeric_date(token: &str) -> bool {
+/// Whether `token` is a numeric date that reads as `(year, month, day)`:
+/// two or three groups of digits joined by `/` or `-`; `YYYY-MM-DD`, or a
+/// day and a month in either order with an optional year after them
+/// ("24/10", "10-24-2026", "3/4").
+fn numeric_date(token: &str, (year, month, day): (i64, usize, i64)) -> bool {
     let token = token.trim_matches(|c: char| !c.is_ascii_digit());
+    let month = month as i64;
     for separator in ['/', '-'] {
         let parts: Vec<&str> = token.split(separator).collect();
-        if (2..=3).contains(&parts.len())
-            && parts.iter().all(|part| {
+        if !(2..=3).contains(&parts.len())
+            || !parts.iter().all(|part| {
                 (1..=4).contains(&part.len()) && part.bytes().all(|b| b.is_ascii_digit())
             })
         {
-            return true;
+            continue;
         }
+        let Ok(numbers) = parts
+            .iter()
+            .map(|part| part.parse::<i64>())
+            .collect::<Result<Vec<_>, _>>()
+        else {
+            continue;
+        };
+        if parts[0].len() == 4 {
+            return numbers.len() == 3 && numbers[..] == [year, month, day];
+        }
+        let year_agrees = match parts.get(2) {
+            None => true,
+            Some(part) if part.len() == 4 => numbers[2] == year,
+            Some(part) if part.len() == 2 => numbers[2] == year % 100,
+            Some(_) => false,
+        };
+        return year_agrees
+            && ((numbers[0], numbers[1]) == (day, month)
+                || (numbers[0], numbers[1]) == (month, day));
     }
     false
 }
 
-/// Whether `heard` names a day a date can come from. Deterministic:
-/// lower-cased words, compared whole.
-pub fn names_a_day(heard: &str) -> bool {
+/// Whether the words in `heard` name the day `on`, both days since
+/// 1970-01-01, said on the lamp's local day `today`. Deterministic:
+/// lower-cased words, compared whole; one naming that agrees is enough.
+pub fn names_the_day(heard: &str, on: i64, today: i64) -> bool {
+    let ahead = on - today;
+    if ahead < 0 {
+        return false;
+    }
+    let (year, month, day) = crate::local_time::civil(on);
+    // Days after Monday, of `on` and of today.
+    let weekday = (on + 3).rem_euclid(7);
+    let this_sunday = today + 6 - (today + 3).rem_euclid(7);
+    let in_week = |sunday: i64| (sunday - 6..=sunday).contains(&on);
     let lower = heard.to_lowercase();
-    if lower.split_whitespace().any(numeric_date) {
+    if lower
+        .split_whitespace()
+        .any(|token| numeric_date(token, (year, month, day)))
+    {
         return true;
     }
     let words: Vec<&str> = lower
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
         .collect();
-    let has = |set: &[&str]| words.iter().any(|word| set.contains(word));
-    if has(WEEKDAYS) || has(DAY_WORDS) {
-        return true;
+    let before = |at: usize| at.checked_sub(1).map(|at| words[at]);
+    let after = |at: usize| words.get(at + 1).copied();
+    let day_numbers = || words.iter().filter_map(|word| day_number(word));
+    let vi_next_week = words
+        .windows(2)
+        .any(|pair| matches!(pair, ["tuần", "sau" | "tới"]));
+    for (at, word) in words.iter().enumerate() {
+        let named_weekday = WEEKDAYS
+            .iter()
+            .position(|name| *word == *name || word.strip_suffix('s') == Some(*name));
+        let agrees = match *word {
+            _ if named_weekday.is_some() => {
+                named_weekday == Some(weekday as usize)
+                    && if before(at) == Some("next") {
+                        (8..=14).contains(&ahead)
+                    } else {
+                        ahead <= 7
+                    }
+            }
+            "today" | "tonight" => ahead == 0,
+            "tomorrow" => ahead == if before(at) == Some("after") { 2 } else { 1 },
+            "weekend" => weekday >= 5 && ahead <= 13,
+            "week" => match before(at) {
+                Some("this") => in_week(this_sunday),
+                Some("next") => in_week(this_sunday + 7),
+                _ => false,
+            },
+            "nay" => matches!(before(at), Some("hôm" | "tối")) && ahead == 0,
+            "mai" => before(at) == Some("ngày") && ahead == 1,
+            "kia" => before(at) == Some("ngày") && ahead == 2,
+            "tuần" => match after(at) {
+                Some("này") if before(at) != Some("cuối") => in_week(this_sunday),
+                Some("sau" | "tới") => in_week(this_sunday + 7),
+                _ => before(at) == Some("cuối") && weekday >= 5 && ahead <= 13,
+            },
+            "thứ" | "chủ" => {
+                let named = if *word == "chủ" {
+                    (after(at) == Some("nhật")).then_some(6)
+                } else {
+                    after(at).and_then(|next| {
+                        VI_WEEKDAYS
+                            .iter()
+                            .find(|(name, _)| *name == next)
+                            .map(|(_, day)| *day)
+                    })
+                };
+                named == Some(weekday)
+                    && if vi_next_week {
+                        (1..=14).contains(&ahead)
+                    } else {
+                        ahead <= 7
+                    }
+            }
+            "tháng" => {
+                after(at).and_then(|next| next.parse::<usize>().ok()) == Some(month)
+                    && day_numbers().any(|number| number == day)
+            }
+            _ => {
+                MONTHS
+                    .iter()
+                    .any(|(name, number)| name == word && *number == month)
+                    && day_numbers().any(|number| number == day)
+            }
+        };
+        if agrees {
+            return true;
+        }
     }
-    let pairs = || words.windows(2);
-    if pairs().any(|pair| matches!(pair, ["next" | "this", "week"])) {
-        return true;
-    }
-    if has(MONTHS) && words.iter().any(|word| day_number(word)) {
-        return true;
-    }
-    if pairs().any(|pair| VI_PHRASES.iter().any(|phrase| pair == phrase))
-        || pairs().any(|pair| pair[0] == "thứ" && VI_WEEKDAYS.contains(&pair[1]))
-    {
-        return true;
-    }
-    // "ngày 24 tháng 10": a month with a day number.
-    words.contains(&"tháng") && words.iter().any(|word| day_number(word))
+    false
+}
+
+/// The lamp's local today, as days since 1970-01-01.
+fn today() -> i64 {
+    super::local_day(super::unix_ms(), crate::local_time::system())
 }
 
 /// `remember`'s call as the memory is asked it: `on` dropped unless the
-/// line's `heard` words name a day ([`names_a_day`]). Nothing heard, a
-/// text from the app or a line the lamp wrote, drops it too. Any other
-/// call is as it is.
+/// line's `heard` words name that day ([`names_the_day`]) on the lamp's
+/// local today. Nothing heard, a text from the app or a line the lamp
+/// wrote, drops it too. Any other call is as it is.
 pub fn call_as_heard<'a>(call: &'a ToolCall, heard: Option<&str>) -> Cow<'a, ToolCall> {
-    if call.name != super::REMEMBER
-        || call.args.get("on").is_none()
-        || heard.is_some_and(names_a_day)
+    call_as_heard_on(call, heard, today)
+}
+
+/// [`call_as_heard`] with today's day from `today`, asked only when there
+/// is an `on` and heard words to hold it against.
+fn call_as_heard_on<'a>(
+    call: &'a ToolCall,
+    heard: Option<&str>,
+    today: impl FnOnce() -> i64,
+) -> Cow<'a, ToolCall> {
+    if call.name != super::REMEMBER {
+        return Cow::Borrowed(call);
+    }
+    let Some(on) = call.args.get("on") else {
+        return Cow::Borrowed(call);
+    };
+    let day = on.as_str().and_then(crate::local_time::day_of);
+    if let (Some(heard), Some(day)) = (heard, day)
+        && names_the_day(heard, day, today())
     {
         return Cow::Borrowed(call);
     }
@@ -182,35 +290,85 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// The words check: kept for a line that names a day, dropped for one
-    /// that names none.
+    /// Days since 1970-01-01 of a `YYYY-MM-DD`.
+    fn day(name: &str) -> i64 {
+        crate::local_time::day_of(name).unwrap()
+    }
+
+    /// The words check, said on Monday 19 October 2026: kept only when the
+    /// words name the day `on` is (reviewer-lead P3 on #2680).
     #[test]
-    fn a_day_is_kept_only_from_words_that_name_one() {
-        for (heard, named) in [
-            ("my sister's wedding is on Saturday", true),
-            ("the dentist tomorrow", true),
-            ("on the 24th of October", true),
-            ("remember the dentist the day after tomorrow", true),
-            ("I fly out tonight", true),
-            ("the meeting is today at three", true),
-            ("we go camping next week", true),
-            ("we go camping this weekend", true),
-            ("my exam is on October 24", true),
-            ("the party is on 24/10", true),
-            ("the party is on 2026-10-24", true),
-            ("đám cưới chị tôi vào thứ bảy", true),
-            ("nhớ giúp tôi ngày mai đi nha sĩ", true),
-            ("sinh nhật ngày 24 tháng 10", true),
-            ("remember my sister's name is Mai", false),
-            ("my sister's wedding", false),
-            ("remember that I like October", false),
-            ("my locker is number 24", false),
-            ("I may be late", false),
-            ("I'm 3.5 feet from the door", false),
-            ("", false),
+    fn a_day_is_kept_only_from_words_that_name_that_day() {
+        let monday = day("2026-10-19");
+        for (heard, on, agrees) in [
+            ("my sister's wedding is on Saturday", "2026-10-24", true),
+            ("my sister's wedding is on Saturday", "2026-10-31", false),
+            ("dentist on Friday", "2026-10-23", true),
+            ("dentist on Friday", "2026-10-22", false),
+            ("dentist on Fridays", "2026-10-23", true),
+            ("dentist next Friday", "2026-10-30", true),
+            ("dentist next Friday", "2026-10-23", false),
+            ("the meeting is on Monday", "2026-10-26", true),
+            ("the meeting is today at three", "2026-10-19", true),
+            ("the meeting is today at three", "2026-10-20", false),
+            ("I fly out tonight", "2026-10-19", true),
+            ("the dentist tomorrow", "2026-10-20", true),
+            ("the dentist tomorrow", "2026-10-21", false),
+            ("the dentist the day after tomorrow", "2026-10-21", true),
+            ("the dentist the day after tomorrow", "2026-10-20", false),
+            ("we go camping this weekend", "2026-10-24", true),
+            ("we go camping this weekend", "2026-10-25", true),
+            ("we go camping this weekend", "2026-10-23", false),
+            ("we go camping next week", "2026-10-28", true),
+            ("we go camping next week", "2026-10-22", false),
+            ("the review is this week", "2026-10-25", true),
+            ("the review is this week", "2026-10-26", false),
+            ("my exam is on October 24", "2026-10-24", true),
+            ("on the 24th of October", "2026-10-24", true),
+            ("my exam is on October 24", "2026-10-25", false),
+            ("my exam is on November 24", "2026-10-24", false),
+            ("the party is on 24/10", "2026-10-24", true),
+            ("the party is on 10/24/2026", "2026-10-24", true),
+            ("the party is on 2026-10-24", "2026-10-24", true),
+            ("the party is on 24/10", "2026-10-25", false),
+            ("the party is on 24/10/2027", "2026-10-24", false),
+            ("add 3/4 cup of flour", "2026-10-24", false),
+            ("add 3/4 cup of flour", "2026-11-03", false),
+            ("đám cưới chị tôi vào thứ bảy", "2026-10-24", true),
+            ("đám cưới chị tôi vào thứ bảy", "2026-10-25", false),
+            ("đám cưới vào chủ nhật", "2026-10-25", true),
+            ("nhớ giúp tôi ngày mai đi nha sĩ", "2026-10-20", true),
+            ("nhớ giúp tôi ngày mai đi nha sĩ", "2026-10-21", false),
+            ("hôm nay họp", "2026-10-19", true),
+            ("sinh nhật ngày 24 tháng 10", "2026-10-24", true),
+            ("sinh nhật ngày 24 tháng 11", "2026-10-24", false),
+            ("đi cắm trại cuối tuần", "2026-10-24", true),
+            ("đi cắm trại tuần sau", "2026-10-27", true),
+            ("remember my sister's name is Mai", "2026-10-24", false),
+            ("my sister's wedding", "2026-10-24", false),
+            ("remember that I like October", "2026-10-24", false),
+            ("my locker is number 24", "2026-10-24", false),
+            ("I may be late", "2026-10-19", false),
+            ("I'm 3.5 feet from the door", "2026-10-19", false),
+            ("", "2026-10-19", false),
         ] {
-            assert_eq!(names_a_day(heard), named, "{heard:?}");
+            assert_eq!(
+                names_the_day(heard, day(on), monday),
+                agrees,
+                "{heard:?} on {on}"
+            );
         }
+        // "3/4 cup" reads as 3 April or 4 March: the only days it agrees with.
+        let march = day("2027-03-01");
+        for (on, agrees) in [
+            ("2027-03-04", true),
+            ("2027-04-03", true),
+            ("2027-04-04", false),
+        ] {
+            assert_eq!(names_the_day("add 3/4 cup", day(on), march), agrees, "{on}");
+        }
+        // A day before today is never one the words name.
+        assert!(!names_the_day("on Friday", day("2026-10-16"), monday));
     }
 
     fn remember(args: Value) -> ToolCall {
@@ -223,15 +381,20 @@ mod tests {
 
     /// `on` goes to the memory only with heard words that name a day.
     #[test]
-    fn on_is_dropped_unless_the_heard_line_names_a_day() {
+    fn on_is_dropped_unless_the_heard_line_names_that_day() {
         let call = remember(json!({"text":"Sister's wedding is on Saturday.","on":"2026-10-24"}));
+        let monday = || day("2026-10-19");
         assert!(matches!(
-            call_as_heard(&call, Some("my sister's wedding is on Saturday")),
+            call_as_heard_on(&call, Some("my sister's wedding is on Saturday"), monday),
             Cow::Borrowed(_)
         ));
-        for heard in [None, Some("remember my sister's wedding")] {
+        for heard in [
+            None,
+            Some("remember my sister's wedding"),
+            Some("my sister's wedding is on Sunday"),
+        ] {
             assert_eq!(
-                call_as_heard(&call, heard).args,
+                call_as_heard_on(&call, heard, monday).args,
                 json!({"text":"Sister's wedding is on Saturday."}),
                 "{heard:?}"
             );
