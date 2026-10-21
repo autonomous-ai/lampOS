@@ -1,7 +1,7 @@
 //! Local windows and durable daily chances, through the real skill loader
 //! and engine. No lamp or wall-clock wait is needed.
 use lamp_msgs::Faces;
-use lamp_skills::{Call, Engine, LOCAL_CLOCK_TOPIC, Run, Skill, daily::Journal, load, load_all};
+use lamp_skills::{Call, Engine, LOCAL_CLOCK_TOPIC, Run, Skill, load, load_all};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 const MIDNIGHT: u64 = 1_767_225_600_000; // 2026-01-01 UTC.
@@ -142,7 +142,7 @@ fn routine_quiet_time_restarts_after_a_stale_voice_heartbeat() {
     );
     let loaded = manifest(root.path(), &text);
     let mut engine = Engine::new(vec![loaded], true)
-        .with_daily_journal(Journal::open(root.path().join("daily.json")).unwrap());
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
     clock(&mut engine, 0, 0, 360);
     engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
     assert!(calls(engine.clock_tick(0)).is_empty());
@@ -189,7 +189,7 @@ fn a_daily_chance_requires_both_a_sane_clock_and_a_durable_journal() {
             .any(|event| event.allowed == Some(false) && event.why.contains("writable journal"))
     }));
     assert!(calls(refused).is_empty());
-    let journal = Journal::open(root.path().join("daily.json")).unwrap();
+    let journal = crate::journal(root.path().join("daily.json"));
     let mut engine = Engine::new(vec![loaded], true).with_daily_journal(journal);
     clock(&mut engine, 0, 0, 360);
     assert_eq!(calls(engine.clock_tick(0)).len(), 1);
@@ -201,8 +201,8 @@ fn corrected_dates_run_once_after_a_future_claim_restart_and_reload() {
     let loaded = skill(root.path(), "", morning());
     let path = root.path().join("daily.json");
     {
-        let mut engine = Engine::new(vec![loaded.clone()], true)
-            .with_daily_journal(Journal::open(&path).unwrap());
+        let mut engine =
+            Engine::new(vec![loaded.clone()], true).with_daily_journal(crate::journal(&path));
         clock(&mut engine, 0, 0, 360);
         assert_eq!(calls(engine.clock_tick(0)).len(), 1);
         clock(&mut engine, 1, 20_000, 300);
@@ -213,8 +213,8 @@ fn corrected_dates_run_once_after_a_future_claim_restart_and_reload() {
         assert!(calls(engine.clock_tick(3)).is_empty());
     }
     {
-        let mut engine = Engine::new(vec![loaded.clone()], true)
-            .with_daily_journal(Journal::open(&path).unwrap());
+        let mut engine =
+            Engine::new(vec![loaded.clone()], true).with_daily_journal(crate::journal(&path));
         clock(&mut engine, 0, 0, 370);
         assert!(
             calls(engine.clock_tick(0)).is_empty(),
@@ -229,8 +229,7 @@ fn corrected_dates_run_once_after_a_future_claim_restart_and_reload() {
             "the corrected next date was never used"
         );
     }
-    let mut engine =
-        Engine::new(vec![loaded], true).with_daily_journal(Journal::open(&path).unwrap());
+    let mut engine = Engine::new(vec![loaded], true).with_daily_journal(crate::journal(&path));
     for (index, day) in [0, 1, 20_000].into_iter().enumerate() {
         let now = (index * 2) as u64;
         clock(&mut engine, now, day, 300);
@@ -254,7 +253,7 @@ fn an_unsynchronized_clock_neither_spends_a_day_nor_approves_pending_output() {
     let path = root.path().join("daily.json");
     let mut engine = Engine::new(vec![loaded], false)
         .asking_the_policy()
-        .with_daily_journal(Journal::open(&path).unwrap());
+        .with_daily_journal(crate::journal(&path));
     assert!(engine.needs_daily_clock());
     let local = lamp_local_time::LocalTime::Offset(0);
     let wall = MIDNIGHT + 360 * 60_000;
@@ -314,7 +313,7 @@ fn the_daily_claim_precedes_a_policy_answer_and_is_not_replayed_after_refusal() 
     let run = {
         let mut engine = Engine::new(vec![loaded.clone()], false)
             .asking_the_policy()
-            .with_daily_journal(Journal::open(&path).unwrap());
+            .with_daily_journal(crate::journal(&path));
         clock(&mut engine, 0, 0, 360);
         let run = engine.clock_tick(0).pop().unwrap();
         assert!(run.ask.is_some());
@@ -326,8 +325,7 @@ fn the_daily_claim_precedes_a_policy_answer_and_is_not_replayed_after_refusal() 
         run
     };
     assert!(!run.calls.is_empty());
-    let mut restarted =
-        Engine::new(vec![loaded], true).with_daily_journal(Journal::open(path).unwrap());
+    let mut restarted = Engine::new(vec![loaded], true).with_daily_journal(crate::journal(path));
     clock(&mut restarted, 0, 0, 361);
     assert!(calls(restarted.clock_tick(0)).is_empty());
 }
@@ -486,7 +484,7 @@ fn a_pending_daily_ask_cannot_be_rebound_to_a_reordered_trigger() {
     let loaded = manifest(root.path(), &definition(&immediate, &delayed));
     let mut engine = Engine::new(vec![loaded], false)
         .asking_the_policy()
-        .with_daily_journal(Journal::open(root.path().join("daily.json")).unwrap());
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
     clock(&mut engine, 0, 0, 360);
     let mut pending = engine.clock_tick(0);
     assert_eq!(
@@ -556,7 +554,7 @@ fn a_missing_journal_reports_once_across_ticks_and_reload_until_one_is_installed
         engine.clock_tick(500_003).is_empty(),
         "a new day is no repair"
     );
-    engine = engine.with_daily_journal(Journal::open(root.path().join("daily.json")).unwrap());
+    engine = engine.with_daily_journal(crate::journal(root.path().join("daily.json")));
     assert_eq!(calls(engine.clock_tick(500_004)).len(), 1);
     assert!(engine.clock_tick(500_005).is_empty());
 }
@@ -568,7 +566,7 @@ fn a_storage_fault_withholds_pending_daily_output_and_is_not_retried() {
     let loaded = skill(root.path(), "", &daily);
     let mut engine = Engine::new(vec![loaded], false)
         .asking_the_policy()
-        .with_daily_journal(Journal::open(root.path().join("daily.json")).unwrap());
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
     clock(&mut engine, 0, 0, 360);
     let run = engine.clock_tick(0).pop().unwrap();
     assert!(engine.still(&run, 1).is_some());

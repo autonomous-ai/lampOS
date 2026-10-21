@@ -4883,9 +4883,10 @@ fn the_program_dances_again_on_dance_again_but_not_on_a_noise() {
         .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
         .unwrap();
     let mut hear = |text: &str, finished: bool| {
-        heard
+        let asked = heard
             .publish_json(1, &serde_json::json!({"text": text, "finished": finished}))
             .unwrap();
+        assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     };
     let call = || {
         let stream = std::os::unix::net::UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -8779,9 +8780,13 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
             .spawn()
             .unwrap(),
     );
+    // Its words come on the bus, so it hears them only once it listens to
+    // them: a publisher sends to the listeners there when it looks, and words
+    // said before that were refused as not asked out loud (#1569 row 60).
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -8832,7 +8837,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
     assert!(next(&mut requests, Duration::from_millis(300)).is_none());
     // A, whose face the eyes know, asks out loud.
     fs::write(&known, "known-a\n").unwrap();
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -8843,6 +8848,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     let on = call("on");
     assert_eq!(on["ok"], true, "{on}");
     assert!(
@@ -9064,6 +9070,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9100,7 +9107,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
         say(presence, true);
         say(presence, false);
     };
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -9111,6 +9118,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     // Taken in before the call: the skip's answer says so.
     clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -9257,6 +9265,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9294,7 +9303,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
         say(presence, false);
     };
     let speak = |heard: &mut lamp_bus::Publisher| {
-        heard
+        let asked = heard
             .publish_json(
                 1,
                 &Speech {
@@ -9305,6 +9314,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
                 },
             )
             .unwrap();
+        assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
         // Taken in before the call: the skip's answer says so.
         clock.skip(Duration::ZERO);
     };
@@ -9471,6 +9481,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
     let deadline = Instant::now() + Duration::from_secs(10);
     while !tools.join("call.sock").exists()
         || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+        || bus.subscribers(Speech::TOPICS[0]).unwrap().is_empty()
     {
         assert!(Instant::now() < deadline, "guard mode was never loaded");
         std::thread::sleep(Duration::from_millis(50));
@@ -9499,7 +9510,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
             .unwrap();
         clock.skip(Duration::ZERO);
     };
-    heard
+    let asked = heard
         .publish_json(
             1,
             &Speech {
@@ -9510,6 +9521,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
             },
         )
         .unwrap();
+    assert_eq!(asked.delivered, 1, "the words reached lamp-skills");
     // Taken in before the call: the skip's answer says so.
     clock.skip(Duration::ZERO);
     let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
@@ -10283,7 +10295,6 @@ fn who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces() {
 
 #[test]
 fn daily_rise_revalidation_keeps_window_and_reload_fences() {
-    use lamp_skills::daily::Journal;
     use std::os::unix::fs::PermissionsExt;
 
     const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
@@ -10314,7 +10325,7 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
         let journal = dir.path().join("daily.json");
         let mut engine = Engine::new(vec![skill.clone()], false)
             .asking_the_policy()
-            .with_daily_journal(Journal::open(&journal).unwrap());
+            .with_daily_journal(crate::journal(&journal));
         engine.clock(0, 0, MORNING);
         assert!(
             engine
@@ -10375,7 +10386,7 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
         // Losing the pending answer never restores its durable chance,
         // even when a new process sees a fresh rise in the same window.
         let mut restarted =
-            Engine::new(vec![skill], true).with_daily_journal(Journal::open(&journal).unwrap());
+            Engine::new(vec![skill], true).with_daily_journal(crate::journal(&journal));
         restarted.clock(0, 0, MORNING);
         restarted.observe("air/state", 0, br#"{"pm2_5":20}"#, None);
         assert!(
@@ -10391,7 +10402,6 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
 /// consumed across reload and restart, using this branch's existing dim owner.
 #[test]
 fn daily_held_dim_keeps_clock_reload_and_restart_fences() {
-    use lamp_skills::daily::Journal;
     use std::os::unix::fs::PermissionsExt;
 
     const MORNING: u64 = 1_767_225_600_000 + 6 * 3_600_000;
@@ -10421,7 +10431,7 @@ light = { dim = 1, until = "ends" }
     .unwrap();
     let journal = dir.path().join("daily.json");
     let mut engine =
-        Engine::new(vec![daily.clone()], true).with_daily_journal(Journal::open(&journal).unwrap());
+        Engine::new(vec![daily.clone()], true).with_daily_journal(crate::journal(&journal));
     let local = lamp_local_time::LocalTime::Offset(0);
     engine.clock_in_with_trust(&local, 0, MORNING, false);
     assert!(
@@ -10455,8 +10465,7 @@ light = { dim = 1, until = "ends" }
     );
     drop(engine);
 
-    let mut restarted =
-        Engine::new(vec![daily], true).with_daily_journal(Journal::open(&journal).unwrap());
+    let mut restarted = Engine::new(vec![daily], true).with_daily_journal(crate::journal(&journal));
     restarted.clock(0, 0, MORNING);
     assert!(
         restarted
