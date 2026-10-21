@@ -2189,6 +2189,53 @@ mod tests {
         assert!(scratch.0.join("Not-A-Person").exists());
     }
 
+    /// Lines a later build wrote, with fields this build doesn't know, read
+    /// as the fields it knows (#1505's rule): the exchange and the kept
+    /// thing come back, and the count goes on after them.
+    #[test]
+    fn lines_from_a_later_build_read_as_the_fields_this_build_knows() {
+        use std::io::Write as _;
+        let scratch = Scratch::new("later");
+        let now = at("2026-10-13", 600);
+        let me = everyone();
+        let mut store = scratch.open(now);
+        assert_eq!(store.append(&me, now, "one", "1", now).unwrap(), 1);
+        assert_eq!(store.remember(&me, now, "two").unwrap(), 2);
+        drop(store);
+        let dir = scratch.0.join("everyone");
+        let line = |path: PathBuf, value: serde_json::Value| {
+            let mut file = fs::OpenOptions::new().append(true).open(path).unwrap();
+            writeln!(file, "{value}").unwrap();
+        };
+        line(
+            dir.join("journal-2026-10-13.jsonl"),
+            serde_json::json!({"id": 3, "at_unix_ms": now, "heard": "three", "said": "3", "face": "known"}),
+        );
+        line(
+            dir.join("kept.jsonl"),
+            serde_json::json!({"id": 4, "at_unix_ms": now, "text": "four", "asked_by": "the app"}),
+        );
+        let mut store = scratch.open(now);
+        let day = store.recall(&me, &ask(None, Some("2026-10-13"))).unwrap();
+        assert!(
+            day.contains(&Entry::Exchange(Exchange {
+                id: 3,
+                at_unix_ms: now,
+                heard: "three".into(),
+                said: "3".into(),
+            })),
+            "{day:?}"
+        );
+        let kept: Vec<String> = store
+            .kept(&me, usize::MAX)
+            .unwrap()
+            .into_iter()
+            .map(|kept| kept.text)
+            .collect();
+        assert_eq!(kept, ["two", "four"]);
+        assert_eq!(store.remember(&me, now, "five").unwrap(), 5);
+    }
+
     #[test]
     fn status_counts_each_person_and_a_directory_is_one_stores_at_a_time() {
         let scratch = Scratch::new("status");

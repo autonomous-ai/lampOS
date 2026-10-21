@@ -456,4 +456,18 @@ mod tests {
             assert_eq!(read(&path), None, "{score}");
         }
     }
+
+    /// A later build may keep more beside the bar (#1505's rule): its file
+    /// still gives this build the bar, from the fields it knows.
+    #[test]
+    fn a_file_from_a_later_build_still_gives_its_bar() {
+        let folder = tempfile::tempdir().expect("folder");
+        let path = folder.path().join("near-call.json");
+        let calibrated = Calibrated::of(tries(&[22.4, 25.0, 23.1]), 1_760_000_000).expect("a bar");
+        let mut later = serde_json::to_value(&calibrated).expect("json");
+        later["seat"] = serde_json::json!("the desk chair");
+        later["tries"][0]["face_seen"] = serde_json::json!(true);
+        std::fs::write(&path, serde_json::to_vec(&later).expect("json")).expect("written");
+        assert_eq!(read(&path), Some(19.4));
+    }
 }
