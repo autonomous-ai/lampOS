@@ -53,7 +53,10 @@
 #
 # Environment: SAY (say, else spd-say; or piper), VOICE (Samantha; with
 # spd-say, its synthesis voice, e.g. female1, and none by default), GAP (15),
-# LAMP_WORD ("Hey Lamp,"), DRY (1: print the rows without speaking or waiting).
+# LAMP_WORD ("Hey Lamp,"), DRY (1: print the rows without speaking or waiting),
+# TONE_LINES (a file of `kind|words` rows played in place of the lines below,
+# each kind's controls as here; `mood-tone-run.sh` gives one) and KIND_GAP
+# (seconds after each line that isn't plain; GAP by default).
 set -euo pipefail
 
 if [ -z "${SAY:-}" ]; then
@@ -151,6 +154,17 @@ speak() {
 }
 
 lines() {
+  if [ -n "${TONE_LINES:-}" ]; then
+    local kind words
+    while IFS='|' read -r kind words; do
+      case "$kind" in
+        calm) printf 'calm|%s|%s\n' "$CALM" "$words" ;;
+        lively) printf 'lively|%s|%s\n' "$LIVELY" "$words" ;;
+        *) printf '%s||%s\n' "$kind" "$words" ;;
+      esac
+    done <"$TONE_LINES"
+    return
+  fi
   local plain
   for plain in \
     "What time is it?" \
@@ -187,7 +201,7 @@ play() {
     printf '%d\t%s\t%s\t%s\n' "$n" "$kind" "$at" "$words"
     if [ "$DRY" != 1 ]; then
       speak "$kind" "$controls" "$words"
-      sleep "$GAP"
+      if [ "$kind" = plain ]; then sleep "$GAP"; else sleep "${KIND_GAP:-$GAP}"; fi
     fi
   done < <(lines)
 }
