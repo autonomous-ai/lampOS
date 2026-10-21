@@ -180,7 +180,10 @@ pub fn call_as_heard(call: &ToolCall, request: u64, heard: bool) -> Option<(Tool
 /// [`call_as_heard`] with the words heard in its line. A heard line kept
 /// instead is sent without the model's `replaces` (#2510, reviewer-lead
 /// P2): it may lack the fact's subject ("They said: it's green now"), so
-/// the old fact stays and the heard line is kept beside it.
+/// the old fact stays and the heard line is kept beside it. Its `on`
+/// (#1693) stays: by now an `on` is left only when these same heard words
+/// name that day ([`super::on::call_as_heard`]), so the heard line is
+/// exactly what dates it (reviewer-lead P3 on #2680).
 pub(super) fn call_with(call: &ToolCall, heard: Option<&str>) -> Option<(ToolCall, String)> {
     if call.name != super::REMEMBER {
         return None;
@@ -188,7 +191,11 @@ pub(super) fn call_with(call: &ToolCall, heard: Option<&str>) -> Option<(ToolCal
     let model = call.args.get("text")?.as_str()?;
     let kept = heard_instead(model, heard, true)?;
     let mut call = call.clone();
+    let on = call.args.get("on").cloned();
     call.args = json!({"text": kept});
+    if let Some(on) = on {
+        call.args["on"] = on;
+    }
     Some((call, kept))
 }
 
@@ -340,6 +347,13 @@ mod tests {
         correction.args["replaces"] = json!(4);
         let (sent, kept) = call_with(&correction, Some(TEA)).unwrap();
         assert_eq!(sent.args, json!({"text": kept}));
+        // Its day stays with the heard line that named it (#1693,
+        // reviewer-lead P3 on #2680).
+        let mut dated = call(super::super::REMEMBER, "Dentist appointment on Friday.");
+        dated.args["on"] = json!("2026-10-23");
+        let (sent, kept) = call_with(&dated, Some("remember my dentist is on friday")).unwrap();
+        assert_eq!(kept, "They said: my dentist is on friday");
+        assert_eq!(sent.args, json!({"text": kept, "on": "2026-10-23"}));
     }
 
     #[test]

@@ -936,14 +936,24 @@ the unchanged legacy client, used unless the new Days client is selected.
   Saturday"): with the switch, `remember` is declared with an optional
   `on`, `YYYY-MM-DD`, which the model gives only when they named the day,
   worked out from today's date (`remember::on::DESCRIBED`). The voice keeps
-  it only when the words heard in that line name a day it can come from
-  (`remember::on::names_a_day`, lower-cased whole words): a weekday;
-  today, tonight, tomorrow (so "the day after tomorrow"); next or this
-  week; weekend; a month name or short form (never "may", "mar", "jun",
-  "jul") with a day number 1 to 31, bare or "24th"; a numeric date of two
-  or three digit groups joined by `/` or `-`; and in Vietnamese hôm nay,
-  tối nay, ngày mai, ngày kia, tuần sau/tới/này, cuối tuần, chủ nhật,
-  thứ hai to thứ bảy (or thứ 2 to 7), and tháng with a day number.
+  it only when the words heard in that line name that same day, against
+  the lamp's local today (`remember::on::names_the_day`, lower-cased whole
+  words; one naming that agrees is enough): a weekday (or its plural)
+  that `on` falls on, within the next 7 days, or 8 to 14 days on after
+  "next"; today or tonight, `on` is today; tomorrow, today plus one; the
+  day after tomorrow, today plus two; weekend, a Saturday or Sunday within
+  two weeks; this week or next week, `on` within that Monday-to-Sunday
+  week; a month name or short form (never "may", "mar", "jun", "jul") with
+  a day number 1 to 31, bare or "24th", that are `on`'s month and day; a
+  numeric date of two or three digit groups joined by `/` or `-` that
+  reads as `on`, day first or month first, with its year if it has one
+  (`YYYY-MM-DD` exactly), so "3/4 cup" agrees only with 3 April or 4
+  March; and in Vietnamese hôm nay and tối nay (today), ngày mai (+1),
+  ngày kia (+2), tuần sau/tới (next week), tuần này (this week), cuối
+  tuần (weekend), chủ nhật and thứ hai to thứ bảy (or thứ 2 to 7) for
+  `on`'s weekday within 7 days (14 with tuần sau/tới), and tháng N with a
+  day number for `on`'s month and day. "Dentist on Friday" with `on` a
+  Thursday loses its `on`.
   Otherwise `on` is dropped before the memory is asked, never guessed
   (`tools.rs`, `remember::on::call_as_heard`): so too for a text from the
   app or a line the lamp wrote, which nobody said at the lamp. What is
@@ -955,14 +965,20 @@ the unchanged legacy client, used unless the new Days client is selected.
   without a day is never given. A correction that replaces it, and every
   forget, takes its day too. Off, `remember`'s declaration and request are
   byte for byte as before. With `LAMP_MEMORY_KEEP_HEARD`, a heard line
-  kept in place of the model's sentence is kept without `on`. Tests:
-  `remember::on::tests::a_day_is_kept_only_from_words_that_name_one`,
-  `remember::on::tests::on_is_dropped_unless_the_heard_line_names_a_day`,
+  kept in place of the model's sentence keeps `on`: by then `on` is left
+  only when those same heard words name it (`remember::heard::call_with`).
+  Said again with `LAMP_MEMORY_REMEMBER_ONCE` for a later day (a weekly
+  "dentist on Friday"), the kept fact takes the new day and is followed
+  up once after it (memory-days.md, `remember {…, on}`). Tests:
+  `remember::on::tests::a_day_is_kept_only_from_words_that_name_that_day`,
+  `remember::on::tests::on_is_dropped_unless_the_heard_line_names_that_day`,
+  `remember::heard::tests::the_call_is_held_against_the_words_heard_in_its_own_line`,
   `remember::on::tests::a_day_is_sent_only_from_today_to_sixty_days_on`,
   `remember::tests::with_the_events_switch_remember_sends_its_day`,
   `remember::tests::without_the_events_switch_remember_is_declared_as_before`,
   `days::a_kept_thing_with_a_day_is_given_once_the_day_after_it`,
   `days::a_kept_thing_without_a_good_day_is_never_given`,
+  `days::a_weekly_kept_thing_said_again_for_a_later_day_is_followed_up_again`,
   `days::a_replaced_kept_thing_loses_its_day`,
   `days::forgetting_a_kept_thing_removes_its_day`,
   `days::a_kept_day_is_given_only_to_the_person_who_kept_it`.
