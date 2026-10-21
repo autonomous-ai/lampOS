@@ -147,13 +147,15 @@ build hash taken out. Same board (Orange Pi 4 Pro), two lamps.
 - The voice's options: `--noise-suppression off --turn-taking duplex
   --faint-floor-db -28 --microphone mic2 --reference-clock capture
   --reference-recovery bounded --provider-continuation kept-start
-  --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600
+  --playout-start-ms 350 --end-silence-ms 600
   --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000`. On
   17 October `bounded` replaced `off` (lamp-cb94's voice ended on a held-up
   speaker with `off`; bounded recovery kept it up, #1298) and the call's
   wait came from lamp-4ace. The template's
   `@VOICE_OPTIONS@` calls them "the measured options of this lamp"; on two
-  lamps they are one set.
+  lamps they are one set. The ring's `--ring-channel-ceiling 24` is not among
+  them: the template carries it itself (#2529), and the voice refuses the flag
+  given twice, so it never goes into `@VOICE_OPTIONS@`.
 - Every option of name, ears, air, actions, memory, schedule and controls
   (`lamp-name --microphone mic2 --least 0.9`, `lamp-ears --device
   plug:device_micro1 --rise-db 30`, `lamp-air --bus-number 0`,
