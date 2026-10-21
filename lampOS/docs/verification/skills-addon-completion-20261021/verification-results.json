@@ -1,0 +1,275 @@
+[
+  {
+    "label": "after-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 6.9889,
+    "stdout": "after-compile.stdout",
+    "stderr": "after-compile.stderr"
+  },
+  {
+    "label": "after-enabled-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.028383,
+    "stdout": "after-enabled-1.stdout",
+    "stderr": "after-enabled-1.stderr"
+  },
+  {
+    "label": "after-disabled-1",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.647531,
+    "stdout": "after-disabled-1.stdout",
+    "stderr": "after-disabled-1.stderr"
+  },
+  {
+    "label": "after-enabled-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.693267,
+    "stdout": "after-enabled-2.stdout",
+    "stderr": "after-enabled-2.stderr"
+  },
+  {
+    "label": "after-disabled-2",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.646333,
+    "stdout": "after-disabled-2.stdout",
+    "stderr": "after-disabled-2.stderr"
+  },
+  {
+    "label": "after-enabled-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.691785,
+    "stdout": "after-enabled-3.stdout",
+    "stderr": "after-enabled-3.stderr"
+  },
+  {
+    "label": "after-disabled-3",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.646687,
+    "stdout": "after-disabled-3.stdout",
+    "stderr": "after-disabled-3.stderr"
+  },
+  {
+    "label": "mutant-rate-limit-bypassed-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.810331,
+    "stdout": "mutant-rate-limit-bypassed-compile.stdout",
+    "stderr": "mutant-rate-limit-bypassed-compile.stderr"
+  },
+  {
+    "label": "mutant-rate-limit-bypassed",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 1.452115,
+    "stdout": "mutant-rate-limit-bypassed.stdout",
+    "stderr": "mutant-rate-limit-bypassed.stderr"
+  },
+  {
+    "label": "mutant-off-filter-ignored-with-slow-startup-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.557864,
+    "stdout": "mutant-off-filter-ignored-with-slow-startup-compile.stdout",
+    "stderr": "mutant-off-filter-ignored-with-slow-startup-compile.stderr"
+  },
+  {
+    "label": "mutant-off-filter-ignored-with-slow-startup",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 1.923869,
+    "stdout": "mutant-off-filter-ignored-with-slow-startup.stdout",
+    "stderr": "mutant-off-filter-ignored-with-slow-startup.stderr"
+  },
+  {
+    "label": "mutant-done-suppressed-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 2.626001,
+    "stdout": "mutant-done-suppressed-compile.stdout",
+    "stderr": "mutant-done-suppressed-compile.stderr"
+  },
+  {
+    "label": "mutant-done-suppressed",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+      "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "--exact",
+      "--nocapture"
+    ],
+    "expected_exit": 101,
+    "exit_code": 101,
+    "wall_s": 10.932913,
+    "stdout": "mutant-done-suppressed.stdout",
+    "stderr": "mutant-done-suppressed.stderr"
+  },
+  {
+    "label": "gate-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 12.90221,
+    "stdout": "gate-fmt.stdout",
+    "stderr": "gate-fmt.stderr"
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-skills",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 41.145752,
+    "stdout": "gate-clippy.stdout",
+    "stderr": "gate-clippy.stderr"
+  },
+  {
+    "label": "gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-skills"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 20.123153,
+    "stdout": "gate-tests.stdout",
+    "stderr": "gate-tests.stderr"
+  },
+  {
+    "label": "gate-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 59.164646,
+    "stdout": "gate-build.stdout",
+    "stderr": "gate-build.stderr"
+  },
+  {
+    "label": "gate-diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "expected_exit": 0,
+    "exit_code": 0,
+    "wall_s": 0.073195,
+    "stdout": "gate-diff.stdout",
+    "stderr": "gate-diff.stderr"
+  }
+]

@@ -43,7 +43,7 @@ const ONE_PASS: Duration = Duration::from_millis(300);
 /// [`Clock::host`] is the lamp's own instead: no flag, and each skip a real
 /// wait, so a few tests still run the waits a lamp runs.
 #[derive(Clone)]
-struct Clock {
+pub(super) struct Clock {
     /// The control socket; none on the host's clock.
     socket: Option<PathBuf>,
     skipped_us: Arc<AtomicU64>,
@@ -51,7 +51,7 @@ struct Clock {
 
 impl Clock {
     /// The clock of a program whose control socket is in `root`.
-    fn at(root: &Path) -> Self {
+    pub(super) fn at(root: &Path) -> Self {
         Self {
             socket: Some(root.join("clock.sock")),
             skipped_us: Arc::default(),
@@ -67,7 +67,7 @@ impl Clock {
     }
 
     /// The flag that hands it to the program, if any.
-    fn args(&self) -> Vec<&OsStr> {
+    pub(super) fn args(&self) -> Vec<&OsStr> {
         self.socket
             .iter()
             .flat_map(|socket| ["--clock-control".as_ref(), socket.as_os_str()])
@@ -81,7 +81,7 @@ impl Clock {
 
     /// Skips the program's clock `by`, once it has taken in what was
     /// published before.
-    fn skip(&self, by: Duration) {
+    pub(super) fn skip(&self, by: Duration) {
         self.skip_after(by, || {});
     }
 

@@ -1,0 +1,30 @@
+--- a/lampOS/crates/skills/tests/it/addon.rs
++++ b/lampOS/crates/skills/tests/it/addon.rs
+@@ -335,7 +335,8 @@
+         .tempdir_in("/tmp")
+         .unwrap();
+     let root = dir.path();
+-    addon_with(&root.join("skills"), "quiet-say", RESTING);
++    let addon = "quiet-say";
++    addon_with(&root.join("skills"), addon, RESTING);
+     let bus = Bus::new(root.join("bus")).unwrap();
+     let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+@@ -404,7 +405,7 @@
+             // trigger. Latest-state publications could otherwise coalesce,
+             // and a clock acknowledgement alone does not clear a busy run.
+             let deadline = Instant::now() + Duration::from_secs(10);
+-            let what = format!("quiet-note completion after publication {publication}");
++            let what = format!("{addon} completion after publication {publication}");
+             loop {
+                 running.waiting(deadline, root, &what);
+                 let wait = deadline
+@@ -412,7 +413,7 @@
+                     .min(Duration::from_millis(100));
+                 if let Some(message) = events.recv(wait).unwrap() {
+                     let event = message.parse::<SkillEvent>().unwrap();
+-                    let done = event.skill == "quiet-note" && event.stage == SkillStage::Done;
++                    let done = event.skill == addon && event.stage == SkillStage::Done;
+                     seen.push(event);
+                     if done {
+                         break;

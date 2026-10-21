@@ -1,0 +1,131 @@
+===== before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-1.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 2.30s
+
+===== before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-1.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.89s
+
+===== before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-2.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.60s
+
+===== before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-2.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.90s
+
+===== before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-3.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.60s
+
+===== before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-3.txt =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.89s
+
+===== after-enabled-1 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+EXIT: 0; WALL_SECONDS: 2.028383
+
+--- after-enabled-1.stdout ---
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.24s
+
+--- after-enabled-1.stderr ---
+
+
+===== after-disabled-1 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+EXIT: 0; WALL_SECONDS: 0.647531
+
+--- after-disabled-1.stdout ---
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.63s
+
+--- after-disabled-1.stderr ---
+
+
+===== after-enabled-2 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+EXIT: 0; WALL_SECONDS: 0.693267
+
+--- after-enabled-2.stdout ---
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.68s
+
+--- after-enabled-2.stderr ---
+
+
+===== after-disabled-2 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+EXIT: 0; WALL_SECONDS: 0.646333
+
+--- after-disabled-2.stdout ---
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.63s
+
+--- after-disabled-2.stderr ---
+
+
+===== after-enabled-3 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+EXIT: 0; WALL_SECONDS: 0.691785
+
+--- after-enabled-3.stdout ---
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.67s
+
+--- after-enabled-3.stderr ---
+
+
+===== after-disabled-3 =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+EXIT: 0; WALL_SECONDS: 0.646687
+
+--- after-disabled-3.stdout ---
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.63s
+
+--- after-disabled-3.stderr ---
+

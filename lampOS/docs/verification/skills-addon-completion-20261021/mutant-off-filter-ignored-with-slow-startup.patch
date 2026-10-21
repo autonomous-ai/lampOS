@@ -1,0 +1,19 @@
+--- a/lampOS/crates/skills/src/main.rs
++++ b/lampOS/crates/skills/src/main.rs
+@@ -1008,7 +1008,7 @@
+                 skills.retain(|skill| options.routines || !skill.is_routine());
+                 skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
+                 skills.retain(|skill| {
+-                    let kept = options.addons || skill.kind != lamp_skills::SkillKind::Addon;
++                    let kept = true;
+                     if !kept {
+                         eprintln!(
+                             "lamp-skills: not loaded: {}: kind = \"addon\" runs only with {}=on",
+@@ -1031,6 +1031,7 @@
+                 }
+                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
+                 eprintln!("lamp-skills: loaded {names:?}");
++                std::thread::sleep(Duration::from_millis(500));
+                 if let Some(manager) = &mut routines {
+                     manager.reload_skills(&skills, lamp_ipc::monotonic_us());
+                 }

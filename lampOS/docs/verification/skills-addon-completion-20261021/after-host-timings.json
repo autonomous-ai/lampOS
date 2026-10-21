@@ -1,0 +1,101 @@
+{
+  "base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "rows": [
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 1,
+      "label": "after-enabled-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 2.028383,
+      "stdout": "after-enabled-1.stdout",
+      "stderr": "after-enabled-1.stderr"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 1,
+      "label": "after-disabled-1",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.647531,
+      "stdout": "after-disabled-1.stdout",
+      "stderr": "after-disabled-1.stderr"
+    },
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 2,
+      "label": "after-enabled-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.693267,
+      "stdout": "after-enabled-2.stdout",
+      "stderr": "after-enabled-2.stderr"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 2,
+      "label": "after-disabled-2",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.646333,
+      "stdout": "after-disabled-2.stdout",
+      "stderr": "after-disabled-2.stderr"
+    },
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 3,
+      "label": "after-enabled-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.691785,
+      "stdout": "after-enabled-3.stdout",
+      "stderr": "after-enabled-3.stderr"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 3,
+      "label": "after-disabled-3",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "expected_exit": 0,
+      "exit_code": 0,
+      "wall_s": 0.646687,
+      "stdout": "after-disabled-3.stdout",
+      "stderr": "after-disabled-3.stderr"
+    }
+  ]
+}

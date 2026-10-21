@@ -1,0 +1,84 @@
+Command: /private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+Expected/actual exit: 101; wall seconds: 11.585355
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... FAILED
+
+failures:
+
+failures:
+    addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 10.78s
+
+
+thread 'addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on' (689459461) panicked at crates/skills/tests/it/addon.rs:295:9:
+timed out waiting for quiet-note completion after publication 1; stderr:
+lamp-skills: skills from /tmp/adcqkjjr/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["quiet-say"]
+lamp-skills: quiet-say Triggered: voice/state has held for 0 s
+lamp-skills: quiet-say Answered: an add-on: its proposals go to the judge on addon/proposal
+lamp-skills: quiet-say Done: proposed say as 3155791135286 on addon/proposal
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+Command: /private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+Expected/actual exit: 101; wall seconds: 1.395909
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... FAILED
+
+failures:
+
+failures:
+    addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 1.37s
+
+
+thread 'addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on' (689463165) panicked at crates/skills/tests/it/addon.rs:442:5:
+assertion `left == right` failed: [AddonProposal { proposal: 3155814896860, addon: "quiet-say", version: "1.2.0", act: "say", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }, AddonProposal { proposal: 3155814897285, addon: "quiet-say", version: "1.2.0", act: "say", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }, AddonProposal { proposal: 3155814897650, addon: "quiet-say", version: "1.2.0", act: "say", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }]
+  left: 3
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+Command: /private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+Expected/actual exit: 101; wall seconds: 1.936602
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... FAILED
+
+failures:
+
+failures:
+    addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 1.92s
+
+
+thread 'addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written' (689463611) panicked at crates/skills/tests/it/addon.rs:466:5:
+an add-on was loaded without the switch
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+Command: /private/tmp/tests-codex-1569-target/debug/deps/it-f6f1fcfb0dfb4233 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+Expected/actual exit: 101; wall seconds: 10.768874
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... FAILED
+
+failures:
+
+failures:
+    addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 260 filtered out; finished in 10.75s
+
+
+thread 'addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on' (689464155) panicked at crates/skills/tests/it/addon.rs:295:9:
+timed out waiting for quiet-say completion after publication 1; stderr:
+lamp-skills: skills from /tmp/ad4tdWu4/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["quiet-say"]
+lamp-skills: quiet-say Triggered: voice/state has held for 0 s
+lamp-skills: quiet-say Answered: an add-on: its proposals go to the judge on addon/proposal
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

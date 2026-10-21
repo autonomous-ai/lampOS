@@ -566,6 +566,22 @@ skills".)
   the renewal thread has armed its next wait. The paused-light test keeps
   the original 500 ms allowance after light-on as an explicit no-text
   observation, followed by the original 300 ms check after the next visit.
+  The add-on process pair in `crates/skills/tests/it/addon.rs` also replaces
+  settling sleeps with acknowledgements (#1806). With `LAMP_ADDONS=on`, each
+  of three resting-state publications waits up to 10 s for `quiet-say`'s
+  `done` event before publishing the next; every event is kept for the
+  assertions. This observes each proposal or limit refusal separately,
+  without coalescing the latest-state triggers. Without the switch, the
+  fixture waits for the loaded announcement, then asks for a zero-duration
+  clock skip: the next main-loop skip handler is after startup subscription
+  setup, so its acknowledgement precedes the subscriber absence check. A
+  zero skip after each publication also lets the loop consume pending input.
+  These skips advance no time and do not promise that a run has completed;
+  the enabled case uses `done`, with no clock-control flag. Both cases keep
+  their final 500 ms proposal and 100 ms event absence drains, and all
+  original assertions, including the real 10 s proposal limit.
+  Timings and regression controls are recorded in the
+  [add-on completion verification](verification/skills-addon-completion-20261021/README.md).
 
 `lamp-update install` puts it on a home lamp (#811): the product unit
 `deploy/product/lamp-skills.service`, every product skill in
