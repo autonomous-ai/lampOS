@@ -342,3 +342,11 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - The stand-in test passes (11 cases). Not run on a lamp yet.
 - **#2671** merged.
 - #2667 is third in the Reviewer-lead's lane.
+
+## 22 Oct, 02:0x–02:3x: 2b merged; #2675's ARM64 failure was mine
+
+- **#2667 (2b)** merged as `97ce33ce3`. #2675 is retargeted onto lamp-voice through the REST API (`7dd7c6b6d`, `=`).
+- **ARM64 failed** in lamp-cloud's `an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp`. Its test add-on proposed `note`, which this PR now refuses at load. I had run only the voice and skills crates.
+  - Fixed: the add-on proposes a `mood`. Folded as `6eb4a9666`.
+  - The whole workspace ran locally: 200 targets passed. lamp-audio's bounded-work timing test and lamp-records' `public_tree_pipeline…` failed under the workspace's load, and both pass alone.
+  - Noted in memory: a lamp-skills load-rule change gets the whole workspace's tests.
