@@ -42,6 +42,68 @@ check "calm slow, quiet and low, after the lamp's name said plainly" 'sed -n 11p
 check "lively quick, loud and high, after the lamp's name said plainly" 'sed -n 12p "$T/said" | grep -q "^-v Samantha Hey Lamp, \[\[rate 230\]\]\[\[volm 1.0\]\]\[\[pbas 62\]\]\[\[pmod 70\]\]I think"'
 check "plain lines with no controls" 'sed -n 1p "$T/said" | grep -q "^-v Samantha Hey Lamp, What time is it?$"'
 
+# play, spoken by a stand-in `spd-say` (Linux): the lamp's name plainly, then
+# the words with the kind's own settings, each waited for.
+mkdir -p "$T/spd"
+cat >"$T/spd/spd-say" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$SAID"
+SH
+chmod +x "$T/spd/spd-say"
+SAID="$T/spd-said" SAY="$T/spd/spd-say" GAP=0 "$SCRIPT" play >/dev/null
+check "spd-say: the name, then the words, for each line" '[ "$(wc -l <"$T/spd-said" | tr -d " ")" = 36 ]'
+check "spd-say: the lamp's name plainly, waited for" '[ "$(grep -cx -- "-w Hey Lamp," "$T/spd-said")" = 18 ]'
+check "spd-say: calm slow, low, flat and quieter" 'sed -n 22p "$T/spd-said" | grep -qx -- "-w -r -45 -p -45 -R -90 -i -40 I think we could go to the park later today."'
+check "spd-say: lively quick, high, moving and full" 'sed -n 24p "$T/spd-said" | grep -qx -- "-w -r 55 -p 45 -R 90 -i 100 I think we could go to the park later today."'
+check "spd-say: plain lines with no settings, no Mac voice" 'sed -n 2p "$T/spd-said" | grep -qx -- "-w What time is it?"'
+SAID="$T/spd-voice" SAY="$T/spd/spd-say" VOICE=female1 GAP=0 "$SCRIPT" play >/dev/null
+check "spd-say: a voice given is its synthesis voice" '[ "$(grep -c -- "^-w -t female1 " "$T/spd-voice")" = 36 ]'
+
+# play, through Piper (the Linux mode to use): a stand-in Piper writes a steady
+# tone for any text, a stand-in pw-play keeps each line it is given, and ffmpeg
+# makes the sentence calm or lively. Skipped without ffmpeg.
+if command -v ffmpeg >/dev/null 2>&1; then
+  mkdir -p "$T/piper" "$T/kept"
+  cat >"$T/piper/piper" <<'SH'
+#!/usr/bin/env bash
+while [ $# -gt 0 ]; do case "$1" in -f) out=$2; shift ;; esac; shift; done
+cat >/dev/null
+python3 -I -c "
+import math, struct, sys, wave
+w = wave.open(sys.argv[1], 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)
+w.writeframes(b''.join(struct.pack('<h', int(8000 * math.sin(2 * math.pi * 220 * n / 22050))) for n in range(22050)))
+" "$out"
+SH
+  cat >"$T/piper/pw-play" <<'SH'
+#!/usr/bin/env bash
+n=$(ls "$KEPT" | wc -l | tr -d " ")
+cp "$1" "$KEPT/$((n + 1)).wav"
+SH
+  chmod +x "$T/piper/piper" "$T/piper/pw-play"
+  echo '{"audio": {"sample_rate": 22050}}' >"$T/voice.onnx.json"
+  KEPT="$T/kept" PATH="$T/piper:$PATH" SAY=piper PIPER_MODEL="$T/voice.onnx" GAP=0 "$SCRIPT" play </dev/null >"$T/piper-played.tsv"
+  # The words only: the stand-in's name is the line's first second.
+  mean() { ffmpeg -nostdin -hide_banner -ss 1.1 -i "$1" -af volumedetect -f null - 2>&1 | sed -n 's/.*mean_volume: \([-0-9.]*\) dB/\1/p'; }
+  check "piper: every line played, the list read whole" '[ "$(ls "$T/kept" | wc -l | tr -d " ")" = 18 ] && [ "$(cut -f2 "$T/piper-played.tsv" | tr "\n" " ")" = "$kinds" ]'
+  calm=$(mean "$T/kept/11.wav"); lively=$(mean "$T/kept/12.wav"); plain=$(mean "$T/kept/1.wav")
+  check "piper: calm's words are quieter than lively's (${calm} against ${lively} dB)" 'awk -v c="$calm" -v l="$lively" "BEGIN{exit !(l - c > 6)}"'
+  check "piper: a plain line's words are as loud as lively's" 'awk -v p="$plain" -v l="$lively" "BEGIN{d=p-l; exit !(d < 1.5 && d > -1.5)}"'
+  # A voice with no sample rate is refused before anything is said, and a
+  # Piper that fails says why; no working folder is left behind.
+  before=$(ls -d "${TMPDIR:-/tmp}"/tmp.* 2>/dev/null | wc -l | tr -d " ")
+  echo '{}' >"$T/bare.onnx.json"
+  SAY=piper PIPER_MODEL="$T/bare.onnx" PATH="$T/piper:$PATH" GAP=0 "$SCRIPT" play </dev/null >/dev/null 2>"$T/bare.err"
+  check "piper: a voice with no sample rate is refused" '[ $? = 2 ] && grep -q "no sample rate" "$T/bare.err"'
+  printf '#!/usr/bin/env bash\necho "model is broken" >&2\nexit 3\n' >"$T/piper-bad"
+  chmod +x "$T/piper-bad"
+  SAY=piper PIPER="$T/piper-bad" PIPER_MODEL="$T/voice.onnx" PATH="$T/piper:$PATH" GAP=0 "$SCRIPT" play </dev/null >/dev/null 2>"$T/bad.err"
+  check "piper: a Piper that fails says why" 'grep -q "model is broken" "$T/bad.err"'
+  after=$(ls -d "${TMPDIR:-/tmp}"/tmp.* 2>/dev/null | wc -l | tr -d " ")
+  check "piper: no working folder left behind" '[ "$after" -le "$before" ]'
+else
+  echo "skip piper: no ffmpeg"
+fi
+
 # read: made-up records and played times for the eighteen lines, 18 s apart,
 # each End 3 s after its line began, on a lamp clock 5000 s from the Mac's.
 # The baseline is sure from line 6.
