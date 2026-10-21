@@ -838,6 +838,10 @@ is from `lamp-eyes` ([eyes.md](eyes.md)) on that socket: one datagram a look,
 `{"face":{"x":..,"y":..,"size":..,"turned":..}}` or `{"face":null}`. Anything
 else is ignored, and only the newest waiting counts.
 
+Which face that is, is the eyes' choice: the largest near one, or, with
+`LAMP_TURN_TO_ANSWERED=on` in the eyes' unit, the one seen asking while the
+lamp answers it ([eyes.md](eyes.md), "Turning to the one it answers").
+
 A skill's look (`lamp-skills`, "look at the face") comes on the same socket
 in the same shape, and the body cannot tell it from the eyes' own: it is
 taken or dropped by the same rules, and a look alone never stands a folded

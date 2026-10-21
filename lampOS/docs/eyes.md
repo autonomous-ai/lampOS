@@ -1590,6 +1590,44 @@ Once it can be trusted, the voice's "spoken to" judging is to read it
 while the only face turned to the lamp reads `no` is not for it, and a face
 that reads `yes` with the voice's speech is the one speaking.
 
+### Turning to the one it answers (`LAMP_TURN_TO_ANSWERED=on`, #1810)
+
+Off unless `LAMP_TURN_TO_ANSWERED=on` is in the eyes' unit beside
+`LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; off, the body is sent the largest
+near face as before. With the bus off, the journal says it is on without the
+bus and nothing changes; with `LAMP_EYES_SPEAKING` off, the journal says no
+face reads speaking, so the lamp turns to nobody. On ([`answered.rs`](../crates/eyes/src/answered.rs)):
+
+- **Who:** each look, the passing ids whose `speaking` read `yes` are kept
+  for 10 s, in memory only, and none while an answer is under way; each
+  pick starts the count again, so neither the last asker nor someone who
+  talked over the last answer counts for the next. As the voice begins an answer (`voice/state`
+  turns `speaking` on the bus, read at each look, and no older than 3 s),
+  the one face that read `yes` in at least 3 of those looks is the one
+  answered, and the journal says `lamp-eyes: the answer turns to f3, the
+  face seen asking`. Two faces that did, or none, and nothing changes: the
+  lamp turns to nobody rather than to the wrong one.
+- **Once:** it is picked as the answer begins and kept until the answer
+  ends. Someone else talking over the answer does not take it. While that
+  face is in view and near (`sight::LEAST_SIZE`), it is the face sent on
+  `--body-socket`. While its passing id is not in view (it is out of view,
+  or came back under a new id after 1.5 s unseen), nothing is sent, so the
+  body keeps its last aim: the largest near face is not taken. An asker
+  back under a new id is not turned to again in this answer. A pause inside the turn (`thinking`, as between a filler and the
+  answer) keeps it, and the second `speaking` picks nothing again. When the
+  voice listens or rests, or says nothing for 3 s, the choice is let go.
+- **How it moves:** nothing new in the body. Its gaze ([body.md](body.md))
+  takes the face in small corrections with stillness between them, and while
+  the lamp speaks it leaves a face within 0.35 across and 0.40 down alone,
+  so a head already near the person barely moves. It never searches.
+- **Never over a hand:** the body never moves a joint that met resistance
+  for a gaze; it is left where it is for the whole ease
+  (`a_base_turning_to_a_face_that_meets_a_hand_is_left_where_it_is`).
+
+**What a lamp still has to show:** two people at the lamp, one asking. The
+`speaking` it rests on holds only for a near face (above), so the asker sits
+within about half a metre. Tested on the host only.
+
 ## Running it
 
 ```text
