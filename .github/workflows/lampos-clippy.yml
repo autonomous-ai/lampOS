@@ -15,11 +15,13 @@ name: lampOS clippy
 #
 # Its cache is kept as the ARM64 run's is (lampos-arm64.yml, #1806): saved by
 # lamp-voice's own runs under a key with their commit, restored and not saved
-# by pull requests, but for one onto #1712's branch that found none.
+# by pull requests, but for one onto #1712's branch that found none, and each
+# unchanged source file given back the time the cached build had for it, so
+# clippy checks only what changed.
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml']
+    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-source-times.py']
   pull_request:
     branches: ['lamp-voice', 'first/voice-cascade-gemini']
     paths:
@@ -33,6 +35,7 @@ on:
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
       - '.github/workflows/lampos-clippy.yml'
+      - '.github/scripts/lampos-source-times.py'
   workflow_dispatch:
 
 concurrency:
@@ -68,12 +71,14 @@ jobs:
           restore-keys: |
             lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
             lampos-clippy-u2204-
+      - name: unchanged source files get the cached build's times back
+        run: python3 -I .github/scripts/lampos-source-times.py
       - name: clippy (every crate and target, warnings as errors)
         working-directory: lampOS
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: save the cache
         if: >-
-          ${{ !cancelled() && (github.event_name != 'pull_request'
+          ${{ !cancelled() && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         uses: actions/cache/save@v4
         with:
