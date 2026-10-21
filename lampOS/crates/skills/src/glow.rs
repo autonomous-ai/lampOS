@@ -41,9 +41,17 @@ pub const LEVEL_UNKNOWN: u8 = 3;
 /// chose, which a glow does not change, only dims.
 pub const EVENING_WARMTH: [&str; 2] = ["white", "warm"];
 
+/// The ring's levels, 1 to [`LEVELS`].
+pub const LEVELS: u8 = 5;
+
 /// What [`Call::Relative`] is, against the person's light as the ring says
-/// it shows it (`light/state`), or why nothing is to be shown: `already
-/// evening` when the light is already as warm and as low as the steps go.
+/// it shows it (`light/state`), or why nothing is to be shown: the light
+/// off or not known. It is always at least one level from the person's
+/// light, and only down (the first builder on #1672: "one visible level,
+/// never the colour", and at 21:18 "down, never up"): a warmth that is
+/// already as warm as it goes is no change a person sees, so the level is
+/// what shows the glow. At level 1 there is none under it, and nothing is
+/// asked: someone at their dimmest light is already resting.
 pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> {
     let Call::Relative {
         warmer,
@@ -64,15 +72,15 @@ pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> 
         Some(at) => EVENING_WARMTH[(at + usize::from(*warmer)).min(EVENING_WARMTH.len() - 1)],
         None => now.colour.as_str(),
     };
-    let low = now.level.saturating_sub(*dimmer).max(1);
-    if colour == now.colour && low == now.level {
-        return Err("already evening");
+    // At least one level down, whatever `dimmer` says; never up.
+    let low = now.level.saturating_sub((*dimmer).max(1)).max(1);
+    if low == now.level {
+        return Err("the person's light is at its dimmest: no evening glow");
     }
-    // With a breath, the top is the person's level and the breath goes down
-    // the steps and back: one step dimmer, breathing back. At level 1 there
-    // is no step under it, and the light is steady.
+    // With a breath, it stays at the person's level and breathes down the
+    // steps and back; steady, it is the steps down.
     let (level, pattern) = match breathe_ms {
-        Some(period_ms) if low < now.level => (
+        Some(period_ms) => (
             now.level,
             Some(LightPattern {
                 kind: PatternKind::Breathe,
@@ -80,7 +88,7 @@ pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> 
                 low,
             }),
         ),
-        _ => (low, None),
+        None => (low, None),
     };
     Ok(Call::Light {
         colour: colour.into(),
@@ -268,9 +276,15 @@ impl Glow {
         };
         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
         let asking = (light.clone(), pattern, fade);
-        if let Err(error) = ask_ring(&self.glows, &self.source, &asking, until_us) {
-            return format!("{what}: light/request not written ({error})");
-        }
+        let delivered = match ask_ring(&self.glows, &self.source, &asking, until_us) {
+            Ok(delivered) => delivered,
+            Err(error) => return format!("{what}: light/request not written ({error})"),
+        };
+        let untaken = if delivered == 0 {
+            ", but no subscriber took it"
+        } else {
+            ""
+        };
         let level = light.level;
         let moving = pattern.map_or(String::new(), |pattern| self.moving(pattern));
         let fading = fade.map_or(String::new(), |ms| format!(", faded into over {ms} ms"));
@@ -304,9 +318,9 @@ impl Glow {
             }
         }
         if matches!(call, Call::Out { .. }) {
-            return format!("{what}: asked of the ring{fading}");
+            return format!("{what}: asked of the ring{fading}{untaken}");
         }
-        format!("{what}: asked of the ring at level {level}{moving}")
+        format!("{what}: asked of the ring at level {level}{moving}{untaken}")
     }
 
     /// How the run's line says a pattern (#940 item 3), and for a pulse
@@ -352,7 +366,7 @@ impl Glow {
         // person's light again.
         let until_us = lamp_ipc::monotonic_us().saturating_sub(1);
         let back = match ask_ring(&glows, &source, &asked, until_us) {
-            Ok(()) => "light given back: asked again with a time already passed".into(),
+            Ok(_) => "light given back: asked again with a time already passed".into(),
             Err(error) => format!(
                 "light not given back at once: light/request not written ({error}); the ring lets it go within {} s",
                 GLOW_HOLDS_US / 1_000_000
@@ -394,13 +408,14 @@ pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
 
 /// One `light/request` from `source` at skill priority for a light, its
 /// pattern and its fade, holding until `until_us` on the host's monotonic
-/// clock.
+/// clock, and how many subscribers took it: none is said in the journal,
+/// as a ring that never got it shows nothing.
 fn ask_ring(
     glows: &Glows,
     source: &str,
     (light, pattern, fade_ms): &Asked,
     until_us: u64,
-) -> io::Result<()> {
+) -> io::Result<usize> {
     let request = LightRequest {
         claim: Claim {
             source: source.to_owned(),
@@ -412,9 +427,14 @@ fn ask_ring(
         pattern: *pattern,
         fade_ms: *fade_ms,
     };
-    locked(&glows.out)
-        .publish_json(lamp_ipc::monotonic_us(), &request)
-        .map(|_| ())
+    let published = locked(&glows.out).publish_json(lamp_ipc::monotonic_us(), &request)?;
+    if published.delivered == 0 {
+        eprintln!(
+            "lamp-skills: {source}'s light/request taken by no subscriber ({} dropped)",
+            published.dropped
+        );
+    }
+    Ok(published.delivered)
 }
 
 #[cfg(test)]
@@ -730,30 +750,112 @@ mod tests {
         }
     }
 
-    /// Row 7 on lamp-06c1 (#1672): the ring was already warm at level 1,
-    /// and the fixed evening glow asked for warm 2 breathing to 1, which
-    /// nobody saw. Relative to that light there is nothing to show.
+    /// The level and the breath an evening ask over `now` comes to.
+    fn evening_over(now: &Light, breathe: Option<u32>) -> (String, u8, Option<(u8, u8)>) {
+        let Ok(Call::Light {
+            colour,
+            level: Some(level),
+            pattern,
+            ..
+        }) = relative(Some(now), &evening(breathe))
+        else {
+            panic!("a light over {now:?}");
+        };
+        if let Some(pattern) = pattern {
+            assert_eq!(pattern.kind, PatternKind::Breathe);
+            assert!(pattern.check(level).is_ok(), "{pattern:?} at {level}");
+        }
+        (colour, level, pattern.map(|pattern| (level, pattern.low)))
+    }
+
+    /// Row 7 on lamp-06c1 (#1672), 17:41: the person's light was warm 3.
+    /// Warmer goes no further than warm, so the glow is the level: warm 3
+    /// breathing down to 2 and back, steady warm 2 without the breath. Its
+    /// colour is the person's (the first builder: "one visible level, never
+    /// the colour").
     #[test]
-    fn a_warm_level_one_light_is_already_evening_and_nothing_is_asked() {
+    fn over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour() {
+        let warm_three = light(true, "warm", 3);
+        assert_eq!(
+            evening_over(&warm_three, Some(10_000)),
+            ("warm".into(), 3, Some((3, 2)))
+        );
+        assert_eq!(evening_over(&warm_three, None), ("warm".into(), 2, None));
+    }
+
+    /// At the dimmest level there is no step under it, and the glow never
+    /// goes up (the first builder, 21:18 on #2655): nothing is asked, and
+    /// the journal says why.
+    #[test]
+    fn at_the_dimmest_level_the_evening_asks_nothing() {
+        for colour in ["warm", "orange", "white"] {
+            for breathe in [Some(10_000), None] {
+                assert_eq!(
+                    relative(Some(&light(true, colour, 1)), &evening(breathe)),
+                    Err("the person's light is at its dimmest: no evening glow"),
+                    "{colour}"
+                );
+            }
+        }
+    }
+
+    /// Whatever the person's light above the dimmest, the glow is at least
+    /// a level under it, never over: the breath from their level down, or
+    /// steady under it. A dimmer of 0 still moves a level.
+    #[test]
+    fn every_evening_ask_is_at_least_one_level_under_the_persons_light() {
+        for dimmer in [0, 1, 4] {
+            for level in 2..=LEVELS {
+                for breathe_ms in [Some(10_000), None] {
+                    let now = light(true, "warm", level);
+                    let call = Call::Relative {
+                        warmer: 1,
+                        dimmer,
+                        lasting: Some("20s".into()),
+                        breathe_ms,
+                    };
+                    let Ok(Call::Light {
+                        colour,
+                        level: Some(asked),
+                        pattern,
+                        ..
+                    }) = relative(Some(&now), &call)
+                    else {
+                        panic!("a light at {level}");
+                    };
+                    assert_eq!(colour, "warm");
+                    assert!((1..=level).contains(&asked));
+                    let reaches = match pattern {
+                        Some(pattern) => {
+                            assert!(pattern.check(asked).is_ok());
+                            assert_eq!(level, asked);
+                            asked - pattern.low
+                        }
+                        None => level - asked,
+                    };
+                    assert!(
+                        reaches >= 1,
+                        "dimmer {dimmer} at {level}: {asked} {pattern:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// A light that is off is the person's darkness, and is left so; one
+    /// not known has nothing to step from.
+    #[test]
+    fn a_light_off_or_not_known_asks_nothing() {
         for breathe in [Some(10_000), None] {
             assert_eq!(
-                relative(Some(&light(true, "warm", 1)), &evening(breathe)),
-                Err("already evening")
+                relative(Some(&light(false, "warm", 3)), &evening(breathe)),
+                Err("the light is off")
+            );
+            assert_eq!(
+                relative(None, &evening(breathe)),
+                Err("the light shown is not known")
             );
         }
-        // Orange is warmer than evening light goes: a colour kept, at 1.
-        assert_eq!(
-            relative(Some(&light(true, "orange", 1)), &evening(None)),
-            Err("already evening")
-        );
-        assert_eq!(
-            relative(Some(&light(false, "white", 4)), &evening(None)),
-            Err("the light is off")
-        );
-        assert_eq!(
-            relative(None, &evening(None)),
-            Err("the light shown is not known")
-        );
     }
 
     #[test]
@@ -797,16 +899,5 @@ mod tests {
             panic!("a light");
         };
         assert_eq!((colour.as_str(), level), ("blue", Some(2)));
-        // White at level 1: warmer only, steady, as no step is under it.
-        let Ok(Call::Light {
-            colour,
-            level,
-            pattern,
-            ..
-        }) = relative(Some(&light(true, "white", 1)), &evening(Some(10_000)))
-        else {
-            panic!("a light");
-        };
-        assert_eq!((colour.as_str(), level, pattern), ("warm", Some(1), None));
     }
 }
