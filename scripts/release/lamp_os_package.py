@@ -15,20 +15,25 @@ CORE_BINARIES = ('lamp-keeper', 'lamp-voice', 'lamp-turn-end', 'lamp-body',
 # Optional executables are carried when built; carrying one never adds its unit.
 # lamp-cloud (company broker, opt-in, must not share V1 os-server's MQTT client ID)
 # and lamp-skills (needs the product skills and settings) stay out of DEFAULT_UNITS.
+# lamp-peek (read-only page, off unless LAMP_PEEK=on, never on a product lamp) is carried
+# without a unit, as lamp-cloud and lamp-skills are.
 OPTIONAL_BINARIES = ('lamp-surround', 'lamp-update', 'lamp-ears', 'lamp-schedule',
                      'lamp-tasks', 'lamp-air', 'lamp-records', 'lamp-mood', 'lamp-bus',
-                     'lamp-selftest', 'lamp-settings', 'lamp-setup', 'lamp-cloud', 'lamp-skills')
+                     'lamp-selftest', 'lamp-settings', 'lamp-setup', 'lamp-cloud', 'lamp-skills',
+                     'lamp-peek')
 DEVELOPMENT_BINARIES = {'lamp-audio', 'lamp-body-inspect', 'lamp-ipc-probe',
     'lamp-memory-eval', 'lamp-observer', 'lamp-policy-fit', 'lamp-policy-judges',
     'lamp-sound-fixtures', 'lamp-tasks-harness-fixture', 'lamp-voice-eval',
-    'lamp-memory-fixture', 'lamp-records-fixture', 'lamp-same-voice', 'lamp-policy-replay'}
+    'lamp-memory-fixture', 'lamp-records-fixture', 'lamp-same-voice', 'lamp-policy-replay',
+    # The production station's bench tool (a station run's record and verdict), not on a lamp.
+    'lamp-station'}
 # Factory/provisioning tools are not product runtime. The generic package carries
 # them under tools/ for the V1 migration script, which measures each lamp's own
 # BODY_POSES; poses are never shipped or copied between lamps. From a source with
 # lamp-body-measure.service (lampOS #2163), the generic package also runs it: a lamp
 # without poses is read seated at rest before its first body start, so the tool
 # also sits beside lamp-body, as lamp-body-worker does.
-PROVISIONING_BINARIES = {'lamp-body-measure'}
+PROVISIONING_BINARIES = {'lamp-body-measure', 'lamp-body-mood'}
 SEATED_MEASURE_UNIT = 'lamp-body-measure.service'
 PROVISION_SETTINGS = ('voice-provider.json', 'controls.json', 'controls-pins.json')
 # The adapter's prepare runs `lamp-keeper prepare` (lamp-voice #1094); its usage

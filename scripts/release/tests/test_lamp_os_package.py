@@ -85,7 +85,8 @@ class PackageTest(unittest.TestCase):
         self.write_source('deploy/product/lamp-policy.service', self.PRODUCT_POLICY.encode())
         for name in pkg.PROVISION_SETTINGS:
             self.write_source('deploy/product/settings/' + name, b'{"fixture": true}\n')
-        (self.binaries / 'lamp-body-measure').write_bytes(self.adapter.read_bytes() + b'measure')
+        for name in pkg.PROVISIONING_BINARIES:
+            (self.binaries / name).write_bytes(self.adapter.read_bytes() + name.encode())
 
     def test_generic_carries_migration_tool_and_setting_templates(self):
         self.write_generic_units()

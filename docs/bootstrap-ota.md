@@ -1658,7 +1658,7 @@ confirms its first stand. A read it refuses (torque on) keeps the body from
 starting, and it never turns torque off. From an older source the ZIP is as
 before. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
-`lamp-same-voice pairs` measurement CLI are development tools and are excluded.
+`lamp-same-voice pairs` measurement CLI are development tools and are excluded. `lamp-station` (the production station's bench tool) is excluded the same way. `lamp-body-mood` is a factory tool carried with `lamp-body-measure` under `tools/`, and `lamp-peek` is carried without a unit.
 Unknown binaries still fail packaging so a new runtime cannot be silently
 omitted.
 
