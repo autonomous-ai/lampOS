@@ -153,6 +153,9 @@ jobs:
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
+      - name: every built lamp-* binary is classified for the lamp-os package
+        working-directory: lampOS
+        run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
       - name: which crates a pull request tests
         id: scope
         if: github.event_name == 'pull_request'
