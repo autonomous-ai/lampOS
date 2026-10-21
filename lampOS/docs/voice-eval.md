@@ -509,6 +509,65 @@ cargo run -p lamp-voice-eval -- render-stimuli .cache/acoustic NEW_REPORT.json  
 Every failed attempt carries a reproduction command; fake attempts reproduce
 exactly with `--attempt-seed`.
 
+## Gaps in unfinished replies: `answer-gaps` (#2602)
+
+```sh
+cargo run -p lamp-voice-eval -- answer-gaps /path/to/events.jsonl /path/to/other.timing.jsonl [--json]
+```
+
+Reads each exact JSONL file independently, including timing-only exports. The
+output labels **files**, not sessions; it neither combines rotated files nor
+deduplicates identities across files. Only counts and fixed diagnostic names
+are printed, alongside the supplied filenames. Recorded words, free-form
+record fields, owner identities and parser error payloads are never printed.
+
+The scope is all accepted-zero receipts: **every origin is included**, including
+spoken notices and absent or null `origin`, and listening gaps are included.
+This is not the coordinator's `playback_gaps` counter, which applies origin and
+listening rules. In particular, a cancellation's terminal receipt can have a
+null origin after its reply has retired; it still pairs by `gap.owner` and the
+start timestamp. The report and coordinator share `PlaybackGap::is_valid_receipt`
+for phase, frame, epoch and timestamp validation; their counting policies stay
+separate.
+
+- Raw `started`, `resumed`, `cancelled` and unknown phase record counts remain
+  visible. A start and its terminal receipt count as **one** gap. A valid pair
+  needs the same nested `gap.owner` (boot, turn and generation), start timestamp
+  and first sample cursor, with consistent frames, epochs and receipt times.
+- `paired_terminals` counts all valid, unique pairs. `over_300_ms` counts only
+  pairs whose accepted zero PCM is **strictly greater than 300 ms** at the
+  runtime's 24 kHz render rate: 7,200 frames is excluded; 7,201 is included.
+  Report delay and wall-clock elapsed time do not extend that duration. This
+  is accepted PCM evidence, not measured room silence.
+- Resumed and cancelled gaps have separate gap and distinct affected reply
+  counts; their reply union is also reported. Several gaps can belong to one
+  reply. A resumed gap stays resumed if that turn is cancelled later.
+- An unmatched start is `incomplete`, with an **unknown final duration**, so
+  it is not assigned to either duration category. Orphan terminals, malformed
+  JSON, invalid receipts, mismatched pairs and duplicate starts or terminals
+  remain explicit. **Even a byte-identical repeated start or terminal excludes
+  that gap identity** from paired counts; repeated lines are not deduplicated.
+  Raw phase counts are preserved. Valid pairs elsewhere in an invalid or
+  truncated file remain visible as partial evidence.
+
+Exit 0 requires at least one gap record and complete, valid pairing in every
+supplied file; otherwise the report is printed and exit 1 returned. A file
+with no gap records cannot establish zero gaps for a complete session.
+`evidence_complete` describes the supplied file's receipt and pair validation,
+not its coverage of a session or an audit of the whole playback timeline. Gap
+identity is owner plus start timestamp; this command does not establish that
+separately stamped pairs never overlap. It supplies no denominator for all answered
+replies and infers no causes from queue counters, turn endings or other fields.
+
+Local input is streamed with bounded memory: 1–64 regular files, no final
+symlinks, at most 32 MiB per file, 1 MiB per line (including its newline), and
+250,000 nonblank records per file. A limit or I/O failure is explicit and
+makes the evidence incomplete. FIFOs are opened nonblocking and rejected;
+directories are not traversed. There are no network calls, polling, audio
+reads or device access. The local reporting target is under one second from
+process launch to complete output for the two supplied timing exports
+(130 gap records); this does not measure voice or acoustic latency.
+
 ## Waiting answers held and cut, per route: `waiting-cuts` (#1866)
 
     journalctl -u lamp-voice --since '<test start>' -o short-iso \

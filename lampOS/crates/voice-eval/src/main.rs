@@ -57,6 +57,9 @@ const USAGE: &str = "usage:
   lamp-voice-eval waiting-cuts [--since 'YYYY-MM-DD HH:MM[:SS]'] [--until ...] [--sessions DIR] [--json]
       < journal (`journalctl -u lamp-voice -o short-iso`); --since/--until filter its own stamps;
       the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
+  lamp-voice-eval answer-gaps FILE... [--json]
+      (accepted zero PCM gaps per exact JSONL event file; resumed and cancelled >300 ms,
+      distinct affected replies, and incomplete or invalid evidence; no words or inferred causes)
   lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO... [--voice-estimate VOICE N]
       (what each arm of a played test cost, from `journalctl -u lamp-voice`; FROM and TO are
       HH:MM or HH:MM:SS by the lamp's clock; the prices are dollars, in a JSON file;
@@ -419,6 +422,50 @@ fn score(all: &[String]) -> Result<i32> {
     Ok(0)
 }
 
+fn answer_gaps(all: &[String]) -> Result<i32> {
+    use lamp_voice_eval::answer_gaps::{THRESHOLD_MS, read_file, render};
+    let mut files = Vec::new();
+    let mut as_json = false;
+    let mut positional = false;
+    for arg in all {
+        match arg.as_str() {
+            "--" if !positional => positional = true,
+            "--json" if !positional && !as_json => as_json = true,
+            flag if !positional && flag.starts_with('-') => return Err(invalid(USAGE)),
+            _ => files.push(arg),
+        }
+    }
+    if files.is_empty() || files.len() > 64 {
+        return Err(invalid("answer-gaps needs 1 to 64 exact JSONL files"));
+    }
+    let reports: Vec<_> = files
+        .iter()
+        .map(|file| read_file(Path::new(file)))
+        .collect();
+    if as_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "sample_rate_hz": lamp_audio::RENDER_RATE,
+                "threshold_ms": THRESHOLD_MS,
+                "threshold_comparison": "strictly_greater",
+                "files": reports,
+            }))?
+        );
+    } else {
+        println!(
+            "Accepted zero PCM at {} Hz; final gap duration strictly >{THRESHOLD_MS} ms.",
+            lamp_audio::RENDER_RATE
+        );
+        for report in &reports {
+            print!("{}", render(report));
+        }
+    }
+    Ok(i32::from(
+        reports.iter().any(|report| !report.evidence_complete),
+    ))
+}
+
 fn run() -> Result<i32> {
     let mut all: Vec<String> = std::env::args().skip(1).collect();
     if all.is_empty() {
@@ -443,6 +490,7 @@ fn run() -> Result<i32> {
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
         "cost" => return cost(&all),
         "endpoint" => return endpoint(&all),
+        "answer-gaps" => return answer_gaps(&all),
         "score" => return score(&all),
         _ => {}
     }
