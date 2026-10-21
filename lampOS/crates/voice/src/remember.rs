@@ -372,6 +372,29 @@ const SPAN_DAYS: u64 = 14;
 /// answered as kept already and not kept again (#2176). Off, as before.
 pub const REMEMBER_ONCE_ENVIRONMENT: &str = "LAMP_MEMORY_REMEMBER_ONCE";
 
+/// Only the exact value `on`, with the Days client: `remember` also takes
+/// `replaces`, the id of a kept thing this session was shown (the note,
+/// recall, a hit, or one it kept), when the person corrects it ("it's green
+/// now"). The store accepts it only for one of this scope's, kept, active,
+/// not newer and among the ids sent as `shown`; the old one is then only
+/// history, linked to the new one, and forgetting either removes both
+/// (#2510). The model is told `replaced` with the old id. With it, the hit
+/// lines of the second route carry each kept thing's id. Off, every function
+/// and answer is as before.
+pub const REPLACES_ENVIRONMENT: &str = "LAMP_MEMORY_REPLACES";
+static REPLACES: OnceLock<bool> = OnceLock::new();
+
+/// Whether `remember` takes `replaces` ([`REPLACES_ENVIRONMENT`]).
+pub fn replaces_on() -> bool {
+    REPLACES.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_replaces(on: bool) -> bool {
+    *REPLACES.get_or_init(|| on)
+}
+
 /// Only the exact value `on`, with the Days client: `forget` also takes what
 /// it is `about`, and forgets the kept things of whoever is at the lamp that
 /// have every one of those words (#2176). Off, the functions are as before.
@@ -647,7 +670,30 @@ fn recall_v2_request(
 
 /// [`tools`] with the rules switched on or off.
 pub fn tools_with(rules: bool) -> Vec<Tool> {
-    tools_for(rules, forget_all_on(), forget_about_on())
+    let tools = tools_for(rules, forget_all_on(), forget_about_on());
+    if replaces_on() {
+        replaces_described(tools)
+    } else {
+        tools
+    }
+}
+
+/// `remember` with `replaces` (#2510, [`REPLACES_ENVIRONMENT`]): the other
+/// functions as they are.
+fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
+    for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
+        tool.description.push_str(
+            " When they correct something you were shown as kept, with its id or source_id \
+             (\"it's green now\" after \"my favourite colour is violet\"), keep the corrected sentence and give \
+             that id as replaces, so the old one is replaced and not kept beside it. Never guess an id; \
+             without one, keep it without replaces. When the answer says replaced, say what it is now \
+             and what it was, such as 'green now, not violet'.",
+        );
+        if let Some(parameters) = tool.parameters.as_mut() {
+            parameters["properties"]["replaces"] = json!({"type": "integer", "description": "Only for a correction: the id or source_id of the kept thing it corrects, as you were shown it."});
+        }
+    }
+    tools
 }
 
 /// [`tools_with`] with each forgetting switch on or off. With
@@ -837,6 +883,12 @@ pub fn is_tool_with(name: &str, rules: bool) -> bool {
     matches!(name, REMEMBER | RECALL | FORGET)
         || (name == FORGET_EVERYTHING && forget_all_on())
         || (rules && crate::rules::is_tool(name))
+}
+
+/// What the model is told when the memory refused a correction (#2510):
+/// nothing was kept or changed.
+fn not_replaced() -> Value {
+    json!({"remembered": false, "note": "Nothing was kept or changed: that id is not something kept that you were shown just now, or it was already replaced. Call recall to find it, then correct it by its source_id."})
 }
 
 /// What the model is told for a `source_id` this session was not shown.
@@ -1093,6 +1145,9 @@ fn answer_for(
                 answer.get("id")?;
                 if answer["existing"] == true {
                     json!({"remembered": true, "note": "That was already kept."})
+                } else if let Some(old) = answer.get("replaced").and_then(Value::as_u64) {
+                    // #2510: no note, so a kept heard line still says its own.
+                    json!({"remembered": true, "replaced": old})
                 } else {
                     json!({"remembered": true})
                 }
@@ -1141,6 +1196,8 @@ fn answer_for(
     }
     match answer.get("error").and_then(Value::as_str)? {
         "empty" => Some(json!({"error": "There was nothing in that for me to keep."})),
+        // Only a `replaces` is refused so (#2510).
+        "refused" if name == REMEMBER => Some(not_replaced()),
         _ => None,
     }
 }
@@ -1232,6 +1289,7 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     switch_forget_about(
         days && std::env::var(FORGET_ABOUT_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
+    switch_replaces(days && std::env::var(REPLACES_ENVIRONMENT).ok().as_deref() == Some("on"));
     if days {
         DAYS.get_or_init(|| {
             // The optional thread file contains no source IDs. A new Days
@@ -1695,6 +1753,8 @@ pub struct DaysClient {
     remember_once: AtomicBool,
     /// [`forget_about_on`], read when the client is made (#2176).
     forget_about: AtomicBool,
+    /// [`replaces_on`], read when the client is made (#2510).
+    replaces: AtomicBool,
     /// [`ROOM_NOT_ASKER_ENVIRONMENT`], read when the client is made (#2176).
     room_not_asker: AtomicBool,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
@@ -1802,6 +1862,11 @@ struct DaysContext {
     /// removes it; one forgotten in this session stays here, so that what
     /// follows is refused rather than journalled without it.
     rules: Vec<(Option<String>, u64)>,
+    /// Kept things a hit line told with its id ([`hits_note`], with
+    /// [`REPLACES_ENVIRONMENT`]), each with its person: shown, so one may be
+    /// corrected, but never a source, so the session's bound isn't spent on
+    /// them. The newest [`SOURCE_IDS`].
+    hits: Vec<(Option<String>, u64)>,
 }
 
 /// Why memory's journal stopped until a fresh worker (#2176): said in the
@@ -1924,6 +1989,30 @@ impl DaysContext {
             .collect()
     }
 
+    /// Hit lines told these kept things of this person's, by id.
+    fn hit(&mut self, person: Option<&str>, ids: &[u64]) {
+        for id in ids {
+            let hit = (person.map(str::to_owned), *id);
+            self.hits.retain(|told| *told != hit);
+            if self.hits.len() == SOURCE_IDS {
+                self.hits.remove(0);
+            }
+            self.hits.push(hit);
+        }
+    }
+
+    /// What this session was shown of this person's: its sources and the
+    /// hits told by id, for a correction (#2510).
+    fn shown(&self, person: Option<&str>) -> Vec<u64> {
+        let mut shown = self.of(person);
+        for (whose, id) in &self.hits {
+            if whose.as_deref() == person && !shown.contains(id) {
+                shown.push(*id);
+            }
+        }
+        shown
+    }
+
     /// This person's sources, for a write to their scope.
     fn of(&self, person: Option<&str>) -> Vec<u64> {
         self.sources
@@ -2009,7 +2098,17 @@ pub fn hits_note(
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
     let answer = bounded_exchange_up_to(socket, &request, HITS_WITHIN, HITS_ANSWER_BYTES)?;
-    let told = hits_told(&answer, heard, now_unix_ms, zone)?;
+    let ids = DAYS
+        .get()
+        .and_then(Option::as_ref)
+        .filter(|client| client.socket == socket && client.replaces.load(Ordering::Acquire));
+    let (told, shown) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
+    // Told by id, so shown: one of them may be corrected (#2510).
+    if let Some(client) = ids
+        && let Ok(mut context) = client.context.lock()
+    {
+        context.hit(person, &shown);
+    }
     Some(match person {
         Some(_) => told,
         None => format!("{told}\n{HITS_ROOM_NOTE}"),
@@ -2057,39 +2156,52 @@ fn content_words(text: &str) -> Vec<String> {
 
 /// [`hits_note`]'s words for a kept list's answer and what was heard: the
 /// kept things sharing the most words with it, then the newest, at most
-/// [`HITS`]; nothing when none shares a word.
+/// [`HITS`]; nothing when none shares a word. With `ids` (#2510), each line
+/// ends with its kept thing's id, and the ids told are returned.
 fn hits_told(
     answer: &Value,
     heard: &str,
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
-) -> Option<String> {
+    ids: bool,
+) -> Option<(String, Vec<u64>)> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
     }
     let wanted = content_words(heard);
     let today = local_day(now_unix_ms, zone);
-    let mut found: Vec<(usize, u64, String)> = answer
+    let mut found: Vec<(usize, u64, String, Option<u64>)> = answer
         .get("entries")?
         .as_array()?
         .iter()
         .filter_map(|entry| {
             let text = entry.get("text")?.as_str()?.trim();
             let at = entry.get("at_unix_ms")?.as_u64()?;
+            let id = entry.get("id").and_then(Value::as_u64);
             let shared = content_words(text)
                 .iter()
                 .filter(|word| wanted.contains(word))
                 .count();
-            (shared > 0).then(|| (shared, at, text.chars().take(HIT_CHARS).collect()))
+            (shared > 0).then(|| (shared, at, text.chars().take(HIT_CHARS).collect(), id))
         })
         .collect();
     found.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+    let mut shown = vec![];
     let lines: Vec<String> = found
         .into_iter()
         .take(HITS)
-        .map(|(_, at, text)| format!("- {text} ({})", when(today - local_day(at, zone))))
+        .map(|(_, at, text, id)| {
+            let when = when(today - local_day(at, zone));
+            match id.filter(|_| ids) {
+                Some(id) => {
+                    shown.push(id);
+                    format!("- {text} ({when}, source_id {id})")
+                }
+                None => format!("- {text} ({when})"),
+            }
+        })
         .collect();
-    (!lines.is_empty()).then(|| format!("{HITS_NOTE}\n{}", lines.join("\n")))
+    (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown))
 }
 
 /// `line` for this person: no `person` at all for the room's, as before.
@@ -2190,6 +2302,7 @@ impl DaysClient {
                 std::env::var(REMEMBER_ONCE_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             forget_about: AtomicBool::new(forget_about_on()),
+            replaces: AtomicBool::new(replaces_on()),
             room_not_asker: AtomicBool::new(
                 std::env::var(ROOM_NOT_ASKER_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
@@ -2353,6 +2466,8 @@ impl DaysClient {
                     context.lost_writes -= settled;
                     context.sources.clear();
                     context.rules.clear();
+                    // Hits told by id before are not this snapshot's (#2510).
+                    context.hits.clear();
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(settled);
                     let why = context.stopped_by.take().map_or("unknown", Stopped::as_str);
                     context.journal_inhibited = false;
@@ -2566,6 +2681,22 @@ impl DaysClient {
         }
         if call.name == REMEMBER && self.remember_once.load(Ordering::Acquire) {
             request["once"] = json!(true);
+        }
+        // #2510: a correction, with what this session was shown of this
+        // scope; the store checks it. An id that is no id is not sent.
+        if call.name == REMEMBER
+            && self.replaces.load(Ordering::Acquire)
+            && let Some(old) = call
+                .args
+                .get("replaces")
+                .and_then(Value::as_u64)
+                .filter(|id| *id > 0 && *id <= i64::MAX as u64)
+        {
+            let Ok(context) = self.context.try_lock() else {
+                return (gone(), false);
+            };
+            request["replaces"] = json!(old);
+            request["shown"] = json!(context.shown(person));
         }
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
@@ -7335,6 +7466,7 @@ mod tests {
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
+            replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
@@ -7496,6 +7628,7 @@ mod tests {
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
+            replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(false),
             fresh_tried: Mutex::new(None),
@@ -7639,6 +7772,7 @@ mod tests {
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
+            replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(resumes),
             fresh_tried: Mutex::new(None),
@@ -8105,5 +8239,283 @@ mod tests {
         assert!(client.wants_fresh_session());
         served.join().unwrap();
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510, `LAMP_MEMORY_REPLACES`: a correction is sent with what this
+    /// session was shown of its scope, for the store to check; the model is
+    /// told what was replaced, or that nothing changed. Off, a `replaces`
+    /// the model gives is not sent, and the request is the same bytes.
+    #[test]
+    fn with_the_replaces_switch_a_correction_is_sent_with_what_was_shown() {
+        fn answer(request: &Value) -> Value {
+            match (request["op"].as_str(), request["replaces"].as_u64()) {
+                (Some("search"), _) => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":8,"at_unix_ms":NOW-DAY,"text":"Her favourite colour is violet."}
+                ]}),
+                (Some("remember"), Some(8)) => json!({"ok":true,"id":9,"replaced":8}),
+                (Some("remember"), Some(_)) => {
+                    json!({"ok":false,"error":"refused","reason":"not_shown","message":"x"})
+                }
+                (Some("remember"), None) => json!({"ok":true,"id":10}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let (socket, served) = memory_lines("replaces", 5, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |args| client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None);
+        assert!(
+            client
+                .run_at(
+                    &call(RECALL, json!({"about":"colour"})),
+                    FIRST_READ,
+                    NOW,
+                    Some(&EAST),
+                    None
+                )
+                .1
+        );
+        // A hit told by id is shown too.
+        client.context.lock().unwrap().hit(None, &[5]);
+        let green = json!({"text":"Her favourite colour is green.","replaces":8});
+        assert_eq!(
+            run(green.clone()),
+            (json!({"remembered":true,"replaced":8}), true)
+        );
+        let (told, answered) = run(json!({"text":"Her favourite colour is red.","replaces":77}));
+        assert!(answered);
+        assert_eq!(told, not_replaced());
+        // Off: a `replaces` given is not sent at all.
+        client.replaces.store(false, Ordering::Release);
+        assert_eq!(run(green).0, json!({"remembered":true}));
+        assert_eq!(
+            run(json!({"text":"Her favourite colour is green."})).0,
+            json!({"remembered":true})
+        );
+        let read = served.join().unwrap();
+        let sent: Vec<Value> = read
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(sent[1]["replaces"], 8);
+        assert_eq!(sent[1]["shown"], json!([8, 5]));
+        assert_eq!(sent[2]["replaces"], 77);
+        assert_eq!(sent[2]["shown"], json!([8, 9, 5]));
+        assert_eq!(read[3].replace("green", ""), read[4].replace("green", ""));
+        assert!(sent[3].get("replaces").is_none() && sent[3].get("shown").is_none());
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510 (reviewer-lead P3): a `replaces` that is no store id (0, below
+    /// it, past `i64::MAX`, or not a number) is not sent: the text is kept
+    /// as a plain remember, with no `replaces` and no `shown`.
+    #[test]
+    fn a_replaces_out_of_the_id_range_is_not_sent() {
+        let bad = [
+            json!(0),
+            json!(-1),
+            json!(i64::MAX as u64 + 1),
+            json!("8"),
+            json!(8.5),
+        ];
+        let (socket, served) = memory_lines("replaces-range", bad.len(), |request| {
+            match request["op"].as_str() {
+                Some("remember") => json!({"ok":true,"id":10}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        client.context.lock().unwrap().hit(None, &[8]);
+        for replaces in &bad {
+            let told = client.run_at(
+                &call(
+                    REMEMBER,
+                    json!({"text":"Her favourite colour is green.","replaces":replaces}),
+                ),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                None,
+            );
+            assert_eq!(told, (json!({"remembered":true}), true), "{replaces}");
+        }
+        for line in served.join().unwrap() {
+            let sent: Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(sent["op"], "remember", "{line}");
+            assert!(
+                sent.get("replaces").is_none() && sent.get("shown").is_none(),
+                "{line}"
+            );
+        }
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510 (reviewer-lead P2), with `LAMP_MEMORY_KEEP_HEARD`: a correction
+    /// whose heard line is kept instead of the model's text is sent without
+    /// `replaces`, so the old fact stays active and the heard line is kept
+    /// beside it. The model's own text keeps its `replaces`.
+    #[test]
+    fn a_correction_kept_as_heard_does_not_replace_the_old_fact() {
+        fn answer(request: &Value) -> Value {
+            match (request["op"].as_str(), request["replaces"].as_u64()) {
+                (Some("search"), _) => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":8,"at_unix_ms":NOW-DAY,"text":"Her favourite colour is violet."}
+                ]}),
+                (Some("remember"), Some(8)) => json!({"ok":true,"id":9,"replaced":8}),
+                (Some("remember"), None) => json!({"ok":true,"id":10}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let (socket, served) = memory_lines("replaces-heard", 4, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |call: &ToolCall| client.run_at(call, FIRST_READ, NOW, Some(&EAST), None);
+        assert!(run(&call(RECALL, json!({"about":"colour"}))).1);
+        let green = call(
+            REMEMBER,
+            json!({"text":"Her favourite colour is green.","replaces":8}),
+        );
+        let (as_heard, kept) = heard::call_with(&green, Some("it's green now")).unwrap();
+        assert_eq!(kept, "They said: it's green now");
+        assert_eq!(as_heard.args, json!({"text": kept}));
+        // Id 8 is not replaced: still found by a recall for "colour".
+        assert_eq!(run(&as_heard), (json!({"remembered":true}), true));
+        let (found, _) = run(&call(RECALL, json!({"about":"colour"})));
+        assert_eq!(found["found"][0]["source_id"], 8, "{found}");
+        // The model's text, heard in full, keeps its `replaces`.
+        assert_eq!(
+            heard::call_with(&green, Some("her favourite colour is green now")),
+            None
+        );
+        assert_eq!(run(&green), (json!({"remembered":true,"replaced":8}), true));
+        let sent: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert!(sent[1].get("replaces").is_none() && sent[1].get("shown").is_none());
+        assert_eq!(sent[1]["text"], kept);
+        assert_eq!(sent[3]["replaces"], 8);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510 (reviewer-lead P3): a correction while the session's context is
+    /// held elsewhere is told the memory isn't answering, and nothing is
+    /// sent to the memory.
+    #[test]
+    fn a_correction_with_the_context_busy_is_told_gone_and_sends_nothing() {
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-remember-replaces-busy-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let held = client.context.lock().unwrap();
+        let told = client.run_at(
+            &call(
+                REMEMBER,
+                json!({"text":"Her favourite colour is green.","replaces":8}),
+            ),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            None,
+        );
+        drop(held);
+        assert_eq!(told, (gone(), false));
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510 (reviewer-lead P3): a resumed fresh session's shown ids are its
+    /// snapshot's alone, as its sources are: a kept thing a hit line told by
+    /// id before the resume can no longer be corrected by that id.
+    #[test]
+    fn a_resumed_session_forgets_the_hits_told_before() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("replaces-resume-hits", 1, |request| {
+            match request["op"].as_str() {
+                Some("session_open") => {
+                    json!({"ok":true,"snapshot":snapshot(request["session"].as_str().unwrap())})
+                }
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = resumes_test_client(socket.clone(), true);
+        {
+            let mut context = client.context.lock().unwrap();
+            context.journal_inhibited = true;
+            context.hit(None, &[5]);
+            context.hit(Some(MAI), &[6]);
+            assert_eq!(context.shown(None), [5]);
+        }
+        assert!(
+            client
+                .open_fresh_session_within(2, FIRST_READ, None, true)
+                .is_some()
+        );
+        let context = client.context.lock().unwrap();
+        assert!(!context.journal_inhibited, "resumed");
+        assert!(context.hits.is_empty(), "{:?}", context.hits);
+        assert_eq!(context.shown(None), [7]);
+        assert!(context.shown(Some(MAI)).is_empty());
+        drop(context);
+        assert_eq!(served.join().unwrap().len(), 1);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510: off unless set, the functions are exactly as before; on, only
+    /// `remember` takes `replaces`. A hit line carries its id only with it,
+    /// and those ids are this scope's shown, never its sources.
+    #[test]
+    fn without_the_replaces_switch_the_functions_and_hit_lines_are_as_before() {
+        assert!(!replaces_on());
+        for rules in [false, true] {
+            let off = tools_with(rules);
+            assert_eq!(off, tools_for(rules, forget_all_on(), forget_about_on()));
+            assert!(
+                off[0].parameters.as_ref().unwrap()["properties"]
+                    .get("replaces")
+                    .is_none()
+            );
+            let on = replaces_described(off.clone());
+            assert_eq!(on[1..], off[1..]);
+            assert!(on[0].parameters.as_ref().unwrap()["properties"]["replaces"].is_object());
+            assert!(on[0].description.starts_with(&off[0].description));
+            assert!(on[0].description.contains("give that id as replaces"));
+        }
+        let answer = json!({"ok":true,"entries":[
+            {"id":4,"at_unix_ms":NOW,"text":"Her favourite colour is violet."}
+        ]});
+        let (off, none) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
+        assert_eq!(
+            off,
+            format!("{HITS_NOTE}\n- Her favourite colour is violet. (today)")
+        );
+        assert!(none.is_empty());
+        let (on, shown) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
+        assert_eq!(
+            on,
+            format!("{HITS_NOTE}\n- Her favourite colour is violet. (today, source_id 4)")
+        );
+        assert_eq!(shown, [4]);
+        let mut context = DaysContext::default();
+        context.hit(Some("p-1"), &shown);
+        context.hit(Some("p-1"), &shown);
+        assert_eq!(context.shown(Some("p-1")), [4]);
+        assert!(context.shown(None).is_empty());
+        assert!(context.of(Some("p-1")).is_empty());
     }
 }

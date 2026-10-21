@@ -94,6 +94,18 @@ pub enum Request {
         /// `source_ids`. The legacy store ignores it.
         #[serde(default)]
         once: bool,
+        /// The Days store's (#2510, `LAMP_MEMORY_REPLACES`): a kept id of
+        /// this person's that the new text corrects. Accepted only when it
+        /// is kept, active, not newer, and in `shown`; then it is replaced
+        /// (inactive, linked to the new one) and the answer says
+        /// `"replaced":<id>`. Refused, nothing is written. The legacy store
+        /// ignores both.
+        #[serde(default)]
+        replaces: Option<u64>,
+        /// The ids the asking session was shown (the note, recall or a
+        /// hit), for `replaces`.
+        #[serde(default)]
+        shown: Vec<u64>,
     },
     /// What it was asked to keep, for telling a new session.
     Kept {
@@ -348,7 +360,8 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
                 .map_err(not_added)?;
             Response::Added { id }
         }
-        // The legacy store keeps no links, and no `once` (#2176).
+        // The legacy store keeps no links, no `once` (#2176) and no
+        // `replaces` (#2510).
         Request::Remember {
             person,
             at_unix_ms,
@@ -786,6 +799,8 @@ mod tests {
                 text: "black coffee".into(),
                 source_ids: vec![],
                 once: false,
+                replaces: None,
+                shown: vec![],
             }
         );
         // The Days store's: where it came from (#1693).
@@ -797,6 +812,8 @@ mod tests {
                 text: "black coffee".into(),
                 source_ids: vec![3],
                 once: false,
+                replaces: None,
+                shown: vec![],
             }
         );
         assert_eq!(
