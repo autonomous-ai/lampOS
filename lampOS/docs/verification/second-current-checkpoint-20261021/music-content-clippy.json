@@ -1,0 +1,64 @@
+{
+  "head": "ae3384f301c364938eb02afb23e68096b2d0825e",
+  "event": "pull_request",
+  "tested_checkout": "0629e393242da32565286b3ad90c81bb30315d67",
+  "tested_base": "796d53b2490f8622a30f7746657642a954c1dd78",
+  "run": 39550250346,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39550250346",
+  "conclusion": "success",
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "log_sha256": "ef382f8c6d18f6f8148fb3320a2a8951c5fa574622ca3c6cb70df2606f38ff24",
+  "warnings": [],
+  "steps": [
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "restore the cache",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "unchanged source files get the cached build's times back",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "save the cache",
+      "conclusion": "skipped"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ]
+}

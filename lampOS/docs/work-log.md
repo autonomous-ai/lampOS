@@ -13,7 +13,110 @@ of the Queue issue (#705), a finished task is one pull request from its
 log and nothing a lamp runs ([joining.md](joining.md),
 [builders/second.md](../builders/second.md)).
 
-## Current checkpoint: 2026-10-21, Music and release review corrections
+## Current checkpoint: 2026-10-21, corrected Music and publication heads
+
+Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
+`ae3384f301c364938eb02afb23e68096b2d0825e`, one commit on
+`99f2ecfcd4ebb3b9279750bee42f219c0c4895ed`. Release publication
+[#2462](https://github.com/autonomous-ai/lampOS/pull/2462) is pushed at
+`18318e115cd0cb35ebea571132ec3eafc5f651b6`, one commit on
+`796d53b2490f8622a30f7746657642a954c1dd78`. Both worktrees are clean.
+The two corrections and their earlier failures are recorded separately.
+[Queue checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309169568).
+
+### Music
+
+Ready for lamp-voice: yes (#1757), for reviewer integration; the skill stays off.
+
+The fresh complete host gate passed **8,685 / 0 failed / 44 ignored / none
+filtered**: 35 source-only consumer crates **8,426 / 0 / 42** in **1,252.54 s**,
+full Update in the checkout **259 / 0 / 2** in **199.54 s**. Formatting,
+strict workspace/all-target Clippy, workspace build, all focused checks and
+renderer/package/disposable install passed. All **2,180** frozen source hashes
+matched after completion. Five clean mutation baselines passed and all five
+independent mutants compiled and failed their intended assertion.
+[Complete host and mutation record](https://github.com/autonomous-ai/lampOS/tree/ae3384f301c364938eb02afb23e68096b2d0825e/lampOS/docs/verification/requested-audio-content-20261021).
+
+Every scan now hashes all current definition and WAV bytes with the existing
+optimized SHA-256 implementation. Sixteen maximum recordings required
+**46,085,516 bytes** per scan and measured **23.550625 / 22.874458 / 23.183833 ms**
+at `Scan::unchanged`. Prepared handoff measured **186 / 165 microseconds**
+from confirmation retirement to authored speaker IPC acceptance. These are
+host fixtures with recently written/read files; no cold-disk, acoustic or
+physical-lamp qualification is claimed. The generated WAV/package and all
+seven installed hashes remain unchanged. Previous metadata-cache/native and
+unchanged Setup failures remain in their original evidence records.
+
+[x86 39550250346](https://github.com/autonomous-ai/lampOS/actions/runs/39550250346)
+passed without warnings on merge `0629e393242da32565286b3ad90c81bb30315d67`,
+base `796d53b2490f8622a30f7746657642a954c1dd78`;
+[receipt](verification/second-current-checkpoint-20261021/music-content-clippy.json).
+[ARM64 39550250450](https://github.com/autonomous-ai/lampOS/actions/runs/39550250450)
+passed on the same merge and base: **9,271 passed (one leaky), 62 skipped** in
+**148.375 s**, plus four doctests, 12 own-harness tests and relay signals.
+The same-size WAV regression passes in the full run. The known Voice
+journal-test leak and four shared-example filename warnings remain. Release
+build, package classification, checksums and artifact upload passed.
+[Native receipt](verification/second-current-checkpoint-20261021/music-content-arm64.json).
+The PR is [ready for review](https://github.com/autonomous-ai/lampOS/pull/1757#issuecomment-6309169244).
+The downloaded artifact has **49 entries**: 46 exactly classified binaries,
+two selected examples and `SHA256SUMS`; **48/48 payload checksums** match.
+The **111,064,303-byte** ZIP matches GitHub's digest
+`6da644749ff10152719f64986e7e7c760b277cac14891927c75ced69ffb61cf6`.
+Inventory comparison uses the classification blob from the tested integration
+base, which this feature commit does not change. The receipt preserves the
+initial check's wrong-checkout lookup and the corrected comparison; the same
+archive was reused. No downloaded binary was executed.
+Normal PR CI does not include the full nightly realtime group. First owns the
+planned lamp-4ace run; no physical-lamp acceptance is claimed.
+
+### Release publication
+
+Ready for lamp-voice: yes (#2462), for reviewer integration.
+
+The signing job names a branch-restricted environment, eligible candidates
+build cold, and the shared classification excludes development binaries and
+CI examples after complete original checksum verification. Core, optional
+and provisioning binaries remain, with new subset checksums and no changed
+updater install rule. Ordinary PR cache/source-time behavior is preserved.
+The docs require environment-only key provisioning and state publication
+cadence, measured size and indefinite release retention. Publication is off.
+
+Host gates passed **35 publisher + 12 provenance + 7 real CLI tests**,
+a fresh updater build, actionlint, 72 gate scenarios, six cold-target cases,
+16 shell blocks and Python/YAML/JSON/diff checks. Optional actionlint
+ShellCheck/Pyflakes integrations were disabled. The [external reviewer](https://github.com/autonomous-ai/lampOS/pull/2462#issuecomment-6309058136)
+closed the P2 and all three P3s, found no new P1/P2, and independently passed
+all 35 + 12 + 7 Python checks.
+
+[ARM64 39549616814](https://github.com/autonomous-ai/lampOS/actions/runs/39549616814)
+and [x86 39549616784](https://github.com/autonomous-ai/lampOS/actions/runs/39549616784)
+passed on merge `43ba23b9a2f1c8dbef1a6402f8aa316e108c585c`, base
+`796d53b2490f8622a30f7746657642a954c1dd78`: **9,121 native passes (one leaky),
+62 skips**, four doctests, 12 own-harness tests and relay signals; native
+Python **35 + 12 + 7 passed**. x86 has no warnings; ARM retains the known
+Voice journal-test leak and four shared-example filename warnings. Generic
+Go/Web/Python CI passed. Publication was skipped; the ordinary cached PR path
+ran. The cold guard's host fixtures do not establish a real-key publication
+or full nightly realtime coverage.
+[ARM complete receipt](verification/second-current-checkpoint-20261021/release-protected-arm64.json),
+[x86 receipt](verification/second-current-checkpoint-20261021/release-protected-clippy.json).
+
+The downloaded artifact's **48/48 payload hashes** matched: 46 classified
+binaries, two selected examples and their checksum list. ZIP **111,096,432
+bytes**, raw **300,787,902 bytes**, retained 30-binary subtotal **215,046,344
+bytes** before generated release assets. No downloaded binary was executed.
+Two non-atomic promotion renames and absence of pruning remain documented.
+No environment, secret, variable or real release was created.
+
+[Ready notice](https://github.com/autonomous-ai/lampOS/pull/2462#issuecomment-6309018606).
+After actual reviewer merge, #1812 closes with the workflow/docs slice and
+hands wider OTA and unperformed real-key internet/body acceptance to Migrate.
+The next labelled #871 still requires the on-lamp replay described in
+[its returned plan](https://github.com/autonomous-ai/lampOS/issues/871#issuecomment-6304890118);
+Second has no lamp and has not claimed an additional task or accessed one.
+
+## Earlier checkpoint: 2026-10-21, Music and release review corrections
 
 Music [#1757](https://github.com/autonomous-ai/lampOS/pull/1757) is pushed at
 `6f4e5ceea0df9f47ec211e5649dedf075507a7d6`; release workflow
