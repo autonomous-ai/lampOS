@@ -1393,6 +1393,14 @@ unit tùy ý. Entrypoint hỗ trợ các đối số cố định:
   để dọn tài nguyên lifecycle thuộc chính nó. Cleanup có timeout và phải thành
   công trước khi recovery bật lại chủ sở hữu hardware cũ.
 
+Web của V1 (lampOS #2396): khi adapter `lamp-os` cài, nếu `nginx.service` của
+V1 đang bật lúc boot thì nó ghi unit này vào journal, rồi disable và stop. Lamp
+đã chuyển vì vậy có cổng 80 trống sau khi V2 chạy, và không còn route V1 nào
+(`/monitor`, `/setting`, proxy `/api` sang os-server, `/hw`) trả lời. File của
+nginx giữ nguyên. ZIP chung không mang `lamp-setup`, nên trên V2 không gì bật
+nginx. `cleanup`, chạy khi rollback trước recovery, enable và start lại nó, nên
+V1 trở về với đủ site. Lamp có nginx không bật lúc boot thì giữ nguyên.
+
 ZIP `lamp-os` build trên main có `SERVICE_PREFLIGHT=1` và `SERVICE_CLEANUP=1`.
 `bin/service prepare` exec chính `bin/lamp-keeper prepare` của release (hợp đồng
 V2 từ lamp-voice #1094), bỏ `AUTONOMOUS_SERVICE_NAME` và `AUTONOMOUS_SERVICE_DATA`

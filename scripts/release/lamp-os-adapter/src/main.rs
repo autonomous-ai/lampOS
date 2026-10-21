@@ -50,6 +50,10 @@ struct Journal {
     marker: PathBuf,
     #[serde(default)]
     bus_group: Option<String>,
+    /// V1's web units this install found enabled at boot and disabled
+    /// (lampOS #2396): put back, enabled and started, by `cleanup`.
+    #[serde(default)]
+    v1_web: Vec<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct Health {
@@ -70,6 +74,10 @@ struct Layout {
 trait Systemd {
     fn run(&self, verb: &str, units: &[String]) -> Result<()>;
     fn active(&self, unit: &str) -> bool;
+    /// Whether the unit is enabled at boot.
+    fn enabled(&self, _unit: &str) -> bool {
+        false
+    }
     fn states(&self, units: &[String]) -> Result<BTreeMap<String, (bool, bool)>> {
         Ok(units
             .iter()
@@ -140,7 +148,19 @@ impl Systemd for RealSystemd {
             .status()
             .is_ok_and(|s| s.success())
     }
+    fn enabled(&self, unit: &str) -> bool {
+        bounded_systemctl(3)
+            .args(["is-enabled", "--quiet", unit])
+            .status()
+            .is_ok_and(|s| s.success())
+    }
 }
+/// V1's web, which a lamp moved to V2 no longer serves (lampOS #2396, the
+/// lead): its nginx held port 80 at every boot with V1's routes to a stopped
+/// os-server and HAL. It is disabled and stopped while V2 runs, its files
+/// untouched, and put back as it was by `cleanup` on a rollback. The generic
+/// package carries no `lamp-setup`, so nothing starts it on V2.
+const V1_WEB: &[&str] = &["nginx.service"];
 fn keeper_command(release: &Path) -> Command {
     let mut command = Command::new(release.join("bin/lamp-keeper"));
     command
@@ -456,6 +476,7 @@ fn plan(layout: &Layout, hostname: &str) -> Result<Journal> {
         files,
         marker,
         bus_group,
+        v1_web: Vec::new(),
     })
 }
 fn journal_path(layout: &Layout) -> PathBuf {
@@ -525,6 +546,11 @@ fn cleanup(layout: &Layout, systemd: &impl Systemd) -> Result<()> {
         }
     }
     systemd.run("daemon-reload", &[])?;
+    // V1's web as it was before the move (lampOS #2396).
+    if !journal.v1_web.is_empty() {
+        systemd.run("enable", &journal.v1_web)?;
+        systemd.run("start", &journal.v1_web)?;
+    }
     if exists(&journal.marker) {
         fs::remove_file(&journal.marker).map_err(|e| e.to_string())?;
     }
@@ -599,7 +625,13 @@ fn configure_bus(layout: &Layout, journal: &Journal) -> Result<()> {
 }
 fn install(layout: &Layout, hostname: &str, systemd: &impl Systemd) -> Result<Journal> {
     cleanup(layout, systemd)?;
-    let journal = plan(layout, hostname)?;
+    let mut journal = plan(layout, hostname)?;
+    // Recorded before it is changed, so a cut-short install is put back too.
+    journal.v1_web = V1_WEB
+        .iter()
+        .filter(|unit| systemd.enabled(unit))
+        .map(|unit| (*unit).to_owned())
+        .collect();
     expose_release(layout)?;
     configure_bus(layout, &journal)?;
     write_atomic(
@@ -618,6 +650,18 @@ fn install(layout: &Layout, hostname: &str, systemd: &impl Systemd) -> Result<Jo
         .collect();
     if !legacy.is_empty() {
         systemd.run("stop", &legacy)?;
+    }
+    if !journal.v1_web.is_empty() {
+        systemd.run("disable", &journal.v1_web)?;
+        let running: Vec<String> = journal
+            .v1_web
+            .iter()
+            .filter(|unit| systemd.active(unit))
+            .cloned()
+            .collect();
+        if !running.is_empty() {
+            systemd.run("stop", &running)?;
+        }
     }
     if STOP.load(Ordering::SeqCst) {
         return Err("cancelled before starting children".into());
@@ -778,6 +822,7 @@ mod tests {
     struct Fake {
         calls: RefCell<Vec<String>>,
         fail_start: bool,
+        enabled: Vec<&'static str>,
     }
     impl Systemd for Fake {
         fn run(&self, verb: &str, units: &[String]) -> Result<()> {
@@ -793,6 +838,58 @@ mod tests {
         fn active(&self, _: &str) -> bool {
             false
         }
+        fn enabled(&self, unit: &str) -> bool {
+            self.enabled.contains(&unit)
+        }
+    }
+    /// lampOS #2396: V1's nginx, enabled at boot, is recorded, then
+    /// disabled; a rollback's cleanup enables and starts it again. A lamp
+    /// without it enabled is left alone, and a journal from before has none.
+    #[test]
+    fn v1_web_is_disabled_while_v2_runs_and_put_back_by_cleanup() {
+        let f = Fixture::new();
+        let systemd = Fake {
+            enabled: vec!["nginx.service"],
+            ..Fake::default()
+        };
+        let journal = install(&f.0, "lamp-test", &systemd).unwrap();
+        assert_eq!(journal.v1_web, ["nginx.service"]);
+        let saved: Journal = serde_json::from_str(&read(&journal_path(&f.0)).unwrap()).unwrap();
+        assert_eq!(saved.v1_web, ["nginx.service"], "recorded in the journal");
+        let calls = systemd.calls.borrow().clone();
+        let disabled = calls
+            .iter()
+            .position(|c| c == "disable nginx.service")
+            .unwrap();
+        let started = calls
+            .iter()
+            .position(|c| c == "start lampos.target")
+            .unwrap();
+        assert!(disabled < started, "{calls:?}");
+        systemd.calls.borrow_mut().clear();
+        cleanup(&f.0, &systemd).unwrap();
+        let calls = systemd.calls.borrow().clone();
+        assert!(
+            calls.contains(&"enable nginx.service".to_owned()),
+            "{calls:?}"
+        );
+        assert!(
+            calls.contains(&"start nginx.service".to_owned()),
+            "{calls:?}"
+        );
+        assert!(!exists(&journal_path(&f.0)));
+
+        let f = Fixture::new();
+        let systemd = Fake::default();
+        let journal = install(&f.0, "lamp-test", &systemd).unwrap();
+        assert!(journal.v1_web.is_empty());
+        assert!(!systemd.calls.borrow().iter().any(|c| c.contains("nginx")));
+
+        let old: Journal = serde_json::from_str(
+            r#"{"format":1,"service":"lamp-os","units":[],"files":[],"marker":"/x"}"#,
+        )
+        .unwrap();
+        assert!(old.v1_web.is_empty());
     }
     #[test]
     fn rejects_other_device_without_changes() {

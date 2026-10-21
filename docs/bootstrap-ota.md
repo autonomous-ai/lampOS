@@ -1429,6 +1429,15 @@ supports fixed arguments:
   after stop to remove only their own lifecycle resources. Cleanup is bounded and
   must succeed before recovery restarts previous hardware owners.
 
+V1's web (lampOS #2396): when the `lamp-os` adapter installs, it records V1's
+`nginx.service` in its journal if that unit is enabled at boot, then disables
+and stops it. A moved lamp then has port 80 free after V2 starts, and no V1
+route (`/monitor`, `/setting`, the `/api` proxy to os-server, `/hw`) answers.
+Nginx's files are left untouched. The generic ZIP carries no `lamp-setup`, so
+nothing starts nginx on V2. `cleanup`, which runs on a rollback before
+recovery, enables and starts it again, so V1 comes back with its whole site.
+A lamp whose nginx was not enabled is left as it is.
+
 The `lamp-os` ZIP built on main carries `SERVICE_PREFLIGHT=1` and
 `SERVICE_CLEANUP=1`. Its `bin/service prepare` execs the release's own
 `bin/lamp-keeper prepare` (the V2 contract from lamp-voice #1094) with
