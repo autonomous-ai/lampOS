@@ -1942,17 +1942,7 @@ pub fn serve(
             let who = hits_who;
             engine = engine.remembering(Arc::new(move |request, heard, lease| {
                 let started = Instant::now();
-                let person = match lease {
-                    // Revoked: nothing is asked for it.
-                    Some(lease) => Some(lease.scope()?.person().map(str::to_owned)),
-                    None => hits_person(&hits_sessions, who.as_deref(), started),
-                };
-                let Some(person) = person else {
-                    eprintln!(
-                        "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
-                    );
-                    return None;
-                };
+                let person = hits_whose(request, lease, &hits_sessions, who.as_deref(), started)?;
                 let now_unix_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |since| since.as_millis() as u64);
@@ -4959,6 +4949,31 @@ fn hits_person(
         .map(|mut sessions| sessions.open_ahead(who, now))
         .unwrap_or_default();
     crate::remember::hits_scope(known.as_deref(), session.as_deref())
+}
+
+/// Whose kept things a spoken turn's hits are asked in: `Some(None)` the
+/// room's, `Some(Some(person))` that person's, `None` nothing. With a
+/// request's lease (`LAMP_SECOND_SCOPED_CONTEXT`), its own admitted scope,
+/// narrowed to the room when another face spoke it, and nothing for a revoked
+/// one. Without, the sticky session's person, and nothing when the face and
+/// the session's person differ.
+fn hits_whose(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    sessions: &Mutex<Sessions>,
+    who: Option<&Path>,
+    now: Instant,
+) -> Option<Option<String>> {
+    if let Some(lease) = lease {
+        return Some(lease.scope()?.person().map(str::to_owned));
+    }
+    let person = hits_person(sessions, who, now);
+    if person.is_none() {
+        eprintln!(
+            "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
+        );
+    }
+    person
 }
 
 /// Whose the second route's turns are, and the Days note of that person's
@@ -9174,6 +9189,49 @@ mod tests {
         );
         assert_eq!(next, (false, ossa));
         assert_eq!(other, None, "a face the session isn't for");
+    }
+
+    /// The reviewer-lead's P3 on #2537: with a request's lease, its hits are
+    /// asked in the lease's own scope, whoever the sticky session holds; in
+    /// the room's once another face spoke the line; and not at all once it is
+    /// revoked. Without a lease, the session's person as before.
+    #[test]
+    fn a_turns_hits_are_asked_in_its_leases_scope() {
+        // One test at a time on the process's thread and room.
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-voice-second-hits-lease-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("known");
+        std::fs::write(&file, "Kesh\n").unwrap();
+        let now = Instant::now();
+        let sessions = Mutex::new(Sessions::default());
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+            session: 1,
+            request: 3,
+        };
+        let scope = RequestScope::new(key, ScopeSnapshot::of("Ossa"));
+        let lease = scope.lease();
+        let ossa = Some(crate::remember::person_id("Ossa"));
+        let theirs = hits_whose(3, Some(&lease), &sessions, Some(&file), now);
+        lease.narrow_to_room();
+        let narrowed = hits_whose(3, Some(&lease), &sessions, Some(&file), now);
+        scope.revoke();
+        let revoked = hits_whose(3, Some(&lease), &sessions, Some(&file), now);
+        let unleased = hits_whose(3, None, &sessions, Some(&file), now);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(theirs, Some(ossa), "the lease's person, not the session's");
+        assert_eq!(narrowed, Some(None), "another face spoke it: the room's");
+        assert_eq!(revoked, None, "a revoked lease asks nothing");
+        assert_eq!(
+            unleased,
+            Some(Some(crate::remember::person_id("Kesh"))),
+            "without a lease, the session's person"
+        );
     }
 
     /// #1712: as the lamp's only voice, the rule judges in the room this
