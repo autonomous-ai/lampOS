@@ -172,7 +172,8 @@ pub const SPEECH_WARM_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_WARM";
 /// begins (#2135's row): `on`, and nothing else.
 pub const SPEECH_SOCKET_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_SOCKET";
 /// Where the voice reads the speech socket's own model (#2135, the backend at
-/// 17:5x on 21 Oct): a model ElevenLabs' `stream-input` serves; absent,
+/// 17:5x on 21 Oct): a model ElevenLabs' `stream-input` serves, or
+/// `eleven_v4_turbo`, which takes its dialogue socket (#2602); absent,
 /// `eleven_flash_v2_5`. Every piece of an answer whose socket opened is
 /// said in it, those over HTTP too.
 pub const SPEECH_SOCKET_MODEL_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_SOCKET_MODEL";
