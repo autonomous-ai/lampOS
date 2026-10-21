@@ -586,6 +586,30 @@ pub fn ring_off(report: lamp_msgs::Diagnostic, off: bool) -> lamp_msgs::Diagnost
     out.with("ring", "off")
 }
 
+/// The voice's report with, while `refused`, that a voice service (speech to text, the chat or speech) refused
+/// this lamp's key turn after turn though the link is up (#2231,
+/// `coordinator::key_refusals`): a warning, with `refused` = `key`. What
+/// was wrong before is said after it.
+pub fn chat_key_refused(report: lamp_msgs::Diagnostic, refused: bool) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level};
+    if !refused {
+        return report;
+    }
+    let said = "a voice service refused this lamp's key: it needs a working key, from setup or the app's own keys";
+    let message = if report.message.is_empty() {
+        said.to_owned()
+    } else {
+        format!("{said}; {}", report.message)
+    };
+    let level = match report.level {
+        Level::Ok => Level::Warn,
+        level => level,
+    };
+    let mut out = Diagnostic::new(level, SOURCE, &message);
+    out.values = report.values;
+    out.with("refused", "key")
+}
+
 /// The voice's report with, while `runs` is above 0, that so many runs in a
 /// row failed before they heard anything (#1567): a warning, never that it
 /// is muted, since it is not, and the count as the fact `could_not_start`.
@@ -935,6 +959,7 @@ pub struct BusOut {
     could_not_start: u32,
     /// The light ring faulted and stays off this session (#1620).
     ring_off: bool,
+    chat_key_refused: bool,
 }
 
 impl BusOut {
@@ -985,6 +1010,7 @@ impl BusOut {
             calls: crate::not_speech::CallsLeftOut::new(),
             could_not_start: 0,
             ring_off: false,
+            chat_key_refused: false,
         })
     }
 
@@ -1103,7 +1129,10 @@ impl BusOut {
             .map_or(0, |since| now_us.saturating_sub(since));
         let report = ring_off(
             could_not_start(
-                health(link_up, down_for, refusal, mic_at_start),
+                chat_key_refused(
+                    health(link_up, down_for, refusal, mic_at_start),
+                    self.chat_key_refused,
+                ),
                 self.could_not_start,
             ),
             self.ring_off,
@@ -1118,6 +1147,12 @@ impl BusOut {
     /// each report while it does.
     pub fn set_ring_off(&mut self, off: bool) {
         self.ring_off = off;
+    }
+
+    /// Whether a voice service refuses this lamp's key turn after turn
+    /// (#2231): said with each report while it does.
+    pub fn set_chat_key_refused(&mut self, refused: bool) {
+        self.chat_key_refused = refused;
     }
 
     /// How many runs in a row failed before they heard anything, as the
@@ -1267,6 +1302,30 @@ mod tests {
             health(true, 0, Some(Fault::Authentication), None).level,
             lamp_msgs::Level::Ok
         );
+    }
+
+    /// #2231 (the lead on #1711): a key a voice service refuses turn after
+    /// turn is said while the link is up, beside what else is said.
+    #[test]
+    fn a_chat_key_refused_turn_after_turn_is_said_while_the_link_is_up() {
+        let well = health(true, 0, None, None);
+        assert_eq!(chat_key_refused(well.clone(), false), well);
+        let refused = chat_key_refused(well, true);
+        assert_eq!(refused.level, lamp_msgs::Level::Warn);
+        assert!(
+            refused
+                .message
+                .starts_with("a voice service refused this lamp's key"),
+            "{}",
+            refused.message
+        );
+        let has = |key: &str, value: &str| {
+            refused
+                .values
+                .iter()
+                .any(|fact| fact.key == key && fact.value == value)
+        };
+        assert!(has("refused", "key") && has("link", "ready"));
     }
 
     /// A kept room older than `ROOM_FRESH_MS` is no room: the worker that
