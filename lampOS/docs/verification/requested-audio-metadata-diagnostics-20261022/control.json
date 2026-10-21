@@ -1,0 +1,37 @@
+{
+  "started_at": "2026-10-22T01:38:12.381526+07:00",
+  "base": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "mutation": "replace only stability_refusal body with the old generic refusal; keep every guard",
+  "source_before": "be0155e463f65663a45ab7d81b494adb8604a2e09a56bb25bceab98497caa5dd",
+  "mutated_source": "599291c10cf2bfae297ce2c2a300c9f827a94d15c7d94b45a05e6b6fc60962bb",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-skills",
+    "--lib",
+    "requested_audio::file_checks::",
+    "--",
+    "--test-threads=1"
+  ],
+  "source_after": "be0155e463f65663a45ab7d81b494adb8604a2e09a56bb25bceab98497caa5dd",
+  "source_unchanged": true,
+  "exit_code": 101,
+  "elapsed_seconds": 23.496,
+  "summaries": [
+    "test result: FAILED. 3 passed; 5 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.01s"
+  ],
+  "counts": {
+    "passed": 3,
+    "failed": 5,
+    "ignored": 0,
+    "filtered out": 129
+  },
+  "log_name": "generic-message-control.log",
+  "log_sha256": "6bf20d79d236b2ccdfb41c3d3283accaade4ad75daaf8b5ece8b8e45a6954fa8",
+  "finished_at": "2026-10-22T01:38:35.893835+07:00",
+  "status": "expected-failure-observed"
+}

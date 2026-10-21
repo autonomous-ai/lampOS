@@ -1,0 +1,60 @@
+{
+  "started_at": "2026-10-22T01:39:13.324326+07:00",
+  "base": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "source_before": "be0155e463f65663a45ab7d81b494adb8604a2e09a56bb25bceab98497caa5dd",
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.624,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 16.167,
+      "log_name": "clippy.log",
+      "log_sha256": "f2a803108c4cf21be2b1e147adc3ab1fd33616474710698b27405e488e95dafc",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "failed",
+  "error": "clippy failed",
+  "source_after": "be0155e463f65663a45ab7d81b494adb8604a2e09a56bb25bceab98497caa5dd",
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T01:39:34.132944+07:00"
+}
