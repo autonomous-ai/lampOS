@@ -3090,8 +3090,11 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
         serde_json::from_str::<serde_json::Value>(&line).unwrap()
     };
     // Poses said over `window` of the program's clock, from now: a second
-    // on at a time, what it says in it waited for.
-    let poses = |window: Duration| {
+    // on at a time, what it says in it waited for. The pose is said by a
+    // thread of its own, which a loaded runner can run later than the
+    // second's 200 ms (#1569 row 69): with fewer than `due` said, the rest
+    // are waited for, up to 2 s each.
+    let poses = |window: Duration, due: usize| {
         let until = clock.now() + window;
         let mut buffer = [0u8; 256];
         let mut count = 0;
@@ -3102,6 +3105,16 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
                 count += 1;
             }
         }
+        mood.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        while count < due {
+            let Ok(length) = mood.recv(&mut buffer) else {
+                break;
+            };
+            assert_eq!(&buffer[..length], br#"{"level":0,"mood":"reading"}"#);
+            count += 1;
+        }
+        mood.set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
         count
     };
     ring.publish_json(1, &Light::new(true, "blue", 3).unwrap())
@@ -3121,13 +3134,13 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
     assert!(posed(), "the pose came after the answer");
     let lit = lights.try_recv().expect("the light came after the answer");
     assert!(lit.contains("white"), "{lit}");
-    let first = 1 + poses(Duration::from_millis(3_500));
+    let first = 1 + poses(Duration::from_millis(3_500), 2);
     // Let go: nothing said between the pose's end and the second call.
-    let quiet = poses(Duration::from_millis(1_500));
+    let quiet = poses(Duration::from_millis(1_500), 0);
     let again = call();
     assert_eq!(again["ok"], true, "{again}");
     assert!(posed(), "the pose again came after the answer");
-    let second = 1 + poses(Duration::from_millis(3_500));
+    let second = 1 + poses(Duration::from_millis(3_500), 2);
     assert_eq!((first, quiet, second), (3, 0, 3));
     // The light was made once, taken above: the second call made only the
     // pose.
