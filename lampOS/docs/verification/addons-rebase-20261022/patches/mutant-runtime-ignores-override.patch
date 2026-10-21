@@ -1,0 +1,11 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -119,7 +119,7 @@
+     // The say put to the policy, while it waits for an answer.
+     let mut asked: Option<AddonProposal> = None;
+     let mut watcher =
+-        Watcher::new(lamp_ipc::monotonic_us(), config.mute_grace_us).on_clock(&clock_id);
++        Watcher::new(lamp_ipc::monotonic_us(), ASLEEP_FRESH_US).on_clock(&clock_id);
+     // What was there before it started: the kept values of each topic.
+     for topic in TOPICS {
+         if let Ok(Some(message)) = bus.latest(topic) {

@@ -1,0 +1,74 @@
+{
+  "source_head": "2b53b580fd3511efec3a7aa315f37dadee7b804e",
+  "json_validated": 20,
+  "local_links_validated": 39,
+  "patch_checks": [
+    {
+      "patch": "patches/mutant-decision-before-light-50ms.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-decision-before-light-50ms.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "patch": "patches/mutant-decision-duplicated-50ms.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "patch": "patches/mutant-default-grace-zero.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-default-grace-zero.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "patch": "patches/mutant-restart-does-not-renew-grace.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-restart-does-not-renew-grace.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "patch": "patches/mutant-runtime-ignores-override.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-runtime-ignores-override.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "patch": "patches/mutant-said-mute-age-refreshed.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-addons-20261021/lampOS/docs/verification/addons-review-20261022/patches/mutant-said-mute-age-refreshed.patch"
+      ],
+      "exit": 0
+    }
+  ],
+  "raw_logs_preserved": 57,
+  "metadata_stdout_omissions": 2,
+  "freshness_1314_file_content_digest_matches": true,
+  "all_tested_source_hashes_match": true,
+  "historical_raw_evidence_unchanged": true,
+  "tracked_and_new_file_whitespace_checks_passed": true,
+  "remote_links": "Existing approval/PR URLs retained; no network calls made."
+}

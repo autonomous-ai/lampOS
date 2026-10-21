@@ -1,0 +1,148 @@
+1:  0f961123b ! 1:  2b53b580f lampOS: end add-on judge fixtures on outcomes with a test startup grace
+    @@ lampOS/crates/addons/src/main.rs: use std::{
+          time::Duration,
+      };
+
+    -+const HELP: &str = "usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--mute-grace-ms N]
+    ++const HELP: &str = "usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N] [--mute-grace-ms N]
+     +LAMP_ADDONS=on is --enable.
+    ++--say-quiet-ms N  Tests only: wait 0..15000 ms of quiet before a say (default 15000 ms).
+     +--mute-grace-ms N  Tests only: wait 0..3000 ms for a voice/mute never said (default 3000 ms).";
+     +
+      fn run() -> Result<(), Box<dyn std::error::Error>> {
+          let mut args = std::env::args().skip(1);
+     -    if args.next().as_deref() != Some("serve") {
+    --        return Err("usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] (LAMP_ADDONS=on is --enable)".into());
+    +-        return Err("usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N, for tests: below 15000] (LAMP_ADDONS=on is --enable)".into());
+     +    match args.next().as_deref() {
+     +        Some("--help" | "-h") => {
+     +            println!("{HELP}");
+    @@ lampOS/crates/addons/src/main.rs: fn run() -> Result<(), Box<dyn std::error::Err
+                      config.bus_root = Some(PathBuf::from(
+     @@ lampOS/crates/addons/src/main.rs: fn run() -> Result<(), Box<dyn std::error::Error>> {
+                      }
+    -                 config.run_for = Some(Duration::from_millis(ms));
+    +                 config.say_quiet = Some(Duration::from_millis(ms));
+                  }
+     +            "--mute-grace-ms" => {
+     +                let ms: u64 = args
+    @@ lampOS/crates/addons/src/main.rs: fn run() -> Result<(), Box<dyn std::error::Err
+
+      ## lampOS/crates/addons/src/runtime.rs ##
+     @@
+    - //! journal, one line each, with why. A kept mood is said to `lamp-mood` as a
+    - //! nudge on `mood/nudge`, which it holds inside its own bounds.
+    + //! the rules is put to the policy on `addon/ask` (#2530 part 2) and kept or
+    + //! dropped by its answer on `policy/decisions`, `by` `jev`.
+      use crate::carry;
+    --use crate::rules::{Judge, Verdict};
+    -+use crate::rules::{ASLEEP_FRESH_US, Judge, Verdict};
+    +-use crate::rules::{Drop, Judge, Verdict};
+    ++use crate::rules::{ASLEEP_FRESH_US, Drop, Judge, Verdict};
+      use crate::situation::{TOPICS, Watcher};
+      use lamp_bus::{Bus, Message, Publisher, Subscriber};
+      use lamp_msgs::{
+    @@ lampOS/crates/addons/src/runtime.rs: pub const ENVIRONMENT: &str = "LAMP_ADDONS"
+      pub struct Config {
+          pub bus_root: Option<PathBuf>,
+          /// The claims' clock: the host's boot, or a test's.
+    -     pub clock_id: Option<String>,
+    +@@ lampOS/crates/addons/src/runtime.rs: pub struct Config {
+          pub run_for: Option<Duration>,
+    +     /// A shorter quiet before a say, for tests only (`--say-quiet-ms`).
+    +     pub say_quiet: Option<Duration>,
+     +    /// Wait for a mute never said after startup or a voice restart. Tests
+     +    /// may shorten it; a mute that was said keeps its own 3 s freshness.
+     +    pub mute_grace_us: u64,
+    @@ lampOS/crates/addons/src/runtime.rs: pub const ENVIRONMENT: &str = "LAMP_ADDONS"
+     +            bus_root: None,
+     +            clock_id: None,
+     +            run_for: None,
+    ++            say_quiet: None,
+     +            mute_grace_us: ASLEEP_FRESH_US,
+     +        }
+     +    }
+    @@ lampOS/crates/addons/src/runtime.rs: pub const ENVIRONMENT: &str = "LAMP_ADDONS"
+
+      /// What it did, said when it stops.
+     @@ lampOS/crates/addons/src/runtime.rs: pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
+    -         &AddonDecision::declaration(),
+    -         "addons",
+    -     )?;
+    +     let mut answers = bus.subscribe(Decision::TOPIC, "addons")?;
+    +     // The say put to the policy, while it waits for an answer.
+    +     let mut asked: Option<AddonProposal> = None;
+     -    let mut watcher = Watcher::new(lamp_ipc::monotonic_us()).on_clock(&clock_id);
+     +    let mut watcher =
+     +        Watcher::new(lamp_ipc::monotonic_us(), config.mute_grace_us).on_clock(&clock_id);
+    @@ lampOS/crates/addons/src/situation.rs: pub struct Watcher {
+     +            setting_up: false,
+     +            voice_boot: None,
+     +            voice_resting: None,
+    ++            resting_since_us: None,
+     +            room_quiet: None,
+     +            persons: None,
+     +            slept_since_persons: false,
+    @@ lampOS/crates/addons/tests/judge.rs: fn over_a_persons_light_that_rests_a_glow_i
+          bus.publisher_declared(
+              AddonProposal::TOPIC,
+              &AddonProposal::declaration(),
+    -@@ lampOS/crates/addons/tests/judge.rs: fn over_a_persons_light_that_rests_a_glow_is_asked_briefly() {
+    -     let holds_us = request.claim.until_us - lamp_ipc::monotonic_us();
+    -     assert!(holds_us <= 5_000_000, "{holds_us}");
+    +@@ lampOS/crates/addons/tests/judge.rs: fn a_say_is_asked_of_the_policy_and_kept_or_dropped_by_its_answer() {
+    +         assert!(dropped.why.starts_with(why), "{dropped:?}");
+    +     }
+      }
+     +
+     +#[test]
+    @@ lampOS/crates/addons/tests/judge.rs: fn over_a_persons_light_that_rests_a_glow_i
+
+      ## lampOS/docs/addons.md ##
+     @@ lampOS/docs/addons.md: on a lamp without the head's controls):
+    - | Late | the proposal's age | judged after its `holds_ms` |
+    - | Rate (rule 8) | the judge's own memory | its add-on had one kept within 2 minutes, or 10 within the hour; a dropped one is not counted |
+    +
+    + **A say (part 2, #2530).** A `say` past every rule is not kept by the rules alone: the judge puts it to the policy as one `AddonAsk` on `addon/ask` (the proposal's number, the add-on, `why`, `sure`; no words), one at a time, and waits 3 s (`ASK_WAIT_US`) for a `Decision` from `lamp-policy` with `about` `addon` naming the proposal. Only `say_now` that acts (`shadow` false), with the rules holding again as it comes, keeps it, `by` `jev`; `wait` or a shadow answer drops it, `by` `jev`, with why; no answer drops it, `by` `rule`. Only a kept say counts toward the rates. In this PR a kept say is said kept and not spoken: the policy's question and the voice's side come in part 2's next PRs. `--say-quiet-ms` shortens the 15 s for tests only.
+
+     +For tests, `serve --mute-grace-ms N` accepts 0..3000 ms for the wait before
+     +a `voice/mute` never said counts as absent, both at startup and after a
+     +new voice publisher boot. `--help` identifies it as a test option. The
+     +product default remains **3000 ms** and the product service passes no
+    -+override. `runtime::Config::mute_grace_us` passes that wait to
+    ++override. The ordinary binary accepts this test-oriented option: explicitly
+    ++passing a smaller value shortens the absent-mute startup and restart wait.
+    ++It is not restricted by a separate test mode.
+    ++`runtime::Config::mute_grace_us` passes that wait to
+     +`Watcher::new(began_us, mute_grace_us)`; the freshness of a mute that was
+     +said remains **3 s**, independently of this wait.
+     +
+     +The judge's process tests publish the lamp's retained state before
+     +starting it, then wait for its proposal subscription and decision (or
+     +its exit with add-ons off). The product-lamp fixture alone passes a zero
+    -+grace, while clock-stepped tests check the default, custom startup and
+    -+restart boundaries, and the unchanged freshness of an actual mute. The
+    -+light requests are read immediately after the first decision, before the
+    ++grace, while unit tests using explicit timestamps check the default, custom
+    ++startup and restart boundaries, and the unchanged freshness of an actual
+    ++mute. The process fixture does not verify the default timing window or
+    ++that `serve` forwards the default into `Watcher`; it has no injected clock.
+    ++The light requests are read immediately after the first decision, before the
+     +100 ms observation that catches a second decision on the same proposal.
+     +No light request may arrive during that observation: the decision must
+     +follow the light it acknowledges. Host timings and controls are recorded in
+    @@ lampOS/docs/verification/addons-judge-grace-20261021/README.md (new)
+     +
+     +No native Linux ARM64 run of this candidate or device execution is included
+     +here. New CI on the published PR head is still required. No product service unit,
+    -+deployed binary, mute freshness rule, or actual output behavior was changed.
+    ++deployed binary, mute freshness rule, or default output behavior was changed.
+    ++The ordinary binary does accept the explicit test-oriented grace override;
+    ++passing a smaller value shortens its absent-mute startup and restart wait.
+    ++The shipped service omits it. Unit tests cover the default boundary with
+    ++explicit timestamps, but the process fixture uses zero grace and does not
+    ++verify the default window or its forwarding by `serve`. The former 3.2 s
+    ++pause checked eventual acceptance, not rejection before the default boundary.
+
+      ## lampOS/docs/verification/addons-judge-grace-20261021/after-host-timings.json (new) ##
+     @@

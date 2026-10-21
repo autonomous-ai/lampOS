@@ -1,0 +1,24 @@
+{
+  "before_head": "9b577ce0f0ad361d2b68a83adba9642e7ff0b713",
+  "parent_base": "8029dbd30e171e609a706bbc622f27a781075510",
+  "old_pr_head": "4e16dbed9316417b5f620352ad8ebc3688be26bf",
+  "after": "Uncommitted source tested after mutation restoration; docs were added after gates.",
+  "files": {
+    "lampOS/crates/addons/src/main.rs": {
+      "before": "ac23614c6b52e358940ee6dc3cef4342be79e7007bc1b079ee1590b048cd1d0d",
+      "after": "86dcd5fb59889609d255feb3791bb2af3da8010fbc881d62479369b231ab9ca2"
+    },
+    "lampOS/crates/addons/src/runtime.rs": {
+      "before": "eec3883119ffa3ee49e919a38afcfb8901872139f027d77151a71f6b2f9d26d5",
+      "after": "97ef9af571b5b7a6a4fd8bfb926c4e929ccd95476e0f75d954842c0d70063540"
+    },
+    "lampOS/crates/addons/src/situation.rs": {
+      "before": "bbff1a96df0e7dd15db6585e53249bc27c578049ad26f8b57d16fc7b09a7d15f",
+      "after": "104659da97b70258b95c97f8a0f91db477477ceb57b5ef70207eebe184ba73a6"
+    },
+    "lampOS/crates/addons/tests/judge.rs": {
+      "before": "26728369449762127c6b47d43b57c0f55ec36fa6b6dd1039efd614d43a06a037",
+      "after": "6a6ef8a603623c1526453fe693145a9c85cf3e6ef79de5f4ee0e5af47fdd7565"
+    }
+  }
+}

@@ -1,0 +1,648 @@
+[
+  {
+    "label": "dependency-metadata",
+    "command": [
+      "cargo",
+      "metadata",
+      "--format-version",
+      "1",
+      "--no-deps",
+      "--offline",
+      "--locked"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "dependency-metadata.log",
+    "expected_failure": false,
+    "timeout_s": 120,
+    "started_utc": "2026-10-21T19:02:50.211427+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0857,
+    "results": []
+  },
+  {
+    "label": "mutant-default-grace-zero-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-default-grace-zero.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-default-grace-zero-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:50.325755+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0476,
+    "results": []
+  },
+  {
+    "label": "mutant-default-grace-zero-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-default-grace-zero.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-default-grace-zero-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:50.374688+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0478,
+    "results": []
+  },
+  {
+    "label": "mutant-default-grace-zero-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-default-grace-zero-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:02:50.423993+00:00",
+    "test": "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 5.5713,
+    "results": [
+      "thread 'runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said' (687062460) panicked at crates/addons/src/runtime.rs:408:9:",
+      "runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.00s",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-runtime-ignores-override-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-runtime-ignores-override.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-runtime-ignores-override-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:56.049055+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0398,
+    "results": []
+  },
+  {
+    "label": "mutant-runtime-ignores-override-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-runtime-ignores-override.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-runtime-ignores-override-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:56.089598+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0374,
+    "results": []
+  },
+  {
+    "label": "mutant-runtime-ignores-override-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-runtime-ignores-override-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:02:56.127840+00:00",
+    "test": "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.8728,
+    "results": [
+      "thread 'a_product_lamp_with_no_pause_or_mute_said_keeps_a_light' (687062852) panicked at crates/addons/tests/judge.rs:297:5:",
+      "a_product_lamp_with_no_pause_or_mute_said_keeps_a_light --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.44s",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-restart-does-not-renew-grace-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-restart-does-not-renew-grace.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-restart-does-not-renew-grace-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:58.053572+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0464,
+    "results": []
+  },
+  {
+    "label": "mutant-restart-does-not-renew-grace-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-restart-does-not-renew-grace.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-restart-does-not-renew-grace-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:58.100714+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0468,
+    "results": []
+  },
+  {
+    "label": "mutant-restart-does-not-renew-grace-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-restart-does-not-renew-grace-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:02:58.148575+00:00",
+    "test": "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.0217,
+    "results": [
+      "thread 'situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice' (687063062) panicked at crates/addons/src/situation.rs:516:17:",
+      "situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.00s",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-said-mute-age-refreshed-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-said-mute-age-refreshed.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-said-mute-age-refreshed-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:59.223959+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0373,
+    "results": []
+  },
+  {
+    "label": "mutant-said-mute-age-refreshed-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-said-mute-age-refreshed.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-said-mute-age-refreshed-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:02:59.262379+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0402,
+    "results": []
+  },
+  {
+    "label": "mutant-said-mute-age-refreshed-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--lib",
+      "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-said-mute-age-refreshed-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:02:59.303507+00:00",
+    "test": "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.0436,
+    "results": [
+      "thread 'situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness' (687063306) panicked at crates/addons/src/situation.rs:562:17:",
+      "situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.00s",
+      "error: test failed, to rerun pass `-p lamp-addons --lib`"
+    ]
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-before-light-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-before-light-50ms-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:00.401845+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0439,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-before-light-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-before-light-50ms-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:00.447056+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0423,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-decision-before-light-50ms-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:03:00.490752+00:00",
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.9596,
+    "results": [
+      "thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (687064329) panicked at crates/addons/tests/judge.rs:240:5:",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.44s",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-2-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-before-light-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-before-light-50ms-2-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:02.509628+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0475,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-2-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-before-light-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-before-light-50ms-2-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:02.557889+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0421,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-before-light-50ms-2",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-decision-before-light-50ms-2.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:03:02.601021+00:00",
+    "test": "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.9029,
+    "results": [
+      "thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (687064825) panicked at crates/addons/tests/judge.rs:240:5:",
+      "a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.49s",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-1-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-duplicated-50ms-1-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:04.561743+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0429,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-1-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-duplicated-50ms-1-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:04.605593+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0451,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-1",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-decision-duplicated-50ms-1.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:03:04.651742+00:00",
+    "test": "a_kept_light_is_said_kept_on_addon_decision",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.937,
+    "results": [
+      "thread 'a_kept_light_is_said_kept_on_addon_decision' (687065235) panicked at crates/addons/tests/judge.rs:283:9:",
+      "a_kept_light_is_said_kept_on_addon_decision --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.50s",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-2-apply-check",
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-duplicated-50ms-2-apply-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:06.642697+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0429,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-2-apply",
+    "command": [
+      "git",
+      "apply",
+      "/private/tmp/tests-codex-addons-review-20261022/patches/mutant-decision-duplicated-50ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021",
+    "log": "mutant-decision-duplicated-50ms-2-apply.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:03:06.686543+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0455,
+    "results": []
+  },
+  {
+    "label": "mutant-decision-duplicated-50ms-2",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--test",
+      "judge",
+      "a_kept_light_is_said_kept_on_addon_decision",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "mutant-decision-duplicated-50ms-2.log",
+    "expected_failure": true,
+    "timeout_s": 600,
+    "started_utc": "2026-10-21T19:03:06.732942+00:00",
+    "test": "a_kept_light_is_said_kept_on_addon_decision",
+    "status": "expected_failure_verified",
+    "exit": 101,
+    "wall_s": 1.8894,
+    "results": [
+      "thread 'a_kept_light_is_said_kept_on_addon_decision' (687065629) panicked at crates/addons/tests/judge.rs:283:9:",
+      "a_kept_light_is_said_kept_on_addon_decision --- FAILED",
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.49s",
+      "error: test failed, to rerun pass `-p lamp-addons --test judge`"
+    ]
+  },
+  {
+    "label": "gate-format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "gate-format.log",
+    "expected_failure": false,
+    "timeout_s": 300,
+    "started_utc": "2026-10-21T19:03:08.717260+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 10.4175,
+    "results": []
+  },
+  {
+    "label": "gate-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "-p",
+      "lamp-addons",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-Dwarnings"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "gate-clippy.log",
+    "expected_failure": false,
+    "timeout_s": 1200,
+    "started_utc": "2026-10-21T19:03:19.161937+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 5.3885,
+    "results": []
+  },
+  {
+    "label": "gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "-q",
+      "-p",
+      "lamp-addons"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "gate-tests.log",
+    "expected_failure": false,
+    "timeout_s": 900,
+    "started_utc": "2026-10-21T19:03:24.577739+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 7.7682,
+    "results": [
+      "test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.56s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "label": "gate-workspace-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--workspace"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "gate-workspace-build.log",
+    "expected_failure": false,
+    "timeout_s": 1800,
+    "started_utc": "2026-10-21T19:03:32.372370+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 53.3039,
+    "results": []
+  },
+  {
+    "label": "gate-diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-addons-20261021/lampOS",
+    "log": "gate-diff-check.log",
+    "expected_failure": false,
+    "timeout_s": 30,
+    "started_utc": "2026-10-21T19:04:25.757501+00:00",
+    "status": "passed",
+    "exit": 0,
+    "wall_s": 0.0837,
+    "results": []
+  }
+]

@@ -1,0 +1,11 @@
+--- a/lampOS/crates/addons/src/situation.rs
++++ b/lampOS/crates/addons/src/situation.rs
+@@ -234,7 +234,7 @@
+             privacy_closed: self.privacy_closed,
+             paused: self.paused,
+             asleep: match self.muted_asleep {
+-                Some(reading) => Some(Reading::new(reading.value || resting, reading.at_us)),
++                Some(reading) => Some(Reading::new(reading.value || resting, now_us)),
+                 None if now_us.saturating_sub(self.began_us) >= self.mute_grace_us => {
+                     Some(Reading::new(resting, now_us))
+                 }

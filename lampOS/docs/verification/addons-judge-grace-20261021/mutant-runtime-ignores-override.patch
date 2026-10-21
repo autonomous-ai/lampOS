@@ -1,0 +1,5 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -95 +95 @@
+-        Watcher::new(lamp_ipc::monotonic_us(), config.mute_grace_us).on_clock(&clock_id);
++        Watcher::new(lamp_ipc::monotonic_us(), ASLEEP_FRESH_US).on_clock(&clock_id);

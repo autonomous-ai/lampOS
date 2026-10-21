@@ -1,0 +1,11 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -63,7 +63,7 @@
+             say_quiet: None,
+             move_quiet: None,
+             body_socket: None,
+-            mute_grace_us: ASLEEP_FRESH_US,
++            mute_grace_us: 0,
+         }
+     }
+ }

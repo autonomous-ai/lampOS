@@ -1,0 +1,5 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -164,0 +165,2 @@
++        let _ = decisions.publish_json(now_us, &decision);
++        std::thread::sleep(Duration::from_millis(50));

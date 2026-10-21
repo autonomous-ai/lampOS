@@ -1,0 +1,33 @@
+===== gate-format.log =====
+COMMAND: cargo fmt --all --check
+
+===== gate-clippy.log =====
+COMMAND: cargo clippy -q -p lamp-addons --all-targets --message-format=short -- -Dwarnings
+
+===== gate-tests.log =====
+COMMAND: cargo test -q -p lamp-addons
+
+running 29 tests
+.............................
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+===== gate-workspace-build.log =====
+COMMAND: cargo build -q --workspace
+
+===== gate-diff-check.log =====
+COMMAND: git diff --check

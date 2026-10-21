@@ -1,0 +1,1 @@
+1:  4e16dbed9 = 1:  9b577ce0f lampOS: the add-ons judge tests end on the judge's decision, and off on its exit, not on quiet, 2.2 s to 0.4 s each (#1806)

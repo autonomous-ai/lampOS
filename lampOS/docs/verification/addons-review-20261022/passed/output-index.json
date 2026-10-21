@@ -1,0 +1,241 @@
+{
+  "dependency-metadata.log": {
+    "original_log": "dependency-metadata.log",
+    "sha256": "6e01c95474040fcdec63c42e50492ea5046a80988da30590d5d69bbaae06c54f",
+    "bytes": 174138,
+    "omitted": true,
+    "reason": "Bulk Cargo metadata stdout omitted; exact command, status and dependency closure retained."
+  },
+  "mutant-default-grace-zero-1-apply-check.log": {
+    "original_log": "mutant-default-grace-zero-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-default-grace-zero-1-apply-check"
+  },
+  "mutant-default-grace-zero-1-apply.log": {
+    "original_log": "mutant-default-grace-zero-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-default-grace-zero-1-apply"
+  },
+  "mutant-default-grace-zero-1.log": {
+    "original_log": "mutant-default-grace-zero-1.log",
+    "sha256": "aa665d5fc8c3b6d29d0e47aa8f369dcccdf217aba8e7655b30763ac76e2f8b5a",
+    "bytes": 898,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-default-grace-zero-1"
+  },
+  "mutant-runtime-ignores-override-1-apply-check.log": {
+    "original_log": "mutant-runtime-ignores-override-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-runtime-ignores-override-1-apply-check"
+  },
+  "mutant-runtime-ignores-override-1-apply.log": {
+    "original_log": "mutant-runtime-ignores-override-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-runtime-ignores-override-1-apply"
+  },
+  "mutant-runtime-ignores-override-1.log": {
+    "original_log": "mutant-runtime-ignores-override-1.log",
+    "sha256": "f934bb3b1abeb7253219f3f3e77b4ba23d454ffc6d04df4de191d6b4db90d374",
+    "bytes": 748,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-runtime-ignores-override-1"
+  },
+  "mutant-restart-does-not-renew-grace-1-apply-check.log": {
+    "original_log": "mutant-restart-does-not-renew-grace-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-restart-does-not-renew-grace-1-apply-check"
+  },
+  "mutant-restart-does-not-renew-grace-1-apply.log": {
+    "original_log": "mutant-restart-does-not-renew-grace-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-restart-does-not-renew-grace-1-apply"
+  },
+  "mutant-restart-does-not-renew-grace-1.log": {
+    "original_log": "mutant-restart-does-not-renew-grace-1.log",
+    "sha256": "0babdcc09b85f4c3244adc1b385b02b3c4f09a4702611c7ace12a2e35a15c642",
+    "bytes": 718,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-restart-does-not-renew-grace-1"
+  },
+  "mutant-said-mute-age-refreshed-1-apply-check.log": {
+    "original_log": "mutant-said-mute-age-refreshed-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-said-mute-age-refreshed-1-apply-check"
+  },
+  "mutant-said-mute-age-refreshed-1-apply.log": {
+    "original_log": "mutant-said-mute-age-refreshed-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-said-mute-age-refreshed-1-apply"
+  },
+  "mutant-said-mute-age-refreshed-1.log": {
+    "original_log": "mutant-said-mute-age-refreshed-1.log",
+    "sha256": "ea4459c27aa46651f4f6eba9a47e381f8d14755a92e87d5426ca915709143821",
+    "bytes": 739,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-said-mute-age-refreshed-1"
+  },
+  "mutant-decision-before-light-50ms-1-apply-check.log": {
+    "original_log": "mutant-decision-before-light-50ms-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-1-apply-check"
+  },
+  "mutant-decision-before-light-50ms-1-apply.log": {
+    "original_log": "mutant-decision-before-light-50ms-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-1-apply"
+  },
+  "mutant-decision-before-light-50ms-1.log": {
+    "original_log": "mutant-decision-before-light-50ms-1.log",
+    "sha256": "7979e0743816f046c1d6329ef3b18e05be1e14b7244d792d27e03a200ab55943",
+    "bytes": 603,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-1"
+  },
+  "mutant-decision-before-light-50ms-2-apply-check.log": {
+    "original_log": "mutant-decision-before-light-50ms-2-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-2-apply-check"
+  },
+  "mutant-decision-before-light-50ms-2-apply.log": {
+    "original_log": "mutant-decision-before-light-50ms-2-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-2-apply"
+  },
+  "mutant-decision-before-light-50ms-2.log": {
+    "original_log": "mutant-decision-before-light-50ms-2.log",
+    "sha256": "8ee7a61b579710c6cce6f6e03284e66da2834e61b8b798e6722694d8ee39d7be",
+    "bytes": 603,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-before-light-50ms-2"
+  },
+  "mutant-decision-duplicated-50ms-1-apply-check.log": {
+    "original_log": "mutant-decision-duplicated-50ms-1-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-1-apply-check"
+  },
+  "mutant-decision-duplicated-50ms-1-apply.log": {
+    "original_log": "mutant-decision-duplicated-50ms-1-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-1-apply"
+  },
+  "mutant-decision-duplicated-50ms-1.log": {
+    "original_log": "mutant-decision-duplicated-50ms-1.log",
+    "sha256": "d3f9a9d66f7f2a1dc3926282c1beeb9cf4f7121785e7ffac64b499faf204dee3",
+    "bytes": 808,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-1"
+  },
+  "mutant-decision-duplicated-50ms-2-apply-check.log": {
+    "original_log": "mutant-decision-duplicated-50ms-2-apply-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-2-apply-check"
+  },
+  "mutant-decision-duplicated-50ms-2-apply.log": {
+    "original_log": "mutant-decision-duplicated-50ms-2-apply.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-2-apply"
+  },
+  "mutant-decision-duplicated-50ms-2.log": {
+    "original_log": "mutant-decision-duplicated-50ms-2.log",
+    "sha256": "74da85252f3bb33a40328fba7a1ed340de109063e1efc93c07293856ede23aba",
+    "bytes": 808,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "mutant-decision-duplicated-50ms-2"
+  },
+  "gate-format.log": {
+    "original_log": "gate-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "gate-format"
+  },
+  "gate-clippy.log": {
+    "original_log": "gate-clippy.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "gate-clippy"
+  },
+  "gate-tests.log": {
+    "original_log": "gate-tests.log",
+    "sha256": "4ce097c75110ad6b7ca6909f3c6b6ae40242e024a903832938cf143bf20c15c9",
+    "bytes": 501,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "gate-tests"
+  },
+  "gate-workspace-build.log": {
+    "original_log": "gate-workspace-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "gate-workspace-build"
+  },
+  "gate-diff-check.log": {
+    "original_log": "gate-diff-check.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "omitted": false,
+    "artifact": "commands-output.txt",
+    "section": "gate-diff-check"
+  }
+}

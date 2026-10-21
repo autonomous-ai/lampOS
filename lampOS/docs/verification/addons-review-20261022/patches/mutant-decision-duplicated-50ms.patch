@@ -1,0 +1,11 @@
+--- a/lampOS/crates/addons/src/runtime.rs
++++ b/lampOS/crates/addons/src/runtime.rs
+@@ -290,6 +290,8 @@
+         by: by.into(),
+         why: why.chars().take(200).collect(),
+     };
++    let _ = decisions.publish_json(now_us, &decision);
++    std::thread::sleep(Duration::from_millis(50));
+     if let Err(error) = decisions.publish_json(now_us, &decision) {
+         eprintln!(
+             "lamp-addons: the decision on #{} not written: {error}",

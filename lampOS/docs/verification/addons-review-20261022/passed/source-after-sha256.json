@@ -1,0 +1,14 @@
+{
+  "lampOS/crates/addons/Cargo.toml": "0ba18b83569133ada50b367510d6596a0989f8b625f5608923329ef977746292",
+  "lampOS/crates/addons/src/carry.rs": "7477ce3758326abc4fdd4e57c156057e4f0e24b6be48e5431cbd4ba7bc71ab92",
+  "lampOS/crates/addons/src/lib.rs": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8",
+  "lampOS/crates/addons/src/main.rs": "c5e86a5071cad5aca9cb744f4b0d4346c120f67172cff63b050f022e407a1cac",
+  "lampOS/crates/addons/src/rules.rs": "0f0441d6638ef1d891cf1e8a21f75f9dd8a490a26b3f0e5893dad592d955d936",
+  "lampOS/crates/addons/src/runtime.rs": "9ccf4f3f2c0aff5b2f45e864306e03736482116d520318a2727d2c321963ca16",
+  "lampOS/crates/addons/src/situation.rs": "d012a1ea17fb5d4858a574d8dfa271efbcd42e2fcc838281c00e754e09f30f8b",
+  "lampOS/crates/addons/tests/judge.rs": "fd1dcf0eedbafe668d554551e00685b6d2151a63c87ffc90476d5abbeea7141d",
+  "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+  "lampOS/Cargo.lock": "2200c948079b33bb2a948d663aebc035cee979e5841678a512451c693e03b982",
+  "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+  "lampOS/.cargo/config.toml": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+}

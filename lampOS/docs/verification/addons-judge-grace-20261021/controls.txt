@@ -1,0 +1,167 @@
+===== mutant-default-grace-zero-1.log =====
+COMMAND: cargo test -q -p lamp-addons --lib runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said -- --exact --nocapture
+
+running 1 test
+runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said --- FAILED
+
+failures:
+
+failures:
+    runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+
+warning: unused import: `ASLEEP_FRESH_US`
+ --> crates/addons/src/runtime.rs:7:20
+  |
+7 | use crate::rules::{ASLEEP_FRESH_US, Judge, Verdict};
+  |                    ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+
+thread 'runtime::tests::the_product_waits_three_seconds_for_a_mute_never_said' (685754636) panicked at crates/addons/src/runtime.rs:280:9:
+assertion `left == right` failed
+  left: 0
+ right: 3000000
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --lib`
+
+===== mutant-runtime-ignores-override-1.log =====
+COMMAND: cargo test -q -p lamp-addons --test judge a_product_lamp_with_no_pause_or_mute_said_keeps_a_light -- --exact --nocapture
+
+running 1 test
+a_product_lamp_with_no_pause_or_mute_said_keeps_a_light --- FAILED
+
+failures:
+
+failures:
+    a_product_lamp_with_no_pause_or_mute_said_keeps_a_light
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.74s
+
+
+thread 'a_product_lamp_with_no_pause_or_mute_said_keeps_a_light' (685754881) panicked at crates/addons/tests/judge.rs:297:5:
+assertion `left == right` failed: [AddonDecision { proposal: 3127876608788, addon: "evening-glow", act: "light", choice: "dropped", by: "rule", why: "the lamp is asleep, or that is not known" }]
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --test judge`
+
+===== mutant-restart-does-not-renew-grace-1.log =====
+COMMAND: cargo test -q -p lamp-addons --lib situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice -- --exact --nocapture
+
+running 1 test
+situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice --- FAILED
+
+failures:
+
+failures:
+    situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+
+
+thread 'situation::tests::a_test_mute_grace_ends_at_its_boundary_and_restarts_with_the_voice' (685755086) panicked at crates/addons/src/situation.rs:503:17:
+assertion `left == right` failed
+  left: Some(Reading { value: false, at_us: 3199999 })
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --lib`
+
+===== mutant-said-mute-age-refreshed-1.log =====
+COMMAND: cargo test -q -p lamp-addons --lib situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness -- --exact --nocapture
+
+running 1 test
+situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness --- FAILED
+
+failures:
+
+failures:
+    situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.00s
+
+
+thread 'situation::tests::a_test_mute_grace_keeps_a_said_mutes_three_second_freshness' (685755244) panicked at crates/addons/src/situation.rs:549:17:
+assertion `left == right` failed
+  left: Some(Reading { value: false, at_us: 4000000 })
+ right: Some(Reading { value: false, at_us: 1000000 })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --lib`
+
+===== mutant-decision-before-light-50ms-1.log =====
+COMMAND: cargo test -q -p lamp-addons --test judge a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle -- --exact --nocapture
+
+running 1 test
+a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED
+
+failures:
+
+failures:
+    a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.79s
+
+
+thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (685755531) panicked at crates/addons/tests/judge.rs:240:5:
+a light was asked after its decision
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --test judge`
+
+===== mutant-decision-before-light-50ms-2.log =====
+COMMAND: cargo test -q -p lamp-addons --test judge a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle -- --exact --nocapture
+
+running 1 test
+a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle --- FAILED
+
+failures:
+
+failures:
+    a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.51s
+
+
+thread 'a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle' (685755597) panicked at crates/addons/tests/judge.rs:240:5:
+a light was asked after its decision
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --test judge`
+
+===== mutant-decision-duplicated-50ms-1.log =====
+COMMAND: cargo test -q -p lamp-addons --test judge a_kept_light_is_said_kept_on_addon_decision -- --exact --nocapture
+
+running 1 test
+a_kept_light_is_said_kept_on_addon_decision --- FAILED
+
+failures:
+
+failures:
+    a_kept_light_is_said_kept_on_addon_decision
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.83s
+
+
+thread 'a_kept_light_is_said_kept_on_addon_decision' (685755909) panicked at crates/addons/tests/judge.rs:283:9:
+[AddonDecision { proposal: 3127884461073, addon: "evening-glow", act: "light", choice: "kept", by: "rule", why: "asked of the ring at idle for 30000 ms" }, AddonDecision { proposal: 3127884461073, addon: "evening-glow", act: "light", choice: "kept", by: "rule", why: "asked of the ring at idle for 30000 ms" }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --test judge`
+
+===== mutant-decision-duplicated-50ms-2.log =====
+COMMAND: cargo test -q -p lamp-addons --test judge a_kept_light_is_said_kept_on_addon_decision -- --exact --nocapture
+
+running 1 test
+a_kept_light_is_said_kept_on_addon_decision --- FAILED
+
+failures:
+
+failures:
+    a_kept_light_is_said_kept_on_addon_decision
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.61s
+
+
+thread 'a_kept_light_is_said_kept_on_addon_decision' (685755978) panicked at crates/addons/tests/judge.rs:283:9:
+[AddonDecision { proposal: 3127885281208, addon: "evening-glow", act: "light", choice: "kept", by: "rule", why: "asked of the ring at idle for 30000 ms" }, AddonDecision { proposal: 3127885281208, addon: "evening-glow", act: "light", choice: "kept", by: "rule", why: "asked of the ring at idle for 30000 ms" }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p lamp-addons --test judge`
