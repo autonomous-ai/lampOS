@@ -126,9 +126,91 @@ async fn post(
             }
         })?;
     if !response.status().is_success() {
-        return Err(Error::Status(response.status().as_u16()));
+        let status = response.status().as_u16();
+        // Why it refused, as the service's codes alone (#1712: Gemini's chat
+        // answered HTTP 400 ten times out of ten on 21 Oct, and nothing said
+        // whether for the key, the model or the request).
+        let codes = refusal_codes(&refusal_head(response).await);
+        if codes.is_empty() {
+            eprintln!("lamp-voice second: a service answered HTTP {status}, naming no code");
+        } else {
+            eprintln!(
+                "lamp-voice second: a service answered HTTP {status} ({})",
+                codes.join(", ")
+            );
+        }
+        return Err(Error::Status(status));
     }
     Ok(response)
+}
+
+/// The most of a refusal's body [`refusal_head`] reads, and how long it waits.
+const REFUSAL_BYTES: usize = 4 << 10;
+const REFUSAL_WAIT: Duration = Duration::from_secs(1);
+/// The most codes, and the longest, [`refusal_codes`] keeps.
+const MOST_CODES: usize = 4;
+const CODE_CHARS: usize = 40;
+/// More digits than this and it's taken for a key, not a code: DeepSeek's
+/// and Deepgram's keys are hex in one case, and no service's code has more
+/// than a few (the reviewer on #2397).
+const CODE_DIGITS: usize = 4;
+
+/// A refusal's body, up to [`REFUSAL_BYTES`] or [`REFUSAL_WAIT`], whichever
+/// comes first; empty if it breaks.
+async fn refusal_head(mut response: reqwest::Response) -> Vec<u8> {
+    let mut head = Vec::new();
+    let _ = tokio::time::timeout(REFUSAL_WAIT, async {
+        while head.len() < REFUSAL_BYTES {
+            match response.chunk().await {
+                Ok(Some(piece)) => head.extend_from_slice(&piece),
+                _ => break,
+            }
+        }
+    })
+    .await;
+    head.truncate(REFUSAL_BYTES);
+    head
+}
+
+/// The codes a refusal names: Google's `error.status` and each
+/// `error.details[].reason`, OpenAI's `error.code` and `error.type`. A
+/// value is kept only when it reads as a code, in one case, of letters,
+/// digits and `_`, `.` or `-`, at most [`CODE_CHARS`] and at most
+/// [`CODE_DIGITS`] digits, so that no server's words reach the journal, nor
+/// a string shaped like a key (mixed case, or many digits); at most
+/// [`MOST_CODES`].
+fn refusal_codes(body: &[u8]) -> Vec<String> {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return Vec::new();
+    };
+    let error = &value["error"];
+    let reasons = error["details"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|detail| &detail["reason"]);
+    let mut codes = Vec::new();
+    for candidate in [&error["status"], &error["code"], &error["type"]]
+        .into_iter()
+        .chain(reasons)
+    {
+        let Some(code) = candidate.as_str() else {
+            continue;
+        };
+        let one_case = !code.chars().any(|c| c.is_ascii_lowercase())
+            || !code.chars().any(|c| c.is_ascii_uppercase());
+        let a_code = (1..=CODE_CHARS).contains(&code.len())
+            && code.chars().any(|c| c.is_ascii_alphabetic())
+            && code
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+            && one_case
+            && code.chars().filter(|c| c.is_ascii_digit()).count() <= CODE_DIGITS;
+        if a_code && !codes.iter().any(|kept| kept == code) && codes.len() < MOST_CODES {
+            codes.push(code.to_owned());
+        }
+    }
+    codes
 }
 
 /// A JSON `GET` with the key in `authorization` (a service's model list),
@@ -265,6 +347,34 @@ mod tests {
             openai_base("https://example.com/ai"),
             "https://example.com/ai"
         );
+    }
+
+    #[test]
+    fn a_refusal_names_its_codes_and_none_of_its_words() {
+        // Google's answer to a key it doesn't know.
+        let google = br#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com"}]}}"#;
+        assert_eq!(
+            refusal_codes(google),
+            ["INVALID_ARGUMENT", "API_KEY_INVALID"]
+        );
+        // OpenAI's form, as DeepSeek and OpenRouter answer.
+        let openai = br#"{"error":{"message":"The model `x` does not exist","type":"invalid_request_error","code":"model_not_found"}}"#;
+        assert_eq!(
+            refusal_codes(openai),
+            ["model_not_found", "invalid_request_error"]
+        );
+        // Words, a mixed-case string like a key, a long one, a number:
+        // none is a code.
+        let words = br#"{"error":{"status":"the key sk-ab12 was refused","code":"sk3XyZ9qLm2PwR8tVb7N","type":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","details":[{"reason":42}]}}"#;
+        assert!(refusal_codes(words).is_empty());
+        // Keys in one case, as DeepSeek's and Deepgram's are: too many digits.
+        let deepseek_like = br#"{"error":{"code":"sk-0123456789abcdef0123456789abcdef"}}"#;
+        assert!(refusal_codes(deepseek_like).is_empty());
+        let hex_40 = br#"{"error":{"status":"0123456789abcdef0123456789abcdef01234567"}}"#;
+        assert!(refusal_codes(hex_40).is_empty());
+        // Not JSON, or JSON without an error.
+        assert!(refusal_codes(b"<html>Bad Gateway</html>").is_empty());
+        assert!(refusal_codes(br#"{"status":0,"message":"no"}"#).is_empty());
     }
 
     #[test]
