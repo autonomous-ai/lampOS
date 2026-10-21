@@ -1654,8 +1654,13 @@ pub fn serve(
             }
         };
         let memory = match &socket {
-            Some(socket) if days => sessions.frozen(changed, |session| {
-                crate::remember::told_for_session(socket, session, person.as_deref())
+            // Every request here is built afresh from the thread and the
+            // session's snapshot: a new session is a fresh context (#2176
+            // row 1b).
+            // After a stop, the next turn opens one, so journalling can go on
+            // (Friday's P1 on #2226).
+            Some(socket) if days => sessions.frozen(opens_anew(changed), |session| {
+                crate::remember::told_for_fresh_session(socket, session, person.as_deref(), true)
             }),
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
@@ -3889,6 +3894,13 @@ impl Sessions {
         }
         self.note.clone().unwrap_or_default()
     }
+}
+
+/// Whether this turn's session is opened anew: the person changed, or the
+/// memory wants a fresh context after journalling stopped or a write was
+/// lost (`LAMP_MEMORY_JOURNAL_RESUMES`, Friday's P1 on #2226).
+pub(crate) fn opens_anew(changed: bool) -> bool {
+    changed || crate::remember::wants_fresh_session()
 }
 
 /// The system message for a turn begun now, as a Live session opened now
