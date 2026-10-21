@@ -1,0 +1,158 @@
+{
+  "bounds": {
+    "attempts_per_variant": 1,
+    "each_docker_run_seconds": 30,
+    "each_script_execution_seconds": 3
+  },
+  "cargo_run": false,
+  "command_normalization": "Host Docker path is normalized to docker. PYTHON_PAYLOAD denotes the private measurement program whose algorithm and source hash are retained; its code is not committed.",
+  "conclusion": "Under the recorded local Linux ARM64 image and non-root restrictions, the original tmpfs argument produced an effective noexec mount and direct execution of the owned mode-0700 script returned EACCES. Adding explicit exec removed noexec and the same script exited 0 with the expected marker.",
+  "docker_context": "colima-lampos",
+  "finished_at": "2026-10-21T15:40:45.114949+00:00",
+  "image": {
+    "architecture": "arm64",
+    "id": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+    "os": "linux"
+  },
+  "image_reference": "lampos-dev:1.96",
+  "limits": [
+    "This was a controlled scratch-only script probe, not a rerun of any project test.",
+    "It establishes mount-option behavior for the matched probe configuration, not an execution trace for every original project failure.",
+    "It does not explain the independent requested-audio worker cancellation or asset-packing metadata refusal."
+  ],
+  "original_gate_exit_code": 1,
+  "original_gate_status": "failed",
+  "probe_algorithm": [
+    "Read effective UID/GID, /tmp mount flags and effective capabilities/no-new-privileges.",
+    "Write an owned temporary script with a /bin/sh shebang and a printf of TMP_EXEC_PROBE_OK, then chmod to 0700.",
+    "Execute that file directly with a three-second subprocess limit; retain exit/stdout/stderr or errno.",
+    "Unlink only that probe script. Repeat once with explicit exec in the tmpfs options."
+  ],
+  "project_source_or_target_mounted": false,
+  "project_tests_run": false,
+  "provenance": {
+    "probe_script_basename": "probe.py",
+    "probe_script_sha256": "d6dec5f80934517b2c83b41c6d966407ffded1965640eef2619253078a8626d5",
+    "raw_receipt_basename": "receipt.json",
+    "raw_receipt_sha256": "be6109399a0bf15746eaeaa32e75ab392ae9dfe97550c0cec31f8f04a77ae030"
+  },
+  "started_at": "2026-10-21T15:40:44.855622+00:00",
+  "status": "completed_controlled_probe_not_project_qualification",
+  "variants": [
+    {
+      "command_normalized": [
+        "docker",
+        "--context",
+        "colima-lampos",
+        "run",
+        "--rm",
+        "--name",
+        "second-music-tmp-probe-original-735a0db0e9bf",
+        "--init",
+        "--pull",
+        "never",
+        "--network",
+        "none",
+        "--user",
+        "501:20",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,size=1073741824",
+        "--entrypoint",
+        "python3",
+        "lampos-dev:1.96",
+        "-c",
+        "PYTHON_PAYLOAD"
+      ],
+      "docker_returncode": 0,
+      "elapsed_seconds": 0.121135,
+      "observed": {
+        "execution": {
+          "errno": 13,
+          "error": "Permission denied"
+        },
+        "file": {
+          "bytes": 39,
+          "gid": 20,
+          "mode": "0o700",
+          "uid": 501
+        },
+        "gid": 20,
+        "security": [
+          "CapEff:\t0000000000000000",
+          "NoNewPrivs:\t1"
+        ],
+        "tmp_mounts": [
+          "tmpfs /tmp tmpfs rw,nosuid,nodev,noexec,relatime,size=1048576k,inode64 0 0"
+        ],
+        "uid": 501
+      },
+      "raw_log_basename": "original.log",
+      "raw_log_sha256": "4c34a75a0d835f3c0646d939b1c9298b148dd8556c88d154469390ff12600617",
+      "tmpfs_argument": "/tmp:rw,nosuid,nodev,size=1073741824",
+      "variant": "original"
+    },
+    {
+      "command_normalized": [
+        "docker",
+        "--context",
+        "colima-lampos",
+        "run",
+        "--rm",
+        "--name",
+        "second-music-tmp-probe-explicit-exec-6a242f934baf",
+        "--init",
+        "--pull",
+        "never",
+        "--network",
+        "none",
+        "--user",
+        "501:20",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,exec,size=1073741824",
+        "--entrypoint",
+        "python3",
+        "lampos-dev:1.96",
+        "-c",
+        "PYTHON_PAYLOAD"
+      ],
+      "docker_returncode": 0,
+      "elapsed_seconds": 0.117515,
+      "observed": {
+        "execution": {
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "TMP_EXEC_PROBE_OK\n"
+        },
+        "file": {
+          "bytes": 39,
+          "gid": 20,
+          "mode": "0o700",
+          "uid": 501
+        },
+        "gid": 20,
+        "security": [
+          "CapEff:\t0000000000000000",
+          "NoNewPrivs:\t1"
+        ],
+        "tmp_mounts": [
+          "tmpfs /tmp tmpfs rw,nosuid,nodev,relatime,size=1048576k,inode64 0 0"
+        ],
+        "uid": 501
+      },
+      "raw_log_basename": "explicit-exec.log",
+      "raw_log_sha256": "fde54ec2218a1b13bf6d252c44f509e5a3f50fa1f65a321e9ed90b3486a73a2c",
+      "tmpfs_argument": "/tmp:rw,nosuid,nodev,exec,size=1073741824",
+      "variant": "explicit-exec"
+    }
+  ]
+}

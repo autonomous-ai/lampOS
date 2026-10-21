@@ -1,0 +1,26 @@
+{
+  "limitation": "One or more example test/render/package/install stages failed or were not run; no artifact success is inferred.",
+  "stages": [
+    {
+      "exit_code": 0,
+      "stage": "example_tests",
+      "status": "passed"
+    },
+    {
+      "exit_code": 0,
+      "stage": "example_render",
+      "status": "passed"
+    },
+    {
+      "exit_code": 1,
+      "stage": "example_pack",
+      "status": "failed"
+    },
+    {
+      "exit_code": 1,
+      "stage": "example_install",
+      "status": "failed"
+    }
+  ],
+  "status": "not qualified"
+}
