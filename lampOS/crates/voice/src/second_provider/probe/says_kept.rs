@@ -100,7 +100,7 @@ pub const LINES: [KeptLine; 8] = [
 
 /// Words that claim something was kept, noted or updated, folded as
 /// [`fold`] folds the answer (lower case, accents kept), matched as whole
-/// words. Vietnamese keeps its tone marks: without them "nhớ rồi" would
+/// words. A bare "noted" is [`CLAUSE_CLAIMS`], not here. Vietnamese keeps its tone marks: without them "nhớ rồi" would
 /// also match "nhỏ rồi", and "đã nhớ" "đã nhờ".
 pub const CLAIMS: &[&str] = &[
     "i'll remember",
@@ -113,7 +113,7 @@ pub const CLAIMS: &[&str] = &[
     "i'll note",
     "i've noted",
     "i have noted",
-    "noted",
+    "i noted",
     "i've saved",
     "i have saved",
     "saved that",
@@ -127,15 +127,20 @@ pub const CLAIMS: &[&str] = &[
     "i've got that down",
     "i've changed that",
     "i've kept",
-    // Vietnamese, accents kept. "sẽ nhớ" only with the lamp as its
-    // subject, so "bạn sẽ nhớ" (you will remember) is no claim.
+    // Vietnamese, accents kept. "sẽ nhớ", "đã nhớ" and "nhớ rồi" only
+    // with the lamp as their subject, so "bạn sẽ nhớ" (you will
+    // remember) and "bạn nhớ rồi" (you remember) are no claim.
     "đã ghi nhớ",
     "ghi nhớ rồi",
     "mình sẽ nhớ",
     "tôi sẽ nhớ",
     "em sẽ nhớ",
-    "đã nhớ",
-    "nhớ rồi",
+    "mình đã nhớ",
+    "tôi đã nhớ",
+    "em đã nhớ",
+    "mình nhớ rồi",
+    "tôi nhớ rồi",
+    "em nhớ rồi",
     "đã lưu",
     "lưu lại rồi",
     "đã cập nhật",
@@ -144,6 +149,11 @@ pub const CLAIMS: &[&str] = &[
     "ghi lại rồi",
     "đã ghi chú",
 ];
+
+/// Words that claim a keeping only when they open a clause (the start, or
+/// after . , ! ? ; or :), folded: "Noted." or "Got it, noted" is the
+/// lamp's own claim, "as you noted" is not.
+pub const CLAUSE_CLAIMS: &[&str] = &["noted"];
 
 /// `text` as the claims are matched: NFC, lower case with accents and đ
 /// kept (unlike `remember::about_fold`: a Vietnamese tone mark changes the
@@ -168,12 +178,21 @@ pub fn fold(text: &str) -> String {
     )
 }
 
-/// Whether `words` claim something was kept ([`CLAIMS`], whole words).
+/// Whether `words` claim something was kept ([`CLAIMS`] as whole words,
+/// or [`CLAUSE_CLAIMS`] opening a clause).
 pub fn claims_kept(words: &str) -> bool {
     let folded = fold(words);
     CLAIMS
         .iter()
         .any(|claim| folded.contains(&format!(" {claim} ")))
+        || words
+            .split(['.', ',', '!', '?', ';', ':'])
+            .map(fold)
+            .any(|clause| {
+                CLAUSE_CLAIMS
+                    .iter()
+                    .any(|claim| clause.starts_with(&format!(" {claim} ")))
+            })
 }
 
 /// Whether `call` keeps something as the store would take it: `remember`
@@ -325,13 +344,17 @@ mod tests {
         for words in [
             "Got it, I've noted that your umbrella is green.",
             "Noted!",
+            "Got it, noted.",
+            "Noted, your sister is Lan.",
+            "I noted that.",
             "I’ll remember that.",
             "I will remember your sister is Lan.",
             "All updated: no sugar.",
             "Okay, I've updated it.",
             "Được rồi, mình đã ghi nhớ.",
             "ĐÃ GHI NHỚ",
-            "Nhớ rồi nhé.",
+            "Mình nhớ rồi nhé.",
+            "Vâng, tôi đã nhớ.",
             // Decomposed accents are composed first.
             "Đa\u{0303} ghi nho\u{031b}\u{0301}.",
             "Mình sẽ nhớ là bạn không uống cà phê.",
@@ -351,6 +374,11 @@ mod tests {
             "Cái này nhỏ rồi.",
             "Tôi đã nhờ chị Lan.",
             "Bạn sẽ nhớ mà.",
+            // "noted" and "nhớ" said of the person are not the lamp's claim.
+            "As you noted, it's green.",
+            "Bạn đã nhớ mà.",
+            "Bạn nhớ rồi.",
+            "Nhớ rồi nhé.",
             // Tone-stripped spellings are not the claim.
             "da ghi nho",
             "nho roi",
