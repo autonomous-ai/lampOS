@@ -256,11 +256,37 @@ fn serve_with_no_slide_says_so_and_marks_its_state() {
         ),
     ] {
         let root = Root::new();
-        let output = command(&root, value)
-            .args(["serve", "--clock-id", CLOCK, "--seconds", "1", "--bus-root"])
+        // Stopped as systemd stops it, once its first state is on the bus,
+        // not after its shortest run (`--seconds 1`, #1806): a state comes
+        // only from its loop, which starts once SIGTERM is registered. Its
+        // `--seconds` is a cap for a test gone wrong.
+        let child = command(&root, value)
+            .args([
+                "serve",
+                "--clock-id",
+                CLOCK,
+                "--seconds",
+                "10",
+                "--bus-root",
+            ])
             .arg(root.0.join("bus"))
-            .output()
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .unwrap();
+        let bus = root.bus();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while bus.latest(ControlsState::TOPIC).unwrap().is_none() {
+            assert!(std::time::Instant::now() < deadline, "{value}: no state");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        rustix::process::kill_process(
+            rustix::process::Pid::from_raw(child.id() as i32).expect("a child's pid"),
+            rustix::process::Signal::TERM,
+        )
+        .unwrap();
+        let output = child.wait_with_output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(output.status.success(), "{value}: {stderr}");
         assert!(stderr.contains(line), "{value}: {stderr}");
