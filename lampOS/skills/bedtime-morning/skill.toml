@@ -5,7 +5,7 @@ kind = "core"
 version = "1.0.0"
 
 [permissions]
-topics = ["humans/faces/tracked", "voice/state"]
+topics = ["humans/faces/tracked", "voice/state", "voice/heard"]
 speak = true
 light = true
 body = true
@@ -46,8 +46,10 @@ near = 0.14
 for = "3s"
 wait = "1m"
 rearm = "ends"
-during = { from = "06:00", to = "10:00" }
+during = { from = "06:00", to = "11:00" }
 once_per_day = true
+# Spoken to since 06:00: already greeted, so the day's chance is let go.
+unless_heard = true
 
 [[while]]
 topic = "voice/state"

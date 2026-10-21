@@ -81,7 +81,7 @@ excluding its end.
 | Night ceilings | 21:00–06:00, independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
 | Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Always a level under their light, never over, in their colour when it is already warm. At level 1, off or not known, nothing is shown and the journal says why. |
 | Bedtime | 23:00–06:00; a fresh empty face list continuously for 15 minutes, kept for up to 15 minutes more while the voice has not yet rested its 30 seconds | Ask Expression to sustain this skill's rest, renewable until 10:00. A sound that ends it is followed by settling again (below), at most three times a night. |
-| Morning | 06:00–10:00; a nearby person for three seconds | Wake only this skill's still-owned rest; after its planned stretch completes, ask Say for a hum. |
+| Morning | 06:00–11:00; a nearby person for three seconds, the lamp rested that night, and nothing heard on `voice/heard` since 06:00 | Wake this skill's still-owned rest and, after its planned stretch completes, ask Say for a hum. A rest a sound ended early (the lamp is already up): the body's `stretching` clip, then the hum once the body says it is over. One stretch and one hum, never a second greeting. |
 
 Evening, bedtime and morning each have one daily chance and require Voice to
 have reported resting for 30 seconds. They retain the process's existing
@@ -99,7 +99,47 @@ up to 15 minutes (`wait = "15m"`, #1672): on lamp-06c1 the empty desk
 matured two seconds before the voice had rested its 30 seconds after a
 sound, and without the wait the night's chance was spent with no line.
 A chance dropped because its conditions did not hold within its wait now
-says so in the journal (`bedtime chance dropped: ...`). A failed,
+says so in the journal (`bedtime chance dropped: ...`).
+
+### The morning greeting
+
+The first builder's ruling: the greeting comes once a day, on the first face
+seen 06:00–11:00, if the lamp rested that night, even when a sound ended
+the rest early. Before, a morning after a night stir was refused (`this
+skill owns no rest to wake`) and the hum was skipped too.
+
+- **The night it rested.** Skills' rest manager keeps, in memory, the local
+  day the last night this skill's rest began (its rest window's start day:
+  02:00 belongs to the night that began the evening before), set when
+  Expression first said `resting` for it. A restart or a change to the
+  skill forgets it.
+- **Already up.** A morning wake with no rest left to own, on the day after
+  that night, is answered `Woke::Already`, once, and nothing is sent to
+  Expression. The run then sends the body its `stretching` clip (6.5 s) and
+  asks Say for the hum only once `body/gesture` says the clip is over, so
+  the hum never cuts the stretch short. A stretch the body dropped, a push
+  or a pause, and no hum follows. Both stay within the wake's 12-second
+  start deadline. A wake of a still-owned rest is as before: Expression's
+  waking stretch, then the hum, with no second stretch.
+- **Never a sleeping lamp.** No `Already` answer, and so no stretch and no
+  hum, while the lamp is put to sleep by hand (the newest `voice/mute` says
+  muted with reason `sleep`) or kept private (the newest `voice/mute` says
+  muted with no reason, or the newest `voice/privacy` is not a valid open
+  lease: the slide closed). These are read as Expression reads them, and
+  read again just before the stretch. The run is refused (`the lamp was put
+  to sleep by hand, so it is not woken`).
+- **Already spoken to.** The morning trigger has `unless_heard = true`:
+  once anything was heard on `voice/heard` since 06:00 that day, the face
+  is not greeted, the day's chance is claimed, and the journal says so once
+  (`morning chance let go: spoken to since 06:00`). Anything the voice
+  took in as heard counts, not only the person: a radio or a TV it heard
+  as speech uses up the morning's greeting too (chosen: a missed greeting
+  is quieter than one over someone already up). Mid-conversation the
+  trigger's `[[while]]` (the voice resting 30 seconds) holds it back as
+  before, and a skill turned off has no chance at all.
+- **No rest, no greeting.** A night it did not rest, or the night before
+  last, answers the wake with `this skill owns no rest to wake`: the run
+  ends before the hum. A failed,
 interrupted or refused chance is consumed; there is no later catch-up that
 day. Missing, malformed or stale faces never count as an empty desk.
 

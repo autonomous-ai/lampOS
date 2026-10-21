@@ -1976,9 +1976,28 @@ fn start(
             });
             return;
         }
+        // A morning the lamp was already awake for (`Woke::Already`, the
+        // first builder's ruling on bedtime-morning): Expression played no
+        // wake clip, so the run stretches before its sound. Exactly one
+        // stretch: an owned wake's stretch is Expression's clip. Never for
+        // a lamp put to sleep by hand or kept private since the answer.
+        let already = rest_permits.iter().any(Permit::already);
+        if already && let Some(why) = lamp_skills::routine::kept_asleep(&bus) {
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why: format!("{why}, so it is not woken"),
+                allowed: Some(false),
+            });
+            return;
+        }
+        let opening: Vec<Call> = already
+            .then(|| Call::Gesture(MORNING_STRETCH.into()))
+            .into_iter()
+            .collect();
         let why = perform(
             &skill,
-            (&calls, &rest_permits),
+            (&calls, &rest_permits, &opening),
             &sockets,
             &bus,
             before,
@@ -2804,6 +2823,10 @@ fn dropped(gesture: &BodyGesture) -> String {
     said
 }
 
+/// The body's clip an already awake morning stretches with, as Expression's
+/// waking stretch (its catalogue's `alive` stretch) is not a skill's to ask.
+const MORNING_STRETCH: &str = "stretching";
+
 /// How long after a clip's length the next waits, at most, for the body to
 /// say the clip is `over`: a gesture asked of a lamp still rising waits up
 /// to 3 s for the rise (`crates/body/src/body.rs`, `GESTURE_WAIT`).
@@ -2832,7 +2855,10 @@ fn body_gestures(bus: &Bus) -> Option<Subscriber> {
 /// way ([`Glow`]).
 fn perform(
     skill: &str,
-    (calls, rest_permits): (&[Call], &[Permit]),
+    // `opening`: clips played to their end before anything else, the sound
+    // included, so it never cuts them short (an already awake morning's
+    // stretch); one not played out, and nothing else is made.
+    (calls, rest_permits, opening): (&[Call], &[Permit], &[Call]),
     sockets: &Sockets,
     bus: &Bus,
     before: Option<Light>,
@@ -2933,6 +2959,29 @@ fn perform(
         ..Changed::default()
     };
     let mut played = Played::default();
+    if let Some(refused) = opening.iter().find_map(|call| sockets.may.refuses(call)) {
+        said.push(refused);
+        return said.join("; ");
+    }
+    if !opening.is_empty() {
+        act(
+            opening,
+            sockets,
+            bus,
+            asker,
+            &mut changed,
+            &mut played,
+            &mut glow,
+            &mut said,
+        );
+        if let Some(mut last) = played.last.take() {
+            played.stopped = held_back(&mut last, bus);
+        }
+        if let Some(why) = &played.stopped {
+            said.push(format!("{why}: nothing after it is made"));
+            return said.join("; ");
+        }
+    }
     match asking {
         Some((what, asking)) => {
             let mut begun = Vec::new();
@@ -4064,7 +4113,7 @@ mod tests {
             let (made, _) = mpsc::channel();
             let outcome = perform(
                 "prepare-unplug",
-                (&[Call::PrepareUnplug], &[]),
+                (&[Call::PrepareUnplug], &[], &[]),
                 &sockets,
                 &bus,
                 None,
@@ -4486,7 +4535,7 @@ mod tests {
             let (made, told) = mpsc::channel();
             let said = perform(
                 "test",
-                (&[speech, Call::Gesture("nod".into())], &[]),
+                (&[speech, Call::Gesture("nod".into())], &[], &[]),
                 &moved,
                 &bus,
                 None,
@@ -4497,6 +4546,110 @@ mod tests {
             assert!(!said.contains("gesture"), "{said}");
             // Never told that its body was made: the sender is gone.
             assert!(told.recv().is_err());
+        }
+    }
+
+    /// An already awake morning (the first builder's ruling on
+    /// bedtime-morning): the stretch is told the body first, and the hum is
+    /// asked of the voice only once the body says the stretch is over, so
+    /// the hum never cuts it short. A stretch the body dropped, no hum.
+    #[test]
+    fn an_already_awake_morning_stretches_then_hums() {
+        for over in [true, false] {
+            // Short: the bus's socket paths must fit a Unix address.
+            let dir = tempfile::Builder::new()
+                .prefix("morning-")
+                .tempdir_in("/tmp")
+                .unwrap();
+            let bus = Bus::new(dir.path().join("bus")).unwrap();
+            let sockets = nowhere(
+                dir.path(),
+                Permissions {
+                    body: true,
+                    speak: true,
+                    ..Permissions::default()
+                },
+            );
+            let body = UnixDatagram::bind(&sockets.mood).unwrap();
+            body.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let voice = UnixListener::bind(&sockets.say).unwrap();
+            voice.set_nonblocking(true).unwrap();
+            let mut gestures = bus
+                .publisher_declared(BodyGesture::TOPIC, &BodyGesture::declaration(), "body")
+                .unwrap();
+            let played = std::thread::spawn(move || {
+                let mut datagram = [0; 512];
+                let length = body.recv(&mut datagram).unwrap();
+                let told: serde_json::Value = serde_json::from_slice(&datagram[..length]).unwrap();
+                clock::sleep(Duration::from_millis(100));
+                // Before the end is published: once it is, the hum may be
+                // accepted before this thread runs again.
+                let over_at = Instant::now();
+                gestures
+                    .publish_json(
+                        lamp_ipc::monotonic_us(),
+                        &BodyGesture {
+                            name: told["gesture"].as_str().unwrap().into(),
+                            state: if over {
+                                GestureState::Over
+                            } else {
+                                GestureState::Dropped
+                            },
+                            source: None,
+                            why: None,
+                            by: None,
+                        },
+                    )
+                    .unwrap();
+                (told, over_at)
+            });
+            let hummed = std::thread::spawn(move || {
+                let began = Instant::now();
+                let (stream, _) = loop {
+                    match voice.accept() {
+                        Ok(accepted) => break accepted,
+                        Err(_) if began.elapsed() < Duration::from_secs(2) => {
+                            clock::sleep(Duration::from_millis(5));
+                        }
+                        Err(_) => return None,
+                    }
+                };
+                stream.set_nonblocking(false).unwrap();
+                let at = Instant::now();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut reply = &stream;
+                writeln!(reply, "{}", json!({"event": "begun"})).unwrap();
+                writeln!(reply, "{}", json!({"outcome": "played"})).unwrap();
+                Some((
+                    serde_json::from_str::<serde_json::Value>(&line).unwrap(),
+                    at,
+                ))
+            });
+            let (made, _) = mpsc::channel();
+            let said = perform(
+                "bedtime-morning",
+                (&[Call::Cue], &[], &[Call::Gesture(MORNING_STRETCH.into())]),
+                &sockets,
+                &bus,
+                None,
+                (None, false),
+                (made, None),
+            );
+            let (told, over_at) = played.join().unwrap();
+            assert_eq!(told["gesture"], "stretching");
+            assert!(said.contains("gesture stretching: told the body"), "{said}");
+            let hum = hummed.join().unwrap();
+            if over {
+                let (asked, at) =
+                    hum.unwrap_or_else(|| panic!("the hum is asked after the stretch: {said}"));
+                assert_eq!(asked["cue"], "hum");
+                assert!(at >= over_at, "the hum waited for the stretch's end");
+                assert!(said.contains("sound: played"), "{said}");
+            } else {
+                assert!(hum.is_none(), "no hum after a dropped stretch: {said}");
+                assert!(said.contains("nothing after it is made"), "{said}");
+            }
         }
     }
 

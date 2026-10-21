@@ -87,6 +87,26 @@ fn core_bedtime_manifest_is_disabled_and_has_no_model_function() {
     assert!(skill.tool.is_none());
     assert_eq!(skill.triggers.len(), 3);
     assert!(skill.triggers.iter().all(|trigger| trigger.once_per_day));
+    // The morning greeting (the first builder's ruling): 06:00 to 11:00,
+    // and not once the person has spoken to the lamp since 06:00.
+    let morning = skill
+        .triggers
+        .iter()
+        .find(|trigger| trigger.name.as_deref() == Some("morning"))
+        .unwrap();
+    let window = morning.during.unwrap();
+    assert!(!window.contains(5 * 60 + 59) && window.contains(6 * 60));
+    assert!(window.contains(10 * 60 + 59) && !window.contains(11 * 60));
+    assert!(morning.unless_heard);
+    assert!(
+        skill
+            .triggers
+            .iter()
+            .filter(|trigger| trigger.unless_heard)
+            .count()
+            == 1
+    );
+    assert!(skill.permissions.refuses_reading("voice/heard").is_none());
     assert!(
         lamp_skills::tools_file(&[skill])["tools"]
             .as_array()
@@ -672,4 +692,134 @@ fn relative_lights_and_resettles_are_checked_at_load() {
         fs::write(path.join("skill.toml"), granted_light(step)).unwrap();
         assert!(load(&path).is_err(), "{step}");
     }
+}
+
+/// The real bedtime-morning manifest, switched on.
+fn bedtime_morning(root: &Path) -> Skill {
+    let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/bedtime-morning");
+    let folder = root.join("bedtime-morning");
+    fs::create_dir_all(&folder).unwrap();
+    fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
+    let text = fs::read_to_string(from.join("skill.toml")).unwrap();
+    assert!(text.contains("enabled = false"));
+    fs::write(
+        folder.join("skill.toml"),
+        text.replace("enabled = false", "enabled = true"),
+    )
+    .unwrap();
+    load(&folder).unwrap()
+}
+
+const FACE: &[u8] =
+    br#"{"faces":[{"id":"f1","xmin":0.4,"ymin":0.3,"xmax":0.6,"ymax":0.6,"confidence":0.9}]}"#;
+const EMPTY: &[u8] = br#"{"faces":[]}"#;
+
+/// The engine's monotonic clock: microseconds since local midnight.
+fn us(minute: u64, second: u64) -> u64 {
+    (minute * 60 + second) * 1_000_000
+}
+
+/// From `minute`, a minute of the voice resting and `face` (or no one) in
+/// view each second: the calls made and the reasons said.
+fn morning_minute(engine: &mut Engine, minute: u64, face: bool) -> (Vec<Call>, Vec<String>) {
+    let (mut made, mut said) = (Vec::new(), Vec::new());
+    for second in 0..60 {
+        let now = us(minute, second);
+        clock(engine, now, 0, minute);
+        engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+        let runs = engine.observe(Faces::TOPIC, now, if face { FACE } else { EMPTY }, None);
+        said.extend(
+            runs.iter()
+                .flat_map(|run| run.events.iter().map(|event| event.why.clone())),
+        );
+        made.extend(calls(runs));
+    }
+    (made, said)
+}
+
+fn greeted(made: &[Call]) -> bool {
+    made.iter().any(
+        |call| matches!(call, Call::Rest(rest) if rest.op == lamp_msgs::ExpressionRestOp::Wake),
+    ) && made.contains(&Call::Cue)
+}
+
+#[test]
+fn spoken_to_at_0650_a_face_at_0710_is_not_greeted() {
+    // At 05:50, before the window opened, it does not count.
+    for (heard_at, greets) in [(6 * 60 + 50, false), (5 * 60 + 50, true)] {
+        let root = private_root();
+        let mut engine = Engine::new(vec![bedtime_morning(root.path())], true)
+            .with_daily_journal(crate::journal(root.path().join("daily.json")));
+        assert!(engine.topics().contains(&"voice/heard".into()));
+        clock(&mut engine, us(heard_at, 0), 0, heard_at);
+        engine.observe(
+            "voice/heard",
+            us(heard_at, 0),
+            br#"{"text":"good morning lamp","finished":true}"#,
+            None,
+        );
+        // Resting a minute, then a face from 07:10.
+        morning_minute(&mut engine, 7 * 60 + 9, false);
+        let (made, said) = morning_minute(&mut engine, 7 * 60 + 10, true);
+        let let_go = said
+            .iter()
+            .filter(|why| *why == "morning chance let go: spoken to since 06:00")
+            .count();
+        if greets {
+            assert!(greeted(&made), "{made:?} {said:?}");
+            assert_eq!(let_go, 0);
+        } else {
+            assert!(made.is_empty(), "{made:?}");
+            assert_eq!(let_go, 1, "said once: {said:?}");
+            // The day is spent: a face later that morning is not greeted
+            // either, and nothing more is said.
+            morning_minute(&mut engine, 7 * 60 + 30, false);
+            let (made, said) = morning_minute(&mut engine, 7 * 60 + 31, true);
+            assert!(made.is_empty() && said.is_empty(), "{made:?} {said:?}");
+        }
+    }
+}
+
+#[test]
+fn two_faces_in_one_morning_greet_once() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![bedtime_morning(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    morning_minute(&mut engine, 7 * 60 + 9, false);
+    let (made, _) = morning_minute(&mut engine, 7 * 60 + 10, true);
+    assert!(greeted(&made), "{made:?}");
+    assert_eq!(made.iter().filter(|call| **call == Call::Cue).count(), 1);
+    // They leave, and a face comes again at 08:00: no second greeting.
+    morning_minute(&mut engine, 7 * 60 + 11, false);
+    morning_minute(&mut engine, 7 * 60 + 59, false);
+    let (made, _) = morning_minute(&mut engine, 8 * 60, true);
+    assert!(made.is_empty(), "{made:?}");
+}
+
+#[test]
+fn unless_heard_goes_with_during() {
+    let root = private_root();
+    let path = root.path().join("daily-check");
+    let text = |trigger: &str| {
+        format!(
+            "[permissions]\ntopics = [\"clock/local\", \"voice/state\", \"voice/heard\"]\nbody = true\n[trigger]\n{trigger}\nunless_heard = true\n[ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"stretching\" }}\n"
+        )
+    };
+    let loaded = manifest(root.path(), &text(morning()));
+    assert!(loaded.triggers[0].unless_heard);
+    fs::write(
+        path.join("skill.toml"),
+        text("topic = \"clock/local\"\nfield = \"known\"\nequals = true"),
+    )
+    .unwrap();
+    let error = load(&path).unwrap_err();
+    assert!(error.contains("unless_heard goes with during"), "{error}");
+    // Per item, hearing is never checked, so it is refused (#2664).
+    fs::write(
+        path.join("skill.toml"),
+        text("topic = \"clock/local\"\nduring = { from = \"06:00\", to = \"11:00\" }\neach = \"items\"\nkey = \"id\"\nwhen = \"appears\""),
+    )
+    .unwrap();
+    let error = load(&path).unwrap_err();
+    assert!(error.contains("not each"), "{error}");
 }
