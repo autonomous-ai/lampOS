@@ -36,10 +36,18 @@ part of this builder loop after a PR's gate passes.
   each time. This is host debug timing of `Scan::unchanged` after load,
   excluding fixture creation, snapshot cloning and copyback. No sound played.
   [Benchmark evidence](verification/second-music-scan-20261021/README.md).
+- The current frozen run measured **1.481916 ms** first and
+  **0.749791 / 0.762500 ms** repeated, with **zero payload bytes** read.
+  [Before/after record](verification/second-music-scan-20261021/scan-benchmark.json).
 - The fresh source-only gate covers **36 crates**, with **2,152** source
-  inputs frozen. Formatting passed; strict workspace/all-target Clippy,
-  complete consumer tests, build and packaging are running. Final counts
-  and the new native runs have not been claimed.
+  inputs frozen. Formatting and strict workspace/all-target Clippy passed,
+  as did the focused file checks (2), scan measurement (1), Voice integration
+  (12), Voice audio (49), Skills audio (30) and prepared handoff (1).
+  Complete consumer tests, build and packaging are running. Final counts
+  and new native results have not been claimed. Three failed preflights are
+  retained: cache layout, needless box replacement, and one new test's use
+  of a TOML value parser instead of the document parser. Each was corrected
+  before this fresh run.
 - The separate caps behavior is documented: with `LAMP_OUTPUT_CAPS=on`,
   rejected volume arguments that never touch the mixer retain a confirmed
   cap, including when requested audio is off.
@@ -54,9 +62,20 @@ shows updater-only recovery on a local test-key channel: **107 s** after exit,
 **about 693 s** without confirmation. No product part changed. Publication and
 the real key remain explicitly deferred until about 20 November in #1812;
 First has the question of reconciling that deferral with the current priority.
-The next host preparation is release-workflow wiring and the stale update docs,
-after Music. No publication, key change or device action is authorized by this
-checkpoint.
+The documentation correction is [#2421](https://github.com/autonomous-ai/lampOS/pull/2421),
+one commit `426080c984`, onto observed integration `34aa8f18c13e`.
+`git diff --check` passed and seven referenced source-file hashes matched the
+reviewed source. Its Markdown-only path is excluded by both native workflow
+triggers, so no ARM64 result is claimed for it. No runtime or lamp tests were
+run for this documentation change.
+
+The [release preparation proposal](proposals/second-internet-release-20261021.md)
+binds artifact and checkout identity, requires CI checksums, reuses the existing
+manifest/signature format, checks complete assets before promotion and refuses
+a channel sequence that moves backward. Its
+[source record](verification/second-update-plan-20261021/sources.json) names the
+inspected revision and hashes. The plan is for offline preparation; it does not
+change the publication deferral, provision a key or claim any lamp acceptance.
 
 ## Previous checkpoint: 2026-10-20
 

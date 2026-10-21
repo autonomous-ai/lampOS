@@ -1,0 +1,123 @@
+{
+  "boundary": "Scan::unchanged only; 16 x 60s WAV, first after load and two repeats, fixtures/clone/copyback/logging excluded",
+  "profile": "host debug; dev/test debug=0; incremental=0; jobs=2",
+  "measurement_limit": "One first scan after load and two repeated scans on the host, not a cold filesystem, ARM64, acoustic or whole-loop latency measurement.",
+  "before": {
+    "source_commit": "f8d2417b81fa05381f35bffacb025102e9986ce9",
+    "boundary": "Scan::unchanged only; 16 x 60s WAV, first after load and two repeats, fixtures/clone/copyback/logging excluded",
+    "helper_sha256": "e45c05640a0b9bbda7161e0a6d307c4e561b777d00bbc9b694b99cc609753c2b",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "asset_scan_cost",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "profile": "host debug; dev/test debug=0; incremental=0; jobs=2",
+    "payload_count": "known exact total fixture bytes; original scan reads all three files on every successful scan",
+    "exit_code": 0,
+    "seconds": 67.55,
+    "measurements_raw": [
+      "test scan_cost_before ... requested_audio stable_scan phase=first round=0 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=46085516 elapsed_ns=1380945167",
+      "requested_audio stable_scan phase=repeat round=1 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=46085516 elapsed_ns=1401177416",
+      "requested_audio stable_scan phase=repeat round=2 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=46085516 elapsed_ns=1407403209"
+    ],
+    "measurements": [
+      {
+        "phase": "first",
+        "round": 0,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 46085516,
+        "elapsed_ns": 1380945167
+      },
+      {
+        "phase": "repeat",
+        "round": 1,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 46085516,
+        "elapsed_ns": 1401177416
+      },
+      {
+        "phase": "repeat",
+        "round": 2,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 46085516,
+        "elapsed_ns": 1407403209
+      }
+    ]
+  },
+  "baseline_asset_source": {
+    "public_commit": "fd05557ba14af823863ecc19d738476767bfd77f",
+    "rebased_commit": "f8d2417b81fa05381f35bffacb025102e9986ce9",
+    "path": "lampOS/crates/skills/src/requested_audio.rs",
+    "identical_git_blob": "d231c2463d97bed7ee3db8752064a939b57f9d7f"
+  },
+  "after": {
+    "integration_base": "892b1d3233efb1f339ca60e64e4004b40659e006",
+    "source_tree_sha256": "bbd21f1d16e601b9ea3ef3591f79b4f55ce6cc1d3afc70bd6a469222c686f021",
+    "source_file_count": 2152,
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "requested_audio",
+      "sixteen_maximum_recordings_have_zero_read_stable_scan_measurements",
+      "--",
+      "--exact",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "stage_seconds": 11.24,
+    "raw_log_sha256": "d9308207144c9de6e787adff693f2419330fec2fbccfc2d4d91013f0f6187c9b",
+    "result_lines": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 7.08s"
+    ],
+    "measurements_raw": [
+      "test sixteen_maximum_recordings_have_zero_read_stable_scan_measurements ... requested_audio stable_scan phase=first round=0 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=0 elapsed_ns=1481916",
+      "requested_audio stable_scan phase=repeat round=1 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=0 elapsed_ns=749791",
+      "requested_audio stable_scan phase=repeat round=2 assets=16 frames_per_asset=1440000 fixture_bytes=46085516 payload_bytes=0 elapsed_ns=762500"
+    ],
+    "measurements": [
+      {
+        "phase": "first",
+        "round": 0,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 0,
+        "elapsed_ns": 1481916
+      },
+      {
+        "phase": "repeat",
+        "round": 1,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 0,
+        "elapsed_ns": 749791
+      },
+      {
+        "phase": "repeat",
+        "round": 2,
+        "assets": 16,
+        "frames_per_asset": 1440000,
+        "fixture_bytes": 46085516,
+        "payload_bytes": 0,
+        "elapsed_ns": 762500
+      }
+    ]
+  }
+}
