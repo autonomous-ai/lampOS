@@ -42,6 +42,7 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   from setup or the app's own keys", with `refused: "key"`, after two
   refused turns in a row, or once the first refusal is 120 s old with no
   answered turn since (its age, not a second try); the first answered turn
+  (its generation finished, not a line held or a turn ended unasked)
   clears it. A single refused turn is only a
   journal line.
 - **`voice/link`** (`crates/msgs/src/lib.rs`, `VoiceLink`: ready or

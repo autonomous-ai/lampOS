@@ -1326,6 +1326,17 @@ mod tests {
                 .any(|fact| fact.key == key && fact.value == value)
         };
         assert!(has("refused", "key") && has("link", "ready"));
+        // Said first, with what else was the matter after it.
+        let down = chat_key_refused(health(false, LINK_GRACE_US, None, None), true);
+        assert!(
+            down.message
+                .starts_with("a voice service refused this lamp's key")
+                && down
+                    .message
+                    .ends_with("cannot reach the speech service, and keeps trying"),
+            "{}",
+            down.message
+        );
     }
 
     /// A kept room older than `ROOM_FRESH_MS` is no room: the worker that
