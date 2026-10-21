@@ -161,7 +161,7 @@ plainly not the conversation's is no part of it
   them. One too short to know that began a conversation of its own leaves
   no voice known.
 - **The rule.** A line's **highest** cosine against the conversation's
-  prints, under 0.45 (`DIFFERENT_BELOW`), is another voice: no
+  prints, under 0.30 (`DIFFERENT_BELOW`), is another voice: no
   conversation is going on for that line, and only the name, a face, or close and turned to the
   lamp, let its answer out. The same voice, or no verdict, is as without
   the model. Each verdict is a journal line with its cosine: "another voice
@@ -192,19 +192,29 @@ to the lamp's answer to A ("And what about tomorrow?", when 1.5 s or
 longer) now needs B facing the lamp, or the name. A person at the desk
 would usually answer it. That is why it is behind its own model path.
 
-**A second bar, 0.30, for the same-one rules** (`SOMEONE_ELSE_BELOW`,
-beside `DIFFERENT_BELOW`; the first builder at 02:33 and 02:44 on #1722):
-`LAMP_GOING_ON_NOT_OWN` and `LAMP_QUIET_GOING_ON_SAME_ONE` take a print
-under 0.30 against the caller's as someone else's; no print (a line begun
-over the lamp's voice, or under 1.5 s) never is. On lamp-4ace's mic2 on
-21 October at 02:29 the same voice with both clips quiet scored down to
-0.35 and other voices up to 0.29
-([verification](verification/same-voice-20261021/)); on the sets with
-pairs kept, 0.30 read none of 37 same-voice pairs of printed lines as
-another and caught 27 of 29 others. The known cost: 18 October's set had
-one same-voice pair at 0.27. The conversation's own check keeps 0.45.
+**The bar is 0.30**, one bar for every rule that reads a voice (the first
+builder at 03:50 on Queue #1722): the conversation's own check above and
+the same-one rules, `LAMP_GOING_ON_NOT_OWN` and
+`LAMP_QUIET_GOING_ON_SAME_ONE`, which take a print under it against the
+caller's as someone else's (no print, a line begun over the lamp's voice
+or under 1.5 s, never is). Two bars for one question would let the older
+check hold what the newer rules let through. **The evidence:** on
+lamp-4ace's mic2 on 21 October at 02:29 the same voice with both clips
+quiet scored down to 0.35 and other voices up to 0.29; 0.45 would have
+held 3 of 20 of those same-voice pairs, 0.30 none
+([verification](verification/same-voice-20261021/), #2354). On the sets
+with pairs kept, 0.30 read none of 37 same-voice pairs of printed lines as
+another and caught 27 of 29 others. On 18 October's labelled set (below)
+1 of 950 same-voice pairs is under 0.30, the lowest at 0.27, so a rare own
+follow-up is still held. **The cost** is the trade: more other voices
+pass as the same and go on, so more talk between people is answered, the
+case #829 was made for. That set's count of pairs of two at or over 0.30 is
+not recountable (only its summary is kept): between about 220 (at 0.455,
+its 7.5% equal error) and 1,269 (at 0.25) of 2,966. The 0.29 top for other
+voices on 21 October is two synthetic voices in one room. Without `LAMP_SAME_VOICE_MODEL`, which
+no lamp sets today, nothing changes.
 
-**The bar is 0.45**, the equal-error bar of lamp-4ace's labelled set
+**The bar was 0.45 before**, the equal-error bar of lamp-4ace's labelled set
 (18 October, scored on lamp-4ace by the first builder with the Sixth's
 script; [verification](verification/same-voice-20261018/README.md), #1485).
 That set is 89 clips of Daniel, Samantha and Karen played on mic2 with the
@@ -222,7 +232,7 @@ of them cut again as the worker prints them, 0.45 takes 39 of the 75
 same-voice pairs for two voices, 31 of them among the 38 with a line under
 1.5 s, and 1 of the 96 pairs of two for one voice
 (`verification/same-voice-early-20261018`). The labelled set is the
-cleaner measurement, but only of lines 1.5 s or longer. Even at 0.45
+cleaner measurement, but only of lines 1.5 s or longer. At either bar
 **the check stays off**: it is at chance with the lamp's voice in a
 print, and if it's used at all it's one weak sign beside facing, lips
 (#720) and the name (the first builder, #1445).
@@ -246,7 +256,7 @@ were read as two voices (11%) and 896 of 3,212 pairs of two as one
 (28%). With the lamp sounding over one or both it was 47.9%, chance. No
 bar separates them, so **the check stays off and is not to hold an
 answer** (the first builder's decision). The labelled set (above) is the
-cleaner measurement and sets the bar at 0.45. (An earlier note here, that one voice's own lines
+cleaner measurement and set the bar at 0.45 then. (An earlier note here, that one voice's own lines
 came out at 0.14 and 0.24 in the 09:31 run, was wrong: they were two
 speakers, both judged right.)
 
@@ -277,10 +287,10 @@ speakers, both judged right.)
   question is only let through while a conversation is going on. And it
   needn't be a second person (the Seventh on #1415): a TV's line of 1.5 s
   or more, or the asker's own line shouted or whispered, can fall under
-  the bar too. At 0.45, about 1 in 13 of one voice's own pairs does on
-  the labelled set, whose lines are 1.5 s or longer, with the lamp quiet.
-  With a line under 1.5 s it is most of them: 31 of 38 on the older
-  recordings (below). Before, one
+  the bar too. At 0.30, 1 of 950 of one voice's own pairs does on the
+  labelled set, whose lines are 1.5 s or longer, with the lamp quiet (at
+  the earlier 0.45, about 1 in 13). With a line under 1.5 s, at 0.45 it
+  was most of them: 31 of 38 on the older recordings (below). Before, one
   false "another voice" held one line; now it holds every unnamed line
   after it until the lamp speaks. **So before `LAMP_SAME_VOICE_MODEL`
   goes on anywhere,** #829's battery on lamp-4ace gets a TV line and a
@@ -386,8 +396,8 @@ speakers, both judged right.)
     is held as another voice, which is the scene's own expectation for B's
     follow-up without a face or the name, and with this rule the
     conversation ends there. A's own short follow-up, in A's voice, is
-    answered only if the model takes it for A's, and at 0.45 it mostly
-    doesn't. On lamp-4ace's October recordings, cut as the worker prints
+    answered only if the model takes it for A's, and at the earlier bar of
+    0.45 it mostly didn't. On lamp-4ace's October recordings, cut as the worker prints
     them (`verification/same-voice-early-20261018`), **0.45 takes 31 of
     the 38 same-voice pairs with a line under 1.5 s for two voices** at
     1.8 s (33 at 3 s), and 8 of the 37 longer ones (12 at 3 s). The bar of
@@ -457,7 +467,7 @@ speakers, both judged right.)
   scene 3 went on with B and A's remark was judged against B's voice. Now
   the late print of a line let out as the conversation going on is
   compared with the conversation's voice first. Another voice's (under
-  0.45) is not taken; the journal says "another voice than the
+  0.30) is not taken; the journal says "another voice than the
   conversation's, known after its answer (cosine 0.12): the conversation
   is over", and at the next line's verdict the conversation ends, as for a
   line held as another voice (`RoomTold::another_voice_held`), that line

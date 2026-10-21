@@ -3522,7 +3522,7 @@ impl Heeding {
     }
 
     /// Whether `seen` shows a line surely someone else's than the answered
-    /// caller's: its print scored under [`crate::same_voice::SOMEONE_ELSE_BELOW`]
+    /// caller's: its print scored under [`crate::same_voice::DIFFERENT_BELOW`]
     /// (0.30) against the caller's, or the eyes saw a face speaking it not
     /// turned to the lamp, none of them the caller's, whether or not the
     /// caller's face is known. No print (begun over the lamp, too short) is
@@ -3535,7 +3535,7 @@ impl Heeding {
     fn someone_else(&self, seen: &Seen) -> bool {
         let callers = |face: &String| self.caller_faces.contains(face);
         seen.likeness
-            .is_some_and(|likeness| likeness < crate::same_voice::SOMEONE_ELSE_BELOW)
+            .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW)
             || (!seen.speakers.iter().any(callers)
                 && seen
                     .speakers

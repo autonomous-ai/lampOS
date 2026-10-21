@@ -1835,13 +1835,13 @@ after a take-over, but now for every turn:
   question of the lamp's (`Heeding::someone_else`, the one check
   `LAMP_GOING_ON_NOT_OWN` reads too): with `LAMP_SAME_VOICE_MODEL`, another
   voice: a print scored under 0.30 against the caller's
-  (`same_voice::SOMEONE_ELSE_BELOW`, the first builder at 02:33: on
+  (`same_voice::DIFFERENT_BELOW`, the first builder at 02:33: on
   lamp-4ace's mic2 on 21 Oct at 02:29 the same voice in a quiet room scored
   down to 0.35, other voices up to 0.29); no print, a line begun over the
   lamp's voice or under 1.5 s, is never another voice and goes on (02:19).
-  #829's own bar stays 0.45 (`same_voice::DIFFERENT_BELOW`) and holds a
-  line under it before this rule reads it, so while it stands the 0.30 bar
-  holds nothing by voice that #829 lets out; with the eyes' speaking faces
+  #829's own check reads the same bar (one bar since the first builder's
+  03:50 on #1722; [same-voice.md](same-voice.md)) and holds a line under it
+  before this rule reads it; with the eyes' speaking faces
   (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from `humans/faces/tracked` on
   the bus), a face seen speaking it not turned to the lamp, none of them the answered
   caller's, whether or not the caller's face is known (the first builder at
@@ -2142,7 +2142,7 @@ after a take-over, but now for every turn:
   person's day lines, 12/12 to 9/12, "What do you see right now?",
   "Remember that my favourite colour is green." and "What time is it?"
   each `no_audio_answer`) means its print scored under 0.30 against the
-  caller's (`same_voice::SOMEONE_ELSE_BELOW`, the first builder at 02:33:
+  caller's (`same_voice::DIFFERENT_BELOW`, the first builder at 02:33:
   on lamp-4ace's mic2 on 21 Oct at 02:29 the same voice in a quiet room
   scored down to 0.35, other voices up to 0.29), or the eyes saw a face
   speaking it not turned to the lamp, none of them the answered caller's,
@@ -2150,12 +2150,11 @@ after a take-over, but now for every turn:
   `caller_faces` and speaking-faces reader, read with this switch too). No
   print (a line begun over the lamp's voice, or under 1.5 s) is never
   another voice and goes on as the conversation (the first builder at
-  02:19). The conversation's own check keeps its bar of 0.45
-  (`same_voice::DIFFERENT_BELOW`): #829 holds a line under it at
-  its verdict, or, known after its answer, ends the conversation at the
-  next line, with the switch as without it, so a line #829 lets out scored
-  0.45 or more and the 0.30 bar chains nothing by voice while #829's bar
-  stands; the same voice at 0.35 is still held there. A line with nothing to tell
+  02:19). The conversation's own check reads the same bar of 0.30 (one
+  bar since the first builder's 03:50 on #1722): #829 holds a line under
+  it at its verdict, or, known after its answer, ends the conversation at
+  the next line, with the switch as without it; the same voice at 0.35
+  now goes on there too. A line with nothing to tell
   the speakers apart (no voice model, no speaking face seen) is taken for
   the same person's follow-up, and its answer renews the window as
   without the switch: without a speaking face (lamp-4ace's played test,
