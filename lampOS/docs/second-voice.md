@@ -366,6 +366,18 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   gaps ended in cancellation, including one without a matching journal
   turn). Replayed over those
   turns, at 3.0 s it would come in 10, with 3 gaps over 300 ms after it.
+  A person who only paused hears the sound and goes on over it (lamp-4ace,
+  21 Oct 18:36: 130 ms after it began). A line begun over nothing of the
+  lamp's but the last request's wait sound, sounding still or not, is
+  taken as begun in the clear (`Shared::only_its_wait_sound`; the journal:
+  `began over only request N's wait sound`): no cut-in, no cut-in note,
+  counted as the room's talk, so the join (#2620) can take it as the
+  request going on; but no same-voice print is asked for it, since the
+  sound is in its first samples (`Heard::BeganOverTheWaitSound`): on
+  lamp-52e6 on 21 Oct (22:14-22:16, the Mac's played follow-ups), three
+  such lines read 0.78, 0.59 and 0.17 against the conversation's voice, and
+  the one at 0.17 was held as another voice. Once an answer piece has
+  sounded, a line over it is a cut-in as before.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
   begun within its bound, or whose chat refuses it before any word (a
   status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),

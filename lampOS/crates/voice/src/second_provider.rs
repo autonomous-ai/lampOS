@@ -465,7 +465,12 @@ pub type LinkBack = Arc<dyn Fn() -> BoxFuture<'static, bool> + Send + Sync>;
 /// (`LAMP_SAME_VOICE_MODEL`, `worker::Heeding::hear`): its start, said over
 /// the lamp's voice or not, its samples, and its end.
 pub enum Heard<'a> {
-    Began { over_the_lamps_voice: bool },
+    Began {
+        over_the_lamps_voice: bool,
+    },
+    /// Begun over nothing of the lamp's but the last request's wait sound:
+    /// in the clear, but not printed for the same-voice check.
+    BeganOverTheWaitSound,
     Samples(&'a [i16]),
     Ended,
 }
@@ -690,6 +695,10 @@ struct Shared {
     warmed: Mutex<Option<u64>>,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
+    /// The request whose only sound so far is its wait sound
+    /// (`LAMP_SECOND_WAIT_CUE`): a line begun over it is begun in the clear
+    /// ([`Shared::only_its_wait_sound`]).
+    wait_sound_only: Mutex<Option<u64>>,
     /// What a skill's answer said to do with the picture of the look it
     /// asked ([`picture_note`]), with the session the look was asked for:
     /// given once to that session's next look turn, after its question, and
@@ -1145,6 +1154,7 @@ impl Engine {
                 spares: AtomicU64::new(0),
                 warmed: Mutex::new(None),
                 begun: Mutex::new(None),
+                wait_sound_only: Mutex::new(None),
                 look_note: Mutex::new(None),
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
@@ -1959,6 +1969,25 @@ impl Engine {
                 ..
             } => {
                 let previous = self.begun_last;
+                // Begun over nothing of the lamp's but the last request's
+                // wait sound: the person going on after a pause, not a
+                // cut-in (lamp-4ace on 21 Oct at 18:36, the first builder on
+                // #2602). Begun in the clear for the room's talk, the
+                // conversation and the cut-in note, but with no voice print:
+                // the sound is in its first samples, and on lamp-52e6 (21 Oct
+                // 22:14-22:16) one such line of three read 0.17 against its
+                // own voice and was held.
+                let over_the_wait_sound = over_the_lamps_voice
+                    && previous.is_some_and(|(previous, _)| {
+                        let only = self.shared.only_its_wait_sound(previous);
+                        if only {
+                            eprintln!(
+                                "lamp-voice second: request {request} began over only request {previous}'s wait sound: taken as begun in the clear"
+                            );
+                        }
+                        only
+                    });
+                let over_the_lamps_voice = over_the_lamps_voice && !over_the_wait_sound;
                 if !self.begin(request, session) {
                     return;
                 }
@@ -1971,8 +2000,12 @@ impl Engine {
                 if let Some(hearing) = &self.shared.hearing {
                     hearing(
                         request,
-                        Heard::Began {
-                            over_the_lamps_voice,
+                        if over_the_wait_sound {
+                            Heard::BeganOverTheWaitSound
+                        } else {
+                            Heard::Began {
+                                over_the_lamps_voice,
+                            }
                         },
                     );
                 }
@@ -2728,6 +2761,10 @@ impl Shared {
     /// A piece of `request`'s answer begins: its words, none for a wait
     /// sound. The first of a newer request's starts its record afresh.
     fn said_piece(&self, request: u64, words: Option<&str>) {
+        // Any piece but the wait sound, which marks itself after this.
+        if let Ok(mut only) = self.wait_sound_only.lock() {
+            *only = None;
+        }
         if let Ok(mut said) = self.said.lock() {
             if said.0 != request {
                 *said = (request, Vec::new(), crate::not_speech::CallsLeftOut::new());
@@ -2743,6 +2780,14 @@ impl Shared {
                 samples: 0,
             });
         }
+    }
+
+    /// Whether all the lamp has sounded for `request` is its wait sound,
+    /// sounding still or not.
+    fn only_its_wait_sound(&self, request: u64) -> bool {
+        self.wait_sound_only
+            .lock()
+            .is_ok_and(|only| *only == Some(request))
     }
 
     /// `samples` more of `request`'s newest piece sent.
@@ -4555,6 +4600,9 @@ enum Stop {
 async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> {
     // Its time counts in what was heard of the answer, with no words.
     shared.said_piece(request, None);
+    if let Ok(mut only) = shared.wait_sound_only.lock() {
+        *only = Some(request);
+    }
     for part in clip.chunks(PACKET_SAMPLES) {
         let audio = ProviderOutput::Audio {
             request,
