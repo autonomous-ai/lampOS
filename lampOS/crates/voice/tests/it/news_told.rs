@@ -9,7 +9,9 @@
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, Clock as Sample},
     harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target},
-    runtime::{Adapter, Clock, Config, REPORT_EVERY, request, serve_with_adapter},
+    runtime::{
+        Adapter, Clock, Config, DAEMON_RETRY_AFTER, REPORT_EVERY, request, serve_with_adapter,
+    },
 };
 use lamp_voice::task_news::{BootClock, TaskNews};
 use serde_json::{Value, json};
@@ -116,6 +118,7 @@ impl Place {
             set_up_later: None,
             sign_in_by_code: false,
             report_every: REPORT_EVERY,
+            daemon_retry_after: DAEMON_RETRY_AFTER,
         };
         let mut place = Self {
             root,

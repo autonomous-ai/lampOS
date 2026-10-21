@@ -1,6 +1,6 @@
 use lamp_tasks::runtime::{
-    Config, REPORT_EVERY, SET_UP_LOOK_EVERY, SetUpLater, SystemClock, read_targets_or_newer,
-    request, serve,
+    Config, DAEMON_RETRY_AFTER, REPORT_EVERY, SET_UP_LOOK_EVERY, SetUpLater, SystemClock,
+    read_targets_or_newer, request, serve,
 };
 use std::{
     io::{self, Read},
@@ -171,6 +171,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }),
         sign_in_by_code,
         report_every: REPORT_EVERY,
+        daemon_retry_after: DAEMON_RETRY_AFTER,
     };
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;

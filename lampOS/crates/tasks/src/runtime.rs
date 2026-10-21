@@ -43,6 +43,15 @@ pub const STALE_AFTER: Duration = Duration::from_millis(1500);
 /// How often the part says how it is on `diagnostics` while nothing changes
 /// ([`Config::report_every`] on a lamp).
 pub const REPORT_EVERY: Duration = Duration::from_secs(1);
+/// A `harness start` after a sign-in that failed is tried again this long
+/// after, then twice as long after each next failure, [`DAEMON_START_TRIES`]
+/// tries in all ([`Config::daemon_retry_after`] on a lamp): on lamp-75c9
+/// (21 October) the start right after a spoken sign-in said `start_failed`,
+/// and one by hand about a minute later worked.
+pub const DAEMON_RETRY_AFTER: Duration = Duration::from_secs(10);
+/// How many times `harness start` is tried after a sign-in: at once, then
+/// 10, 20 and 40 s after each failure on a lamp.
+pub const DAEMON_START_TRIES: u32 = 4;
 pub const WORKERS: usize = 4;
 pub const CLIENT_QUEUE: usize = 4;
 pub const REQUEST_QUEUE: usize = 16;
@@ -154,6 +163,9 @@ pub struct Config {
     /// at once, whatever this is. Tests pass less, so a test that reads the
     /// report waits a fraction of a second rather than one (#1128).
     pub report_every: Duration,
+    /// The first wait before `harness start` is tried again after a
+    /// sign-in ([`DAEMON_RETRY_AFTER`] on a lamp). Tests pass less.
+    pub daemon_retry_after: Duration,
 }
 
 /// What `serve --set-up-later` looks at again, and how often.
@@ -675,6 +687,8 @@ type Switches = (
     bool,
     Option<SetUpLater>,
     Option<Starter>,
+    // [`Config::daemon_retry_after`].
+    Duration,
 );
 
 fn owner<C: Clock>(
@@ -684,7 +698,7 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     stop: Arc<AtomicBool>,
-    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter): Switches,
+    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter, daemon_retry_after): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
@@ -710,8 +724,11 @@ fn owner<C: Clock>(
     let mut machines_said = String::new();
     // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
     let mut sign_in: Option<SignInSession> = None;
-    // A sign-in by code succeeded: Harness's daemon is started once.
-    let mut start_daemon_due = false;
+    // A sign-in by code succeeded: Harness's daemon is started, and when a
+    // start fails, tried again later, with the tries made so far. A
+    // hand-over waits while a try is due.
+    let mut start_daemon_due: Option<Instant> = None;
+    let mut daemon_tries: u32 = 0;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
     // restart isn't taken for one before it (the reviewer's P3 on #2174).
     let mut sign_ins: u64 = std::time::SystemTime::now()
@@ -736,8 +753,9 @@ fn owner<C: Clock>(
                 // Harness's own sign-in stops its daemon, and its user
                 // service doesn't start it again, so every hand-over after
                 // it says "Harness is not running here" (lamp-75c9, 20 Oct;
-                // openharness#1463): started once, here.
-                start_daemon_due = true;
+                // openharness#1463): started here.
+                start_daemon_due = Some(Instant::now());
+                daemon_tries = 0;
             }
         }
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
@@ -801,12 +819,23 @@ fn owner<C: Clock>(
                     Ok(())
                 }
                 Outcome::StartDaemon(started) => {
+                    daemon_tries += 1;
                     match started {
                         Ok(()) => eprintln!(
                             "tasks: Harness's daemon started after the sign-in (openharness#1463)"
                         ),
+                        Err(code) if daemon_tries < DAEMON_START_TRIES => {
+                            let after = daemon_retry_after * (1 << (daemon_tries - 1));
+                            eprintln!(
+                                "tasks: Harness's daemon not started after the sign-in: {code}; \
+                                 tried again in {} s",
+                                after.as_secs_f32()
+                            );
+                            start_daemon_due = Some(Instant::now() + after);
+                        }
                         Err(code) => eprintln!(
-                            "tasks: Harness's daemon not started after the sign-in: {code}"
+                            "tasks: Harness's daemon not started after the sign-in: {code}; \
+                             {daemon_tries} tries, not tried again until the next sign-in"
                         ),
                     }
                     Ok(())
@@ -917,9 +946,18 @@ fn owner<C: Clock>(
             // succeeded (openharness#1463): a hand-over already waiting
             // would go to the daemon the sign-in stopped, and fail (the
             // reviewer-lead's P2 on #2309).
-            let daemon = std::mem::take(&mut start_daemon_due).then_some(Job::StartDaemon);
+            // A start that failed is tried again later, and until then no
+            // hand-over goes either: it would fail on the stopped daemon.
+            let daemon = match start_daemon_due {
+                Some(due) if due <= Instant::now() => {
+                    start_daemon_due = None;
+                    Some(Job::StartDaemon)
+                }
+                _ => None,
+            };
             let launch = match daemon {
                 Some(job) => Some(job),
+                None if start_daemon_due.is_some() => None,
                 None => engine
                     .begin_launch(&now)
                     .map_err(io::Error::other)?
@@ -2110,6 +2148,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let (owner_tx, owner_rx) = mpsc::sync_channel(REQUEST_QUEUE);
     let owner_stop = stop.clone();
     let switches = (config.watch, config.progress, config.close_told);
+    let daemon_retry_after = config.daemon_retry_after;
     let set_up_later = config.set_up_later.clone();
     let report = current.clone();
     let owner = thread::Builder::new()
@@ -2129,6 +2168,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     switches.2,
                     set_up_later,
                     sign_in_starter,
+                    daemon_retry_after,
                 ),
             )
         })?;
@@ -2722,6 +2762,7 @@ mod tests {
             set_up_later: None,
             sign_in_by_code: false,
             report_every: REPORT_EVERY,
+            daemon_retry_after: DAEMON_RETRY_AFTER,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")
