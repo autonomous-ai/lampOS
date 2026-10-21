@@ -5190,6 +5190,18 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **(a), claimed on #1722:** a voice-tone baseline for each known person, keyed by the memory person id, at most 8, in memory only. It's dropped when the person's words ask to forget their face, and every baseline when they ask to forget everything.
 - **(b), Mood reading `voice/tone`,** waits on a base: #2353 is on lamp-voice and #2427 on #1712.
 
+## 2026-10-21, 10:28 ICT: #2427's review fixed and folded as #2450; (a) up as #2457
+
+- **#2427's review** (the reviewer, 09:19): one P2 and three P3s, fixed in `316526df6`:
+  - the meter now takes only the line's own speech with the lamp silent, plus the 400 ms before it;
+  - words go only to their own line's reading;
+  - a pitch every 30 ms, about 3.5 ms of one core for a 2 s line on this Mac;
+  - "no" turns nothing.
+- **Tests and the gate:** two coordinator tests now drive the tone. Six mutations each fail a test. Gate: 3015 passed, plus three child timeouts that pass alone.
+- **#2450:** the reviewer's 10:04 found nothing new and asked for a fold. #2450 is that one commit, and #2427 is closed.
+- **#2457, (a):** a tone baseline for each known person, by memory id, at most 8, in memory only. A forget of their face, or of everything, lets it go. Gate 3022/0, with four mutations caught. It's stacked on #2450.
+- **b0802:** Seventh's #2456 widens #2376's at-the-start window to 1.3 s.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
