@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-22 01:00 +07, updater recovery slice claimed
+
+**Ready for lamp-voice: no (#2700, implementation starting).** First approved
+[the narrow recovery slice](https://github.com/autonomous-ai/lampOS/issues/1369#issuecomment-6322779087)
+and opened [#2700](https://github.com/autonomous-ai/lampOS/issues/2700) with
+`builder:second`. Claimed as session `second-updater-self-handover-20261022`,
+no lamp. Branch `second/updater-self-handover` is clean on current
+`lamp-voice` `66518bb4c803a8a3439cc3ff2d0743bf460ba92e`.
+
+[The source audit and fixture plan](verification/update-self-handover-review-20261022/README.md)
+record the existing handover, its proof and rollback, the unarmed-recovery
+paths and the cut boundaries. An independent source read found no factual
+correction. This is not executed test evidence. The update files are unchanged
+between the reviewed `4efcf4eb0` and the task's current base.
+
+Implement a recovery-readiness check shared by ordinary and `min_updater`
+handover, with no automatic installation or timer activation. Preserve
+completed parts when self-update waits. Add missing-recovery and durable
+cut fixtures. Mac gates remain fmt, strict Clippy and changed-crate tests;
+ARM64 runs only in the PR. No updater build, test or device run yet.
+
+**Ready for lamp-voice: yes (#1757, #2692, #2694).** Their heads and native
+evidence are unchanged below. #2462 remains with its merger.
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 00:49 +07, full-journal native gate passed
 
 **Ready for lamp-voice: yes (#1757, #2692, #2694).** Skills journal head
