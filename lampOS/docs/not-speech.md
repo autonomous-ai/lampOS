@@ -557,6 +557,40 @@ turn is made for a misheard cut-in.
   and the switch off, told nothing), `misheard_hum::tests` and
   `provider_worker::tests::going_on_asks::misheard_hum_is_read_after_cut_in_told`.
 
+## Music the detector takes for speech (#2602)
+
+The detector takes tonal music for speech at any level. On lamp-c0a4, a 6 s
+tune of two-tone notes over a 65 Hz hum, played from a Mac, opened a turn
+admitted 914 ms in (Thirteen on #2602). `tests/it/music_turns.rs` feeds six
+tunes synthesised in the test (nothing recorded from people) block by block
+through the voice's own detector, at three levels each:
+
+| | turns opened | ≥30 speech blocks (past the length gate above) |
+|---|---|---|
+| Piper's "Stop. Please stop talking." | 1 | 1 (89 blocks) |
+| 6 tunes × 3 levels (peak 0.5, 0.15, 0.05) | 17 of 18 | 17 of 18 (205 to 824 blocks: the whole tune) |
+
+The only one that opened nothing was the beat with a bass, at the lowest
+level. With `LAMP_MUSIC_TURNS_WAVS=DIR` the test writes the tunes there as
+16 kHz WAVs, to play in a room or score off the lamp.
+
+**`LAMP_SPOKEN_TO=on` already holds such a turn's answer** (the product unit
+and lamp-4ace set it): music shows no sign it was said to the lamp, so its
+answer is held as not spoken to. A gate on `ears/classes` at the answer
+(#2726, closed) would have changed nothing there. Holding the turn itself
+before it is admitted can't use the classes either: a candidate is decided
+within 200 ms (`admission::DECISION_BUDGET_US`), and YAMNet's first window
+of the turn's own sound comes about 1.2 s in. What a music turn still moves
+is whatever reacts to admission itself, such as a gesture ended "by
+conversation" (#2668).
+
+Off the lamp, the pinned YAMNet (`lamp-ears`'s `score_wav`) scored music
+over 0.6 in every window of four of the tunes, in 6 of 16 of the plucked
+arpeggio's, and in none of a bright line with vibrato. In 40.8 s of Piper's
+speech, none of 80 windows went over 0.02. Over the held chords, at the
+music's level and 6 and 12 dB over it, 26 of 27 Piper lines reached a speech
+score of 0.06 or more, against at most 0.02 in the tunes alone.
+
 ## An answer with no word in it
 
 Told to stay quiet, the model sometimes says so aloud: an answer whose
