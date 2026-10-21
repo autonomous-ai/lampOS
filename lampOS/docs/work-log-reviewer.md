@@ -1,5 +1,14 @@
 # Reviewer work log
 
+## 2026-10-21 (resumed)
+
+Newest first. Times from `date` (+07).
+
+21:08 #1757: checkpoint correction 803cf41c7c independently verified against c74b0f710; four source hashes match. fmt and strict actions+voice clippy pass; full Actions suite 120/0, requested_audio runtime 17/0. New heartbeat regression fails on original c74 (queued reply EOF before mute) and passes restored. Source copy removed; published PR remains draft on unfixed c74, so its P2 stays open there. Review and gate: https://github.com/autonomous-ai/lampOS/pull/1757#issuecomment-6317950123
+20:58 #2468: b3934c47b preserves the added/removed lines of the original reviewed commit in all four files; both second-voice doc paragraphs retained. Prior three P3s stand. Current ARM64 39610451746 and clippy 39610451698 green; no new local gate. First builder's privacy lane. https://github.com/autonomous-ai/lampOS/pull/2468#issuecomment-6317911578
+20:57 Ownership audit: #2543 and #2619 already read by First; #2619 awaits Mobile's compatibility answer. #2642 has Reviewer-lead's P2 on 2d6eed1e4; no duplicate gates.
+20:55 Resumed on Queue #2602. Read current role/rules and the First/Reviewer-lead merge split. Main worktree unchanged, preexisting pr.json left alone; one shared build target, about 16 GiB. https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6317862199
+
 ## 2026-10-21 (the same Claude session, after midnight)
 
 Newest first. Times from `date` (+07).
