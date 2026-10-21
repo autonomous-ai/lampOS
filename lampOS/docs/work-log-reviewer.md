@@ -4,6 +4,22 @@
 
 Newest first. Times from `date` (+07).
 
+10:54 #2464 (Reviewer-lead's rebase of #2306): same patch as ac7da1a5c, checked file by file; merge left to Reviewer-lead.
+10:53 #2467 (Fourth, onto #1712): first read, #2457's patch folded, no P1/P2; for the first builder (a person's voice baseline).
+10:52 #2460 (Third, onto #1712): first read, no P1/P2, two P3s (tests don't pin "a hand's sleep only" or the route's wire; docs); for the first builder (the privacy indicator's ring).
+10:51 #2445 (Third): my P3 closed on 6561e3682 (only the voice's voice/mute is taken).
+10:51 #2441 (Seventh): my 09:45 P3 closed on 0303080a5; the fan case now rests on the lamp run.
+10:51 #2311 (Ten): re-read of d4f4b44a4, my three P3s and the first builder's lost-publish ask closed; one P3 (any chat/out subscriber counts as lamp-cloud); #2463 is the old patch.
+10:49 #2465 (Tests): first read, my #2454 P2 taken, one P3 (a hand run on another branch saves a cache nobody reads); I merge on green ARM64.
+10:46 #2459 (Migrate): first read, one P2 (the refusal may never reach the bus before the run ends: report is limited to once per 950 ms); for the first builder (on by default).
+10:43 Merged #2453 (#2434 follow-up: ring test + docs) as c9bd79d86
+10:39 #2454 (CI cache saved only by lamp-voice) first read: P2 PRs onto #1712 lose all caching
+10:37 #2453 (#2434 follow-up test+docs) read: no finding; mine after gate
+10:36 #2424 at 4247ca19c: P2 + both P3s answered; first builder's
+10:35 #2448 (privacy step arms at start, one sentence) first read (late): P2 'turn it off, then on again' direction; P3 conflicts with #1948; first builder's
+10:35 #2445 (sleep folds the body) first read: no P1/P2, P3 voice/mute source unchecked; conflicts with #1699; first builder's
+10:31 #2457 at 9002b985c: P3 closed (doc); fold after #2450
+10:30 #2407 (seeing who speaks in product, onto #1712) first read: P2 with #2402 in it's live on product with no lamp run; first builder's
 - 10:28 #2456 (name at line start 1.3 s) read: no P1/P2, P3 one sample; first builder's
 - 10:28 #2449 (face-gap hold no recall) first read: P2 held line still reaches A's memory (words forget, remember, Days note); first builder's after fix
 - 10:27 #2457 (per-person tone baselines) read: no P1/P2, P3 forget scope wording; first builder's after #2450
