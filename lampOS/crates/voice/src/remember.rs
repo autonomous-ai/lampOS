@@ -1134,6 +1134,9 @@ fn run_for_guarded(
         }
         let forgets = matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING);
         if forgets {
+            // Nothing heard or saved before it follows anyone
+            // (`LAMP_MEMORY_FOLLOWS_FACE`), whatever the forget's outcome.
+            crate::follows_face::forgot();
             // A timed-out removal can still commit. Invalidate the local
             // recap without waiting on its mutex in this tool's deadline.
             FORGET_THREAD.store(true, Ordering::Release);
@@ -1454,6 +1457,7 @@ static KEPT_OUT: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
 /// faces. Once for a process; a second call changes nothing.
 pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     if let Some(known) = known {
+        crate::follows_face::reading_known(known.clone());
         let _ = KNOWN_FILE.set(known);
     }
     let days = *DAYS_MODE.get_or_init(days_from_environment);
@@ -1592,6 +1596,20 @@ pub fn finished(request: u64) {
         Err(_) => return,
     };
     hand_on(done, unix_ms(), jobs);
+}
+
+/// A face was saved as `to`'s (a memory id) in the request `request`: with
+/// `LAMP_MEMORY_FOLLOWS_FACE` and the Days memory, the caller's own lines of
+/// the room's conversation follow them ([`crate::follows_face`]). Never
+/// waits; nothing otherwise.
+pub fn face_saved(request: u64, to: &str) {
+    if let Some(client) = DAYS.get().and_then(Option::as_ref)
+        && client.face_saved(request, to)
+    {
+        eprintln!(
+            "lamp-voice provider: request {request}: a face was saved; the caller's own lines of the conversation follow it"
+        );
+    }
 }
 
 /// The same keep/forget exclusion for both journal backends. Scope is carried
@@ -2002,7 +2020,8 @@ pub struct DaysClient {
     current: Arc<Mutex<Current>>,
     /// Held and queued answers, shared with the writer (#2145).
     hand_ons: Arc<HandOns>,
-    /// [`crate::early_words::on`], read when the client is made (#2176, 5a).
+    /// [`crate::early_words::on`] or [`crate::follows_face::on`], read when
+    /// the client is made (#2176): the room's things kept go to the writer.
     early: bool,
 }
 
@@ -2521,6 +2540,8 @@ enum Listed {
 
 enum DaysJob {
     Exchange {
+        /// The request it answered; 0 for none known.
+        request: u64,
         at_unix_ms: u64,
         finished: Instant,
         heard: String,
@@ -2535,8 +2556,21 @@ enum DaysJob {
     Close(String, Option<String>),
     End,
     /// A thing kept in the room's scope, by its id, with
-    /// [`crate::early_words`]: the conversation's, should it follow.
-    Kept(u64),
+    /// [`crate::early_words`] or [`crate::follows_face`]: the
+    /// conversation's, should it follow. With the request it was kept in,
+    /// when known, and the room's kept thing it replaced, if any.
+    Kept {
+        id: u64,
+        request: Option<u64>,
+        replaced: Option<u64>,
+    },
+    /// A face was saved as `to`'s in `request` ([`crate::follows_face`]),
+    /// with the forgets said before it ([`crate::follows_face::FORGETS`]).
+    FaceSaved {
+        request: u64,
+        to: String,
+        forgets: u64,
+    },
 }
 
 impl DaysClient {
@@ -2563,12 +2597,20 @@ impl DaysClient {
         let hand_ons = Arc::new(HandOns::default());
         let handing = Arc::clone(&hand_ons);
         let context = Arc::new(Mutex::new(DaysContext::default()));
-        let early = crate::early_words::on();
+        let (words, follows) = (crate::early_words::on(), crate::follows_face::on());
+        let early = words || follows;
         let moving = Arc::clone(&context);
         std::thread::Builder::new()
             .name("lamp-voice-memory-days".into())
             .spawn(move || {
                 let early = early.then(|| Early {
+                    words,
+                    follows,
+                    lines: &crate::follows_face::LINES_HEARD,
+                    known: &crate::follows_face::known_now,
+                    forgets: &crate::follows_face::FORGETS,
+                    fill: &crate::follows_face::fill_prints,
+                    print_wait: crate::follows_face::PRINT_WAIT,
                     faces: &crate::early_words::SEEN,
                     context: &moving,
                 });
@@ -3094,6 +3136,9 @@ impl DaysClient {
             }
             result
         };
+        // The kept thing a correction replaced (`LAMP_MEMORY_REPLACES`): it
+        // follows nobody ([`crate::follows_face`]).
+        let mut replaced = None;
         let (told, ids) = if call.name == RECALL {
             let Some(result) = deadline
                 .checked_sub(started.elapsed())
@@ -3173,6 +3218,7 @@ impl DaysClient {
                 else {
                     return lost((gone(), false));
                 };
+                replaced = answer["replaced"].as_u64();
                 let replaces = self.replaces.load(Ordering::Acquire);
                 (
                     told_kept(told, id, replaces),
@@ -3237,7 +3283,12 @@ impl DaysClient {
         drop(context);
         say(said);
         if let Some(id) = room_kept {
-            let _ = self.jobs.try_send(DaysJob::Kept(id));
+            let request = lease.map(|lease| lease.key().request);
+            let _ = self.jobs.try_send(DaysJob::Kept {
+                id,
+                request,
+                replaced,
+            });
         }
         (told, true)
     }
@@ -3626,6 +3677,35 @@ impl DaysClient {
         self.queue_exchange(at_unix_ms, heard, said, person, (None, None))
     }
 
+    /// [`Self::finished_exchange_for`] of the request `request`, for a
+    /// caller that runs the Days client itself (`LAMP_MEMORY_FOLLOWS_FACE`).
+    pub fn finished_line(
+        &self,
+        request: u64,
+        at_unix_ms: u64,
+        heard: &str,
+        said: &str,
+        person: Option<&str>,
+    ) -> bool {
+        self.finished_exchange_of(request, at_unix_ms, heard, said, person)
+    }
+
+    /// A face was saved as `to`'s in the request `request`
+    /// ([`crate::follows_face`]): the caller's own lines of the room's
+    /// conversation follow them. Never waits; nothing without the switch.
+    pub fn face_saved(&self, request: u64, to: &str) -> bool {
+        self.early
+            && crate::follows_face::on()
+            && self
+                .jobs
+                .try_send(DaysJob::FaceSaved {
+                    request,
+                    to: to.to_owned(),
+                    forgets: crate::follows_face::FORGETS.load(Ordering::Acquire),
+                })
+                .is_ok()
+    }
+
     /// Holds this request's hand-on ([`hold`]): what its turn's end knows
     /// now goes with its exchange whenever it is handed on. The context lock
     /// is never held across I/O, so this waits for it rather than skip (the
@@ -3780,6 +3860,7 @@ impl DaysClient {
         let sent = self
             .jobs
             .try_send(DaysJob::Exchange {
+                request: request.unwrap_or(0),
                 at_unix_ms,
                 finished,
                 heard: heard.to_owned(),
@@ -4264,6 +4345,23 @@ struct Conversation {
     /// its first words began, for whether they may follow someone known.
     kept: Vec<u64>,
     began: Option<Instant>,
+    /// With [`crate::follows_face`]: each room exchange's and kept thing's
+    /// id with the request it was said in, the face saved in it, and the
+    /// last request heard in it.
+    lines: Vec<(u64, u64)>,
+    follow: Option<Follow>,
+    last_request: u64,
+}
+
+/// A face saved in the room's conversation as `to`'s, in the request
+/// `anchor` ([`crate::follows_face`]). Once that line is written, the move
+/// waits for its print until `by` at the latest
+/// ([`crate::follows_face::PRINT_WAIT`]).
+#[derive(Clone, Debug)]
+struct Follow {
+    to: String,
+    anchor: u64,
+    by: Option<Instant>,
 }
 
 impl Conversation {
@@ -4395,10 +4493,95 @@ pub fn observe_output(text: &str) -> Option<Value> {
     Some(value)
 }
 
-/// What the writer needs for [`crate::early_words`], when it is on.
+/// What the writer needs for [`crate::early_words`] or
+/// [`crate::follows_face`], when one is on.
 struct Early<'a> {
+    /// `LAMP_MEMORY_EARLY_WORDS`: a lone face's early words (the Live route).
+    words: bool,
+    /// `LAMP_MEMORY_FOLLOWS_FACE`: the caller's own lines (the second route).
+    follows: bool,
+    lines: &'a Mutex<crate::follows_face::Lines>,
+    /// The eyes' known person now (a memory id) and their face's passing
+    /// id ([`crate::follows_face::known_now`]).
+    known: &'a dyn Fn() -> Option<(String, String)>,
+    /// The forgets said ([`crate::follows_face::FORGETS`]).
+    forgets: &'a AtomicU64,
+    /// The prints come since, filled into `lines`, and whether the given
+    /// line's is still on its way ([`crate::follows_face::fill_prints`]).
+    fill: &'a dyn Fn(u64) -> bool,
+    /// The longest a face saved waits for its line's print
+    /// ([`crate::follows_face::PRINT_WAIT`]).
+    print_wait: Duration,
     faces: &'a Mutex<crate::early_words::Seen>,
     context: &'a Mutex<DaysContext>,
+}
+
+/// The room's `ids` become `to`'s in the store (`adopt`): each one's new id,
+/// every one of them, or `None` and nothing moved.
+fn adopt_ids(socket: &Path, to: &str, ids: &[u64]) -> Option<Vec<(u64, u64)>> {
+    bounded_exchange(
+        socket,
+        &json!({"op":"adopt","to":to,"ids":ids}),
+        WRITER_DEADLINE,
+    )
+    .filter(|answer| answer["ok"] == true)
+    .and_then(|answer| serde_json::from_value(answer["ids"].clone()).ok())
+    .filter(|moved: &Vec<(u64, u64)>| ids.iter().all(|id| moved.iter().any(|(old, _)| old == id)))
+}
+
+/// After `moved`, the conversation goes on as `to`'s with what moved, and so
+/// do the sources in the provider's context and the writer's `current`.
+fn go_on_as(
+    conversation: &mut Conversation,
+    to: &str,
+    moved: &[(u64, u64)],
+    context: &Mutex<DaysContext>,
+    current: &Mutex<Current>,
+) {
+    let new = |old: u64| moved.iter().find(|(was, _)| *was == old).map(|(_, id)| *id);
+    conversation.sources = conversation
+        .sources
+        .iter()
+        .filter_map(|id| new(*id))
+        .collect();
+    conversation.kept.clear();
+    conversation.lines.clear();
+    conversation.follow = None;
+    conversation.person = Some(to.to_owned());
+    if let Ok(mut context) = context.lock() {
+        for source in &mut context.sources {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+        // And what they say and which turn gave them (#2176 finding 14).
+        for (source, _) in &mut context.words {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+        for (_, whose, id) in &mut context.fetched {
+            if whose.is_none()
+                && let Some(moved) = new(*id)
+            {
+                (*whose, *id) = (Some(to.to_owned()), moved);
+            }
+        }
+        for source in &mut context.carried {
+            if source.0.is_none()
+                && let Some(id) = new(source.1)
+            {
+                *source = (Some(to.to_owned()), id);
+            }
+        }
+    }
+    if let Ok(mut current) = current.lock() {
+        *current = (conversation.person.clone(), conversation.sources.clone());
+    }
 }
 
 /// The room's conversation `conversation` becomes `to`'s, someone known,
@@ -4441,67 +4624,152 @@ fn adopt_early(
         .chain(&conversation.kept)
         .copied()
         .collect();
-    let moved: Option<Vec<(u64, u64)>> = bounded_exchange(
-        socket,
-        &json!({"op":"adopt","to":to,"ids":ids}),
-        WRITER_DEADLINE,
-    )
-    .filter(|answer| answer["ok"] == true)
-    .and_then(|answer| serde_json::from_value(answer["ids"].clone()).ok())
-    .filter(|moved: &Vec<(u64, u64)>| ids.iter().all(|id| moved.iter().any(|(old, _)| old == id)));
-    let Some(moved) = moved else {
+    let Some(moved) = adopt_ids(socket, to, &ids) else {
         eprintln!(
             "lamp-voice provider: what was said before a face was known stays the room's: why=not_adopted exchanges={exchanges} kept={kept}"
         );
         return false;
     };
-    let new = |old: u64| moved.iter().find(|(was, _)| *was == old).map(|(_, id)| *id);
-    conversation.sources = conversation
-        .sources
-        .iter()
-        .filter_map(|id| new(*id))
-        .collect();
-    conversation.kept.clear();
-    conversation.person = Some(to.to_owned());
-    if let Ok(mut context) = early.context.lock() {
-        for source in &mut context.sources {
-            if source.0.is_none()
-                && let Some(id) = new(source.1)
-            {
-                *source = (Some(to.to_owned()), id);
-            }
-        }
-        // And what they say and which turn gave them (#2176 finding 14).
-        for (source, _) in &mut context.words {
-            if source.0.is_none()
-                && let Some(id) = new(source.1)
-            {
-                *source = (Some(to.to_owned()), id);
-            }
-        }
-        for (_, whose, id) in &mut context.fetched {
-            if whose.is_none()
-                && let Some(moved) = new(*id)
-            {
-                (*whose, *id) = (Some(to.to_owned()), moved);
-            }
-        }
-        for source in &mut context.carried {
-            if source.0.is_none()
-                && let Some(id) = new(source.1)
-            {
-                *source = (Some(to.to_owned()), id);
-            }
-        }
-    }
-    if let Ok(mut current) = current.lock() {
-        *current = (conversation.person.clone(), conversation.sources.clone());
-    }
+    go_on_as(conversation, to, &moved, early.context, current);
     eprintln!(
         "lamp-voice provider: what was said before a lone face was known is theirs now: exchanges={exchanges} kept={kept} moved={}",
         moved.len()
     );
     true
+}
+
+/// The room's conversation `conversation` becomes `to`'s, by a face saved or
+/// known in the request `anchor` ([`crate::follows_face`]): of its room
+/// exchanges and kept things, those said in the caller's own lines, the
+/// caller being whoever said `anchor`, are moved to their scope (`adopt`),
+/// and the conversation goes on as theirs with them. Gives the rest, still
+/// the room's, for the caller to end as the room's conversation; `None`,
+/// with nothing changed, when nothing moved. The lines' prints are dropped
+/// once moved. The journal has counts only.
+fn follow_face(
+    socket: &Path,
+    conversation: &mut Conversation,
+    to: &str,
+    anchor: u64,
+    early: &Early<'_>,
+    current: &Mutex<Current>,
+) -> Option<Conversation> {
+    conversation.follow = None;
+    if conversation.person.is_some() || conversation.lines.is_empty() {
+        return None;
+    }
+    let (exchanges, kept) = (conversation.sources.len(), conversation.kept.len());
+    let stays = |why: &str| {
+        eprintln!(
+            "lamp-voice provider: what the caller said before their face was known stays the room's: why={why} exchanges={exchanges} kept={kept}"
+        );
+    };
+    if conversation.overflow || conversation.incomplete || exchanges + kept > SOURCE_IDS {
+        stays("incomplete");
+        return None;
+    }
+    let mut stayed = crate::follows_face::Stayed::default();
+    // The prints come since, the anchor's above all, filled in first; and
+    // whose face the eyes know now, read before the lines are locked.
+    (early.fill)(anchor);
+    let known = (early.known)();
+    let ids: Vec<u64> = {
+        let Ok(mut lines) = early.lines.lock() else {
+            stays("cant_tell");
+            return None;
+        };
+        lines.prune(Instant::now());
+        // The anchor must have been seen spoken by `to`'s one face; its
+        // print matching itself proves nothing (the reviewer-lead's P1).
+        let anchored = lines.of(anchor);
+        if let Err(why) = anchored.map_or(Err(crate::follows_face::Why::CantTell), |caller| {
+            crate::follows_face::anchored(caller, to, known.clone())
+        }) {
+            stays(why.as_str());
+            return None;
+        }
+        // With no print of its own, the caller's from another line on the
+        // same one face (the reviewer-lead's P2 (b) on #2673).
+        let others = conversation
+            .lines
+            .iter()
+            .filter(|(_, request)| *request != anchor)
+            .filter_map(|(_, request)| lines.of(*request));
+        let caller = &crate::follows_face::caller(anchored?, others, to, known);
+        conversation
+            .lines
+            .iter()
+            .filter_map(|(id, request)| {
+                let theirs = lines
+                    .of(*request)
+                    .map_or(Err(crate::follows_face::Why::CantTell), |line| {
+                        crate::follows_face::theirs(line, caller)
+                    });
+                theirs.map_err(|why| stayed.count(why)).ok().map(|()| *id)
+            })
+            .collect()
+    };
+    // A room exchange or kept thing of no known line stays too.
+    stayed.cant_tell += (exchanges + kept).saturating_sub(conversation.lines.len());
+    if ids.is_empty() {
+        eprintln!(
+            "lamp-voice provider: what the caller said before their face was known stays the room's: moved=0 {stayed}"
+        );
+        return None;
+    }
+    let Some(moved) = adopt_ids(socket, to, &ids) else {
+        stays("not_adopted");
+        return None;
+    };
+    let rest = Conversation {
+        sources: conversation
+            .sources
+            .iter()
+            .filter(|id| !ids.contains(id))
+            .copied()
+            .collect(),
+        finished: conversation.finished,
+        ..Conversation::default()
+    };
+    let last = conversation.last_request.max(anchor);
+    go_on_as(conversation, to, &moved, early.context, current);
+    conversation.last_request = last;
+    if let Ok(mut lines) = early.lines.lock() {
+        lines.forget_through(last);
+    }
+    eprintln!(
+        "lamp-voice provider: what the caller said before their face was known is theirs now: moved={} {stayed}",
+        moved.len()
+    );
+    Some(rest)
+}
+
+/// The writer's `current` is the conversation going on, after the rest of a
+/// followed one was ended as the room's.
+fn go_on(conversation: &Conversation, current: &Mutex<Current>) {
+    if let Ok(mut current) = current.lock() {
+        *current = (conversation.person.clone(), conversation.sources.clone());
+    }
+}
+
+/// A face saved in the room's conversation ([`Conversation::follow`]): the
+/// caller's own lines follow them ([`follow_face`]), the rest is ended as
+/// the room's, and the conversation goes on as theirs. Nothing without one.
+fn follow_saved(
+    socket: &Path,
+    conversation: &mut Conversation,
+    early: &Early<'_>,
+    current: &Mutex<Current>,
+    end: &mut impl FnMut(&mut Conversation),
+) {
+    let Some(Follow { to, anchor, .. }) = conversation.follow.clone().filter(|_| early.follows)
+    else {
+        return;
+    };
+    if let Some(mut rest) = follow_face(socket, conversation, &to, anchor, early, current) {
+        end(&mut rest);
+        go_on(conversation, current);
+    }
 }
 
 /// When words that began `at_unix_ms` began, on this process's clock.
@@ -4536,10 +4804,21 @@ fn days_writer(
             );
         }
     };
+    // The lines heard, with [`crate::follows_face`]: a conversation's go
+    // with it.
+    let lines_heard = early
+        .as_ref()
+        .filter(|early| early.follows)
+        .map(|early| early.lines);
     let mut end = |conversation: &mut Conversation| {
         let ended = std::mem::take(conversation);
         if let Ok(mut current) = current.lock() {
             *current = Current::default();
+        }
+        if let Some(Ok(mut lines)) = lines_heard.map(Mutex::lock)
+            && ended.last_request != 0
+        {
+            lines.forget_through(ended.last_request);
         }
         // A foreground loss can belong to a later conversation still in this
         // queue. There is no ordered marker for a failed enqueue, so never
@@ -4597,9 +4876,38 @@ fn days_writer(
             );
         }
     };
+    // The forgets seen, with [`crate::follows_face`]: a later one drops the
+    // face saved and the lines kept before it.
+    let follows = early.as_ref().filter(|early| early.follows);
+    let mut forgets_seen = follows.map_or(0, |early| early.forgets.load(Ordering::Acquire));
     loop {
-        match jobs.recv_timeout(conversation.wait(idle)) {
+        // With the lines heard kept, woken at least every `KEPT_FOR` to drop
+        // the old ones.
+        let wait = conversation.wait(idle);
+        let wait = match lines_heard {
+            Some(_) => wait.min(crate::follows_face::KEPT_FOR),
+            None => wait,
+        };
+        // A face saved waiting for its line's print: woken to look for it
+        // every `PRINT_POLL`, and at its bound.
+        let wait = match conversation.follow.as_ref().and_then(|follow| follow.by) {
+            Some(by) => wait
+                .min(crate::follows_face::PRINT_POLL)
+                .min(by.saturating_duration_since(Instant::now())),
+            None => wait,
+        };
+        let job = jobs.recv_timeout(wait);
+        if let Some(early) = follows {
+            let forgets = early.forgets.load(Ordering::Acquire);
+            if forgets != forgets_seen {
+                forgets_seen = forgets;
+                conversation.follow = None;
+                conversation.lines.clear();
+            }
+        }
+        match job {
             Ok(DaysJob::Exchange {
+                request,
                 at_unix_ms,
                 finished,
                 heard,
@@ -4621,16 +4929,40 @@ fn days_writer(
                     .finished
                     .is_some_and(|last| finished.saturating_duration_since(last) >= idle);
                 if idle_over || (conversation.finished.is_some() && conversation.person != person) {
-                    let adopted = !idle_over
-                        && early.as_ref().is_some_and(|early| {
-                            adopt_early(
-                                socket,
-                                &mut conversation,
-                                person.as_deref(),
-                                early,
-                                current,
-                            )
-                        });
+                    // A face known now: the caller's own lines follow them,
+                    // the caller being whoever said the line their face was
+                    // saved in, or this one (`LAMP_MEMORY_FOLLOWS_FACE`).
+                    let followed = match (&early, person.as_deref()) {
+                        (Some(early), Some(to)) if early.follows && !idle_over => {
+                            let anchor = conversation
+                                .follow
+                                .as_ref()
+                                .filter(|follow| follow.to == to)
+                                .map_or(request, |follow| follow.anchor);
+                            follow_face(socket, &mut conversation, to, anchor, early, current)
+                        }
+                        _ => None,
+                    };
+                    let adopted = match followed {
+                        Some(mut rest) => {
+                            end(&mut rest);
+                            go_on(&conversation, current);
+                            true
+                        }
+                        None => {
+                            !idle_over
+                                && early.as_ref().is_some_and(|early| {
+                                    early.words
+                                        && adopt_early(
+                                            socket,
+                                            &mut conversation,
+                                            person.as_deref(),
+                                            early,
+                                            current,
+                                        )
+                                })
+                        }
+                    };
                     if !adopted {
                         end(&mut conversation);
                     }
@@ -4664,10 +4996,29 @@ fn days_writer(
                 } else {
                     conversation.incomplete = true;
                 }
+                if let Some(early) = early.as_ref().filter(|early| early.follows) {
+                    conversation.last_request = conversation.last_request.max(request);
+                    if let Some(id) = id.filter(|_| conversation.person.is_none() && request != 0) {
+                        conversation.lines.push((id, request));
+                    }
+                    // The line the face was saved in is written: its
+                    // conversation's caller's lines follow them once its
+                    // print is in, at the latest by `print_wait`.
+                    if let Some(follow) = conversation
+                        .follow
+                        .as_mut()
+                        .filter(|follow| follow.anchor == request)
+                    {
+                        follow.by.get_or_insert(Instant::now() + early.print_wait);
+                    }
+                }
                 hand_ons.done.fetch_add(1, Ordering::AcqRel);
             }
             Ok(DaysJob::Close(session, person)) => {
                 if conversation.wait(idle).is_zero() {
+                    if let Some(early) = &early {
+                        follow_saved(socket, &mut conversation, early, current, &mut end);
+                    }
                     end(&mut conversation);
                 }
                 let _ = bounded_exchange(
@@ -4679,7 +5030,11 @@ fn days_writer(
                     WRITER_DEADLINE,
                 );
             }
-            Ok(DaysJob::Kept(id)) if early.is_some() => {
+            Ok(DaysJob::Kept {
+                id,
+                request,
+                replaced,
+            }) if early.is_some() => {
                 let now = Instant::now();
                 if conversation.wait(idle).is_zero() {
                     end(&mut conversation);
@@ -4687,7 +5042,19 @@ fn days_writer(
                 // Only the room's conversation's; past the bound, too many
                 // to follow anyone ([`adopt_early`]).
                 if conversation.person.is_none() && conversation.kept.len() <= SOURCE_IDS {
+                    // A correction's older version is history: it follows
+                    // nobody (`LAMP_MEMORY_REPLACES`).
+                    if let Some(old) = replaced {
+                        conversation.kept.retain(|kept| *kept != old);
+                        conversation.lines.retain(|(kept, _)| *kept != old);
+                    }
                     conversation.kept.push(id);
+                    if let Some(request) =
+                        request.filter(|_| early.as_ref().is_some_and(|early| early.follows))
+                    {
+                        conversation.lines.push((id, request));
+                        conversation.last_request = conversation.last_request.max(request);
+                    }
                     // Its words began before the call: as early as the
                     // conversation could have.
                     if conversation.began.is_none() {
@@ -4696,12 +5063,67 @@ fn days_writer(
                     conversation.finished.get_or_insert(now);
                 }
             }
-            Ok(DaysJob::Kept(_)) => {}
-            Ok(DaysJob::End) | Err(RecvTimeoutError::Timeout) => end(&mut conversation),
+            Ok(DaysJob::Kept { .. }) => {}
+            Ok(DaysJob::FaceSaved {
+                request,
+                to,
+                forgets,
+            }) => {
+                let Some(early) = early.as_ref().filter(|early| early.follows) else {
+                    continue;
+                };
+                // Saved before a forget: it follows nobody.
+                if forgets < forgets_seen {
+                    continue;
+                }
+                if conversation.wait(idle).is_zero() {
+                    end(&mut conversation);
+                }
+                if conversation.person.is_none() {
+                    // Its own line written already, the wait for its print
+                    // begins now.
+                    let written = conversation.lines.iter().any(|(_, of)| *of == request);
+                    conversation.follow = Some(Follow {
+                        to,
+                        anchor: request,
+                        by: written.then(|| Instant::now() + early.print_wait),
+                    });
+                }
+            }
+            // Woken only to drop old lines: the conversation goes on.
+            Err(RecvTimeoutError::Timeout)
+                if lines_heard.is_some() && !conversation.wait(idle).is_zero() =>
+            {
+                if let Some(Ok(mut lines)) = lines_heard.map(Mutex::lock) {
+                    lines.prune(Instant::now());
+                }
+            }
+            Ok(DaysJob::End) | Err(RecvTimeoutError::Timeout) => {
+                if let Some(early) = &early {
+                    follow_saved(socket, &mut conversation, early, current, &mut end);
+                }
+                end(&mut conversation);
+            }
             Err(RecvTimeoutError::Disconnected) => {
+                if let Some(early) = &early {
+                    follow_saved(socket, &mut conversation, early, current, &mut end);
+                }
                 end(&mut conversation);
                 return;
             }
+        }
+        // A face saved, its line written: the move is weighed once the
+        // line's print is in or none is coming, or at its bound
+        // (the reviewer-lead's P2 on #2673). A forget since cleared it.
+        if let Some(early) = follows
+            && let Some(Follow {
+                anchor,
+                by: Some(by),
+                ..
+            }) = conversation.follow
+            && (Instant::now() >= by || !(early.fill)(anchor))
+        {
+            follow_saved(socket, &mut conversation, early, current, &mut end);
         }
     }
 }
@@ -6810,6 +7232,7 @@ mod tests {
         // admission failure happened during B, before A could be closed.
         for (heard, finished) in [("A", now - Duration::from_secs(2)), ("B", now)] {
             send.send(DaysJob::Exchange {
+                request: 0,
                 at_unix_ms: NOW,
                 finished,
                 heard: heard.into(),
@@ -6882,6 +7305,7 @@ mod tests {
         let current = Mutex::new(Current::default());
         let (send, receive) = sync_channel(8);
         let exchange = |at_unix_ms, finished, person: Option<&str>| DaysJob::Exchange {
+            request: 0,
             at_unix_ms,
             finished,
             heard: "asked".into(),
@@ -6897,7 +7321,12 @@ mod tests {
             None,
         ))
         .unwrap();
-        send.send(DaysJob::Kept(7)).unwrap();
+        send.send(DaysJob::Kept {
+            id: 7,
+            request: None,
+            replaced: None,
+        })
+        .unwrap();
         if end_between {
             send.send(DaysJob::End).unwrap();
         }
@@ -6914,6 +7343,13 @@ mod tests {
             &current,
             &HandOns::default(),
             early.then_some(Early {
+                words: true,
+                follows: false,
+                lines: &Mutex::new(crate::follows_face::Lines::default()),
+                known: &|| None,
+                forgets: &AtomicU64::new(0),
+                fill: &|_| false,
+                print_wait: crate::follows_face::PRINT_WAIT,
                 faces: &faces_seen,
                 context: &context,
             }),
@@ -6961,6 +7397,713 @@ mod tests {
         assert_eq!(current, Current::default());
     }
 
+    /// The caller's print, and one 0.80 like it, over `SAME_FROM` (0.70);
+    /// another voice at 0.10, under `DIFFERENT_BELOW` (0.30).
+    const BRAMBLE: [f32; 2] = [1.0, 0.0];
+    const BRAMBLE_AGAIN: [f32; 2] = [0.8, 0.6];
+    const SOMEONE_ELSE: [f32; 2] = [0.1, 0.995];
+
+    /// A line as the second route kept it: its print and its speaking faces.
+    fn heard_line(print: Option<[f32; 2]>, faces: &[&str]) -> crate::follows_face::Line {
+        crate::follows_face::Line {
+            print: print.map(|print| print.to_vec()),
+            faces: faces.iter().map(|face| (*face).to_owned()).collect(),
+        }
+    }
+
+    /// The eyes' known person now and their face's passing id, as
+    /// `follows_face::known_now` reads them: Bramble's, face `f1`.
+    const BRAMBLE_KNOWN: Option<(&str, &str)> = Some(("p-b", "f1"));
+
+    /// A finished exchange of the request `request`, said for `person`.
+    fn follows_exchange(request: u64, heard: &str, person: Option<&str>) -> DaysJob {
+        DaysJob::Exchange {
+            request,
+            at_unix_ms: unix_ms(),
+            finished: Instant::now(),
+            heard: heard.into(),
+            said: "answer".into(),
+            sources: vec![],
+            rules: vec![],
+            person: person.map(str::to_owned),
+            forgotten: 0,
+        }
+    }
+
+    /// When the saving line's (request 3) print comes, for
+    /// [`follows_jobs_timed`]: on its way `coming` after the writer first
+    /// asks for it, then filled with `late`, if any; the writer waiting at
+    /// most `print_wait` for it. With `hold`, the last job (the
+    /// conversation's end) is sent that long after the others, with a
+    /// forget said halfway through it when `forget_held`.
+    #[derive(Clone, Copy)]
+    struct Timing {
+        coming: Duration,
+        late: Option<[f32; 2]>,
+        print_wait: Duration,
+        hold: Option<Duration>,
+        forget_held: bool,
+    }
+
+    impl Default for Timing {
+        fn default() -> Self {
+            Self {
+                coming: Duration::ZERO,
+                late: None,
+                print_wait: crate::follows_face::PRINT_WAIT,
+                hold: None,
+                forget_held: false,
+            }
+        }
+    }
+
+    /// `LAMP_MEMORY_FOLLOWS_FACE`'s writer (#2176) given `jobs`, each line
+    /// of `lines` kept as the second route kept it, the eyes knowing
+    /// `known` (a memory id and a face's passing id) when it asks, and, with
+    /// `forget`, a forget said after the jobs were queued and before the
+    /// writer ran them. Gives what the store was asked, and whether the
+    /// lines' prints were gone at the end. `follows` off is as with neither
+    /// switch: the writer is given no early part at all.
+    fn follows_jobs(
+        name: &str,
+        requests: usize,
+        lines: Vec<(u64, crate::follows_face::Line)>,
+        jobs: Vec<DaysJob>,
+        known: Option<(&str, &str)>,
+        forget: bool,
+        follows: bool,
+    ) -> (Vec<Value>, bool) {
+        let (read, gone, _) = follows_jobs_timed(
+            name,
+            requests,
+            lines,
+            jobs,
+            known,
+            forget,
+            follows,
+            Timing::default(),
+        );
+        (read, gone)
+    }
+
+    /// [`follows_jobs`], the saving line's print coming as `timing` says;
+    /// also gives whether the lines were gone before a held end was sent.
+    #[allow(clippy::too_many_arguments)]
+    fn follows_jobs_timed(
+        name: &str,
+        requests: usize,
+        lines: Vec<(u64, crate::follows_face::Line)>,
+        mut jobs: Vec<DaysJob>,
+        known: Option<(&str, &str)>,
+        forget: bool,
+        follows: bool,
+        timing: Timing,
+    ) -> (Vec<Value>, bool, bool) {
+        let (socket, served) = memory(name, requests, |request| match request["op"].as_str() {
+            Some("append_linked") => match request["heard"].as_str() {
+                Some("my name is bramble") => json!({"ok":true,"id":1}),
+                Some("anyway, we drop the trip") => json!({"ok":true,"id":2}),
+                _ => json!({"ok":true,"id":3}),
+            },
+            Some("adopt") => {
+                let ids: Vec<Value> = request["ids"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|id| json!([id, id.as_u64().unwrap() + 100]))
+                    .collect();
+                json!({"ok":true,"moved":ids.len(),"ids":ids})
+            }
+            Some("session_close") => json!({"ok":true}),
+            _ => json!({"ok":true,"submitted":false,"reason":"model_unconfigured"}),
+        });
+        let heard = Mutex::new(crate::follows_face::Lines::default());
+        for (request, line) in lines {
+            heard.lock().unwrap().mark(request, line);
+        }
+        let forgets = AtomicU64::new(0);
+        let context = Mutex::new(DaysContext::default());
+        let current = Mutex::new(Current::default());
+        let faces = Mutex::new(crate::early_words::Seen::default());
+        let held = timing.hold.and_then(|_| jobs.pop());
+        let (send, receive) = sync_channel(16);
+        for job in jobs {
+            send.send(job).unwrap();
+        }
+        if held.is_none() {
+            send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        }
+        if forget {
+            crate::follows_face::forgot_in(&heard, &forgets);
+        }
+        let known = known.map(|(person, face)| (person.to_owned(), face.to_owned()));
+        let known_now = move || known.clone();
+        let asked = OnceLock::new();
+        let fill = |request: u64| {
+            if request != 3 {
+                return false;
+            }
+            if asked.get_or_init(Instant::now).elapsed() < timing.coming {
+                return true;
+            }
+            if let Some(print) = timing.late {
+                heard.lock().unwrap().printed(3, print.to_vec());
+            }
+            false
+        };
+        let gone_before_end = std::thread::scope(|scope| {
+            let holding = scope.spawn(|| {
+                let (Some(end), Some(hold)) = (held, timing.hold) else {
+                    drop(send);
+                    return false;
+                };
+                if timing.forget_held {
+                    std::thread::sleep(hold / 2);
+                    crate::follows_face::forgot_in(&heard, &forgets);
+                    std::thread::sleep(hold / 2);
+                } else {
+                    std::thread::sleep(hold);
+                }
+                let gone = heard.lock().unwrap().is_empty();
+                send.send(end).unwrap();
+                send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+                gone
+            });
+            days_writer(
+                &socket,
+                "voice-test",
+                &receive,
+                Duration::from_secs(45),
+                &AtomicU64::new(0),
+                &current,
+                &HandOns::default(),
+                follows.then_some(Early {
+                    words: false,
+                    follows: true,
+                    lines: &heard,
+                    known: &known_now,
+                    forgets: &forgets,
+                    fill: &fill,
+                    print_wait: timing.print_wait,
+                    faces: &faces,
+                    context: &context,
+                }),
+            );
+            holding.join().unwrap()
+        });
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        let gone = heard.lock().unwrap().is_empty();
+        (read, gone, gone_before_end)
+    }
+
+    /// "My name is Bramble" (request 1, a thing kept in it too), with
+    /// `between` (request 2, a second voice's line) or not, then "remember
+    /// my face" saved as Bramble's (request 3), each line as `lines` gives
+    /// it, the eyes knowing `known` after; the conversation ends. As
+    /// [`follows_jobs`].
+    fn follows_conversation(
+        name: &str,
+        requests: usize,
+        lines: [crate::follows_face::Line; 3],
+        between: bool,
+        known: Option<(&str, &str)>,
+        forget: bool,
+        follows: bool,
+    ) -> (Vec<Value>, bool) {
+        let mut jobs = vec![
+            follows_exchange(1, "my name is bramble", None),
+            DaysJob::Kept {
+                id: 7,
+                request: Some(1),
+                replaced: None,
+            },
+        ];
+        if between {
+            jobs.push(follows_exchange(2, "anyway, we drop the trip", None));
+        }
+        // Saved in the turn, before its line is written at the turn's end.
+        jobs.push(DaysJob::FaceSaved {
+            request: 3,
+            to: "p-b".into(),
+            forgets: 0,
+        });
+        jobs.push(follows_exchange(3, "remember my face", None));
+        jobs.push(DaysJob::End);
+        let lines = [1, 2, 3].into_iter().zip(lines).collect();
+        follows_jobs(name, requests, lines, jobs, known, forget, follows)
+    }
+
+    /// [`follows_conversation`] with the switch, Bramble's face known and
+    /// no forget before, the saving line's print coming as `timing` says.
+    fn follows_conversation_timed(
+        name: &str,
+        requests: usize,
+        lines: [crate::follows_face::Line; 3],
+        between: bool,
+        timing: Timing,
+    ) -> (Vec<Value>, bool) {
+        let mut jobs = vec![
+            follows_exchange(1, "my name is bramble", None),
+            DaysJob::Kept {
+                id: 7,
+                request: Some(1),
+                replaced: None,
+            },
+        ];
+        if between {
+            jobs.push(follows_exchange(2, "anyway, we drop the trip", None));
+        }
+        jobs.push(DaysJob::FaceSaved {
+            request: 3,
+            to: "p-b".into(),
+            forgets: 0,
+        });
+        jobs.push(follows_exchange(3, "remember my face", None));
+        jobs.push(DaysJob::End);
+        let lines = [1, 2, 3].into_iter().zip(lines).collect();
+        let (read, _, gone_before_end) = follows_jobs_timed(
+            name,
+            requests,
+            lines,
+            jobs,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+            timing,
+        );
+        (read, gone_before_end)
+    }
+
+    /// The ids the store was asked to move, if it was.
+    fn adopted(read: &[Value]) -> Option<Value> {
+        read.iter()
+            .find(|line| line["op"] == "adopt")
+            .map(|line| line["ids"].clone())
+    }
+
+    /// The reviewer-lead's P2 on #2673 (a): "remember my face" is short, so
+    /// its print comes after its verdict, or after its turn. The move waits
+    /// for it, and weighs it once it is in, before the conversation ends:
+    /// "my name is Bramble", printed and off camera, follows Bramble's face.
+    #[test]
+    fn with_follows_face_the_saving_lines_late_print_is_waited_for() {
+        let (read, gone_before_end) = follows_conversation_timed(
+            "follows-late-print",
+            5,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(None, &["e/f1"]),
+            ],
+            false,
+            Timing {
+                coming: Duration::from_millis(150),
+                late: Some(BRAMBLE_AGAIN),
+                print_wait: Duration::from_secs(5),
+                hold: Some(Duration::from_millis(1500)),
+                forget_held: false,
+            },
+        );
+        assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
+        assert!(gone_before_end, "weighed only at the conversation's end");
+        assert_eq!(read[3]["op"], "conversation_end");
+        assert_eq!(read[3]["source_ids"], json!([101, 103]));
+    }
+
+    /// (b): the saving line never printed (under 1.5 s), but "my name is
+    /// Bramble" was seen spoken by the same one face, known now as
+    /// Bramble's: its print is the caller's, and it follows them.
+    #[test]
+    fn with_follows_face_an_unprinted_saving_line_takes_the_print_of_the_same_face() {
+        let (read, _) = follows_conversation_timed(
+            "follows-stand-in",
+            5,
+            [
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+                heard_line(None, &[]),
+                heard_line(None, &["e/f1"]),
+            ],
+            false,
+            Timing::default(),
+        );
+        assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
+    }
+
+    /// (b), refused: the saving line never printed, and the printed line
+    /// with the caller's voice was seen on another face or on two: no print
+    /// is taken, so a line off camera in that voice stays the room's too.
+    /// Only the saving line, on the caller's one face, moves.
+    #[test]
+    fn with_follows_face_an_unprinted_saving_line_takes_no_print_of_another_face() {
+        for (name, faces) in [
+            ("follows-stand-in-other", &["e/f2"][..]),
+            ("follows-stand-in-two", &["e/f1", "e/f2"][..]),
+        ] {
+            let (read, _) = follows_conversation_timed(
+                name,
+                7,
+                [
+                    heard_line(Some(BRAMBLE), faces),
+                    heard_line(Some(BRAMBLE_AGAIN), &[]),
+                    heard_line(None, &["e/f1"]),
+                ],
+                true,
+                Timing::default(),
+            );
+            assert_eq!(adopted(&read), Some(json!([3])), "{faces:?}: {read:?}");
+        }
+    }
+
+    /// A forget while the move waits for the saving line's print: nothing
+    /// moves, though the print would have come.
+    #[test]
+    fn with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing() {
+        let (read, _) = follows_conversation_timed(
+            "follows-forget-waiting",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(None, &["e/f1"]),
+            ],
+            false,
+            Timing {
+                coming: Duration::from_millis(400),
+                late: Some(BRAMBLE_AGAIN),
+                print_wait: Duration::from_secs(5),
+                hold: Some(Duration::from_millis(800)),
+                forget_held: true,
+            },
+        );
+        assert_eq!(adopted(&read), None, "{read:?}");
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "conversation_end room",
+                "session_close room"
+            ]
+        );
+    }
+
+    /// The wait is bounded: the print still not in at `print_wait`, the
+    /// move is weighed without it, and a print come later changes nothing.
+    /// "My name is Bramble", off camera, stays the room's.
+    #[test]
+    fn with_follows_face_the_wait_for_the_print_ends_at_its_bound() {
+        let (read, gone_before_end) = follows_conversation_timed(
+            "follows-wait-bound",
+            6,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(None, &["e/f1"]),
+            ],
+            false,
+            Timing {
+                coming: Duration::from_millis(900),
+                late: Some(BRAMBLE_AGAIN),
+                print_wait: Duration::from_millis(200),
+                hold: Some(Duration::from_millis(1500)),
+                forget_held: false,
+            },
+        );
+        assert_eq!(adopted(&read), Some(json!([3])), "{read:?}");
+        assert!(gone_before_end, "not weighed at its bound");
+        assert_eq!(read[3]["source_ids"], json!([1]));
+    }
+
+    /// #2176, `LAMP_MEMORY_FOLLOWS_FACE`: "my name is Bramble", then
+    /// "remember my face" in the same voice and face: the exchange and the
+    /// thing kept in it, and the saving line, are moved to Bramble's, and
+    /// Bramble's conversation ends with them. The prints are gone after.
+    #[test]
+    fn with_follows_face_the_callers_early_lines_follow_their_saved_face() {
+        let (read, gone) = follows_conversation(
+            "follows-saved",
+            5,
+            [
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f1"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "adopt room",
+                "conversation_end p-b",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[2], json!({"op":"adopt","to":"p-b","ids":[1,7,3]}));
+        assert_eq!(read[3]["source_ids"], json!([101, 103]));
+        assert!(gone, "the lines' prints outlived the conversation");
+    }
+
+    /// A second voice's line between stays the room's, and is ended as the
+    /// room's conversation; the caller's lines still follow them.
+    #[test]
+    fn with_follows_face_a_second_voices_line_between_stays_the_rooms() {
+        let (read, gone) = follows_conversation(
+            "follows-between",
+            7,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(Some(SOMEONE_ELSE), &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f1"]),
+            ],
+            true,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "append_linked room",
+                "adopt room",
+                "conversation_end room",
+                "conversation_end p-b",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[3]["ids"], json!([1, 7, 3]));
+        assert_eq!(read[4]["source_ids"], json!([2]));
+        assert_eq!(read[5]["source_ids"], json!([101, 103]));
+        assert!(gone);
+    }
+
+    /// Two faces seen speaking the saving line: the caller can't be told,
+    /// nothing moves, everything is the room's, and the prints are gone at
+    /// the conversation's end.
+    #[test]
+    fn with_follows_face_two_faces_seen_move_nothing() {
+        let (read, gone) = follows_conversation(
+            "follows-two-faces",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f1", "e/f2"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "conversation_end room",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[2]["source_ids"], json!([1, 3]));
+        assert!(gone, "the lines' prints outlived the conversation");
+    }
+
+    /// A line too short to print with no face seen speaking it stays the
+    /// room's, with what was kept in it; the saving line still follows.
+    #[test]
+    fn with_follows_face_a_line_with_no_print_and_no_face_stays_the_rooms() {
+        let (read, _) = follows_conversation(
+            "follows-unknown",
+            6,
+            [
+                heard_line(None, &[]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "adopt room",
+                "conversation_end room",
+                "conversation_end p-b",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[2]["ids"], json!([3]));
+        assert_eq!(read[3]["source_ids"], json!([1]));
+        assert_eq!(read[4]["source_ids"], json!([103]));
+    }
+
+    /// The reviewer-lead's P1 on #2673, the saved path: B, off camera, says
+    /// "remember my face" while A is the one face in view, so A's face is
+    /// saved as B's. No face was seen speaking the saving line: nothing
+    /// moves into the memory of A's face, though every line is in B's voice.
+    #[test]
+    fn with_follows_face_a_face_saved_for_a_voice_off_camera_moves_nothing() {
+        let (read, gone) = follows_conversation(
+            "follows-saved-off-camera",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &[]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "conversation_end room",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[2]["source_ids"], json!([1, 3]));
+        assert!(gone);
+    }
+
+    /// The saving line spoken by one face, but not the face the eyes know
+    /// as whose it was saved: nothing moves.
+    #[test]
+    fn with_follows_face_a_saving_line_spoken_by_another_face_moves_nothing() {
+        let (read, _) = follows_conversation(
+            "follows-saved-other-face",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f2"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            true,
+        );
+        assert!(
+            !ops(&read).iter().any(|op| op.starts_with("adopt")),
+            "{read:?}"
+        );
+    }
+
+    /// The reviewer-lead's P1 on #2673, the recognised path: A is in view
+    /// and known, and B speaks off camera, so the line the conversation
+    /// became A's in was seen spoken by no face. B's earlier lines, in B's
+    /// voice, are not moved into A's memory: the room's conversation ends
+    /// as the room's, and A's goes on.
+    #[test]
+    fn with_follows_face_a_known_face_in_view_takes_nothing_said_off_camera() {
+        let (read, gone) = follows_jobs(
+            "follows-known-off-camera",
+            5,
+            vec![
+                (1, heard_line(Some(BRAMBLE), &[])),
+                (2, heard_line(Some(BRAMBLE_AGAIN), &[])),
+            ],
+            vec![
+                follows_exchange(1, "my name is bramble", None),
+                DaysJob::Kept {
+                    id: 7,
+                    request: Some(1),
+                    replaced: None,
+                },
+                follows_exchange(2, "what time is it", Some("p-a")),
+                DaysJob::End,
+            ],
+            Some(("p-a", "f1")),
+            false,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "conversation_end room",
+                "append_linked p-a",
+                "conversation_end p-a",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[1]["source_ids"], json!([1]));
+        assert!(gone);
+    }
+
+    /// The reviewer-lead's P2 on #2673: "forget my face" or "forget
+    /// everything" said after the face was saved and before the saving
+    /// line's exchange is written leaves nothing to move: the lines and the
+    /// face saved before the forget are gone, and all stays the room's.
+    #[test]
+    fn with_follows_face_a_forget_before_the_saving_line_is_written_moves_nothing() {
+        let (read, gone) = follows_conversation(
+            "follows-forgotten",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f1"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            true,
+            true,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "conversation_end room",
+                "session_close room"
+            ]
+        );
+        assert!(gone);
+    }
+
+    /// The switch off: a saved face moves nothing, as before.
+    #[test]
+    fn without_follows_face_a_saved_face_moves_nothing() {
+        let (read, _) = follows_conversation(
+            "follows-off",
+            4,
+            [
+                heard_line(Some(BRAMBLE), &["e/f1"]),
+                heard_line(None, &[]),
+                heard_line(Some(BRAMBLE_AGAIN), &["e/f1"]),
+            ],
+            false,
+            BRAMBLE_KNOWN,
+            false,
+            false,
+        );
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "conversation_end room",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[2]["source_ids"], json!([1, 3]));
+    }
+
     /// The first builder's P2 on #2615 (#2540): the note asked again after
     /// something kept opens the next Days session, as a person change does,
     /// and the one before is closed mid-conversation. The store has no ask
@@ -6984,6 +8127,7 @@ mod tests {
         let current = Mutex::new(Current::default());
         let (send, receive) = sync_channel(8);
         let exchange = |heard: &str, finished| DaysJob::Exchange {
+            request: 0,
             at_unix_ms: unix_ms(),
             finished,
             heard: heard.into(),
@@ -7087,7 +8231,9 @@ mod tests {
             std::fs::remove_file(socket).unwrap();
             let queued: Vec<_> = work.try_iter().collect();
             assert_eq!(
-                queued.iter().any(|job| matches!(job, DaysJob::Kept(5))),
+                queued
+                    .iter()
+                    .any(|job| matches!(job, DaysJob::Kept { id: 5, .. })),
                 told,
                 "{early} {person:?}"
             );
@@ -8964,6 +10110,7 @@ mod tests {
         hand_ons.forgotten.store(1, Ordering::Release);
         for (heard, forgotten) in [("before", 0), ("after", 1)] {
             send.send(DaysJob::Exchange {
+                request: 0,
                 at_unix_ms: NOW,
                 finished: Instant::now(),
                 heard: heard.into(),

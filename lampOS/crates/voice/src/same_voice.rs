@@ -119,7 +119,8 @@ pub const DIFFERENT_BELOW: f32 = 0.30;
 /// 0.69, `docs/verification/same-voice-20261018`), whose own voices' pairs
 /// had a median of 0.62, so fewer than half of one person's pairs reach it
 /// there; two 6 s lines of one voice with the lamp quiet scored a median
-/// 0.95 (`docs/same-voice.md`).
+/// 0.95 (`docs/same-voice.md`). The same proof moves a line into one
+/// person's memory (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
 pub const SAME_FROM: f32 = 0.70;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
@@ -666,6 +667,12 @@ impl<P: Printer> Voices<P> {
                 }
             }
         }
+    }
+
+    /// The print of the line `request`, once it has come.
+    pub fn print_of(&mut self, request: u64) -> Option<Vec<f32>> {
+        self.poll();
+        self.print(request).cloned()
     }
 
     fn print(&self, request: u64) -> Option<&Vec<f32>> {

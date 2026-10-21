@@ -2373,7 +2373,7 @@ pub fn serve(
         let hears = checking_the_voice_for(
             &heeding,
             files.same_voice.clone().filter(|_| route.only_voice),
-            files.spoken_to || quiet_same_one || not_own,
+            files.spoken_to || quiet_same_one || not_own || crate::follows_face::on(),
             |model| {
                 crate::same_voice::Prints::beside_voice(model)
                     .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
@@ -2517,6 +2517,25 @@ pub fn serve(
                 // sign is as before.
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
+        }
+        // What the caller said before their face was known follows them
+        // (`LAMP_MEMORY_FOLLOWS_FACE=on`, #2176): each line's voice and the
+        // faces seen speaking it tell whether it was theirs.
+        if crate::follows_face::on() && days {
+            eprintln!(
+                "lamp-voice second: what the caller said before their face was known follows them once it is, by their voice or their face (LAMP_MEMORY_FOLLOWS_FACE)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+            // A saving line's print come after its verdict is waited for
+            // (`follows_face::PRINT_WAIT`), filled in by the writer.
+            let filling = heeding.clone();
+            crate::follows_face::filling_prints(move |request| {
+                filling
+                    .lock()
+                    .is_ok_and(|mut heeding| heeding.prints_filled(request))
+            });
         }
         // The lamp's own answers to lines let out only as the conversation
         // going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`).
@@ -3471,7 +3490,7 @@ fn checking_the_voice_for(
         },
         (false, Some(_)) => {
             eprintln!(
-                "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE or LAMP_GOING_ON_NOT_OWN on: not judged"
+                "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE, LAMP_GOING_ON_NOT_OWN or LAMP_MEMORY_FOLLOWS_FACE on: not judged"
             );
             false
         }
@@ -4905,8 +4924,58 @@ impl Heeding {
         policy.verdict(request)
     }
 
+    /// With `LAMP_MEMORY_FOLLOWS_FACE`, the line `request`'s voice print and
+    /// the faces seen speaking it, kept for whether it was the caller's
+    /// ([`crate::follows_face`]); and the prints come since for lines kept
+    /// before. In memory only.
+    fn marking_the_line(&mut self, request: u64, seen: &Seen) {
+        if !crate::follows_face::on() {
+            return;
+        }
+        let Ok(mut lines) = crate::follows_face::LINES_HEARD.lock() else {
+            return;
+        };
+        self.filling_the_prints(&mut lines);
+        let line = crate::follows_face::Line {
+            print: self
+                .voices
+                .as_mut()
+                .and_then(|voices| voices.print_of(request)),
+            faces: seen.speakers.clone(),
+        };
+        lines.mark(request, line);
+    }
+
+    /// The prints come since for the lines kept without one.
+    fn filling_the_prints(&mut self, lines: &mut crate::follows_face::Lines) {
+        let Some(voices) = self.voices.as_mut() else {
+            return;
+        };
+        for waiting in lines.unprinted() {
+            if let Some(came) = voices.print_of(waiting) {
+                lines.printed(waiting, came);
+            }
+        }
+    }
+
+    /// With `LAMP_MEMORY_FOLLOWS_FACE`, for the Days writer before it
+    /// weighs a move (`follows_face::fill_prints`): the prints come since
+    /// filled in, and whether the line `request`'s is still on its way.
+    fn prints_filled(&mut self, request: u64) -> bool {
+        let Ok(mut lines) = crate::follows_face::LINES_HEARD.lock() else {
+            return false;
+        };
+        self.filling_the_prints(&mut lines);
+        lines.of(request).is_some_and(|line| line.print.is_none())
+            && self
+                .voices
+                .as_ref()
+                .is_some_and(|voices| voices.print_coming(request))
+    }
+
     /// The verdict on `request`, seen as `seen`, said and kept.
     fn verdict(&mut self, request: u64, seen: &Seen) -> Option<&'static str> {
+        self.marking_the_line(request, seen);
         let someone_else = self.someone_else(seen);
         let attention = &mut self.attention;
         let (heard, busy, lamp_asked, turned) =

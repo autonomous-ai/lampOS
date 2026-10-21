@@ -1215,6 +1215,88 @@ then use that person's scope:
   - **The journal** says counts only: `is theirs now: exchanges=N kept=N
     moved=N`, or `stays the room's: why=another_face|cant_tell|incomplete|not_adopted
     exchanges=N kept=N`.
+- **What the caller said before their face was known**
+  (`LAMP_MEMORY_FOLLOWS_FACE=on`, with Days, the second route only; off
+  unless set; #2176; `crates/voice/src/follows_face.rs`). "My name is
+  Bramble" said before "remember my face" was the room's, so a new
+  session's "what's my name?" found nothing. With the switch, when a face is
+  saved (`remember_my_face` answered, in a line of the room's) or known in a
+  conversation that began the room's, the room exchanges and the things kept
+  in that conversation that were the caller's own lines are moved to that
+  person's scope by the memory's `adopt`, on the Days writer's thread,
+  never a turn's. The caller is whoever said the line the face was saved
+  in, or the first line the eyes knew them in. The rest stays the room's
+  and is ended as the room's conversation; the conversation goes on as
+  theirs with what moved.
+  - **Only on a face seen saying it.** The line the face was saved or
+    known in moves anything only when exactly one face was seen speaking it
+    and that face is the one the eyes know now as whose it becomes (their
+    known file and the face's passing id beside it, read when the move is
+    weighed). Spoken off camera, by two faces, or by a face the eyes don't
+    know as that person, nothing moves (`cant_tell`, or `two_faces`): a
+    voice off camera while someone else's face is in view, known or just
+    saved, never fills that face's memory. The line's print matching itself
+    proves nothing.
+  - **Only the caller's own lines.** Each line is kept at its verdict with
+    its voice print (`LAMP_SAME_VOICE_MODEL`) and the faces the eyes saw
+    speaking it (`LAMP_EYES_SPEAKING`). A line with a print moves only when
+    its voice is the caller's, a cosine at or over `same_voice::SAME_FROM`
+    (0.70) against the saving line's, whatever face was seen: the caller's
+    lips moving under a TV's voice (0.30 to 0.70) don't make it theirs. A
+    line with no print (too short, said over the lamp) moves only on its one
+    speaking face being the caller's. Either way it stays the room's when
+    two faces or more were seen speaking it, its voice is another's (under
+    `DIFFERENT_BELOW`, 0.30), its speaking face is another, or nothing
+    tells: a voice between 0.30 and 0.70, a print with no caller's print to
+    agree with, or no print and no face. A thing kept with no request
+    known, and the older version of a correction (`replaced`,
+    `LAMP_MEMORY_REPLACES`), stay too.
+  - **When the saving line's print is late or missing.** "Remember my
+    face" is short: its print is asked for at its end and often comes after
+    the turn's first output, and a line under 1.5 s
+    (`same_voice::LEAST_SAMPLES`) is never printed. So the move is not
+    weighed at the saving line's verdict. Once its exchange is written, the
+    writer looks for its print every 100 ms (`follows_face::PRINT_POLL`) and
+    weighs the move as soon as the print is in or none is coming, at the
+    latest 3 s after (`follows_face::PRINT_WAIT`), or sooner when the
+    conversation ends or a line of someone known comes; the prints come
+    since are filled in first. What a lamp then does:
+    - **The print came in time**: each line is told by its voice against the
+      saving line's, as above.
+    - **No print came, but another line of this conversation was seen
+      spoken by exactly one face, the same face track, known now as that
+      person**: that line's print is the caller's, the one most like the
+      rest when there are several, and none when two of them disagree (a
+      cosine under 0.70). "My name is Bramble" said on that face then
+      moves, and so does a line off camera in the same voice.
+    - **No print, and no such line** (the earlier lines off camera, on
+      another face or on two): the caller has no print, so every printed
+      line stays the room's (`cant_tell`), and only lines with no print
+      whose one speaking face is the caller's move, with the saving line
+      itself. "My name is Bramble" said off camera and printed stays the
+      room's.
+  - **A forget drops it all.** Any forget (`forget_my_face`, `forget
+    everything`, or `forget` by what it is about, by id or "forget that")
+    drops every line kept and any face saved before it, so a forget said
+    before the saving line's exchange is written, or while the move waits
+    for its print, leaves nothing to move.
+  - **Prints are kept in memory only**, at most 16 lines and at most 3
+    minutes each (`follows_face::KEPT_FOR`; a conversation goes on while
+    its lines come within 45 s of each other, so its first lines may be
+    older than 45 s when the face is known), never journalled, and dropped
+    when their conversation ends or is moved, or on a forget. A line no
+    exchange came of (a TV line let alone) goes at 3 minutes.
+  - **Beside the other switches.** `LAMP_MEMORY_EARLY_WORDS` is the Live
+    route's (a lone face, every line or none); this is the second route's,
+    line by line. With `LAMP_MEMORY_ROOM_NOT_ASKER`, what stays the room's
+    is still told as said by someone in the room; what moved is told as
+    theirs.
+  - **The journal** says counts only: `is theirs now: moved=N stayed=N
+    (two_faces=N other_voice=N other_face=N cant_tell=N)`; `stays the
+    room's: moved=0 stayed=N (two_faces=N other_voice=N other_face=N
+    cant_tell=N)` when no line was the caller's; or `stays the room's:
+    why=two_faces|cant_tell|incomplete|not_adopted exchanges=N kept=N` when
+    the saving line can't anchor a move or the store refused it.
 - **Seeing someone speak** (`LAMP_SECOND_SPEAKING_FACE=on`, the second
   route only, off unless set; `crates/voice/src/speaking_faces.rs`). It needs
   `LAMP_SECOND_SCOPED_CONTEXT=on` too, which tells and files each turn for
