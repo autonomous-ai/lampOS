@@ -5280,6 +5280,20 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Guard mode's words** (row 42): every line it says or tells the model is in its `[watch.words]`. A visit's text is put together from `{who}`, `{at}` and `{long}`, each line checked for only its own slots. A copy from before (guard mode is installable) says the built-in words for one release. Tests: byte for byte against the old words, the slots, the older copy; both mutations fail them. In its gate.
 - **Next, from the first builder at 19:4x:** the second route's silences mid-answer, the breakdown by cause, then the fix. It waits on the two lamp-4ace sessions, which I asked for; a waiter picks them up.
 
+## 2026-10-21, 21:32 ICT: the silences broken down; #2665, #2654 up; #2643 merged; paused at the owner's word
+
+- **The second route's silences** (the first builder's 19:4x), from two lamp-4ace sessions' timing events and journal. Of 46 gaps over 300 ms:
+  - 24 were a stop working: a yield, then the answer cancelled;
+  - 13 of the other 22 came after the wait sound at 1.5 s, with the first answer audio now at p50 1.99 s;
+  - 6 were yields that went on (Third's);
+  - 2 were a next piece late;
+  - none came from new connections.
+- **#2665:** `LAMP_SECOND_CUE_AFTER_MS` (the first builder's yes, 3000 for tonight's run). Replayed, it leaves about 3 gaps after the sound where there were 19. Gate: 3862 passed, 0 failed.
+- **#2654:** guard mode's words in its `[watch.words]`, with the built-in words for one release. Read clean by the reviewer-lead and the first builder.
+- **#2643 merged** (prepare-unplug's words).
+- **#2638's rerun** on its base was green, and Ten's played run passed. It now needs a rebase after #2577.
+- **Paused** at the owner's word, until they say resume. Next: #2638's rebase, then who was here's words.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
