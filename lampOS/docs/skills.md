@@ -140,9 +140,9 @@ must not leave a step silently undone)*.
 | `enabled` | no | Boolean, true by default for existing skills. False still validates the folder but removes its active triggers and model tools |
 | `[limits]` | no | A local `during = { from, to }` window and one or both of `light_channel_max` (12–120) and `volume_raw_max` (1–100). Private, durable restrictions; requires `permissions.output_limits = true` and the routine and cap switches. See [Bedtime and Morning](bedtime-morning.md#durable-output-ceilings) |
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
-| `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
+| `kind` | no | `core` (comes with the lamp, always there, never removed), `installable` (its owner puts it on and takes it off), or `addon` (a partner's: it only proposes, [addons.md](addons.md)), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out; and for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)). A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
@@ -886,7 +886,17 @@ As built on 2026-10-19 (`crates/skills/src/package.rs`; not yet run on a
 lamp):
 
 **The kind.** `skill.toml` says `kind = "core"` or `kind = "installable"`,
-and a skill that says neither is installable.
+and a skill that says neither is installable. `kind = "addon"` is a
+partner's add-on ([addons.md](addons.md)): installed and removed as an
+installable skill, but it only proposes. It says its version; its
+`[permissions]` give `propose` (some of `say`, `light`, `move`, `mood`,
+`note`) and topics from the add-on allowlist alone
+(`lamp_msgs::ADDON_TOPICS`), and nothing else; it starts by its triggers
+alone, with no `[ask]`, tool, `[history]` or other tool's tables; and its
+steps are `propose = { act, why, sure, holds, ... }` only. `lamp-skills`
+writes each proposal on `addon/proposal`, stamped with the add-on's name
+and version and held to the add-on limits, for a judge. Without
+`LAMP_ADDONS=on` an add-on is not loaded, and the journal says so.
 
 | Skill | Kind | Why |
 |---|---|---|
@@ -1099,6 +1109,7 @@ look = true     # the full look's picture for the model (do.look)
 messages = true # a short text for the person's phone, unasked (a watch's)
 known_faces = true  # whether a face at the lamp is known, never whose (a watch's)
 output_limits = true  # private declarative light/volume restrictions
+propose = []    # an add-on's alone (kind = "addon"): the acts it may propose
 actions = []    # the actions part's functions it may call by name
 ```
 

@@ -269,6 +269,7 @@ fn main() -> ExitCode {
         ask,
         light_requests: std::env::var(REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
+        addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         boot_id,
         clock_control,
         daily_state,
@@ -509,6 +510,9 @@ struct Options {
     /// `LAMP_BODY_REQUESTS=on`: a skill's gestures and moves say who asks,
     /// for a body with `--arbitration on` (#940).
     body_requests: bool,
+    /// `LAMP_ADDONS=on`: add-ons are loaded and their proposals written
+    /// (`docs/addons.md`); without it, they are not loaded.
+    addons: bool,
     /// `--boot-id`: the boot a light request's claim is on, in place of the
     /// host's own, which only Linux has.
     boot_id: Option<String>,
@@ -899,6 +903,19 @@ fn serve(
             signs: None,
             retaken: HashMap::new(),
         }),
+        // Declared only when on: without the switch nothing new is on the bus.
+        proposals: if options.addons {
+            Some(Arc::new(Mutex::new(Proposals {
+                out: bus.publisher_declared(
+                    lamp_msgs::AddonProposal::TOPIC,
+                    &lamp_msgs::AddonProposal::declaration(),
+                    "skills",
+                )?,
+                limits: lamp_skills::addon::Limits::default(),
+            })))
+        } else {
+            None
+        },
     };
     let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
@@ -966,6 +983,17 @@ fn serve(
                 let (mut skills, errors) = load_all(dir);
                 skills.retain(|skill| options.routines || !skill.is_routine());
                 skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
+                skills.retain(|skill| {
+                    let kept = options.addons || skill.kind != lamp_skills::SkillKind::Addon;
+                    if !kept {
+                        eprintln!(
+                            "lamp-skills: not loaded: {}: kind = \"addon\" runs only with {}=on",
+                            skill.name,
+                            lamp_skills::ADDONS_ENVIRONMENT
+                        );
+                    }
+                    kept
+                });
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
@@ -1336,6 +1364,62 @@ struct Runner {
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
     watching: RefCell<Watching>,
+    /// With `LAMP_ADDONS=on`: where the add-ons' proposals are written, and
+    /// their limits (`docs/addons.md`).
+    proposals: Option<Arc<Mutex<Proposals>>>,
+}
+
+/// `addon/proposal`, written for the add-ons, and what they proposed lately.
+struct Proposals {
+    out: Publisher,
+    limits: lamp_skills::addon::Limits,
+}
+
+/// An add-on's run: each proposal numbered, held to the limits and written
+/// for the judge. What became of each is said; nothing else is made.
+fn propose(calls: &[Call], proposals: Option<&Arc<Mutex<Proposals>>>, may: &May) -> String {
+    let Some(proposals) = proposals else {
+        return format!(
+            "not proposed: {} is not on",
+            lamp_skills::ADDONS_ENVIRONMENT
+        );
+    };
+    let mut said = Vec::new();
+    for call in calls {
+        let Call::Propose(proposal) = call else {
+            continue;
+        };
+        if let Some(why) = may.refuses(call) {
+            said.push(why);
+            continue;
+        }
+        let mut proposals = proposals
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let numbered = match proposals.limits.admit(proposal, lamp_ipc::monotonic_us()) {
+            Ok(numbered) => numbered,
+            Err(why) => {
+                said.push(why);
+                continue;
+            }
+        };
+        let sent = proposals
+            .out
+            .publish_json(lamp_ipc::monotonic_us(), &numbered);
+        said.push(match sent {
+            Ok(_) => format!(
+                "proposed {} as {} on {}",
+                numbered.act,
+                numbered.proposal,
+                lamp_msgs::AddonProposal::TOPIC
+            ),
+            Err(error) => format!(
+                "not proposed: {} was not written ({error})",
+                lamp_msgs::AddonProposal::TOPIC
+            ),
+        });
+    }
+    said.join("; ")
 }
 
 /// A path given by its flag, or else by the environment's `name`, unless
@@ -1734,6 +1818,23 @@ fn start(
                 allowed: None,
             },
         );
+        return made_rx;
+    }
+    // An add-on's run proposes, and nothing else: written for the judge at
+    // once, on this thread, as it holds no output to wait on.
+    if !calls.is_empty() && calls.iter().all(|call| matches!(call, Call::Propose(_))) {
+        let why = propose(
+            &calls,
+            runner.proposals.as_ref(),
+            &runner.sockets_for(&skill).may,
+        );
+        let _ = made.send(());
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why,
+            allowed: None,
+        });
         return made_rx;
     }
     // A run waits on the voice for as long as the say takes (at most
@@ -3557,6 +3658,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),
         Call::Text(_) => "text: a watch's, sent by the watch".into(),
+        Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
     }
 }
@@ -4106,6 +4208,7 @@ mod tests {
                 signs: None,
                 retaken: HashMap::new(),
             }),
+            proposals: None,
         };
         let admitted = runner.sockets_for(lamp_skills::unplug::SKILL);
         runner.permissions.borrow_mut().clear();
@@ -4332,6 +4435,7 @@ mod tests {
                         signs: None,
                         retaken: HashMap::new(),
                     }),
+                    proposals: None,
                 };
                 let told = start(
                     "test".into(),
@@ -4396,6 +4500,7 @@ mod tests {
                 signs: None,
                 retaken: HashMap::new(),
             }),
+            proposals: None,
         };
         let dance = runner.sockets_for("dance");
         assert_eq!(dance.may.skill, "dance");

@@ -105,6 +105,11 @@ pub struct Places {
     pub manage: PathBuf,
     /// Whether `skills.install` is answered ([`STORE_ENVIRONMENT`]).
     pub store: bool,
+    /// Whether add-ons run on this lamp: lamp-skills loads a `kind =
+    /// "addon"` folder only with `LAMP_ADDONS=on` in its own unit, so the
+    /// page reads the same switch from its own (`docs/addons.md`), and says
+    /// an add-on is off rather than show it working.
+    pub addons: bool,
 }
 
 impl Places {
@@ -116,9 +121,13 @@ impl Places {
             off: "/var/lib/lampos-skills-state/off".into(),
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
             store: store_on_from_environment(),
+            addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         }
     }
 }
+
+/// What the page says of an add-on while add-ons are off on this lamp.
+pub const ADDONS_OFF: &str = "add-ons are off on this lamp";
 
 /// A skill's group on the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -262,7 +271,7 @@ pub fn list(places: &Places) -> Result<Value, String> {
     let off = read_off(&places.off);
     let mut rows: Vec<Listed> = lamp_skills::load_each(&places.folder)
         .into_iter()
-        .map(|(folder, loaded)| row(&folder, loaded, off.as_ref()))
+        .map(|(folder, loaded)| row(&folder, loaded, off.as_ref(), places.addons))
         .collect();
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
     let left_out = rows.len().saturating_sub(MOST_SKILLS);
@@ -298,7 +307,7 @@ pub fn remove(places: &Places, data: &Value) -> Result<Value, String> {
         .into_iter()
         .find(|(folder, _)| folder.file_name() == Some(std::ffi::OsStr::new(name)))
         .ok_or_else(|| format!("no skill {name} on this lamp"))?;
-    if row(&folder, loaded, None).group == Group::Core {
+    if row(&folder, loaded, None, places.addons).group == Group::Core {
         return Err(format!(
             "{name} is a core skill: it comes with the lamp, so it can't be removed"
         ));
@@ -440,6 +449,7 @@ fn row(
     folder: &Path,
     loaded: Result<lamp_skills::Skill, String>,
     off: Option<&BTreeSet<String>>,
+    addons: bool,
 ) -> Listed {
     let name = folder
         .file_name()
@@ -473,13 +483,17 @@ fn row(
             Some(cut(&one_line(&why), WHY_MOST)),
         ),
     };
+    // An add-on that loads is still not run without the switch: said so.
+    let why = why.or_else(|| (kind == SkillKind::Addon && !addons).then(|| ADDONS_OFF.to_owned()));
     let loads = why.is_none();
     let group = match kind {
         SkillKind::Core => Group::Core,
         SkillKind::Installable if front_field(&card, "made").as_deref() == Some(MADE_HERE) => {
             Group::MadeHere
         }
-        SkillKind::Installable => Group::Installed,
+        // A partner's add-on is put on and taken off as an installed skill is:
+        // the app's groups stay as they are (docs/addons.md).
+        SkillKind::Installable | SkillKind::Addon => Group::Installed,
     };
     let can_turn_off = has_stop && loads;
     Listed {
@@ -581,6 +595,7 @@ pub mod tests {
             off: root.join("off"),
             manage: root.join("m.sock"),
             store: true,
+            addons: false,
         }
     }
 
@@ -695,6 +710,36 @@ pub mod tests {
             (&rows[1]["name"], &rows[1]["group"], &rows[1]["can_remove"]),
             (&json!("tutor"), &json!("installed"), &json!(true))
         );
+    }
+
+    #[test]
+    fn an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp() {
+        let mut places = places("addon");
+        // Written whole: [`skill`] gives every folder a tool, which an
+        // add-on may not have.
+        let dir = places.folder.join("quiet-note");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("SKILL.md"),
+            "---\nname: quiet-note\ndescription: A partner's add-on.\n---\n\n# Quiet note\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("skill.toml"),
+            "kind = \"addon\"\nversion = \"1.0.0\"\n\n[permissions]\ntopics = [\"voice/state\"]\npropose = [\"note\"]\n\n\
+             [trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\n\
+             [[do]]\npropose = { act = \"note\", why = \"quiet\", sure = 0.5, holds = \"10s\", note = \"The room is quiet.\" }\n",
+        )
+        .unwrap();
+        let rows = listed(&places);
+        assert_eq!(rows[0]["loads"], false, "{rows:?}");
+        assert_eq!(rows[0]["why"], ADDONS_OFF);
+        assert_eq!(rows[0]["group"], "installed");
+        assert_eq!(rows[0]["can_remove"], true);
+        places.addons = true;
+        let rows = listed(&places);
+        assert_eq!(rows[0]["loads"], true, "{rows:?}");
+        assert!(rows[0].get("why").is_none_or(Value::is_null), "{rows:?}");
     }
 
     #[test]
@@ -843,13 +888,13 @@ pub mod tests {
         fs::write(&places.off, "sip\nnot a name\n").unwrap();
         let off = read_off(&places.off);
         assert_eq!(off, Some(["sip".to_owned()].into()));
-        let stopped = row(&folder, Ok(loaded.clone()), off.as_ref());
+        let stopped = row(&folder, Ok(loaded.clone()), off.as_ref(), false);
         assert_eq!((stopped.can_turn_off, stopped.off), (true, Some(true)));
         let none = read_off(&places.off.with_file_name("none"));
         assert_eq!(none, Some(BTreeSet::new()));
-        let on = row(&folder, Ok(loaded.clone()), none.as_ref());
+        let on = row(&folder, Ok(loaded.clone()), none.as_ref(), false);
         assert_eq!((on.can_turn_off, on.off), (true, Some(false)));
-        let unknown = row(&folder, Ok(loaded), None);
+        let unknown = row(&folder, Ok(loaded), None, false);
         assert_eq!((unknown.can_turn_off, unknown.off), (true, None));
     }
 

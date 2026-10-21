@@ -469,7 +469,10 @@ fn a_skills_kind_and_version_are_read_and_checked() {
         Some("2.13.0")
     );
     let error = load(&with("app", "kind = \"app\"")).unwrap_err();
-    assert!(error.contains("\"core\" or \"installable\""), "{error}");
+    assert!(
+        error.contains("\"core\", \"installable\" or \"addon\""),
+        "{error}"
+    );
     for version in ["1.0", "1.0.0.0", "01.0.0", "1.0.0-beta", "v1.0.0", ""] {
         let error = load(&with("versioned", &format!("version = {version:?}"))).unwrap_err();
         assert!(error.contains("MAJOR.MINOR.PATCH"), "{version}: {error}");

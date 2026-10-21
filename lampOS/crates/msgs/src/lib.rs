@@ -82,6 +82,8 @@ mod arrival;
 pub use arrival::*;
 mod skill_ask;
 pub use skill_ask::*;
+mod addon;
+pub use addon::*;
 mod arbitration;
 pub use arbitration::*;
 mod privacy;
@@ -1482,6 +1484,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(arrival_topics())
         .chain(turn_topics())
         .chain(skill_ask_topics())
+        .chain(addon_topics())
         .chain(privacy_topics())
         .chain(sound_class_topics())
         .chain(chat_topics())

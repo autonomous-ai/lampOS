@@ -657,6 +657,7 @@ const VOICE_STATES: [&str; 4] = ["resting", "listening", "thinking", "speaking"]
 /// name in their own code. Any other topic is counted as `other`, so a topic
 /// name never carries anything else into `left-out.json`.
 const BUS_TOPICS: &[&str] = &[
+    "addon/proposal",
     "air/state",
     "attention/addressed",
     "attention/concentration",

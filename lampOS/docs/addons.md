@@ -4,9 +4,13 @@ Proposed by blue as blue-P1 on 2026-10-21
 ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309164481)),
 shaped by the first builder's answer the same day
 ([#1722, 13:1x](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309437399)).
-Nothing here is built yet. This is the contract the code will follow; the
-first code is the `addon/proposal` type and `lamp-skills` writing it, off
-unless `LAMP_ADDONS=on`.
+**Built so far** (blue, 2026-10-21, off unless `LAMP_ADDONS=on`): the
+`addon` kind and its load-time refusals, the read allowlist,
+`lamp_msgs::AddonProposal` on `addon/proposal`, and `lamp-skills` writing it
+within the rate limits below (`crates/msgs/src/addon.rs`,
+`crates/skills/src/addon.rs`). **Not built yet:** the judge, the mood nudge
+input, the say service's context line, and everything after 1.0. Nothing
+reads `addon/proposal` yet, so a proposal changes nothing on a lamp.
 
 ## Why
 
@@ -119,21 +123,22 @@ A `lamp-msgs` type, `lamp_msgs/AddonProposal`, version 1, an event topic.
 | `addon` | The add-on's skill name, stamped by `lamp-skills` from the folder it loaded, never from the add-on's own words |
 | `version` | The add-on's version, as loaded |
 | `act` | `say`, `light`, `move`, `mood` or `note` |
-| `why` | One of a fixed list of reasons (`music`, `laughter`, `evening`, `arrived`, `quiet`, `long_sitting`, ...), never free text |
+| `why` | One of a fixed list of reasons, never free text: `music`, `laughter`, `evening`, `morning`, `arrived`, `left`, `quiet`, `long_sitting`, `mood` (`lamp_msgs::ADDON_WHYS`) |
 | `sure` | How sure the add-on is, 0.0 to 1.0, as its manifest states it; the judge may weigh it, never be bound by it |
 | `holds_ms` | How long the proposal stays worth doing: 1 s to 30 s, as a `Claim`'s lease (`msgs/src/arbitration.rs`) |
 | `light` | For `light`: colour, level 1 to 5, and an optional pattern (`breathe`, `candle`, `pulse`), the same shape a skill's light takes |
-| `move` | For `move`: one named gesture or clip from the add-on's own `moves/`, played within the body's limits |
-| `mood` | For `mood`: a nudge of `energy` or `warmth`, at most ±0.1, for at most 10 minutes |
+| `gesture` | For `move`: one of the body's gestures, by name, played within the body's limits. A clip of the add-on's own `moves/` comes later |
+| `mood` | For `mood`: a nudge of `energy` or `warmth`, at most ±0.1, and `for_ms`, how long, 1 s to 10 minutes (`for = "10m"` in the folder) |
 | `note` | For `say` and `note`: what the add-on suggests the lamp might mention, at most 300 bytes, written in the add-on's folder, never made at run time. It reaches the model quoted and untrusted, never as an instruction (below, "The judge") |
 
 Every text an add-on can send is in its folder, so it is read when the
 package is signed and installed, and a running add-on cannot compose words.
 
-**Rate and lease** (proposed, to be measured on a lamp): per add-on, at
-most one proposal every 10 s and 20 an hour; at most 4 `say` proposals an
-hour across all add-ons; at most 2 waiting for a decision. A proposal over a
-limit is not published and the journal counts it. A kept proposal holds
+**Rate and lease** (to be measured on a lamp): per add-on, at most one
+proposal every 10 s and 20 an hour; at most 4 `say` proposals an hour
+across all add-ons (built, `crates/skills/src/addon.rs`); at most 2
+waiting for a decision (with the judge). A proposal over a limit is not
+published, and the run's `skills/events` says why. A kept proposal holds
 for its `holds_ms` and is then given back, as a skill's light is.
 
 ## The judge
@@ -217,7 +222,7 @@ field = "state"
 equals = "resting"
 
 [[do]]
-propose = { act = "mood", why = "music", sure = 0.7, holds = "30s", mood = { energy = 0.1 } }
+propose = { act = "mood", why = "music", sure = 0.7, holds = "30s", mood = { energy = 0.1, for = "10m" } }
 ```
 
 Music heard for 20 s while the voice rests: `lamp-skills` publishes one
@@ -264,7 +269,10 @@ the allowlist, `addon/proposal`, the judge's rules, Jev's say question
 acting, the mood nudge input and the say service's context line; a partner
 guide with the two examples; the bus recordings in each add-on's `tests/`.
 Without the switch, `lamp-skills` refuses `kind = "addon"`, publishes
-nothing new, and the lamp is unchanged.
+nothing new, and the lamp is unchanged. The app's skills page (`lamp-cloud`) reads
+the same switch from its own unit: without it an installed add-on is
+listed as not loading, "add-ons are off on this lamp", never as working.
+Turning add-ons on sets `LAMP_ADDONS=on` in both units.
 
 **After 1.0, off the lamp, through Harness.** A partner's add-on runs on
 the partner's computer as an agent or service and speaks the same
