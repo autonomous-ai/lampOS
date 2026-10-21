@@ -197,6 +197,10 @@ impl Services for Script {
         .boxed()
     }
 
+    fn declares(&self, _messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
+        Some(!without.contains(&name))
+    }
+
     fn warm(&self) -> BoxFuture<'static, ()> {
         self.warmed.fetch_add(1, Ordering::Relaxed);
         Box::pin(async {})
@@ -2031,6 +2035,105 @@ async fn a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines() {
             }))
         );
     }
+}
+
+/// #2510, `LAMP_MEMORY_REPLACES` (`Engine::noting_turn_tools`): each turn
+/// has one journal line, whether `remember` was among the functions its
+/// chat was given, how many calls of each function it made in any round,
+/// and whether its chat begun on the early words stood for round 1; names
+/// and counts, never a word heard or called with. Off, no line.
+#[tokio::test(start_paused = true)]
+async fn a_turns_tools_are_journalled_by_name_and_count_never_words() {
+    for (note, prepare, early, final_words, line) in [
+        (
+            true,
+            true,
+            "remember my tea is jasmine",
+            "Remember my tea is jasmine.",
+            Some(
+                "lamp-voice second: request 1: tools: remember_offered=y calls=recall:1,remember:2 prepared=y",
+            ),
+        ),
+        (
+            true,
+            true,
+            "remember my tea",
+            "Remember my tea is jasmine.",
+            Some(
+                "lamp-voice second: request 1: tools: remember_offered=y calls=recall:1,remember:2 prepared=n",
+            ),
+        ),
+        (
+            false,
+            true,
+            "remember my tea is jasmine",
+            "Remember my tea is jasmine.",
+            None,
+        ),
+    ] {
+        let calls = || {
+            Ok(ChatEvent::ToolCalls(vec![
+                call(
+                    "a",
+                    "remember",
+                    json!({"text":"Her tea is jasmine.","replaces":8}),
+                ),
+                call("b", "recall", json!({"about":"tea"})),
+            ]))
+        };
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(final_words.to_owned())].into()),
+            early: Mutex::new([vec![net::Early::Words(early.to_owned())]].into()),
+            finish_after: Some(Duration::from_millis(400)),
+            first_event_after: Some(Duration::from_millis(600)),
+            // A chat begun on early words the line went past is asked, and
+            // dropped: one more in the script.
+            chats: Mutex::new(
+                (early.len() < final_words.len() - 1)
+                    .then(|| vec![calls(), Ok(ChatEvent::Done)])
+                    .into_iter()
+                    .chain([
+                        vec![calls(), Ok(ChatEvent::Done)],
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![call(
+                                "c",
+                                "remember",
+                                json!({"text":"Her tea is jasmine."}),
+                            )])),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![text("Kept."), Ok(ChatEvent::Done)],
+                    ])
+                    .collect(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let journal = Arc::new(Mutex::new(Vec::new()));
+        let mut engine = engine
+            .preparing(prepare)
+            .noting_turn_tools(note)
+            .keeping_turn_tools_journal(journal.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        let said = journal.lock().unwrap().clone();
+        assert_eq!(
+            said,
+            line.into_iter().map(str::to_owned).collect::<Vec<_>>(),
+            "{early:?}"
+        );
+        for line in &said {
+            for word in ["jasmine", "tea", "Her", "8"] {
+                assert!(!line.contains(word), "{word:?} in {line}");
+            }
+        }
+    }
+    // A name the model made up is never said as it wrote it.
+    assert_eq!(super::function_name("remember"), "remember");
+    assert_eq!(super::function_name("tell her: jasmine"), "other");
+    assert_eq!(super::function_name(""), "other");
 }
 
 /// #1712: Flux's `TurnResumed` (`net::Early::Resumed`) takes the early words

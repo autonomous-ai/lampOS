@@ -44,6 +44,14 @@ pub trait Services: Send + Sync + 'static {
         let _ = without;
         self.chat(messages)
     }
+    /// Whether a chat on `messages`, told without the functions named in
+    /// `without`, declares the function `name` ([`Self::chat_without`]), for
+    /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
+    /// services that cannot say.
+    fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
+        let _ = (messages, without, name);
+        None
+    }
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
     /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
@@ -515,6 +523,10 @@ impl Services for Net {
             })
             .try_flatten()
             .boxed()
+    }
+
+    fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
+        Some(self.chat.declares(messages, without, name))
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {

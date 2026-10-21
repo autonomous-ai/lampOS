@@ -689,8 +689,32 @@ the unchanged legacy client, used unless the new Days client is selected.
     model's own text, kept, keeps its `replaces`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** a correction is never `once`; it
     always writes its new version.
+  - **The journal**, counts and yes/no only, never a word of the call,
+    of what was heard or of what was kept:
+    - One line per `remember` call, both routes:
+      `lamp-voice provider: remember: replaces=y|n shown=y|n|- new_words=N old=y|n [keep_heard=model|heard] answer=KIND`.
+      `replaces` is whether the model sent one; `shown`, whether its id was
+      among the ids this session was shown of the call's scope (`-`
+      without one); `new_words`, how many content words of the model's
+      text are neither the old fact's nor heard in the call's line, folded
+      as the hits fold them (`remember::content_words`: lower case, three
+      letters or more, small words out, a plural's `s` off); `old`, whether
+      the old fact's text was there to count against (the session keeps no
+      texts yet, so `n` and the count is of the words not heard);
+      `keep_heard` only with `LAMP_MEMORY_KEEP_HEARD`, whose words were
+      sent; `answer` the store's kind: `kept`, `existing`, `replaced`,
+      `refused:<reason code>`, `error:<code>`, or `none` (no answer). A
+      code that is not lower-case letters and `_` is `other`.
+    - One line per second-route turn:
+      `lamp-voice second: request N: tools: remember_offered=y|n|? calls=none|NAME:N,… prepared=y|n`:
+      whether `remember` was among the functions any round's chat was
+      given (as narrowed, without memory's on a gap-held line), each
+      function called in any round with its count (a name that is not
+      lower-case letters, digits and `_` is `other`), and whether the chat
+      begun on the line's early words (`LAMP_SECOND_PREPARED`) stood for
+      round 1.
   - Off, the functions, the hit lines and every request are as before; a
-    `replaces` the model gives is not sent.
+    `replaces` the model gives is not sent, and neither line is written.
   - **A thing kept in the same session can be corrected:** an ok
     `remember` is told with the kept id, `{"remembered":true,"id":8}` (with
     `replaced` or the kept-already note beside it; kept already by
@@ -700,6 +724,9 @@ the unchanged legacy client, used unless the new Days client is selected.
     the probe (`probe/kept_earlier.rs`), English and Vietnamese. The id is
     the caller's own scope's, already one of the session's sources, so it
     is in that scope's `shown` and never another's. Off, no id, as before.
+    The journal's `remember` line says no id, the kept one's or the
+    `replaces`: a correction of a thing kept this session is `shown=y`,
+    as one recalled is.
   - Tests: `days_protocol::tests::a_correction_replaces_a_kept_thing_this_session_was_shown_by_link`,
     `remember::tests::with_the_replaces_switch_a_correction_is_sent_with_what_was_shown`,
     `remember::tests::without_the_replaces_switch_the_functions_and_hit_lines_are_as_before`,
@@ -713,7 +740,12 @@ the unchanged legacy client, used unless the new Days client is selected.
     `remember::tests::a_kept_id_is_shown_only_to_its_own_scope`,
     `remember::tests::a_correction_kept_as_heard_does_not_replace_the_old_fact`,
     `remember::heard::tests::the_call_is_held_against_the_words_heard_in_its_own_line` and
-    `remember::heard::tests::the_model_is_told_what_was_kept_only_when_it_was`.
+    `remember::heard::tests::the_model_is_told_what_was_kept_only_when_it_was`,
+    `remember::tests::each_remember_call_is_journalled_in_counts_and_yes_or_no_never_words`,
+    `remember::noted::tests::the_stores_answer_is_told_by_its_kind_and_codes_alone`,
+    `remember::noted::tests::new_words_are_the_texts_content_words_neither_old_nor_heard`,
+    `remember::noted::tests::the_line_says_each_field_in_counts_and_yes_or_no` and
+    `second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words`.
 
 - **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
   with the Days client only; off unless set; both voice routes).

@@ -1077,7 +1077,10 @@ order is kept. A written turn is the same from the chat on.
   heard and how long after the line, the state of the words at the line's
   end (above), each chat round's first event (the first text or tool
   calls: a role-only chunk carries neither and is not an event), the
-  tools called, the first answer audio, and any failure.
+  tools called, the first answer audio, and any failure. With
+  `LAMP_MEMORY_REPLACES=on`, one more line at the turn's end, names and
+  counts only: `request N: tools: remember_offered=y|n|? calls=none|NAME:N,… prepared=y|n`
+  ([memory.md](memory.md), the correction's journal).
 
 - Up to four chat requests in a turn, tool rounds included (`MAX_ROUNDS`).
 - A call to `not_for_me` ends the turn silently, before the unfinished last

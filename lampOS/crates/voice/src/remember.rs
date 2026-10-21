@@ -55,6 +55,7 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub mod heard;
+pub mod noted;
 pub mod on;
 
 /// Where the coordinator reads the memory's socket: an absolute path.
@@ -2905,6 +2906,10 @@ impl DaysClient {
             let Some(answer) = answer else {
                 return lost((gone(), false));
             };
+            // Its kind, for the call's journal line (#2510).
+            if call.name == REMEMBER && self.replaces.load(Ordering::Acquire) {
+                noted::answered(&answer);
+            }
             // A refusal the store said is told as before, and settled at the
             // end; one with nothing to tell is settled here.
             let Some(told) = answer_for(&call.name, &answer, now, zone) else {
@@ -9120,6 +9125,108 @@ mod tests {
         assert!(sent[1].get("replaces").is_none() && sent[1].get("shown").is_none());
         assert_eq!(sent[1]["text"], kept);
         assert_eq!(sent[3]["replaces"], 8);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2510, `LAMP_MEMORY_REPLACES`: each `remember` call has one journal
+    /// line with counts and yes/no only: `replaces` sent, its id shown or
+    /// not, the text's words neither the old fact's nor heard, KEEP_HEARD's
+    /// choice, and the store's answer kind; no word of the call's sentence
+    /// or of what was heard. Off, no line, and the request is the same.
+    #[test]
+    fn each_remember_call_is_journalled_in_counts_and_yes_or_no_never_words() {
+        fn answer(request: &Value) -> Value {
+            match (request["op"].as_str(), request["replaces"].as_u64()) {
+                (Some("search"), _) => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":8,"at_unix_ms":NOW-DAY,"text":"Her favourite colour is violet."}
+                ]}),
+                (Some("remember"), Some(8)) => json!({"ok":true,"id":9,"replaced":8}),
+                (Some("remember"), Some(_)) => {
+                    json!({"ok":false,"error":"refused","reason":"not_shown","message":"x"})
+                }
+                (Some("remember"), None) => json!({"ok":true,"id":10}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let (socket, served) = memory_lines("replaces-noted", 6, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |call: &ToolCall| client.run_at(call, FIRST_READ, NOW, Some(&EAST), None);
+        assert!(run(&call(RECALL, json!({"about":"colour"}))).1);
+        let noted = |model: &ToolCall, sent: &ToolCall, heard: Option<&str>, kept: Option<bool>| {
+            client.noted(None, model, heard, kept, || run(sent))
+        };
+        // Replaced: the model's text kept, with its shown id; the model is
+        // told the new one's id (#2713), the line says none.
+        let green = call(
+            REMEMBER,
+            json!({"text":"Her favourite colour is green.","replaces":8}),
+        );
+        let (told, replaced) = noted(&green, &green, Some("it's green now"), Some(false));
+        assert_eq!(told, (json!({"remembered":true,"replaced":8,"id":9}), true));
+        let replaced = replaced.unwrap();
+        assert_eq!(
+            replaced,
+            "lamp-voice provider: remember: replaces=y shown=y new_words=2 old=n keep_heard=model answer=replaced"
+        );
+        // Refused: an id this session was not shown.
+        let red = call(
+            REMEMBER,
+            json!({"text":"Her favourite colour is red.","replaces":77}),
+        );
+        let (told, refused) = noted(&red, &red, None, None);
+        assert_eq!(told, (not_replaced(), true));
+        let refused = refused.unwrap();
+        assert_eq!(
+            refused,
+            "lamp-voice provider: remember: replaces=y shown=n new_words=3 old=n answer=refused:not_shown"
+        );
+        // No `replaces`, the heard line kept in place of the model's text.
+        let tea = call(REMEMBER, json!({"text":"My favorite food is jasmine."}));
+        let heard = "please remember that my favourite tea is jasmine";
+        let (as_heard, _) = heard::call_with(&tea, Some(heard)).unwrap();
+        let (told, plain) = noted(&tea, &as_heard, Some(heard), Some(true));
+        assert_eq!(told, (json!({"remembered":true,"id":10}), true));
+        let plain = plain.unwrap();
+        assert_eq!(
+            plain,
+            "lamp-voice provider: remember: replaces=n shown=- new_words=2 old=n keep_heard=heard answer=kept"
+        );
+        // No word of a sentence or of what was heard is in any line.
+        for line in [&replaced, &refused, &plain] {
+            assert!(
+                !line.contains("id=") && !line.contains(['8', '9']),
+                "{line}"
+            );
+            for text in [
+                "Her favourite colour is green.",
+                "Her favourite colour is red.",
+                "My favorite food is jasmine.",
+                "it's green now",
+                heard,
+                "They said: my favourite tea is jasmine",
+            ] {
+                for word in content_words(text) {
+                    assert!(!line.contains(&word), "{word:?} in {line}");
+                }
+            }
+        }
+        // Off: nothing new is journalled, and the request is as before.
+        client.replaces.store(false, Ordering::Release);
+        let (told, off) = noted(&tea, &tea, Some(heard), None);
+        assert_eq!((told, off), ((json!({"remembered":true}), true), None));
+        // A call that is no `remember` has no line either.
+        client.replaces.store(true, Ordering::Release);
+        let recall = call(RECALL, json!({"about":"colour"}));
+        assert_eq!(noted(&recall, &recall, None, None).1, None);
+        let sent: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert!(sent[4].get("replaces").is_none() && sent[4].get("shown").is_none());
         drop(client);
         std::fs::remove_file(&socket).unwrap();
     }

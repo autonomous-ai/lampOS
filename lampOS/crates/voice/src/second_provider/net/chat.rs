@@ -446,13 +446,7 @@ impl Chat {
     /// [`Self::body_only`], never declaring the tools named in `without`.
     fn body_without(&self, messages: &[Message], only: Option<&[&str]>, without: &[&str]) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
-        let mut declared = (self.declare)();
-        declared.retain(|tool| !without.contains(&tool.name.as_str()));
-        if let Some(only) = only {
-            declared.retain(|tool| only.contains(&tool.name.as_str()));
-        } else if let Some(narrow) = self.narrow.get() {
-            declared = narrow(declared, messages);
-        }
+        let mut declared = self.declared(messages, only, without);
         let forced = only
             .is_none()
             .then(|| self.force.get().and_then(|force| force(messages)))
@@ -480,6 +474,32 @@ impl Chat {
             }
         }
         body
+    }
+
+    /// The tools a request on `messages` is given: those declared now but
+    /// `without`, then only those in `only`, or else as narrowed.
+    fn declared(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+    ) -> Vec<lamp_gemini::Tool> {
+        let mut declared = (self.declare)();
+        declared.retain(|tool| !without.contains(&tool.name.as_str()));
+        if let Some(only) = only {
+            declared.retain(|tool| only.contains(&tool.name.as_str()));
+        } else if let Some(narrow) = self.narrow.get() {
+            declared = narrow(declared, messages);
+        }
+        declared
+    }
+
+    /// Whether a request on `messages`, never declaring `without`, is given
+    /// the function `name` (`LAMP_MEMORY_REPLACES`'s turn line, #2510).
+    pub fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> bool {
+        self.declared(messages, None, without)
+            .iter()
+            .any(|tool| tool.name == name)
     }
 
     /// The request as [`Self::send`] makes it, for a probe that makes it
@@ -1230,6 +1250,11 @@ data: [DONE]
         }));
         assert_eq!(names(chat.body(&one)), ["light_on"]);
         assert_eq!(names(chat.body(&two)), ["light_on", "remember"]);
+        // What a turn's journal line says was given (#2510): as narrowed,
+        // and never what is left out.
+        assert!(!chat.declares(&one, &[], "remember"));
+        assert!(chat.declares(&two, &[], "remember"));
+        assert!(!chat.declares(&two, &["remember"], "remember"));
         // Set once.
         chat.narrowing(Arc::new(|_, _| Vec::new()));
         assert_eq!(names(chat.body(&one)), ["light_on"]);

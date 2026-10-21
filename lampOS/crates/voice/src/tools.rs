@@ -1184,14 +1184,35 @@ fn run_call_with_scope(
                             .heard_for(request, std::time::Instant::now())
                     })
                     .flatten();
+            let model = call;
             let dated = crate::remember::on::call_as_heard(call, words.as_deref());
             let call = dated.as_ref();
             let as_heard = crate::remember::heard::call_as_heard(call, request, heard);
             let call = as_heard.as_ref().map_or(call, |(call, _)| call);
-            let (told, answered) = match lease {
-                Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
-                None => crate::remember::run(socket, call, deadline),
-            };
+            // With `LAMP_MEMORY_REPLACES`, a `remember`'s journal line counts
+            // its words against those heard in its line (#2510).
+            let heard_words = (heard
+                && model.name == crate::remember::REMEMBER
+                && crate::remember::replaces_on())
+            .then(|| {
+                crate::thread::THREAD
+                    .lock()
+                    .ok()?
+                    .heard_for(request, std::time::Instant::now())
+            })
+            .flatten();
+            let heard_kept = crate::remember::heard::on().then_some(as_heard.is_some());
+            let (told, answered) = crate::remember::noted::remember_noted(
+                socket,
+                model,
+                heard_words.as_deref(),
+                heard_kept,
+                lease,
+                || match lease {
+                    Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
+                    None => crate::remember::run(socket, call, deadline),
+                },
+            );
             let told = match &as_heard {
                 Some((_, kept)) => crate::remember::heard::told(told, kept),
                 None => told,

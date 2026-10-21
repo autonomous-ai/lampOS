@@ -681,6 +681,12 @@ struct Shared {
     /// A spoken turn's chat begins on the line's early words
     /// ([`Engine::preparing`]).
     prepare: bool,
+    /// Each turn's journal line on its tools ([`Engine::noting_turn_tools`],
+    /// `LAMP_MEMORY_REPLACES`, #2510).
+    note_tools: bool,
+    /// A test's copy of each such line ([`Shared::turn_tools_said`]).
+    #[cfg(test)]
+    tools_journal: Option<Arc<Mutex<Vec<String>>>>,
     /// A listener is kept connected for the next line
     /// ([`Engine::keeping_a_listener_ready`]): the one kept, and how many
     /// have been opened, so an expiry takes only its own.
@@ -1148,6 +1154,9 @@ impl Engine {
                 look_by_call: false,
                 skill_look: None,
                 prepare: false,
+                note_tools: false,
+                #[cfg(test)]
+                tools_journal: None,
                 keep_listener: false,
                 open_name: false,
                 spare: Mutex::new(None),
@@ -1753,6 +1762,27 @@ impl Engine {
     pub fn asking_by_name(mut self, named: NamedAsk) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_ask = Some(named);
+        }
+        self
+    }
+
+    /// Each turn says in the journal whether `remember` was among the
+    /// functions its chat was given, how many calls of each function it
+    /// made, and whether its chat begun on the early words stood for round
+    /// 1 (`LAMP_MEMORY_REPLACES=on`, #2510): names and counts only. Before
+    /// any turn only.
+    pub fn noting_turn_tools(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.note_tools = on;
+        }
+        self
+    }
+
+    /// A test's copy of each turn's tools line, as it is said.
+    #[cfg(test)]
+    fn keeping_turn_tools_journal(mut self, journal: Arc<Mutex<Vec<String>>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.tools_journal = Some(journal);
         }
         self
     }
@@ -3939,6 +3969,16 @@ impl Shared {
 }
 
 impl Shared {
+    /// A turn's tools line said ([`Engine::noting_turn_tools`]), and kept
+    /// for a test that asked for it.
+    fn turn_tools_said(&self, line: String) {
+        #[cfg(test)]
+        if let Some(journal) = &self.tools_journal {
+            journal.lock().unwrap().push(line.clone());
+        }
+        eprintln!("{line}");
+    }
+
     /// A named-ask journal line said (`LAMP_TASKS_NAMED_ASK`), and kept
     /// for a test that asked for it.
     fn named_ask_said(&self, line: String) {
@@ -3947,6 +3987,79 @@ impl Shared {
             journal.lock().unwrap().push(line.clone());
         }
         eprintln!("{line}");
+    }
+}
+
+/// What a turn's journal line says of its tools
+/// ([`Engine::noting_turn_tools`]): names and counts, never words.
+#[derive(Default)]
+struct TurnTools {
+    /// Whether `remember` was given to any round's chat; `None` while no
+    /// round has been asked, or from services that cannot say.
+    remember_offered: Option<bool>,
+    /// Each function called in any round, by name, and how many times.
+    calls: std::collections::BTreeMap<String, usize>,
+    /// The chat begun on the early words stood for round 1.
+    prepared: bool,
+}
+
+impl TurnTools {
+    /// One round, asked on `messages` without `without` (or, `quoted`, with
+    /// no function at all), and its `calls`.
+    fn round(
+        &mut self,
+        services: &dyn Services,
+        messages: &[Message],
+        without: &[&str],
+        calls: &[net::ToolCall],
+        quoted: bool,
+    ) {
+        // A quoted line's round declares no function at all (#2530).
+        let declared = if quoted {
+            Some(false)
+        } else {
+            services.declares(messages, without, crate::remember::REMEMBER)
+        };
+        if let Some(offered) = declared {
+            self.remember_offered = Some(self.remember_offered.unwrap_or(false) || offered);
+        }
+        for call in calls {
+            *self.calls.entry(function_name(&call.name)).or_default() += 1;
+        }
+    }
+
+    fn line(&self, request: u64) -> String {
+        let yes = |on: bool| if on { "y" } else { "n" };
+        let calls = if self.calls.is_empty() {
+            "none".to_owned()
+        } else {
+            self.calls
+                .iter()
+                .map(|(name, count)| format!("{name}:{count}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        format!(
+            "lamp-voice second: request {request}: tools: remember_offered={} calls={calls} prepared={}",
+            self.remember_offered.map_or("?", yes),
+            yes(self.prepared),
+        )
+    }
+}
+
+/// A called function's name as the journal may say it: the model writes
+/// it, so one that is no function name (lower-case letters, digits and `_`,
+/// at most 64) is `other`, never its words.
+fn function_name(name: &str) -> String {
+    if !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        name.to_owned()
+    } else {
+        "other".to_owned()
     }
 }
 
@@ -4353,6 +4466,15 @@ fn chat_for(
     }
 }
 
+/// The functions [`chat_for`] leaves out for this scope.
+fn withheld(scope: Option<&crate::memory_scope::ScopeLease>) -> &'static [&'static str] {
+    if held_by_gap(scope) {
+        MEMORY_CALLS
+    } else {
+        &[]
+    }
+}
+
 /// Whom a turn's forget is held for, or whose yes runs one: the admitted
 /// request's session and known person. None with nobody known (the room)
 /// or no admitted scope: a forget isn't undone, so it takes no anonymous
@@ -4755,6 +4877,9 @@ async fn answer(
     // Whether the model called anything in the turn, any round.
     let called_any = AtomicBool::new(false);
     let called = &called_any;
+    // The turn's tools, for its journal line (`LAMP_MEMORY_REPLACES`).
+    let turn_tools = Mutex::new(TurnTools::default());
+    let tools_noted = shared.note_tools.then_some(&turn_tools);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -4854,7 +4979,14 @@ async fn answer(
             let mut stream = match prepared.take() {
                 // A quoted line's every round declares no function at all.
                 _ if quoted => shared.services.chat_only(messages.clone(), &[]),
-                Some(prepared) if round == 1 => prepared.into_events(),
+                Some(prepared) if round == 1 => {
+                    if let Some(noted) = tools_noted
+                        && let Ok(mut noted) = noted.lock()
+                    {
+                        noted.prepared = true;
+                    }
+                    prepared.into_events()
+                }
                 _ => chat_for(shared, scope.as_ref(), messages.clone()),
             };
             let mut first = true;
@@ -5012,6 +5144,19 @@ async fn answer(
             if refused {
                 round -= 1;
                 continue;
+            }
+            // Asked on `messages` as they still are: what the round's chat
+            // was given, and what it called.
+            if let Some(noted) = tools_noted
+                && let Ok(mut noted) = noted.lock()
+            {
+                noted.round(
+                    shared.services.as_ref(),
+                    &messages,
+                    withheld(scope.as_ref()),
+                    &calls,
+                    quoted,
+                );
             }
             // Round 1 of a named ask: its hand-over goes to the agent named,
             // and the journal says what became of it (#1722).
@@ -5410,6 +5555,11 @@ async fn answer(
         Ok(whole)
     };
     let ended = tokio::try_join!(writing, saying);
+    if shared.note_tools
+        && let Ok(noted) = turn_tools.lock()
+    {
+        shared.turn_tools_said(noted.line(request));
+    }
     // A forget held in this turn stands only on its answer said whole.
     settle_held_forget(
         shared,
