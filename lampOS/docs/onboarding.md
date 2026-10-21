@@ -282,9 +282,10 @@ is read as `unknown` and its token still asked for: the say service decides), an
 a try. A prompt counts once its budget commit lands, before it is published;
 one dropped before the model took it (nobody there, the pause) is given back.
 One cut before it played whole (someone spoke over it: an office's voices, or
-the person answering early, as on lamp-52e6's row 10, try 1) is offered again
-with its own number and spends nothing, twice in a step at most
-(`MOST_REOFFERS`, kept through absence); a third cut one counts. Its record
+the person answering early, as on lamp-52e6's row 10, try 1), or answered
+over its last word (below), is offered again with its own number and spends
+nothing, twice in a step at most (`MOST_REOFFERS`, kept through absence); a
+third such prompt counts. Its record
 says `offered_again`.
 
 **A try.** At the moment the prompt's whole playback is known, the runner reads
@@ -300,22 +301,26 @@ before a hearing is known; the try is judged 0.3 s after that for delivery.
 `lamp_near_call::near_try` judges it: one hearing in the 6 s at 0.95 or more,
 mic1's largest rise over its quiet in the second after it began, and the lamp
 not speaking from 0.5 s before the hearing to 1 s after (speech elsewhere in
-the window does not spoil it).
+the window does not spoil it). The prompt itself counts as the lamp speaking
+until its end, so a name begun in the half second after it is refused as the
+lamp speaking (its own tail or echo).
 
-**A call begun over the prompt's last word counts.** People start answering
-as the lamp finishes: on lamp-52e6 (row 10, tries 2 and 4) the name began 237
-to 478 ms before the prompt's end and the try said "the name wasn't heard".
-A name begun up to 0.5 s before the end (`OVER_PROMPT_MS`, the call wait's
-`CALL_BEFORE_US`) whose final hearing came after it is the call, measured as
-beginning at the prompt's end (`call_began_ms`); one begun earlier, or over
-before the end, is not. So the prompt's own speech is not an answer: the
-lamp's `voice/state` speaking that began before the prompt's end and stopped
-within 0.5 s of it is left out, and a name just after the end counts too (it
-used to be refused as the prompt's echo). The rise is still read only from
-levels the ears didn't flag as the lamp's own; the prompt's echo can only
-raise it, so the bar errs high (fewer calls let through), never low. The
-lamp speaking past that, or again, still spoils the try. Test:
-`a_name_begun_over_the_prompts_last_word_counts_from_its_end`.
+**A call begun over the prompt's last word is not a try.** People start
+answering as the lamp finishes: on lamp-52e6 (row 10, tries 2 and 4) the name
+began 237 to 478 ms before the prompt's end. A name heard at 0.95 or more,
+begun up to 0.5 s before the end (`OVER_PROMPT_MS`, the call wait's
+`CALL_BEFORE_US`), whose final hearing came after it, is the person answering
+early: the voice holds its reply as to any call (`call_began_ms`), but it is
+not measured. Its sound sits under the lamp's own voice, and the ears flag
+`own_voice` for 0.5 s past the end (`lamp-ears`, `own_tail_ms`), so the second
+after it would give the room after the call, not the call; nor is it told from
+the lamp's own last word heard as its name (`lamp-name`'s `not_self.rs`). So
+the prompt is offered again with its own number and spends nothing, under the
+same `MOST_REOFFERS` as a cut prompt; once those are used it counts as a try
+not accepted. Its record says `why: answered_early` and `offered_again`. One
+begun earlier, or over before the end, is not the call. Tests:
+`a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured`,
+`the_lamps_own_last_word_or_echo_heard_as_its_name_is_not_a_call`.
 
 A try is refused, and the person asked again, when the Unix clock moved more
 than 1 s apart from the monotonic one over the try, when a source began again

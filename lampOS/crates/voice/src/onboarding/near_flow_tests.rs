@@ -152,7 +152,9 @@ fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
 }
 
 /// Mic1's level every 100 ms from the prompt's end through 7 s, 2 dB over
-/// the quiet, rising `rise_db` at `peak_ms` after the prompt.
+/// the quiet, rising `rise_db` at `peak_ms` after the prompt. As the ears
+/// send them: flagged the lamp's own through 0.5 s past the end
+/// (`lamp-ears`, `own_tail_ms`).
 fn room(walk: &mut Onboarding, prompt: &Prompt, peak_ms: u64, rise_db: f32) {
     for after in (0..=7_000).step_by(100) {
         let level_db = FLOOR + if after == peak_ms { rise_db } else { 2.0 };
@@ -161,7 +163,7 @@ fn room(walk: &mut Onboarding, prompt: &Prompt, peak_ms: u64, rise_db: f32) {
             &RoomSound {
                 level_db,
                 floor_db: Some(FLOOR),
-                own_voice: false,
+                own_voice: after <= 500,
             },
         ));
     }
@@ -323,79 +325,87 @@ fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
         speaking: false,
     });
     assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
-    // The prompt's own tail is not an answer: a name begun 0.3 s after it
-    // ended counts.
+    // The prompt's own tail: a name heard 0.3 s after it ended.
     let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
     room(&mut walk, &prompt, 400, 21.0);
     name(&mut walk, &prompt, 300, 0.98);
-    assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
 }
 
-/// lamp-52e6, row 10: names begun 237 to 478 ms before the prompt's end
-/// were "not heard". A name begun over the prompt's last word, up to 0.5 s
-/// before its end, that ended after it is the call, its rise read from the
-/// prompt's end; one begun earlier, or over by the end, is not. Its reply is
-/// held as any call's.
+/// A name begun `before_ms` before the prompt's end, its final hearing
+/// `heard_after_ms` after it.
+fn over(walk: &mut Onboarding, prompt: &Prompt, before_ms: u64, heard_after_ms: u64, score: f32) {
+    walk.near_seen(Seen::hearing(
+        prompt.ended_ms + heard_after_ms,
+        &NameHeard {
+            score,
+            ago_ms: (before_ms + heard_after_ms) as u32,
+        },
+    ));
+}
+
+/// lamp-52e6, row 10: names begun 237 to 478 ms before the prompt's end. A
+/// name begun over the prompt's last word, up to 0.5 s before its end, that
+/// ended after it is the person answering early: its reply is held, but its
+/// sound sits under the lamp's own voice and the ears' 0.5 s tail, so it is
+/// not a try. The prompt is offered again with its own number, under the
+/// re-offers' cap; no rise is read from the room after it. One begun
+/// earlier, or over by the end, is not the call.
 #[test]
-fn a_name_begun_over_the_prompts_last_word_counts_from_its_end() {
+fn a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
-    let over = |walk: &mut Onboarding, prompt: &Prompt, before_ms: u64, heard_after_ms: u64| {
-        walk.near_seen(Seen::hearing(
-            prompt.ended_ms + heard_after_ms,
-            &NameHeard {
-                score: 0.98,
-                ago_ms: (before_ms + heard_after_ms) as u32,
-            },
-        ));
-    };
-    for (turn, before_ms) in [(1, 237), (2, 478), (3, 500)] {
+    for (turn, before_ms, again) in [(1, 237, true), (2, 478, true), (3, 500, false)] {
         let at = turn * 20 * S;
         let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
-        // The peak while the lamp still spoke is its own voice, left out.
-        walk.near_seen(Seen::level(
-            prompt.ended_ms - 100,
-            &RoomSound {
-                level_db: FLOOR + 30.0,
-                floor_db: Some(FLOOR),
-                own_voice: true,
-            },
-        ));
-        room(&mut walk, &prompt, 300, 6.0);
-        over(&mut walk, &prompt, before_ms, 200);
+        // The call's 20 dB inside the ears' own-voice tail, the room's
+        // 2 dB after it.
+        room(&mut walk, &prompt, 300, 20.0);
+        over(&mut walk, &prompt, before_ms, 200, 0.98);
         assert!(walk.near_holds_reply(prompt.ended_us - 100_000, prompt.ended_us + S));
         let judged = judge(&mut walk, &prompt);
-        assert_eq!(judged["accepted"], true, "{before_ms}: {judged}");
-        assert_eq!(judged["rise_db"].as_f64().unwrap() as f32, 6.0);
+        assert_eq!(judged["accepted"], false, "{before_ms}: {judged}");
+        assert_eq!(judged["why"], "answered_early");
+        assert_eq!(judged["prompt"], 1);
+        assert_eq!(judged["offered_again"], again);
+        assert!(judged.get("rise_db").is_none(), "{judged}");
     }
-    let store = Store::new(None);
-    let mut walk = store.cycle(S);
+    assert!(walk.kept().near_call_tries.is_empty());
+    // The third counts.
+    assert_eq!(walk.kept().near_call_prompts, 1);
     // Begun 501 ms before the end: talking over the prompt, not the call.
-    let prompt = play(&mut walk, 20 * S, 1_760_000_020_000, 1);
-    room(&mut walk, &prompt, 300, 6.0);
-    over(&mut walk, &prompt, 501, 200);
+    let prompt = play(&mut walk, 80 * S, 1_760_000_080_000, 4);
+    room(&mut walk, &prompt, 300, 20.0);
+    over(&mut walk, &prompt, 501, 200, 0.98);
     assert!(!walk.near_holds_reply(prompt.ended_us, prompt.ended_us + S));
     assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
     // Begun and over before the end: its final hearing came before it.
-    let prompt = play(&mut walk, 40 * S, 1_760_000_040_000, 2);
-    room(&mut walk, &prompt, 300, 6.0);
-    walk.near_seen(Seen::hearing(
-        prompt.ended_ms,
-        &NameHeard {
-            score: 0.98,
-            ago_ms: 400,
-        },
-    ));
+    let prompt = play(&mut walk, 100 * S, 1_760_000_100_000, 5);
+    room(&mut walk, &prompt, 300, 20.0);
+    over(&mut walk, &prompt, 400, 0, 0.98);
     assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
-    // The lamp still speaking well past the prompt's end is not the prompt.
-    let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 3);
-    walk.near_seen(Seen::Speaking {
-        at_ms: prompt.ended_ms + 30,
-        speaking: true,
-    });
-    room(&mut walk, &prompt, 300, 6.0);
-    over(&mut walk, &prompt, 300, 200);
-    assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
+    assert!(walk.kept().near_call_tries.is_empty());
+}
+
+/// The reviewer's probes, with nobody calling: the lamp's own last word heard
+/// as its name (begun 0.3 s before the end, final 0.15 s after) and the
+/// prompt's echo heard as its name 0.2 s after the end. Neither is a call.
+#[test]
+fn the_lamps_own_last_word_or_echo_heard_as_its_name_is_not_a_call() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    over(&mut walk, &prompt, 300, 150, 0.99);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["why"], "answered_early", "{judged}");
+    assert_eq!(judged["offered_again"], true);
+    let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    name(&mut walk, &prompt, 200, 0.99);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["why"], "the lamp was speaking", "{judged}");
+    assert!(walk.kept().near_call_tries.is_empty());
 }
 
 /// lamp-52e6, row 10, try 1: the person spoke over the first prompt, so it

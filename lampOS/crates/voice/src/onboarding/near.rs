@@ -62,16 +62,19 @@ const MOST_AGO_MS: u64 = 10_000;
 const MOST_SEEN: usize = 256;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
-/// A call may begin this long before the prompt's end, over its last word,
-/// if its name ended after it: people start answering as the lamp finishes
-/// (lamp-52e6, row 10: names begun 237 to 478 ms before the end). Its rise is
-/// read from the prompt's end, where the ears no longer flag the lamp's own
-/// voice; the prompt's echo can only raise it, so the bar errs high (fewer
-/// calls let through), never low. The detector's own allowance,
-/// `crate::activity::CALL_BEFORE_US`.
+/// A name begun this long before the prompt's end, over its last word, whose
+/// final hearing came after it, is the person answering early: people start
+/// answering as the lamp finishes (lamp-52e6, row 10: names begun 237 to
+/// 478 ms before the end). Its reply is held as a call's, but it is not a
+/// try: its sound sits under the lamp's own voice, and the ears flag
+/// `own_voice` for 0.5 s past the end (`lamp-ears`, `own_tail_ms`), so its
+/// rise can't be read; nor can it be told from the lamp's own last word
+/// heard as the name. The prompt is offered again under [`MOST_REOFFERS`].
+/// The detector's own allowance, `crate::activity::CALL_BEFORE_US`.
 const OVER_PROMPT_MS: u64 = crate::activity::CALL_BEFORE_US / 1_000;
-/// A prompt cut before it played whole (someone spoke over it) is offered
-/// again with its own number, this many times in a step at most.
+/// A prompt cut before it played whole (someone spoke over it), or answered
+/// over its last word ([`OVER_PROMPT_MS`]), is offered again with its own
+/// number, this many times in a step at most.
 const MOST_REOFFERS: u8 = 2;
 /// The sentence's level bar is never under this rise over the room's quiet
 /// (a doubling of its power): in a loud office, where the person's own
@@ -305,26 +308,14 @@ impl NearFlow {
         self.named
     }
 
-    /// The try's evidence for `near_try`, the prompt having ended at
-    /// `ended_ms`: a call begun over the prompt's last word is measured from
-    /// the prompt's end ([`call_began_ms`]), and the lamp's speech that began
-    /// before that end and stopped within [`OVER_PROMPT_MS`] of it is the
-    /// prompt itself, not an answer.
-    fn take_evidence(
-        &mut self,
-        ended_ms: u64,
-    ) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
+    fn take_evidence(&mut self) -> (Vec<Hearing>, Vec<Level>, Vec<Spoke>, Option<&'static str>) {
         let mut hearings = Vec::new();
         let mut levels = Vec::new();
         let mut spoke: Vec<Spoke> = Vec::new();
         let mut open: Option<u64> = None;
         for seen in self.seen.drain(..) {
             match seen {
-                Seen::Hearing(hearing, heard_ms) => hearings.push(Hearing {
-                    began_ms: call_began_ms(&hearing, heard_ms, ended_ms)
-                        .unwrap_or(hearing.began_ms),
-                    ..hearing
-                }),
+                Seen::Hearing(hearing, _) => hearings.push(hearing),
                 Seen::Level(level) => levels.push(level),
                 Seen::Speaking { at_ms, speaking } => match (speaking, open) {
                     (true, None) => open = Some(at_ms),
@@ -346,12 +337,6 @@ impl NearFlow {
                 ended_ms: None,
             });
         }
-        spoke.retain(|spoke| {
-            spoke.began_ms >= ended_ms
-                || spoke
-                    .ended_ms
-                    .is_none_or(|end| end > ended_ms + OVER_PROMPT_MS)
-        });
         (hearings, levels, spoke, self.spoiled.take())
     }
 }
@@ -638,6 +623,18 @@ impl Onboarding {
         }
     }
 
+    /// A prompt that made no try is offered again with its own number and
+    /// spends none of the budget, [`MOST_REOFFERS`] times in a step at most.
+    fn offer_again(&mut self, sentence: bool, prompt: u8) -> bool {
+        let again = self.near.reoffered < MOST_REOFFERS && *self.prompts(sentence) == prompt;
+        if again {
+            self.near.reoffered += 1;
+            *self.prompts(sentence) = prompt - 1;
+            self.save();
+        }
+        again
+    }
+
     /// The whole prompt's playback is the only start of a try. Its end is
     /// read from the Unix clock now, at that boundary.
     pub(super) fn near_invitation_finished(
@@ -659,15 +656,8 @@ impl Onboarding {
                 "onboarding_near_try"
             };
             // Someone spoke over it (an office's voices, or the person
-            // answering early): it is offered again with its own number and
-            // spends none of the budget, twice in a step at most.
-            let again = self.near.reoffered < MOST_REOFFERS
-                && *self.prompts(offer.sentence) == offer.prompt;
-            if again {
-                self.near.reoffered += 1;
-                *self.prompts(offer.sentence) = offer.prompt - 1;
-                self.save();
-            }
+            // answering early).
+            let again = self.offer_again(offer.sentence, offer.prompt);
             self.records.push(json!({"kind":kind,"prompt":offer.prompt,
                 "accepted":false,"why":"the prompt was not played whole",
                 "offered_again":again,"at_us":now_us}));
@@ -834,15 +824,32 @@ impl Onboarding {
             return;
         }
         let listening = self.near.listening.take().expect("due");
-        // The prompt's own speech is left out: a call may begin over its
-        // last word, and its rise is read from the prompt's end on, where
-        // the ears no longer flag the lamp's own voice.
-        let (hearings, levels, spoke, spoiled) = self.near.take_evidence(listening.ended_ms);
+        // A name begun over the prompt's last word ([`OVER_PROMPT_MS`]).
+        let early = self.near.seen.iter().any(|seen| match seen {
+            Seen::Hearing(hearing, heard_ms) => {
+                hearing.began_ms < listening.ended_ms
+                    && hearing.score >= SCORE
+                    && call_began_ms(hearing, *heard_ms, listening.ended_ms).is_some()
+            }
+            _ => false,
+        });
+        let (hearings, levels, mut spoke, spoiled) = self.near.take_evidence();
+        // The prompt itself: the lamp spoke until its end.
+        spoke.push(Spoke {
+            began_ms: listening.ended_ms.saturating_sub(1),
+            ended_ms: Some(listening.ended_ms),
+        });
         let expected_ms = listening.ended_ms + now_us.saturating_sub(listening.ended_us) / 1_000;
         let judged = if (self.unix_clock)().abs_diff(expected_ms) > CLOCK_SLACK_MS {
             Err("the clock jumped".to_owned())
         } else if let Some(why) = spoiled {
             Err(why.to_owned())
+        } else if early {
+            let again = self.offer_again(false, listening.prompt);
+            self.records.push(json!({"kind":"onboarding_near_try",
+                "prompt":listening.prompt,"accepted":false,"why":"answered_early",
+                "offered_again":again,"at_us":now_us}));
+            return;
         } else {
             near_try(listening.ended_ms, &hearings, &levels, &spoke).map_err(|why| why.to_string())
         };
@@ -1001,10 +1008,12 @@ impl Onboarding {
     }
 }
 
-/// When a hearing's call began, for a try whose prompt ended at `ended_ms`:
-/// its own start, or the prompt's end for a name begun at most
-/// [`OVER_PROMPT_MS`] before it that ended after it (its final hearing,
-/// sent at `heard_ms`, came after the end). None for one begun earlier.
+/// When a hearing's call began, for holding the reply in a try whose prompt
+/// ended at `ended_ms`: its own start, or the prompt's end for a name begun
+/// at most [`OVER_PROMPT_MS`] before it that ended after it (its final
+/// hearing, sent at `heard_ms`, came after the end). None for one begun
+/// earlier. A name begun before the end is never measured: the prompt is
+/// offered again (`near_judge`).
 fn call_began_ms(hearing: &Hearing, heard_ms: u64, ended_ms: u64) -> Option<u64> {
     if hearing.began_ms >= ended_ms {
         Some(hearing.began_ms)
