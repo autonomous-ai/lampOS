@@ -33,6 +33,7 @@ name = "bedtime"
 topic = "humans/faces/tracked"
 present = false
 for = "15m"
+wait = "15m"
 rearm = "ends"
 during = { from = "23:00", to = "06:00" }
 once_per_day = true
@@ -59,11 +60,11 @@ policy = "nudge"
 
 [[do]]
 on = "evening"
-light = { colour = "warm", level = 2, for = "8s", pattern = { kind = "breathe", period = "8s", low = 1 } }
+light = { relative = { warmer = 1, dimmer = 1 }, for = "20s", pattern = { kind = "breathe", period = "10s" } }
 
 [[do]]
 on = "bedtime"
-rest = { op = "rest", during = { from = "23:00", to = "10:00" } }
+rest = { op = "rest", during = { from = "23:00", to = "10:00" }, resettle = { most = 3, after = "30s", during = { from = "23:00", to = "06:00" } } }
 
 [[do]]
 on = "morning"

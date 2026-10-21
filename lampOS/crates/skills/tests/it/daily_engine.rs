@@ -588,3 +588,88 @@ fn a_storage_fault_withholds_pending_daily_output_and_is_not_retried() {
     );
     assert!(engine.clock_tick(3).is_empty());
 }
+
+/// Row 7's try 3 on lamp-06c1 (#1672): the empty desk matured while the
+/// voice had not yet rested its 30 s. Bedtime's `wait` keeps that chance;
+/// without it the chance is spent, and the journal says so.
+#[test]
+fn bedtime_keeps_a_chance_that_matured_while_the_voice_was_listening() {
+    for wait in [true, false] {
+        let root = private_root();
+        let text = format!(
+            "[[trigger]]\nname = \"bedtime\"\ntopic = \"humans/faces/tracked\"\npresent = false\nfor = \"1m\"\n{}rearm = \"ends\"\nduring = {{ from = \"23:00\", to = \"06:00\" }}\nonce_per_day = true\n[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\nfor = \"30s\"\n[ask]\npolicy = \"nudge\"\n[[do]]\non = \"bedtime\"\nrest = {{ op = \"rest\", during = {{ from = \"23:00\", to = \"10:00\" }} }}\n",
+            if wait { "wait = \"15m\"\n" } else { "" }
+        );
+        let loaded = manifest(root.path(), &text);
+        let mut engine = Engine::new(vec![loaded], true)
+            .with_daily_journal(crate::journal(root.path().join("daily.json")));
+        let empty = br#"{"faces":[]}"#;
+        let mut fired = Vec::new();
+        let mut dropped = false;
+        for second in 0..=120_u64 {
+            let now = second * 1_000_000;
+            clock(&mut engine, now, 0, 23 * 60 + second / 60);
+            let voice: &[u8] = if second == 55 {
+                br#"{"state":"listening"}"#
+            } else {
+                br#"{"state":"resting"}"#
+            };
+            engine.observe("voice/state", now, voice, None);
+            let runs = engine.observe(Faces::TOPIC, now, empty, None);
+            dropped |= runs.iter().any(|run| {
+                run.events
+                    .iter()
+                    .any(|event| event.why.contains("bedtime chance dropped"))
+            });
+            if !calls(runs).is_empty() {
+                fired.push(second);
+            }
+        }
+        if wait {
+            // Rested again from 56 s: 30 s later, and once.
+            assert_eq!(fired, vec![86]);
+            assert!(!dropped);
+        } else {
+            assert!(fired.is_empty(), "{fired:?}");
+            assert!(dropped, "a dropped chance says so in the journal");
+        }
+    }
+}
+
+/// #1672: the evening glow is relative to the person's light, and a rest
+/// a sound ended settles again; both are checked as the manifest loads.
+#[test]
+fn relative_lights_and_resettles_are_checked_at_load() {
+    let root = private_root();
+    let path = root.path().join("daily-check");
+    let base = "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\n[ask]\npolicy = \"nudge\"\n[[do]]\n";
+    let granted_light = |step: &str| {
+        format!(
+            "[permissions]\ntopics = [\"clock/local\", \"voice/state\"]\nbody = true\nlight = true\n{base}{step}\n"
+        )
+    };
+    manifest(
+        root.path(),
+        &granted_light(
+            "light = { relative = { warmer = 1, dimmer = 1 }, for = \"20s\", pattern = { kind = \"breathe\", period = \"10s\" } }",
+        ),
+    );
+    manifest(
+        root.path(),
+        &granted_light(
+            "rest = { op = \"rest\", during = { from = \"23:00\", to = \"10:00\" }, resettle = { most = 3, after = \"30s\", during = { from = \"23:00\", to = \"06:00\" } } }",
+        ),
+    );
+    for step in [
+        "light = { relative = { warmer = 1 }, colour = \"warm\", for = \"20s\" }",
+        "light = { relative = { warmer = 0, dimmer = 0 }, for = \"20s\" }",
+        "light = { relative = { dimmer = 1 } }",
+        "light = { relative = { dimmer = 1 }, for = \"20s\", pattern = { kind = \"breathe\", low = 1 } }",
+        "light = { relative = { dimmer = 1 }, for = \"20s\", pattern = { kind = \"candle\" } }",
+        "rest = { op = \"rest\", during = { from = \"23:00\", to = \"10:00\" }, resettle = { most = 4, after = \"30s\", during = { from = \"23:00\", to = \"06:00\" } } }",
+        "rest = { op = \"cancel\", resettle = { most = 1, after = \"30s\", during = { from = \"23:00\", to = \"06:00\" } } }",
+    ] {
+        fs::write(path.join("skill.toml"), granted_light(step)).unwrap();
+        assert!(load(&path).is_err(), "{step}");
+    }
+}

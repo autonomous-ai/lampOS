@@ -853,6 +853,9 @@ impl Service {
         for notice in self.engine.take_sleep_name_notices() {
             eprintln!("lamp-expression: {notice}");
         }
+        if let Some(why) = self.engine.take_rest_ended() {
+            eprintln!("lamp-expression: ended a skill's rest: {why}");
+        }
         if self
             .last_state
             .is_none_or(|last| at_us.saturating_sub(last) >= 200_000)

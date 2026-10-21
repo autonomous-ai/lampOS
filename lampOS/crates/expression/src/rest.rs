@@ -19,6 +19,8 @@ pub(super) struct Owner {
 
 pub(super) struct Gate {
     pub eligible: bool,
+    /// Why it is not eligible: the first shut gate.
+    pub why_not: Option<&'static str>,
     pub owner: Option<Owner>,
     pub context: Context,
 }
@@ -46,6 +48,8 @@ pub(super) struct Rest {
     pub phase: Phase,
     /// Why the last request was refused, kept only while `phase` is `Refused`.
     pub reason: Option<&'static str>,
+    /// Why `sync` ended an active rest itself, until the journal takes it.
+    pub ended: Option<&'static str>,
 }
 
 impl Default for Rest {
@@ -56,6 +60,7 @@ impl Default for Rest {
             request: None,
             phase: Phase::Idle,
             reason: None,
+            ended: None,
         }
     }
 }
@@ -77,15 +82,32 @@ impl Rest {
     }
 
     pub fn sync(&mut self, now: u64, gate: &Gate, life: &mut Option<Life>) {
-        if self.active.as_ref().is_some_and(|active| {
-            now >= active.request.valid_until_us
-                || !gate.eligible
-                || gate.owner.as_ref() != Some(&active.owner)
-                || life.as_ref().is_none_or(|life| {
-                    !life.routine_owned() || !life.routine_allowed(now, &gate.context)
-                })
-        }) {
+        let Some(active) = &self.active else {
+            return;
+        };
+        let why = if now >= active.request.valid_until_us {
+            Some("its lease ran out")
+        } else if !gate.eligible {
+            Some(gate.why_not.unwrap_or("its gate is shut"))
+        } else if gate.owner.as_ref() != Some(&active.owner) {
+            Some("the voice began another turn")
+        } else {
+            match life.as_ref() {
+                None => Some("there is no life planner"),
+                Some(life) if !life.routine_owned() => Some(
+                    "a stronger reflex took it over: a name, a touch, a reminder or a conversation",
+                ),
+                Some(life) if !life.routine_allowed(now, &gate.context) => {
+                    Some("rest is no longer allowed: a hand, a lean, a look up or manual sleep")
+                }
+                Some(_) => None,
+            }
+        };
+        if let Some(why) = why {
             self.cancel(now, life);
+            // Said once, by the runtime: a cancel the skill then sends for
+            // this episode is a no-op, not a refusal (#1672).
+            self.ended = Some(why);
         }
     }
 
@@ -184,6 +206,18 @@ impl Rest {
             })
             .cloned();
         if !newer && current.is_none() {
+            // Expression may have ended the episode first (the voice heard
+            // a sound): the skill's cancel that follows asks for what is
+            // already so. Nothing is resumed or replayed (#1672).
+            // Another skill's active rest keeps its receipt.
+            if request.op == Op::Cancel && !lost_input {
+                if self.active.is_none() {
+                    self.request = Some(request);
+                    self.phase = Phase::Cancelled;
+                    self.reason = None;
+                }
+                return Ok(());
+            }
             return Err(Error("rest episode was already spent".into()));
         }
         if newer
@@ -294,6 +328,7 @@ mod tests {
             let mut life = Some(life);
             let gate = Gate {
                 eligible: true,
+                why_not: None,
                 owner: Some(Owner {
                     session: "voice".into(),
                     turn: 1,
@@ -347,5 +382,86 @@ mod tests {
                 Some("rest input lost messages; episode is spent")
             );
         }
+    }
+
+    fn resting_gate() -> Gate {
+        Gate {
+            eligible: true,
+            why_not: None,
+            owner: Some(Owner {
+                session: "voice".into(),
+                turn: 1,
+                request: 1,
+            }),
+            context: Context {
+                voice: Some(Voice::Resting),
+                free: true,
+            },
+        }
+    }
+
+    /// Row 7 on lamp-06c1 (#1672): a sound ended the rest, and the skill's
+    /// cancel of that spent episode was refused as "already spent".
+    #[test]
+    fn a_cancel_of_an_episode_a_sound_already_ended_is_a_no_op() {
+        let catalogue = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+        let mut life = Life::new(catalogue.alive.unwrap(), 2_000_000, 1_000_000);
+        life.set_scheduling(Scheduling::Skills, 1_000_000);
+        let mut life = Some(life);
+        let mut rest = Rest::default();
+        let mut request = Request {
+            stamp: ClockStamp {
+                clock_id: "host".into(),
+                at_us: 1_000_000,
+                sequence: 1,
+            },
+            skill: "routine".into(),
+            skill_session_id: "source".into(),
+            expression_session_id: "target".into(),
+            episode: 1,
+            op: Op::Rest,
+            valid_until_us: 4_000_000,
+        };
+        rest.offer(
+            1_000_000,
+            request.clone(),
+            &resting_gate(),
+            &mut life,
+            false,
+        )
+        .unwrap();
+        assert_eq!(rest.phase, Phase::Resting);
+        // The voice hears a sound: Expression ends the rest and says why.
+        let mut listening = resting_gate();
+        listening.eligible = false;
+        listening.why_not = Some("the voice is no longer resting: it is listening");
+        listening.context.voice = Some(Voice::Listening);
+        rest.sync(1_100_000, &listening, &mut life);
+        assert_eq!(rest.phase, Phase::Cancelled);
+        assert_eq!(
+            rest.ended.take(),
+            Some("the voice is no longer resting: it is listening")
+        );
+        assert!(!life.as_ref().unwrap().routine_owned());
+        // The skill's cancel of that episode asks for what is already so.
+        request.op = Op::Cancel;
+        request.stamp.at_us = 1_200_000;
+        request.stamp.sequence = 2;
+        request.valid_until_us = 4_200_000;
+        assert!(
+            rest.offer(1_200_000, request.clone(), &listening, &mut life, false)
+                .is_ok()
+        );
+        assert_eq!(rest.phase, Phase::Cancelled);
+        assert_eq!(rest.reason, None);
+        assert_eq!(rest.ended, None, "said once, not again by the cancel");
+        // It resumes nothing: a rest of the spent episode is still refused.
+        request.op = Op::Rest;
+        request.stamp.sequence = 3;
+        assert!(
+            rest.offer(1_200_000, request, &resting_gate(), &mut life, false)
+                .is_err()
+        );
+        assert!(!life.as_ref().unwrap().routine_owned());
     }
 }

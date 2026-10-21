@@ -478,16 +478,31 @@ impl Engine {
                 .concentration
                 .as_ref()
                 .is_some_and(|value| value.concentrating);
+        // The first gate that is shut, said in the journal when it ends a
+        // rest (row 7 on lamp-06c1 had a rest end without a line, #1672).
+        let why_not = if !self.enabled || self.fault.is_some() || self.cancelled {
+            Some("Expression is off, faulted or cancelled")
+        } else if self.routine_paused {
+            Some("the lamp is paused")
+        } else if self.privacy_muted {
+            Some("the microphones are off")
+        } else if !free {
+            Some("the body is held, its joints are stale, or someone is concentrating")
+        } else {
+            // Idle Voice need not retain a Listening turn. Its explicit
+            // manual mute and the physical privacy route are separate gates.
+            match voice.map(|voice| voice.state) {
+                Some(Voice::Resting) => None,
+                Some(Voice::Listening) => Some("the voice is no longer resting: it is listening"),
+                Some(Voice::Thinking | Voice::Speaking) => {
+                    Some("the voice is no longer resting: it is in a turn")
+                }
+                None => Some("the voice's state is stale"),
+            }
+        };
         rest::Gate {
-            eligible: self.enabled
-                && self.fault.is_none()
-                && !self.cancelled
-                && !self.routine_paused
-                && !self.privacy_muted
-                && free
-                // Idle Voice need not retain a Listening turn. Its explicit
-                // manual mute and the physical privacy route are separate gates.
-                && voice.is_some_and(|voice| voice.state == Voice::Resting),
+            eligible: why_not.is_none(),
+            why_not,
             owner: voice.map(|voice| rest::Owner {
                 session: voice.session_id.clone(),
                 turn: voice.turn,
@@ -576,6 +591,14 @@ impl Engine {
                     .filter(|_| routine.phase == lamp_msgs::ExpressionRestPhase::Refused)
                     .map(str::to_owned),
             })
+    }
+
+    /// Why the last active rest was ended by Expression itself, once: a
+    /// shut gate, a stronger reflex or a lapsed lease, for the journal.
+    pub fn take_rest_ended(&mut self) -> Option<&'static str> {
+        self.routine
+            .as_mut()
+            .and_then(|routine| routine.ended.take())
     }
 
     pub fn rejected_inputs(&self) -> u64 {

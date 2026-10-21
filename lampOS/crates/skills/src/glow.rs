@@ -35,6 +35,63 @@ pub const GLOW_HOLDS_US: u64 = 15_000_000;
 /// #1132). A skill that needs a level names it.
 pub const LEVEL_UNKNOWN: u8 = 3;
 
+/// The evening's warmth, coolest first (#1672): the ring's white and its
+/// amber `warm`, as the actions part's warmer steps them. Warm is as warm as
+/// evening light goes; orange and the other colours are a colour the person
+/// chose, which a glow does not change, only dims.
+pub const EVENING_WARMTH: [&str; 2] = ["white", "warm"];
+
+/// What [`Call::Relative`] is, against the person's light as the ring says
+/// it shows it (`light/state`), or why nothing is to be shown: `already
+/// evening` when the light is already as warm and as low as the steps go.
+pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> {
+    let Call::Relative {
+        warmer,
+        dimmer,
+        lasting,
+        breathe_ms,
+    } = call
+    else {
+        return Ok(call.clone());
+    };
+    let Some(now) = now else {
+        return Err("the light shown is not known");
+    };
+    if !now.on {
+        return Err("the light is off");
+    }
+    let colour = match EVENING_WARMTH.iter().position(|shade| *shade == now.colour) {
+        Some(at) => EVENING_WARMTH[(at + usize::from(*warmer)).min(EVENING_WARMTH.len() - 1)],
+        None => now.colour.as_str(),
+    };
+    let low = now.level.saturating_sub(*dimmer).max(1);
+    if colour == now.colour && low == now.level {
+        return Err("already evening");
+    }
+    // With a breath, the top is the person's level and the breath goes down
+    // the steps and back: one step dimmer, breathing back. At level 1 there
+    // is no step under it, and the light is steady.
+    let (level, pattern) = match breathe_ms {
+        Some(period_ms) if low < now.level => (
+            now.level,
+            Some(LightPattern {
+                kind: PatternKind::Breathe,
+                period_ms: *period_ms,
+                low,
+            }),
+        ),
+        _ => (low, None),
+    };
+    Ok(Call::Light {
+        colour: colour.into(),
+        level: Some(level),
+        lasting: lasting.clone(),
+        pattern,
+        keep: false,
+        until_ends: false,
+    })
+}
+
 /// How a skill asks the ring for its light: the bus, to see that the ring
 /// takes `light/request`, the publisher on it, the boot its claims are on,
 /// and how often a light kept is asked again.
@@ -662,5 +719,94 @@ mod tests {
         assert_eq!(request.claim.source.len(), 64);
         assert!(request.check().is_ok());
         glow.give_back();
+    }
+
+    fn evening(breathe_ms: Option<u32>) -> Call {
+        Call::Relative {
+            warmer: 1,
+            dimmer: 1,
+            lasting: Some("20s".into()),
+            breathe_ms,
+        }
+    }
+
+    /// Row 7 on lamp-06c1 (#1672): the ring was already warm at level 1,
+    /// and the fixed evening glow asked for warm 2 breathing to 1, which
+    /// nobody saw. Relative to that light there is nothing to show.
+    #[test]
+    fn a_warm_level_one_light_is_already_evening_and_nothing_is_asked() {
+        for breathe in [Some(10_000), None] {
+            assert_eq!(
+                relative(Some(&light(true, "warm", 1)), &evening(breathe)),
+                Err("already evening")
+            );
+        }
+        // Orange is warmer than evening light goes: a colour kept, at 1.
+        assert_eq!(
+            relative(Some(&light(true, "orange", 1)), &evening(None)),
+            Err("already evening")
+        );
+        assert_eq!(
+            relative(Some(&light(false, "white", 4)), &evening(None)),
+            Err("the light is off")
+        );
+        assert_eq!(
+            relative(None, &evening(None)),
+            Err("the light shown is not known")
+        );
+    }
+
+    #[test]
+    fn a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer() {
+        // Breathing: from the person's level down one step and back.
+        let Ok(Call::Light {
+            colour,
+            level,
+            pattern,
+            lasting,
+            keep,
+            until_ends,
+        }) = relative(Some(&light(true, "white", 4)), &evening(Some(10_000)))
+        else {
+            panic!("a light");
+        };
+        assert_eq!((colour.as_str(), level), ("warm", Some(4)));
+        let pattern = pattern.unwrap();
+        assert_eq!(
+            (pattern.kind, pattern.period_ms, pattern.low),
+            (PatternKind::Breathe, 10_000, 3)
+        );
+        assert!(pattern.check(4).is_ok());
+        assert_eq!(lasting.as_deref(), Some("20s"));
+        assert!(!keep && !until_ends);
+        // Steady: one step dimmer.
+        let Ok(Call::Light {
+            colour,
+            level,
+            pattern,
+            ..
+        }) = relative(Some(&light(true, "white", 4)), &evening(None))
+        else {
+            panic!("a light");
+        };
+        assert_eq!((colour.as_str(), level, pattern), ("warm", Some(3), None));
+        // A colour the person chose keeps its colour and is only dimmed.
+        let Ok(Call::Light { colour, level, .. }) =
+            relative(Some(&light(true, "blue", 3)), &evening(None))
+        else {
+            panic!("a light");
+        };
+        assert_eq!((colour.as_str(), level), ("blue", Some(2)));
+        // White at level 1: warmer only, steady, as no step is under it.
+        let Ok(Call::Light {
+            colour,
+            level,
+            pattern,
+            ..
+        }) = relative(Some(&light(true, "white", 1)), &evening(Some(10_000)))
+        else {
+            panic!("a light");
+        };
+        assert_eq!((colour.as_str(), level, pattern), ("warm", Some(1), None));
     }
 }

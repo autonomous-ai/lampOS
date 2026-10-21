@@ -1050,6 +1050,16 @@ by the existing lease rather than a separate stream-gap notification. A routine 
 or privacy sleep. Existing Body fold, pause, range and motor guards remain
 authoritative; Expression does not infer unfolding from joint angles.
 
+When Expression ends an active rest itself, its journal says why once:
+`lamp-expression: ended a skill's rest: <why>`, the first shut gate (the
+voice listening or in a turn, privacy, a pause, a held body, a stale voice),
+a changed Voice turn, a stronger reflex, rest no longer allowed, or the
+lease running out. A `cancel` the skill then sends for that already ended
+episode is a no-op: it is accepted with a `cancelled` receipt (unless
+another skill's rest is active, whose receipt is kept) and resumes nothing.
+Before #1672 it was refused as "rest episode was already spent". A cancel
+that arrives with lost input is still refused.
+
 Each accepted or refused episode leaves a tombstone. Cancelled or completed
 episodes cannot be renewed into activity. New publisher boots retire old
 Skills sessions across all skills. The planner remembers at most 32

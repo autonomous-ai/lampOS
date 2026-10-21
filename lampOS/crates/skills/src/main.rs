@@ -1881,6 +1881,23 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
+        // A light relative to the person's is made from the light shown as
+        // the run began (#1672): already as warm and low as its steps go,
+        // nothing is shown, and the journal says `already evening`.
+        let calls: Vec<Call> = calls
+            .into_iter()
+            .filter_map(
+                |call| match lamp_skills::glow::relative(before.as_ref(), &call) {
+                    Ok(call) => Some(call),
+                    Err(why) => {
+                        eprintln!(
+                            "lamp-skills: skill:{skill}: {why}: its relative light is not shown"
+                        );
+                        None
+                    }
+                },
+            )
+            .collect();
         // Rest bypasses perform's per-output checks. Check the whole plan
         // first: a denied accompanying cue must never cause an earlier wake.
         if calls.iter().any(|call| matches!(call, Call::Rest(_)))
@@ -3561,6 +3578,8 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         };
     match call {
         Call::PrepareUnplug => "unplug preparation must run with its completion check".into(),
+        // Made into a light as its run begins: one left here was not.
+        Call::Relative { .. } => "relative light: not made against the light shown".into(),
         Call::Gaze { face: None } => "look at the face: no face in view".into(),
         Call::Gaze {
             face: Some((x, y, size)),
@@ -4463,6 +4482,7 @@ mod tests {
                     vec![
                         Call::Rest(routine::Rest {
                             op,
+                            resettle: None,
                             during: (op == Op::Rest)
                                 .then(|| Window::parse("23:00", "10:00").unwrap()),
                         }),
