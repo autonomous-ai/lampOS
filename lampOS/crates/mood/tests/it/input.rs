@@ -8,8 +8,8 @@ use lamp_mood::{
 };
 use lamp_msgs::{
     AirFeel, AirState, ClockStamp, ControlGesture, ControlIntent, ControlSource, ControlsState,
-    Face, Faces, Gesture, HoldTier, NameHeard, ScheduleDue, ScheduleNotice, Speech, SuddenSound,
-    Voice, VoiceState,
+    Face, Faces, Gesture, HoldTier, MoodNudge, NameHeard, ScheduleDue, ScheduleNotice, Speech,
+    SuddenSound, Voice, VoiceState,
 };
 
 const NOW: u64 = 10_000_000;
@@ -1102,5 +1102,59 @@ fn how_a_face_seems_is_taken_only_when_switched_on_and_as_its_kind() {
             .with_seems(true)
             .ingest(&wrong, NOW, WALL)
             .is_err()
+    );
+}
+
+/// A kept add-on's nudge (#2530): taken only from the add-ons' judge, on
+/// this boot's clock, in its bounds; held until its own end, not the
+/// message's.
+#[test]
+fn a_nudge_is_taken_only_from_the_add_ons_judge_and_in_bounds() {
+    let index = INPUTS
+        .iter()
+        .position(|spec| spec.topic == MoodNudge::TOPIC)
+        .unwrap();
+    let nudge = MoodNudge {
+        stamp: stamp(),
+        addon: "music-mood".into(),
+        energy: 0.05,
+        warmth: 0.1,
+        until_us: NOW + 600_000_000,
+    };
+    let events = adapter()
+        .ingest(&message(index, &nudge), NOW, WALL)
+        .unwrap();
+    assert_eq!(
+        events.iter().map(|event| &event.kind).collect::<Vec<_>>(),
+        [&EventKind::Nudge {
+            energy_milli: 50,
+            warmth_milli: 100,
+            until_us: NOW + 600_000_000,
+        }]
+    );
+    let mut skill = message(index, &nudge);
+    skill.header.source = "skills".into();
+    assert_eq!(
+        adapter().ingest(&skill, NOW, WALL),
+        Err(InputError::InvalidHeader)
+    );
+    let too_much = MoodNudge {
+        energy: 0.2,
+        ..nudge.clone()
+    };
+    assert_eq!(
+        adapter().ingest(&message(index, &too_much), NOW, WALL),
+        Err(InputError::InvalidPayload)
+    );
+    let other_boot = MoodNudge {
+        stamp: ClockStamp {
+            clock_id: "another-boot".into(),
+            ..stamp()
+        },
+        ..nudge
+    };
+    assert_eq!(
+        adapter().ingest(&message(index, &other_boot), NOW, WALL),
+        Err(InputError::WrongClock)
     );
 }

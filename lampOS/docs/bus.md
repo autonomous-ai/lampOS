@@ -588,6 +588,7 @@ the service installed the topic is never made.
 |---|---|---|---|
 | `addon/proposal` | event, no period, no lifespan | `lamp-skills`, with `LAMP_ADDONS=on` | `lamp-addons`, the add-ons' judge ([addons.md](addons.md)) |
 | `addon/decision` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | People, the journal and the app: each proposal kept or dropped, and why |
+| `mood/nudge` | event, no period, no lifespan | `lamp-addons`, with `LAMP_ADDONS=on` | `lamp-mood`: a kept add-on's mood, held inside Mood's own bounds until its end (#2530) |
 
 [`AddonProposal`](msgs.md): what a partner's add-on suggests, never an
 order. Without `LAMP_ADDONS=on` the topic is never made.

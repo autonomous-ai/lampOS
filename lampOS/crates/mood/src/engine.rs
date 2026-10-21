@@ -29,7 +29,7 @@ const WARMTH_CAP: f64 = 0.85;
 const AIR_REDUCTION: f64 = 0.08;
 const SLEEP_THRESHOLD: f64 = 0.25;
 const CHANGE_DELTA: f64 = 0.01;
-const EVENT_STREAMS: usize = 13;
+const EVENT_STREAMS: usize = 14;
 /// How someone near seems (#1671, `LAMP_MOOD_SEEMS`): small, like a pet's,
 /// and nothing kept of anyone. A smile is two `positive` reads in a row
 /// (about 4 s); someone low, three `negative` (about 6 s).
@@ -44,6 +44,20 @@ pub const SMILE_COOLDOWN_US: u64 = 120 * SECOND_US;
 /// energy a step lower, unless they smile or nobody is near.
 pub const QUIET_US: u64 = 2 * MINUTE_US;
 const QUIET_REDUCTION: f64 = 0.10;
+
+/// An add-on's nudge moves energy or warmth this much at most (#2530, the
+/// first builder's bound), inside the clamps that hold without it...
+pub const NUDGE_MOST: f64 = 0.1;
+/// ...and fades to nothing over its last minute.
+pub const NUDGE_FADE_US: u64 = MINUTE_US;
+
+/// The newest kept nudge: what it adds, and until when.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Nudge {
+    energy: f64,
+    warmth: f64,
+    until_us: u64,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FaceTarget {
@@ -93,6 +107,14 @@ pub enum EventKind {
     /// One read of how the near face seems (#1671, the eyes'
     /// `humans/seems`), `None` for `unsure`.
     Seems(Option<SeemsKind>),
+    /// A kept add-on's nudge (#2530, `mood/nudge`), in thousandths: energy
+    /// both ways, warmth up only, each [`NUDGE_MOST`] at most, held until
+    /// `until_us`.
+    Nudge {
+        energy_milli: i16,
+        warmth_milli: u16,
+        until_us: u64,
+    },
 }
 
 impl EventKind {
@@ -111,6 +133,7 @@ impl EventKind {
             Self::Air(_) => 10,
             Self::Familiar(_) => 11,
             Self::Seems(_) => 12,
+            Self::Nudge { .. } => 13,
         }
     }
 }
@@ -229,6 +252,8 @@ pub struct Engine {
     /// The lamp's one breath, from 0 to 1 (#1670): begun where the plain
     /// breath is, moved on at the pace whenever time does, never jumped.
     breath_phase: f64,
+    /// The newest add-on nudge (#2530); none after it ends or in sleep.
+    nudge: Option<Nudge>,
 }
 
 impl Engine {
@@ -266,6 +291,7 @@ impl Engine {
             last_smile_us: None,
             quiet_until_us: None,
             breath_phase: plain_breath_phase(now_us),
+            nudge: None,
         })
     }
 
@@ -382,7 +408,9 @@ impl Engine {
         } else {
             0.0
         };
-        (BASE_ENERGY - self.air_reduction - quiet + self.energy_pulse).clamp(0.0, ENERGY_CAP)
+        let (nudge, _) = self.nudge_at(self.now_us);
+        (BASE_ENERGY - self.air_reduction - quiet + self.energy_pulse + nudge)
+            .clamp(0.0, ENERGY_CAP)
     }
 
     /// Keeping someone low company: while its two minutes last and a face
@@ -392,7 +420,18 @@ impl Engine {
     }
 
     fn warmth(&self) -> f64 {
-        (BASE_WARMTH + self.warmth_pulse).clamp(BASE_WARMTH, WARMTH_CAP)
+        let (_, nudge) = self.nudge_at(self.now_us);
+        (BASE_WARMTH + self.warmth_pulse + nudge).clamp(BASE_WARMTH, WARMTH_CAP)
+    }
+
+    /// What the nudge adds to energy and warmth at `at_us`: all of it until
+    /// its last minute, then less, to nothing at `until_us`.
+    fn nudge_at(&self, at_us: u64) -> (f64, f64) {
+        let Some(nudge) = self.nudge.filter(|nudge| at_us < nudge.until_us) else {
+            return (0.0, 0.0);
+        };
+        let share = ((nudge.until_us - at_us) as f64 / NUDGE_FADE_US as f64).min(1.0);
+        (nudge.energy * share, nudge.warmth * share)
     }
 
     fn changed(&self, next: &Self) -> bool {
@@ -539,6 +578,20 @@ impl Engine {
                 self.familiar = level.map(|level| (level, event.valid_until_us));
             }
             EventKind::Seems(kind) => self.seems(now_us, observed, kind),
+            // Asleep, the lamp takes no nudge; the judge keeps none then.
+            EventKind::Nudge {
+                energy_milli,
+                warmth_milli,
+                until_us,
+            } if !self.asleep => {
+                let most = |value: f64| value.clamp(-NUDGE_MOST, NUDGE_MOST);
+                self.nudge = Some(Nudge {
+                    energy: most(f64::from(energy_milli) / 1_000.0),
+                    warmth: most(f64::from(warmth_milli) / 1_000.0),
+                    until_us,
+                });
+            }
+            EventKind::Nudge { .. } => {}
             EventKind::Air(co2) => {
                 let high_since_us = co2.filter(|ppm| *ppm >= 1_200).map(|_| {
                     self.air
@@ -623,6 +676,7 @@ impl Engine {
         self.face = None;
         self.seems_run = None;
         self.quiet_until_us = None;
+        self.nudge = None;
     }
 
     fn maybe_sleep(&mut self, at_us: u64) {

@@ -38,6 +38,9 @@ pub struct Watcher {
     resting: Option<Reading<bool>>,
     /// Setup's last word had an invitation pending.
     setting_up: bool,
+    /// The voice's publisher boot, as `voice/state` last came: a new one is
+    /// a restarted voice, which may say no mute any more.
+    voice_boot: Option<String>,
     voice_resting: Option<Reading<bool>>,
     room_quiet: Option<Reading<bool>>,
     /// The newest light a person set this boot, if any.
@@ -90,8 +93,23 @@ impl Watcher {
         self.setting_up = !pending.invitations.is_empty();
     }
 
-    /// `voice/state`.
-    pub fn voice(&mut self, voice: &VoiceState, at_us: u64) {
+    /// `voice/state`, from the voice's publisher `boot`. A voice restarted
+    /// (a new boot) may run without the head's controls and say no mute, so
+    /// the old mute is forgotten and its silence is waited for afresh, as at
+    /// the judge's start; otherwise that mute would go stale and hold the
+    /// lamp asleep until the judge restarted.
+    pub fn voice(&mut self, voice: &VoiceState, at_us: u64, boot: &str) {
+        if self
+            .voice_boot
+            .as_deref()
+            .is_some_and(|known| known != boot)
+        {
+            self.muted_asleep = None;
+            self.began_us = at_us;
+        }
+        if self.voice_boot.as_deref() != Some(boot) {
+            self.voice_boot = Some(boot.to_owned());
+        }
         self.voice_resting = Some(Reading::new(voice.state == Voice::Resting, at_us));
     }
 
@@ -258,6 +276,34 @@ mod tests {
         );
     }
 
+    /// The reviewer-lead's P3 on #2553: a voice restarted without the head's
+    /// controls says no mute, so the old one must not hold the lamp asleep.
+    #[test]
+    fn a_restarted_voice_forgets_the_old_mute_and_is_waited_for_afresh() {
+        let mut watcher = Watcher::new(0);
+        let resting = VoiceState {
+            state: Voice::Resting,
+        };
+        watcher.voice(&resting, 1_000_000, "voice-a");
+        watcher.mute(
+            &VoiceMute {
+                muted: false,
+                reason: None,
+            },
+            1_000_000,
+        );
+        // The same voice saying its state again keeps its mute.
+        watcher.voice(&resting, 2_000_000, "voice-a");
+        assert_eq!(
+            watcher.situation(9_000_000).asleep.unwrap().at_us,
+            1_000_000
+        );
+        // Restarted: unknown for a moment, then the rest skill alone.
+        watcher.voice(&resting, 10_000_000, "voice-b");
+        assert_eq!(watcher.situation(11_000_000).asleep, None);
+        assert!(!watcher.situation(13_000_000).asleep.unwrap().value);
+    }
+
     #[test]
     fn setup_with_an_invitation_pending_is_setting_up() {
         let mut watcher = Watcher::default();
@@ -321,6 +367,7 @@ mod tests {
                 state: Voice::Listening,
             },
             1,
+            "voice-a",
         );
         let s = watcher.situation(1);
         assert!(!s.room_quiet.unwrap().value);
@@ -331,6 +378,7 @@ mod tests {
                 state: Voice::Resting,
             },
             2,
+            "voice-a",
         );
         let s = watcher.situation(2);
         assert!(s.room_quiet.unwrap().value && s.voice_resting.unwrap().value);

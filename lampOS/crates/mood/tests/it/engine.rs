@@ -1,7 +1,7 @@
 use lamp_mood::engine::{
     AIR_QUALIFY_US, DIRECT_ATTENTION_US, ENERGY_HALF_LIFE_US, Engine, Event, EventKind,
-    FACE_ATTENTION_US, FaceTarget, MAX_EVENT_LEASE_US, MINUTE_US, QUIET_BEGIN_US, QUIET_FULL_US,
-    Reject, SECOND_US, SUDDEN_COOLDOWN_US, WARMTH_COOLDOWN_US, WARMTH_HALF_LIFE_US,
+    FACE_ATTENTION_US, FaceTarget, MAX_EVENT_LEASE_US, MINUTE_US, NUDGE_FADE_US, QUIET_BEGIN_US,
+    QUIET_FULL_US, Reject, SECOND_US, SUDDEN_COOLDOWN_US, WARMTH_COOLDOWN_US, WARMTH_HALF_LIFE_US,
 };
 use lamp_msgs::{
     AttentionTarget, Familiarity, MOOD_STATE_PERIOD_US, MOOD_STATE_TTL_US, MoodState, mood_topics,
@@ -1166,4 +1166,76 @@ fn a_sleeping_lamp_takes_nothing_from_how_a_face_seems() {
         close(value.warmth, 0.60);
         assert!(value.asleep);
     }
+}
+
+fn nudge(energy_milli: i16, warmth_milli: u16, until_us: u64) -> EventKind {
+    EventKind::Nudge {
+        energy_milli,
+        warmth_milli,
+        until_us,
+    }
+}
+
+/// An add-on's kept nudge (#2530): all of it until its last minute, then
+/// fading to nothing at its end.
+#[test]
+fn an_add_ons_nudge_holds_then_fades_over_its_last_minute() {
+    let mut mood = engine(DAY);
+    let until = 10 * MINUTE_US;
+    send(&mut mood, 1, nudge(100, 100, until));
+    close(state(&mood).energy, 0.40);
+    close(state(&mood).warmth, 0.70);
+    mood.advance(until - NUDGE_FADE_US, DAY).unwrap();
+    close(state(&mood).energy, 0.40);
+    mood.advance(until - NUDGE_FADE_US / 2, DAY).unwrap();
+    close(state(&mood).energy, 0.35);
+    close(state(&mood).warmth, 0.65);
+    mood.advance(until, DAY).unwrap();
+    close(state(&mood).energy, 0.30);
+    close(state(&mood).warmth, 0.60);
+}
+
+/// The first builder's bound: no nudge moves energy or warmth past the
+/// clamps that hold without it, and none moves either by more than 0.1.
+#[test]
+fn a_nudge_never_moves_energy_or_warmth_past_its_clamp() {
+    let until = 10 * MINUTE_US;
+    // Down: energy never below 0, and warmth never below its neutral.
+    let mut low = engine(DAY);
+    send(&mut low, 1, nudge(-30_000, 0, until));
+    close(state(&low).energy, 0.20);
+    close(state(&low).warmth, 0.60);
+    // Up, from as high as the lamp gets by itself.
+    let mut high = engine(DAY);
+    send(&mut high, 1, EventKind::SuddenSound);
+    send(&mut high, 1 + SUDDEN_COOLDOWN_US, EventKind::SuddenSound);
+    let begun = 2 + SUDDEN_COOLDOWN_US;
+    for step in 0..40 {
+        send(
+            &mut high,
+            begun + step * WARMTH_COOLDOWN_US,
+            EventKind::Touch { kind: true },
+        );
+    }
+    let at = begun + 40 * WARMTH_COOLDOWN_US;
+    send(&mut high, at, EventKind::SuddenSound);
+    let plain = state(&high);
+    send(&mut high, at + 1, nudge(30_000, 30_000, at + until));
+    let value = state(&high);
+    assert!(value.energy <= 0.70, "{}", value.energy);
+    assert!(value.energy - plain.energy <= 0.100_001, "{value:?}");
+    close(value.warmth, 0.85);
+}
+
+#[test]
+fn the_newest_nudge_replaces_the_last_and_sleep_takes_none() {
+    let mut mood = engine(DAY);
+    send(&mut mood, 1, nudge(100, 0, 10 * MINUTE_US));
+    send(&mut mood, 2, nudge(-50, 20, 10 * MINUTE_US));
+    close(state(&mood).energy, 0.25);
+    close(state(&mood).warmth, 0.62);
+    let mut asleep = engine(NIGHT);
+    send(&mut asleep, 1, nudge(100, 100, 10 * MINUTE_US));
+    close(state(&asleep).energy, 0.30);
+    close(state(&asleep).warmth, 0.60);
 }

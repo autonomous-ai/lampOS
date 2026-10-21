@@ -6,7 +6,7 @@
 //! The judge keeps one asker per add-on, `addon:<name>`; its claim lapses by
 //! itself at the proposal's `holds_ms` (at most 30 s), and a person's own
 //! light is over it at once.
-use lamp_msgs::{AddonProposal, Claim, Light, LightRequest, Priority};
+use lamp_msgs::{AddonProposal, Claim, ClockStamp, Light, LightRequest, MoodNudge, Priority};
 
 /// The claim's source for an add-on's light: one a partner's skill cannot
 /// take, as a skill's is `skill:<name>`.
@@ -39,6 +39,30 @@ pub fn light_request(
         fade_ms: None,
     };
     request.check().ok().map(|()| request)
+}
+
+/// Mood's nudge for a kept `mood` proposal, the `sequence`th the judge
+/// says on `clock_id` at `now_us`, holding its `for_ms`. `None` for any
+/// other act, or a nudge that does not pass Mood's own check (warmth down).
+pub fn mood_nudge(
+    proposal: &AddonProposal,
+    clock_id: &str,
+    now_us: u64,
+    sequence: u64,
+) -> Option<MoodNudge> {
+    let mood = proposal.mood.as_ref()?;
+    let nudge = MoodNudge {
+        stamp: ClockStamp {
+            clock_id: clock_id.into(),
+            at_us: now_us,
+            sequence,
+        },
+        addon: proposal.addon.clone(),
+        energy: mood.energy.unwrap_or(0.0),
+        warmth: mood.warmth.unwrap_or(0.0),
+        until_us: now_us + u64::from(mood.for_ms) * 1_000,
+    };
+    nudge.check().ok().map(|()| nudge)
 }
 
 #[cfg(test)]
@@ -109,6 +133,10 @@ mod tests {
             ..glow()
         };
         assert!(light_request(&lift, "b", 0).is_none());
+        let nudge = mood_nudge(&lift, "b", 5, 1).unwrap();
+        assert_eq!((nudge.energy, nudge.warmth), (0.1, 0.0));
+        assert_eq!(nudge.until_us, 5 + 600_000_000);
+        assert!(mood_nudge(&glow(), "b", 5, 1).is_none());
     }
 
     #[test]

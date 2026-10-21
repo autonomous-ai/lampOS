@@ -214,6 +214,7 @@ shape, age and ordering checks before the pure engine accepts an event.
 | `schedule/due` / `ScheduleDue` | `schedule` | 3 s | A user-created due-item token, not reminder text, delivery acknowledgement or speech permission. |
 | `humans/familiar` / `HumanFamiliar` | `eyes` | 5 s | The level of the remembered person recognised at the lamp, or none; no name (#1670, `lamp-eyes --visits on`). Held for its lease, never kept. |
 | `humans/seems` / `HumanSeems` | `eyes` | 5 s | How the near face seems, as its kind only (`unsure` is none, the confidence stays the reader's), with `LAMP_MOOD_SEEMS=on`; without it Mood doesn't subscribe to it, and the adapter drops any before it is read (#1671, `lamp-eyes --seems` or `--seems-blendshapes`). Only the count of reads in a row of one kind is kept, never a read or whose face. Every read counts, whichever reader said it (`from`), so with both of the eyes' readers on a run would mix them at twice the rate: a lamp trying it runs one reader. |
+| `mood/nudge` / `MoodNudge` | `addons` | 3 s | A kept add-on's nudge (#2530, [addons.md](addons.md)), written only by the add-ons' judge with `LAMP_ADDONS=on`. Energy moves both ways and warmth up only, each 0.1 at most, added before Mood's own clamps, so neither passes them. Held until its `until_us` (10 minutes at most), fading over its last minute; the newest replaces the last; none is taken asleep, and sleep ends one. |
 
 **On the second voice route** (`LAMP_VOICE_ROUTE=second`, the owner's rule
 of 19 Oct that a voice feature works there too). Only the first two inputs
