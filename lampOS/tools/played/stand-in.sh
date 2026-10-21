@@ -12,6 +12,8 @@
 #                     that one alias on the fixture's machine with Claude Code, in place of the unit's --targets
 #   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on)
 #   PLAYED_TASKS      a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
+# lamp-tasks always gets a store of its own for the run ($PLAYED_REMOTE/store, in place of --dir): the real one is
+# never touched.
 #   PLAYED_REMOTE     the stand-in's folder (default /usr/local/lib/played-stand-in; /run may be noexec)
 # and, for stand-in-test.sh, PLAYED_UNITS (where the drop-ins go, default /run/systemd/system) and SYSTEMCTL.
 REMOTE=${PLAYED_REMOTE:-/usr/local/lib/played-stand-in}
@@ -68,6 +70,13 @@ in)
     exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--targets [^ ]+#--targets $REMOTE/targets.json#")
     echo "the run's target: $alias (Claude Code on the stand-in's machine)"
   fi
+  # A store of its own for the run, empty at the start and removed with the rest, so nothing a check makes outlives
+  # it (lamp-4ace, 22 Oct 05:4x: the calendar run's task 381 stayed in the real store and was told in the email run).
+  case "$exec_line" in *"--dir "*) ;; *) fail "lamp-tasks' ExecStart has no --dir";; esac
+  store=$REMOTE/store
+  rm -rf "$store" && mkdir -p "$store" || fail "mkdir $store failed"
+  chown "$user:$group" "$store" && chmod 0700 "$store" || fail "chown or chmod of $store failed"
+  exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--dir [^ ]+#--dir $store#")
   # Its --harness swapped for the stand-in, with --sign-in-by-code.
   exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--harness [^ ]+#--harness $REMOTE/harness#")
   case "$exec_line" in *--sign-in-by-code*) ;; *) exec_line="$exec_line --sign-in-by-code";; esac
@@ -80,7 +89,7 @@ in)
   $SYSTEMCTL daemon-reload && $SYSTEMCTL restart lamp-tasks lamp-voice || {
     rm -f "$TASKS_DROP" "$VOICE_DROP"; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart lamp-tasks lamp-voice
     fail "restarting with the stand-in failed; put back"; }
-  echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness"
+  echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness, its store $store"
   ;;
 out)
   rm -f "$TASKS_DROP" "$VOICE_DROP"
