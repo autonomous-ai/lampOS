@@ -902,3 +902,58 @@ been in since 20 Oct)
   Edited both via the API once I noticed GitHub hadn't rendered the
   code spans. PR bodies in the same session were unaffected — checked
   all three.
+
+## 21 Oct — the Skills Store, split in two; `skills.install` plumbing
+
+- The first builder's 17:57 ask: "the app's skills store page on
+  Backend2's catalogue." A fork's research found #1698 is actually
+  the *lamp-side* install work (merged precedent, not a live
+  catalogue), and lampOS's own `skills.catalog` kind — a real name,
+  grepped for — has zero implementation anywhere; the lamp team's own
+  doc still says "`catalog` and `install`... once the update channel
+  carries skills," and only `install` shipped. No REST or MQTT
+  endpoint for *listing* the catalogue exists anywhere I could find.
+- Split the task: built the MQTT `skills.install` half now (safe and
+  fully specified), asked on #2602 for the catalogue-listing
+  endpoint's owner and shape before building the browse UI, since
+  guessing it would mean writing against an invented contract for a
+  feature that installs arbitrary packages on real lamp hardware.
+- **Safety-checked before writing code**, same discipline as the
+  Wi-Fi probe: read the real `crates/skills/src/package.rs` on
+  `lamp-voice`. Its own test
+  (`a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off`)
+  confirms an empty `{}` probe gets `NOT_A_STORE_URL` before the
+  helper is ever asked — `url`'s extraction is the Rust struct
+  literal's first field and short-circuits on `?` before
+  `sha256`/`name`/`version`, and before any network fetch. Also
+  confirmed `http://` and `file://` both refuse the same way, so no
+  lamp build can ever let the probe trigger a real fetch.
+- Added `LampSkillsKind.install`/`.installing()`,
+  `LampSkillsSays.notAStoreUrl`/`.notASha256`/`.notAVersion` (word for
+  word from `package.rs`), `LampSkillsList.installs` (its own switch,
+  `LAMP_SKILLS_STORE`, independent of `removes`). Generalized the
+  notifier's `_probe()` to take a kind, probing remove and install
+  side by side. Renamed `fromRemoveReply` → `fromChangeReply`, now
+  taking explicit `removes`/`installs` so a successful install can't
+  silently reset what was already known about remove, or the reverse
+  — the bug I'd have shipped by just hardcoding the one flag I was
+  touching.
+- `flutter analyze`: clean on the 3 changed files. `flutter test`:
+  14/14 on the file (5 new), 869/0 on the full suite.
+- Opened [ecm-sds-mobile#30](https://github.com/autonomous-ai/ecm-sds-mobile/pull/30)
+  onto `v3`. Asked the catalogue question on
+  [#2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6316773843).
+- Along the way: hit a real scare when `crates/cloud/src/skills.rs`
+  referenced symbols (`lamp_skills::package::Asked`, `STORE_OFF`,
+  `NOT_A_STORE_URL`) that genuinely didn't exist in
+  `crates/skills/src/package.rs` on my research worktree — turned out
+  I'd cherry-picked one file from `origin/lamp-voice` with
+  `git checkout origin/lamp-voice -- <path>` without syncing its
+  sibling crate, leaving the worktree in a self-inconsistent state
+  that looked like a real compile error upstream. A full
+  `git checkout origin/lamp-voice -- .` fixed it. Also used the
+  moment to verify, from first principles, that `autonomous-ai/lampOS`
+  and `autonomous-ai/ecm-sds-mobile` are both real repos under the
+  real org (`gh repo view`) — they are, public and private
+  respectively — since the scare briefly raised the question of
+  whether any of this session's work was real.
