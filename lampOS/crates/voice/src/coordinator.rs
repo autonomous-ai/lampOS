@@ -1544,6 +1544,34 @@ fn mandatory(worker: &Worker, standby: bool) -> bool {
     worker.role != "second" || !standby
 }
 
+/// A worker's refused authority send, as the session ends on it. On the
+/// Controls route a privacy worker that ended cleanly is its switch
+/// unreadable, as at its start (`privacy_started`): the microphones stay
+/// closed and the wait reads it again, never an exit (lamp-75c9, 21 Oct
+/// 22:32:43: the session's new worker had ended on `physical privacy source
+/// expired` before the first publish, and `privacy.c.p: Connection refused`
+/// ended the voice). Its end is waited for at most [`ENDED_WITHIN`]; one that
+/// crashed, or hasn't ended by then, ends the voice as before.
+fn authority_refused(worker: &mut Worker, privacy_controls: bool, error: io::Error) -> io::Error {
+    if !privacy_controls || worker.role != "privacy" {
+        return error;
+    }
+    let until = std::time::Instant::now() + ENDED_WITHIN;
+    loop {
+        match worker.try_exit() {
+            Ok(Some(status)) if status.success() => return service_privacy::unavailable_io(error),
+            Ok(None) if std::time::Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            _ => return error,
+        }
+    }
+}
+
+/// How long a privacy worker whose socket refused is waited for to end
+/// ([`authority_refused`]): it closes its socket as it exits.
+const ENDED_WITHIN: Duration = Duration::from_millis(100);
+
 impl Rig {
     /// The start horizon of a reply begun now ([`playout_for`]): the route
     /// answering is the provider's slot's.
@@ -1561,6 +1589,7 @@ impl Rig {
         let mut failure = None;
         let standby = self.second.is_some();
         let held = self.capture_held;
+        let privacy_controls = self.privacy_controls;
         for worker in [&mut self.capture, &mut self.privacy, &mut self.provider] {
             // A ridden gap's lapse holds here too (#2602, the first
             // builder's P1 on #2623): no fresh lease for capture.
@@ -1573,7 +1602,7 @@ impl Rig {
                 .send(Control::Authority { snapshot })
                 && mandatory(worker, standby)
             {
-                failure.get_or_insert(error);
+                failure.get_or_insert(authority_refused(worker, privacy_controls, error));
             }
         }
         if let Some(route) = &mut self.second
@@ -1605,6 +1634,7 @@ impl Rig {
         }
         let standby = self.second.is_some();
         let held = self.capture_held;
+        let privacy_controls = self.privacy_controls;
         for worker in [
             &mut self.speaker,
             &mut self.capture,
@@ -1621,7 +1651,7 @@ impl Rig {
                 .send(Control::Authority { snapshot })
                 && mandatory(worker, standby)
             {
-                return Err(error);
+                return Err(authority_refused(worker, privacy_controls, error));
             }
         }
         if let Some(route) = &mut self.second
