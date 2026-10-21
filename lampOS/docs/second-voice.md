@@ -792,6 +792,26 @@ order is kept. A written turn is the same from the chat on.
     candidates let go after an end, with the switch and without. Then one
     in a busy room, someone else speaking within 2.5 s of "my name is": it
     is not joined.
+- **With `LAMP_SECOND_QUIET_HELD=on` the quiet after a pause isn't sent**
+  (off unless set; needs `LAMP_SECOND_EARLY_FINALIZE=on`; the backend on
+  #2135 and the first builder on #1722, 21 Oct 13:1x). Deepgram bills each
+  second of audio sent, and the wait before a line's end is decided (0.4 s
+  for a confident line, 0.6 s on the window, up to 1.5 s for an unfinished
+  one) was streamed as quiet. With the switch (`QuietHeld`, `net/stt.rs`):
+  - **after a request's pause's `Finalize`**, blocks at or under the
+    absolute floor (`SOUND_FLOOR_RMS`, about -60 dBFS) are held on the lamp,
+    up to 10 s; that `Finalize` has already asked for everything before it;
+  - **a block over the floor**, however soft, ends the hold: the held quiet
+    goes first, in order, then the block, so the service's audio stays
+    whole and no word is lost. The hold starts again only at the next
+    pause;
+  - **at the line's end** what is held is dropped, never sent, and the end
+    line says `quiet held back N ms`. A pause's answer then covers all the
+    audio sent, so such a line usually ends `settled`, with nothing more
+    asked for;
+  - **not the stop words' stream** (its flushes hold nothing) and **not
+    Flux**. A busy room whose quiet is over the floor holds nothing, by
+    design.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is

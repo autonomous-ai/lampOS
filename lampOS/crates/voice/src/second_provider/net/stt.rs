@@ -30,6 +30,13 @@ const FINISH: Duration = Duration::from_secs(15);
 /// falling back to `CloseStream` (#779): on lamp-52e6 `CloseStream`'s took
 /// 0.56 to 0.66 s, so a proxy that passes `Finalize` answers well within.
 const FINALIZE: Duration = Duration::from_secs(1);
+/// `on` only, off unless set: the quiet after a request's pause
+/// (`LAMP_SECOND_EARLY_FINALIZE`'s `Finalize`) is held on the lamp, not
+/// streamed ([`QuietHeld`]; the backend on #2135: the service bills each
+/// second sent, and the wait before a line's end is decided is quiet).
+pub const QUIET_HELD_ENVIRONMENT: &str = "LAMP_SECOND_QUIET_HELD";
+/// At most 10 s of 20 ms frames held: a longer quiet is sent after all.
+const MOST_HELD: usize = 500;
 /// About 6 s of 20 ms frames waiting to be written.
 const QUEUE: usize = 300;
 const MAX_MESSAGE: usize = 1 << 20;
@@ -426,12 +433,73 @@ impl Replies {
     }
 }
 
+fn quiet_held() -> bool {
+    std::env::var(QUIET_HELD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The quiet after a request's pause, held back
+/// ([`QUIET_HELD_ENVIRONMENT`]): the pause's `Finalize` has asked for the
+/// words of everything before it, and quiet sent after it tells the
+/// service nothing. A block over [`SOUND_FLOOR_RMS`], however soft, ends
+/// the hold and goes after the held quiet, in order, so the service's
+/// audio stays whole and no word is lost. The line's end drops what is
+/// held: those seconds are never sent.
+#[derive(Debug, Default)]
+struct QuietHeld {
+    holding: bool,
+    blocks: Vec<Vec<u8>>,
+    /// Samples dropped at the line's end, for the journal.
+    dropped: usize,
+}
+
+impl QuietHeld {
+    /// A pause's `Finalize` went: hold from here, if asked to.
+    fn pause(&mut self, holds_quiet: bool) {
+        self.holding = holds_quiet;
+    }
+
+    /// A block to send: `None` when it's held, else the blocks to send
+    /// now, the held quiet first.
+    fn block(&mut self, bytes: Vec<u8>) -> Option<Vec<Vec<u8>>> {
+        if self.holding && level(&bytes) <= SOUND_FLOOR_RMS && self.blocks.len() < MOST_HELD {
+            self.blocks.push(bytes);
+            return None;
+        }
+        self.holding = false;
+        let mut out = std::mem::take(&mut self.blocks);
+        out.push(bytes);
+        Some(out)
+    }
+
+    /// The line's end: what is held is dropped.
+    fn end(&mut self) {
+        self.dropped += self
+            .blocks
+            .drain(..)
+            .map(|bytes| bytes.len() / 2)
+            .sum::<usize>();
+        self.holding = false;
+    }
+
+    /// The journal's word on it, empty when nothing was held back.
+    fn told(&self) -> String {
+        if self.dropped == 0 {
+            return String::new();
+        }
+        format!(", quiet held back {} ms", self.dropped / 16)
+    }
+}
+
 /// What the stream's task writes, in the order queued.
 enum Outgoing {
     Audio(Vec<u8>),
     /// `Finalize` with the stream kept open: the words of what was sent so
-    /// far, then more audio ([`SttStream::flush`]).
-    Flush,
+    /// far, then more audio ([`SttStream::flush`]). `holds_quiet` for a
+    /// request's pause with [`QUIET_HELD_ENVIRONMENT`] on: the quiet after
+    /// it is held back ([`QuietHeld`]).
+    Flush {
+        holds_quiet: bool,
+    },
 }
 
 /// One utterance's stream. The socket is owned by a task that writes the
@@ -461,6 +529,8 @@ pub struct SttStream {
     /// On Flux, whose flush ends its turn (`ForceEndTurn`): a pause asks
     /// nothing of it ([`Self::paused`]).
     on_flux: bool,
+    /// [`QUIET_HELD_ENVIRONMENT`]: a pause's quiet is held back.
+    holds_quiet: bool,
 }
 
 /// Words a stream has before they are final, for a chat begun on them
@@ -597,6 +667,7 @@ impl SttStream {
             early: Some(early),
             quiet_end,
             on_flux,
+            holds_quiet: quiet_held(),
         }
     }
 
@@ -643,7 +714,7 @@ impl SttStream {
     /// relay, a short "Stop." gets no interim result at all, and its words
     /// come only once `Finalize` asks for them, 269 ms after its audio).
     pub fn flush(&self) -> Result<()> {
-        self.queue(Outgoing::Flush)
+        self.queue(Outgoing::Flush { holds_quiet: false })
     }
 
     /// The line has gone quiet for a moment (`LAMP_SECOND_EARLY_FINALIZE`):
@@ -654,7 +725,9 @@ impl SttStream {
         if self.on_flux {
             return Ok(());
         }
-        self.flush()
+        self.queue(Outgoing::Flush {
+            holds_quiet: self.holds_quiet,
+        })
     }
 
     fn queue(&self, outgoing: Outgoing) -> Result<()> {
@@ -906,6 +979,8 @@ where
     // The loudest block sent since that `Finalize`, RMS, for the journal:
     // what a floor for a busy room would be set from (#2135).
     let mut loudest_since_flush = 0.0f64;
+    // The quiet after a pause, held back (`LAMP_SECOND_QUIET_HELD`).
+    let mut held = QuietHeld::default();
     // `CloseStream` went: its final words, or its close, are waited for.
     let mut closing = false;
     let mut last_final: Option<Instant> = None;
@@ -943,28 +1018,33 @@ where
             frame = queued.recv(), if finalize_by.is_none() && !closing => {
                 match frame {
                     Some(Outgoing::Audio(bytes)) => {
-                        if flushed.is_some() {
-                            let level = level(&bytes);
-                            loudest_since_flush = loudest_since_flush.max(level);
-                            if level > SOUND_FLOOR_RMS {
-                                sounded_since_flush = true;
-                                if std::mem::take(&mut early_from_pause) {
-                                    let _ = early.send(Early::Resumed);
+                        let Some(blocks) = held.block(bytes) else {
+                            continue;
+                        };
+                        for bytes in blocks {
+                            if flushed.is_some() {
+                                let level = level(&bytes);
+                                loudest_since_flush = loudest_since_flush.max(level);
+                                if level > SOUND_FLOOR_RMS {
+                                    sounded_since_flush = true;
+                                    if std::mem::take(&mut early_from_pause) {
+                                        let _ = early.send(Early::Resumed);
+                                    }
                                 }
                             }
+                            sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
+                            samples_sent += bytes.len() / 2;
+                            write
+                                .send(Message::binary(bytes))
+                                .await
+                                .map_err(|_| Error::Transport("speech-to-text send"))?;
                         }
-                        sound.sent(&bytes, (samples_sent + bytes.len() / 2) as f64 / 16_000.0);
-                        samples_sent += bytes.len() / 2;
-                        write
-                            .send(Message::binary(bytes))
-                            .await
-                            .map_err(|_| Error::Transport("speech-to-text send"))?;
                         last_sent = Instant::now();
                         continue;
                     }
                     // Its answer comes as `from_finalize` results, read as
                     // any other; the stream goes on.
-                    Some(Outgoing::Flush) => {
+                    Some(Outgoing::Flush { holds_quiet }) => {
                         write
                             .send(Message::text(r#"{"type":"Finalize"}"#))
                             .await
@@ -976,10 +1056,12 @@ where
                         flushes_unanswered += 1;
                         sounded_since_flush = false;
                         loudest_since_flush = 0.0;
+                        held.pause(holds_quiet);
                         continue;
                     }
                     None => {}
                 }
+                held.end();
                 // The end of the line. Words already settled are the
                 // answer; otherwise `Finalize` asks for the final at once
                 // (#779), and `CloseStream` only if it does not come.
@@ -1005,7 +1087,11 @@ where
                         dbfs(loudest_since_flush)
                     )
                 };
-                at_end = format!("{}, last final {before}{pause}", transcript.at_end(sent));
+                at_end = format!(
+                    "{}, last final {before}{pause}{}",
+                    transcript.at_end(sent),
+                    held.told()
+                );
                 if transcript.settled(sent) {
                     let _ = write.send(close_stream()).await;
                     return Ok(ending(&transcript, &at_end, None, "settled"));
@@ -2439,6 +2525,167 @@ mod tests {
         stream.send(&[0; 160]).unwrap();
         assert_eq!(words.recv().await.as_deref(), Some("Stop."));
         assert_eq!(server.await.unwrap(), ["audio", "finalize", "audio"]);
+    }
+
+    /// A line through a service that answers each `Finalize` with words
+    /// covering all it was sent, and records what it got: `loud` and
+    /// `quiet` for audio by level, `finalize`, `close`. The lamp's side
+    /// sends `runs` (`Some(loud)` blocks of 20 ms, `None` a pause) with
+    /// [`QUIET_HELD_ENVIRONMENT`] as `holds_quiet`, then ends the line.
+    async fn line_held(
+        holds_quiet: bool,
+        runs: &[Option<(bool, usize)>],
+    ) -> (Vec<&'static str>, String) {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 20);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut seen = Vec::new();
+            let mut samples = 0usize;
+            let mut answered_to = 0.0;
+            let mut words = ["Lamp,", "what's the time?"].into_iter();
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(bytes) => {
+                        samples += bytes.len() / 2;
+                        seen.push(if level(&bytes) > SOUND_FLOOR_RMS {
+                            "loud"
+                        } else {
+                            "quiet"
+                        });
+                    }
+                    Message::Text(text) if text.contains("Finalize") => {
+                        seen.push("finalize");
+                        let to = samples as f64 / 16_000.0;
+                        let heard = format!(
+                            r#"{{"type":"Results","is_final":true,"speech_final":false,"from_finalize":true,"start":{answered_to},"duration":{},"channel":{{"alternatives":[{{"transcript":"{}"}}]}}}}"#,
+                            to - answered_to,
+                            words.next().unwrap_or("")
+                        );
+                        answered_to = to;
+                        socket.send(Message::text(heard)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => {
+                        seen.push("close");
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            seen
+        });
+        let mut stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        stream.holds_quiet = holds_quiet;
+        for run in runs {
+            match run {
+                Some((loud, blocks)) => {
+                    for _ in 0..*blocks {
+                        stream.send(&[if *loud { 3000 } else { 5 }; 320]).unwrap();
+                    }
+                }
+                None => {
+                    stream.paused().unwrap();
+                    // The pause's answer comes before the line goes on.
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }
+        }
+        let (words, told) = stream.finish_told(true).await.unwrap();
+        (
+            server.await.unwrap(),
+            format!("{words} | {}", told.unwrap_or_default()),
+        )
+    }
+
+    fn after_last_finalize(seen: &[&'static str]) -> Vec<&'static str> {
+        let last = seen.iter().rposition(|kind| *kind == "finalize").unwrap();
+        seen[last + 1..].to_vec()
+    }
+
+    /// The backend on #2135 (`LAMP_SECOND_QUIET_HELD`): the quiet after a
+    /// pause's `Finalize` is not sent when the line ends there, and the
+    /// line's words are the pause's answer with no second `Finalize`.
+    #[tokio::test]
+    async fn the_quiet_after_a_pause_is_held_back_and_dropped_at_the_end() {
+        let line = [Some((true, 30)), Some((false, 8)), None, Some((false, 25))];
+        let (seen, told) = line_held(true, &line).await;
+        assert_eq!(seen.iter().filter(|kind| **kind == "finalize").count(), 1);
+        assert_eq!(after_last_finalize(&seen), ["close"], "{seen:?}");
+        // The pause's answer covers all that was sent: the words are
+        // settled at the end, with nothing more asked for.
+        assert!(told.starts_with("Lamp, | settled=true"), "{told}");
+        assert!(told.contains("quiet held back 500 ms"), "{told}");
+        // Off, the same line streams its quiet to the end, as before.
+        let (seen, told) = line_held(false, &line).await;
+        assert_eq!(
+            after_last_finalize(&seen),
+            [["quiet"; 25].as_slice(), &["close"]].concat()
+        );
+        assert!(!told.contains("held back"), "{told}");
+    }
+
+    /// Speech after a held quiet sends the quiet first, in order, so the
+    /// service's audio stays whole; nothing of it is lost, and the hold
+    /// starts again only at the next pause.
+    #[tokio::test]
+    async fn speech_after_a_held_quiet_sends_it_first_in_order() {
+        let line = [
+            Some((true, 30)),
+            None,
+            Some((false, 10)),
+            Some((true, 5)),
+            Some((false, 3)),
+            None,
+            Some((false, 12)),
+        ];
+        let (seen, told) = line_held(true, &line).await;
+        let first = seen.iter().position(|kind| *kind == "finalize").unwrap();
+        assert_eq!(
+            seen[first + 1..first + 19],
+            [["quiet"; 10].as_slice(), &["loud"; 5], &["quiet"; 3]].concat()[..],
+            "{seen:?}"
+        );
+        assert_eq!(after_last_finalize(&seen), ["close"], "{seen:?}");
+        assert!(
+            told.starts_with("Lamp, what's the time? | settled=true"),
+            "{told}"
+        );
+        assert!(told.contains("quiet held back 240 ms"), "{told}");
+    }
+
+    /// A soft block over the floor, under any line-relative bar, ends the
+    /// hold: a word however quiet is never held back and dropped.
+    #[test]
+    fn a_soft_block_over_the_floor_is_never_held() {
+        let block = |sample: i16| {
+            [sample; 320]
+                .iter()
+                .flat_map(|sample| sample.to_le_bytes())
+                .collect::<Vec<u8>>()
+        };
+        let mut held = QuietHeld::default();
+        assert_eq!(
+            held.block(block(5)).map(|out| out.len()),
+            Some(1),
+            "not paused"
+        );
+        held.pause(true);
+        assert!(held.block(block(5)).is_none());
+        assert!(held.block(block(30)).is_none(), "under the floor");
+        assert_eq!(
+            held.block(block(40)).map(|out| out.len()),
+            Some(3),
+            "a soft word"
+        );
+        assert!(held.block(block(5)).is_some(), "the hold ended with it");
+        held.pause(false);
+        assert!(
+            held.block(block(5)).is_some(),
+            "a stop word's flush holds nothing"
+        );
+        held.end();
+        assert_eq!(held.told(), "");
     }
 
     /// #1047, the first builder at 20:58: how the stream ended is kept,
