@@ -57,6 +57,7 @@ The owner's desk. Most of these ride on a few sessions: the owner at the desk, t
 | `LAMP_SECOND_FLUX` | #1712 | The same lines through both: `stt-check` on recorded lines, then the played test, for the words and the time from the line's end to them. | nothing (played) | #1712 |
 | `LAMP_SECOND_SPEECH` | #1712 | The next played test with `elevenlabs` and `eleven_v4_turbo`, recorded against this row. | nothing (played) | #1712 |
 | `LAMP_SECOND_SPEECH_MODEL` | #1712 | `eleven_v4_turbo` against `eleven_flash_v2_5` in the next played test: the time to the first audio. | nothing (played) | #1712 |
+| `LAMP_SECOND_SPEECH_SOCKET` with `LAMP_SECOND_SPEECH_SOCKET_MODEL` | #2135, #2660 (#2658 for `eleven_v4_turbo`) | `tools/socket-ab.sh LABEL` (`--model`, Flash by default): the played day lines with the switch off (speech over HTTP), then on, one pair in the same hour. It reads the timing only: each piece's request-to-first-audio, socket and HTTP apart, from the journal; each answer's first sound after the end of speech, from the session's events; and refusals, 429s and fallbacks to HTTP. **Bar** (the first builder on #2602, 17:3x and 01:03): with it on, the first-sound median is no later than off's; the socket pieces' median first audio is below off's HTTP median (about 0.27 s kept per piece); and 0 refused. | nothing (played) | lamp-voice |
 | `LAMP_SECOND_KEY_TERMS` | #1712 | The next played test with "Hanoi" among the terms: heard as "Hanoi". | nothing (played) | #1712 |
 | `LAMP_SECOND_DEEPSEEK_BASE_URL` | #1934 | The relay route with no `deepseek.key`: the played check 5 of 5, and `probe-cascade`'s relay first token within 0.2 s of the direct median. | nothing (played) | #1712 |
 | `LAMP_UNCLEAR_HUM` | #1417 | The light lines: the hum after an empty "Sorry?", and nothing new elsewhere. | nothing (played) | #1712 |
@@ -242,7 +243,6 @@ From #2208, the bench run on build 3309. Third asks for `head_move` here. The re
 
 ## Not placed
 
-- `LAMP_SECOND_SPEECH_SOCKET` (#2135): through the relay the socket closes before any audio. It waits for the relay's `/ws/` to carry `stream-input`, not for a lamp.
 - `LAMP_LIVE_SCOPED_SESSION` (#1675), `LAMP_REMARKS` (#705), `LAMP_TRANSCRIPTION_LANGUAGE` (#926) and `LAMP_PROVIDER_WRITES` (#705): the Live route only. Lamps run the second route since 19 Oct.
 - `LAMP_SECOND_GEMINI_BASE_URL` (#1712): its check is recorded (19 Oct, 12 of 12 through the relay) and it's proposed unset. Gemini speech isn't the lamps' voice, so nothing is left to run.
 - `LAMP_MAKE_SKILL` (#1685): waits for the lead's ruling on how a made skill goes on a lamp.
