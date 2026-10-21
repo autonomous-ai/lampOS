@@ -1,15 +1,15 @@
 //! `lamp-addons serve` (#2530 part 1): reads `addon/proposal` and what the
 //! lamp is doing, judges each proposal by [`crate::rules`], and asks the ring
 //! for a kept light ([`crate::carry`]). Every proposal's verdict goes to the
-//! journal, one line each, with why. A kept mood waits for `lamp-mood`'s
-//! nudge input (#2530, question 1) and is journaled as kept, not carried out.
+//! journal, one line each, with why. A kept mood is said to `lamp-mood` as a
+//! nudge on `mood/nudge`, which it holds inside its own bounds.
 use crate::carry;
 use crate::rules::{Judge, Verdict};
 use crate::situation::{TOPICS, Watcher};
 use lamp_bus::{Bus, Message, Publisher, Subscriber};
 use lamp_msgs::{
     AddonDecision, AddonProposal, ExpressionRestState, Light, LightRequest, MicrophonePrivacy,
-    OnboardingPending, Pause, RoomState, VoiceMute, VoiceState,
+    MoodNudge, OnboardingPending, Pause, RoomState, VoiceMute, VoiceState,
 };
 use std::{
     io,
@@ -42,6 +42,7 @@ pub struct Report {
     pub kept: u64,
     pub dropped: u64,
     pub lights_asked: u64,
+    pub moods_nudged: u64,
 }
 
 /// The boot's identity, which the ring holds a claim's clock to.
@@ -69,6 +70,8 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         .collect::<io::Result<_>>()?;
     let mut lights =
         bus.publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "addons")?;
+    let mut nudges =
+        bus.publisher_declared(MoodNudge::TOPIC, &MoodNudge::declaration(), "addons")?;
     let mut decisions = bus.publisher_declared(
         AddonDecision::TOPIC,
         &AddonDecision::declaration(),
@@ -122,7 +125,10 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
             verdict,
             &clock_id,
             now_us,
-            &mut lights,
+            Outputs {
+                lights: &mut lights,
+                nudges: &mut nudges,
+            },
             &mut report,
         );
         let decision = AddonDecision {
@@ -148,13 +154,20 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
     Ok(report)
 }
 
-/// One verdict journaled, and a kept light asked of the ring: why, in words.
+/// Where a kept act goes: the ring's requests, and Mood's nudges.
+struct Outputs<'a> {
+    lights: &'a mut Publisher,
+    nudges: &'a mut Publisher,
+}
+
+/// One verdict journaled, and a kept light asked of the ring or a kept mood
+/// said to Mood: why, in words.
 fn decide(
     proposal: &AddonProposal,
     verdict: Verdict,
     clock_id: &str,
     now_us: u64,
-    lights: &mut Publisher,
+    out: Outputs,
     report: &mut Report,
 ) -> String {
     let named = format!("{} {} #{}", proposal.addon, proposal.act, proposal.proposal);
@@ -167,7 +180,7 @@ fn decide(
         Verdict::Kept => {
             report.kept += 1;
             match carry::light_request(proposal, clock_id, now_us) {
-                Some(request) => match lights.publish_json(now_us, &request) {
+                Some(request) => match out.lights.publish_json(now_us, &request) {
                     Ok(_) => {
                         report.lights_asked += 1;
                         let why = format!(
@@ -182,15 +195,27 @@ fn decide(
                         "kept, but the ring was not asked".into()
                     }
                 },
-                None if proposal.act == "mood" => {
-                    let why = "kept; lamp-mood takes no nudge yet (#2530)";
-                    eprintln!("lamp-addons: kept {named}: {why}");
-                    why.into()
-                }
-                None => {
-                    eprintln!("lamp-addons: kept {named}: nothing to ask");
-                    "kept; nothing to ask".into()
-                }
+                None => match carry::mood_nudge(proposal, clock_id, now_us, report.kept) {
+                    Some(nudge) => match out.nudges.publish_json(now_us, &nudge) {
+                        Ok(_) => {
+                            report.moods_nudged += 1;
+                            let why = format!(
+                                "said to lamp-mood for {} s",
+                                (nudge.until_us - now_us) / 1_000_000
+                            );
+                            eprintln!("lamp-addons: kept {named}: {why}");
+                            why
+                        }
+                        Err(error) => {
+                            eprintln!("lamp-addons: kept {named}, not said: {error}");
+                            "kept, but lamp-mood was not told".into()
+                        }
+                    },
+                    None => {
+                        eprintln!("lamp-addons: kept {named}: nothing to ask");
+                        "kept; nothing to ask".into()
+                    }
+                },
             }
         }
     }
@@ -205,7 +230,9 @@ fn take(watcher: &mut Watcher, message: &Message, now_us: u64) {
         VoiceMute::TOPIC => message.parse().map(|value| watcher.mute(&value, now_us)),
         ExpressionRestState::TOPIC => message.parse().map(|value| watcher.rest(&value, now_us)),
         OnboardingPending::TOPIC => message.parse().map(|value| watcher.onboarding(&value)),
-        VoiceState::TOPIC => message.parse().map(|value| watcher.voice(&value, now_us)),
+        VoiceState::TOPIC => message
+            .parse()
+            .map(|value| watcher.voice(&value, now_us, &message.header.boot)),
         RoomState::TOPIC => message.parse().map(|value| watcher.room(&value, now_us)),
         "light/command" => message
             .parse::<Light>()

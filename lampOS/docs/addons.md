@@ -68,7 +68,9 @@ lamp-skills carries it out through today's owners, each call checked again:
 
 ## The `addon` kind's manifest
 
-`skill.toml` says `kind = "addon"` and a `version`. An add-on is always
+`skill.toml` says `kind = "addon"` and a `version`; beside it, as in every
+skill folder, a `SKILL.md` with its `name` and `description` (the examples
+below show only `skill.toml`). An add-on is always
 installable: it is never core, and `remove` takes it off like any
 installable skill.
 
@@ -160,10 +162,11 @@ on a lamp without the head's controls):
 |---|---|---|
 | Privacy | `voice/privacy` | the voice does not permit capture now, or nothing fresh (1 s) |
 | Pause | `lamp/pause` | paused; never said is not paused, as `lamp-keeper` means it ([keeper.md](keeper.md)) |
-| Asleep | `voice/mute`, `expression/rest_state` | muted for sleep, or the rest skill resting (its word fresh within 1 s), or a mute once said gone stale (3 s). The voice says its mute every second only with the head's controls on (`LAMP_HEAD_TOUCH`, `--controls-mute`); with none said 3 s after the judge starts, the rest skill alone tells sleep |
+| Asleep | `voice/mute`, `expression/rest_state` | muted for sleep, or the rest skill resting (its word fresh within 1 s), or a mute once said gone stale (3 s). The voice says its mute every second only with the head's controls on (`LAMP_HEAD_TOUCH`, `--controls-mute`); with none said 3 s after the judge starts, or after the voice restarts (a new publisher on `voice/state`, which may run without the controls), the rest skill alone tells sleep |
 | Setting up | `onboarding/pending` | its last word holds an invitation: setup owns the light and the voice while it runs a step |
 | Talking or speaking | `voice/state` | not `resting`, or nothing fresh (3 s) |
 | A busy room | `room/state` | not `quiet` (`unknown` included), or nothing fresh (3 s) |
+| Colder (a `mood` only) | the proposal | its warmth is below 0: an add-on may warm the lamp, never cool it |
 | The person's light (a `light` only) | `light/command`, `light/state` | the newest `light/command` this boot came from the actions part or the app and `light/state` shows it; with none, the ring shows its own idle light |
 | Not yet | the act | `say`, `note` or `move` (#2530 part 2) |
 | Late | the proposal's age | judged after its `holds_ms` |
@@ -173,7 +176,11 @@ A kept `light` becomes one `LightRequest` on `light/request` from
 `addon:<name>` at `Priority::Idle`, holding its `holds_ms` (30 s at most) on
 the boot's clock: every skill, the conversation, safety and a person
 outrank it, and the ring stays the light's one writer. A kept `mood` is
-said kept and not carried out until `lamp-mood` takes a nudge. Every
+said to `lamp-mood` as one `MoodNudge` on `mood/nudge` (the second PR of
+part 1): energy both ways and warmth up only, 0.1 at most, inside Mood's
+own clamps, held for its `for_ms` and fading over the last minute, the
+newest replacing the last, none taken asleep. A mood that would lower
+warmth is dropped. Every
 verdict is a journal line and an `AddonDecision` on `addon/decision`
 (`proposal`, `addon`, `act`, `choice` kept or dropped, `by` rule, `why`).
 The policy's own `policy/decisions` stays `lamp-policy`'s alone (the first
@@ -298,9 +305,9 @@ propose = { act = "light", why = "evening", sure = 0.6, holds = "30s", light = {
 Someone at the desk two minutes after 19:00: one proposal for a warm, slow
 breath. It is kept only while the ring shows the lamp's own idle light; if
 the person chose their light, by voice or the app, the proposal is
-dropped and their light stays. If kept, the ring is asked at `Skill`
-priority for 30 s and then given back, and any word from the person
-outranks it.
+dropped and their light stays. If kept, the ring is asked at `Idle`
+priority for 30 s, after which the claim lapses by itself; every skill, the
+conversation and any word from the person outrank it.
 
 ## Phases
 

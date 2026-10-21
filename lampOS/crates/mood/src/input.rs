@@ -4,7 +4,8 @@ use crate::engine::{Event, EventKind, FaceTarget};
 use lamp_bus::{Declaration, Kind, Message};
 use lamp_msgs::{
     AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, HumanFamiliar,
-    HumanSeems, NameHeard, ScheduleDue, SeemsKind, Speech, SuddenSound, Voice, VoiceState,
+    HumanSeems, MoodNudge, NameHeard, ScheduleDue, SeemsKind, Speech, SuddenSound, Voice,
+    VoiceState,
 };
 use std::{collections::BTreeSet, fmt};
 
@@ -39,7 +40,7 @@ impl InputSpec {
     }
 }
 
-pub const INPUTS: [InputSpec; 11] = [
+pub const INPUTS: [InputSpec; 12] = [
     InputSpec {
         topic: VoiceState::TOPIC,
         type_name: VoiceState::TYPE,
@@ -131,6 +132,17 @@ pub const INPUTS: [InputSpec; 11] = [
         kind: Kind::Latest,
         source: "eyes",
         max_age_ms: 5_000,
+    },
+    // A kept add-on's nudge (#2530): only the add-ons' judge writes it, with
+    // `LAMP_ADDONS=on`; the message is taken fresh, and what it holds is
+    // held until its own `until_us`.
+    InputSpec {
+        topic: MoodNudge::TOPIC,
+        type_name: MoodNudge::TYPE,
+        version: MoodNudge::VERSION,
+        kind: Kind::Event,
+        source: "addons",
+        max_age_ms: 3_000,
     },
 ];
 
@@ -245,6 +257,7 @@ enum Payload {
     Schedule(ScheduleDue),
     Familiar(HumanFamiliar),
     Seems(SeemsKind),
+    Nudge(MoodNudge),
 }
 
 impl Payload {
@@ -253,6 +266,7 @@ impl Payload {
             Self::Controls(value) => Some(&value.stamp),
             Self::Gesture(value) => Some(&value.stamp),
             Self::Schedule(value) => Some(&value.stamp),
+            Self::Nudge(value) => Some(&value.stamp),
             _ => None,
         }
     }
@@ -527,6 +541,11 @@ impl InputAdapter {
                 (kind != SeemsKind::Unsure).then_some(kind),
             )),
             Payload::Name(value) => (value.score >= 0.9).then_some(EventKind::Name),
+            Payload::Nudge(value) => Some(EventKind::Nudge {
+                energy_milli: (value.energy * 1_000.0).round() as i16,
+                warmth_milli: (value.warmth * 1_000.0).round() as u16,
+                until_us: value.until_us,
+            }),
             Payload::Schedule(value) => {
                 if let Some(notice) = value.oldest {
                     // Schedule owns elapsed/trusted-wall time and its durable
@@ -709,6 +728,11 @@ fn parse(message: &Message, index: usize) -> Result<Payload, InputError> {
             let value: HumanSeems = message.parse().map_err(malformed)?;
             value.check().map_err(|_| InputError::InvalidPayload)?;
             Payload::Seems(value.kind)
+        }
+        11 => {
+            let value: MoodNudge = message.parse().map_err(malformed)?;
+            value.check().map_err(|_| InputError::InvalidPayload)?;
+            Payload::Nudge(value)
         }
         _ => return Err(InputError::UnknownTopic),
     })

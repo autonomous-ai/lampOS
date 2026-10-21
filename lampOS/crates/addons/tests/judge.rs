@@ -3,8 +3,8 @@
 //! judge asks of the ring read back.
 use lamp_bus::Bus;
 use lamp_msgs::{
-    AddonDecision, AddonLight, AddonProposal, ClockStamp, Light, LightRequest, MicrophonePrivacy,
-    Pause, Priority, Room, RoomState, Voice, VoiceMute, VoiceState,
+    AddonDecision, AddonLight, AddonMood, AddonProposal, ClockStamp, Light, LightRequest,
+    MicrophonePrivacy, MoodNudge, Pause, Priority, Room, RoomState, Voice, VoiceMute, VoiceState,
 };
 use std::{
     path::Path,
@@ -242,4 +242,52 @@ fn a_proposal_not_from_lamp_skills_is_not_judged() {
 #[test]
 fn without_the_switch_nothing_runs_and_nothing_is_asked() {
     assert!(asked(false, false).is_empty());
+}
+
+/// A kept mood is said to Mood on `mood/nudge`, as the add-on asked it,
+/// on the lamp's clock (#2530).
+#[test]
+fn a_kept_mood_is_said_to_lamp_mood() {
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let bus = Bus::new(dir.path()).unwrap();
+    let mut mood = bus.subscribe(MoodNudge::TOPIC, "mood").unwrap();
+    let _judge = judge(dir.path(), true);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    calm(&bus, false, false);
+    std::thread::sleep(Duration::from_millis(300));
+    let lift = AddonProposal {
+        act: "mood".into(),
+        why: "music".into(),
+        light: None,
+        mood: Some(AddonMood {
+            energy: Some(0.1),
+            warmth: Some(0.05),
+            for_ms: 600_000,
+        }),
+        ..glow(lamp_ipc::monotonic_us())
+    };
+    bus.publisher_declared(
+        AddonProposal::TOPIC,
+        &AddonProposal::declaration(),
+        "skills",
+    )
+    .unwrap()
+    .publish_json(lamp_ipc::monotonic_us(), &lift)
+    .unwrap();
+    let message = mood.recv(Duration::from_millis(1_500)).unwrap().unwrap();
+    assert_eq!(message.header.source, "addons");
+    let nudge: MoodNudge = message.parse().unwrap();
+    assert_eq!(nudge.check(), Ok(()));
+    assert_eq!(nudge.stamp.clock_id, "test-boot");
+    assert_eq!(
+        (nudge.addon.as_str(), nudge.energy, nudge.warmth),
+        ("evening-glow", 0.1, 0.05)
+    );
+    assert_eq!(nudge.until_us - nudge.stamp.at_us, 600_000_000);
 }

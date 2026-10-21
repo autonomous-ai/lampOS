@@ -705,6 +705,7 @@ const BUS_TOPICS: &[&str] = &[
     "memory/forgot",
     "messages/out",
     "mic2/audio",
+    "mood/nudge",
     "mood/state",
     "name/heard",
     "name/rising",

@@ -3,7 +3,7 @@
 //! the proposal on its behalf and stamps who it is, and a judge keeps or
 //! drops it. A proposal is never an order: nothing here reaches a speaker,
 //! a light or a motor by itself.
-use crate::{Invalid, Light, LightPattern};
+use crate::{ClockStamp, Invalid, Light, LightPattern};
 use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};
 
@@ -265,11 +265,65 @@ impl AddonDecision {
     }
 }
 
+/// A kept add-on's nudge of Mood (`mood/nudge`, #2530): written only by the
+/// add-ons' judge (`lamp-addons`), read only by Mood. It moves energy both
+/// ways and warmth up only, each by [`ADDON_MOOD_AT_MOST`] at most,
+/// inside Mood's own bounds, until `until_us`, fading over its last minute.
+/// The newest replaces the last. Manner only, as the mood itself.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MoodNudge {
+    pub stamp: ClockStamp,
+    /// The add-on whose proposal was kept, as `lamp-skills` named it.
+    pub addon: String,
+    pub energy: f32,
+    pub warmth: f32,
+    /// On the stamp's clock, at most [`ADDON_MOOD_FOR_MS`] after it.
+    pub until_us: u64,
+}
+
+impl MoodNudge {
+    pub const TYPE: &str = "lamp_msgs/MoodNudge";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "mood/nudge";
+
+    /// Each is a message of its own; Mood keeps the newest.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        self.stamp.check()?;
+        let most = ADDON_MOOD_AT_MOST;
+        if self.stamp.sequence == 0
+            || self.addon.is_empty()
+            || self.addon.len() > 64
+            || self.addon.chars().any(char::is_control)
+        {
+            return Err(Invalid(
+                "a mood nudge needs a positive sequence and a bounded add-on name".into(),
+            ));
+        }
+        if !(-most..=most).contains(&self.energy) || !(0.0..=most).contains(&self.warmth) {
+            return Err(Invalid(format!(
+                "a mood nudge moves energy within ±{most} and warmth from 0 to {most}"
+            )));
+        }
+        let longest = u64::from(*ADDON_MOOD_FOR_MS.end()) * 1_000;
+        if self.until_us <= self.stamp.at_us || self.until_us - self.stamp.at_us > longest {
+            return Err(Invalid(
+                "a mood nudge holds after its stamp, for ten minutes at most".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// The add-ons' optional topics, apart from the first topics.
 pub fn addon_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (AddonProposal::TOPIC, AddonProposal::declaration()),
         (AddonDecision::TOPIC, AddonDecision::declaration()),
+        (MoodNudge::TOPIC, MoodNudge::declaration()),
     ]
 }
 
@@ -523,6 +577,54 @@ mod tests {
         assert_eq!(
             crate::declaration_of(AddonProposal::TOPIC),
             Some(AddonProposal::declaration())
+        );
+    }
+
+    #[test]
+    fn a_mood_nudge_is_small_warmth_only_up_and_ten_minutes_at_most() {
+        let nudge = MoodNudge {
+            stamp: ClockStamp {
+                clock_id: "boot".into(),
+                at_us: 1_000,
+                sequence: 1,
+            },
+            addon: "music-mood".into(),
+            energy: -0.1,
+            warmth: 0.1,
+            until_us: 1_000 + 600_000_000,
+        };
+        assert_eq!(nudge.check(), Ok(()));
+        for wrong in [
+            MoodNudge {
+                energy: 0.11,
+                ..nudge.clone()
+            },
+            MoodNudge {
+                energy: f32::NAN,
+                ..nudge.clone()
+            },
+            MoodNudge {
+                warmth: -0.01,
+                ..nudge.clone()
+            },
+            MoodNudge {
+                until_us: 1_000,
+                ..nudge.clone()
+            },
+            MoodNudge {
+                until_us: 1_001 + 600_000_000,
+                ..nudge.clone()
+            },
+            MoodNudge {
+                addon: String::new(),
+                ..nudge.clone()
+            },
+        ] {
+            assert!(wrong.check().is_err(), "{wrong:?}");
+        }
+        assert_eq!(
+            crate::declaration_of(MoodNudge::TOPIC),
+            Some(MoodNudge::declaration())
         );
     }
 }

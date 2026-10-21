@@ -73,6 +73,8 @@ pub enum Drop {
     NotResting,
     BusyRoom,
     PersonsLight,
+    /// A mood that would make the lamp colder: warmth goes up only (#2530).
+    Colder,
     /// An act part 1 does not carry out: `say`, `note`, `move` (#2530 part 2).
     NotYet,
     /// Its add-on's own rate ([`EVERY_US`], [`AN_HOUR`]).
@@ -93,6 +95,7 @@ impl Drop {
             }
             Self::BusyRoom => "the room is busy, or that is not known",
             Self::PersonsLight => "the light shown is the person's own, which always wins",
+            Self::Colder => "an add-on may warm the lamp, never cool it",
             Self::NotYet => "the lamp does not act on this yet (#2530 part 2)",
             Self::Rate => "its add-on has had enough kept lately",
             Self::Late => "it no longer holds",
@@ -154,6 +157,14 @@ impl Judge {
         }
         if !matches!(proposal.act.as_str(), "light" | "mood") {
             return Some(Drop::NotYet);
+        }
+        if proposal
+            .mood
+            .as_ref()
+            .and_then(|mood| mood.warmth)
+            .is_some_and(|warmth| warmth < 0.0)
+        {
+            return Some(Drop::Colder);
         }
         let closed = s
             .privacy_closed
@@ -430,6 +441,22 @@ mod tests {
         assert_eq!(
             Judge::default().judge(&light("glow"), 0, &situation, NOW),
             Verdict::Kept
+        );
+    }
+
+    #[test]
+    fn a_mood_that_would_cool_the_lamp_is_dropped() {
+        let colder = AddonProposal {
+            mood: Some(AddonMood {
+                energy: None,
+                warmth: Some(-0.05),
+                for_ms: 600_000,
+            }),
+            ..mood("music")
+        };
+        assert_eq!(
+            Judge::default().judge(&colder, 0, &calm(), NOW),
+            Verdict::Dropped(Drop::Colder)
         );
     }
 
