@@ -1783,11 +1783,47 @@ fn an_event_is_given_only_to_the_person_who_said_it() {
     assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
 }
 
+/// The event day kept for observation `id` of `person`'s, if any; `None`
+/// also when there is no such observation, so callers check it is kept.
+fn event_day_of(scratch: &Scratch, person: &Person, id: u64) -> Option<String> {
+    let connection = Connection::open(scratch.0.join(DATABASE)).unwrap();
+    let kept: u64 = connection
+        .query_row(
+            "SELECT count(*) FROM entries WHERE person=?1 AND id=?2 AND kind='observation'",
+            rusqlite::params![person.as_str(), id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, 1, "observation {id} is kept");
+    connection
+        .query_row(
+            "SELECT d.day FROM entries e JOIN event_days d ON d.rid=e.rid WHERE e.person=?1 AND e.id=?2",
+            rusqlite::params![person.as_str(), id],
+            |r| r.get(0),
+        )
+        .optional()
+        .unwrap()
+}
+
+/// Whether `person` still has observation `id`.
+fn has_observation(scratch: &Scratch, person: &Person, id: u64) -> bool {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM entries WHERE person=?1 AND id=?2 AND kind='observation'",
+            rusqlite::params![person.as_str(), id],
+            |r| r.get::<_, u64>(0),
+        )
+        .unwrap()
+        == 1
+}
+
 /// `on` that is not a day, is before its evidence's day, is more than 60
-/// days after it, or is on a preference refuses the result, nothing kept.
+/// days after it, or is on a preference is dropped: the observation is
+/// kept, undated, never the whole result refused.
 #[test]
-fn a_bad_event_day_refuses_the_result() {
-    let scratch = Scratch::new("event-refused");
+fn a_bad_event_day_is_dropped_and_the_observation_kept() {
+    let scratch = Scratch::new("event-dropped");
     let mut store = scratch.open(30, NOW);
     let minh = person("p-minh");
     for (on, category) in [
@@ -1798,13 +1834,13 @@ fn a_bad_event_day_refuses_the_result() {
         ("2026-12-19", Category::Promise),
         ("2026-10-24", Category::Preference),
     ] {
-        let error = dated(&mut store, &minh, MONDAY, "Wedding", Some(on), category).unwrap_err();
-        assert_eq!(error.code, "bad_request", "{on}");
+        let id = dated(&mut store, &minh, MONDAY, "Wedding", Some(on), category).unwrap();
+        assert_eq!(event_day_of(&scratch, &minh, id), None, "{on}");
     }
     assert_eq!(event_rows(&scratch), 0);
     // The evidence's own day and 60 days after it are days.
     for on in ["2026-10-19", "2026-12-18"] {
-        dated(
+        let id = dated(
             &mut store,
             &minh,
             MONDAY,
@@ -1813,6 +1849,7 @@ fn a_bad_event_day_refuses_the_result() {
             Category::Promise,
         )
         .unwrap();
+        assert_eq!(event_day_of(&scratch, &minh, id).as_deref(), Some(on));
     }
     assert_eq!(event_rows(&scratch), 2);
     // Over the protocol, `on` beside the proposal's other fields.
@@ -1829,34 +1866,129 @@ fn a_bad_event_day_refuses_the_result() {
     assert_eq!(event_rows(&scratch), 3);
 }
 
-/// Without `events`, the same store answers as before: the day is passed
-/// over, the thread given the next day, with no `on`.
+/// "My exam was yesterday, it went badly", dated yesterday by the model:
+/// before its evidence's day, so the day is dropped, and the observation
+/// and the rest of its conversation's batch are kept.
 #[test]
-fn without_events_a_follow_up_ignores_event_days() {
+fn a_past_event_day_keeps_the_observation_and_its_batch() {
+    let scratch = Scratch::new("event-past");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    store.maintain(MONDAY).unwrap();
+    let said = store
+        .append(
+            &minh,
+            MONDAY,
+            "My exam was yesterday, it went badly. My sister's wedding is on Saturday",
+            "Oh no, sorry",
+            &[],
+        )
+        .unwrap();
+    let job = store.conversation_end(&minh, "exam-past", &[said]).unwrap();
+    let mut out = output("Exam yesterday went badly", &[said], None);
+    out.observations[0].category = Category::Thread;
+    out.observations[0].on = Some("2026-10-18".into());
+    let mut wedding = proposal("Sister's wedding is on Saturday", &[said], None);
+    wedding.category = Category::Thread;
+    wedding.on = Some("2026-10-24".into());
+    out.observations.push(wedding);
+    out.observations
+        .push(proposal("Coffee black", &[said], None));
+    let ids = store.tidy_apply(&minh, &job.job, &out).unwrap();
+    assert_eq!(ids.len(), 3, "the whole batch is kept");
+    assert_eq!(event_day_of(&scratch, &minh, ids[0]), None);
+    assert_eq!(
+        event_day_of(&scratch, &minh, ids[1]).as_deref(),
+        Some("2026-10-24")
+    );
+    assert_eq!(event_day_of(&scratch, &minh, ids[2]), None);
+    assert_eq!(event_rows(&scratch), 1, "no row for yesterday's exam");
+}
+
+/// An event 50 days out, never searched for, outlives the 30 unused days
+/// and its exchange's expiry, is asked about the day after it, and expires
+/// as usual once its follow-up window is over, its event day with it.
+#[test]
+fn an_event_far_off_is_kept_to_its_follow_up_window() {
+    let scratch = Scratch::new("event-kept");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    // Monday 2026-10-19 plus 50 days: Tuesday 2026-12-08.
+    let id = dated(
+        &mut store,
+        &minh,
+        MONDAY,
+        "Moving house on 8 December",
+        Some("2026-12-08"),
+        Category::Thread,
+    )
+    .unwrap();
+    let undated = thread(&mut store, &minh, MONDAY, "Tired of the commute");
+    store.maintain(MONDAY + 40 * DAY).unwrap();
+    assert!(has_observation(&scratch, &minh, id), "kept for its day");
+    assert!(
+        !has_observation(&scratch, &minh, undated),
+        "unused, expired"
+    );
+    assert_eq!(event_rows(&scratch), 1);
+    // Its day, then the day after it.
+    store.maintain(MONDAY + 50 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
+    store.maintain(MONDAY + 51 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap().unwrap()["id"],
+        id
+    );
+    // 14 days after its day, the last of its window: still kept.
+    store.maintain(MONDAY + 64 * DAY).unwrap();
+    assert!(has_observation(&scratch, &minh, id));
+    // 15 days after: expired as unused, and its event day goes with it.
+    store.maintain(MONDAY + 65 * DAY).unwrap();
+    assert!(!has_observation(&scratch, &minh, id));
+    assert_eq!(event_rows(&scratch), 0, "expiry clears event_days");
+}
+
+/// Without `events` (the switch turned off later), a dated thread is not
+/// asked about before its day is over; an undated one keeps its rules; the
+/// dated one is given after its day, with no `on`, and never again.
+#[test]
+fn without_events_an_event_is_not_asked_about_before_its_day() {
     let scratch = Scratch::new("event-off");
     let mut store = scratch.open(30, NOW);
     let minh = person("p-minh");
     let id = wedding(&mut store, &minh);
+    let commute = thread(&mut store, &minh, MONDAY, "Tired of the commute");
+    // Tuesday: the undated one, never the wedding to come.
     let (answer, _) = request(
         &mut store,
         json!({"op":"follow_up","person":"p-minh"}),
         MONDAY + DAY,
     );
-    assert_eq!(
-        answer,
-        json!({"ok":true,"follow_up":{"id":id,"category":"thread","text":"Sister's wedding is on Saturday"}})
-    );
+    assert_eq!(answer["follow_up"]["id"], commute, "{answer}");
+    // Friday and Saturday, the day itself: nothing.
+    for at in [MONDAY + 4 * DAY, MONDAY + 5 * DAY] {
+        let (answer, _) = request(
+            &mut store,
+            json!({"op":"follow_up","person":"p-minh","events":false}),
+            at,
+        );
+        assert_eq!(answer, json!({"ok":true,"follow_up":null}), "{at}");
+    }
+    // Sunday: given by the old rules, with no `on`.
     let (answer, _) = request(
         &mut store,
         json!({"op":"follow_up","person":"p-minh","events":false}),
         MONDAY + 6 * DAY,
     );
-    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
-    // With `events` over the protocol: the 25th, but it was given already.
+    assert_eq!(
+        answer,
+        json!({"ok":true,"follow_up":{"id":id,"category":"thread","text":"Sister's wedding is on Saturday"}})
+    );
+    // With `events` over the protocol: it was given already.
     let (answer, _) = request(
         &mut store,
         json!({"op":"follow_up","person":"p-minh","events":true}),
-        MONDAY + 6 * DAY,
+        MONDAY + 8 * DAY,
     );
     assert_eq!(answer, json!({"ok":true,"follow_up":null}));
 }

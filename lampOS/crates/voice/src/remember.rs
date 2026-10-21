@@ -594,7 +594,7 @@ pub const OBSERVE_PROMPT: &str = "You keep a household lamp's memory tidy. The u
 
 /// What [`OBSERVE_PROMPT`] is told after it with [`EVENTS_ENVIRONMENT`],
 /// when the job carries the conversation's day (`"today"`).
-const OBSERVE_EVENTS: &str = " \"today\" is the day of these exchanges. A thread or promise about an event on a day the cited words make clear (\"on Saturday\", \"tomorrow\", \"on 24 October\") also has \"on\":\"YYYY-MM-DD\", that day worked out from \"today\"; when the day is not clear, leave \"on\" out, and never guess it.";
+const OBSERVE_EVENTS: &str = " \"today\" is the day of these exchanges. A thread or promise about an event on a day the cited words make clear (\"on Saturday\", \"tomorrow\", \"on 24 October\") also has \"on\":\"YYYY-MM-DD\", that day worked out from \"today\". \"on\" is only for an event still to come, \"today\" or later: one already past (\"my exam was yesterday\") has none. When the day is not clear, leave \"on\" out, and never guess it.";
 
 /// The observation pass's prompt: [`OBSERVE_PROMPT`] as it is, and with
 /// `events` (a job carrying `"today"`, [`observe_input`]) the sentence
@@ -5893,7 +5893,8 @@ mod tests {
             asked.ends_with(OBSERVE_EVENTS)
                 && asked.contains(r#""on":"YYYY-MM-DD""#)
                 && asked.contains("\"today\"")
-                && asked.contains("never guess"),
+                && asked.contains("never guess")
+                && asked.contains("still to come"),
             "{asked}"
         );
         assert!(!OBSERVE_PROMPT.contains("today"));

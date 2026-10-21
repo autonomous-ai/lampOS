@@ -388,8 +388,11 @@ can still be wrong; structural validation cannot prove meaning.
 A `thread` or `promise` may carry `on`, the local day, `YYYY-MM-DD`, it is
 about (a wedding on Saturday, #1693). It must be a real day, from the local
 day of its newest evidence to 60 days after it (`EVENT_WITHIN_DAYS`). One
-that is not, or `on` on a `preference`, refuses the whole result with
-`bad_request`, nothing kept, as an invalid category does. It is kept in
+that is not (a day already past, "my exam was yesterday", or a model's
+slip), or `on` on a `preference`, is dropped: the observation is kept
+undated and the rest of the result with it, never the whole result
+refused. The answer's `ids` are unchanged; nothing counts the dropped
+days. It is kept in
 `event_days(rid PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE, day)`,
 created `IF NOT EXISTS` like `follow_ups`, `user_version` unchanged: a
 store made before it opens and gets the table, and an older build passes
@@ -431,7 +434,12 @@ forgetting: its job has been removed, and apply fails as `stale`.
 
 Journal days older than `--keep-days` (default 30) expire as before.
 Observations expire after more than 30 days without a successful search
-returning them, or when any required source expires. Passive inclusion
+returning them, or when any required source expires. One with an event
+day outlives both until its follow-up window is over: it is kept while its
+day is no more than 14 days (`FOLLOW_UP_WITHIN_DAYS`) before today, so an
+event 31 to 60 days out is still there to ask about the day after it; from
+the 15th day after its day it expires by the rules above, its
+`event_days` row with it. Passive inclusion
 in a session note does not keep an unused observation alive. Superseded
 versions age out too. Expiring an old source does not follow the correction
 link to a newer observation with independent evidence. Explicit kept
@@ -467,7 +475,7 @@ message. A refusal leaves the connection usable.
 | `remember {at_unix_ms, text, source_ids?, once?}` | The legacy request, with two optional fields: `source_ids` (#1693) and `once` (#2176, default false). Without `once`, as before: `{ok:true,id}`. With `once:true`, when an active kept thing of the same person has the same text after normalisation, `{ok:true,id,existing:true}` with its id, and no entry is written: no row, no last use; the answer reports no write. An existing match gains the new conversation's source links (`source_ids`, checked as a new remember's are), so forgetting it removes both. Otherwise a new kept thing, `{ok:true,id}`. Normalisation: NFC, lower case, trimmed, inner white space collapsed to one space, and punctuation at the end dropped. Another person's text, or a forgotten or replaced one, is not the same. |
 | `remember {…, replaces, shown}` | #2510, the voice's `LAMP_MEMORY_REPLACES`: a correction. `replaces` is a kept id of the same person's; `shown` the ids the asking session was shown (the note, recall or search, a hit, or one it kept). Accepted only when `replaces` is in `shown`, is this person's, is kind `kept`, is active, and is not newer than `at_unix_ms`: then, in one transaction, the new kept thing, `replacements(newer, older)` and the old one `active=0`, and `{ok:true,id,replaced:<old id>}`. Refused, nothing is written: `{ok:false,error:"refused",reason,message}`, logged `refused error=refused reason=<code>`, the codes checked in this order: `not_shown`, `unknown` (not this person's, or no such id), `not_kept`, `inactive` (already replaced), `not_older`. `once` is not applied to a correction: it is always its new version. A replaced kept thing is history: `kept` and `session_open` leave it out, `search` returns it only with `history:true`, and `forget` of either version removes both (`versions`); it no longer uses one of the 200 kept slots (`full` counts active kept things only, as an adopt's room does). The legacy store ignores both fields. |
 | `session_open {session, max_bytes?}` | `{ok:true,snapshot:Note}`. Default/max cap 1,200 UTF-8 bytes for `Note.note`, including its inner JSON framing and escaping. Outer response metadata and re-escaping are outside that cap. |
-| `follow_up {person}` | `{ok:true,follow_up:{id,category,text}|null}`: at most one open `thread`/`promise` observation of a known person's, 6 h to 14 days old, never given before, none within 24 h of the last given; recorded as given in the same transaction (table `follow_ups`, `ON DELETE CASCADE` with its entry, created `IF NOT EXISTS`, `user_version` unchanged). The room's or a rules scope: `bad_person`. #1693 (3). Optional `events:true` (the voice's `LAMP_MEMORY_EVENTS`; default false, exactly as before, dates ignored): an observation with an `event_days` row is eligible only from the local day after its event day to 14 days after it (`FOLLOW_UP_WITHIN_DAYS`), whenever it was said, never on the day itself; an undated one keeps the rules above; dated ones come first, then newest; once and one a day as ever. Its answer adds `on:"YYYY-MM-DD"`. |
+| `follow_up {person}` | `{ok:true,follow_up:{id,category,text}|null}`: at most one open `thread`/`promise` observation of a known person's, 6 h to 14 days old, never given before, none within 24 h of the last given; recorded as given in the same transaction (table `follow_ups`, `ON DELETE CASCADE` with its entry, created `IF NOT EXISTS`, `user_version` unchanged). The room's or a rules scope: `bad_person`. #1693 (3). Without `events` (default false) an observation with an `event_days` row is not eligible until its event day is over, so a lamp whose switch was turned off later never asks before the event; after it, the rules above; with no `event_days` rows, exactly as before. Optional `events:true` (the voice's `LAMP_MEMORY_EVENTS`): an observation with an `event_days` row is eligible only from the local day after its event day to 14 days after it (`FOLLOW_UP_WITHIN_DAYS`), whenever it was said, never on the day itself; an undated one keeps the rules above; dated ones come first, then newest; once and one a day as ever. Its answer adds `on:"YYYY-MM-DD"`. |
 | `session_close {session}` | `{ok:true}`; safe to repeat. |
 | `conversation_end {conversation, source_ids, previous_ids?, submit?}` | Absent/false `submit`: `{ok:true,input:Input}`. Sources: 1–64 distinct journal exchanges that have already happened; ids this store no longer has under any person (a forget since) are passed over; an id another person's scope still has is refused as before, counted in its journal (`conversation_end named N source(s) it no longer has`), and the end goes on with the rest, refused only when none is left (#2176 row 13). Up to 32 optional current observation IDs select known correction context. True `submit`: the no-model skipped receipt below. |
 | `tidy_apply {job, observations}` | `{ok:true,ids:[...]}`. Entire validated batch commits or none does. Repeat of a completed, retained job returns its original IDs without duplicating writes. |
