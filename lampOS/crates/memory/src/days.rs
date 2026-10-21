@@ -362,10 +362,16 @@ impl Days {
             .and_then(|today| today.before(self.keep_days))
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let unused = self.now.saturating_sub(UNUSED_DAYS * DAY_MS);
+        // An event still to come, or within its follow-up window, outlives
+        // both rules (#1693): an event day on or after this one is kept, so
+        // a wedding 50 days out is there to ask about the day after it.
+        let event = Day::at(self.now, &self.local)
+            .and_then(|today| today.before(FOLLOW_UP_WITHIN_DAYS))
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
         tx.execute("DELETE FROM doomed", [])?;
-        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND used_unix_ms<?2)",params![day,unused])?;
-        descendants(&tx, false)?;
+        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
             "DELETE FROM sessions WHERE opened_unix_ms<?",
@@ -816,7 +822,7 @@ impl Days {
         if record.kind == "observation" || record.kind == "kept" {
             tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
         }
-        descendants(&tx, true)?;
+        descendants(&tx, None)?;
         let count = erase(&tx)?;
         tx.commit()?;
         Ok(count)
@@ -1022,8 +1028,9 @@ impl Days {
     /// [`FOLLOW_UP_EVERY_MS`]. The one given is recorded as given in the
     /// same transaction: once, even if the moment never comes. The room's
     /// scope and a rules scope have none: a lamp that can't tell who is
-    /// there never asks one person about another's week. Event days are
-    /// passed over: [`Self::follow_up_with`] without `events`.
+    /// there never asks one person about another's week. Event days only
+    /// hold one back until its day is over ([`Self::follow_up_with`]
+    /// without `events`): never asked about before the event.
     pub fn follow_up(&mut self, person: &Person) -> Result<Option<serde_json::Value>> {
         self.follow_up_with(person, false)
     }
@@ -1078,12 +1085,19 @@ impl Days {
             )
             .optional()?
         } else {
+            // A dated one is never asked about before its day is over, even
+            // with the switch since turned off; after it, as any other.
+            // Without dated rows this is the query from before event days.
+            let today = Day::at(now, &self.local)
+                .map(|day| day.to_string())
+                .unwrap_or_default();
             tx.query_row(
-                "SELECT e.rid,e.id,e.text,e.category FROM entries e WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3 AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT 1",
+                "SELECT e.rid,e.id,e.text,e.category FROM entries e WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3 AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=e.rid AND d.day>=?4) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT 1",
                 params![
                     person.as_str(),
                     now.saturating_sub(FOLLOW_UP_AFTER_MS),
-                    now.saturating_sub(FOLLOW_UP_WITHIN_MS)
+                    now.saturating_sub(FOLLOW_UP_WITHIN_MS),
+                    today
                 ],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, None)),
             )
@@ -1453,7 +1467,7 @@ impl Days {
                 .map(|record| record.at_unix_ms)
                 .max()
                 .ok_or_else(|| bad("an observation needs dated evidence"))?;
-            let on = event_day(proposal, at, &self.local)?;
+            let on = event_day(proposal, at, &self.local);
             if let Some(old) = proposal.supersedes {
                 let old = read_record(&tx, person, old)?
                     .ok_or_else(|| bad("the superseded observation is missing"))?;
@@ -1862,30 +1876,21 @@ fn insert_record(db: &Connection, r: &Record, local: &LocalTime, used: u64) -> R
 /// wedding next month, not a plan for next year.
 pub const EVENT_WITHIN_DAYS: u32 = 60;
 
-/// A proposal's event day (#1693), checked like the rest of a proposal: a
-/// bad one refuses the whole result, nothing kept. A real `YYYY-MM-DD`, of
-/// a `thread` or `promise` only (a preference has no day), from the local
-/// day of its newest evidence `at` to [`EVENT_WITHIN_DAYS`] after it.
-fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Result<Option<Day>> {
-    let Some(text) = proposal.on.as_deref() else {
-        return Ok(None);
-    };
+/// A proposal's event day (#1693): a real `YYYY-MM-DD`, of a `thread` or
+/// `promise` (a preference has no day), from the local day of its newest
+/// evidence `at` to [`EVENT_WITHIN_DAYS`] after it. Any other `on` is
+/// dropped and the observation kept undated: a day the model got wrong, or
+/// one already past ("my exam was yesterday"), never costs the batch.
+fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Option<Day> {
     if proposal.category == tidy::Category::Preference {
-        return Err(bad("only a thread or a promise has an event day"));
+        return None;
     }
-    let on = Day::parse(text).ok_or_else(|| bad("an event day is a real YYYY-MM-DD"))?;
-    let said = Day::at(at, local)
-        .ok_or_else(|| Error::new("bad_time", "the timestamp is outside 1970 through 9999"))?;
-    if on < said
-        || on
-            .before(EVENT_WITHIN_DAYS)
-            .is_some_and(|start| start > said)
-    {
-        return Err(bad(
-            "an event day is from its evidence's day to 60 days after it",
-        ));
-    }
-    Ok(Some(on))
+    let on = Day::parse(proposal.on.as_deref()?)?;
+    let said = Day::at(at, local)?;
+    let far = on
+        .before(EVENT_WITHIN_DAYS)
+        .is_some_and(|start| start > said);
+    (said <= on && !far).then_some(on)
 }
 /// The label a plain fact carries in a session note, the one voice reads
 /// for a kept fact (`voice/src/remember.rs`).
@@ -1920,15 +1925,19 @@ fn versions(db: &Connection) -> Result<()> {
     db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     Ok(())
 }
-fn descendants(db: &Connection, with_versions: bool) -> Result<()> {
-    if with_versions {
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
-    } else {
+/// What goes with the doomed rows: for a forget (`expiry` None), all that
+/// derives from them and every version; for expiry, from the first day
+/// whose events no longer hold (`expiry`), what derives from them only.
+fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+    if let Some(event) = expiry {
         // Expiry: a kept thing never expires, even one remembered with its
         // conversation (#1693): the walk stops at it, and its link to an
-        // expired exchange goes by the foreign key (#2176). A forget, above,
-        // still follows that link to it.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+        // expired exchange goes by the foreign key (#2176). So does an
+        // observation whose event day is on or after `event`: it is kept to
+        // its follow-up window. A forget, below, still follows those links.
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
+    } else {
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
 }

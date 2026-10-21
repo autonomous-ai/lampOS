@@ -901,18 +901,32 @@ the unchanged legacy client, used unless the new Days client is selected.
   the memory never sees it), and the prompt one more sentence: a thread or
   promise about an event on a day the cited words make clear also has
   `"on":"YYYY-MM-DD"`, worked out from "today", and is left without it
-  when the day isn't clear, never guessed (`remember::observe_prompt`).
+  when the day isn't clear, never guessed, and only for an event still to
+  come, "today" or later (`remember::observe_prompt`).
   A thread's or promise's `on` goes to `tidy_apply`; any other is dropped.
+  The memory keeps the day only from the conversation's day to 60 days
+  after it; any other `on` (one already past, "my exam was yesterday") is
+  dropped there and the observation kept undated, with the rest of its
+  conversation, never the whole pass lost. A dated observation is kept,
+  even unused, until 14 days after its day, so one 31 to 60 days out is
+  not expired before it is asked about; then it expires as usual.
   The session's `follow_up` sends `"events": true`, so the memory gives a
   dated one only after its day, with its `"on"`, and the session is told
   "(it was on Saturday 24 October: ask how it went)" after its words, so
   the model asks how it went, not how it's coming along. Off, the prompt,
   the job, what goes to `tidy_apply` (every `on` stripped, so an older
-  memory never sees it) and the note are byte for byte as before. Tests:
+  memory never sees it) and the note are byte for byte as before. Either
+  way, nothing dated is asked about before its day: with the switch turned
+  off after a day was kept, the memory holds that thread back until its
+  day is over, then gives it by the old rules. Tests:
   `remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one`,
   `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`,
   `remember::tests::with_events_a_dated_follow_up_is_told_with_its_day`,
-  `local_time::tests::a_named_day_is_read_back_and_said_as_a_person_would`.
+  `local_time::tests::a_named_day_is_read_back_and_said_as_a_person_would`,
+  `days::a_bad_event_day_is_dropped_and_the_observation_kept`,
+  `days::a_past_event_day_keeps_the_observation_and_its_batch`,
+  `days::an_event_far_off_is_kept_to_its_follow_up_window`,
+  `days::without_events_an_event_is_not_asked_about_before_its_day`.
 - **The same person, the next day** (#1693 (1), `LAMP_MEMORY_REOPEN_QUIET=on`,
   the second route only; off unless set). A Live session asks for the note
   each time it connects. The second route asked only when the person
