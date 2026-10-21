@@ -5259,6 +5259,19 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#2539:** its code is done (#2573 merged); its lamp row is left.
 - **The Queue moved to #2602** at 10:08Z (#1722 full). My watch missed it for about 45 minutes, until a post was refused; it now reads #2602 and my open issues.
 
+## 2026-10-21, 19:30 ICT: #2540 merged (#2627); "Everything is a skill": the inventory and its first move (#2632); #2621 up
+
+- **#2627 merged** (`262a41491`), #2540's code: a name told with `remember` mid-run is in that run's later notes on the second route.
+  - The first builder's P2 asked whether the re-ask splits the conversation. It doesn't: the writer ends a conversation by its own quiet, never by a session closing mid-talk. A test shows it, and fails when a close ends the conversation.
+  - #2540's lamp run is Seventh's, on 52e6.
+- **#2621** replaces #2608, the duplex tone words, with the reviewer-lead's last P3: words heard just before a lamp line begins are its first. Gate: 3813 passed, 0 failed. It's first in the reviewer's order.
+- **"Everything is a skill"**, given me at 18:1x:
+  - **The inventory:** 48 behaviours, each by where it lives, called system, core skill or installable, on #2602 (18:31). The first builder said yes to the calls and the order of moves.
+  - **The first move, #2632** (`d3e230fda`): prepare-unplug's five lines into its `skill.toml`'s `[unplug]`, read only with its core grant, and the Rust constants deleted. The words equal the old ones byte for byte.
+  - **Gate,** with lamp-skills' five readers: 4849 passed, 1 failed. The one is lamp-eyes' `/dev/full` test, which can't pass on a Mac; I gave it to Tests for #1569.
+  - **Next:** guard mode's and who was here's words.
+- **A slip:** `;` chains ran on past failed steps twice today. Once a broken commit reached my own branch (deleted); once a PR opened with placeholders (edited). Folds and PR steps are now chained with `&&`.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5284,7 +5297,7 @@ The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
 `LAMP_VOICE_TONE` (#2427) is off unless set. It was played on lamp-75c9 with nobody there (Ten, 21 Oct: the words' valence passed, the arousal wasn't shown by the tools there), and run with a known face on lamp-c0a4 (Thirteen, 21 Oct: a pass on the second route; on the duplex route no forget, now in its fix).
-`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2615's note re-ask (no switch) and #2608's duplex words were not run on a lamp.
+`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2627's note re-ask (no switch), #2621's duplex words and #2632's unplug words (a pure move) were not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
