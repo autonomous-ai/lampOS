@@ -46,10 +46,25 @@ fn sending() -> ReportsState {
     }
 }
 
+/// Keeps the stand-in `lamp-cloud` listening until dropped.
+struct Listening(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for Listening {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 /// `lamp-cloud` on the test's bus: `first` said, and off once asked, kept
 /// as the voice's, held as asked, and when. Each ask it takes is sent on
-/// the channel.
-fn cloud(bus: &std::path::Path, first: ReportsState) -> std::sync::mpsc::Receiver<ReportsRequest> {
+/// the channel. It listens until the [`Listening`] is dropped: with the
+/// whole crate's tests running, the rig took over 5 s to reach its call,
+/// and a stand-in that left after 5 s of nothing had its ask reach no one
+/// (#1569 row 66).
+fn cloud(
+    bus: &std::path::Path,
+    first: ReportsState,
+) -> (std::sync::mpsc::Receiver<ReportsRequest>, Listening) {
     let bus = lamp_bus::Bus::new(bus).unwrap();
     let mut taking = bus
         .subscribe_typed(ReportsRequest::TOPIC, "cloud", ReportsRequest::TYPE)
@@ -61,8 +76,16 @@ fn cloud(bus: &std::path::Path, first: ReportsState) -> std::sync::mpsc::Receive
         .publish_json(lamp_ipc::monotonic_us(), &first)
         .unwrap();
     let (told, asks) = std::sync::mpsc::channel();
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let listening = Listening(done.clone());
     std::thread::spawn(move || {
-        while let Ok(Some(message)) = taking.recv(Duration::from_secs(5)) {
+        while !done.load(std::sync::atomic::Ordering::Relaxed) {
+            let Ok(taken) = taking.recv(Duration::from_millis(100)) else {
+                return;
+            };
+            let Some(message) = taken else {
+                continue;
+            };
             let ask = message.parse::<ReportsRequest>().unwrap();
             let _ = state.publish_json(
                 lamp_ipc::monotonic_us(),
@@ -79,7 +102,7 @@ fn cloud(bus: &std::path::Path, first: ReportsState) -> std::sync::mpsc::Receive
             }
         }
     });
-    asks
+    (asks, listening)
 }
 
 /// What came of a line heard as `text` whose answer calls `function`: what
@@ -110,7 +133,7 @@ async fn line_with(
 ) -> Came {
     let desk = Desk::new(tag);
     *crate::reports_stop::TEST_ROOT.lock().unwrap() = Some(desk.bus());
-    let asks = cloud(&desk.bus(), first);
+    let (asks, _listening) = cloud(&desk.bus(), first);
     // An id of the test's own: the record of what the room was told is
     // shared by every test in the binary.
     let id = format!("{tag}-c9");
