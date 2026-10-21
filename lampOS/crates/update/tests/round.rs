@@ -305,7 +305,8 @@ fn controls_unit(build: &str) -> String {
 /// every file the other tests have open, a records' lock among them: that
 /// lock, let go by its test and taken again, is then "another lamp-update
 /// is at work". A test that starts a process holds `FORKS` to write until
-/// it has started; each take of the lock holds it to read.
+/// it has started, and so does a round on Linux, which can start one
+/// itself ([`rounding`]); each take of the lock holds it to read.
 static FORKS: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
 fn no_fork() -> std::sync::RwLockReadGuard<'static, ()> {
@@ -318,6 +319,21 @@ fn forking() -> std::sync::RwLockWriteGuard<'static, ()> {
     FORKS
         .write()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// What a round holds. A round can start `lamp-skills list` (its skills
+/// check), so on Linux, where a child holds the other tests' files from its
+/// start to its exec, it holds `FORKS` to write (#1569 row 57: 5 of 12 runs
+/// in the image failed on the lock without it). macOS starts a child in one
+/// step, so there a round only holds it to read, as a take of the lock does.
+#[cfg(target_os = "linux")]
+fn rounding() -> std::sync::RwLockWriteGuard<'static, ()> {
+    forking()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn rounding() -> std::sync::RwLockReadGuard<'static, ()> {
+    no_fork()
 }
 
 /// A lamp made of files, its channel, and the rest of its world.
@@ -515,7 +531,7 @@ impl Lamp {
     }
 
     fn round(&mut self) -> Outcome {
-        let _no_fork = no_fork();
+        let _rounding = rounding();
         let clock = FakeClock(Rc::clone(&self.now));
         let talking = self.talking.take().unwrap_or_else(|| Box::new(|_| false));
         let mut ears = FakeEars {
@@ -1710,12 +1726,14 @@ fn a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail() {
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert_eq!(lamp.skills_link(), sha(&checks));
     assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+    let forking = forking();
     let listed =
         std::process::Command::new(lamp.root.join("opt/lampOS/skills/current/lamp-skills"))
             .args(["list", "--dir"])
             .arg(lamp.root.join("var/lib/lampOS/skills"))
             .output()
             .unwrap();
+    drop(forking);
     let listed = String::from_utf8(listed.stdout).unwrap();
     assert!(!listed.contains("not loaded"), "{listed}");
     assert!(
@@ -1781,12 +1799,14 @@ impl Lamp {
 
     /// What `lamp-skills list` of the running build says of the folder.
     fn listed(&self) -> String {
+        let forking = forking();
         let listed =
             std::process::Command::new(self.root.join("opt/lampOS/skills/current/lamp-skills"))
                 .args(["list", "--dir"])
                 .arg(self.root.join(PRODUCT_SKILLS))
                 .output()
                 .unwrap();
+        drop(forking);
         String::from_utf8(listed.stdout).unwrap()
     }
 }
@@ -2394,7 +2414,8 @@ impl Lamp {
     /// The new lamp-update confirming itself, as the build `running` from:
     /// only after a dry round has read and checked the channel's manifest.
     fn confirm(&mut self, running: &str) -> own::Confirm {
-        let _no_fork = no_fork();
+        // Its dry round can start `lamp-skills list` too.
+        let _rounding = rounding();
         let clock = FakeClock(Rc::clone(&self.now));
         let mut ears = FakeEars {
             now: Rc::clone(&self.now),
