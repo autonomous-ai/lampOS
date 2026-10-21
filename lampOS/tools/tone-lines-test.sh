@@ -107,10 +107,11 @@ fi
 # read: made-up records and played times for the eighteen lines, 18 s apart,
 # each End 3 s after its line began, on a lamp clock 5000 s from the Mac's.
 # The baseline is sure from line 6.
-records() { # $1: lively's arousal; $2: a line the lamp missed (0: none); $3: 1 for a stray End
-  python3 -I - "$1" "$2" "$3" "$T/played-timed.tsv" <<'PY'
+records() { # $1: lively's arousal; $2: a line the lamp missed (0: none); $3: 1 for a stray End;
+  # $4: 1 for a later conversation whose turn 17 tells no valence
+  python3 -I - "$1" "$2" "$3" "${4:-0}" "$T/played-timed.tsv" <<'PY'
 import json, sys
-lively, missed, stray, played = float(sys.argv[1]), int(sys.argv[2]), sys.argv[3] == "1", sys.argv[4]
+lively, missed, stray, later, played = float(sys.argv[1]), int(sys.argv[2]), sys.argv[3] == "1", sys.argv[4] == "1", sys.argv[5]
 kinds = ["plain"] * 10 + ["calm", "lively"] * 3 + ["glad", "down"]
 with open(played, "w") as out:
     for n, kind in enumerate(kinds, 1):
@@ -124,8 +125,16 @@ for n, kind in enumerate(kinds, 1):
     at_us = int((5000 + (n - 1) * 18 + 3) * 1e6)
     print(json.dumps({"kind": "local_endpoint", "turn": n, "at_us": at_us, "tone": {"whose": "room",
         "baseline_lines": n, "reading": {"arousal": arousal, "sure": sure}}}))
-    print(json.dumps({"kind": "voice_tone", "turn": n, "arousal": arousal, "sure": sure,
-        "valence": {"glad": 1.0, "down": -1.0}.get(kind), "words": True}))
+    print(json.dumps({"kind": "voice_tone", "turn": n, "at_us": at_us + 500_000, "arousal": arousal,
+        "sure": sure, "valence": {"glad": 1.0, "down": -1.0}.get(kind), "words": True}))
+if later:
+    # The voice numbers its turns again in a new conversation: its turn 17,
+    # 15 s after line 18 began, tells no valence (lamp-75c9, 21 Oct).
+    at_us = int((5000 + 17 * 18 + 15) * 1e6)
+    print(json.dumps({"kind": "local_endpoint", "turn": 17, "at_us": at_us, "tone": {"whose": "room",
+        "baseline_lines": 1, "reading": {"arousal": 0.1, "sure": 0.2}}}))
+    print(json.dumps({"kind": "voice_tone", "turn": 17, "at_us": at_us + 500_000, "arousal": 0.1,
+        "sure": 0.2, "valence": None, "words": True}))
 if stray:
     # Another voice, 9.5 s after line 13 began: no line's End.
     print(json.dumps({"kind": "local_endpoint", "turn": 99, "at_us": int((5000 + 12 * 18 + 9.5) * 1e6),
@@ -155,6 +164,11 @@ records 0.7 12 1 >"$T/events-shifted"
 code=$?
 check "a missed line is missed, a stray End is stray" 'grep -q "^12	lively	missed$" "$T/read-shifted" && grep -q "^lines	played=18	matched=17	missed=1	stray=1$" "$T/read-shifted"'
 check "the lines after it keep their own Ends" '[ $code = 0 ] && grep -q "^13	calm	turn=13	arousal=-0.60	sure=1.00	pass$" "$T/read-shifted" && grep -q "^18	down	turn=18" "$T/read-shifted"'
+
+records 0.7 0 0 1 >"$T/events-later"
+"$SCRIPT" read "$T/events-later" "$T/played-timed.tsv" >"$T/read-later" 2>&1
+code=$?
+check "a turn number told again later keeps glad's own valence" '[ $code = 0 ] && grep -q "^17	glad	turn=17	valence=1.00	pass$" "$T/read-later" && grep -q "^lines	played=18	matched=18	missed=0	stray=1$" "$T/read-later"'
 
 grep -v at_us "$T/events" >"$T/events-untimed"
 "$SCRIPT" read "$T/events-untimed" "$T/played-timed.tsv" >"$T/read-untimed" 2>&1

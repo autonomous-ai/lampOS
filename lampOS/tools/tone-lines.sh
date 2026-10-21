@@ -29,8 +29,8 @@
 # lamp missed is shown as missed, and an End of another voice as stray, and
 # neither moves the others onto the wrong kind (the reviewer-lead's P3 on
 # #2504). The signs are then checked once the baseline is sure: calm under 0,
-# lively over 0, glad's valence over 0, down's under 0. Counts and numbers only:
-# no words from the records.
+# lively over 0, glad's valence (the telling just after its End) over 0, down's
+# under 0. Counts and numbers only: no words from the records.
 #
 # The lamp: the voice on #1712's build or later, with `LAMP_VOICE_TONE=on` and
 # `LAMP_BUS=on`, its speaker volume as for any played test, nobody else
@@ -213,14 +213,13 @@ for line in open(events, encoding="utf-8", errors="replace"):
                      reading.get("arousal"), reading.get("sure"), record.get("at_us")))
     elif kind == "voice_tone":
         told.append((record.get("turn"), record.get("arousal"), record.get("sure"),
-                     record.get("valence"), record.get("words")))
+                     record.get("valence"), record.get("words"), record.get("at_us")))
     elif kind == "voice_tone_forgot":
         print(f"forgot\tby={record.get('by')}\twhose={record.get('whose')}\tall={record.get('all')}")
 fmt = lambda v: "-" if v is None else (f"{v:.2f}" if isinstance(v, float) else str(v))
 for turn, whose, lines, arousal, sure, _ in ends:
     print(f"end\tturn={fmt(turn)}\twhose={fmt(whose)}\tlines={fmt(lines)}\tarousal={fmt(arousal)}\tsure={fmt(sure)}")
-valence = {turn: value for turn, _, _, value, _ in told}
-for turn, arousal, sure, value, words in told:
+for turn, arousal, sure, value, words, _ in told:
     print(f"told\tturn={fmt(turn)}\tarousal={fmt(arousal)}\tsure={fmt(sure)}\tvalence={fmt(value)}\twords={fmt(words)}")
 if not played:
     sys.exit(0)
@@ -258,6 +257,24 @@ for _, _, start in lines:
         if found[:2] > best[:2]:
             best = found
 matched = best[2]
+
+# An End's valence is the telling just after it, by the lamp's clock: the voice
+# numbers its turns again from 1 in each conversation, so one session's records
+# can hold one turn number twice (lamp-75c9, 21 Oct 21:01). Records without a
+# time fall back to the turn.
+TOLD_WITHIN = 3.0
+
+def valence_of(end):
+    turn, at = end[0], end[5]
+    if isinstance(at, (int, float)):
+        after = [t for t in told if isinstance(t[5], (int, float)) and 0 <= (t[5] - at) / 1e6 <= TOLD_WITHIN]
+        if after:
+            return min(after, key=lambda t: t[5])[3]
+    for t in reversed(told):
+        if t[0] == turn and not isinstance(t[5], (int, float)):
+            return t[3]
+    return None
+
 failed = judged = 0
 for n, (number, kind, _) in enumerate(lines):
     end = matched.get(n)
@@ -272,7 +289,7 @@ for n, (number, kind, _) in enumerate(lines):
         ok = arousal is not None and (arousal < 0 if kind == "calm" else arousal > 0)
         print(f"{number}\t{kind}\tturn={fmt(turn)}\tarousal={fmt(arousal)}\tsure={fmt(sure)}\t{'pass' if ok else 'FAIL'}")
     elif kind in ("glad", "down"):
-        value = valence.get(turn)
+        value = valence_of(end)
         ok = value is not None and (value > 0 if kind == "glad" else value < 0)
         print(f"{number}\t{kind}\tturn={fmt(turn)}\tvalence={fmt(value)}\t{'pass' if ok else 'FAIL'}")
     else:
