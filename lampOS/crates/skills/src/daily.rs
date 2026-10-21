@@ -121,6 +121,11 @@ impl Window {
         format!("{:02}:{:02}", self.from / 60, self.from % 60)
     }
 
+    /// When it closes, as `HH:MM`.
+    pub fn closes(&self) -> String {
+        format!("{:02}:{:02}", self.to / 60, self.to % 60)
+    }
+
     /// The date on which this occurrence began. After midnight, the early
     /// portion of an overnight window belongs to the previous local date.
     pub fn occurrence_day(&self, local_day: i64, local_minute: u16) -> Option<i64> {

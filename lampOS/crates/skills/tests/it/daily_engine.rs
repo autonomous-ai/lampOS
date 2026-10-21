@@ -295,7 +295,11 @@ fn an_unsynchronized_clock_neither_spends_a_day_nor_approves_pending_output() {
         engine.still(&run, 3).is_none(),
         "trust loss invalidates the last good sample"
     );
-    assert!(engine.clock_tick(3).is_empty());
+    // The morning's watch, held since 2, is reset, and the journal says so.
+    assert_eq!(
+        reasons(engine.clock_tick(3)),
+        vec!["morning watch reset after 0 s: no trusted local moment"]
+    );
     engine.clock_in_with_trust(&local, 4, wall, true);
     assert!(
         engine.clock_tick(4).is_empty(),
@@ -528,7 +532,17 @@ fn a_pending_daily_ask_cannot_be_rebound_to_a_reordered_trigger() {
         "reload does not refund the immediate trigger's consumed day"
     );
     clock(&mut engine, 2, 1, 300);
-    assert!(engine.clock_tick(2).is_empty());
+    // Only the line saying the held watch left its window.
+    let left = engine.clock_tick(2);
+    assert!(
+        left.iter()
+            .all(|run| run.calls.is_empty() && run.ask.is_none())
+    );
+    assert!(
+        reasons(left)
+            .iter()
+            .all(|line| line.contains("watch reset") && line.contains("left its window"))
+    );
     clock(&mut engine, 3, 1, 360);
     let next = engine.clock_tick(3);
     assert_eq!(next.len(), 1);
@@ -822,4 +836,184 @@ fn unless_heard_goes_with_during() {
     .unwrap();
     let error = load(&path).unwrap_err();
     assert!(error.contains("not each"), "{error}");
+}
+
+/// Bedtime as on lamp-06c1 (#1672, row 7): an empty desk for 15 minutes,
+/// 23:00–06:00, once a day; `daily` false makes it an ordinary trigger.
+fn bedtime_watch(root: &Path, daily: bool) -> Engine {
+    let text = format!(
+        "[[trigger]]\nname = \"bedtime\"\ntopic = \"humans/faces/tracked\"\npresent = false\nfor = \"15m\"\nrearm = \"ends\"\nduring = {{ from = \"23:00\", to = \"06:00\" }}\n{}[ask]\npolicy = \"nudge\"\n[[do]]\non = \"bedtime\"\nbody = {{ gesture = \"stretching\" }}\n",
+        if daily { "once_per_day = true\n" } else { "" }
+    );
+    Engine::new(vec![manifest(root, &text)], true)
+        .with_daily_journal(crate::journal(root.join("daily.json")))
+}
+
+/// The empty desk seen once a second from 23:10 for `seconds`, and every
+/// journal line those messages made.
+fn held_empty(engine: &mut Engine, seconds: u64) -> Vec<String> {
+    let mut lines = Vec::new();
+    for second in 0..=seconds {
+        let now = second * 1_000_000;
+        clock(engine, now, 0, 23 * 60 + 10 + second / 60);
+        lines.extend(reasons(engine.observe(
+            Faces::TOPIC,
+            now,
+            br#"{"faces":[]}"#,
+            None,
+        )));
+    }
+    lines
+}
+
+fn reasons(runs: Vec<Run>) -> Vec<String> {
+    runs.into_iter()
+        .flat_map(|run| run.events)
+        .map(|event| event.why)
+        .collect()
+}
+
+fn resets(lines: &[String]) -> Vec<&String> {
+    lines
+        .iter()
+        .filter(|line| line.contains("watch reset"))
+        .collect()
+}
+
+const A_FACE: &[u8] =
+    br#"{"faces":[{"xmin":0.4,"ymin":0.2,"xmax":0.6,"ymax":0.6,"confidence":0.9}]}"#;
+
+#[test]
+fn a_daily_watch_reset_by_a_face_says_so_once_with_its_held_time() {
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), true);
+    assert!(resets(&held_empty(&mut engine, 400)).is_empty());
+    let mut lines = Vec::new();
+    for second in 401..=403_u64 {
+        let now = second * 1_000_000;
+        clock(&mut engine, now, 0, 23 * 60 + 10 + second / 60);
+        lines.extend(reasons(engine.observe(Faces::TOPIC, now, A_FACE, None)));
+    }
+    assert_eq!(
+        resets(&lines),
+        vec![
+            "bedtime watch reset after 400 s: stopped holding: humans/faces/tracked present no longer false"
+        ],
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_daily_watch_leaving_its_window_says_so_once() {
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), true);
+    held_empty(&mut engine, 120);
+    let mut lines = Vec::new();
+    for second in 121..=123_u64 {
+        let now = second * 1_000_000;
+        // 06:00 the next morning: out of the window.
+        clock(&mut engine, now, 1, 6 * 60);
+        lines.extend(reasons(engine.observe(
+            Faces::TOPIC,
+            now,
+            br#"{"faces":[]}"#,
+            None,
+        )));
+    }
+    assert_eq!(
+        resets(&lines),
+        vec!["bedtime watch reset after 120 s: left its window 23:00\u{2013}06:00"],
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_daily_watch_losing_the_trusted_moment_says_so_once() {
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), true);
+    held_empty(&mut engine, 120);
+    let local = lamp_local_time::LocalTime::Offset(0);
+    let mut lines = Vec::new();
+    for second in 121..=123_u64 {
+        let now = second * 1_000_000;
+        engine.clock_in_with_trust(&local, now, MIDNIGHT + (23 * 60 + 12) * 60_000, false);
+        lines.extend(reasons(engine.observe(
+            Faces::TOPIC,
+            now,
+            br#"{"faces":[]}"#,
+            None,
+        )));
+    }
+    assert_eq!(
+        resets(&lines),
+        vec!["bedtime watch reset after 120 s: no trusted local moment"],
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_watch_that_never_held_or_is_not_daily_says_nothing() {
+    // Never began holding: a face all along, then out of the window.
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), true);
+    let mut lines = Vec::new();
+    for second in 0..=10_u64 {
+        let now = second * 1_000_000;
+        clock(&mut engine, now, 0, 23 * 60 + 10);
+        lines.extend(reasons(engine.observe(Faces::TOPIC, now, A_FACE, None)));
+    }
+    clock(&mut engine, 11_000_000, 1, 7 * 60);
+    lines.extend(reasons(engine.observe(
+        Faces::TOPIC,
+        11_000_000,
+        br#"{"faces":[]}"#,
+        None,
+    )));
+    assert!(resets(&lines).is_empty(), "{lines:?}");
+
+    // Not daily: held, then a face, then out of the window.
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), false);
+    let mut lines = held_empty(&mut engine, 400);
+    clock(&mut engine, 401_000_000, 0, 23 * 60 + 16);
+    lines.extend(reasons(engine.observe(
+        Faces::TOPIC,
+        401_000_000,
+        A_FACE,
+        None,
+    )));
+    clock(&mut engine, 402_000_000, 1, 7 * 60);
+    lines.extend(reasons(engine.observe(
+        Faces::TOPIC,
+        402_000_000,
+        br#"{"faces":[]}"#,
+        None,
+    )));
+    assert!(resets(&lines).is_empty(), "{lines:?}");
+}
+
+#[test]
+fn a_daily_watch_reset_by_a_silent_camera_says_so_once() {
+    let root = private_root();
+    let mut engine = bedtime_watch(root.path(), true);
+    held_empty(&mut engine, 400);
+    let mut lines = Vec::new();
+    // Nothing for 10 s, past the faces' 2 s lifespan, then empty again.
+    for second in 410..=412_u64 {
+        let now = second * 1_000_000;
+        clock(&mut engine, now, 0, 23 * 60 + 17);
+        lines.extend(reasons(engine.observe(
+            Faces::TOPIC,
+            now,
+            br#"{"faces":[]}"#,
+            None,
+        )));
+    }
+    assert_eq!(
+        resets(&lines),
+        vec![
+            "bedtime watch reset after 400 s: went silent: nothing held it on humans/faces/tracked for 10 s, past its 2 s"
+        ],
+        "{lines:?}"
+    );
 }

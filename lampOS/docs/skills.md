@@ -1639,6 +1639,10 @@ refused. A rest's `resettle` lets the rest manager settle again after a
 sound ended it, as described in [Bedtime and Morning](bedtime-morning.md#settling-again-after-a-night-sound).
 A once-a-day trigger whose chance matured while its conditions did not hold,
 past its `wait`, says `<trigger> chance dropped: ...` in the journal. The shared `skills` publisher identifies the skill in its payload.
+A once-a-day trigger whose watch is reset after it had begun holding says once
+`<trigger> watch reset after N s: <why>`, where why is `stopped holding: <topic> <field> no longer <value>`
+(or `<field> no longer rising` for a rise), `went silent: nothing held it on <topic> for N s, past its N s`,
+`left its window HH:MM–HH:MM` or `no trusted local moment`. A watch that never held says nothing.
 Rest admission is not motion confirmation. A wake waits for correlated
 planner completion, at most twelve seconds, before its following sound.
 The fixed `cue = "hum"` uses Say's existing privacy, quiet and rarity checks;

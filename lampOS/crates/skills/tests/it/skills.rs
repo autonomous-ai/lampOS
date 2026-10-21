@@ -10419,6 +10419,7 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
             "reloaded" => {
                 engine.replace(vec![skill.clone()]);
                 for (at, reading) in [(2, 200), (3, 20), (4, 200)] {
+                    // Only the journal's line that the held watch reset.
                     assert!(
                         engine
                             .observe(
@@ -10427,7 +10428,8 @@ say = { text = "Please check the room.", priority = 8, expires = "2m" }
                                 format!(r#"{{"pm2_5":{reading}}}"#).as_bytes(),
                                 None,
                             )
-                            .is_empty(),
+                            .iter()
+                            .all(|run| run.calls.is_empty() && run.ask.is_none()),
                         "reload resets readings but cannot refund the day's claim"
                     );
                 }
@@ -10514,7 +10516,18 @@ light = { dim = 1, until = "ends" }
     assert!(engine.still(&run, 1).is_some());
 
     engine.clock_in_with_trust(&local, 2, MORNING, false);
-    let ended = engine.tick(2);
+    // The held watch's reset is said in the journal; the end is its own run.
+    let (said, ended): (Vec<lamp_skills::Run>, Vec<lamp_skills::Run>) = engine
+        .tick(2)
+        .into_iter()
+        .partition(|run| run.calls.is_empty());
+    assert_eq!(
+        said.iter()
+            .flat_map(|run| &run.events)
+            .map(|event| event.why.as_str())
+            .collect::<Vec<_>>(),
+        ["morning watch reset after 0 s: no trusted local moment"]
+    );
     assert_eq!(ended.len(), 1);
     assert_eq!(ended[0].skill, "daily-dim");
     assert!(matches!(ended[0].calls.as_slice(), [Call::Ends]));
@@ -10538,10 +10551,15 @@ light = { dim = 1, until = "ends" }
         "the claim survives restart"
     );
     restarted.clock(0, 1_000, MORNING + 86_400_000);
-    assert!(
-        restarted
-            .observe("air/indoor", 1_000, br#"{"co2":800}"#, None)
-            .is_empty()
+    // Only the journal's line: the watch held at 0 stopped holding.
+    let said = restarted.observe("air/indoor", 1_000, br#"{"co2":800}"#, None);
+    assert!(said.iter().all(|run| run.calls.is_empty()));
+    assert_eq!(
+        said.iter()
+            .flat_map(|run| &run.events)
+            .map(|event| event.why.as_str())
+            .collect::<Vec<_>>(),
+        ["morning watch reset after 0 s: stopped holding: air/indoor co2 no longer above 1000"]
     );
     let runs = restarted.observe("air/indoor", 2_000, br#"{"co2":1200}"#, None);
     assert_eq!(runs.len(), 1);
