@@ -1578,6 +1578,56 @@ root (`LAMP_BUS_ROOT`, or `/run/lampos-bus`) and lamp-eyes does not start
 if it cannot. Monday's silent-face measurement runs without it, so a
 silent face is read.
 
+**Explaining an unknown mouth (`--mouth-diagnostics on`, off by default,
+#720).** This is an observation-only CLI option. It requires an already usable
+`LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; missing prerequisites fail before
+model loading or camera setup. It does not enable a model, change a threshold,
+read another frame, or change any `humans/faces/tracked` payload. No installed
+unit enables it. Existing look-timing lines remain unchanged.
+
+One `lamp-eyes: mouth diagnostic {JSON}` line explains the largest detection
+per existing look (normally at most four per second). It uses the same
+`Mouths::judge` state transition and gates as publication, not a second scorer.
+The fixed record has monotonic `at_us`, `filled` width/height, `face_box_px`
+(x, y, width, height), `face_count`, unrounded `eyes_px`,
+`window_mean_eyes_px`, `window_looks`, `window_span_us`, `turn_deg`,
+`jitter_rad`, `reason`, `mesh_current`, `mesh_window_looks`, `mouth_open`,
+`window_reset`, and `speaking` (state, score, optional source). It contains no
+track/person ID, name, landmarks, image, audio or transcript. No record is
+emitted without a valid largest box or without the already enabled judge. If
+that tallest box is clipped to zero area, it does not substitute a smaller face.
+
+Coordinates and the 24 px gate are in **working-detector pixels**, not the
+mesh crop's 256-square coordinates. `filled` excludes padding; the existing
+camera-open line gives capture dimensions. The frame is shrunk uniformly to
+fit 320 by 256, never enlarged; a 320 by 240 capture adds sixteen black rows,
+without stretching. Mesh crop upsampling does not change `eyes_px`. The box
+helps interpret framing but does not prove identity or physical distance.
+
+`reason` names the first returning branch: `invalid_eyes`, `turn_unavailable`,
+`turned`, `small`, `too_few_looks`, `jitter`, `mesh`, or `corners`. `mesh` and
+`corners` identify the scoring path, not necessarily speech. Later unevaluated
+metrics are null, including window count/span/mesh count after `invalid_eyes`;
+zero is a measured value. `window_reset=true` means this valid look starts a
+new window (first sight, a new passing track, or all earlier looks expired).
+It does not mean every internal field was reset. An invalid look reports false
+and does not fabricate an empty history. `mesh_current` describes this input;
+`mesh_window_looks` counts available mesh values in the actual rolling window.
+
+Logging uses the existing nonblocking log relay; records may be dropped under
+backpressure. `at_us` is judgement time, not capture time, and missing records
+must not be treated as silent faces. Target host overhead is below 1 ms per
+look for the decision and formatting, with no added inference/frame read.
+The repeatable host-only report is
+`cargo test -p lamp-eyes --lib mouth_diagnostic_cost_report -- --ignored --nocapture`.
+It compares one bounded synthetic stream with diagnostics off/on, including
+bus-payload and diagnostic JSON formatting, without a fragile timing assertion.
+It excludes inference and journal delivery. One macOS ARM64 host run with
+Rust 1.96, unoptimized profile, debug info and incremental compilation off,
+measured 14.35 microseconds/look off and 36.33 on over 10,000 looks (about
+22 microseconds extra). This meets the host target only; real-device overhead
+and capture-to-decision latency remain unmeasured.
+
 **A closing camera waits for the mesh.** With `--mouth-model`, a
 `{"camera":false}` that arrives mid-look closes the camera once that look's
 mesh is done: up to 85 ms on a big core and 290 ms on a small one under
@@ -1644,7 +1694,7 @@ within about half a metre. Tested on the host only.
 lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`).
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
 `VENDOR:PRODUCT` alone, without `--device` (#2190): then at each open the eyes
 take the one camera with those ids on whatever port it is on, its capture
