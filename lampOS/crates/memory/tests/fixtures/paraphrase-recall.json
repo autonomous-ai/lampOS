@@ -1,0 +1,487 @@
+{
+ "about": "A paraphrase recall set for lamp-memory's kept list (#2510). Each question paraphrases one kept thing of its language without its key words; the other kept things of that language are the pool it is looked for in (16 targets and 16 distractors each). A kept thing's id is its order: a higher id is newer. Made-up content, no real people. Vietnamese is accented as Deepgram writes it. Never send it to any API.",
+ "kept": [
+  {
+   "id": 1,
+   "lang": "en",
+   "text": "I don't drink coffee after noon."
+  },
+  {
+   "id": 2,
+   "lang": "en",
+   "text": "My sister owns a small coffee shop downtown."
+  },
+  {
+   "id": 3,
+   "lang": "en",
+   "text": "I'm allergic to peanuts."
+  },
+  {
+   "id": 4,
+   "lang": "en",
+   "text": "I bought a new piano last winter."
+  },
+  {
+   "id": 5,
+   "lang": "en",
+   "text": "My daughter's piano lesson is every Tuesday at five."
+  },
+  {
+   "id": 6,
+   "lang": "en",
+   "text": "My neighbour's cat sometimes sleeps in our garden."
+  },
+  {
+   "id": 7,
+   "lang": "en",
+   "text": "I keep the spare house key under the blue flowerpot."
+  },
+  {
+   "id": 8,
+   "lang": "en",
+   "text": "I ran my first 10K two years ago."
+  },
+  {
+   "id": 9,
+   "lang": "en",
+   "text": "My dog Biscuit is scared of thunder."
+  },
+  {
+   "id": 10,
+   "lang": "en",
+   "text": "The car needs an oil change in December."
+  },
+  {
+   "id": 11,
+   "lang": "en",
+   "text": "I'm training for a half marathon in March."
+  },
+  {
+   "id": 12,
+   "lang": "en",
+   "text": "My doctor's office closes at four on Fridays."
+  },
+  {
+   "id": 13,
+   "lang": "en",
+   "text": "I parked the car on level three, near the elevator."
+  },
+  {
+   "id": 14,
+   "lang": "en",
+   "text": "I like my tea with honey, not sugar."
+  },
+  {
+   "id": 15,
+   "lang": "en",
+   "text": "I take my blood pressure pill every morning with breakfast."
+  },
+  {
+   "id": 16,
+   "lang": "en",
+   "text": "Our anniversary dinner was at an Italian place."
+  },
+  {
+   "id": 17,
+   "lang": "en",
+   "text": "My wife's birthday is on the twelfth of June."
+  },
+  {
+   "id": 18,
+   "lang": "en",
+   "text": "I prefer window seats on planes."
+  },
+  {
+   "id": 19,
+   "lang": "en",
+   "text": "I'm vegetarian, so no meat or fish."
+  },
+  {
+   "id": 20,
+   "lang": "en",
+   "text": "My brother is a chef in a hotel kitchen."
+  },
+  {
+   "id": 21,
+   "lang": "en",
+   "text": "The wifi password is written on the back of the router."
+  },
+  {
+   "id": 22,
+   "lang": "en",
+   "text": "I'm reading a long book about the history of trains."
+  },
+  {
+   "id": 23,
+   "lang": "en",
+   "text": "I hate horror films."
+  },
+  {
+   "id": 24,
+   "lang": "en",
+   "text": "The garage door remote is in the kitchen drawer."
+  },
+  {
+   "id": 25,
+   "lang": "en",
+   "text": "My mother moved to a fishing village last year."
+  },
+  {
+   "id": 26,
+   "lang": "en",
+   "text": "I usually go to bed around eleven."
+  },
+  {
+   "id": 27,
+   "lang": "en",
+   "text": "I'm learning Spanish on Thursday evenings."
+  },
+  {
+   "id": 28,
+   "lang": "en",
+   "text": "My favourite colour is green."
+  },
+  {
+   "id": 29,
+   "lang": "en",
+   "text": "I can't stand loud music when I'm working."
+  },
+  {
+   "id": 30,
+   "lang": "en",
+   "text": "I play badminton with friends on Sundays."
+  },
+  {
+   "id": 31,
+   "lang": "en",
+   "text": "I water the tomato plants every other day."
+  },
+  {
+   "id": 32,
+   "lang": "en",
+   "text": "The printer upstairs is out of ink."
+  },
+  {
+   "id": 33,
+   "lang": "vi",
+   "text": "Tôi không uống cà phê sau buổi trưa."
+  },
+  {
+   "id": 34,
+   "lang": "vi",
+   "text": "Chị tôi mở một quán cà phê nhỏ ở trung tâm."
+  },
+  {
+   "id": 35,
+   "lang": "vi",
+   "text": "Tôi bị dị ứng đậu phộng."
+  },
+  {
+   "id": 36,
+   "lang": "vi",
+   "text": "Mùa đông năm ngoái tôi mua một cây đàn mới."
+  },
+  {
+   "id": 37,
+   "lang": "vi",
+   "text": "Con gái tôi học đàn vào chiều thứ Ba."
+  },
+  {
+   "id": 38,
+   "lang": "vi",
+   "text": "Con mèo nhà hàng xóm hay ngủ trong vườn nhà tôi."
+  },
+  {
+   "id": 39,
+   "lang": "vi",
+   "text": "Chìa khóa dự phòng để dưới chậu hoa màu xanh."
+  },
+  {
+   "id": 40,
+   "lang": "vi",
+   "text": "Hai năm trước tôi chạy giải mười cây số đầu tiên."
+  },
+  {
+   "id": 41,
+   "lang": "vi",
+   "text": "Con chó của tôi rất sợ sấm sét."
+  },
+  {
+   "id": 42,
+   "lang": "vi",
+   "text": "Xe cần thay nhớt vào tháng Mười Hai."
+  },
+  {
+   "id": 43,
+   "lang": "vi",
+   "text": "Tôi đang tập chạy bán marathon vào tháng Ba."
+  },
+  {
+   "id": 44,
+   "lang": "vi",
+   "text": "Phòng khám của bác sĩ đóng cửa lúc bốn giờ chiều thứ Sáu."
+  },
+  {
+   "id": 45,
+   "lang": "vi",
+   "text": "Tôi đỗ xe ở tầng ba, gần thang máy."
+  },
+  {
+   "id": 46,
+   "lang": "vi",
+   "text": "Tôi thích uống trà với mật ong, không đường."
+  },
+  {
+   "id": 47,
+   "lang": "vi",
+   "text": "Mỗi sáng tôi uống thuốc huyết áp sau bữa ăn."
+  },
+  {
+   "id": 48,
+   "lang": "vi",
+   "text": "Kỷ niệm ngày cưới chúng tôi ăn tối ở một nhà hàng Ý."
+  },
+  {
+   "id": 49,
+   "lang": "vi",
+   "text": "Sinh nhật vợ tôi là ngày mười hai tháng Sáu."
+  },
+  {
+   "id": 50,
+   "lang": "vi",
+   "text": "Đi máy bay tôi thích ngồi cạnh cửa sổ."
+  },
+  {
+   "id": 51,
+   "lang": "vi",
+   "text": "Tôi ăn chay, không ăn thịt cá."
+  },
+  {
+   "id": 52,
+   "lang": "vi",
+   "text": "Anh trai tôi làm đầu bếp trong một khách sạn."
+  },
+  {
+   "id": 53,
+   "lang": "vi",
+   "text": "Mật khẩu wifi ghi ở mặt sau bộ phát."
+  },
+  {
+   "id": 54,
+   "lang": "vi",
+   "text": "Tôi đang đọc một cuốn sách dày về lịch sử đường sắt."
+  },
+  {
+   "id": 55,
+   "lang": "vi",
+   "text": "Tôi rất ghét phim kinh dị."
+  },
+  {
+   "id": 56,
+   "lang": "vi",
+   "text": "Điều khiển cửa ga ra để trong ngăn kéo bếp."
+  },
+  {
+   "id": 57,
+   "lang": "vi",
+   "text": "Mẹ tôi chuyển về sống ở một làng chài từ năm ngoái."
+  },
+  {
+   "id": 58,
+   "lang": "vi",
+   "text": "Tôi thường đi ngủ khoảng mười một giờ."
+  },
+  {
+   "id": 59,
+   "lang": "vi",
+   "text": "Tôi học tiếng Tây Ban Nha vào tối thứ Năm."
+  },
+  {
+   "id": 60,
+   "lang": "vi",
+   "text": "Màu tôi thích nhất là màu xanh lá."
+  },
+  {
+   "id": 61,
+   "lang": "vi",
+   "text": "Tôi không chịu được nhạc ồn khi đang làm việc."
+  },
+  {
+   "id": 62,
+   "lang": "vi",
+   "text": "Chủ nhật tôi đánh cầu lông với bạn bè."
+  },
+  {
+   "id": 63,
+   "lang": "vi",
+   "text": "Tôi tưới mấy cây cà chua hai ngày một lần."
+  },
+  {
+   "id": 64,
+   "lang": "vi",
+   "text": "Máy in trên lầu hết mực rồi."
+  }
+ ],
+ "questions": [
+  {
+   "lang": "en",
+   "text": "Can I have an espresso this evening?",
+   "kept": 1
+  },
+  {
+   "lang": "en",
+   "text": "Is this satay sauce safe for me to eat?",
+   "kept": 3
+  },
+  {
+   "lang": "en",
+   "text": "When does my kid have her music class?",
+   "kept": 5
+  },
+  {
+   "lang": "en",
+   "text": "Where did I hide the backup for getting inside if I'm locked out?",
+   "kept": 7
+  },
+  {
+   "lang": "en",
+   "text": "Why is the puppy hiding under the bed during the storm?",
+   "kept": 9
+  },
+  {
+   "lang": "en",
+   "text": "What race am I preparing for this spring?",
+   "kept": 11
+  },
+  {
+   "lang": "en",
+   "text": "Which floor did I leave the vehicle on in the garage?",
+   "kept": 13
+  },
+  {
+   "lang": "en",
+   "text": "When should I swallow my hypertension medication?",
+   "kept": 15
+  },
+  {
+   "lang": "en",
+   "text": "When do I need to buy a present for my partner?",
+   "kept": 17
+  },
+  {
+   "lang": "en",
+   "text": "Should I order the steak tonight?",
+   "kept": 19
+  },
+  {
+   "lang": "en",
+   "text": "Where can I find the code for the internet?",
+   "kept": 21
+  },
+  {
+   "lang": "en",
+   "text": "Should we watch something scary tonight?",
+   "kept": 23
+  },
+  {
+   "lang": "en",
+   "text": "Where is mom living now?",
+   "kept": 25
+  },
+  {
+   "lang": "en",
+   "text": "What language class do I attend each week?",
+   "kept": 27
+  },
+  {
+   "lang": "en",
+   "text": "Should you play some rock songs while I write this report?",
+   "kept": 29
+  },
+  {
+   "lang": "en",
+   "text": "How often do my vegetables in the garden need a drink?",
+   "kept": 31
+  },
+  {
+   "lang": "vi",
+   "text": "Tối nay tôi làm một ly espresso được không?",
+   "kept": 33
+  },
+  {
+   "lang": "vi",
+   "text": "Món gỏi có rắc lạc này tôi ăn được không?",
+   "kept": 35
+  },
+  {
+   "lang": "vi",
+   "text": "Bé nhà mình đi lớp nhạc hôm nào nhỉ?",
+   "kept": 37
+  },
+  {
+   "lang": "vi",
+   "text": "Tôi giấu cái để mở cửa trước ở đâu nhỉ?",
+   "kept": 39
+  },
+  {
+   "lang": "vi",
+   "text": "Sao cún cứ trốn dưới gầm giường mỗi lần mưa bão?",
+   "kept": 41
+  },
+  {
+   "lang": "vi",
+   "text": "Mùa xuân này tôi chuẩn bị cho giải đua nào?",
+   "kept": 43
+  },
+  {
+   "lang": "vi",
+   "text": "Ô tô của tôi để ở lầu mấy trong hầm gửi?",
+   "kept": 45
+  },
+  {
+   "lang": "vi",
+   "text": "Bao giờ trong ngày tôi phải nhớ dùng viên hạ áp?",
+   "kept": 47
+  },
+  {
+   "lang": "vi",
+   "text": "Khi nào tôi cần mua quà cho bà xã?",
+   "kept": 49
+  },
+  {
+   "lang": "vi",
+   "text": "Tối nay tôi gọi món bít tết nhé?",
+   "kept": 51
+  },
+  {
+   "lang": "vi",
+   "text": "Mã vào mạng internet nhà mình xem ở đâu?",
+   "kept": 53
+  },
+  {
+   "lang": "vi",
+   "text": "Tối nay mình coi gì đó rùng rợn không?",
+   "kept": 55
+  },
+  {
+   "lang": "vi",
+   "text": "Bây giờ má đang ở đâu?",
+   "kept": 57
+  },
+  {
+   "lang": "vi",
+   "text": "Mỗi tuần tôi đi lớp ngoại ngữ gì?",
+   "kept": 59
+  },
+  {
+   "lang": "vi",
+   "text": "Bật vài bài rock trong lúc tôi viết báo cáo nhé?",
+   "kept": 61
+  },
+  {
+   "lang": "vi",
+   "text": "Vườn rau của tôi bao lâu thì phải cho nước một lần?",
+   "kept": 63
+  }
+ ]
+}

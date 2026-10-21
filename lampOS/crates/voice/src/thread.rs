@@ -63,8 +63,10 @@ const TAIL_BYTES: usize = 160;
 /// this long of it.
 const ASKED_WITHIN: Duration = Duration::from_secs(20);
 /// An exchange older than this is not told to a new session: whoever it was
-/// with has probably gone.
-const REMEMBERED_FOR: Duration = Duration::from_secs(600);
+/// with has probably gone. With `LAMP_MEMORY_REOPEN_QUIET`, the second
+/// route's conversation quiet this long is over: its next turn asks the
+/// memory's note again (`second_provider::worker::Sessions`).
+pub(crate) const REMEMBERED_FOR: Duration = Duration::from_secs(600);
 /// A conversation whose last exchange is this new is told as one that may
 /// go on; an older one as one that is finished. Until 2026-10-13 every one
 /// was told as "this conversation ... for you to carry on from the way
