@@ -207,7 +207,10 @@ observation only.
 no-slide lamp has none, so its ring is as with the route off: the asleep face
 (`LAMP_RING_ASLEEP=on`), the tap face and the reminder pulse are allowed, and
 the wait never starts the muted indicator worker (`worker ring --privacy`), so
-the ring keeps one writer. Controls never opens microphones or clears a
+the ring keeps one writer. With a slide, a hand's sleep still shows the
+asleep face while the slide is open, and gives the ring to the red breath
+when the slide closes ([ring-choreography.md](ring-choreography.md), "A
+hand's sleep", #1362). Controls never opens microphones or clears a
 software mute.
 
 **Expression's head touch.** `lamp-expression serve --head-touch` reads

@@ -405,6 +405,72 @@ impl<F: FnMut() -> Option<Asleep>> TapFace<F> {
     }
 }
 
+/// The asleep face while a hand held on the head keeps the lamp asleep
+/// (#1362), where the face is not already shown for the whole wait: begun
+/// at the first look of the muted wait that finds the head's sleep, after
+/// [`AFTER`] and fading in as the face always does, and stopped when the
+/// sleep ends. With the Controls privacy route's slide (`yields`), the
+/// slide closing stops it at once, black and the device closed, before the
+/// wait starts the slide's own indication, so the ring keeps one writer
+/// (#795); that indication keeps the device until the wait ends, so the
+/// face does not come back in the same wait.
+pub struct SleepFace<F: FnMut() -> Option<Asleep>> {
+    start: F,
+    showing: Option<Asleep>,
+    yields: bool,
+    gave_way: bool,
+}
+
+impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
+    pub fn new(start: F, yields: bool) -> Self {
+        Self {
+            start,
+            showing: None,
+            yields,
+            gave_way: false,
+        }
+    }
+
+    /// One look of the muted wait: whether the head's sleep keeps it
+    /// muted. True when a face began.
+    pub fn poll(&mut self, asleep: bool) -> bool {
+        if !asleep {
+            if let Some(showing) = self.showing.take() {
+                showing.stop();
+            }
+            return false;
+        }
+        if self.showing.is_none() && !self.gave_way {
+            self.showing = (self.start)();
+            return self.showing.is_some();
+        }
+        false
+    }
+
+    /// What the wait read of the slide, as it changes: closed, with
+    /// `yields`, the face stops now and not again in this wait.
+    pub fn slide(&mut self, state: crate::privacy::PrivacyState) {
+        if self.yields && state == crate::privacy::PrivacyState::Muted {
+            self.gave_way = true;
+            if let Some(showing) = self.showing.take() {
+                showing.stop();
+            }
+        }
+    }
+
+    /// Whether the face is begun and not stopped.
+    pub fn showing(&self) -> bool {
+        self.showing.is_some()
+    }
+
+    /// Black and the device closed, before the next cycle's ring worker.
+    pub fn stop(self) {
+        if let Some(showing) = self.showing {
+            showing.stop();
+        }
+    }
+}
+
 /// Sleep `length` in short steps; false if stopped meanwhile.
 fn wait(length: Duration, stop: &AtomicBool) -> bool {
     let until = Instant::now() + length;
@@ -680,5 +746,93 @@ mod tests {
             "no longer owed or held: none"
         );
         assert_eq!(*frames.last().unwrap(), EncodedFrame::black());
+    }
+
+    /// A ring that says whether it is open: set when the face opens it,
+    /// cleared when the face closes it.
+    struct Open(Arc<AtomicBool>, Frames);
+    impl FrameSink for Open {
+        fn write_frame(&mut self, frame: &EncodedFrame) -> io::Result<()> {
+            self.1.write_frame(frame)
+        }
+    }
+    impl Drop for Open {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+
+    /// #1362: a hand's sleep's face begins once while the sleep lasts and
+    /// stops when it ends. With the privacy slide's route, the slide closing
+    /// leaves the ring black and closed by the time it is told, before the
+    /// slide's indication may open it, and the face does not come back in
+    /// that wait. Off the route, a closed slide leaves it as it is.
+    #[test]
+    fn a_hands_sleep_shows_the_face_and_gives_the_ring_to_a_closing_slide() {
+        use crate::privacy::PrivacyState;
+        let open = Arc::new(AtomicBool::new(false));
+        let frames = Frames::default();
+        let starts = std::cell::Cell::new(0);
+        let start = || {
+            starts.set(starts.get() + 1);
+            let (flag, sink) = (open.clone(), frames.clone());
+            Some(Asleep::start_timed(
+                move || {
+                    flag.store(true, Ordering::SeqCst);
+                    AsleepRing::new(Open(flag, sink))
+                },
+                ceiling(48),
+                Pulses::OWED,
+                QUICK,
+            ))
+        };
+        let mut face = SleepFace::new(start, true);
+        assert!(!face.poll(false), "awake: nothing");
+        assert!(face.poll(true), "asleep: begun");
+        assert!(!face.poll(true), "once");
+        let until = Instant::now() + Duration::from_secs(2);
+        while !open.load(Ordering::SeqCst) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(open.load(Ordering::SeqCst), "the face opened the ring");
+        face.slide(PrivacyState::Allowed);
+        assert!(face.showing(), "an open slide changes nothing");
+        face.slide(PrivacyState::Muted);
+        assert!(!open.load(Ordering::SeqCst), "closed when told");
+        assert_eq!(
+            *frames.0.lock().unwrap().last().unwrap(),
+            EncodedFrame::black()
+        );
+        assert!(!face.showing());
+        assert!(!face.poll(true), "not again in this wait");
+        face.slide(PrivacyState::Allowed);
+        assert!(!face.poll(true), "nor once the slide opens");
+        assert_eq!(starts.get(), 1);
+        face.stop();
+
+        let starts = std::cell::Cell::new(0);
+        let mut off_route = SleepFace::new(
+            || {
+                starts.set(starts.get() + 1);
+                Some(Asleep::start_timed(
+                    || AsleepRing::new(Frames::default()),
+                    ceiling(48),
+                    Pulses::OWED,
+                    QUICK,
+                ))
+            },
+            false,
+        );
+        assert!(off_route.poll(true));
+        off_route.slide(PrivacyState::Muted);
+        assert!(
+            off_route.showing(),
+            "off the route the face is the muted look"
+        );
+        assert!(!off_route.poll(false));
+        assert!(!off_route.showing(), "awake again: stopped");
+        assert!(off_route.poll(true), "asleep again: begun again");
+        assert_eq!(starts.get(), 2);
+        off_route.stop();
     }
 }

@@ -605,6 +605,7 @@ fn the_persons_light_is_said_and_taken_while_the_switch_is_closed() {
         &controls,
         &reminders,
         None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
         None,
         None,
         Some(light),

@@ -265,8 +265,9 @@ With the Controls privacy route on (`LAMP_PRIVACY_CONTROLS=on`), the muted
 look is the physical-mute indication below instead, and the asleep face stays
 off whatever `LAMP_RING_ASLEEP` says: the ring has one writer at a time (the
 first builder on #795, 2026-10-16 13:50). So with the route on, the red breath
-is the hardware switch and sleep or a software mute leaves the ring dark; the
-warm asleep face is the route-off look. A lamp with no slide
+is the hardware switch and a software mute leaves the ring dark; the warm
+asleep face is the route-off look, and, with head touch, a hand's sleep's
+while the slide is open (#1362, "A hand's sleep" below). A lamp with no slide
 (`LAMP_PRIVACY_CONTROLS=no-slide`) has no red breath to show, so its ring is
 as with the route off: the asleep face, the tap face and the pulse, and no
 indicator worker ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)).
@@ -392,7 +393,31 @@ reviewer on #1288). The face is drawn only where it is the muted look:
   switch's own indication and has one writer (#755): there a software mute
   stays dark, rather than show a look that claims the switch (with
   `no-slide` the face shows, as with the route off);
-- not `LAMP_RING_ASLEEP=on`, which shows the face the whole time already.
+- not `LAMP_RING_ASLEEP=on`, which shows the face the whole time already;
+- not while a hand's sleep's face shows (below).
+
+**A hand's sleep (#1362, the first builder on #1362, 21 Oct 09:21).** A
+person who holds the head to put the lamp to sleep must see that it worked,
+and a dark ring reads as idle. So with head touch on, while the wait is the
+sleep a hand chose (`Observation::asleep`, the voice's mute with the reason
+`sleep`), the ring shows the asleep face as above: the same faint warm glow
+at the bottom and 6 s breath, starting 1.5 s into the wait and fading in
+over 1.5 s, as the body folds (#2445, body.md's "Asleep" once that is
+in). It is the trace's `head_sleep_face`, once per sleep, and it stops when
+the sleep ends (a plain mute, the person's or the app's, gets none); the tap
+that wakes the lamp ends the wait, and the cycle's ring worker takes over
+(`ring_asleep::SleepFace`; `sleep_face_allowed` says whether it is drawn
+and whether it yields to the slide). It is drawn:
+- with head touch (`LAMP_HEAD_TOUCH=on`), where the face is not shown the
+  whole time already by `LAMP_RING_ASLEEP=on`;
+- on the Controls privacy route with a slide too, while the slide is open.
+  The slide's own dark-red whole-ring breath is unlike it, so the two never
+  look alike. When the wait reads the slide closed, the face stops there
+  and then, black with the device closed, before the wait starts the
+  slide's indicator worker, so the ring keeps one writer (#795). That
+  worker keeps the device until the wait ends, so the face doesn't come
+  back in that wait, even once the slide opens: then the ring is dark until
+  the lamp wakes.
 
 It is stopped, black and closed, before the wait returns, as the long face
 is. Expression gives no look-up for a tap while the software mute holds
