@@ -1999,6 +1999,7 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "serde_json",
  "sha2",
  "tract-onnx",
 ]
