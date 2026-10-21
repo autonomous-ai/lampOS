@@ -505,8 +505,17 @@ other installable skills and the parked Laugh glance are left out,
 on, its own hello off, and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
 A skill with a tool costs one of the 32 functions a session takes, after
-the voice's own and the actions part's, and what is past 32 is left out
-without a word: a product lamp's are 31 (`crates/update/tests/functions.rs`).
+the voice's own and the actions part's: a product lamp's are 31
+(`crates/update/tests/functions.rs`). Past 32 a core skill's function is
+never the one cut (the owner's rule, on #2614): the tools file names core
+skills' tools in `core` beside `tools` (`lamp_skills::tools_file`), and
+the voice cuts the other skills' functions, the last first, after the
+second route's fetch and time elsewhere and `reports_state` (with
+`LAMP_REPORTS=on`) and before its search (`tools::uncut`,
+`worker::chat_cut`). With `LAMP_USE_SKILL=on`, `use_skill` carries the
+core skills and is never cut either (#2644). The lamp's own and core skills'
+functions alone past 32 are an error line naming what was left out
+([install.md](install.md)).
 An update round brings them up to date from the build (#2014's P2,
 [updates.md](updates.md), "The product's skills"): each build carries the
 product skills as one signed file, `lamp-product-skills`, and a round writes

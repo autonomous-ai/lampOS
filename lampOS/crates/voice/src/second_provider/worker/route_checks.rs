@@ -69,7 +69,7 @@ async fn reports_stop_is_declared_with_its_switch_and_run_on_the_reports() {
     flags.extend(crate::reports_stop::arguments(Some("on")));
     let tools = tools_of(&flags);
     assert!(tools.reports_stop);
-    let declared = with_search(crate::tools::declared(&tools), &[]);
+    let declared = chat_tools(&tools, &[]);
     assert!(names(&declared).contains(&crate::reports_stop::NAME));
     let few = few_tools(declared, &[]);
     assert!(!names(&few).contains(&crate::reports_stop::NAME));
@@ -106,7 +106,7 @@ async fn dance_is_declared_from_the_skills_tools_file_and_reaches_their_socket()
     let skills_dir = skills.display().to_string();
     let flags = strings(&["--tools", crate::tools::SKILLS_FLAG, &skills_dir]);
     let tools = tools_of(&flags);
-    let declared = with_search(crate::tools::declared(&tools), &[]);
+    let declared = chat_tools(&tools, &[]);
     assert!(
         names(&declared).contains(&"dance"),
         "{:?}",
@@ -128,7 +128,7 @@ async fn dance_is_declared_from_the_skills_tools_file_and_reaches_their_socket()
     let mut flags = flags;
     flags.extend(crate::use_skill::arguments(Some("on")));
     let tools = tools_of(&flags);
-    let declared = with_search(crate::tools::declared(&tools), &[]);
+    let declared = chat_tools(&tools, &[]);
     assert!(!names(&declared).contains(&"dance"));
     let use_skill = declared
         .iter()

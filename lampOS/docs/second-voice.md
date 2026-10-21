@@ -422,9 +422,13 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   none (`deepseek-v4-pro`, DeepSeek's pricing page) is never sent one: a
   look asked of it is told it saw nothing (`Services::sees`).
 - **Web search** (`LAMP_SECOND_SEARCH`, `net/search.rs`), declared to the
-  model beside the lamp's tools, within Live's bound of 32 functions (the
-  search before a skill's last function, the fetch only with room left;
-  `worker::with_search`). A turn waits 3 s for a call (`WITHIN`), then goes
+  model beside the lamp's tools, within Live's bound of 32 functions, cut
+  in the order `worker::chat_cut` declares: the fetch, the time elsewhere,
+  `reports_state` with `LAMP_REPORTS=on`, the skills' functions not a core
+  skill's (the last first), then the search, and never a core skill's
+  function, `use_skill`, `reports_stop` or the actions part's (#2614,
+  #2644, `worker::chat_tools`). What is cut is said once, on a plain
+  journal line (`past the bound of 32, left out: …`). A turn waits 3 s for a call (`WITHIN`), then goes
   on with "the search did not answer in time".
   - `deepseek`: DeepSeek's Search & Fetch API (api-docs.deepseek.com/api/search,
     read 19 Oct). `web_search(query)` is `POST <deepseek>/v1/tools/search`
