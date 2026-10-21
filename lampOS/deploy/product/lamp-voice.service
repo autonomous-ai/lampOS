@@ -82,6 +82,16 @@ Environment=LAMP_SECOND_LOOK=on
 # Each turn told and kept for the person (or the room) admitted with its request, not the session's owner: the lead's
 # decision of 21 Oct on #1711, after the two-person run on lamp-52e6 (11 of 12, nothing crossed; #1895, #2233).
 Environment=LAMP_SECOND_SCOPED_CONTEXT=on
+# Speed, from lamp-4ace's days on them and the backend's 72 h on 21 Oct (#2135, Backend 16:5x): the steady prompt
+# layout keeps 85% of the prompt cached against 24% without it, and the warm connections spare a cold chat and speech
+# connection (150-200 ms each; ~1 line in 3 begins after a minute's quiet). Turned on before each one's own
+# before-and-after run (lamp-runs.md), which stays owed. The speech-to-text socket kept ready sends KeepAlive only, no
+# sound until a line begins, and closes when listening is denied (the reviewer-lead on #2593); an idle one is not
+# billed (Backend2, #2593, 16:59).
+Environment=LAMP_SECOND_STEADY_FIRST=on
+Environment=LAMP_SECOND_CHAT_WARM=on
+Environment=LAMP_SECOND_SPEECH_WARM=on
+Environment=LAMP_SECOND_STT_WARM=on
 # The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
 # (memory.md).
