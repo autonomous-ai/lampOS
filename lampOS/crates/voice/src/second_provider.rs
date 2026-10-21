@@ -94,11 +94,50 @@ pub const MAX_ROUNDS: usize = 4;
 pub const BEGIN_WITHIN: Duration = Duration::from_secs(3);
 /// With `LAMP_SECOND_WAIT_CUE=on` (sixth-P3, #754): a spoken turn whose
 /// first round has not begun this long after the words makes one soft
-/// sound, and then waits until [`BEGIN_WITHIN_AFTER_CUE`]: a "hmm" followed
+/// sound, and then waits another [`BEGIN_WITHIN_AFTER_CUE`]: a "hmm" followed
 /// by silence is the worst of both (the first builder, 15:43). On lamp-4ace
 /// on 2026-10-16, 9 of 10 backup turns waited past 1.5 s.
 pub const CUE_AFTER: Duration = Duration::from_millis(1_500);
-pub const BEGIN_WITHIN_AFTER_CUE: Duration = Duration::from_millis(4_500);
+/// Time allowed for the first chat event after the scheduled cue, when a
+/// clip is ready. The deadline from the words is the configured cue delay
+/// plus this interval: 4.5 s with [`CUE_AFTER`], 7 s with [`CUE_AFTER_MOST`].
+pub const BEGIN_WITHIN_AFTER_CUE: Duration = Duration::from_secs(3);
+/// With it, the wait sound comes this many milliseconds after the words in
+/// place of [`CUE_AFTER`], from [`CUE_AFTER_LEAST`] to [`CUE_AFTER_MOST`]
+/// (Fourth's breakdown of the silences on lamp-4ace, #2602, 21 Oct 20:41).
+/// The first answer audio comes at about 2 s now (p50 1.99 s, p90 3.47 s
+/// over 96 turns), so at 1.5 s the sound came in about 40% of turns, most
+/// of them about to answer: "hmm", then a gap, then the answer. Later, it
+/// comes only for a slow chat, where a sign that it heard helps.
+pub const CUE_AFTER_ENVIRONMENT: &str = "LAMP_SECOND_CUE_AFTER_MS";
+/// The earliest the sound may come.
+pub const CUE_AFTER_LEAST: Duration = Duration::from_millis(500);
+/// The latest scheduled sound. A ready clip still leaves
+/// [`BEGIN_WITHIN_AFTER_CUE`] for the chat's first event after this time.
+pub const CUE_AFTER_MOST: Duration = Duration::from_millis(4_000);
+
+/// When the wait sound comes for `value` ([`CUE_AFTER_ENVIRONMENT`]): its
+/// milliseconds, from [`CUE_AFTER_LEAST`] to [`CUE_AFTER_MOST`]; `None`
+/// unset, and an error for anything else.
+pub fn cue_after(value: Option<&str>) -> Result<Option<Duration>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let after = value
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(Duration::from_millis)
+        .filter(|after| (CUE_AFTER_LEAST..=CUE_AFTER_MOST).contains(after))
+        .ok_or_else(|| {
+            format!(
+                "{CUE_AFTER_ENVIRONMENT} is milliseconds from {} to {}, not {value:?}",
+                CUE_AFTER_LEAST.as_millis(),
+                CUE_AFTER_MOST.as_millis()
+            )
+        })?;
+    Ok(Some(after))
+}
 /// A look's first round may take this long: a picture is slower to read
 /// than words (lamp-52e6 on 2026-10-16, one of two real looks past 3 s; the
 /// first builder, 21:25). Past it, after "Let me look.", the lamp says
@@ -530,6 +569,8 @@ struct Shared {
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
+    /// When the wait sound comes ([`CUE_AFTER`], or [`CUE_AFTER_ENVIRONMENT`]'s).
+    cue_after: Duration,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
     /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
@@ -1019,6 +1060,7 @@ impl Engine {
                 hearing: None,
                 asked: None,
                 cues: None,
+                cue_after: CUE_AFTER,
                 down: None,
                 announce: true,
                 heard_last: Mutex::new(None),
@@ -1755,6 +1797,20 @@ impl Engine {
     pub fn noting_the_air(mut self, note: TaskNote, heard: AirHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.air = Some((note, heard));
+        }
+        self
+    }
+
+    /// The wait sound comes `after` the words, not at [`CUE_AFTER`]
+    /// ([`CUE_AFTER_ENVIRONMENT`]). Before any turn only.
+    pub fn sounding_after(mut self, after: Duration) -> Self {
+        let shared = Arc::get_mut(&mut self.shared);
+        debug_assert!(
+            shared.is_some(),
+            "the wait sound's time is set before any turn"
+        );
+        if let Some(shared) = shared {
+            shared.cue_after = after;
         }
         self
     }
@@ -4506,7 +4562,7 @@ async fn answer(
                     let at = |after: Duration| from + after;
                     let cues = shared.cues.as_ref().filter(|_| heard);
                     let first_wait = if cues.is_some() {
-                        CUE_AFTER
+                        shared.cue_after
                     } else if looking {
                         LOOK_BEGIN_WITHIN
                     } else {
@@ -4516,8 +4572,10 @@ async fn answer(
                     if next.is_err()
                         && let Some(cues) = cues
                     {
-                        // One soft sound, then a longer wait; with no sound
-                        // ready yet, the plain bound.
+                        // Both bounds are measured from the words. A ready
+                        // sound leaves three seconds after its scheduled
+                        // time; without one, never set a deadline earlier
+                        // than the wait already spent checking for it.
                         let bound = match cues.next() {
                             Some(clip) => {
                                 eprintln!(
@@ -4526,9 +4584,9 @@ async fn answer(
                                 );
                                 reached(&writing_times, |times| &mut times.cue);
                                 cue(shared, request, clip).await?;
-                                BEGIN_WITHIN_AFTER_CUE
+                                shared.cue_after + BEGIN_WITHIN_AFTER_CUE
                             }
-                            None => BEGIN_WITHIN,
+                            None => shared.cue_after.max(BEGIN_WITHIN),
                         };
                         next = tokio::time::timeout_at(at(bound), stream.next()).await;
                     }

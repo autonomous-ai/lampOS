@@ -1323,6 +1323,7 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+        crate::second_provider::CUE_AFTER_ENVIRONMENT,
         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::second_provider::LOOK_WALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
@@ -1390,6 +1391,7 @@ mod tests {
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+            crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -1797,6 +1799,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
+                    || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -1898,6 +1901,7 @@ mod tests {
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FACE_NAME=on",
                     "LAMP_SECOND_FEW_TOOLS=on",

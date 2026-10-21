@@ -342,13 +342,30 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   With `LAMP_SECOND_WAIT_CUE=on` (sixth-P3), a spoken turn whose first
   round has not begun 1.5 s after the words makes one soft sound ("Hmm.",
   "Mm." or "Hm.", the next never the last one played), and is then given up
-  only at 4.5 s: a "hmm" followed by silence is the worst of both. The
-  sounds are said once by this route's own voice at its first spoken turn,
+  only 3 s after that scheduled sound (`BEGIN_WITHIN_AFTER_CUE`), at 4.5 s
+  from the words with the default cue time: a "hmm" followed by silence
+  is the worst of both. The sounds are said once by this route's own
+  voice at its first spoken turn,
   kept in memory, cut to 0.6 s with a 30 ms fade, at half the
   reply's level. They go as audio only: nothing is kept in the thread, the 120 s
   announcement still comes before the first real answer, and a written
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
+  With `LAMP_SECOND_CUE_AFTER_MS` (500 to 4,000 ms, off unless set), the
+  sound comes that long after the words in place of 1.5 s; a value it
+  can't take is said and left at 1.5 s. A ready sound also moves the
+  first-chat deadline: 3,000 ms means a 6 s deadline from the words,
+  4,000 ms means 7 s. With no sound ready at the cue time, the deadline
+  is the later of that time and the plain 3 s bound; it does not wait
+  another 3 s in silence. These bounds end the wait for the first chat
+  event, not for speech playback to begin. Fourth's breakdown of lamp-4ace's
+  silences (#2602, 21 Oct 20:41): the first answer audio now comes at p50
+  1.99 s and p90 3.47 s over 96 turns, so at 1.5 s the sound came in about
+  40% of turns, most of them about to answer. The gap after it was 13 of
+  the 21 gaps over 300 ms that resumed (terminal-event recount: 25 other
+  gaps ended in cancellation, including one without a matching journal
+  turn). Replayed over those
+  turns, at 3.0 s it would come in 10, with 3 gaps over 300 ms after it.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
   begun within its bound, or whose chat refuses it before any word (a
   status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),

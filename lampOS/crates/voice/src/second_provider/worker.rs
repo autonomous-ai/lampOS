@@ -1918,6 +1918,29 @@ pub fn serve(
             as crate::second_provider::ScopedSystem
     });
     let system = move || told_for(None);
+    // When the wait sound comes, with LAMP_SECOND_CUE_AFTER_MS (#2602): said
+    // once here, and a value it can't take is said and left at 1.5 s.
+    let cue_after = match crate::second_provider::cue_after(
+        std::env::var(crate::second_provider::CUE_AFTER_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        Ok(Some(after)) => {
+            if route.wait_cue {
+                eprintln!(
+                    "lamp-voice second: the wait sound comes {} ms after the words ({})",
+                    after.as_millis(),
+                    crate::second_provider::CUE_AFTER_ENVIRONMENT
+                );
+            }
+            after
+        }
+        Ok(None) => crate::second_provider::CUE_AFTER,
+        Err(why) => {
+            eprintln!("lamp-voice second: {why}; the wait sound comes at 1500 ms");
+            crate::second_provider::CUE_AFTER
+        }
+    };
     let staff = tools
         .tasks
         .clone()
@@ -1968,6 +1991,7 @@ pub fn serve(
     .telling_cut_ins(files.cut_in_told)
     .holding_hand_on(files.said_as_heard)
     .waiting_with_a_sound(route.wait_cue)
+    .sounding_after(cue_after)
     .saying_when_down(route.down_line)
     .doing_though_held(though_held)
     .announcing(!route.only_voice)
