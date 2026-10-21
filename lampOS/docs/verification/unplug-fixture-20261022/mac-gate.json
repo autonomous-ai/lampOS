@@ -1,0 +1,84 @@
+{
+  "at": "2026-10-22T00:05:03.577738+07:00",
+  "base": "56cfc3983571645a500f2c0d8e0271292e45cc5f",
+  "schema": 1,
+  "scope": "Mac fmt, strict all-target Clippy and all Skills tests; ARM64 qualification is PR CI",
+  "source_file_count": 1693,
+  "source_tree_sha256": "4a59304c72382e9433cc9e69817dbd134eed257deae714cff047b2625b220eba",
+  "source_unchanged": true,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "counts": {},
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 4.979,
+      "stage": "fmt",
+      "summary_count": 0,
+      "summary_lines": []
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "counts": {},
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c817313fd5a9ec4846a8535485778d79fa9551bbfe41012a38e7cbee7599b8ef",
+      "seconds": 17.539,
+      "stage": "clippy",
+      "summary_count": 0,
+      "summary_lines": []
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "passed": 386
+      },
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "f0320f84f52f3ba80cc874e6f26f4b88715e409e44a101460948a4d536a213be",
+      "seconds": 123.379,
+      "stage": "tests",
+      "summary_count": 4,
+      "summary_lines": [
+        "test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.34s",
+        "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.58s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "status": "passed"
+}

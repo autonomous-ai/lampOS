@@ -11024,6 +11024,8 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
         );
         std::thread::sleep(Duration::from_millis(10));
     };
+    // macOS carries O_NONBLOCK from the listener; wait for the client's line.
+    connection.set_nonblocking(false).unwrap();
     connection
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();

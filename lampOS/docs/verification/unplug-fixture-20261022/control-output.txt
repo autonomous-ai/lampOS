@@ -1,0 +1,2 @@
+{"case":"without_normalization","accepted_flags":6,"nonblocking":true,"kind":"WouldBlock","raw_os_error":35,"elapsed_us":26}
+{"case":"with_normalization","accepted_flags":2,"nonblocking":false,"writer_released_after_read_announcement":true,"complete_line":true,"elapsed_us":26}

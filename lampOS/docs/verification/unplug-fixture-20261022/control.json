@@ -1,0 +1,26 @@
+{
+  "binary_sha256": "723c7ada97d9cbd75ee0a7e0b452f09430044c8d56c868f61638b248f8d7c94d",
+  "cases": [
+    {
+      "accepted_flags": 6,
+      "case": "without_normalization",
+      "elapsed_us": 26,
+      "kind": "WouldBlock",
+      "nonblocking": true,
+      "raw_os_error": 35
+    },
+    {
+      "accepted_flags": 2,
+      "case": "with_normalization",
+      "complete_line": true,
+      "elapsed_us": 26,
+      "nonblocking": false,
+      "writer_released_after_read_announcement": true
+    }
+  ],
+  "compile_exit_code": 0,
+  "elapsed_seconds": 0.603,
+  "log_sha256": "0084af063a74bdbff15698f99a7f0708d4d3b8c51353cfc1579accfc9f94a472",
+  "run_exit_code": 0,
+  "source_sha256": "53c3cb9b9d54ae3af1a5f24adc14225a58dc2fc433a8c2e6e64eb2c36f55cde9"
+}
