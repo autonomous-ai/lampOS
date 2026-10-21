@@ -1605,6 +1605,66 @@ impl Test {
     }
 }
 
+impl Test {
+    /// What stopped being so when the test no longer holds, for the
+    /// journal: `present no longer false`, `level no longer above 35`.
+    fn lapsed(&self) -> String {
+        fn shown(value: &Value) -> String {
+            value
+                .as_str()
+                .map_or_else(|| value.to_string(), str::to_owned)
+        }
+        match self {
+            Self::NoFaces => "present no longer false".into(),
+            Self::Faces(_) => "present no longer true".into(),
+            Self::Equals(field, wanted) => format!("{field} no longer {}", shown(wanted)),
+            Self::NotEquals(field, unwanted) => format!("{field} now {}", shown(unwanted)),
+            Self::Above(field, line) => format!("{field} no longer above {line}"),
+            Self::Below(field, line) => format!("{field} no longer below {line}"),
+            Self::Number(field) => format!("{field} no longer a number"),
+        }
+    }
+}
+
+/// A once-a-day trigger's watch reset after it had begun holding, said once
+/// in the journal with why and for how long it held: on lamp-06c1 bedtime
+/// never came in 23 minutes and nothing said why (#1672, row 7).
+fn watch_reset(skill: &Skill, trigger: &Trigger, held_us: u64, why: String) -> Run {
+    Run {
+        generation: None,
+        skill: skill.name.clone(),
+        events: vec![event(
+            &skill.name,
+            SkillStage::Answered,
+            format!(
+                "{} watch reset after {} s: {why}",
+                trigger.name.as_deref().unwrap_or("trigger"),
+                held_us / 1_000_000
+            ),
+            Some(false),
+        )],
+        calls: Vec::new(),
+        ask: None,
+        queue: false,
+        from: None,
+    }
+}
+
+/// Why a trigger with `during` is out of it: outside its window, or no
+/// trusted local moment to tell. None while inside.
+fn out_of_window(trigger: &Trigger, moment: Option<&daily::Moment>) -> Option<String> {
+    let window = trigger.during.as_ref()?;
+    match moment {
+        None => Some("no trusted local moment".into()),
+        Some(moment) if !window.contains(moment.minute) => Some(format!(
+            "left its window {}\u{2013}{}",
+            window.opens(),
+            window.closes()
+        )),
+        Some(_) => None,
+    }
+}
+
 /// The field `path` names in `value`: a dot steps into an object, so
 /// `scores.music` is the `music` of `scores` (#1669: `ears/classes` keeps its
 /// scores in one object). A field that is not there is null.
@@ -4386,14 +4446,23 @@ impl Engine {
                 let Some((_, at_us, lifespan_us)) = self.latest.get(&trigger.topic) else {
                     continue;
                 };
-                if watch.open
-                    && (now_us.saturating_sub(*at_us) >= lifespan_us.unwrap_or(SILENT_ENDS_US)
-                        || trigger.during.as_ref().is_some_and(|window| {
-                            moment
-                                .as_ref()
-                                .is_none_or(|moment| !window.contains(moment.minute))
-                        }))
-                {
+                let silent_us = now_us.saturating_sub(*at_us);
+                let silent = silent_us >= lifespan_us.unwrap_or(SILENT_ENDS_US);
+                let outside = out_of_window(trigger, moment.as_ref());
+                if watch.open && (silent || outside.is_some()) {
+                    if trigger.once_per_day
+                        && let Some(since) = watch.since_us
+                    {
+                        let why = outside.unwrap_or_else(|| {
+                            format!(
+                                "went silent: nothing new on {} for {} s",
+                                trigger.topic,
+                                silent_us / 1_000_000
+                            )
+                        });
+                        let held_us = watch.last_held_us.unwrap_or(now_us).saturating_sub(since);
+                        runs.push(watch_reset(skill, trigger, held_us, why));
+                    }
                     watch.open = false;
                     watch.since_us = None;
                     runs.push(Run {
@@ -4866,11 +4935,13 @@ impl Engine {
                     continue;
                 }
                 let watch = self.watches.entry((skill.name.clone(), index)).or_default();
-                if trigger.during.as_ref().is_some_and(|window| {
-                    moment
-                        .as_ref()
-                        .is_none_or(|moment| !window.contains(moment.minute))
-                }) {
+                if let Some(why) = out_of_window(trigger, moment.as_ref()) {
+                    if trigger.once_per_day
+                        && let Some(since) = watch.since_us
+                    {
+                        let held_us = watch.last_held_us.unwrap_or(now_us).saturating_sub(since);
+                        runs.push(watch_reset(skill, trigger, held_us, why));
+                    }
                     ends(watch, skill, &mut runs);
                     // Time outside the window cannot count toward a duration
                     // or leave an old presence edge waiting for tomorrow.
@@ -4968,11 +5039,31 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                if !(rose && trigger.test.holds(&value) && chooses(skill, &value)) {
+                let holds = trigger.test.holds(&value);
+                if !(rose && holds && chooses(skill, &value)) {
                     if watch
                         .last_held_us
                         .is_none_or(|held| now_us - held >= trigger.gap_us)
                     {
+                        if trigger.once_per_day
+                            && let Some(since) = watch.since_us
+                        {
+                            let what = match (&trigger.rise, holds) {
+                                (Some(rise), _) if !rose => {
+                                    format!("{} no longer rising", rise.field)
+                                }
+                                (_, false) => trigger.test.lapsed(),
+                                _ => "not a choice the skill takes".into(),
+                            };
+                            let held_us =
+                                watch.last_held_us.unwrap_or(now_us).saturating_sub(since);
+                            runs.push(watch_reset(
+                                skill,
+                                trigger,
+                                held_us,
+                                format!("stopped holding: {topic} {what}"),
+                            ));
+                        }
                         watch.since_us = None;
                         ends(watch, skill, &mut runs);
                     }
@@ -4984,6 +5075,22 @@ impl Engine {
                         .last_held_us
                         .is_some_and(|held| now_us - held >= tolerated)
                 {
+                    // Held again only after a silence past what it tolerates:
+                    // what it held is lost, and said so for a daily one.
+                    if trigger.once_per_day
+                        && let (Some(since), Some(held)) = (watch.since_us, watch.last_held_us)
+                    {
+                        runs.push(watch_reset(
+                            skill,
+                            trigger,
+                            held.saturating_sub(since),
+                            format!(
+                                "went silent: nothing held it on {topic} for {} s, past its {} s",
+                                (now_us - held) / 1_000_000,
+                                tolerated / 1_000_000
+                            ),
+                        ));
+                    }
                     ends(watch, skill, &mut runs);
                     watch.since_us = Some(now_us);
                     watch.away_us = now_us - watch.last_held_us.unwrap_or(started);

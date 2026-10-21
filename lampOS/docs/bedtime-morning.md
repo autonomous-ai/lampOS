@@ -100,6 +100,19 @@ matured two seconds before the voice had rested its 30 seconds after a
 sound, and without the wait the night's chance was spent with no line.
 A chance dropped because its conditions did not hold within its wait now
 says so in the journal (`bedtime chance dropped: ...`).
+A once-a-day trigger's watch reset after it had begun holding says so
+once, with how long it held and why (#1672, row 7: bedtime never came in
+23 minutes and the journal could not say why):
+
+- `bedtime watch reset after 412 s: stopped holding: humans/faces/tracked present no longer false`
+  (a face came, past the trigger's `gap`)
+- `bedtime watch reset after 412 s: went silent: nothing held it on humans/faces/tracked for 10 s, past its 2 s`
+  (the topic said nothing past its lifespan or `gap`)
+- `bedtime watch reset after 412 s: left its window 23:00–06:00`
+- `bedtime watch reset after 412 s: no trusted local moment` (the clock lost its trust)
+
+A watch that never began holding, or a trigger that is not once a day,
+says nothing.
 
 ### The morning greeting
 
