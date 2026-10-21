@@ -1,0 +1,10 @@
+--- a/lampOS/crates/expression/src/main.rs
++++ b/lampOS/crates/expression/src/main.rs
+@@ -366,6 +366,7 @@
+             ""
+         }
+     );
++    Err::<(), _>(io::Error::other("mutation: serve failed after started"))?;
+     let began = lamp_ipc::monotonic_us();
+     loop {
+         let started = lamp_ipc::monotonic_us();

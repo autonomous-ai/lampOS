@@ -1,0 +1,52 @@
+diff --git a/lampOS/crates/body/src/bus_out.rs b/lampOS/crates/body/src/bus_out.rs
+index 5ccea6cab..774496899 100644
+--- a/lampOS/crates/body/src/bus_out.rs
++++ b/lampOS/crates/body/src/bus_out.rs
+@@ -1472,4 +1472,6 @@ mod tests {
+-    /// joints' write is file I/O, and here it is held up 1.2 s (the
+-    /// reviewer's case, a FIFO where the joints' next value is written), so
+-    /// a push seen as the step began is a second and more old by the time
+-    /// it would be said, and is not said as fresh.
++    /// joints' write is file I/O, and here it is held up (the reviewer's
++    /// case, a FIFO where the joints' next value is written), so a push is
++    /// a second and more old by the time it would be said, and is not said
++    /// as fresh. Seen 900 ms before the step and held up 250 ms, not seen as
++    /// the step began and held up 1.2 s (#1806): without the write's time
++    /// it would be under the second and said.
+@@ -1496 +1498 @@ mod tests {
+-            std::thread::sleep(Duration::from_millis(1_200));
++            std::thread::sleep(Duration::from_millis(250));
+@@ -1501 +1503 @@ mod tests {
+-        publishing.step(&pushed, false, Instant::now());
++        publishing.step(&pushed, false, Instant::now() - Duration::from_millis(900));
+@@ -1504 +1506 @@ mod tests {
+-        assert!(!said.pushed, "a push 1.2 s old is not said as fresh");
++        assert!(!said.pushed, "a push 1.15 s old is not said as fresh");
+diff --git a/lampOS/crates/controls/tests/it/runtime.rs b/lampOS/crates/controls/tests/it/runtime.rs
+index a79702057..ebf5b5c89 100644
+--- a/lampOS/crates/controls/tests/it/runtime.rs
++++ b/lampOS/crates/controls/tests/it/runtime.rs
+@@ -21 +21 @@ use std::{
+-    time::Duration,
++    time::{Duration, Instant},
+@@ -416,2 +416,6 @@ fn quiet_event_publisher_renews_liveness_without_inventing_a_gesture() {
+-    thread::sleep(Duration::from_millis(1_050));
+-    assert!(bus.publishers(ControlGesture::TOPIC).unwrap().is_empty());
++    // Until the lease has lapsed, not a fixed 1050 ms (#1806).
++    let until = Instant::now() + Duration::from_secs(5);
++    while !bus.publishers(ControlGesture::TOPIC).unwrap().is_empty() {
++        assert!(Instant::now() < until, "the lease never lapsed");
++        thread::sleep(Duration::from_millis(10));
++    }
+diff --git a/lampOS/crates/name/src/main.rs b/lampOS/crates/name/src/main.rs
+index 6a07a8f9e..7a5040221 100644
+--- a/lampOS/crates/name/src/main.rs
++++ b/lampOS/crates/name/src/main.rs
+@@ -840,2 +840,5 @@ mod tests {
+-        // The heartbeat as it was: only one renewed.
+-        for _ in 0..5 {
++        // The heartbeat as it was: only one renewed, every 100 ms, until the
++        // other has lapsed, not a fixed half second (#1806).
++        let until = std::time::Instant::now() + Duration::from_secs(5);
++        while live(NameHeard::RISING_TOPIC) != 0 {
++            assert!(std::time::Instant::now() < until, "never lapsed");

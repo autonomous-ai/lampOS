@@ -1,0 +1,1 @@
+1:  6a418d769 = 1:  3e27c6018 lampOS: five 1.0-1.2 s tests in mood, expression, controls, name and body end on what they check (#1806)

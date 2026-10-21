@@ -837,8 +837,11 @@ mod tests {
             (live(NameHeard::TOPIC), live(NameHeard::RISING_TOPIC)),
             (1, 1)
         );
-        // The heartbeat as it was: only one renewed.
-        for _ in 0..5 {
+        // The heartbeat as it was: only one renewed, every 100 ms, until the
+        // other has lapsed, not a fixed half second (#1806).
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while live(NameHeard::RISING_TOPIC) != 0 {
+            assert!(std::time::Instant::now() < until, "never lapsed");
             let _ = heard.alive();
             std::thread::sleep(Duration::from_millis(100));
         }
