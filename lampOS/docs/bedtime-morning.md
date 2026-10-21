@@ -1,9 +1,8 @@
 # Bedtime and Morning (#1672)
 
 **Since #940 (the first builder on #2602, 22 Oct):** the lamp's sleep is
-the core skill [Night sleep](alive.md#night-sleep-is-a-skill), installed in
-every product lamp (its switches stay off for now, so Expression's built-in
-sleep runs), and the first face of the morning wakes it as Expression's
+the core skill [Night sleep](alive.md#night-sleep-is-a-skill), on in every
+product lamp, and the first face of the morning wakes it as Expression's
 reflex. Bedtime and Morning dropped its own `rest` and `wake` steps and its
 bedtime trigger: it keeps the evening glow, the morning hum and the night's
 ceilings, installed and off, a person's add-on. Its morning hum no longer
@@ -63,9 +62,9 @@ would exit 2 on an option it doesn't know (#2157). Their respective
 `StateDirectory=lampos-skills-state` and `StateDirectory=lampos-output-caps`
 declarations use mode 0700 and the service user `lampos`. Systemd creates
 these durable directories when the services start. The paths do not enable
-the new features. The product units leave `LAMP_SKILL_ROUTINES` and
-`LAMP_REST_REQUESTS` off for now, so Night sleep (#940) is inert and
-Expression's built-in sleep runs; the switch-on is a later PR.
+the new features. Since #940 the product units turn on
+`LAMP_SKILL_ROUTINES` and `LAMP_REST_REQUESTS` for Night sleep, with
+Expression's built-in sleep as the fallback for one release;
 `LAMP_OUTPUT_CAPS` stays unset, so this skill's ceilings stay off, and its
 manifest stays disabled with no active trigger or advertised tool.
 

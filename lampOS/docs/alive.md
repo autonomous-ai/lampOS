@@ -106,8 +106,8 @@ independent touch, reminder, morning-face and Thinking/Speaking wake paths.
 ## Night sleep is a skill
 
 Since #940 the *when* of the night's sleep is the core skill
-[`night-sleep`](../skills/night-sleep/skill.toml), installed in every product
-lamp but inert until its switches are on (below), and the *how* stays here: the bow, the breath, the 4 s settle, the bounds,
+[`night-sleep`](../skills/night-sleep/skill.toml), on in every product lamp,
+and the *how* stays here: the bow, the breath, the 4 s settle, the bounds,
 and every reflex that wakes it. The skill holds today's trigger exactly:
 nobody seen for 15 minutes (`present = false`, `for = "15m"`), the voice
 resting all those 15 minutes (`[[while]]` on `voice/state`, `for = "15m"`:
@@ -168,10 +168,8 @@ its own schedule, the fallback kept for one release (#940)`, and
 claim that comes back while the fallback sleeps leaves that sleep be; the
 first face of the morning or a reflex wakes it. The fallback is marked
 `FALLBACK (#940` in `engine.rs` and `runtime.rs`, and goes in the release
-after. Both switches stay off in the product units for now: Night sleep is
-installed but inert, and Expression's built-in sleep keeps every lamp's
-nights as before. They are turned on in a later PR, after the rest
-handover (a skills restart or the window's edge with no lift).
+after. Both switches are on in the product units, since the rest handover
+(above) takes a skills restart or the window's edge with no lift.
 
 **The same sleep.** `crates/skills/tests/it/night_sleep.rs` runs one fixture
 night (22:30 to 06:05: a sound, a touch, a reminder, a conversation, its
