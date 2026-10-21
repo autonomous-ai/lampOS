@@ -415,6 +415,14 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
     })
 }
 
+/// Whose everything a forget removed, for the lamp's other parts to let
+/// theirs go too (`memory/forgot`): one person's, by id, or every person's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Forgot {
+    One(String),
+    Every,
+}
+
 /// The line to send back for a request line, and the line to log.
 pub struct Answer {
     pub line: String,
@@ -425,6 +433,8 @@ pub struct Answer {
     /// A successful append, remember or append_linked committed a new record.
     /// Reads and removals do not establish that adding records works.
     pub wrote: bool,
+    /// A `forget_all` that was done: whose. Not on the wire or in the log.
+    pub forgot: Option<Forgot>,
 }
 
 /// Answer one request line.
@@ -432,6 +442,16 @@ pub fn answer(store: &mut Store, line: &[u8], now_unix_ms: u64) -> Answer {
     match Request::parse(line) {
         Ok(request) => {
             let asked = format!("{} person={}", request.op(), request.whose());
+            let forgets = match &request {
+                Request::ForgetAll { person: Who::All } => Some(Forgot::Every),
+                Request::ForgetAll {
+                    person: Who::Unsaid,
+                } => Some(Forgot::One(Person::EVERYONE.into())),
+                Request::ForgetAll {
+                    person: Who::Id(id),
+                } => Some(Forgot::One(id.clone())),
+                _ => None,
+            };
             let response = handle(store, request, now_unix_ms);
             Answer {
                 line: response.line(),
@@ -444,6 +464,7 @@ pub fn answer(store: &mut Store, line: &[u8], now_unix_ms: u64) -> Answer {
                     }
                 ),
                 wrote: matches!(&response, Response::Added { .. }),
+                forgot: forgets.filter(|_| matches!(&response, Response::Emptied { .. })),
             }
         }
         // A line that is no request has no op worth naming: what stands
@@ -459,6 +480,7 @@ pub fn answer(store: &mut Store, line: &[u8], now_unix_ms: u64) -> Answer {
                 }
             ),
             wrote: false,
+            forgot: None,
         },
     }
 }
@@ -474,6 +496,7 @@ pub fn too_long() -> Answer {
         log: format!("? {}", refusal.outcome()),
         storage_fault: false,
         wrote: false,
+        forgot: None,
     }
 }
 
@@ -487,6 +510,49 @@ mod tests {
     /// 2026-10-13 12:00 UTC.
     const NOON: u64 = 1_791_892_800_000;
     const DAY: u64 = 86_400_000;
+
+    const NOW_MS: u64 = NOON;
+
+    /// `memory/forgot` (#2467's follow-up): only a `forget_all` that was
+    /// done says whose: one person's id, "everyone" when unsaid, every
+    /// person's for `null`. A refused one, and every other op, says nothing.
+    #[test]
+    fn only_a_forget_all_that_was_done_says_whose() {
+        let (_scratch, mut store) = Scratch::new("forgot");
+        let forgot = |store: &mut _, line: serde_json::Value| {
+            answer(store, line.to_string().as_bytes(), NOW_MS).forgot
+        };
+        assert_eq!(
+            forgot(
+                &mut store,
+                json!({"op":"forget_all","person":"p-0123456789abcdef"})
+            ),
+            Some(Forgot::One("p-0123456789abcdef".into()))
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all"})),
+            Some(Forgot::One("everyone".into()))
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all","person":null})),
+            Some(Forgot::Every)
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"forget_all","person":"NOT AN ID"})),
+            None
+        );
+        assert_eq!(
+            forgot(
+                &mut store,
+                json!({"op":"forget_last","person":"p-0123456789abcdef"})
+            ),
+            None
+        );
+        assert_eq!(
+            forgot(&mut store, json!({"op":"status","person":null})),
+            None
+        );
+    }
 
     /// A directory of this test's own, with the store's directory in it, so
     /// that a path climbing out of the store would still land where the

@@ -84,9 +84,19 @@ isn't taken here: it sends a person's voice to a server for every line.
     few lines.
   - The heard words decide, before any function runs, so a forget the lamp
     then holds back still lets it go; it is learned again in a few lines.
-  - A forget from elsewhere (the app, another lamp) doesn't reach it, but
-    nothing of it outlives a restart.
-  - The `voice_tone_forgot` record says which, never whose words.
+  - **A forget memory does** (`memory/forgot`, the first builder at 10:5x on
+    #2467), asked by the app or by voice, lets that person's baseline go
+    too, or every one for every person's, and memory's `everyone` the
+    room's. Read on the coordinator's loop at most twice a second
+    (`bus_out::ForgotIn`), with `LAMP_BUS=on`; a rules scope (`r-`) is no
+    voice. So a name forgotten in the app and enrolled again starts a fresh
+    baseline. Nothing of it outlives a restart either way.
+  - **A forget memory couldn't tell** (its bus not writable just then) is
+    said in memory's journal and not told again. That person's baseline
+    stays until the voice restarts or 8 other people are heard (the
+    reviewer's note on #2488).
+  - The `voice_tone_forgot` record says which (`all`, `whose`) and by what
+    (`by`: `words` or `memory`), never whose words or id.
 - **Valence** (`valence_of`): glad and down words from a small list, a
   "not", "never" or an n't word in the two words before turning one by
   half; the mean, or nothing when no word says it. "No" turns nothing: it's
@@ -133,8 +143,15 @@ settle with this one (#1722).
     once the lamp fell silent (53 of its 60 blocks; taken while the answer
     played, 59);
   - each line's tone is told with its own words, under its own turn, and the
-    second is read against the first.
-- **`lamp_msgs`:** the message's round trip and its topic.
+    second is read against the first;
+  - a known person's baseline goes when they ask to forget their face;
+  - a name memory forgot (`memory/forgot`) starts a fresh baseline when
+    enrolled again, and a rules scope memory forgot changes nothing;
+  - the loop reads memory's forget from a real bus (`ForgotIn` on a test
+    bus, published after the first End), and the next line starts fresh.
+- **`bus_out::tests::memorys_forgets_are_read_from_memory_only_at_most_twice_a_second`:**
+  a person's forget and every person's, from memory only, well formed only.
+- **`lamp_msgs`:** the messages' round trips and their topics.
 
 ## For a lamp
 

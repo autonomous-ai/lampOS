@@ -716,6 +716,67 @@ impl ToneOut {
     }
 }
 
+/// Memory's forgets (`memory/forgot`, the first builder at 10:5x on #2467),
+/// for the voice's tone baselines: each person whose everything memory has
+/// forgotten, asked by the app or by voice. Never waits, and looks at the
+/// bus at most every half second however often it is asked.
+pub struct ForgotIn {
+    forgot: lamp_bus::Subscriber,
+    looked_at_us: Option<u64>,
+}
+
+/// How often the bus is looked at for a forget: rare, and nothing waits on
+/// it.
+const FORGOT_LOOK_EVERY_US: u64 = 500_000;
+
+impl ForgotIn {
+    /// With `LAMP_BUS=on` and a bus that can be used; else nothing.
+    pub fn from_environment() -> Option<Self> {
+        if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
+            return None;
+        }
+        Bus::from_environment().and_then(|bus| Self::on(&bus)).ok()
+    }
+
+    pub fn on(bus: &Bus) -> io::Result<Self> {
+        Ok(Self {
+            forgot: bus.subscribe_typed(
+                lamp_msgs::MemoryForgot::TOPIC,
+                SOURCE,
+                lamp_msgs::MemoryForgot::TYPE,
+            )?,
+            looked_at_us: None,
+        })
+    }
+
+    /// The forgets since the last look, at most eight: a person's id, or
+    /// `None` for every person's. Only memory's, and only well formed.
+    pub fn forgotten(&mut self, now_us: u64) -> Vec<Option<String>> {
+        if self
+            .looked_at_us
+            .is_some_and(|at| now_us.saturating_sub(at) < FORGOT_LOOK_EVERY_US)
+        {
+            return Vec::new();
+        }
+        self.looked_at_us = Some(now_us);
+        let mut forgotten = Vec::new();
+        for _ in 0..8 {
+            let Ok(Some(message)) = self.forgot.recv(std::time::Duration::ZERO) else {
+                break;
+            };
+            if message.header.source != "memory" {
+                continue;
+            }
+            if let Ok(forgot) = message.parse::<lamp_msgs::MemoryForgot>()
+                && forgot.check().is_ok()
+            {
+                forgotten.push(forgot.person);
+            }
+        }
+        forgotten
+    }
+}
+
 /// The voice's health while it waits (#1371), as a running voice says it:
 /// a little more often than once a second, and at once when why changes.
 pub struct WaitHealth {
@@ -1034,6 +1095,42 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         (Bus::new(&root).unwrap(), root)
+    }
+
+    /// Memory's forgets reach the voice's tone baselines: a person's id, or
+    /// none for every person; only memory's and only well formed; and the
+    /// bus is looked at at most every half second.
+    #[test]
+    fn memorys_forgets_are_read_from_memory_only_at_most_twice_a_second() {
+        let (bus, root) = bus("forgot");
+        let mut forgot = ForgotIn::on(&bus).unwrap();
+        let mut memory = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "memory",
+            )
+            .unwrap();
+        let mut other = bus
+            .publisher_declared(
+                lamp_msgs::MemoryForgot::TOPIC,
+                &lamp_msgs::MemoryForgot::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let person = lamp_msgs::known::person_id("Jim");
+        let told = |person: Option<&str>| lamp_msgs::MemoryForgot {
+            person: person.map(str::to_owned),
+        };
+        memory.publish_json(1, &told(Some(&person))).unwrap();
+        other.publish_json(2, &told(Some(&person))).unwrap();
+        memory.publish_json(3, &told(Some("NOT AN ID"))).unwrap();
+        memory.publish_json(4, &told(None)).unwrap();
+        assert_eq!(forgot.forgotten(1_000_000), [Some(person.clone()), None]);
+        memory.publish_json(5, &told(Some(&person))).unwrap();
+        assert!(forgot.forgotten(1_400_000).is_empty());
+        assert_eq!(forgot.forgotten(1_500_000), [Some(person)]);
+        let _ = std::fs::remove_dir_all(root);
     }
     const WAIT: Duration = Duration::from_millis(500);
 
