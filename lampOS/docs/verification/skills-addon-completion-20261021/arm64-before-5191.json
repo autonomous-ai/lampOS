@@ -1,0 +1,11 @@
+{
+  "run": 39633785316,
+  "number": 5191,
+  "head": "0af798d348ba06f7163f7aac90b79a381263888c",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39633785316",
+  "scope": "Before-only ARM64 queue context, separate from the same-base Mac comparison.",
+  "tests": {
+    "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on": 1.568,
+    "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written": 1.822
+  }
+}

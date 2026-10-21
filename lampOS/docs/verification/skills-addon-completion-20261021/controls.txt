@@ -1,0 +1,72 @@
+===== mutant-rate-limit-bypassed =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+EXIT: 101; WALL_SECONDS: 1.452115
+
+--- mutant-rate-limit-bypassed.stdout ---
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... FAILED
+
+failures:
+
+failures:
+    addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.43s
+
+--- mutant-rate-limit-bypassed.stderr ---
+
+thread 'addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on' (686013906) panicked at crates/skills/tests/it/addon.rs:387:5:
+assertion `left == right` failed: [AddonProposal { proposal: 3129315983893, addon: "quiet-note", version: "1.2.0", act: "note", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }, AddonProposal { proposal: 3129315984877, addon: "quiet-note", version: "1.2.0", act: "note", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }, AddonProposal { proposal: 3129315986019, addon: "quiet-note", version: "1.2.0", act: "note", why: "quiet", sure: 0.5, holds_ms: 10000, light: None, gesture: None, mood: None, note: Some("The room is quiet.") }]
+  left: 3
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+===== mutant-off-filter-ignored-with-slow-startup =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written --exact --nocapture
+EXIT: 101; WALL_SECONDS: 1.923869
+
+--- mutant-off-filter-ignored-with-slow-startup.stdout ---
+
+running 1 test
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... FAILED
+
+failures:
+
+failures:
+    addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 237 filtered out; finished in 1.91s
+
+--- mutant-off-filter-ignored-with-slow-startup.stderr ---
+
+thread 'addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written' (686014899) panicked at crates/skills/tests/it/addon.rs:411:5:
+an add-on was loaded without the switch
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+===== mutant-done-suppressed =====
+COMMAND: /private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1 addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on --exact --nocapture
+EXIT: 101; WALL_SECONDS: 10.932913
+
+--- mutant-done-suppressed.stdout ---
+
+running 1 test
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... FAILED
+
+failures:
+
+failures:
+    addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 237 filtered out; finished in 10.91s
+
+--- mutant-done-suppressed.stderr ---
+
+thread 'addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on' (686015739) panicked at crates/skills/tests/it/addon.rs:242:9:
+timed out waiting for quiet-note completion after publication 1; stderr:
+lamp-skills: skills from /tmp/adVRbJYE/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["quiet-note"]
+lamp-skills: quiet-note Triggered: voice/state has held for 0 s
+lamp-skills: quiet-note Answered: an add-on: its proposals go to the judge on addon/proposal
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

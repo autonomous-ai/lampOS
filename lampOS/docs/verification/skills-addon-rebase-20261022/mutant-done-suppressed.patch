@@ -1,0 +1,16 @@
+--- a/lampOS/crates/skills/src/main.rs
++++ b/lampOS/crates/skills/src/main.rs
+@@ -2115,12 +2115,7 @@
+             &runner.sockets_for(&skill).may,
+         );
+         let _ = made.send(());
+-        let _ = runner.finished.send(SkillEvent {
+-            skill,
+-            stage: SkillStage::Done,
+-            why,
+-            allowed: None,
+-        });
++        let _ = (skill, why);
+         return made_rx;
+     }
+     // A run waits on the voice for as long as the say takes (at most

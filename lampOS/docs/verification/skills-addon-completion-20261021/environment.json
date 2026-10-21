@@ -1,0 +1,13 @@
+{
+  "base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "measurement": "One exact test per compiled libtest process. Wall time includes process launch, execution, cleanup, and output capture, excludes compilation."
+}

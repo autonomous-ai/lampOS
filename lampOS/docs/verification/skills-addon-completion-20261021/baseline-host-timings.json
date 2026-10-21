@@ -1,0 +1,89 @@
+{
+  "base": "f349d63c7935dd16decc0badd4dd4e18c10094eb",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "compiled_executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+  "source_sha256": {
+    "lampOS/crates/skills/tests/it/addon.rs": "5211abeccb237f2de20027ac6514718cb1a5d79dd4ac771fbc258be9b1ba8d1b",
+    "lampOS/crates/skills/tests/it/skills.rs": "81add751c816c372b5e3d253f3846734404d10b545c8e4fdc25b0ba9674f438a"
+  },
+  "rows": [
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 1,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 3.02735,
+      "log": "before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-1.txt"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 1,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 1.902728,
+      "log": "before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-1.txt"
+    },
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 2,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 1.608884,
+      "log": "before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-2.txt"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 2,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 1.913544,
+      "log": "before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-2.txt"
+    },
+    {
+      "test": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+      "run": 3,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 1.61426,
+      "log": "before-with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on-3.txt"
+    },
+    {
+      "test": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+      "run": 3,
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1",
+        "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "wall_s": 1.90665,
+      "log": "before-without_the_switch_no_add_on_is_loaded_and_nothing_is_written-3.txt"
+    }
+  ]
+}

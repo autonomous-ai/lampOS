@@ -2,7 +2,7 @@
 //! proposes, and the program writes its proposals on `addon/proposal` with
 //! `LAMP_ADDONS=on`, and nothing without it.
 use lamp_bus::Bus;
-use lamp_msgs::{AddonProposal, SkillEvent, VoiceState};
+use lamp_msgs::{AddonProposal, SkillEvent, SkillStage, VoiceState};
 use lamp_skills::{SkillKind, load};
 use std::{
     fs,
@@ -284,6 +284,22 @@ fn only_an_add_on_proposes() {
 
 struct Running(Child);
 
+impl Running {
+    fn waiting(&mut self, deadline: Instant, root: &Path, what: &str) {
+        let status = self.0.try_wait().unwrap();
+        assert!(
+            status.is_none(),
+            "lamp-skills exited {status:?} while waiting for {what}; stderr:\n{}",
+            fs::read_to_string(root.join("stderr")).unwrap()
+        );
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for {what}; stderr:\n{}",
+            fs::read_to_string(root.join("stderr")).unwrap()
+        );
+    }
+}
+
 impl Drop for Running {
     fn drop(&mut self) {
         let _ = self.0.kill();
@@ -319,10 +335,12 @@ fn the_program(on: bool) -> (Vec<AddonProposal>, Vec<SkillEvent>, bool) {
         .tempdir_in("/tmp")
         .unwrap();
     let root = dir.path();
-    addon_with(&root.join("skills"), "quiet-say", RESTING);
+    let addon = "quiet-say";
+    addon_with(&root.join("skills"), addon, RESTING);
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+    let clock = (!on).then(|| super::skills::Clock::at(root));
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     for (flag, path) in [
         ("--dir", root.join("skills")),
@@ -341,44 +359,73 @@ fn the_program(on: bool) -> (Vec<AddonProposal>, Vec<SkillEvent>, bool) {
     if on {
         command.env(lamp_skills::ADDONS_ENVIRONMENT, "on");
     }
-    let _running = Running(command.spawn().unwrap());
-    // Loaded at its start, and subscribed to the voice once it is: with the
-    // switch, waited for. Without it, until it says what it loaded (the
-    // pass that subscribes to its skills' topics just after), then one pass
-    // of its loop (250 ms) to show it is not, not two seconds (#1806).
-    let mut deadline = Instant::now() + Duration::from_secs(10);
-    if !on {
+    if let Some(clock) = &clock {
+        command.args(clock.args());
+    }
+    let mut running = Running(command.spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let subscribed = if let Some(clock) = &clock {
         while !std::fs::read_to_string(root.join("stderr"))
             .unwrap()
             .contains("lamp-skills: loaded ")
         {
-            assert!(Instant::now() < deadline, "the program never loaded");
+            running.waiting(deadline, root, "the loaded announcement");
             std::thread::sleep(Duration::from_millis(10));
         }
-        deadline = Instant::now() + Duration::from_millis(300);
-    }
-    let mut subscribed = false;
-    while Instant::now() < deadline {
-        if !bus.subscribers(VoiceState::TOPIC).unwrap().is_empty() {
-            subscribed = true;
-            break;
+        // The loaded line precedes subscription setup. A skip requested
+        // after that line is taken after setup, so its acknowledgement
+        // makes this absence check independent of a startup sleep (#1806).
+        running.waiting(deadline, root, "the startup acknowledgement");
+        clock.skip(Duration::ZERO);
+        !bus.subscribers(VoiceState::TOPIC).unwrap().is_empty()
+    } else {
+        loop {
+            running.waiting(deadline, root, "the voice/state subscription");
+            if !bus.subscribers(VoiceState::TOPIC).unwrap().is_empty() {
+                break true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
         }
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    };
     let mut voice = bus
         .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
         .unwrap();
-    for _ in 0..3 {
+    let mut seen = Vec::new();
+    for publication in 1..=3 {
         voice
             .publish_json(1, &serde_json::json!({ "state": "resting" }))
             .unwrap();
-        std::thread::sleep(Duration::from_millis(300));
+        if let Some(clock) = &clock {
+            // No add-on is loaded, so there can be no completion event.
+            // A zero skip takes in any input already sent without moving
+            // the clock ahead; the absence drains below still run.
+            clock.skip(Duration::ZERO);
+        } else {
+            // Each proposal or limit refusal completes before the next
+            // trigger. Latest-state publications could otherwise coalesce,
+            // and a clock acknowledgement alone does not clear a busy run.
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let what = format!("{addon} completion after publication {publication}");
+            loop {
+                running.waiting(deadline, root, &what);
+                let wait = deadline
+                    .saturating_duration_since(Instant::now())
+                    .min(Duration::from_millis(100));
+                if let Some(message) = events.recv(wait).unwrap() {
+                    let event = message.parse::<SkillEvent>().unwrap();
+                    let done = event.skill == addon && event.stage == SkillStage::Done;
+                    seen.push(event);
+                    if done {
+                        break;
+                    }
+                }
+            }
+        }
     }
     let mut written = Vec::new();
     while let Some(message) = proposals.recv(Duration::from_millis(500)).unwrap() {
         written.push(message.parse::<AddonProposal>().unwrap());
     }
-    let mut seen = Vec::new();
     while let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
         seen.push(message.parse::<SkillEvent>().unwrap());
     }

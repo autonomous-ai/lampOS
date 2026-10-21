@@ -1,0 +1,91 @@
+Compilation stdout retains only the it test artifact and build-finished JSON records.
+Unrelated dependency-artifact metadata is omitted. Compilation stderr is retained in full.
+
+===== baseline-compile =====
+COMMAND: cargo test -p lamp-skills --test it --no-run --message-format=json
+
+--- baseline-compile.jsonl (selected records) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1","fresh":false}
+{"reason":"build-finished","success":true}
+
+--- baseline-compile.stderr ---
+   Compiling serde v1.0.229
+   Compiling tokio v1.53.1
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/ipc)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/third_party/sonora)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/turn-owner)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/msgs)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/local-time)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/ring)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/near-call)
+   Compiling tokio-rustls v0.26.6
+   Compiling hyper v1.12.0
+   Compiling tower v0.5.3
+   Compiling tokio-tungstenite v0.30.0
+   Compiling hyper-util v0.1.21
+   Compiling tower-http v0.6.11
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/lean)
+   Compiling tokio-util v0.7.20
+   Compiling hyper-rustls v0.27.10
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/controls)
+   Compiling reqwest v0.13.5
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/schedule)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/gemini)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/turn-end-wire)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/voice-processes)
+   Compiling tar v0.4.46
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/update)
+   Compiling tempfile v3.27.0
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/voice)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 52.50s
+
+===== after-compile =====
+COMMAND: cargo test -p lamp-skills --test it --no-run --message-format=json
+
+--- after-compile.stdout (selected records) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1","fresh":false}
+{"reason":"build-finished","success":true}
+
+--- after-compile.stderr ---
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 6.87s
+
+===== mutant-rate-limit-bypassed-compile =====
+COMMAND: cargo test -p lamp-skills --test it --no-run --message-format=json
+
+--- mutant-rate-limit-bypassed-compile.stdout (selected records) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1","fresh":true}
+{"reason":"build-finished","success":true}
+
+--- mutant-rate-limit-bypassed-compile.stderr ---
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 2.71s
+
+===== mutant-off-filter-ignored-with-slow-startup-compile =====
+COMMAND: cargo test -p lamp-skills --test it --no-run --message-format=json
+
+--- mutant-off-filter-ignored-with-slow-startup-compile.stdout (selected records) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1","fresh":true}
+{"reason":"build-finished","success":true}
+
+--- mutant-off-filter-ignored-with-slow-startup-compile.stderr ---
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 2.45s
+
+===== mutant-done-suppressed-compile =====
+COMMAND: cargo test -p lamp-skills --test it --no-run --message-format=json
+
+--- mutant-done-suppressed-compile.stdout (selected records) ---
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills#lamp-skills@0.1.0","manifest_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":0,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1"],"executable":"/private/tmp/tests-codex-1569-target/debug/deps/it-73966c5ffb3365b1","fresh":true}
+{"reason":"build-finished","success":true}
+
+--- mutant-done-suppressed-compile.stderr ---
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-skills-addon-20261021/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 2.50s
