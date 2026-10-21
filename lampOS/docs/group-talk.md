@@ -549,6 +549,27 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     line goes on. The record says `own_line_waits` once for each sound
     that waits, then `input_let_go_own_line` with `why` (`sounded` or
     `deadline`), and the journal says it was let go.
+  - **A sound let go at its deadline stays that sound while it goes on**
+    (#2602, from El's run on lamp-06c1 at 22:21:49 on 21 Oct). There played
+    room talk was let go at +2.144 s. The hello's first audio came at
+    +2.291 s, and the same talk, still playing, rose again as a new sound
+    at +2.343 s and cut the hello as a cut-in.
+    - **What counts as the same sound** (`LetGoSound`): from the last block
+      heard as speech when it was let go, each block of speech carries it
+      on. Quiet as long as the wait's own (`WAIT_QUIET_BLOCKS`, 300 ms) ends
+      it. A new sound under the same line's turn that begins before such a
+      gap is that sound going on.
+    - **It is let go again** once the line sounds (`input_let_go_own_line`
+      with `why` `goes_on`), and kept again from there. Before the line
+      sounds it waits as any sound does.
+    - **Still a cut-in:** the lamp's name heard in it, or a face seen
+      speaking through it turned to the lamp, as above. So is a sound after
+      a 300 ms gap, and speech that starts after the first audio with
+      nothing let go before it.
+    - **Its cost:** someone who starts speaking while the room's talk let go
+      goes on, with no gap, doesn't cut the hello in until there is one.
+    - **Only at the deadline:** a sound let go because the line sounded
+      (`sounded`) isn't kept this way.
   - **A sound that begins once the line sounds** is a cut-in over the lamp's
     voice, judged by the duplex rules as for any of its speech. So words said
     over the hello still stop it.
@@ -565,6 +586,9 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
 - **Tested** as functions:
   - `a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds`, with
     the person's case;
+  - `a_sound_let_go_at_its_deadline_stays_that_sound_past_the_own_lines_first_audio`,
+    with the 22:21:49 timing, a gap, speech after the first audio, and the
+    switch off;
   - `with_words_a_stop_said_before_the_own_line_sounds_stops_it`: a stop and
     a put-off stop the line; a colleague's words wait;
   - `wait_words`' `a_put_off_is_only_what_puts_the_lamp_off`;
