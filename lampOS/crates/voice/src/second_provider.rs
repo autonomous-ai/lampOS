@@ -1170,7 +1170,19 @@ impl Engine {
     ) -> Option<crate::memory_scope::RequestScope> {
         self.memory.as_ref().map(|(worker, cache)| {
             let scope = if heard && self.memory_camera_allowed {
-                cache.snapshot(std::time::Instant::now())
+                let now = std::time::Instant::now();
+                let scope = cache.snapshot(now);
+                // With `LAMP_FACE_GAP_HOLD`, why the line is or isn't
+                // held: counts and ms only (c0a4's run on #2449).
+                if let Some(told) = cache.gap_told(now) {
+                    let whose = match (scope.held(), scope.person()) {
+                        (true, _) => "held by a gap",
+                        (false, Some(_)) => "a known face's",
+                        (false, None) => "the room's",
+                    };
+                    eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
+                }
+                scope
             } else {
                 crate::memory_scope::ScopeSnapshot::room()
             };
