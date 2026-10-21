@@ -1,0 +1,406 @@
+{
+  "current_run": "second-music-integration-20261021-2",
+  "earlier_actions_host_gate": {
+    "completed_process_exit_code": 1,
+    "failed_stages": [
+      "tests"
+    ],
+    "full_suite_totals_excluding_focused_repeats": {
+      "failed": 1,
+      "filtered_out": 0,
+      "ignored": 48,
+      "passed": 8773
+    },
+    "integration_base": "bd43346de29bba069f741baa3eb32d03c6d5794f",
+    "qualification_note": "Historical failed host gate on the older integration base, not the present run. Its 8,773 passed / 1 failed / 48 ignored counts must not be reused as current qualification or native/device evidence.",
+    "raw_public_host_receipt_sha256": "cc153dd0c6e4df4b63620bb615f23552fd23a61cee4e4009a03b4c5b7ee85ca8",
+    "recorded_stage_count": 17,
+    "required_stage_count": 17,
+    "run": "second-music-actions-p2-full-20261021-1",
+    "source_file_count": 2204,
+    "source_head_at_freeze": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+    "source_tree_sha256": "1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40",
+    "stages": [
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-fmt.log",
+        "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "seconds": 4.44,
+        "stage": "fmt",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-clippy.log",
+        "raw_log_sha256": "81e72b15ebd4353922622cad884a21dda2b6925b126c660890a53af5988db15e",
+        "seconds": 138.42,
+        "stage": "clippy",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 23,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-actions_speaker_state.log",
+        "raw_log_sha256": "7448303a0a32a1a411d85c1b08d7c0acc7130e50c2323b92ae63e54a7e72ac9c",
+        "seconds": 21.76,
+        "stage": "actions_speaker_state",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 2782,
+          "ignored": 0,
+          "passed": 1,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-voice_retained_snapshot.log",
+        "raw_log_sha256": "74db6dbfe35bc0c0035cbe826d59d70e125ac0379c68bfabd54934c5416884d2",
+        "seconds": 104.96,
+        "stage": "voice_retained_snapshot",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 101,
+          "ignored": 0,
+          "passed": 4,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-skills_scan_files.log",
+        "raw_log_sha256": "6444f2b69412bda676653e8115e5033f3a6b6a6073df4ed3fa687a09ae1e7fc9",
+        "seconds": 27.32,
+        "stage": "skills_scan_files",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 29,
+          "ignored": 0,
+          "passed": 1,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-skills_scan_cost.log",
+        "raw_log_sha256": "2d1f99d4cb48671fa8d2b285d2ee26e0452b1de97e0425ba4e67051914b4221c",
+        "seconds": 9.23,
+        "stage": "skills_scan_cost",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 2771,
+          "ignored": 0,
+          "passed": 12,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-voice_integration.log",
+        "raw_log_sha256": "9002186d6ded6f07eaf8ddd2a5b60a11b0c679ab74938b7f89fb801a0a3d90a3",
+        "seconds": 0.28,
+        "stage": "voice_integration",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 2733,
+          "ignored": 0,
+          "passed": 50,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-voice_audio.log",
+        "raw_log_sha256": "e0b5163c81631ff03465812845afccabdf63ad1ef349f78be1545acedbf9765c",
+        "seconds": 1.84,
+        "stage": "voice_audio",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 30,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-skills_audio.log",
+        "raw_log_sha256": "6a9de3d3140dc46c7a8db36d8a05403bf396b82ede89b72e11078336a51093c5",
+        "seconds": 5.92,
+        "stage": "skills_audio",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 2782,
+          "ignored": 0,
+          "passed": 1,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-voice_handoff.log",
+        "raw_log_sha256": "39ff67323df52c4f045965906a191e2179c7451d6fd4d50e6315495b6ab09e85",
+        "seconds": 0.28,
+        "stage": "voice_handoff",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 1,
+          "filtered_out": 0,
+          "ignored": 46,
+          "passed": 8514,
+          "summaries": 157
+        },
+        "exit_code": 101,
+        "failing_test_names": [
+          "seems_log::tests::a_failed_write_is_said_once"
+        ],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-tests.log",
+        "raw_log_sha256": "d3007247f44ff206648f936d773e3ba28f9ebc1530ec188f1dae30a0cb150e98",
+        "seconds": 1357.62,
+        "stage": "tests",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "passed": 259,
+          "summaries": 7
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-checkout_tests.log",
+        "raw_log_sha256": "7e626cd7c02bfb03cd2926237764c2323154382b8f1cb31bb35bf2bfbf6ba934",
+        "seconds": 239.91,
+        "stage": "checkout_tests",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-build.log",
+        "raw_log_sha256": "fbe58924ab49a200eadc72b04d26908d7de301b38d25e6e32345ce319dedfa49",
+        "seconds": 27.07,
+        "stage": "build",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 4,
+          "summaries": 1
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-example_tests.log",
+        "raw_log_sha256": "3f25ab14b0ab0049e6b8aa39b20cd0381332bb964b59c67f4db50a8b8f2488fc",
+        "seconds": 4.41,
+        "stage": "example_tests",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-example_render.log",
+        "raw_log_sha256": "d94daef2bb5cd80842412e92e1308124575b78598f22895ac5284976152ad9b3",
+        "seconds": 0.79,
+        "stage": "example_render",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-example_pack.log",
+        "raw_log_sha256": "753102fc2724f870a6441a028663dd8bdfc8cf15b3831ac15c426cfca183a796",
+        "seconds": 0.89,
+        "stage": "example_pack",
+        "verification_error": null
+      },
+      {
+        "compiler_error_codes": [],
+        "counts": {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "passed": 0,
+          "summaries": 0
+        },
+        "exit_code": 0,
+        "failing_test_names": [],
+        "raw_log_basename": "second-music-actions-p2-full-20261021-1-host-example_install.log",
+        "raw_log_sha256": "73e0932b073d58e0eb0d6cfc93b3d58f86e3e1924439c3cb6aca96b5dd850ad2",
+        "seconds": 1.01,
+        "stage": "example_install",
+        "verification_error": null
+      }
+    ],
+    "status": "failed"
+  },
+  "first_integration_attempt": {
+    "base": "1c6b0152a2bf8d936a9ca729a49426f6fd96fa78",
+    "correction_files": {
+      "lampOS/crates/voice/src/second_provider/tests.rs": {
+        "current_attempt_sha256": "8b7480e41d2f201f71b9056699b2ca192745d0125b817f3fcbc60557ec63e2b8",
+        "failed_attempt_sha256": "dc433594f47fd8b38ce0fe3c997bd487c4f1f108262f9588e11e777a027e9931"
+      }
+    },
+    "diagnostic": "error[E0063]: missing fields `named_only` and `sign_in` in initializer of `agent_tasks::Place` at crates/voice/src/second_provider/tests.rs:8387",
+    "limitation": "No consumer tests ran in this failed attempt; the next gate remains separately reported.",
+    "qualification_note": "This failed attempt remains separate from the current run; no test or native qualification is inferred from it.",
+    "raw_failure_receipt_sha256": "9bf0a59a62e30f6a2ae14a2cf16a752099a309fd974788730de67943b7b51f48",
+    "raw_stage_receipt_sha256": "42bcc9c61de519c0166ac1a6df72d59b82ec5f1df0813cb10bcadc089163ec7b",
+    "recorded_stage_count": 2,
+    "required_stage_count": 17,
+    "resolution": "The Music task-news fixture now initializes both fields to false; validation restarts against a new frozen snapshot.",
+    "run": "second-music-integration-20261021-1",
+    "scope": "First integration gate; stopped at test compilation before any test stage ran.",
+    "source_check": {
+      "all_source_hashes_still_match": true,
+      "checkout_fixtures_match": true,
+      "mismatches": {
+        "checkout_fixtures": [],
+        "original_checkout": [],
+        "source_only_copy": []
+      },
+      "original_checkout_matches": true,
+      "source_file_count": 2291,
+      "source_only_copy_matches": true,
+      "source_tree_sha256": "e92239b1a3c517abf3edef7b34fdbcdff6eaf89cd11ac2a7c31ece5c9ffaf4c5"
+    },
+    "source_file_count": 2291,
+    "source_manifest_raw_sha256": "37d637a424c4e2f0f5a6740a5b8f0d642102ecf8bb253efac2901f9ca102e779",
+    "source_tree_sha256": "e92239b1a3c517abf3edef7b34fdbcdff6eaf89cd11ac2a7c31ece5c9ffaf4c5",
+    "stages": [
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "seconds": 4.65,
+        "stage": "fmt"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 101,
+        "raw_log_sha256": "f12236ad4b485059cdcf12c2f1350f972a4d27830ffea68351c005a282e4105c",
+        "seconds": 119.34,
+        "stage": "clippy"
+      }
+    ],
+    "stages_not_run": [
+      "actions_speaker_state",
+      "voice_retained_snapshot",
+      "skills_scan_files",
+      "skills_scan_cost",
+      "voice_integration",
+      "voice_audio",
+      "skills_audio",
+      "voice_handoff",
+      "tests",
+      "checkout_tests",
+      "build",
+      "example_tests",
+      "example_render",
+      "example_pack",
+      "example_install"
+    ],
+    "status": "failed before test execution",
+    "superseding_gate": "second-music-integration-20261021-2"
+  },
+  "scope": "Separate earlier failures, validated against retained receipts and original raw log hashes; neither is added to this run's totals."
+}

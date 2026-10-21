@@ -1,3 +1,42 @@
+## Current checkpoint: 2026-10-21 15:07 UTC, Linux gate running and release cache correction pushed
+
+**Music #1757: ready: no.** The complete Mac gate is preserved as a
+[failed receipt](verification/second-music-integration-mac-20261021/README.md):
+actual exit **1**, all **17 stages** terminal, **9,268 passed, 2 failed,
+49 ignored, 0 filtered** across the complete 37-consumer selection.
+Formatting, strict workspace Clippy, workspace build, rendering, packaging
+and installation passed. Eyes cannot open `/dev/full` on Darwin; Add-ons'
+calm-light test received no idle ring request. Neither failure is resolved,
+waived or replaced by a passing subset. The Eyes fixture came from #2464;
+the older checkpoint's #2306 association below is historical and incorrect.
+
+A complete offline Linux ARM64 gate is running on the identical **2,291
+frozen source files plus 30 parent fixtures**, with a fresh target and a
+bounded scratch budget. Formatting, strict workspace Clippy and **23 Actions
+speaker-state tests** have passed; the remaining stages are pending. Linux
+results will be recorded separately. The public PR remains draft at
+`c74b0f710ecac48f8668c6ab8258777788068c0a` until the integrated correction is
+qualified and pushed. No lamp or audible playback was used.
+
+**Release #2462: ready: no, fresh CI pending.** Review found no P1/P2 on the
+prior qualified head, then identified avoidable example-target cache growth.
+The narrow correction is pushed as
+`924933afe34277d9a16efd4352417eb56b72bd3d`: after artifact upload, remove only
+the isolated example target immediately before cache save under the same
+condition. Artifact examples and checksums remain complete; later runs
+rebuild that target. Fresh host checks passed **35 publisher + 12 provenance
++ 7 real-updater CLI tests**, 72 eligibility cases, 6 cold-target fixtures,
+3 cleanup fixtures, 17 shell blocks and 5 Python AST checks. All **2,282
+captured inputs** remained unchanged. ARM64 run **39622328714** and x86
+Clippy **39622328446** are pending. General CI is excluded by the existing
+lampOS path filters. Earlier native/artifact qualification below remains
+historical. Publication stays disabled; reviewer integration and #1812's
+workflow/docs handoff are still pending.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-21 14:32 UTC, release qualified and Music integration running
 
 **Ready for lamp-voice: yes — release #2462, head
