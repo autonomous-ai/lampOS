@@ -552,6 +552,10 @@ impl Lamp for Real {
         self.texts.on && self.bus.is_some()
     }
 
+    fn offline_will(&self) -> bool {
+        std::env::var(crate::online::OFFLINE_WILL_ENVIRONMENT).is_ok_and(|value| value == "on")
+    }
+
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
         self.reports.clone()
     }

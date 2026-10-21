@@ -101,6 +101,12 @@ pub trait Lamp {
     fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
         None
     }
+    /// Whether the broker is left a will that says the lamp is offline
+    /// (`LAMP_CLOUD_OFFLINE_WILL=on`, `crate::online::options_with_will`).
+    /// Off unless a lamp says so.
+    fn offline_will(&self) -> bool {
+        false
+    }
     /// Where a face from the app's photo goes, and the eyes to ask (#1968,
     /// `crate::photos`): there only with `LAMP_PHOTO_FACES=on`.
     fn photos(&self) -> Option<crate::photos::Place> {
@@ -334,6 +340,8 @@ pub mod tests {
         pub skills: Option<crate::skills::Places>,
         /// Changes after setup (#1959), with their switch.
         pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
+        /// A will left with the broker (`LAMP_CLOUD_OFFLINE_WILL`).
+        pub will: bool,
     }
 
     impl Lamp for Fake {
@@ -393,6 +401,9 @@ pub mod tests {
         }
         fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
             self.changes.clone()
+        }
+        fn offline_will(&self) -> bool {
+            self.will
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
