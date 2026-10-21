@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-22T00:40:19.830307+07:00",
+  "kind": "read-only review of existing source and saved evidence; no new execution",
+  "music_head": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "requested_audio_rs_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+  "original_pack_log_sha256": "ac15c6ca0841c17150c636df48e6b07d9599d0b85a2a653569f624c1db7ba0cf",
+  "original_pack_output": [
+    "    Finished `dev` profile [unoptimized] target(s) in 0.34s",
+    "     Running `/gate/target/debug/lamp-skills pack --out artifacts/skills/relaxing-music/packages artifacts/skills/relaxing-music/staged/relaxing-music`",
+    "lamp-skills: not packed: audio file changed while checking"
+  ],
+  "later_probe_receipt_sha256": "0a364374573d305a6d6ee766c66cd78e8db97f4cdbd21c01d0e8f3d08cbf6db5",
+  "later_probe_files": [
+    {
+      "file": "SKILL.md",
+      "recorded_read_count": 3,
+      "all_four_stamps_equal_in_each_read": true,
+      "content_sha256": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+      "later_ctime_minus_mtime_ns": 0
+    },
+    {
+      "file": "skill.toml",
+      "recorded_read_count": 3,
+      "all_four_stamps_equal_in_each_read": true,
+      "content_sha256": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b",
+      "later_ctime_minus_mtime_ns": 377477813
+    },
+    {
+      "file": "relaxing.wav",
+      "recorded_read_count": 3,
+      "all_four_stamps_equal_in_each_read": true,
+      "content_sha256": "134362ab72a19c143c627dbd438f3d17ceabe9c6923bad6f1ea3f7d5fb9579fa",
+      "later_ctime_minus_mtime_ns": 461508577
+    }
+  ],
+  "finding": "The refusal occurs in the initial load before archive creation. The error does not identify description, manifest or recording, or the failing comparison.",
+  "limits": [
+    "Later stable reads and differences between ctime and mtime cannot establish the original failing comparison or its cause.",
+    "No retries, new probes, Docker runs, local ARM64 builds or gates were performed for this review.",
+    "No weakening of the existing identity/content checks is justified."
+  ]
+}

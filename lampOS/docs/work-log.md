@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-22 00:40 +07, Music metadata refusal audit complete
+
+**Ready for lamp-voice: yes (#1757, #2694); no (#2692, new-head ARM64 pending).**
+Skills journal `624c98887` has green x86 Clippy and its **389/0/0** Mac gate;
+its native release build passed and its test stage is running. Prior heads
+and all failures remain as recorded below.
+
+The [saved Music packaging-failure audit](verification/requested-audio-metadata-review-20261022/README.md)
+locates the refusal in the initial asset load, before archive creation. It
+could be the description, manifest or WAV; the generic message does not name
+the failing comparison. The renderer had exited, and the later nine saved
+metadata reads were stable. Those facts do not identify the original cause.
+No guard change, probe, retry or gate was run for this read-only review.
+Failure-only file-role/phase/stamp diagnostics are recommended to First on
+Queue #2602 as the next slice; a named next task remains requested.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 00:34 +07, full-journal startup regression pushed
 
 **Ready for lamp-voice: no (#2692, new-head native checks running).**
