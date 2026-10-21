@@ -256,6 +256,35 @@ pub type ScopedToolRunner = Arc<
         + Send
         + Sync,
 >;
+/// A separate capability for the worker's microphone turns. Messages receives
+/// only `ToolRunner`, even when a text message asks to speak its answer aloud.
+pub(crate) type RequestedAudioRunner = Arc<
+    dyn Fn(
+            lamp_msgs::RequestedAudioContext,
+            lamp_gemini::ToolCall,
+            crate::memory_scope::ScopeLease,
+        ) -> BoxFuture<'static, crate::tools::ToolAnswer>
+        + Send
+        + Sync,
+>;
+
+#[derive(Clone, Copy)]
+struct SpokenTurn {
+    request: u64,
+    session: u64,
+    privacy_generation: u64,
+    captured: bool,
+}
+
+fn audio_scope_current(
+    scope: &crate::memory_scope::ScopeLease,
+    context: &lamp_msgs::RequestedAudioContext,
+) -> bool {
+    scope.is_current()
+        && scope.key().request == context.request
+        && scope.key().session == context.provider_session
+        && crate::process::boot_text(scope.key().worker) == context.worker_boot
+}
 
 /// The system message for a turn, built when the turn's chat begins.
 pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
@@ -570,6 +599,7 @@ struct Shared {
     services: Arc<dyn Services>,
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
+    requested_audio: Option<(String, RequestedAudioRunner)>,
     system: System,
     scoped_system: Option<ScopedSystem>,
     clock: Clock,
@@ -949,7 +979,8 @@ fn soft(mut clip: Vec<i16>) -> Vec<i16> {
 /// it has gone quiet for a moment (`ProviderInput::Paused`,
 /// `LAMP_SECOND_EARLY_FINALIZE`).
 enum LinePart {
-    Sound(Vec<i16>),
+    /// The flag distinguishes this request's input from an older carried piece.
+    Sound(Vec<i16>, bool),
     Pause,
 }
 
@@ -1116,6 +1147,7 @@ impl Engine {
                 services,
                 tools,
                 scoped_tools: None,
+                requested_audio: None,
                 system,
                 scoped_system: None,
                 clock,
@@ -1442,6 +1474,18 @@ impl Engine {
     pub fn answering_named_to_a_face(mut self, named: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_to_a_face = Some(named);
+        }
+        self
+    }
+
+    /// Installed only by a worker with the explicit requested-audio switch.
+    pub(crate) fn requesting_audio(
+        mut self,
+        boot: lamp_turn_owner::BootId,
+        runner: RequestedAudioRunner,
+    ) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.requested_audio = Some((crate::process::boot_text(boot), runner));
         }
         self
     }
@@ -2230,8 +2274,10 @@ impl Engine {
                                 kept.request,
                                 kept.samples.len() / 16
                             );
-                            let _ = audio
-                                .try_send(LinePart::Sound(kept.samples.iter().copied().collect()));
+                            let _ = audio.try_send(LinePart::Sound(
+                                kept.samples.iter().copied().collect(),
+                                false,
+                            ));
                         }
                         // The line began with the sound carried: the name
                         // heard in it is this line's.
@@ -2256,7 +2302,16 @@ impl Engine {
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
                 let task = tokio::spawn(spoken(
                     self.shared.clone(),
-                    (request, lease, marks.clone()),
+                    (
+                        SpokenTurn {
+                            request,
+                            session,
+                            privacy_generation,
+                            captured: false,
+                        },
+                        lease,
+                        marks.clone(),
+                    ),
                     heard,
                     checked,
                     said.clone(),
@@ -2308,7 +2363,7 @@ impl Engine {
                     let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
                     kept.samples.drain(..over);
                 }
-                match audio.try_send(LinePart::Sound(samples)) {
+                match audio.try_send(LinePart::Sound(samples, true)) {
                     Ok(()) => {}
                     // The task already failed the turn itself.
                     Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
@@ -2493,6 +2548,7 @@ impl Engine {
                             search,
                             quoted,
                         },
+                        None,
                         picture,
                         Vec::new(),
                         Times::new(begun),
@@ -2553,6 +2609,7 @@ impl Engine {
                         (request, lease),
                         note,
                         Asker::Reminder,
+                        None,
                         None,
                         Vec::new(),
                         Times::new(Instant::now()),
@@ -2672,7 +2729,7 @@ impl Engine {
                 Some(event) => event,
                 None => self.output.try_recv().ok()?,
             };
-            if output_request(&event).is_none_or(|r| r > self.retired_through) {
+            if self.current_output(&event) {
                 return Some(event);
             }
         }
@@ -2693,10 +2750,32 @@ impl Engine {
                 Some(event) => event,
                 None => self.output.recv().await.expect("the engine holds a sender"),
             };
-            if output_request(&event).is_none_or(|r| r > self.retired_through) {
+            if self.current_output(&event) {
                 return event;
             }
         }
+    }
+
+    fn current_output(&self, event: &ProviderOutput) -> bool {
+        output_request(event).is_none_or(|r| r > self.retired_through)
+            && match event {
+                ProviderOutput::RequestedAudio {
+                    request,
+                    session,
+                    offer,
+                } => {
+                    self.begun_last == Some((*request, *session))
+                        && self.shared.scoped_tools.as_ref().is_none_or(|_| {
+                            self.turn
+                                .as_ref()
+                                .and_then(|turn| turn.memory_scope.as_ref())
+                                .is_some_and(|scope| {
+                                    audio_scope_current(&scope.lease(), &offer.context)
+                                })
+                        })
+                }
+                _ => true,
+            }
     }
 }
 
@@ -2719,6 +2798,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::Interrupted { request }
         | ProviderOutput::TurnComplete { request, .. }
         | ProviderOutput::HoldingAnswer { request, .. }
+        | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
@@ -2885,14 +2965,19 @@ impl Shared {
 /// judges not said to the lamp are not either.
 async fn spoken(
     shared: Arc<Shared>,
-    context: (u64, Option<crate::memory_scope::ScopeLease>, Arc<Marks>),
+    context: (
+        SpokenTurn,
+        Option<crate::memory_scope::ScopeLease>,
+        Arc<Marks>,
+    ),
     mut heard: mpsc::Receiver<LinePart>,
     checked: Option<Arc<AtomicBool>>,
     said: Arc<Mutex<(u64, u64)>>,
     before: Option<String>,
     continues_from: Option<u64>,
 ) {
-    let (request, scope, marks) = context;
+    let (mut turn, scope, marks) = context;
+    let request = turn.request;
     // Known from its start, so a chat begun on its early words is asked
     // with it too.
     let cut_in: Vec<String> = marks
@@ -2953,7 +3038,8 @@ async fn spoken(
         tokio::select! {
             part = heard.recv() => match part {
                 None => break,
-                Some(LinePart::Sound(samples)) => {
+                Some(LinePart::Sound(samples, fresh)) => {
+                    turn.captured |= fresh && !samples.is_empty();
                     if let Err(error) = listener.send(&samples) {
                         shared.stages(request, &Times::new(begun)).await;
                         return shared.fail(request, FailedStage::InputOpen, &error).await;
@@ -3096,6 +3182,9 @@ async fn spoken(
     {
         return;
     }
+    // Only current captured words authorize a recording: neither a carried
+    // prefix nor the synthetic name below can supply a new spoken identity.
+    turn.captured &= !text.trim().is_empty();
     // What was heard in this request is told as heard; the model is asked
     // with the words of the one it goes on from before them.
     let text = match before {
@@ -3272,6 +3361,7 @@ async fn spoken(
                     (request, lease),
                     words,
                     Asker::Spoken,
+                    None,
                     None,
                     Vec::new(),
                     times,
@@ -3494,6 +3584,7 @@ async fn spoken(
         (request, scope),
         text,
         Asker::Spoken,
+        Some(turn),
         None,
         notes,
         times,
@@ -4803,14 +4894,15 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
-// The prepared round is the turn's eighth input; a struct of them all would
-// only rename the arguments.
+// Provenance and the prepared round remain separate from the turn's admission
+// kind; carried answers can be spoken without receiving audio authority.
 #[allow(clippy::too_many_arguments)]
 async fn answer(
     shared: &Shared,
     context: (u64, Option<crate::memory_scope::ScopeLease>),
     said: String,
     asked: Asker,
+    spoken: Option<SpokenTurn>,
     picture: Option<Vec<u8>>,
     notes: Vec<String>,
     times: Arc<Mutex<Times>>,
@@ -4841,11 +4933,15 @@ async fn answer(
     let answered = AtomicBool::new(false);
     // Whether a tool ran for this line: one declined after is the lamp's.
     let ran = AtomicBool::new(false);
-    let acted = &ran;
+    let ran_tool = &ran;
     // The words of the answer's sentences begun so far, for a call the
     // Policy holds after them.
     let words_begun = AtomicUsize::new(0);
     let words_out = &words_begun;
+    // Accepted private audio or a confirmed held forget keeps the turn acted
+    // after a later decline.
+    let acted = AtomicBool::new(false);
+    let dispatched = &acted;
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -4974,7 +5070,8 @@ async fn answer(
                     return Err(Stop::Held);
                 }
             } else {
-                acted.store(true, Ordering::Relaxed);
+                ran_tool.store(true, Ordering::Relaxed);
+                dispatched.store(true, Ordering::Relaxed);
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
@@ -5031,6 +5128,7 @@ async fn answer(
             let mut text = String::new();
             let mut calls = Vec::new();
             let mut reasoning = None;
+            let mut called_us = 0;
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| from + after;
@@ -5169,7 +5267,10 @@ async fn answer(
                             queue.push(sentence).await?;
                         }
                     }
-                    ChatEvent::ToolCalls(asked) => calls = asked,
+                    ChatEvent::ToolCalls(asked) => {
+                        called_us = monotonic_us();
+                        calls = asked;
+                    }
                     ChatEvent::Reasoning(details) => reasoning = Some(details),
                     ChatEvent::Searched => eprintln!(
                         "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
@@ -5398,8 +5499,48 @@ async fn answer(
                         call.name
                     );
                 }
-                acted.store(true, Ordering::Relaxed);
-                let mut result = run_tool(shared, request, heard, call, scope.as_ref()).await;
+                ran_tool.store(true, Ordering::Relaxed);
+                let mut answer = match (&shared.requested_audio, spoken) {
+                    (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
+                        let context = lamp_msgs::RequestedAudioContext {
+                            worker_boot: worker_boot.clone(),
+                            provider_session: turn.session,
+                            request,
+                            privacy_generation: turn.privacy_generation,
+                            call_id: call.id.clone(),
+                            issued_us: called_us,
+                        };
+                        let mut answer = match scope
+                            .as_ref()
+                            .filter(|scope| audio_scope_current(scope, &context))
+                        {
+                            Some(scope) => {
+                                runner(
+                                    context.clone(),
+                                    lamp_gemini::ToolCall {
+                                        id: call.id.clone(),
+                                        name: call.name.clone(),
+                                        args: call.args.clone(),
+                                    },
+                                    scope.clone(),
+                                )
+                                .await
+                            }
+                            None => crate::tools::ToolAnswer::plain(crate::tools::unavailable()),
+                        };
+                        let now = monotonic_us();
+                        answer.requested_audio = answer.requested_audio.filter(|offer| {
+                            offer.check().is_ok()
+                                && offer.context == context
+                                && now >= offer.issued_us
+                                && now < offer.start_before_us
+                        });
+                        answer
+                    }
+                    _ => crate::tools::ToolAnswer::plain(
+                        run_tool(shared, request, heard, call, scope.as_ref()).await,
+                    ),
+                };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
@@ -5408,7 +5549,7 @@ async fn answer(
                 // on this turn, so the tasks part is told it was heard once
                 // the turn is heard whole, as on the Live route (#1390).
                 if crate::agent_tasks::is_tool(&call.name)
-                    && let Some(key) = crate::agent_tasks::take_news_key(&mut result)
+                    && let Some(key) = crate::agent_tasks::take_news_key(&mut answer.told)
                 {
                     eprintln!(
                         "lamp-voice second: request {request} was answered the news ({key}); it rides on the turn"
@@ -5421,16 +5562,32 @@ async fn answer(
                     }
                 }
                 if skill_looked.is_none()
-                    && result["look"] == true
+                    && answer.told["look"] == true
                     && shared
                         .skill_look
                         .as_ref()
                         .is_some_and(|skill| skill(&call.name))
                 {
-                    skill_looked =
-                        Some((call.name.clone(), call.args.clone(), picture_note(&result)));
+                    skill_looked = Some((
+                        call.name.clone(),
+                        call.args.clone(),
+                        picture_note(&answer.told),
+                    ));
                 }
-                messages.push(Message::tool(call.id.clone(), result.to_string()));
+                messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
+                if let Some(offer) = answer.requested_audio {
+                    if !shared
+                        .emit(ProviderOutput::RequestedAudio {
+                            request,
+                            session: offer.context.provider_session,
+                            offer,
+                        })
+                        .await
+                    {
+                        return Err(Stop::Gone);
+                    }
+                    dispatched.store(true, Ordering::Relaxed);
+                }
             }
             // Held: nothing more of the turn is said, as on the Live route,
             // where none of a held turn's sound is let out. What the model
@@ -5647,7 +5804,7 @@ async fn answer(
             // rule holds is, unless a tool ran for it first (#1155, the
             // first builder on #1817).
             if let Some(told) = shared.verdicts.as_ref()
-                && !acted.load(Ordering::Relaxed)
+                && !ran.load(Ordering::Relaxed)
             {
                 told(request, lamp_msgs::TurnVerdict::HeldBack);
             }
@@ -5680,6 +5837,7 @@ async fn answer(
     if asked == Asker::Spoken
         && matches!(last, ProviderOutput::TurnComplete { .. })
         && !answered.load(Ordering::Relaxed)
+        && !acted.load(Ordering::Relaxed)
     {
         room(|room| {
             if gave_up {
@@ -5829,5 +5987,635 @@ impl Queue<'_> {
             .send((text, packets))
             .await
             .map_err(|_| Stop::Gone)
+    }
+}
+
+#[cfg(test)]
+mod requested_audio_tests {
+    use super::*;
+    use futures_util::stream::{self, BoxStream};
+    use serde_json::json;
+
+    pub(super) struct RecordingScript {
+        pub(super) chats: Mutex<VecDeque<Vec<net::Result<ChatEvent>>>>,
+        pub(super) messages: Mutex<Vec<Vec<Message>>>,
+    }
+
+    struct RecordedWords;
+    impl Listener for RecordedWords {
+        fn send(&self, _samples: &[i16]) -> net::Result<()> {
+            Ok(())
+        }
+        fn finish(self: Box<Self>, _request: u64) -> BoxFuture<'static, net::Result<String>> {
+            Box::pin(async { Ok("Please play relaxing music.".into()) })
+        }
+    }
+
+    impl Services for RecordingScript {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            Box::pin(async { Ok(Box::new(RecordedWords) as Box<dyn Listener>) })
+        }
+        fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.messages.lock().unwrap().push(messages);
+            stream::iter(self.chats.lock().unwrap().pop_front().unwrap()).boxed()
+        }
+        fn speak(&self, _text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            stream::iter([Ok(vec![1; PACKET_SAMPLES])]).boxed()
+        }
+    }
+
+    pub(super) fn offered(
+        context: lamp_msgs::RequestedAudioContext,
+    ) -> lamp_msgs::RequestedAudioOffer {
+        lamp_msgs::RequestedAudioOffer {
+            skills_boot: "skills-test".into(),
+            definition_generation: 1,
+            offer_id: 1,
+            skill: "relaxing-music".into(),
+            asset: "/local/relaxing.wav".into(),
+            sha256: "a".repeat(64),
+            frames: 24_000,
+            issued_us: context.issued_us,
+            start_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US,
+            finish_before_us: context.issued_us + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            context,
+        }
+    }
+
+    #[tokio::test]
+    async fn requested_audio_switch_keeps_the_admitted_identity() {
+        for (requested_audio, written, scoped_context) in [false, true]
+            .into_iter()
+            .flat_map(|audio| [false, true].map(move |written| (audio, written)))
+            .flat_map(|(audio, written)| [false, true].map(move |scoped| (audio, written, scoped)))
+        {
+            let directory = crate::process::SessionDirectory::create().unwrap();
+            let face = directory.path.join("face");
+            let cache = Arc::new(crate::memory_scope::FaceCache::default());
+            let observe = |name: &str| {
+                std::fs::write(&face, name).unwrap();
+                assert!(cache.replace(
+                    cache.begin_refresh(),
+                    crate::known_faces::FaceObservation::read(&face)
+                ));
+            };
+            let expected_person = (!written).then(|| crate::remember::person_id("admitted-face"));
+            let script = Arc::new(RecordingScript {
+                chats: Mutex::new(
+                    [
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![net::ToolCall {
+                                extra: None,
+                                id: "original-scoped-call".into(),
+                                name: "play_relaxing_music".into(),
+                                args: json!({}),
+                            }])),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![Ok(ChatEvent::Done)],
+                    ]
+                    .into(),
+                ),
+                messages: Mutex::default(),
+            });
+            let ordinary_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let scoped_runner: ScopedToolRunner = {
+                let calls = ordinary_calls.clone();
+                let expected_person = expected_person.clone();
+                Arc::new(move |request, heard, name, _, scope| {
+                    assert_eq!(request, 7);
+                    assert_eq!(heard, !written);
+                    assert_eq!(name, "play_relaxing_music");
+                    assert_eq!(scope.scope().unwrap().person(), expected_person.as_deref());
+                    calls.fetch_add(1, Ordering::Relaxed);
+                    Box::pin(async { json!({"next":"Confirm."}) })
+                })
+            };
+            let contexts: Arc<Mutex<Vec<lamp_msgs::RequestedAudioContext>>> = Arc::default();
+            let audio_runner: RequestedAudioRunner = {
+                let contexts = contexts.clone();
+                let expected_person = expected_person.clone();
+                Arc::new(move |context, call, scope| {
+                    assert_eq!(call.id, "original-scoped-call");
+                    assert_eq!(call.name, "play_relaxing_music");
+                    assert_eq!(call.args, json!({}));
+                    assert!(audio_scope_current(&scope, &context));
+                    assert_eq!(scope.scope().unwrap().person(), expected_person.as_deref());
+                    contexts.lock().unwrap().push(context.clone());
+                    Box::pin(async move {
+                        crate::tools::ToolAnswer {
+                            told: json!({"next":"Confirm."}),
+                            requested_audio: Some(offered(context)),
+                        }
+                    })
+                })
+            };
+            let boot = lamp_turn_owner::BootId::new([9; 16]).unwrap();
+            let mut engine = Engine::new(
+                script.clone(),
+                || Told::from("legacy context".to_owned()),
+                Arc::new(|_, _, _, _| panic!("scope remains mandatory with either option off")),
+            )
+            .with_memory_scope(
+                boot,
+                cache.clone(),
+                scoped_runner,
+                scoped_context.then(|| {
+                    Arc::new(|lease: &crate::memory_scope::ScopeLease| {
+                        let scope = lease.scope().unwrap();
+                        Told {
+                            text: format!("context {:?}", scope.person()),
+                            history: vec![Message::assistant(format!(
+                                "history {:?}",
+                                scope.person()
+                            ))],
+                            after: None,
+                        }
+                    }) as ScopedSystem
+                }),
+            )
+            .announcing(false);
+            if requested_audio {
+                engine = engine.requesting_audio(boot, audio_runner);
+            }
+            engine.memory_camera(true, 1);
+            observe("admitted-face");
+            if written {
+                engine.submit(ProviderInput::Written {
+                    request: 7,
+                    session: 3,
+                    privacy_generation: 5,
+                    text: "Please play relaxing music.".into(),
+                    look: false,
+                    search: false,
+                    quoted: false,
+                });
+            } else {
+                engine.submit(ProviderInput::Start {
+                    request: 7,
+                    session: 3,
+                    privacy_generation: 5,
+                    continues: false,
+                    continues_cut_off: false,
+                    over_the_lamp: false,
+                    after_stop: false,
+                    follows_on: false,
+                    over_the_lamps_voice: false,
+                    heard_of_cut: None,
+                });
+                engine.submit(ProviderInput::Audio {
+                    request: 7,
+                    privacy_generation: 5,
+                    sequence: 1,
+                    read_completed_at_us: monotonic_us(),
+                    samples: vec![1; 160],
+                });
+                // Context and the later tool must retain the identity admitted
+                // at Start, even though another face is present before End.
+                observe("later-face");
+                engine.submit(ProviderInput::End {
+                    request: 7,
+                    privacy_generation: 5,
+                    sound: false,
+                    cut_in: false,
+                });
+            }
+            let mut offers = Vec::new();
+            loop {
+                match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                    .await
+                    .unwrap()
+                {
+                    ProviderOutput::RequestedAudio {
+                        request,
+                        session,
+                        offer,
+                    } => {
+                        assert_eq!((request, session), (7, 3));
+                        offers.push(offer);
+                    }
+                    ProviderOutput::TurnComplete { .. } => break,
+                    ProviderOutput::TurnFailed { .. } => panic!("the scripted turn failed"),
+                    _ => (),
+                }
+            }
+            let has_audio = requested_audio && !written;
+            assert_eq!(offers.len(), usize::from(has_audio));
+            assert_eq!(
+                ordinary_calls.load(Ordering::Relaxed),
+                usize::from(!has_audio)
+            );
+            let contexts = contexts.lock().unwrap();
+            assert_eq!(contexts.len(), usize::from(has_audio));
+            if let Some(context) = contexts.first() {
+                assert_eq!(context.worker_boot, crate::process::boot_text(boot));
+                assert_eq!(
+                    (
+                        context.request,
+                        context.provider_session,
+                        context.privacy_generation
+                    ),
+                    (7, 3, 5)
+                );
+                assert_eq!(context.call_id, "original-scoped-call");
+                assert!(context.issued_us > 0);
+                assert_eq!(offers[0].context, *context);
+            }
+            let messages = script.messages.lock().unwrap();
+            assert_eq!(messages.len(), 2);
+            if scoped_context {
+                let system = Message::system(format!("context {:?}", expected_person.as_deref()));
+                let history =
+                    Message::assistant(format!("history {:?}", expected_person.as_deref()));
+                assert!(
+                    messages
+                        .iter()
+                        .all(|round| round[0] == system && round[1] == history)
+                );
+                assert_eq!(messages[0].len(), 3);
+            } else {
+                assert_eq!(messages[0][0], Message::system("legacy context"));
+                assert_eq!(messages[0].len(), 2);
+            }
+            let sent = format!("{messages:?}");
+            assert!(!sent.contains(&crate::remember::person_id("later-face")));
+            assert!(!sent.contains("requested_audio"));
+            assert!(!sent.contains("/local/relaxing.wav"));
+            let lease = engine
+                .turn
+                .as_ref()
+                .unwrap()
+                .memory_scope
+                .as_ref()
+                .unwrap()
+                .lease();
+            assert!(
+                lease.is_current(),
+                "generation completion retains the admitted owner"
+            );
+            engine.retire_through(7);
+            assert!(!lease.is_current());
+        }
+    }
+
+    #[tokio::test]
+    async fn requested_audio_uses_only_the_spoken_runner_and_preserves_the_call_binding() {
+        for mode in [
+            "spoken",
+            "written",
+            "empty-input",
+            "off",
+            "changed-binding",
+            "missing-scope",
+            "wrong-worker",
+        ] {
+            let script = Arc::new(RecordingScript {
+                chats: Mutex::new(
+                    [
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![net::ToolCall {
+                                extra: None,
+                                id: "call-original".into(),
+                                name: "play_relaxing_music".into(),
+                                args: json!({}),
+                            }])),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![
+                            Ok(ChatEvent::Text("A quiet piece is ready.".into())),
+                            Ok(ChatEvent::Done),
+                        ],
+                    ]
+                    .into(),
+                ),
+                messages: Mutex::default(),
+            });
+            let runner: ToolRunner = Arc::new(|_, _, _, _| {
+                panic!("a configured request never falls back to unscoped tools")
+            });
+            let scoped: Arc<Mutex<Vec<(u64, bool)>>> = Arc::default();
+            let seen_scoped = scoped.clone();
+            let scoped_runner: ScopedToolRunner = Arc::new(move |request, heard, _, _, scope| {
+                assert_eq!(scope.key().request, request);
+                assert!(scope.is_current());
+                seen_scoped.lock().unwrap().push((request, heard));
+                Box::pin(async { json!({"next":"Confirm."}) })
+            });
+            let seen: Arc<Mutex<Vec<lamp_msgs::RequestedAudioContext>>> = Arc::default();
+            let captured = seen.clone();
+            let typed: RequestedAudioRunner = Arc::new(move |context, call, scope| {
+                assert_eq!(context.call_id, call.id);
+                assert_eq!(scope.key().request, context.request);
+                assert_eq!(scope.key().session, context.provider_session);
+                assert_eq!(
+                    crate::process::boot_text(scope.key().worker),
+                    context.worker_boot
+                );
+                assert!(scope.is_current());
+                captured.lock().unwrap().push(context.clone());
+                Box::pin(async move {
+                    let mut offer = offered(context);
+                    if mode == "changed-binding" {
+                        offer.context.privacy_generation += 1;
+                    }
+                    crate::tools::ToolAnswer {
+                        told: json!({"next":"Confirm."}),
+                        requested_audio: Some(offer),
+                    }
+                })
+            });
+            let boot = lamp_turn_owner::BootId::new([9; 16]).unwrap();
+            let memory_boot = if mode == "wrong-worker" {
+                lamp_turn_owner::BootId::new([8; 16]).unwrap()
+            } else {
+                boot
+            };
+            let mut engine = Engine::new(script.clone(), Told::default, runner)
+                .with_memory_scope(memory_boot, Arc::default(), scoped_runner, None)
+                .announcing(false);
+            if mode == "missing-scope" {
+                engine.memory = None;
+            }
+            if mode != "off" {
+                engine = engine.requesting_audio(boot, typed);
+            }
+            if mode == "written" {
+                engine.submit(ProviderInput::Written {
+                    request: 7,
+                    session: 3,
+                    privacy_generation: 5,
+                    text: "Please play relaxing music.".into(),
+                    look: false,
+                    search: false,
+                    quoted: false,
+                });
+            } else {
+                engine.submit(ProviderInput::Start {
+                    request: 7,
+                    session: 3,
+                    privacy_generation: 5,
+                    continues: false,
+                    continues_cut_off: false,
+                    over_the_lamp: false,
+                    after_stop: false,
+                    follows_on: false,
+                    over_the_lamps_voice: false,
+                    heard_of_cut: None,
+                });
+                if mode != "empty-input" {
+                    engine.submit(ProviderInput::Audio {
+                        request: 7,
+                        privacy_generation: 5,
+                        sequence: 1,
+                        read_completed_at_us: monotonic_us(),
+                        samples: vec![1; 160],
+                    });
+                }
+                engine.submit(ProviderInput::End {
+                    request: 7,
+                    privacy_generation: 5,
+                    sound: false,
+                    cut_in: false,
+                });
+            }
+            let mut offers = Vec::new();
+            loop {
+                let output = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                    .await
+                    .unwrap();
+                match output {
+                    ProviderOutput::RequestedAudio {
+                        request: 7,
+                        session: 3,
+                        offer,
+                    } => offers.push(offer),
+                    ProviderOutput::TurnComplete { .. } => break,
+                    ProviderOutput::TurnFailed { .. } => panic!("the scripted turn failed"),
+                    _ => (),
+                }
+            }
+            assert_eq!(offers.len(), usize::from(mode == "spoken"), "{mode}");
+            if matches!(mode, "spoken" | "changed-binding") {
+                assert!(scoped.lock().unwrap().is_empty());
+                let contexts = seen.lock().unwrap();
+                assert_eq!(contexts.len(), 1);
+                let context = &contexts[0];
+                assert_eq!(context.worker_boot, crate::process::boot_text(boot));
+                assert_eq!(
+                    (
+                        context.request,
+                        context.provider_session,
+                        context.privacy_generation
+                    ),
+                    (7, 3, 5)
+                );
+                assert!(context.issued_us > 0);
+            } else {
+                assert!(seen.lock().unwrap().is_empty(), "{mode}");
+                if matches!(mode, "missing-scope" | "wrong-worker") {
+                    assert!(scoped.lock().unwrap().is_empty());
+                } else {
+                    assert_eq!(*scoped.lock().unwrap(), [(7, mode != "written")]);
+                }
+            }
+            let messages = script.messages.lock().unwrap();
+            let told = serde_json::to_string(&messages[1]).unwrap();
+            assert!(!told.contains("requested_audio") && !told.contains("relaxing.wav"));
+            if matches!(mode, "missing-scope" | "wrong-worker") {
+                let tool = Message::tool("call-original", crate::tools::unavailable().to_string());
+                assert_eq!(
+                    serde_json::to_value(messages[1].last().unwrap()).unwrap(),
+                    serde_json::to_value(tool).unwrap(),
+                    "{mode}",
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn requested_audio_scope_is_checked_after_the_runner_and_before_queued_delivery() {
+        for revoked in [false, true] {
+            let script = Arc::new(RecordingScript {
+                chats: Mutex::new(
+                    [
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![net::ToolCall {
+                                extra: None,
+                                id: "call-original".into(),
+                                name: "play_relaxing_music".into(),
+                                args: json!({}),
+                            }])),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![Ok(ChatEvent::Done)],
+                    ]
+                    .into(),
+                ),
+                messages: Mutex::default(),
+            });
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            let typed: RequestedAudioRunner = {
+                let entered = entered.clone();
+                let release = release.clone();
+                Arc::new(move |context, call, scope| {
+                    let entered = entered.clone();
+                    let release = release.clone();
+                    assert_eq!(call.id, "call-original");
+                    assert!(audio_scope_current(&scope, &context));
+                    Box::pin(async move {
+                        entered.notify_one();
+                        release.notified().await;
+                        // Deliberately return even after revocation: the provider's
+                        // final fence, not a cooperative runner, must suppress it.
+                        crate::tools::ToolAnswer {
+                            told: json!({"next":"Confirm."}),
+                            requested_audio: Some(offered(context)),
+                        }
+                    })
+                })
+            };
+            let legacy: ToolRunner = Arc::new(|_, _, _, _| panic!("unscoped fallback"));
+            let scoped: ScopedToolRunner = Arc::new(|_, _, _, _, _| panic!("lost audio context"));
+            let boot = lamp_turn_owner::BootId::new([9; 16]).unwrap();
+            let mut engine = Engine::new(script.clone(), Told::default, legacy)
+                .with_memory_scope(boot, Arc::default(), scoped, None)
+                .requesting_audio(boot, typed)
+                .announcing(false);
+            engine.submit(ProviderInput::Start {
+                request: 7,
+                session: 3,
+                privacy_generation: 5,
+                continues: false,
+                continues_cut_off: false,
+                over_the_lamp: false,
+                after_stop: false,
+                follows_on: false,
+                over_the_lamps_voice: false,
+                heard_of_cut: None,
+            });
+            engine.submit(ProviderInput::Audio {
+                request: 7,
+                privacy_generation: 5,
+                sequence: 1,
+                read_completed_at_us: monotonic_us(),
+                samples: vec![1; 160],
+            });
+            engine.submit(ProviderInput::End {
+                request: 7,
+                privacy_generation: 5,
+                sound: false,
+                cut_in: false,
+            });
+            tokio::time::timeout(Duration::from_secs(2), entered.notified())
+                .await
+                .unwrap();
+            if revoked {
+                engine
+                    .turn
+                    .as_ref()
+                    .unwrap()
+                    .memory_scope
+                    .as_ref()
+                    .unwrap()
+                    .revoke();
+            }
+            release.notify_one();
+            if revoked {
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    &mut engine.turn.as_mut().unwrap().task,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                assert_eq!(script.messages.lock().unwrap().len(), 1);
+                while let Some(event) = engine.try_output() {
+                    assert!(!matches!(event, ProviderOutput::RequestedAudio { .. }));
+                }
+            } else {
+                let mut offer = None;
+                loop {
+                    match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                        .await
+                        .unwrap()
+                    {
+                        ProviderOutput::RequestedAudio { offer: got, .. } => {
+                            assert!(offer.replace(got).is_none(), "one private offer only");
+                        }
+                        ProviderOutput::TurnComplete { .. } => break,
+                        ProviderOutput::TurnFailed { .. } => panic!("the scripted turn failed"),
+                        _ => (),
+                    }
+                }
+                let offer = offer.expect("the valid scoped reply is handed on");
+                assert_eq!(offer.context.call_id, "call-original");
+                assert_eq!(script.messages.lock().unwrap().len(), 2);
+                let event = || ProviderOutput::RequestedAudio {
+                    request: 7,
+                    session: 3,
+                    offer: offer.clone(),
+                };
+                // Generation completion does not drop the request's owner. A
+                // still-queued offer can be delivered until that owner is revoked.
+                engine.shared.out.try_send(event()).unwrap();
+                assert!(matches!(
+                    engine.try_output(),
+                    Some(ProviderOutput::RequestedAudio { .. })
+                ));
+                engine.shared.out.try_send(event()).unwrap();
+                engine
+                    .turn
+                    .as_ref()
+                    .unwrap()
+                    .memory_scope
+                    .as_ref()
+                    .unwrap()
+                    .revoke();
+                assert!(engine.try_output().is_none());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn requested_audio_queued_for_a_retired_or_replaced_turn_is_dropped() {
+        let script = Arc::new(RecordingScript {
+            chats: Mutex::default(),
+            messages: Mutex::default(),
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({}) }));
+        let mut engine = Engine::new(script, Told::default, runner);
+        let event = || ProviderOutput::RequestedAudio {
+            request: 7,
+            session: 3,
+            offer: offered(lamp_msgs::RequestedAudioContext {
+                worker_boot: "a".repeat(32),
+                provider_session: 3,
+                request: 7,
+                privacy_generation: 5,
+                call_id: "call-original".into(),
+                issued_us: monotonic_us(),
+            }),
+        };
+        engine.begin(7, 3);
+        engine.urgent.clear();
+        engine.shared.out.try_send(event()).unwrap();
+        assert!(matches!(
+            engine.try_output(),
+            Some(ProviderOutput::RequestedAudio { .. })
+        ));
+        engine.shared.out.try_send(event()).unwrap();
+        engine.begin(8, 3);
+        engine.urgent.clear();
+        assert!(engine.try_output().is_none());
+        engine.shared.out.try_send(event()).unwrap();
+        engine.begin(7, 4);
+        engine.urgent.clear();
+        assert!(engine.try_output().is_none());
+        engine.begin(7, 3);
+        engine.urgent.clear();
+        engine.shared.out.try_send(event()).unwrap();
+        engine.retire_through(7);
+        assert!(engine.try_output().is_none());
     }
 }

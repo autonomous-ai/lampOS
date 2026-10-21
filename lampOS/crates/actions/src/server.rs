@@ -67,6 +67,8 @@ fn answer<S: Mixer, L: Light>(
     executive: &mut Executive<S, L>,
     schedule: Option<&crate::schedule::Adapter>,
     mut caps: Option<&mut crate::caps_service::Service>,
+    mut speaker: Option<&mut crate::speaker_state::Service>,
+    now: &dyn Fn() -> Instant,
 ) {
     let started = Instant::now();
     let served = (|| -> io::Result<(String, Value, Option<Outcome>)> {
@@ -86,6 +88,14 @@ fn answer<S: Mixer, L: Light>(
                 request.get("args").unwrap_or(&Value::Null),
             ))
         });
+        let intent = call.and_then(|(name, args)| crate::speaker_state::intent(name, args));
+        let observed_before = executive
+            .sound
+            .as_ref()
+            .map(|volume| volume.observation().sequence);
+        if let (Some(speaker), Some(intent)) = (speaker.as_mut(), intent) {
+            speaker.before_call(intent);
+        }
         let cap_op = request
             .as_ref()
             .and_then(|request| request.get("op"))
@@ -93,7 +103,11 @@ fn answer<S: Mixer, L: Light>(
             .filter(|op| crate::caps_service::is_operation(op));
         let (name, response, outcome) = if let Some(op) = cap_op {
             let response = match caps.as_mut() {
-                Some(caps) => caps.answer(&line, &mut executive.sound),
+                Some(caps) => caps.answer_guarded(&line, &mut executive.sound, &mut || {
+                    if let Some(speaker) = speaker.as_mut() {
+                        speaker.before_restriction();
+                    }
+                }),
                 None => crate::caps_service::unavailable(),
             };
             (op.to_owned(), response, None)
@@ -132,9 +146,41 @@ fn answer<S: Mixer, L: Light>(
                 }
             }
         };
-        if let Some(caps) = caps.as_mut() {
+        let observation = executive
+            .sound
+            .as_ref()
+            .map(crate::sound::Volume::observation);
+        // Rejected arguments do not touch the mixer and cannot invalidate a
+        // confirmed restriction. Every actual read/write outcome advances the
+        // retained sequence; an exhausted identity must still fail quiet.
+        let observed = observation.map(|observation| observation.sequence) != observed_before
+            || observation.is_some_and(|observation| observation.sequence.is_none());
+        if observed && let Some(caps) = caps.as_mut() {
             caps.observe_volume_result(&name, &response);
         }
+        if let (Some(speaker), Some(intent)) = (speaker.as_mut(), intent) {
+            if let Some(caps) = caps.as_mut() {
+                caps.observe_volume(observation);
+            }
+            speaker.after_call(
+                intent,
+                response["ok"] == true,
+                observation,
+                caps.as_ref().is_none_or(|caps| caps.volume_permitted()),
+                now(),
+            );
+        }
+        // Private cap operations may have read or changed the same mixer.
+        // Their accepted:true receipt is durable acceptance, not audibility.
+        // Optional speaker publication can fail without stopping ordinary
+        // commands or the caps reconciler's observation of their outcomes.
+        refresh_speaker(
+            executive,
+            caps.as_deref_mut(),
+            speaker.as_deref_mut(),
+            now,
+            false,
+        );
         let mut reply = response.to_string();
         reply.push('\n');
         stream.write_all(reply.as_bytes())?;
@@ -168,6 +214,23 @@ fn answer<S: Mixer, L: Light>(
             eprintln!("lamp-actions: {name}: {status} in {took} ms");
         }
         Err(error) => eprintln!("lamp-actions: a caller was dropped after {took} ms: {error}"),
+    }
+}
+
+fn refresh_speaker<S: Mixer, L: Light>(
+    executive: &mut Executive<S, L>,
+    mut caps: Option<&mut crate::caps_service::Service>,
+    speaker: Option<&mut crate::speaker_state::Service>,
+    now: &dyn Fn() -> Instant,
+    poll: bool,
+) {
+    if let Some(speaker) = speaker {
+        let _ = speaker.tick(executive.sound.as_mut(), now, poll, |observation, fresh| {
+            if fresh && let Some(caps) = caps.as_mut() {
+                caps.observe_volume(observation);
+            }
+            caps.as_ref().is_none_or(|caps| caps.volume_permitted())
+        });
     }
 }
 
@@ -235,6 +298,19 @@ pub fn serve_reporting_with_caps<S: Mixer, L: Light>(
     schedule: Option<&crate::schedule::Adapter>,
     config: Option<&crate::caps_service::Config>,
 ) -> io::Result<()> {
+    serve_reporting_with_outputs(directory, executive, stop, health, schedule, config, None)
+}
+
+/// Both optional outputs share the existing socket loop and mixer owner.
+pub fn serve_reporting_with_outputs<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    config: Option<&crate::caps_service::Config>,
+    speaker: Option<crate::speaker_state::Service>,
+) -> io::Result<()> {
     serve_configured(
         directory,
         executive,
@@ -243,7 +319,20 @@ pub fn serve_reporting_with_caps<S: Mixer, L: Light>(
         schedule,
         &Instant::now,
         || config.map(crate::caps_service::Service::open).transpose(),
+        speaker,
     )
+}
+
+/// Requested audio alone preserves the baseline cap and storage behavior.
+pub fn serve_reporting_with_speaker<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    speaker: Option<crate::speaker_state::Service>,
+) -> io::Result<()> {
+    serve_reporting_with_outputs(directory, executive, stop, health, schedule, None, speaker)
 }
 
 /// [`serve_reporting_with_schedule`] with the clock its two periods are
@@ -272,9 +361,48 @@ pub fn serve_with_clock_and_caps<S: Mixer, L: Light>(
     now: &dyn Fn() -> Instant,
     caps: Option<crate::caps_service::Service>,
 ) -> io::Result<()> {
-    serve_configured(directory, executive, stop, health, schedule, now, || {
-        Ok(caps)
-    })
+    serve_with_clock_and_outputs(
+        directory, executive, stop, health, schedule, now, caps, None,
+    )
+}
+
+/// The requested-audio fixture wrapper retains its original argument order.
+pub fn serve_with_clock_and_speaker<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    speaker: Option<crate::speaker_state::Service>,
+    now: &dyn Fn() -> Instant,
+) -> io::Result<()> {
+    serve_with_clock_and_outputs(
+        directory, executive, stop, health, schedule, now, None, speaker,
+    )
+}
+
+/// Both existing injectable clocks and optional services, on one owner loop.
+#[allow(clippy::too_many_arguments)]
+pub fn serve_with_clock_and_outputs<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    now: &dyn Fn() -> Instant,
+    caps: Option<crate::caps_service::Service>,
+    speaker: Option<crate::speaker_state::Service>,
+) -> io::Result<()> {
+    serve_configured(
+        directory,
+        executive,
+        stop,
+        health,
+        schedule,
+        now,
+        || Ok(caps),
+        speaker,
+    )
 }
 
 /// What the part's health warns of about its caps: held back for this run,
@@ -309,6 +437,7 @@ fn set_ready(directory: &Path, ready: bool, previous: &mut Option<bool>) -> io::
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serve_configured<S: Mixer, L: Light>(
     directory: &Path,
     executive: &mut Executive<S, L>,
@@ -317,99 +446,140 @@ fn serve_configured<S: Mixer, L: Light>(
     schedule: Option<&crate::schedule::Adapter>,
     now: &dyn Fn() -> Instant,
     start_caps: impl FnOnce() -> io::Result<Option<crate::caps_service::Service>>,
+    mut speaker: Option<crate::speaker_state::Service>,
 ) -> io::Result<()> {
     std::fs::create_dir_all(directory)?;
     let listener = listen(directory)?;
     let _files = ServingFiles(directory);
     let mut ready = None;
     set_ready(directory, false, &mut ready)?;
-    let mut caps = start_caps()?;
-    if let Some(why) = caps.as_ref().and_then(caps_warning) {
-        eprintln!("lamp-actions: {why}");
-    }
-    if let Some(caps) = caps.as_mut() {
-        caps.tick(&mut executive.sound)?;
-    }
-    let offered_now = |executive: &mut Executive<S, L>| {
-        let mut offered = executive.offered();
-        if schedule.is_some() {
-            offered.extend(crate::schedule::catalog());
+    let mut caps = None;
+    let result = (|| -> io::Result<()> {
+        if let Some(speaker) = speaker.as_mut() {
+            // Attempt retirement before storage recovery or mixer I/O. An
+            // optional publication failure must not prevent ordinary serving.
+            let _ = speaker.start();
         }
-        offered
-    };
-    let mut offered: Vec<Function> = offered_now(executive);
-    put(directory, CATALOG_FILE, &catalog_file(&offered))?;
-    set_ready(
-        directory,
-        caps.as_ref().is_none_or(|caps| caps.ready()),
-        &mut ready,
-    )?;
-    let names = |offered: &[Function]| -> String {
-        offered.iter().map(|f| f.name).collect::<Vec<_>>().join(" ")
-    };
-    eprintln!("lamp-actions: serving; can do now: {}", names(&offered));
-    let mut looked = now();
-    let mut reported: Option<Instant> = None;
-    let mut answered = 0u64;
-    while !stop.load(Ordering::Acquire) {
+        caps = start_caps()?;
+        if let Some(why) = caps.as_ref().and_then(caps_warning) {
+            eprintln!("lamp-actions: {why}");
+        }
         if let Some(caps) = caps.as_mut() {
-            caps.tick(&mut executive.sound)?;
+            caps.tick_guarded(&mut executive.sound, &mut || {
+                if let Some(speaker) = speaker.as_mut() {
+                    speaker.before_restriction();
+                }
+            })?;
         }
+        refresh_speaker(executive, caps.as_mut(), speaker.as_mut(), now, false);
+        let offered_now = |executive: &mut Executive<S, L>| {
+            let mut offered = executive.offered();
+            if schedule.is_some() {
+                offered.extend(crate::schedule::catalog());
+            }
+            offered
+        };
+        let mut offered: Vec<Function> = offered_now(executive);
+        put(directory, CATALOG_FILE, &catalog_file(&offered))?;
         set_ready(
             directory,
             caps.as_ref().is_none_or(|caps| caps.ready()),
             &mut ready,
         )?;
-        if let Some(health) = health.as_mut()
-            && reported.is_none_or(|at| now().saturating_duration_since(at) >= REPORT_EVERY)
-        {
-            reported = Some(now());
-            let mut diagnostic = report(&offered, answered);
-            if let Some(caps) = caps.as_ref() {
-                diagnostic = diagnostic.with("output_caps_ready", caps.ready());
-                if let Some(why) = caps_warning(caps) {
-                    diagnostic.level = lamp_msgs::Level::Warn;
-                    diagnostic.message = why.to_owned();
+        let names = |offered: &[Function]| -> String {
+            offered.iter().map(|f| f.name).collect::<Vec<_>>().join(" ")
+        };
+        eprintln!("lamp-actions: serving; can do now: {}", names(&offered));
+        let mut looked = now();
+        let mut reported: Option<Instant> = None;
+        let mut answered = 0u64;
+        while !stop.load(Ordering::Acquire) {
+            if let Some(caps) = caps.as_mut() {
+                caps.tick_guarded(&mut executive.sound, &mut || {
+                    if let Some(speaker) = speaker.as_mut() {
+                        speaker.before_restriction();
+                    }
+                })?;
+            }
+            refresh_speaker(executive, caps.as_mut(), speaker.as_mut(), now, true);
+            set_ready(
+                directory,
+                caps.as_ref().is_none_or(|caps| caps.ready()),
+                &mut ready,
+            )?;
+            if let Some(health) = health.as_mut()
+                && reported.is_none_or(|at| now().saturating_duration_since(at) >= REPORT_EVERY)
+            {
+                reported = Some(now());
+                let mut diagnostic = report(&offered, answered);
+                if let Some(caps) = caps.as_ref() {
+                    diagnostic = diagnostic.with("output_caps_ready", caps.ready());
+                    if let Some(why) = caps_warning(caps) {
+                        diagnostic.level = lamp_msgs::Level::Warn;
+                        diagnostic.message = why.to_owned();
+                    }
                 }
+                if let Some(speaker) = speaker.as_ref() {
+                    let available = speaker.check().is_ok();
+                    diagnostic = diagnostic.with("speaker_state_available", available);
+                    if !available {
+                        if diagnostic.level == lamp_msgs::Level::Ok {
+                            diagnostic.message = "requested audio unavailable until restart".into();
+                        }
+                        diagnostic.level = lamp_msgs::Level::Warn;
+                    }
+                }
+                let _ = health.publish_json(lamp_ipc::monotonic_us(), &diagnostic);
             }
-            let _ = health.publish_json(lamp_ipc::monotonic_us(), &diagnostic);
-        }
-        match listener.accept() {
-            Ok((stream, _)) => {
-                answered += 1;
-                answer(stream, executive, schedule, caps.as_mut());
-                set_ready(
-                    directory,
-                    caps.as_ref().is_none_or(|caps| caps.ready()),
-                    &mut ready,
-                )?;
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                // Nobody yet: wait for a caller, at most IDLE. A sleep here
-                // kept each caller waiting for the rest of it, up to 50 ms.
-                if lamp_ipc::readable(&listener, IDLE).is_err() {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    answered += 1;
+                    answer(
+                        stream,
+                        executive,
+                        schedule,
+                        caps.as_mut(),
+                        speaker.as_mut(),
+                        now,
+                    );
+                    set_ready(
+                        directory,
+                        caps.as_ref().is_none_or(|caps| caps.ready()),
+                        &mut ready,
+                    )?;
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    // Nobody yet: wait for a caller, at most IDLE. A sleep here
+                    // kept each caller waiting for the rest of it, up to 50 ms.
+                    if lamp_ipc::readable(&listener, IDLE).is_err() {
+                        std::thread::sleep(IDLE);
+                    }
+                }
+                Err(error) => {
+                    eprintln!("lamp-actions: accept failed: {error}");
                     std::thread::sleep(IDLE);
                 }
             }
-            Err(error) => {
-                eprintln!("lamp-actions: accept failed: {error}");
-                std::thread::sleep(IDLE);
+            if now().saturating_duration_since(looked) >= LOOK_AGAIN {
+                looked = now();
+                let current = offered_now(executive);
+                if current != offered {
+                    put(directory, CATALOG_FILE, &catalog_file(&current))?;
+                    eprintln!("lamp-actions: can do now: {}", names(&current));
+                    offered = current;
+                }
             }
         }
-        if now().saturating_duration_since(looked) >= LOOK_AGAIN {
-            looked = now();
-            let current = offered_now(executive);
-            if current != offered {
-                put(directory, CATALOG_FILE, &catalog_file(&current))?;
-                eprintln!("lamp-actions: can do now: {}", names(&current));
-                offered = current;
-            }
-        }
+        Ok(())
+    })();
+    // Attempt speaker inhibition even when recovery, a cap tick or shutdown
+    // observes a fatal error. Neither final check reads or writes the mixer.
+    // In particular a concurrent stop must preserve a prior storage failure.
+    let cap_result = caps
+        .as_ref()
+        .map_or(Ok(()), crate::caps_service::Service::check);
+    if let Some(speaker) = speaker.as_mut() {
+        let _ = speaker.finish();
     }
-    if let Some(caps) = caps.as_ref() {
-        // A stop request may win the next loop boundary after a failed
-        // mutation. It must not turn that recorded failure into success.
-        caps.check()?;
-    }
-    Ok(())
+    result.and(cap_result)
 }

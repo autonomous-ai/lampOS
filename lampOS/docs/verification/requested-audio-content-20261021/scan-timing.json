@@ -1,0 +1,67 @@
+{
+  "integration_base": "99f2ecfcd4ebb3b9279750bee42f219c0c4895ed",
+  "source_tree_sha256": "1fd1c57cca9d64ec7c95aba03f213ddcdf8fcb23c409d0549f385a6ad9ac22c4",
+  "source_file_count": 2180,
+  "profile": "host debug, debug information disabled",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "status": "Focused stage complete; no complete host or native qualification inferred.",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-skills",
+    "--test",
+    "requested_audio",
+    "sixteen_maximum_recordings_report_full_content_scan_costs",
+    "--",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "seconds": 8.14,
+  "target_ns": 250000000,
+  "boundary": "Scan::unchanged after loading; excludes fixture creation, initial loading, snapshot cloning, authority refresh and logging",
+  "samples": [
+    {
+      "phase": "fresh",
+      "round": 0,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 46085516,
+      "elapsed_ns": 23550625
+    },
+    {
+      "phase": "followup",
+      "round": 1,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 46085516,
+      "elapsed_ns": 22874458
+    },
+    {
+      "phase": "followup",
+      "round": 2,
+      "assets": 16,
+      "frames_per_asset": 1440000,
+      "fixture_bytes": 46085516,
+      "payload_bytes": 46085516,
+      "elapsed_ns": 23183833
+    }
+  ],
+  "raw_log_sha256": "3f444093fac87be39900828459cb2af947c7bfd966a687ff225f5c971e6da226",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 4.24s"
+  ],
+  "historical_record": "https://raw.githubusercontent.com/autonomous-ai/lampOS/d2e171f9ac5af88955e631812fa0038b24fa1af8/lampOS/docs/verification/requested-audio-host-20261021-current/scan-timing.json",
+  "limitations": "Three samples on one macOS arm64 host. Files were recently written/read during fixture setup. No cold-filesystem, whole-loop, native Linux ARM64, acoustic-onset or physical-lamp measurement."
+}

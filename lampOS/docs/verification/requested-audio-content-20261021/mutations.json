@@ -1,0 +1,421 @@
+{
+  "all_requirements_met": true,
+  "baselines_passed": 5,
+  "complete": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_DEV_INCREMENTAL": "false",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_PROFILE_TEST_INCREMENTAL": "false",
+    "CARGO_TARGET_DIR": "<separate-mutation-target>",
+    "RUSTUP_TOOLCHAIN": "1.96.0"
+  },
+  "final_target_bytes": 613642240,
+  "hard_budget_bytes": 1610612736,
+  "limitations": [
+    "Host-only mutation checks; no device or native Linux ARM64 execution.",
+    "Each content mutant preserves the read/hash expression and suppresses only its mismatch refusal.",
+    "The stale-key-set mutation proves erroneous stale-result acceptance/freshness; it does not reinsert definitions or revive terminal offers.",
+    "Hash and identity checks do not constitute an atomic filesystem snapshot."
+  ],
+  "mutants_killed": 5,
+  "preparation": {
+    "copied_files": 5893,
+    "explicit_freeze_reference": "Focused freeze receipt and independent source-hash verification.",
+    "integration_tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+    "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+    "source_copy": "source-only copy",
+    "source_head": "6f4e5ceea0df9f47ec211e5649dedf075507a7d6",
+    "source_manifest_sha256": "4200fbae4555e5be1d937ae5a12b5dd81f6d14a98c7e8364b14aa67b52403713",
+    "source_status": [
+      " M lampOS/crates/skills/src/requested_audio.rs",
+      " M lampOS/crates/skills/tests/requested_audio.rs",
+      " M lampOS/docs/requested-audio.md"
+    ],
+    "source_worktree": "Music working tree",
+    "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19"
+  },
+  "restored_runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+  "runner_sha256": "c870e9ae5db027f8a3f81694af421856bc89dffb8b8dd27ab4d636b68c313ca3",
+  "runs": [
+    {
+      "case": "wav_mismatch",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "6a9bcb819c3da4914d23e0a2594f0c0ae6202b2734494b56d8c7b4670a37af85"
+        }
+      ],
+      "exit": 0,
+      "expected_panic": "called `Result::unwrap_err()` on an `Ok` value: ()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:696",
+      "intended_behavioral_failure": false,
+      "log_sha256": "ac9ad74607aca77533cfec9e2fdd262980183132c7e28d92e6229725827bf35a",
+      "name": "baseline_wav_mismatch",
+      "outcome": "passed",
+      "panic_excerpts": [],
+      "passed": true,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+      "seconds": 55.075,
+      "stopped_reason": null,
+      "target_peak_bytes": 555945984,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "baseline",
+      "raw_log_basename": "baseline_wav_mismatch.log"
+    },
+    {
+      "case": "definition_mismatch",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "6a9bcb819c3da4914d23e0a2594f0c0ae6202b2734494b56d8c7b4670a37af85"
+        }
+      ],
+      "exit": 0,
+      "expected_panic": "called `Result::unwrap_err()` on an `Ok` value: ()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:696",
+      "intended_behavioral_failure": false,
+      "log_sha256": "c6bfc8aab278ba1cf8aaab4ab53aa12bb1da85197392d2c0ecfb8c9cf1ced306",
+      "name": "baseline_definition_mismatch",
+      "outcome": "passed",
+      "panic_excerpts": [],
+      "passed": true,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+      "seconds": 0.221,
+      "stopped_reason": null,
+      "target_peak_bytes": 555945984,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "baseline",
+      "raw_log_basename": "baseline_definition_mismatch.log"
+    },
+    {
+      "case": "listed_path",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "6a9bcb819c3da4914d23e0a2594f0c0ae6202b2734494b56d8c7b4670a37af85"
+        }
+      ],
+      "exit": 0,
+      "expected_panic": "assertion failed: opened.bytes(&mut 0).is_err()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:746",
+      "intended_behavioral_failure": false,
+      "log_sha256": "c4cf19053a6e7dcdded2c5c101dec5f0a88dfc23f266a8d3e0c8d3e58b9cba7c",
+      "name": "baseline_listed_path",
+      "outcome": "passed",
+      "panic_excerpts": [],
+      "passed": true,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+      "seconds": 0.219,
+      "stopped_reason": null,
+      "target_peak_bytes": 555945984,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "baseline",
+      "raw_log_basename": "baseline_listed_path.log"
+    },
+    {
+      "case": "parent_identity",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "6a9bcb819c3da4914d23e0a2594f0c0ae6202b2734494b56d8c7b4670a37af85"
+        }
+      ],
+      "exit": 0,
+      "expected_panic": "assertion failed: opened.bytes(&mut 0).is_err()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:759",
+      "intended_behavioral_failure": false,
+      "log_sha256": "f83e76e4c16dab9a20e6ce03ac0a899d27080a7822e5bd699947220ab834b1ce",
+      "name": "baseline_parent_identity",
+      "outcome": "passed",
+      "panic_excerpts": [],
+      "passed": true,
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+      "seconds": 0.222,
+      "stopped_reason": null,
+      "target_peak_bytes": 555945984,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "baseline",
+      "raw_log_basename": "baseline_parent_identity.log"
+    },
+    {
+      "case": "stale_key_set",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --test requested_audio a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/requested_audio-f98ce632b76990d0",
+          "sha256": "2dfce3539c7d0a0e28020dabf3f43cca73963ed26b57b3dcd49859b888ccf0ff"
+        }
+      ],
+      "exit": 0,
+      "expected_panic": "assertion failed: !current.scanned(&earlier, true, 3)",
+      "expected_panic_location": "crates/skills/tests/requested_audio.rs:950",
+      "intended_behavioral_failure": false,
+      "log_sha256": "952eb8963e925b1fb77086e4be19ceca2b7df20f0e5d29d1428f89be8d50feb6",
+      "name": "baseline_stale_key_set",
+      "outcome": "passed",
+      "panic_excerpts": [],
+      "passed": true,
+      "result_lines": [
+        "running 1 test",
+        "test a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... ok",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+      "seconds": 4.053,
+      "stopped_reason": null,
+      "target_peak_bytes": 613715968,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "baseline",
+      "raw_log_basename": "baseline_stale_key_set.log"
+    },
+    {
+      "case": "wav_mismatch",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "f8126a56d23f2d208ed9027deb9ff0f253d582751159a04a0783b62b19e42cb2"
+        }
+      ],
+      "exit": 101,
+      "expected_panic": "called `Result::unwrap_err()` on an `Ok` value: ()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:696",
+      "intended_behavioral_failure": true,
+      "log_sha256": "fdca5abd51c1ffc5d30f4c85c311b7e21da739a29f956b662fba0edfda29f52e",
+      "name": "mutant_wav_mismatch",
+      "outcome": "killed_by_intended_behavioral_assertion",
+      "panic_excerpts": [
+        "thread 'requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes' (50672677) panicked at crates/skills/src/requested_audio.rs:696:61:\ncalled `Result::unwrap_err()` on an `Ok` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... FAILED"
+      ],
+      "passed": false,
+      "patch": "mutations/wav_mismatch.patch",
+      "patch_sha256": "60824df2c6eca6ec387560f9ed84291fdb0b92f7fee8e6386867929618d679ea",
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "103e80bab067d2ed60acdc0cbb577c00bc98de7b286e8248832843dfec4b1ca4",
+      "seconds": 3.379,
+      "stopped_reason": null,
+      "target_peak_bytes": 620630016,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "mutant",
+      "raw_log_basename": "mutant_wav_mismatch.log"
+    },
+    {
+      "case": "definition_mismatch",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "625443e0da61fab32866c1cd2e5689a0a38cdf31a9fb409078e68ed061996fa5"
+        }
+      ],
+      "exit": 101,
+      "expected_panic": "called `Result::unwrap_err()` on an `Ok` value: ()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:696",
+      "intended_behavioral_failure": true,
+      "log_sha256": "e45972291604c71774bd61e227c63de54e2c11983b589df80bf7b2ee8ddfdafa",
+      "name": "mutant_definition_mismatch",
+      "outcome": "killed_by_intended_behavioral_assertion",
+      "panic_excerpts": [
+        "thread 'requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes' (50672961) panicked at crates/skills/src/requested_audio.rs:696:61:\ncalled `Result::unwrap_err()` on an `Ok` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... FAILED"
+      ],
+      "passed": false,
+      "patch": "mutations/definition_mismatch.patch",
+      "patch_sha256": "97ac0348cbae76a25d1cfb5c02d2e861d3d38291e2dedf874da774b21df9bba3",
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "ec4f7fb9ee1364f3c781022eb41f6f5317aff974000e591a52e0518db65c4c09",
+      "seconds": 3.27,
+      "stopped_reason": null,
+      "target_peak_bytes": 620195840,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "mutant",
+      "raw_log_basename": "mutant_definition_mismatch.log"
+    },
+    {
+      "case": "listed_path",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "821fa24d1481719348ce5ebd1012f582334303548593039d4ffa840305b1291f"
+        }
+      ],
+      "exit": 101,
+      "expected_panic": "assertion failed: opened.bytes(&mut 0).is_err()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:746",
+      "intended_behavioral_failure": true,
+      "log_sha256": "be18dd2a8a2ca46d4e861d9bf391ccfe0b5ca94f9d382db7fe8e67a51418d3d6",
+      "name": "mutant_listed_path",
+      "outcome": "killed_by_intended_behavioral_assertion",
+      "panic_excerpts": [
+        "thread 'requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes' (50673753) panicked at crates/skills/src/requested_audio.rs:746:9:\nassertion failed: opened.bytes(&mut 0).is_err()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes ... FAILED"
+      ],
+      "passed": false,
+      "patch": "mutations/listed_path.patch",
+      "patch_sha256": "b967ff3a2aa4f3ac6ff088c265da1f3b6a6623952826da0a0866e1a646162684",
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "dbaa3347fee8646ead2ec89096233afb759696788fabe4cc77e4d35df275e971",
+      "seconds": 3.27,
+      "stopped_reason": null,
+      "target_peak_bytes": 620802048,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "mutant",
+      "raw_log_basename": "mutant_listed_path.log"
+    },
+    {
+      "case": "parent_identity",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/lamp_skills-592237c86f998d67",
+          "sha256": "abde88b96f8d388be0bba597809529d16fbbb2673150e1b546631ee349d008fe"
+        }
+      ],
+      "exit": 101,
+      "expected_panic": "assertion failed: opened.bytes(&mut 0).is_err()",
+      "expected_panic_location": "crates/skills/src/requested_audio.rs:759",
+      "intended_behavioral_failure": true,
+      "log_sha256": "62a82c86df99fd6feac12a2f651999cf065e8d5680cfce9a06fcbb6fbeb414dd",
+      "name": "mutant_parent_identity",
+      "outcome": "killed_by_intended_behavioral_assertion",
+      "panic_excerpts": [
+        "thread 'requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same' (50674030) panicked at crates/skills/src/requested_audio.rs:759:9:\nassertion failed: opened.bytes(&mut 0).is_err()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... FAILED"
+      ],
+      "passed": false,
+      "patch": "mutations/parent_identity.patch",
+      "patch_sha256": "6509dfdeb02f41e214eeac8c577e5a9f079167e1d211d947f06862f00d6b9b17",
+      "result_lines": [
+        "running 1 test",
+        "test requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "0fb57010125a003567849f3976796d6f42e1c1fb77a7ce6c4c27b952e705530b",
+      "seconds": 3.185,
+      "stopped_reason": null,
+      "target_peak_bytes": 618094592,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "mutant",
+      "raw_log_basename": "mutant_parent_identity.log",
+      "raw_patch_sha256": "f3599e0bda1c9a553a2189d0b255c676bb38eef0c82864f44074edfb1c99095c",
+      "patch_normalization": "Removed space-only context markers to satisfy repository whitespace checks; applying the published patch reproduces the exact tested mutant source hash."
+    },
+    {
+      "case": "stale_key_set",
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --test requested_audio a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation -- --exact --nocapture",
+      "compiled_and_ran_one_test": true,
+      "cwd": "lampOS",
+      "executed_binaries": [
+        {
+          "path": "target/debug/deps/requested_audio-f98ce632b76990d0",
+          "sha256": "98442b56e16de09dfaa6a40cd83c3c147db49cfefdc1286fb5ca3d7fb07042e2"
+        }
+      ],
+      "exit": 101,
+      "expected_panic": "assertion failed: !current.scanned(&earlier, true, 3)",
+      "expected_panic_location": "crates/skills/tests/requested_audio.rs:950",
+      "intended_behavioral_failure": true,
+      "log_sha256": "2d68819fc456bc5ceade5674a94edf4df6cba1e9ca3c02951dc7d2e164f5a67a",
+      "name": "mutant_stale_key_set",
+      "outcome": "killed_by_intended_behavioral_assertion",
+      "panic_excerpts": [
+        "thread 'a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation' (50674766) panicked at crates/skills/tests/requested_audio.rs:950:5:\nassertion failed: !current.scanned(&earlier, true, 3)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... FAILED"
+      ],
+      "passed": false,
+      "patch": "mutations/stale_key_set.patch",
+      "patch_sha256": "ed8a2a60eea23f246b4b85b508ab03f36704b51775792d5a9ccc956b0dbc9421",
+      "result_lines": [
+        "running 1 test",
+        "test a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 0.00s"
+      ],
+      "runtime_sha256": "7ed8c315061b3b523fc37353308294274698f2a6fd7ef4ffb1a1b57d7fede6d5",
+      "seconds": 4.161,
+      "stopped_reason": null,
+      "target_peak_bytes": 613715968,
+      "tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+      "unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+      "variant": "mutant",
+      "raw_log_basename": "mutant_stale_key_set.log"
+    }
+  ],
+  "soft_stop_bytes": 1342177280,
+  "source_differences": [],
+  "source_manifest_unchanged": true,
+  "target_start_reference": "Root START authorized after old target and checkout target reclaimed; 2 jobs and 1.5 GiB cap",
+  "tools": {
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "unchanged_integration_tests_sha256": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+  "unchanged_unit_tests_sha256": "eb5d03698ef78e578b5388fbc670f228785fe945c3d46990e0f4c23425b7ab19",
+  "private_receipt_sha256": "ba75c60e9bbd7c9d45dddbb3bfa388a97f2c98259a6ea91aa57db87fc4898274",
+  "full_gate_source_files_match": 2180,
+  "full_gate_source_tree_sha256": "1fd1c57cca9d64ec7c95aba03f213ddcdf8fcb23c409d0549f385a6ad9ac22c4",
+  "path_normalization": "Private scratch/user paths omitted; exact raw logs and receipt remain identified by SHA-256. Published patch normalization is recorded per variant."
+}

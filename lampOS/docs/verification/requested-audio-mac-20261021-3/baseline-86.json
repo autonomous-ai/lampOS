@@ -1,0 +1,2467 @@
+{
+  "baseline_head": "4d932488e2b2a60986a1655bb8d6ccb5e0afb891",
+  "checked_at": "2026-10-21T23:22:56.787902+07:00",
+  "compile_command": "cargo +1.96.0 test --locked --offline --no-run --message-format=json -p lamp-cloud -p lamp-tasks -p lamp-voice -p lamp-update",
+  "compile_exit": 0,
+  "compile_log_sha256": "65874360b9fb00d00458b48aeb3cc90e378eaa7ca1cf37b432c1f52a6ca21ae3",
+  "execution": "Each Cargo-emitted test binary ran once per listed name, with --exact --nocapture --test-threads=1, from its crate directory. No full baseline suite ran.",
+  "limits": [
+    "Mac baseline passes do not reproduce the original Linux noexec environment or prove each historical failure cause.",
+    "No baseline failures were reproduced in these 86 tests; none is labelled an inherited Mac failure.",
+    "Prior local Linux and Mac failed gates remain historical, without erasure or replacement."
+  ],
+  "package_counts": {
+    "lamp-cloud": {
+      "passed": 2
+    },
+    "lamp-tasks": {
+      "passed": 2
+    },
+    "lamp-update": {
+      "passed": 25
+    },
+    "lamp-voice": {
+      "passed": 57
+    }
+  },
+  "platform": {
+    "architecture": "arm64",
+    "os": "Darwin",
+    "rust": "1.96.0"
+  },
+  "raw_matrix_sha256": "c53b6b4dbe317ce31992034f54bd7de33bcb54adcb98ddb51527dc10cd60b43c",
+  "results": [
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 140,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "cloud_temp_iw_empty_result",
+      "log_sha256": "e7cb2184dab6a58e98de9493884ed2040c051e02cf2acfbaa9f871217eedd1bb",
+      "package": "lamp-cloud",
+      "result": "passed",
+      "seconds": 0.601065,
+      "source_definitions": [
+        {
+          "file_sha256": "2f1d5e32fcb16028097e45bbe44e8845534cf4a953b25bafda673604f3dcfffc",
+          "intersects_music_changed_file": false,
+          "line": 1063,
+          "path": "lampOS/crates/cloud/src/lamp.rs"
+        }
+      ],
+      "target": "lamp_cloud",
+      "test": "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 140,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "cloud_temp_iw_empty_result",
+      "log_sha256": "ad81e8db47abf657c06fbde42345ada073dc2e2001fb650656255b682bacebe4",
+      "package": "lamp-cloud",
+      "result": "passed",
+      "seconds": 0.873409,
+      "source_definitions": [
+        {
+          "file_sha256": "2f1d5e32fcb16028097e45bbe44e8845534cf4a953b25bafda673604f3dcfffc",
+          "intersects_music_changed_file": false,
+          "line": 976,
+          "path": "lampOS/crates/cloud/src/lamp.rs"
+        }
+      ],
+      "target": "lamp_cloud",
+      "test": "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 41,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "tasks_copied_binary_preflight_failed",
+      "log_sha256": "c0f2332876215500bee196bfbf7efb2fa998efe04234af8db2b8738988639018",
+      "package": "lamp-tasks",
+      "result": "passed",
+      "seconds": 0.563701,
+      "source_definitions": [
+        {
+          "file_sha256": "d17387b569c9bfefa59d8e831136d2cb5ec275cbdf75cb0d7793b5160bd4cb32",
+          "intersects_music_changed_file": false,
+          "line": 901,
+          "path": "lampOS/crates/tasks/tests/harness.rs"
+        }
+      ],
+      "target": "harness",
+      "test": "changed_executable_after_preflight_proves_new_was_not_spawned"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 41,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "tasks_copied_binary_preflight_failed",
+      "log_sha256": "d67c8afbd24d921dd71a487e6e8c4ae9ab57517535b7c2bbc62a330f0daa4655",
+      "package": "lamp-tasks",
+      "result": "passed",
+      "seconds": 0.342025,
+      "source_definitions": [
+        {
+          "file_sha256": "d17387b569c9bfefa59d8e831136d2cb5ec275cbdf75cb0d7793b5160bd4cb32",
+          "intersects_music_changed_file": false,
+          "line": 648,
+          "path": "lampOS/crates/tasks/tests/harness.rs"
+        }
+      ],
+      "target": "harness",
+      "test": "executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "voice_camera_spawn_before_callback",
+      "log_sha256": "94bca36b41f9885f70c4af36cfe6b71f03cb413e31a855d1ce195753aaa49245",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.037617,
+      "source_definitions": [
+        {
+          "file_sha256": "3471dab561844d8feb1676379618840cd80867e5e21577dd44fe1027d4a8fcb0",
+          "intersects_music_changed_file": false,
+          "line": 478,
+          "path": "lampOS/crates/voice/src/coordinator/camera.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::camera::tests::mandatory_fault_consumed_during_camera_spawn_wait_remains_fatal"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "f402fd55057e9c7ab7fe943380239e6d727eb436a44adf32c7c8e483873db176",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.970455,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 969,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "871364d902b4e00347b85cfcc28fd6756afa9955ae017fdc9e743e4982efb65a",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 1.040689,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1104,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "53e4729348aa6890691a67c85ce118c53aa0e5e08a6d0746aca68fcc1ce057e3",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.28643,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1434,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "61d37bd9fb50eff6cae653babac416808a8298b65e8b45a21bca380ba2fe99c3",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.551201,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1534,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "0cf07c264087a6d1de919c705110d9fbd57ee46f9edd928cc0a32eaf5a881971",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 1.513043,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 802,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "97b3ad8aef784e23c6a848045ae4b4e0f1b7afcacb808a5f19907ff2f964a240",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 1.46115,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 784,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "593857107f45abc340a9cc693162cd9601b5df197dd1b49b94af6353e511a4ed",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.28889,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1283,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "84967cc1d42176d5bc895db868821ab4191592f5ce90c8996fe366f8a062cc35",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.283977,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 766,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "5cc36dfcefc7c9dd8b040e00ee35f74ee77b7f526f9c9b0476d89cd8c9b9cc84",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.287148,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 950,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "a910161a8f007fc9d525c7a5323c88f6ccd6f167743b9ff1c25890accde82581",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.548617,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1383,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "cd2c84c4662a65d3831f8edff1172bb470a41c977c6dd33dacd77608a61707c1",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.338886,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1390,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::late_started_callback_survives_a_host_pause_before_the_gated_worker_is_released"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "46869d236fb2c8b4558fef99ce7b49b2fe0c77e2004d99ace7a372fbd0f2d942",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.345951,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1129,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "a332e1fd0dd6c67bdbc017780756db4b33c7c25cfa7b37b958224305b9c91a2d",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.333247,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 415,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "77eb015bcb49882ba9fb6f4ce3e5f9e00100df2c837cc0c9641d1072b1fa018f",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.336724,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 106,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "34efda9f8fe760f1fd11cd8f2edae1d962c110bf95498680256425afa2baf659",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.553103,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 463,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "4e03786c0652c2df21a44b7a67eb582b39348cb86a2d241c05f77485704a5f75",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.291463,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 197,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "a865b54c5ac1a387727ca7d3f8c07839088578729b1aff70fd4dfc72bffc73b0",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.291669,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 241,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "90fb9bc0d3b3e542cbf09454b7fffdffe6dfefad1b065fe77d3aff5c7f8f95e3",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.28942,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 284,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "674a10022b880f196efccc04b159187bec3a04c0f5e84f509d06999788d6e640",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.503809,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 371,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "8458b9d1422aaa3d56b86a46d093423beb7a8df120253cbe27f81612a15180e0",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.598391,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 110,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "73be7aa98dd946aa75424bba78267141abbd2d695c177dbc433fbb88a580b233",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.290646,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 319,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "fb1432df5fc18c6e0c499c1cccb017c21f1c378e243c3ada626149ef602f091e",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.234765,
+      "source_definitions": [
+        {
+          "file_sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+          "intersects_music_changed_file": false,
+          "line": 513,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "8f9c0c7d485673823f565f7c3d8ad2bbee4624f2b68e81ad4786258e6092fcc8",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.503268,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1044,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "4f83add13722e4bece63e5226bf7085c04e438ce3c15a92feac8192791d9e6c6",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.291075,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1049,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "d2efe493ae8a0a21d9bf194487e17f8f4b8d9f33175889299fb8639e59436ddf",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.287137,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1332,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "8aa3544539b1db949658dae61e388d009eaa3b565a867be5673890cd475004c8",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 1.037263,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1085,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "f7377e88bd81a6efbd8221138a615bcab169eb9006abfc58f7d522df22216f3b",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.874027,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1345,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::privacy_revoke_survives_a_finished_worker_that_takes_300_ms_to_exit"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "f08eb147b26253f2daf738361db4cf4dccbc4e812524d71bb8be5d4bebf5f649",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.341403,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1339,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "f85d2ed23bdf7d0334c3ed26b855a66e8734f0f6b20b54bf8240452707dd2a30",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.290151,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 992,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "c3f7b474a679941530bbafb397070e61cc3ed5e38a1b2ee0036bcb1aa5b39363",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.290512,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1490,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "5e8de33b09ad1f6faf151e8874c5a10f8d4a06eeb1f0a2bfd07b19a155e1e2fd",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.345395,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1495,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "59ae0b89cd7943ae06212c200bcb64649942e2b5004a2d7babe180973831324e",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.289129,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1117,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_motor_temp_script_eacces",
+      "log_sha256": "e13982ce27b3809bfa9ada9ddf892eb9fb102abdd2ced2fd9ee7b1e8449bc97e",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.446201,
+      "source_definitions": [
+        {
+          "file_sha256": "13bee3dc2e08bd4dbb9459fe5205f225a2b72b359727e18ce9fdcbfad31c4f2c",
+          "intersects_music_changed_file": false,
+          "line": 1266,
+          "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "59080da61ed80c0dec7734ed77ea0bd8b6729feae8d5a27b295e3a9da5ec9e57",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.555587,
+      "source_definitions": [
+        {
+          "file_sha256": "dda931330d5a563172f8d192668db9916a37c450b8067a4a7d470d611487b0a7",
+          "intersects_music_changed_file": false,
+          "line": 556,
+          "path": "lampOS/crates/voice/src/coordinator/optional_ring.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::optional_ring::tests::failed_startup_is_inhibited_through_late_ready_and_bounded_reaping"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "fcb779e2237c043edd22ffe14d7c2da57bf6e2f6a5a3faa11c93b195a9e5ea8a",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.551379,
+      "source_definitions": [
+        {
+          "file_sha256": "72e2a55184f1c6b19922f37e95d15a04443d4ecad50c7dd27ca4db4b9eb312f8",
+          "intersects_music_changed_file": false,
+          "line": 842,
+          "path": "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "d41207f037948d8a4fa36bcd5c9ea32d6c47e482a99bc662f60cde9e4ea697f3",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.663673,
+      "source_definitions": [
+        {
+          "file_sha256": "72e2a55184f1c6b19922f37e95d15a04443d4ecad50c7dd27ca4db4b9eb312f8",
+          "intersects_music_changed_file": false,
+          "line": 958,
+          "path": "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "c26e03e915df4b648945d1b6b91c94ae610105315ede507313e04e173f15c965",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.512918,
+      "source_definitions": [
+        {
+          "file_sha256": "72e2a55184f1c6b19922f37e95d15a04443d4ecad50c7dd27ca4db4b9eb312f8",
+          "intersects_music_changed_file": false,
+          "line": 724,
+          "path": "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::optional_ring_tests::failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "f407741d8a190bf4d96af019bc756803428d00056c40b21ce76d7ca7b4808f83",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 1.521287,
+      "source_definitions": [
+        {
+          "file_sha256": "72e2a55184f1c6b19922f37e95d15a04443d4ecad50c7dd27ca4db4b9eb312f8",
+          "intersects_music_changed_file": false,
+          "line": 617,
+          "path": "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "coordinator::optional_ring_tests::mandatory_worker_faults_remain_terminal_during_optional_spawn"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "0071016ea2920b495406e55a42b24e3413dba902b48846fbb4dc4407d686d5ea",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.508884,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 470,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::child_exit_before_ready_is_optional_but_abnormal_exit_is_retained"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "969efd8c2428d5d878f709b7cdc014001b55c617ad28d01da3ce8246d0366852",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.494789,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 304,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::cleanup_refuses_replaced_peer_inode_and_retains_failure"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "a82ed8a34e4a03514f3859aa72d1268c52b96a18f723c173dcf3617f8cc9d338",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.555983,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 355,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::cleanup_refuses_unexpected_file_without_erasing_it"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "0d9bd32a76b60705c765953d5269c936008cdf8ad8b19491b7966d0232f2d958",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.610421,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 438,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::connected_but_unready_ring_times_out_and_remains_owned"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "8aa978065206d0a3870b4b58dca0f909318cead496b8822b4645bf97c5ce28fb",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.498285,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 119,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::failed_handshake_retains_owned_child_and_cleans_only_its_socket_namespace"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "f419d5e92e7db5fe3399c3f7ca6439d66033d12bf08c0f0fd7c277591e13a2a2",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.509169,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 249,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::mandatory_interrupt_during_ring_startup_preserves_kind_and_reaps"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "0214b43963950854ffe6b3ac2cf3e3fdbd417f4e23c2d1cbb20c0864c12ed3f2",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.662896,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 217,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::missing_socket_deadline_is_unchanged_and_does_not_lose_the_child"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "6d2fe631d21ecdd01a78e29b8d57415d923da7e53b5dc1212ee02392444f2208",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.660518,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 386,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::permanently_nonprivate_peers_timeout_without_connecting_or_chmod"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "bba1533a1b14fd745df2ae95ff660f84fec45c67760d46ac2fb3b93cd0d8d7e6",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.552961,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 161,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::ready_ring_keeps_private_handshake_and_control_contract"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "3a0275b7f8ca580705925e5f0e1356feda5e930b516a498192eb45116d56038e",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 2.03068,
+      "source_definitions": [
+        {
+          "file_sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+          "intersects_music_changed_file": false,
+          "line": 508,
+          "path": "lampOS/crates/voice/src/process/ring_startup_tests.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::ring_startup_tests::the_ring_is_started_with_the_unplug_switch_and_only_when_it_is_on"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "f1fc263e16b45a794039f8572cb62696fa9ff9f14e85596cd8afac98c69779bc",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.289988,
+      "source_definitions": [
+        {
+          "file_sha256": "06a11b022178e07661746ca12c981121f291590f46b571526bf1bec808203934",
+          "intersects_music_changed_file": false,
+          "line": 1974,
+          "path": "lampOS/crates/voice/src/process.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::tests::a_started_privacy_worker_learns_no_slide_from_its_arguments_only"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "94f4b1734d7c453290e83aff5afaa50ba7a7e7e74ace933370562087c5ca0936",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.286155,
+      "source_definitions": [
+        {
+          "file_sha256": "06a11b022178e07661746ca12c981121f291590f46b571526bf1bec808203934",
+          "intersects_music_changed_file": false,
+          "line": 1725,
+          "path": "lampOS/crates/voice/src/process.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_process_temp_script_eacces",
+      "log_sha256": "d7f1f5e4b196748ce759eac02193f1107304926af471dcc587d0591acc6355ef",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.282117,
+      "source_definitions": [
+        {
+          "file_sha256": "06a11b022178e07661746ca12c981121f291590f46b571526bf1bec808203934",
+          "intersects_music_changed_file": false,
+          "line": 1420,
+          "path": "lampOS/crates/voice/src/process.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "process::tests::the_named_ask_switch_alone_reaches_the_started_second_worker"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_same_voice_temp_script_eacces",
+      "log_sha256": "74f100021572259657dd78c8ab001b3428b26a943644e4d8452a8b591c18b4ee",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.709304,
+      "source_definitions": [
+        {
+          "file_sha256": "273135992b8cec80d57910cc770ba3e8c465fb6b107ae61c5ce43bc90b332472",
+          "intersects_music_changed_file": false,
+          "line": 1121,
+          "path": "lampOS/crates/voice/src/same_voice.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_same_voice_temp_script_eacces",
+      "log_sha256": "c978f016b53b5a17c0ddb4d4c5a359ac20ed72f0883240f43c1316d9098309f0",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.724317,
+      "source_definitions": [
+        {
+          "file_sha256": "273135992b8cec80d57910cc770ba3e8c465fb6b107ae61c5ce43bc90b332472",
+          "intersects_music_changed_file": false,
+          "line": 1046,
+          "path": "lampOS/crates/voice/src/same_voice.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_same_voice_temp_script_eacces",
+      "log_sha256": "2b98bbab6eac28aa7ebd8d135fea15110a00e69604c0dc9399506eb74af4d4e7",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.501424,
+      "source_definitions": [
+        {
+          "file_sha256": "273135992b8cec80d57910cc770ba3e8c465fb6b107ae61c5ce43bc90b332472",
+          "intersects_music_changed_file": false,
+          "line": 1071,
+          "path": "lampOS/crates/voice/src/same_voice.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_made_skill_temp_script_eacces",
+      "log_sha256": "335d22c2394897abe02056a221eb7f734b0411fd2d397c4b92e7701a312abaa9",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.392543,
+      "source_definitions": [
+        {
+          "file_sha256": "9dc84c837686c5746820cf49b10a4e98123454dd214ef8ab4a92e49bebf17235",
+          "intersects_music_changed_file": false,
+          "line": 2499,
+          "path": "lampOS/crates/voice/src/task_news.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 3017,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "voice_made_skill_temp_script_eacces",
+      "log_sha256": "c2809ffb1c2e91038e3fd80af6f5e2e3351199dcfda907eafb959772737d4477",
+      "package": "lamp-voice",
+      "result": "passed",
+      "seconds": 0.612284,
+      "source_definitions": [
+        {
+          "file_sha256": "9dc84c837686c5746820cf49b10a4e98123454dd214ef8ab4a92e49bebf17235",
+          "intersects_music_changed_file": false,
+          "line": 2321,
+          "path": "lampOS/crates/voice/src/task_news.rs"
+        }
+      ],
+      "target": "lamp_voice",
+      "test": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "9f4d6f8c00fe373fa3f009a656d0c8905f47fbaa310f205a396f94b25817395d",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 0.60349,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2081,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "eb9c922fdfd8dc4cfc8f864656d52ee1b5e7c54674ac12e3c854e291fb3706a7",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 1.242027,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 1994,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_build_put_back_puts_the_product_skills_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "294090923ec01897ad5905529ef9bf1a5cb6b0ab2f26833d76484a57afe9071d",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 5.574975,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 4252,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "79caec569505f47a73c800bd6447fdf3c13580fb8ef665968d5bfc2e4578675e",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.847118,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2540,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_new_updater_not_confirmed_by_the_deadline_is_put_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "574677710e8dd21cfc34395f12bce2151b331100a936eb5bc1bf333a911b7e19",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.735995,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2460,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_new_updater_that_confirms_keeps_its_switch"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "a5b472f018ec7c5bd56b63d4e5bc02c33264f2634995644d12da69228179c0ff",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 3.05757,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2502,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_new_updater_that_exits_at_once_is_put_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "413af630176412d56b0e43de78a6dd1142213e783856d41d3e3ad320b2079815",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.822737,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2690,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_new_updater_that_refuses_every_manifest_is_put_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "0c1c0b0f354f25ac946a0346107770ce0a862525a13eb498247c1d57f3018943",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.89726,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2264,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_round_after_install_keeps_lamp_updates_own_folder"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "598809383610e0ba2077728c0a73c107e033f172a548c4c34ea55f29817ac33c",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 4.64558,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2761,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_round_after_its_own_switch_keeps_the_old_binarys_folder"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "1d9ec72bb9d53b50cfb7963cc16d922785cc29878d4224e41e1e47a24201104c",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.897923,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2743,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_round_by_hand_keeps_the_folder_it_runs_from"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "f64bc30bb2c5793c16635ce97f9463e8ae42b7c08f9109e7ec82d8e0b0212e23",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 0.71209,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 1688,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "4198eec4bc7768fef9586458765c7926cba24c87204d7b5e4ee7b22ce2b4859a",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 0.717012,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 1900,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_round_places_the_builds_product_skills_and_keeps_the_lamps_own"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "83f0db281bbeb227e5ba8312cb611de7e61bd6da2e8ebb7391a24849bc22eeba",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.910508,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 4341,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "a_self_json_from_a_later_version_still_reads"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "e84053fc2d09968bb35366994eb7597739fd8a839bbadb5a5913513c556d3244",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.762551,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2879,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "an_old_updater_climbs_one_updater_a_round"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "1358b366154ef3ae91a3fa172d09458711b990b295dfd266d352da3228a1b630",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.839774,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 4153,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "an_unreadable_self_json_with_both_builds_known_is_put_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "799392b1b14f4a38f4b56135ed7cd6a72af36a641f4c6b540d28c4da020a9aa2",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.79065,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 4221,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "d4dea9bafa961b51ea9d678797d506525067e5801977f32d2398c76512e5c6c5",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 3.066296,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2798,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "9ee0b6e059d3dbcf63a60172ae9d390238a55930bbb793a836a4556109c4542d",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 4.015896,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2639,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "install_writes_the_fallback_and_no_round_touches_it"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "fcb6357a57f0f5717284aa7daef8b4ed8087c7c110c6a6c2b299dcb6fdddb53e",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 3.290069,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 4189,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "lamp_update_back_puts_back_an_unreadable_self_json"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "c71c19b805326375f080a3825bad7bdc3d283ebb5afac4ba0c751bbd225e02e9",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 4.154099,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2560,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "no_second_round_begins_while_lamp_updates_own_switch_waits"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "f7cbe836be0323f3eba6bbce0403e1a77a4073c349238d1a02a9173e1af387c2",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 1.609133,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 1751,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": false,
+      "historical_linux_group": "update_expected_self_switch_missing",
+      "log_sha256": "78035e3e1ed4b5f1f8225a47ac735d52591801d70eb45d39343e71f289bfb52c",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.733702,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2718,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "the_fallback_reads_a_self_json_written_by_a_later_updater"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "01b2237bb1ed17dd020df757301e036b7537ca577fef2eec5117466f608feaec",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 0.541998,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 1962,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "8be590a40abc918acff774a609f35e0565656027f4af151af1779d4fb8ddd5d3",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.93586,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 3508,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models"
+    },
+    {
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 92,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "exit_code": 0,
+      "historical_linux_explicit_eacces": true,
+      "historical_linux_group": "update_temp_skills_explicit_eacces",
+      "log_sha256": "013ac3b64328505742f38798301b8133ff9a51a96e051328584a0065d380dbe7",
+      "package": "lamp-update",
+      "result": "passed",
+      "seconds": 2.678853,
+      "source_definitions": [
+        {
+          "file_sha256": "2f7960575e4210179b93701a9ca9e0fe6136edcd01e4d716c4e45234a8591a8e",
+          "intersects_music_changed_file": false,
+          "line": 2611,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "target": "round",
+      "test": "with_the_switch_off_lamp_update_never_switches_itself"
+    }
+  ],
+  "schema": 1,
+  "source_after": {
+    "files_sha256": "ff677bb3e62d39ebe85809e17db6f60d924cdd19aecb01874925c3b0376cea99",
+    "head": "4d932488e2b2a60986a1655bb8d6ccb5e0afb891",
+    "status_porcelain": "",
+    "tracked_lampos_and_parent_files": 6013
+  },
+  "source_before": {
+    "files_sha256": "ff677bb3e62d39ebe85809e17db6f60d924cdd19aecb01874925c3b0376cea99",
+    "head": "4d932488e2b2a60986a1655bb8d6ccb5e0afb891",
+    "status_porcelain": "",
+    "tracked_lampos_and_parent_files": 6013
+  },
+  "source_unchanged": true,
+  "status_counts": {
+    "passed": 86
+  },
+  "test_binaries_unchanged": true,
+  "test_binary_sha256": {
+    "lamp-cloud": "2bdcfaef3132de354f13caf6fd78506bdd2da9b7d9ed01ff7af5fc7fed1eb784",
+    "lamp-tasks": "1a28b7913a653df5cc9dbed0e0cd242c3c89e84849c40a9ae0a6a7b529ab039f",
+    "lamp-update": "f85f6b05f7a2c76d9d74b21f1b3645a2bd141bedc56ac59fe021aa496fc54c30",
+    "lamp-voice": "5578d9fc8756104ca354854bc9cb12cc8664f74ecbf39d11d64a4891c53fb943"
+  }
+}

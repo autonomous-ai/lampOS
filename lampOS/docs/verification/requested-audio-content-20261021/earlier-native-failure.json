@@ -1,0 +1,28 @@
+{
+  "head": "6f4e5ceea0df9f47ec211e5649dedf075507a7d6",
+  "run": 39542590327,
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "conclusion": "failure",
+      "failed_steps": [
+        "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+      ]
+    },
+    {
+      "name": "report-full-run-failure",
+      "conclusion": "skipped",
+      "failed_steps": []
+    }
+  ],
+  "failed_log_sha256": "8053e26899f7e52bffc175a27aecfacbdb1ea394c816fb68e2aa32eaf7fa4678",
+  "nextest_summary": "Summary [  94.688s] 4685/9210 tests run: 4684 passed, 1 failed, 59 skipped",
+  "nextest_passed": 4684,
+  "nextest_failed": 1,
+  "nextest_skipped": 59,
+  "not_run_after_fail_fast": 4525,
+  "failing_test": "lamp-skills::requested_audio a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation",
+  "failure": "assertion failed: !later.unchanged() at crates/skills/tests/requested_audio.rs:949:5",
+  "status_note": "Same-size audio rewrite was incorrectly classified as unchanged. Metadata cache correctness is under investigation; no CI rerun until a justified correction. Later doc/own-harness/artifact steps did not qualify."
+}

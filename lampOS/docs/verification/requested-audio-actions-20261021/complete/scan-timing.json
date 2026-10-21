@@ -1,0 +1,80 @@
+{
+  "boundary": "Scan::unchanged after loading; excludes fixture creation, initial loading, snapshot cloning, authority refresh and logging",
+  "build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TERM_COLOR": "never",
+    "GIT_NO_LAZY_FETCH": "1"
+  },
+  "checkout_identity_note": "The checkout HEAD identifies the starting checkout only. Uncommitted corrections were included in the frozen working tree; the source delta and its hash qualify those exact bytes. The old checkout commit alone is not this verification result.",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-skills",
+    "--test",
+    "requested_audio",
+    "sixteen_maximum_recordings_report_full_content_scan_costs",
+    "--",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "integration_base": "bd43346de29bba069f741baa3eb32d03c6d5794f",
+  "limitations": "Three samples on one host, with recently written/read filesystem pages. No cold-filesystem, whole-loop, native ARM64, acoustic-onset or physical-lamp qualification.",
+  "profile": "host debug, debug information disabled",
+  "raw_log_sha256": "2d1f99d4cb48671fa8d2b285d2ee26e0452b1de97e0425ba4e67051914b4221c",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 4.38s"
+  ],
+  "samples": [
+    {
+      "assets": 16,
+      "elapsed_ns": 26336500,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "fresh",
+      "round": 0
+    },
+    {
+      "assets": 16,
+      "elapsed_ns": 26798833,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "followup",
+      "round": 1
+    },
+    {
+      "assets": 16,
+      "elapsed_ns": 26505500,
+      "fixture_bytes": 46085516,
+      "frames_per_asset": 1440000,
+      "payload_bytes": 46085516,
+      "phase": "followup",
+      "round": 2
+    }
+  ],
+  "seconds": 9.23,
+  "source_file_count": 2204,
+  "source_head_at_freeze": "c74b0f710ecac48f8668c6ab8258777788068c0a",
+  "source_tree_sha256": "1e624e3d1ca0f315399c851ef1076668bcef57b11c86970ce934d70d9a4c2d40",
+  "stage": "skills_scan_cost",
+  "status": "passed focused stage",
+  "target_ns": 250000000,
+  "uncommitted_correction_files_sha256": {
+    "lampOS/crates/actions/src/server.rs": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b",
+    "lampOS/crates/actions/src/speaker_state.rs": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c",
+    "lampOS/crates/actions/tests/speaker_state.rs": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "0333c076ff2ec57d0ede43aaa1808c223013fda1efc714e0f8727a91ad8601e5"
+  },
+  "verification_error": null
+}

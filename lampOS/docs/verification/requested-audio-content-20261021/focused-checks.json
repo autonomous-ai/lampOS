@@ -1,0 +1,248 @@
+{
+  "status": "Focused development checks complete; full fresh consumer and native gates recorded separately.",
+  "head": "6f4e5ceea0df9f47ec211e5649dedf075507a7d6",
+  "source_sha256": {
+    "lampOS/crates/skills/src/requested_audio.rs": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+    "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+    "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+  },
+  "host": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "checks": {
+    "unit": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--lib",
+        "requested_audio::file_checks",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "7a288813a5101f1ffc53c670f1d6ce4ef980e0b2d4b238f1d52db8d68c6557d7",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 15.451657750003505,
+      "log_sha256": "f218ff21048326dbf8538565317033c5714ae71f7ec4ac1e54e5902eb0e604eb",
+      "raw_log_basename": "unit.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "integration": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "7a288813a5101f1ffc53c670f1d6ce4ef980e0b2d4b238f1d52db8d68c6557d7",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 101,
+      "elapsed_seconds": 8.169866082957014,
+      "log_sha256": "5aefe56f5da92170be7a82edb9988a0862cb273510cd611b74f4b4c902d6856d",
+      "raw_log_basename": "integration.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "integration-host": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "7a288813a5101f1ffc53c670f1d6ce4ef980e0b2d4b238f1d52db8d68c6557d7",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 4.953896082995925,
+      "log_sha256": "e88b2c34848ed136b67408d20083c8610f69608208a1408f0c757bb73ceb8629",
+      "raw_log_basename": "integration-host.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "7a288813a5101f1ffc53c670f1d6ce4ef980e0b2d4b238f1d52db8d68c6557d7",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 15.433564499951899,
+      "log_sha256": "371a2dfa534df6a4658a66a92fbc3ee47ca7df937e8041e7a37998b1562fbd31",
+      "raw_log_basename": "clippy.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "unit-final": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--lib",
+        "requested_audio::file_checks",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 2.8271811659797095,
+      "log_sha256": "dfca3ec205c43178c919a66e15a091b5e13132b82b01c36ba443c223dd5ae45b",
+      "raw_log_basename": "unit-final.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "clippy-final": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 2.5625796249951236,
+      "log_sha256": "8afe6dd488801e397fe32ee5e747f6cfd71732d8da57fee8d7fe476c5715a809",
+      "raw_log_basename": "clippy-final.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    },
+    "fmt-final": {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "crates/skills/src/requested_audio.rs",
+        "crates/skills/tests/requested_audio.rs"
+      ],
+      "cwd": "lampOS",
+      "environment": {
+        "CARGO_TARGET_DIR": "<reused-focused-target>",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      },
+      "source_sha256": {
+        "lampOS/crates/skills/src/requested_audio.rs": "8e8119182054582152c6b30bfa4d29762683ce789a408528dd35bd67e8819355",
+        "lampOS/crates/skills/tests/requested_audio.rs": "5325e08efb212c961dbf857b544068aeafa627f64a4ff7a7beca3827876421e4",
+        "lampOS/docs/requested-audio.md": "2529017fadace131dc76a1859f5a65856782790e30ac9bcc6929c6f21a6df7cf"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 0.040179832954891026,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_log_basename": "fmt-final.log",
+      "log_scope": "Retained private raw log identified by its SHA-256."
+    }
+  },
+  "final_unit_binary_sha256": "bc7b928d1788349af9aa618c4a7a63f9bcdba5cd311e2e21c393d7f8533ee3a9",
+  "limits": [
+    "No native failure timestamp values were logged; equal-stamp tests demonstrate the unsafe metadata assumption independently.",
+    "The 30-test host integration passed before the final listed-path unit-test-only strengthening; production code is unchanged between these hashes.",
+    "No mmap experiment, device work, full consumer suite, or native Linux ARM64 rerun performed here.",
+    "The read/hash boundary is not an atomic filesystem snapshot; existing freshness/lease deadlines and Voice immutable-playback verification remain independent."
+  ],
+  "private_receipt_sha256": "6bae0680914a5946af490c5e20f1ab219317000d981dc5a3a4fd91f5c83e0fde",
+  "sandbox_failure_note": "Initial sandboxed integration had 27 passes and 3 local-service startup failures; an AF_UNIX bind probe returned EPERM. The same complete integration suite passed all 30 with host access. These remain separate outcomes."
+}

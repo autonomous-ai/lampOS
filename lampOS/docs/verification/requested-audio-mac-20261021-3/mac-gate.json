@@ -1,0 +1,124 @@
+{
+  "at": "2026-10-21T23:36:27.323201+07:00",
+  "format": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  "integration_base": "4d932488e2b2a60986a1655bb8d6ccb5e0afb891",
+  "limits": [
+    "No local full-workspace gate was repeated.",
+    "No physical-lamp playback or acoustic latency is qualified.",
+    "Earlier failed integration gates and their limits remain in linked historical receipts."
+  ],
+  "packages": [
+    "lamp-actions",
+    "lamp-msgs",
+    "lamp-skills",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "platform": "macOS ARM64",
+  "schema": 1,
+  "scope": "Changed-crate Mac gate only. Native ARM64 qualification belongs to the new PR run.",
+  "source_file_count": 1709,
+  "source_tree_sha256": "1ebbf72b8672fc3667d2b030bef041649d10974a472d700f6c437f7b2836ef00",
+  "source_unchanged": true,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "counts": {},
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c34421aaea326034a7f580070764fb42b05ae9ec7cc4d8ce8e14f465341e5cce",
+      "seconds": 71.839,
+      "stage": "clippy",
+      "summary_count": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "--test-threads=1"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 14,
+        "passed": 4665
+      },
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8646d4fc92c596f7588eeb4d6692b2e65590dede18dded765e61679d32e73e7c",
+      "seconds": 673.381,
+      "stage": "tests",
+      "summary_count": 23
+    }
+  ],
+  "target_policy": "One owned target, used sequentially for baseline comparison then candidate; source paths differ and no concurrent build used it.",
+  "test_summaries_from_command_output": [
+    "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.24s",
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.25s",
+    "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.94s",
+    "test result: ok. 84 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+    "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+    "test result: ok. 128 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.06s",
+    "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.26s",
+    "test result: ok. 234 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 82.43s",
+    "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.45s",
+    "test result: ok. 3092 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 356.61s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 260 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.30s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+    "test result: ok. 367 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.05s",
+    "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.17s",
+    "test result: ok. 234 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.66s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ]
+}

@@ -1,0 +1,10 @@
+--- original/crates/skills/src/requested_audio.rs
++++ listed_path/crates/skills/src/requested_audio.rs
+@@ -116,7 +116,6 @@
+             || !listed.is_file()
+             || listed.file_type().is_symlink()
+             || (self.stamp_of)(&opened) != self.stamp
+-            || (self.stamp_of)(&listed) != self.stamp
+         {
+             return Err("audio file changed while checking".into());
+         }

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# A source template. Render into artifacts/skills/relaxing-music before packing.
+needs = ["voice"]
+kind = "installable"
+version = "1.0.0"
+tool = "play_relaxing_music"
+
+[permissions]
+speak = true
+
+[[do]]
+say = "Say only one short confirmation that you will play a quiet, 48-second instrumental piece, then stop speaking."
+
+[[do]]
+after = "say"
+requested_audio = "relaxing.wav"
