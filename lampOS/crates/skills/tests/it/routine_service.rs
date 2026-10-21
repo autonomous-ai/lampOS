@@ -501,6 +501,12 @@ fn reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest() {
     .unwrap();
     // The next look for changed definitions, now rather than up to 2 s on.
     fixture.skip(RELOAD);
+    // And until it has looked: the look follows a skip answered at the top
+    // of a pass, or the next pass's top for one answered after its wait, so
+    // the second skip of nothing after it is answered after the look. Not
+    // a renewal's 1 s for each pass (#1806).
+    fixture.barrier();
+    fixture.barrier();
     let until = Instant::now() + WAIT;
     let mut last = rest.clone();
     while fs::read_to_string(&journal)
