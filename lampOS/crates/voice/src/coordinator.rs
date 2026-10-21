@@ -8128,7 +8128,7 @@ fn conversation_with_gate(
             if !heard.is_empty()
                 && let Some(news) = task_news.as_ref()
             {
-                news.heard(heard);
+                news.heard(turn, heard);
             }
             record(
                 trace,

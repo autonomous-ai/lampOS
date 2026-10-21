@@ -147,6 +147,10 @@ pub const NAMED_ONLY_FLAG: &str = "--tasks-named-only";
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
 /// only.
 pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
+/// Signing the lamp's Harness in by voice (#1676, [`crate::sign_in`]):
+/// `on`, and nothing else. Needs `lamp-tasks serve --sign-in-by-code`.
+pub const SIGN_IN_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN";
+pub const SIGN_IN_FLAG: &str = "--tasks-sign-in";
 pub const DEFAULT_TARGET: &str = "office";
 /// The model's two functions.
 pub const START: &str = "start_agent_task";
@@ -593,6 +597,9 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     if place.make_skill {
         tools.push(crate::made_skill::tool(default));
         tools.push(crate::made_skill::put_on_tool());
+    }
+    if place.sign_in {
+        tools.extend(crate::sign_in::tools());
     }
     tools
 }
@@ -1207,6 +1214,7 @@ pub fn is_tool(name: &str) -> bool {
         || name == CHECK
         || name == crate::made_skill::MAKE
         || name == crate::made_skill::PUT_ON
+        || crate::sign_in::is_tool(name)
 }
 
 /// What the tasks part is reached by.
@@ -1241,6 +1249,9 @@ pub struct Place {
     /// them, as any agent the voice knows, and one named who isn't set up
     /// prepares nothing and is said not to be.
     pub named_only: bool,
+    /// The person may sign the lamp's Harness in by voice
+    /// ([`SIGN_IN_FLAG`], `crate::sign_in`).
+    pub sign_in: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -1257,6 +1268,7 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::made_skill::ENVIRONMENT)
             .ok()
             .as_deref(),
+        std::env::var(SIGN_IN_ENVIRONMENT).ok().as_deref(),
     );
     if named_only(
         &arguments,
@@ -1285,6 +1297,7 @@ fn arguments(
     names: Option<&str>,
     needs: Option<&str>,
     make_skill: Option<&str>,
+    sign_in: Option<&str>,
 ) -> Vec<String> {
     let Some(directory) = directory.filter(|path| Path::new(path).is_absolute()) else {
         return Vec::new();
@@ -1317,6 +1330,9 @@ fn arguments(
     if make_skill == Some("on") {
         arguments.push(MAKE_SKILL_FLAG.to_owned());
     }
+    if sign_in == Some("on") {
+        arguments.push(SIGN_IN_FLAG.to_owned());
+    }
     arguments
 }
 
@@ -1329,7 +1345,7 @@ fn alias(text: &str) -> bool {
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
-/// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-named-only]`
+/// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-sign-in] [--tasks-named-only]`
 /// off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
@@ -1386,6 +1402,15 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == MAKE_SKILL_FLAG => (true, rest),
         _ => (false, rest),
     };
+    let (sign_in, rest) = match rest {
+        [flag, rest @ ..] if flag == SIGN_IN_FLAG => (true, rest),
+        _ => (false, rest),
+    };
+    if sign_in {
+        // This worker reads a sign-in's code and account from the tasks
+        // part when it is given its news (`crate::sign_in::written`).
+        crate::sign_in::serve_from(Path::new(directory));
+    }
     let (named_only, rest) = match rest {
         [flag, rest @ ..] if flag == NAMED_ONLY_FLAG && who => (true, rest),
         _ => (false, rest),
@@ -1403,6 +1428,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             staff_note: false,
             make_skill,
             named_only,
+            sign_in,
         }),
         rest,
     ))
@@ -1478,6 +1504,13 @@ fn run_for(
     let started = Instant::now();
     let left = || deadline.saturating_sub(started.elapsed());
     match call.name.as_str() {
+        // Never without its switch, whatever the model calls (#1676).
+        name if crate::sign_in::is_tool(name) => {
+            if !place.sign_in {
+                return (crate::tools::unavailable(), false);
+            }
+            crate::sign_in::run(&place.directory, call, request, heard, left())
+        }
         START | crate::made_skill::MAKE => {
             // A skill to make (`crate::made_skill`): the brief, with the
             // person's request and nothing else, handed over as any work.
@@ -1988,6 +2021,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
             let call = ToolCall {
@@ -2097,10 +2131,11 @@ pub(crate) mod tests {
 
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
-        assert!(arguments(None, None, None, None, None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None, None, None, None, None, None).is_empty());
         assert!(
             arguments(
                 Some("relative"),
+                None,
                 None,
                 None,
                 None,
@@ -2122,6 +2157,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t"]
@@ -2130,6 +2166,7 @@ pub(crate) mod tests {
             arguments(
                 Some("/run/t"),
                 Some("m2"),
+                None,
                 None,
                 None,
                 None,
@@ -2150,6 +2187,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t"]
@@ -2164,6 +2202,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 Some("/usr/local/bin/harness"),
+                None,
                 None
             ),
             [FLAG, "/run/t", NEEDS_FLAG, "/usr/local/bin/harness"]
@@ -2178,6 +2217,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 Some("relative"),
+                None,
                 None
             ),
             [FLAG, "/run/t"]
@@ -2214,6 +2254,7 @@ pub(crate) mod tests {
                 staff_note: false,
                 make_skill: false,
                 named_only: false,
+                sign_in: false,
             })
         );
         assert_eq!(rest, &flags[2..]);
@@ -2248,6 +2289,26 @@ pub(crate) mod tests {
             });
         }
         seen
+    }
+
+    /// The worker's flags for a tasks folder, the make-skill switch and the
+    /// sign-in's (`crate::sign_in`'s tests).
+    pub(crate) fn arguments_for_sign_in(
+        make_skill: Option<&str>,
+        sign_in: Option<&str>,
+    ) -> Vec<String> {
+        arguments(
+            Some("/run/t"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            make_skill,
+            sign_in,
+        )
     }
 
     /// Held by each test that prepares and confirms: they share [`PENDING`].
@@ -2473,6 +2534,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
                           Say so plainly in a few words: it needs setting up on the computer first.";
@@ -2659,6 +2721,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2739,6 +2802,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2827,6 +2891,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2880,6 +2945,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let call = |task: &str| ToolCall {
             id: "c".into(),
@@ -2935,6 +3001,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
             "observations":[{"id":4,"state":"idle"}]});
@@ -3012,6 +3079,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let seen = tasks_part(
             directory,
@@ -3356,6 +3424,7 @@ pub(crate) mod tests {
         assert!(!names(&without).contains(&crate::made_skill::MAKE.to_owned()));
         let making = Place {
             make_skill: true,
+            sign_in: false,
             ..without.clone()
         };
         assert!(names(&making).contains(&crate::made_skill::MAKE.to_owned()));
@@ -3458,6 +3527,7 @@ pub(crate) mod tests {
             None,
             None,
             Some("on"),
+            None,
         );
         assert_eq!(flags, [FLAG, "/run/t", MAKE_SKILL_FLAG]);
         let (taken, rest) = take(&flags).unwrap();
@@ -3472,7 +3542,8 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
-                Some("yes")
+                Some("yes"),
+                None
             ),
             [FLAG, "/run/t"]
         );
@@ -3491,6 +3562,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         }
     }
 
@@ -3667,6 +3739,7 @@ pub(crate) mod tests {
                 None,
                 Some("on"),
                 None,
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", NAMES_FLAG])
@@ -3680,6 +3753,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 Some("yes"),
+                None,
                 None,
                 None
             ),
@@ -3740,6 +3814,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", LEAD_IN_FLAG]
@@ -3750,6 +3825,7 @@ pub(crate) mod tests {
                 Some("m2"),
                 Some("on"),
                 Some("on"),
+                None,
                 None,
                 None,
                 None,
@@ -3769,12 +3845,27 @@ pub(crate) mod tests {
                     None,
                     None,
                     None,
+                    None,
                     None
                 ),
                 [FLAG, "/run/t"]
             );
         }
-        assert!(arguments(None, None, None, Some("on"), None, None, None, None, None).is_empty());
+        assert!(
+            arguments(
+                None,
+                None,
+                None,
+                Some("on"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+            .is_empty()
+        );
         let flags: Vec<String> = [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, "--other"]
             .map(String::from)
             .into();
@@ -3906,6 +3997,7 @@ pub(crate) mod tests {
                 Some("on"),
                 None,
                 None,
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", ASKED_FLAG, ACCOUNTS_FLAG])
@@ -3921,6 +4013,7 @@ pub(crate) mod tests {
                     Some("on"),
                     None,
                     None,
+                    None,
                     None
                 ),
                 flags(&[FLAG, "/run/t"])
@@ -3934,6 +4027,7 @@ pub(crate) mod tests {
                 None,
                 Some("on"),
                 Some("yes"),
+                None,
                 None,
                 None,
                 None
@@ -4301,6 +4395,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "office-claude", WHO_FLAG]
@@ -4310,6 +4405,7 @@ pub(crate) mod tests {
                 Some("/run/t"),
                 None,
                 Some("on"),
+                None,
                 None,
                 None,
                 None,
@@ -4329,11 +4425,26 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t"]
         );
-        assert!(arguments(None, None, Some("on"), None, None, None, None, None, None).is_empty());
+        assert!(
+            arguments(
+                None,
+                None,
+                Some("on"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+            .is_empty()
+        );
         let flags: Vec<String> = [
             FLAG,
             "/run/t",
@@ -4359,6 +4470,7 @@ pub(crate) mod tests {
                 staff_note: false,
                 make_skill: false,
                 named_only: false,
+                sign_in: false,
             })
         );
         assert_eq!(rest, ["--other"]);
@@ -4559,6 +4671,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, ASKED_FLAG]
@@ -4571,6 +4684,7 @@ pub(crate) mod tests {
                     None,
                     None,
                     not_on,
+                    None,
                     None,
                     None,
                     None,

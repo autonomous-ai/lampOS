@@ -1534,6 +1534,128 @@ an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
 Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
 `agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
 
+### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
+
+A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in
+by a code it says aloud (openharness#1410). The tasks part runs Harness's
+own sign-in for the voice (`lamp-tasks serve --sign-in-by-code`, its trusted
+ops `sign_in_start`, `sign_in_state`, `sign_in_asked` and `sign_in_answer`;
+["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
+With `LAMP_TASKS_SIGN_IN=on` the voice declares two functions
+([`sign_in.rs`](../crates/voice/src/sign_in.rs)), on both routes.
+
+**Where the state is.** The voice's news runs in its coordinator and its
+tools in a worker: two processes, which share nothing in memory. So where
+the sign-in is, whether its question was heard and whether an answer may
+be taken are kept in the tasks part alone, each sign-in by its `id`
+(#2137's redesign, after its first version kept them per process and could
+never have asked or taken an answer on a lamp).
+
+- **`sign_in_computer`**, when the person asks to sign the lamp in: the code
+  is said digit by digit in two groups ("1 2 3 4, 5 6 7 8"), with where to
+  type it (the Harness app under Machines ▸ Approve a device, or
+  harness.autonomous.ai). A start refused says why: only the switch being
+  off is "not set up"; a busy tasks part is "busy just now".
+- **The news, in the coordinator, from the tasks part's state only**
+  (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
+  otherwise): a code that came after the start's answer (`code_told`
+  false); once the person approves in Harness, the question "Shall I sign
+  in as someone at example dot com?", the email read back slowly ("dot",
+  "at", "dash", "underscore", "plus"); and how it ended (signed in, or why
+  not). A sign-in first seen already done gets none (the start's answer told
+  it), nor does the end after a no. Each is told once; its key
+  (`sign-in-<id>-code`, `-asking`, `-done`) has no `:`, so it is never taken
+  for a task's or sent as `told`.
+- **The question heard:** once the question's turn was heard whole
+  (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
+  sign-in's id and that turn's number, the same number the worker's tools
+  get as their request. A question cut off or never said opens nothing.
+- **`sign_in_answer`** with `yes` or `no` and its request: the tasks part
+  takes it only after the question was heard, in a later request, within
+  two minutes, once; past that the sign-in ends as `too_late`, and the
+  person is told they can ask again.
+
+Only a request the lamp heard may start a sign-in or answer it: never one
+it wrote, a reminder or a text. No session exists before the person's yes,
+so a stranger who heard the code gains nothing. The guard against someone
+else in the room saying yes is the email read back: the voice doesn't yet
+take the yes only from the voice that asked (`same_voice` exists on the
+Live route alone; a follow-up).
+
+**The code and the email never leave the worker in words** (the first
+builder at 09:46 on #1676; the reviewer's P2 and Jarvis's P1 on #2137).
+Each sign-in news note begins with `sign_in::NEWS_TAG`; the worker given it
+marks its request and reads the code and the email from the tasks part.
+The request whose `sign_in_computer` gave a code and the one that answered
+are marked too. Where each worker's words leave it, before the thread keeps
+them and before they are sent (`sign_in::leaving`, `leaving_text`):
+
+- **the lamp's words of a marked request** leave as one line, "(a sign-in
+  code and account were said)", however they were split, its later pieces
+  empty. The audio is untouched. So the coordinator's events, `voice/said`,
+  the second route's history, the thread's file and the memory's journal
+  never get them. On the second route a cut answer's played words
+  (`LAMP_SAID_AS_HEARD`) are that line too, and any other request's are
+  scrubbed (`keep_heard`);
+- **on Live, every later request of the session that heard it** leaves as
+  "(words kept back: this conversation heard a sign-in code)"
+  (`sign_in::leaving_live`, Jarvis's and the reviewer's P2 on #2137).
+  Gemini's session keeps the tool's result, so "Sorry, what was the code?"
+  could be answered in a request nobody marked. A connection Gemini resumes
+  (a GoAway, about every 10 minutes, or after an outage) goes on with the
+  same conversation under a new session number, so it is held too; a
+  marked request cut before its first word holds its session as well. Only
+  a fresh connection never heard it, so its words are kept again. The second route needs none of this: its
+  history has only the one line, so it can't say the code again without
+  `sign_in_computer`, which marks its request;
+- **the person's words**: any run of three or more of the code's digits in
+  its order, as digits ("4 8 2", "48213907") or words ("four eight two"),
+  says "a sign-in code"; the account's name and its domain, each as written
+  or as said, say "their account". Other numbers are left ("at 2 pm in 10
+  minutes"). On Live, while the code or the account is kept, the person's
+  pieces are held until their line ends and leave whole
+  (`sign_in::person_piece`): a piece split inside the code or a name can't
+  be scrubbed alone, and one sent can't be taken back. So, during a sign-in,
+  `voice/heard` gets the person's line at its end, not word by word. The
+  second route hears each line whole.
+
+The thread also scrubs what it keeps joined, after each piece. The code and
+the account are kept in each worker for 15 minutes after the newest news of
+them at most, and for two minutes after the done news, then forgotten
+(the reviewer's P3 5). Their read from the tasks part is off the worker's
+loop, so a slow tasks part never holds its sound (P3 4). **Left:** past
+those two minutes, the person saying the code or the email back is kept as
+said; and an email split inside its domain across two of the lamp's
+pieces, in a request not marked, on the second route, can leave a fragment.
+
+Tests: `sign_in::tests`:
+- the code and the email as said, and each state as the model is told it;
+- the switch and the two functions;
+- `a_sign_in_by_voice_goes_from_its_code_to_its_news`, through a stand-in
+  tasks part, the worker's calls and the news sharing nothing but it: off,
+  not heard, the code, the question once, its hearing told with its request,
+  a refused answer said, the yes passed on with its own request, the end
+  once;
+- `a_sign_in_is_never_told_twice_nor_its_end_after_a_no`;
+- `a_refused_start_says_why` (a tasks part too old for the ops,
+  `bad_request`, is "not set up on this lamp", the reviewer's P3 2);
+- `the_code_is_kept_only_for_its_sign_in_and_held_pieces_leave_whole`;
+- `what_leaves_the_worker_has_neither_the_code_nor_the_account`, with
+  Jarvis's planted values, in pieces and mixed forms;
+- `the_code_and_the_email_are_taken_out_of_what_is_kept`.
+
+Each worker's own path is tested too:
+`the_second_worker_sends_a_sign_ins_words_as_one_line` (second worker) and
+`the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons`
+(Live, with Jarvis's planted run: an unmarked request in the same session
+held back, and in a resumed one, a fresh one's kept, a marked request cut
+before its first word holding its session, the person's three-word pieces whole, and
+the thread's file clean). Either fails if its call is taken out. The second
+route's news test holds the turn heard to the news's, and
+`task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request`
+holds the number `send_heard` tells the tasks part to that turn's (the
+reviewer's P3 1).
+
 ### A skill made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
 
 The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model

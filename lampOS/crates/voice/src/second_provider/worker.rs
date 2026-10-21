@@ -4788,6 +4788,14 @@ pub(super) fn keep_heard(
     let Some((said, sent)) = engine.said_as_heard(*cut) else {
         return;
     };
+    // The engine's own played words never go round `leaving`: a sign-in's
+    // are its one line, and any other's are scrubbed (Jarvis's P2 2 on
+    // #2137).
+    let said = if crate::sign_in::marked(cut.request) {
+        crate::sign_in::SAID_LINE.to_owned()
+    } else {
+        crate::sign_in::scrub_piece(&said)
+    };
     thread.heard_only(cut.request, &said);
     eprintln!(
         "lamp-voice second: request {}: {} of its answer's {sent} words were played, {} ms of it, before it was cut; request {request} is asked with only those as the lamp's",
@@ -4932,6 +4940,25 @@ fn probe_targets(config: &crate::second_config::SecondConfig) -> Vec<String> {
     targets
 }
 
+/// A sign-in's news marks its request, before anything of it is kept
+/// (#1676, `crate::sign_in::written`).
+fn sign_in_written(command: &ProviderInput) {
+    if let ProviderInput::Written { request, text, .. } = command {
+        crate::sign_in::written(*request, text);
+    }
+}
+
+/// The engine's next output, with a sign-in's code and account taken out
+/// of its words (#1676, `crate::sign_in::leaving`): before the thread keeps
+/// them, and before they are sent.
+fn next_output(engine: &mut Engine) -> Option<ProviderOutput> {
+    let mut event = engine.try_output();
+    if let Some(event) = event.as_mut() {
+        crate::sign_in::leaving(event);
+    }
+    event
+}
+
 /// Run the engine as a provider worker until Stop. Readiness is the
 /// fixture's: `Ready`, then one `ProviderLink` Ready on the control plane.
 /// The services are not probed first: a service that cannot be reached
@@ -5009,6 +5036,7 @@ pub async fn run(
             if gate.admits(monotonic_us(), &command)? {
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).
+                sign_in_written(&command);
                 if let ProviderInput::Written { request, text, .. } = &command
                     && let Ok(mut thread) = crate::thread::THREAD.lock()
                 {
@@ -5051,7 +5079,7 @@ pub async fn run(
             pending = None;
         }
         if pending.is_none() {
-            pending = engine.try_output();
+            pending = next_output(&mut engine);
             if let Some(event) = &pending {
                 let lease = engine
                     .scopes_context()
@@ -7302,6 +7330,55 @@ mod tests {
         assert_eq!(held.release(), None, "the older one went");
         super::keep_scoped(&end(903), None, None, None);
         assert_eq!(held.release(), None, "off: nothing held");
+    }
+
+    /// #2137's redesign, step 5: the second worker's own path, not only
+    /// `sign_in`'s functions. A sign-in's news marks the request it is
+    /// written in, and the lamp's words of that request leave the engine as
+    /// one line however they were split; another request's are untouched.
+    #[test]
+    fn the_second_worker_sends_a_sign_ins_words_as_one_line() {
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        crate::sign_in::forget();
+        let mut engine = Engine::new(
+            Arc::new(Silent),
+            Told::default,
+            Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+        );
+        let written = |request: u64, text: String| ProviderInput::Written {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text,
+            look: false,
+            search: false,
+        };
+        sign_in_written(&written(3, "Claude Code just finished.".into()));
+        sign_in_written(&written(
+            4,
+            format!(
+                "{}Ask whether to sign in as someone at example dot com.",
+                crate::sign_in::NEWS_TAG
+            ),
+        ));
+        let words = |request: u64, text: &str| ProviderOutput::Transcript {
+            request: Some(request),
+            text: text.into(),
+            finished: false,
+        };
+        engine.queue_for_test(words(4, "Shall I sign in as someone at"));
+        engine.queue_for_test(words(4, " example dot com?"));
+        engine.queue_for_test(words(3, "It wrote the story."));
+        let said: Vec<String> = std::iter::from_fn(|| next_output(&mut engine))
+            .map(|event| match event {
+                ProviderOutput::Transcript { text, .. } => text,
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(said, [crate::sign_in::SAID_LINE, "", "It wrote the story."]);
+        crate::sign_in::forget();
     }
 
     fn strings(flags: &[&str]) -> Vec<String> {
@@ -10716,6 +10793,7 @@ mod memory_observer {
             staff_note: true,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let tools = crate::agent_tasks::tools(&place);
         let declare: super::super::net::Declare = Arc::new(move || tools.clone());
@@ -10779,6 +10857,7 @@ mod memory_observer {
             staff_note: true,
             make_skill: false,
             named_only: false,
+            sign_in: false,
         };
         let tools = crate::agent_tasks::tools(&place);
         let declare: super::super::net::Declare = Arc::new(move || tools.clone());
