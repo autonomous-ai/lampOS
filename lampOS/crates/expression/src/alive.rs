@@ -858,6 +858,24 @@ impl Life {
         self.routine_owned() && self.release_rest(now_us)
     }
 
+    /// The night's sleep a skill held, its lease gone and nobody taking it
+    /// over (#940): the built-in sleep keeps it where it is, with no lift,
+    /// while its own conditions hold (inside the night, no face in the last
+    /// look). The first face of the morning or a reflex wakes it as before.
+    pub(crate) fn keep_routine_sleep(&mut self, now_us: u64) -> bool {
+        if !(self.routine_sleep
+            && self.routine_owned()
+            && self.asleep()
+            && self.night(now_us)
+            && self.face_y.is_none())
+        {
+            return false;
+        }
+        self.rest_owner = Some(RestOwner::Autonomous);
+        self.routine_sleep = false;
+        true
+    }
+
     /// The engine can spend an episode as soon as a reflex takes it over,
     /// even before the next planner tick starts that reflex's wake.
     pub(crate) fn routine_owned(&self) -> bool {

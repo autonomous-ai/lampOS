@@ -1630,7 +1630,11 @@ journal diagnostic per missing-trust interval. Ordinary and disabled skills
 remain silent. Losing trust refuses new or pending Rest/Wake transitions;
 an already-admitted Rest can continue only to its last trusted window's
 monotonic deadline, with fresh matching Expression evidence for each bounded
-lease. Clock correction cannot revive an expired episode. See
+lease. Clock correction cannot revive an expired episode. A window that
+closes one minute before it opens (`23:00` to `22:59`, the longest) carries
+a Rest still held in its last minute through that minute to the next
+occurrence's end, the same episode with no cancel, its 24 h episode cap
+counted again from there (`Window::rest_remaining_ms`, night sleep, #940). See
 [Bedtime and Morning](bedtime-morning.md#local-windows-and-daily-chances)
 for clock trust and continuation limits.
 

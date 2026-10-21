@@ -10,6 +10,11 @@ use lamp_msgs::{
 /// restarts with a new target session, which fences every old request.
 const MAX_SOURCES: usize = 32;
 
+/// How long the night's sleep is held after its lease lapses (#940): long
+/// enough for lamp-skills to restart, so a new session's first rest, or a
+/// newer episode, takes it over with the head still down.
+pub(crate) const SLEEP_HOLD_US: u64 = 10_000_000;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Owner {
     pub session: String,
@@ -90,8 +95,25 @@ impl Rest {
     /// End the active rest, if any, saying why once, as `sync` does.
     pub fn withdraw(&mut self, now: u64, why: &'static str, life: &mut Option<Life>) {
         if self.active.is_some() {
-            self.cancel(now, life);
+            self.let_go(now, life);
             self.ended = Some(why);
+        }
+    }
+
+    /// End the active rest; the night's sleep is kept in place by the
+    /// built-in sleep when its conditions hold (#940), with no lift.
+    fn let_go(&mut self, now: u64, life: &mut Option<Life>) {
+        if life
+            .as_mut()
+            .is_some_and(|life| life.keep_routine_sleep(now))
+        {
+            if let Some(active) = self.active.take() {
+                self.request = Some(active.request);
+                self.phase = Phase::Cancelled;
+                self.reason = None;
+            }
+        } else {
+            self.cancel(now, life);
         }
     }
 
@@ -99,12 +121,22 @@ impl Rest {
         let Some(active) = &self.active else {
             return;
         };
-        let why = if now >= active.request.valid_until_us {
+        let sleep = active.phase == Phase::Resting && sleeps(gate, &active.request);
+        let lapsed = now >= active.request.valid_until_us;
+        if sleep && now >= active.request.valid_until_us.saturating_add(SLEEP_HOLD_US) {
+            // Nobody took the night's sleep over within the hold (#940):
+            // the built-in sleep keeps it if it may, else it is released.
+            self.let_go(now, life);
+            self.ended = Some("its lease ran out and no session took it over");
+            return;
+        }
+        let why = if lapsed && !sleep {
             Some("its lease ran out")
-        } else if active.phase == Phase::Resting && sleeps(gate, &active.request) {
+        } else if sleep {
             // The night's sleep: the voice listening, a privacy mute, the
             // body held or a new turn of the voice do not end it, as they
-            // do not end the built-in sleep. A reflex does.
+            // do not end the built-in sleep. A reflex does. Its lease
+            // lapsed, it is held down for `SLEEP_HOLD_US`, for a taker.
             gate.off.or(match life.as_ref() {
                 None => Some("there is no life planner"),
                 Some(life) if !life.routine_owned() => Some(
@@ -188,7 +220,11 @@ impl Rest {
                 for source in &mut self.sources {
                     source.retired = true;
                 }
-                self.cancel(now, life);
+                // A new session's first rest of the claimed skill takes its
+                // night's sleep over below, with no release (#940).
+                if !takes_over(gate, &request, self.active.as_ref()) {
+                    self.cancel(now, life);
+                }
             }
             let retired = late
                 || self
@@ -230,6 +266,12 @@ impl Rest {
                     && active.request.episode == request.episode
             })
             .cloned();
+        // The night's sleep handed over (#940): a newer episode, or a new
+        // session's first rest, of the skill that claims the night takes
+        // the active rest as its own, still down: no release, no lift.
+        let handover =
+            newer && current.is_none() && takes_over(gate, &request, self.active.as_ref());
+        let current = current.or_else(|| self.active.clone().filter(|_| handover));
         if !newer && current.is_none() {
             // Expression may have ended the episode first (the voice heard
             // a sound): the skill's cancel that follows asks for what is
@@ -246,6 +288,7 @@ impl Rest {
             return Err(Error("rest episode was already spent".into()));
         }
         if newer
+            && !handover
             && self.active.as_ref().is_some_and(|active| {
                 active.request.skill == request.skill
                     && active.request.skill_session_id == request.skill_session_id
@@ -279,7 +322,7 @@ impl Rest {
             || now - request.stamp.at_us >= EXPRESSION_REST_FRESH_US
             || now >= request.valid_until_us
         {
-            if current.is_some() {
+            if current.is_some() && !handover {
                 self.cancel(now, life);
             }
             return self.refuse(request, "rest observation is future, stale or expired");
@@ -357,6 +400,17 @@ impl Rest {
 /// Whether `request` is from the skill that claims the night's sleep.
 fn sleeps(gate: &Gate, request: &Request) -> bool {
     gate.sleep.as_deref() == Some(request.skill.as_str())
+}
+
+/// Whether `request` may take `active` over without a release (#940): a
+/// rest of the skill that claims the night, while that skill's rest is the
+/// night's sleep, still down.
+fn takes_over(gate: &Gate, request: &Request, active: Option<&Active>) -> bool {
+    request.op == Op::Rest
+        && sleeps(gate, request)
+        && active.is_some_and(|active| {
+            active.phase == Phase::Resting && active.request.skill == request.skill
+        })
 }
 
 #[cfg(test)]

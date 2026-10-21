@@ -546,8 +546,15 @@ impl Manager {
             let window_until_us = match moment {
                 Some(moment) => active
                     .during
-                    .remaining_ms(moment.minute, unix_ms % 60_000)
-                    .and_then(|remaining| sampled_at_us.checked_add(remaining * 1000)),
+                    .rest_remaining_ms(moment.minute, unix_ms % 60_000)
+                    .and_then(|(remaining, carried)| {
+                        // Carried into the next night: that night's episode
+                        // cap counts from here, as a new rest's would.
+                        if carried {
+                            active.began_us = now;
+                        }
+                        sampled_at_us.checked_add(remaining * 1000)
+                    }),
                 None if active.waiting.is_none() && active.request.op == Op::Rest => {
                     Some(active.window_until_us)
                 }
@@ -1535,6 +1542,43 @@ mod tests {
         );
         assert!(continued.valid_until_us <= until);
         assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+    }
+    /// Night sleep's 23:00 to 22:59 (#940): a rest still held at 22:58 is
+    /// carried through the gap minute into the next night, its episode cap
+    /// counted from the handover, with no cancel.
+    #[test]
+    fn the_longest_window_carries_a_held_rest_into_the_next_night() {
+        let mut f = Fixture::new();
+        f.now = MAX_EPISODE_US + 10_000_000;
+        let initial = f.resting();
+        let active = f
+            .manager
+            .sources
+            .get_mut("routine")
+            .unwrap()
+            .active
+            .as_mut()
+            .unwrap();
+        active.during = Window::parse("23:00", "22:59").unwrap();
+        // Taken a day ago: one second short of its episode cap.
+        active.began_us = f.now + 1_000_000 - MAX_EPISODE_US;
+        let day = 24 * 3_600_000;
+        f.now += 500_000;
+        f.observe(Phase::Resting);
+        f.tick(NIGHT + day - 90_000); // 22:58:30
+        let active = f.manager.sources["routine"].active.as_ref().unwrap();
+        assert_eq!(active.began_us, f.now);
+        assert_eq!(
+            active.window_until_us,
+            f.now + (90_000 + 1439 * 60_000) * 1000
+        );
+        f.now += 1_000_000;
+        f.observe(Phase::Resting);
+        f.tick(NIGHT + day - 30_000); // 22:59:30, the gap minute
+        let active = f.manager.sources["routine"].active.as_ref().unwrap();
+        assert_eq!(active.request.op, Op::Rest);
+        assert_eq!(active.request.episode, initial.episode);
+        assert_eq!(active.request.valid_until_us, f.now + 3_000_000);
     }
     #[test]
     fn publication_stops_at_the_episode_cap_but_cancel_remains_deliverable() {

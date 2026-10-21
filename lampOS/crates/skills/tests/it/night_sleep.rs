@@ -12,7 +12,7 @@ use lamp_msgs::{
     Faces, Gesture, JointState, Light, NameHeard, PersonActivity, Room, RoomState, ScheduleDue,
     ScheduleNotice, Voice, VoiceEvent, VoiceProgress, VoiceTiming,
 };
-use lamp_skills::{Call, Engine as Skills, load};
+use lamp_skills::{Call, Engine as Skills, daily::Window, load};
 use std::path::Path;
 
 const CLOCK: &str = "night-sleep-boot";
@@ -43,29 +43,57 @@ fn claim(on: bool) -> ExpressionSleepClaim {
     }
 }
 
-/// When each route fell asleep and began to wake.
+/// When each route fell asleep, began to settle, began to wake, and
+/// released a rest (the head rising with no wake clip).
 #[derive(Default, Debug)]
 struct Seen {
     asleep: Vec<u64>,
+    falling: Vec<u64>,
     waking: Vec<u64>,
+    releasing: Vec<u64>,
     was_asleep: bool,
+    was_falling: bool,
     was_waking: bool,
+    was_releasing: bool,
 }
 
 impl Seen {
     fn note(&mut self, now: u64, output: &Output) {
+        let named = |name: &str| output.state.behaviours.iter().any(|it| it == name);
         let asleep = output.state.asleep == Some(true);
-        let waking = output.state.behaviours.iter().any(|name| name == "waking");
-        if asleep && !self.was_asleep {
-            self.asleep.push(now);
-        }
-        if waking && !self.was_waking {
-            self.waking.push(now);
+        let falling = named("falling asleep");
+        let waking = named("waking");
+        let releasing = named("releasing rest");
+        for (on, was, at) in [
+            (asleep, self.was_asleep, &mut self.asleep),
+            (falling, self.was_falling, &mut self.falling),
+            (waking, self.was_waking, &mut self.waking),
+            (releasing, self.was_releasing, &mut self.releasing),
+        ] {
+            if on && !was {
+                at.push(now);
+            }
         }
         self.was_asleep = asleep;
+        self.was_falling = falling;
         self.was_waking = waking;
+        self.was_releasing = releasing;
+    }
+
+    /// One settle, and since then no wake, no release and no settle again:
+    /// the head never moved.
+    fn still_down(&self) {
+        assert!(self.was_asleep, "{self:?}");
+        assert_eq!(self.asleep.len(), 1, "{self:?}");
+        assert_eq!(self.falling.len(), 1, "settled again: {self:?}");
+        assert!(self.waking.is_empty(), "{self:?}");
+        assert!(self.releasing.is_empty(), "{self:?}");
     }
 }
+
+/// How long Expression holds the night's sleep after its lease lapses
+/// (`rest::SLEEP_HOLD_US`).
+const HOLD: u64 = 10 * SECOND;
 
 struct Night {
     now: u64,
@@ -81,6 +109,8 @@ struct Night {
     /// lamp-skills' publisher session: a new one each time it starts.
     session: &'static str,
     resting: bool,
+    /// The rest's window, as the skill asked it: its lease ends with it.
+    during: Option<Window>,
     request_sequence: u64,
     built_in_seen: Seen,
     skill_seen: Seen,
@@ -116,6 +146,7 @@ impl Night {
             episode: 0,
             session: "skills-one",
             resting: false,
+            during: None,
             request_sequence: 0,
             built_in_seen: Seen::default(),
             skill_seen: Seen::default(),
@@ -216,7 +247,10 @@ impl Night {
         for run in runs {
             for call in run.calls {
                 match call {
-                    Call::Rest(rest) if rest.op == Op::Rest => self.rest(true),
+                    Call::Rest(rest) if rest.op == Op::Rest => {
+                        self.during = rest.during;
+                        self.rest(true);
+                    }
                     other => panic!("night sleep made {other:?}"),
                 }
             }
@@ -224,8 +258,14 @@ impl Night {
     }
 
     /// The routine manager's lease, as `routine.rs` sends it: a new
-    /// episode, then a renewal every second while Expression says resting.
+    /// episode, then a renewal every second while Expression says resting,
+    /// none past its window's end (`Window::rest_remaining_ms`).
     fn rest(&mut self, new: bool) {
+        let left_us = self.during.map_or(Some(u64::MAX), |during| {
+            during
+                .rest_remaining_ms(self.minute() as u16, (self.now - START) % MINUTE / 1_000)
+                .map(|(ms, _)| ms * 1_000)
+        });
         if new {
             self.episode += 1;
         }
@@ -241,7 +281,7 @@ impl Night {
             expression_session_id: SKILL_ROUTE.into(),
             episode: self.episode,
             op: Op::Rest,
-            valid_until_us: self.now + 3 * SECOND,
+            valid_until_us: self.now + left_us.unwrap_or(0).min(3 * SECOND),
         };
         self.resting = self.skill_route.ingest_rest(self.now, request).is_ok();
     }
@@ -539,43 +579,129 @@ fn the_sleep_grant_is_core_rest_alone_and_asks_nobody() {
     }
 }
 
-/// Row 7 on lamp-06c1, finding 2 (#1672): lamp-skills restarts after a rest
-/// began. Nothing renews the dead session's rest, so Expression lets it go
-/// when its 3 s lease lapses, long before the claim would go stale (180 s):
-/// the head rises over the settle (4 s), and the new session's rest is
-/// refused only until it has. Then it is taken.
+/// Row 7 on lamp-06c1, finding 2 (#1672), and the first builder's P2 on
+/// #2710: lamp-skills restarts mid-night, as an update round does. The dead
+/// session's lease lapses after 3 s, and Expression holds the sleep down
+/// for its hold; the new session's first rest takes it over there. The head
+/// never moves: no release, no wake and no second settle.
 #[test]
-fn a_rest_from_restarted_skills_is_taken_once_the_dead_sessions_lease_lapses() {
+fn a_skills_restart_mid_night_hands_the_sleep_over_with_the_head_down() {
     let mut night = Night::new(Some(claim(true)), true);
     night.until(23, 10);
     assert!(night.resting && night.skill_seen.was_asleep);
     // Renewed at this whole second, then lamp-skills stops. Its claim,
     // said every 60 s, is still fresh.
-    let renewed = night.now;
     night.resting = false;
     night.skills = None;
-    night.run(3 * SECOND + 2 * TICK);
+    night.run(5 * SECOND);
     let state = night.skill_route.rest_state(night.now).unwrap();
-    assert_eq!(state.phase, Phase::Cancelled);
-    assert!(
-        !night.skill_seen.was_asleep,
-        "the dead session's rest is held"
-    );
-    // The new session, while the head still rises: refused.
+    assert_eq!(state.phase, Phase::Resting, "held past its lease");
+    night.skill_seen.still_down();
+    // The new session's first rest, inside the hold: taken over.
     night.session = "skills-two";
     night.request_sequence = 0;
-    night.run(SECOND);
-    night.rest(true);
-    assert!(!night.resting, "taken before the dead rest was let go");
-    // Once it has risen: taken, and renewed from then on.
-    night.run(renewed + 8 * SECOND - night.now);
     night.rest(true);
     assert!(
         night.resting,
         "{:?}",
         night.skill_route.rest_state(night.now)
     );
-    night.run(10 * SECOND);
+    night.run(HOLD + 30 * SECOND);
+    assert!(night.resting);
+    let state = night.skill_route.rest_state(night.now).unwrap();
+    assert_eq!(state.request.unwrap().skill_session_id, "skills-two");
+    night.skill_seen.still_down();
+}
+
+/// The window's edge (#940, the Reviewer-lead's point on #2710): a newer
+/// episode of the same session takes the night's sleep over as it is, with
+/// no release in between.
+#[test]
+fn a_newer_episode_takes_the_night_over_with_no_lift() {
+    let mut night = Night::new(Some(claim(true)), true);
+    night.until(23, 10);
     assert!(night.resting && night.skill_seen.was_asleep);
-    assert_eq!(night.skill_seen.asleep.len(), 2);
+    let episode = night.episode;
+    night.rest(true);
+    assert!(night.resting);
+    night.run(30 * SECOND);
+    let state = night.skill_route.rest_state(night.now).unwrap();
+    assert_eq!(state.phase, Phase::Resting);
+    assert_eq!(state.request.unwrap().episode, episode + 1);
+    night.skill_seen.still_down();
+}
+
+/// A dead claimer, and no new session: past the hold Expression lets the
+/// skill's rest go, and the built-in sleep keeps the night as it is (inside
+/// the night, nobody seen), with no lift. The claim going stale changes
+/// nothing, and the first face of the morning wakes it.
+#[test]
+fn a_dead_claimer_passes_the_night_to_the_fallback_with_no_lift() {
+    let mut night = Night::new(Some(claim(true)), true);
+    night.until(23, 10);
+    assert!(night.resting && night.skill_seen.was_asleep);
+    night.resting = false;
+    night.skills = None;
+    night.run(3 * SECOND + HOLD + SECOND);
+    let state = night.skill_route.rest_state(night.now).unwrap();
+    assert_eq!(state.phase, Phase::Cancelled);
+    night.skill_seen.still_down();
+    // Its claim goes stale (180 s): the fallback's own schedule.
+    night.run(3 * MINUTE);
+    night.skill_route.set_sleep_claim(night.now, None);
+    night.until(6, 1);
+    night.skill_seen.still_down();
+    night.faces = vec![face()];
+    night.until(6, 3);
+    assert_eq!(night.skill_seen.waking, night.built_in_seen.waking);
+    assert_eq!(night.skill_seen.waking.len(), 1);
+    assert!(night.skill_seen.releasing.is_empty());
+}
+
+/// Nobody seen for a day (#940, the Reviewer-lead's point on #2710): the
+/// rest's window, 23:00 to 22:59, ends with the lamp still asleep. Its rest
+/// is carried into the next night, so the head stays down through 22:59 and
+/// 23:00 and does not rise to settle again 15 minutes later.
+#[test]
+fn a_lamp_nobody_saw_all_day_keeps_its_head_down_into_the_next_night() {
+    let mut night = Night::new(Some(claim(true)), true);
+    night.until(23, 10);
+    assert!(night.resting && night.skill_seen.was_asleep);
+    // To 23:05 the next night.
+    night.run(23 * 60 * MINUTE + 55 * MINUTE);
+    assert_eq!(clock(night.now), "23:05:00.0");
+    night.skill_seen.still_down();
+    assert!(night.resting);
+}
+
+/// The night's hours are written twice (the Reviewer-lead's P3 on #2710):
+/// the skill's `[active]` window and the product catalogue's
+/// `alive.sleep.night`, which still wakes the morning face. They match, as
+/// does the skill's nobody-for with the catalogue's `nobody_us`.
+#[test]
+fn the_skill_and_the_product_catalogue_name_the_same_night() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/night-sleep/skill.toml");
+    let skill: toml::Value = toml::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let minutes = |at: &toml::Value| {
+        let (hour, minute) = at.as_str().unwrap().split_once(':').unwrap();
+        hour.parse::<u64>().unwrap() * 60 + minute.parse::<u64>().unwrap()
+    };
+    let window = [
+        minutes(&skill["active"]["from"]),
+        minutes(&skill["active"]["to"]),
+    ];
+    let catalogue: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    let sleep = &catalogue["alive"]["sleep"];
+    let night: Vec<u64> = sleep["night"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|minute| minute.as_u64().unwrap())
+        .collect();
+    assert_eq!(night, window);
+    assert_eq!(skill["trigger"][0]["for"].as_str(), Some("15m"));
+    assert_eq!(sleep["nobody_us"].as_u64(), Some(15 * MINUTE));
 }

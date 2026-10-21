@@ -123,11 +123,28 @@ grant `sleep`, [skills.md](skills.md)).
 Expression holds the claimed skill's rest as it holds its own sleep: the
 voice listening (a night sound), a new voice turn, a privacy mute or the
 body held do not end it; its name with speech, a touch, a tap on the head, a
-reminder, a conversation, manual sleep, Expression off or a lapsed lease
-do. The first face out of the night wakes it, as it wakes the built-in
+reminder, a conversation, manual sleep or Expression off do. The first face out of the night wakes it, as it wakes the built-in
 sleep. It begins on the built-in sleep's own conditions (a free body and a
 resting voice; a privacy mute does not keep it awake). Another skill's rest
 keeps the generic gate ([expression.md](expression.md#leased-skill-rest-requests)).
+
+**Handed over, never lifted.** The night's sleep passes from one rest to
+the next with the head down (#940, the first builder's P2 on #2710). A
+newer episode, or a new skills session's first rest, of the skill that
+claims the night takes the active rest over as it is: no release, no
+`Releasing`, no settle again. Its lease lapsed (lamp-skills restarting, as
+an update round does), the sleep is held down for 10 s
+(`rest::SLEEP_HOLD_US`) for that taker, and a reflex still wakes it. With
+no taker by then, Expression lets the skill's rest go, and the built-in
+sleep keeps the night where it is while its own conditions hold (inside
+the night, no face in the last look): no lift, and the first face of the
+morning wakes it. Outside them the rest is released, the head rising over
+the settle. A claim gone stale passes a held rest to the built-in sleep
+the same way. Tests in `night_sleep.rs`:
+`a_skills_restart_mid_night_hands_the_sleep_over_with_the_head_down`,
+`a_newer_episode_takes_the_night_over_with_no_lift`,
+`a_dead_claimer_passes_the_night_to_the_fallback_with_no_lift`; with the
+handover made a release, the first two fail.
 
 **The claim.** With `LAMP_SKILL_ROUTINES=on`, lamp-skills says
 `expression/sleep_claim` (`{"skill":"night-sleep","on":true}`) at each
@@ -161,9 +178,16 @@ tick. Nothing a person sees or hears changes: the same bow, breath and
 settle, no light and no sound. Known differences, none in the fixture: a
 face below Expression's 0.6 confidence counts as someone for the skill; a
 rest refused by Expression (the body held) is tried again a minute later;
-a lamp nobody saw for a whole day lifts its head at 22:59 and settles
-again at 23:15 (the rest's longest window); and a lamp-skills restarted
-mid-night counts its 15 minutes from its start.
+and a lamp-skills restarted mid-night counts its 15 minutes from its start.
+A lamp nobody saw for a whole day keeps its head down through 22:59 and
+23:00, as the built-in sleep does: the rest's longest window (23:00 to
+22:59) carries a rest still held in its last minute into the next night,
+the same episode renewed with no cancel
+(`a_lamp_nobody_saw_all_day_keeps_its_head_down_into_the_next_night`).
+The night's hours are written twice, the skill's `[active]` and the
+catalogue's `alive.sleep.night` (which still times the morning face):
+`the_skill_and_the_product_catalogue_name_the_same_night` holds the product
+ones equal, and the 15 minutes with them.
 
 Nothing is random. A drift's wait and size come from a fixed hash of how
 many drifts came before, so a replay gives the same plan every time. All

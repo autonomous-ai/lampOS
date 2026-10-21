@@ -47,6 +47,7 @@ equals = false
 for = "15m"
 
 # Held until a reflex or the first face out of the night wakes it, as
-# Expression's sleep was: to 22:59, the rest's longest window.
+# Expression's sleep was: to 22:59, the rest's longest window, which
+# carries a rest still held at 22:58 into the next night with no lift.
 [[do]]
 rest = { op = "rest", during = { from = "23:00", to = "22:59" } }
