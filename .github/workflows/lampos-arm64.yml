@@ -46,8 +46,9 @@ name: lampOS on ARM64
 #
 # The cache is lamp-voice's newest build: each of lamp-voice's own runs saves
 # it under a key with its commit, even when a test failed, and pull requests
-# restore it and don't save. A key on Cargo.lock alone was
-# saved once and never renewed, and each pull request's own 1 GB cache, which
+# restore it and don't save. No lamp-voice run is cancelled while it waits
+# (the concurrency below), so each commit's build is saved. A key on
+# Cargo.lock alone was saved once and never renewed, and each pull request's own 1 GB cache, which
 # no other run could use, pushed the repository past GitHub's 10 GB, so
 # lamp-voice's was thrown out and 6 of 30 pull requests built cold (#1806; the
 # lead, 21 Oct 2026). Until #1712 lands, a pull request onto its branch saves
@@ -104,9 +105,14 @@ on:
 
 concurrency:
   # A full run has its own group, so a merge never cancels the nightly run.
-  group: lampos-arm64-${{ inputs.full && 'full-' || '' }}${{ github.event.pull_request.number || github.ref }}
+  # Each of lamp-voice's runs has a group of its own commit, so none is
+  # cancelled: a group keeps one run waiting, and a newer merge replaced it.
+  # On 21 Oct 7 of 15 lamp-voice runs were cancelled that way, each one a
+  # commit with no binaries for the lamps and the cache not renewed
+  # (devops007-P2 on #1806). Runs of commits close together now run side by
+  # side, one runner each.
+  group: lampos-arm64-${{ inputs.full && 'full-' || '' }}${{ github.event.pull_request.number || (github.ref == 'refs/heads/lamp-voice' && github.sha) || github.ref }}
   # A newer push to a pull request makes the running one moot: it is cancelled.
-  # lamp-voice's own running runs are never cancelled.
   cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
 
 jobs:

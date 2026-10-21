@@ -13,11 +13,15 @@ name: lampOS clippy
 # ARM64 run would add to that run's time. Linux, so the cfg(target_os = "linux")
 # code a Mac's gate skips is checked too. Its triggers are the ARM64 run's.
 #
-# Its cache is kept as the ARM64 run's is (lampos-arm64.yml, #1806): saved by
-# lamp-voice's own runs under a key with their commit, restored and not saved
-# by pull requests, but for one onto #1712's branch that found none, and each
-# unchanged source file given back the time the cached build had for it, so
-# clippy checks only what changed.
+# Its cache is restored as the ARM64 run's is (lampos-arm64.yml, #1806), and
+# each unchanged source file is given back the time the cached build had for
+# it, so clippy checks only what changed since that build. It is saved under a
+# key on Cargo.lock alone, by lamp-voice's first run after the lockfile
+# changes, and by no run that found that key: a save under each commit's key
+# (about 2.2 GB) filled 13.3 of the repository's 14.7 GB on 21 Oct and pushed
+# the ARM64 run's caches out of GitHub's 10 GB (devops007 on #1806). Pull
+# requests restore it and don't save, but for one onto #1712's branch that
+# found none.
 on:
   push:
     branches: ['lamp-voice']
@@ -67,9 +71,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          key: lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          key: lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}
           restore-keys: |
-            lampos-clippy-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
             lampos-clippy-u2204-
       - name: unchanged source files get the cached build's times back
         run: python3 -I .github/scripts/lampos-source-times.py
@@ -78,7 +81,7 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: save the cache
         if: >-
-          ${{ !cancelled() && (github.ref == 'refs/heads/lamp-voice'
+          ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' && (github.ref == 'refs/heads/lamp-voice'
           || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
         uses: actions/cache/save@v4
         with:
