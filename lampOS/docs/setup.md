@@ -259,7 +259,10 @@ line break, a password outside 8–63 printable ASCII characters, or a name over
 break into the file). The name is written in hex and the password raw between
 quotes: wpa_supplicant takes everything between the first and last quote as it
 is, so V1's `\"` and `\\` escapes made a name or password holding `"` or `\`
-never match. And a failed join puts the previous file back before the hotspot
+never match. A password holding `"` is written as its 64-hex PSK instead
+(`wifi::psk`, as `wpa_passphrase` derives it): wpa_supplicant 2.10 ends a line
+at a `#` after a closing quote, so `pa"ss#word` would be cut (#2617's P3 7).
+And a failed join puts the previous file back before the hotspot
 returns, so nothing of it is kept. `wpa_cli status` prints the joined network's
 name with C escapes ("Nhà Lan" as `Nh\xc3\xa0 Lan`); it is decoded before it is
 compared with the name asked for. V1's eight failure cases, from its
@@ -299,7 +302,13 @@ configuration's `free_port` and `web_start` commands, reads the lamp's name,
 and answers V1's setup API with V1's shapes and wrapper
 (`{"status","data","message"}`). The name is read only after the hotspot: on a
 fresh image `device-ap-mode` is what renames the host `lamp-xxxx`, and a name
-read before it would send the page to the wrong `.local` address:
+read before it would send the page to the wrong `.local` address.
+`device-ap-mode` is given 4 minutes (`wifi::HOTSPOT_TIMEOUT`) before it is
+killed with its children: it restarts hostapd up to twice, each up to systemd's
+90 s, so the radio's 45 s would cut a slow hostapd and leave no hotspot
+(#2617's P3 6). `device-sta-mode` keeps 45 s (`RADIO_TIMEOUT`): it starts no
+hostapd, sleeps about 7 s of its own, and the Wi-Fi change's bounds are built
+on it. The routes:
 
 | Route | What it does |
 |---|---|
@@ -535,14 +544,59 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    confirmed. A lamp with no Wi-Fi file is refused, with nothing changed.
 2. The new file is written as setup writes it, and V1's `device-sta-mode`
    restarts the radio, as setup's join does.
-3. **Confirmed** = the new name is the one joined, with a station address,
+3. **Proven** = the new name is the one joined, with a station address,
    and a TCP connection to the broker `lamp-cloud` is on is made and closed
    (3 s at most, name lookup included), within 60 s (setup's own bound). Two
-   rejected keys stop early, as setup's join does.
-4. Otherwise the old file goes back, the radio again, and the old network is
-   waited for (an address and the broker), 60 s at most. A lamp whose old
-   network does not come back either stays on it and keeps trying it:
-   **never the hotspot**, since after setup there is no setup page behind it.
+   rejected keys stop early, as setup's join does. **Kept** only once the app
+   also confirms through it: the helper writes `{"joined": {"ssid",
+   "online_within_ms", "confirm_within_ms"}}`, `lamp-cloud` makes its link
+   again over the new network, says `wifi.joined` to the app on it and,
+   once the broker acks that, says `{"online": true}` within the first
+   (60 s, `ONLINE_WAIT`), and only then does the helper's window of 120 s
+   (`CONFIRM_WAIT`) start; `lamp-cloud` hands back the app's `wifi.confirm`
+   as `{"confirm": true}` within it (`CONFIRM_SLACK`, 500 ms, for the line to
+   cross the socket). Without it (the app closed, the phone gone) the lamp
+   goes back as if the join had failed (#1959's P1, #2617's P2). Once
+   confirmed, `.lamp-previous` is removed and its folder synced; a removal
+   that fails is tried 3 times, and then the file is made the new network's
+   own, so no later restore can undo a confirmed change (#2617's P3 3).
+4. Otherwise the old file goes back (its write tried 3 times a second apart
+   when it fails, at once, not left to the stop's restore; #2617's P3 2),
+   then `wpa_cli reconfigure` **first**, so
+   wpa_supplicant never keeps the new network loaded, then V1's
+   `device-sta-mode`. Each command is bounded (`wifi::RADIO_TIMEOUT` 45 s for
+   the script, killed with its children; 10 s for `wpa_cli` and
+   `journalctl`; a command that ends while a child of its own keeps its
+   output open is waited on 1 s more, then its group is killed, #2617's P3
+   6), and the reconfigure and the restart are tried up to 3 times
+   (`BACK_TRIES`), each try waiting 60 s for an address and the broker. A
+   lamp whose old network does not come back either stays on it and keeps
+   trying it: **never the hotspot**, since after setup there is no setup page
+   behind it.
+5. **Restore before any kill** (#1959's P1): `.lamp-previous` is written
+   before the switch and removed only once the change has ended. A helper cut
+   before that (a crash, `RuntimeMaxSec=25min`, a kill) is followed by the
+   unit's `ExecStopPost=lamp-setup wifi-restore`, which puts the old file back
+   and has wpa_supplicant re-read it and the radio restarted, with the way
+   back's 3 tries, the old network judged back by its address
+   (`TimeoutStopSec=8min` gives it room). `.lamp-previous` is removed only
+   once that has worked; otherwise it stays for the boot (#2617's P3 1).
+   `lamp-setup-wifi-restore.service` (at boot, before `wpa_supplicant@wlan0`
+   and `dhcpcd.service`, only when `.lamp-previous` is there) puts the old
+   file back after a power cut, so the lamp always boots on the network it
+   had. Before dhcpcd too, since V1's `device-sta-mode` drops `nohook
+   wpa_supplicant` from `/etc/dhcpcd.conf`, so dhcpcd's hook may start a
+   wpa_supplicant of its own on the same file (#2617's P3 4). A
+   `.lamp-previous` that cannot be read is an error (`Failed`, the command
+   exits non-zero), never "nothing to restore" (#2617's P3 5). Install never
+   lists the helper's units without the restore unit, enabled (a test on
+   `install`'s list, `crates/update/src/install.rs`).
+
+**Why lamp-0c89 stayed off (#1959's P1, build 4814):** the old file went back,
+but the radio's one restart failed or hung, so wpa_supplicant kept running the
+new network until a reboot. Nothing tried again. The lost line was silent
+because the `wifi_lost` clip is not rendered yet. Now it is said in plain words
+when the voice lacks the clip.
 
 **The lamp says what happened**, through the voice's say service (`LAMP_SAY`,
 `speaking-first.md`) from the skill `wifi`, never the network's name or

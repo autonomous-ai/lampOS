@@ -682,6 +682,17 @@ const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 const BESIDE_IF_CARRIED: &[(&str, &[&str])] =
     &[("lamp-body", &["lamp-body-measure", "lamp-body-mood"])];
 
+/// Whether a list of units holds the Wi-Fi helper only with its boot half
+/// listed and enabled (the first builder's P3 4 on #2617).
+#[cfg(test)]
+fn wifi_helper_whole(listed: &[&str], enabled: &[String]) -> bool {
+    const RESTORE: &str = "lamp-setup-wifi-restore.service";
+    let helper = listed
+        .iter()
+        .any(|name| matches!(*name, "lamp-setup-wifi.socket" | "lamp-setup-wifi@.service"));
+    !helper || (listed.contains(&RESTORE) && enabled.iter().any(|name| name == RESTORE))
+}
+
 /// Services started by a timer of their own, and never enabled themselves.
 /// A template (`NAME@.service`) is started by its socket, never enabled.
 const TIMED: &[&str] = &[
@@ -2381,6 +2392,27 @@ fn saved_zone(config: &Install) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The first builder's P3 4 on #2617: install never lists the Wi-Fi
+    /// helper (`lamp-setup-wifi.socket`, `lamp-setup-wifi@.service`)
+    /// without its boot half, `lamp-setup-wifi-restore.service`, enabled:
+    /// a change a power cut interrupted would boot on an unconfirmed
+    /// network.
+    #[test]
+    fn the_wifi_helper_is_never_listed_without_its_restore_at_boot() {
+        assert!(wifi_helper_whole(
+            &PRODUCT.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            &enabled()
+        ));
+        let helper = ["lamp-setup-wifi.socket", "lamp-setup-wifi@.service"];
+        let restore = "lamp-setup-wifi-restore.service";
+        assert!(!wifi_helper_whole(&helper, &[]));
+        assert!(!wifi_helper_whole(&helper[..1], &[]));
+        let both = [helper[0], helper[1], restore];
+        assert!(!wifi_helper_whole(&both, &[]));
+        assert!(wifi_helper_whole(&both, &[restore.to_owned()]));
+        assert!(wifi_helper_whole(&[], &[]));
+    }
 
     /// #2189: every program the factory's steps run from a part's `current`
     /// folder (`*_BIN=${*_BIN:-/opt/lampOS/<part>/current/<binary>}`) is

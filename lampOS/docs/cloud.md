@@ -1002,29 +1002,61 @@ hotspot's `/wifi` page), so this one is new. Off unless
 - **Asked:** `{"cmd":"data","kind":"wifi.set","data":{"ssid":"…","password":"…","request_id":"…"}}`.
   `request_id` is optional, the app's own, 1 to 64 printable characters, and
   said back. An open network has `"password": ""`.
-- **Answered:** `starting` at once, then, as the same kind, `success` with
-  `data: {"ssid", "request_id"}`, or `failure` with `error` and
-  `data: {"request_id"}`. The errors are setup's page's words (`a Wi-Fi
+- **Answered:** `starting` at once. Once the new network is proven, the
+  link to the broker is dropped and made again at once over it (the old one
+  is dead, and the keepalive alone would notice only after 60 to 120 s;
+  #2617's P2-1), and on the new link, a kind of its own, **`wifi.joined`**
+  `success` with `data: {"ssid", "confirm_within_s": 120, "request_id"}`:
+  joined, confirm please. Then, as `wifi.set`, `success` with
+  `data: {"ssid", "request_id"}` only once the app's confirmation has kept
+  the network, or `failure` with `error` and `data: {"request_id"}`. An app
+  that does not know `wifi.joined` never confirms, and the lamp goes back:
+  it fails safe.
+- **Confirmed by the app (#1959's P1, #2617's P2-2):** on `wifi.joined`, the
+  app sends `{"cmd":"data","kind":"wifi.confirm","data":{}}`, which reaches
+  the lamp only over the new network. **The window is the helper's**, sent
+  in its `joined` line (`confirm_within_ms`, 120 s), and **starts when the
+  broker acks `wifi.joined`**, not at the join: `lamp-cloud` starts its copy
+  then and tells the helper (`{"online": true}`), which starts its own, so
+  `lamp-cloud`'s never ends after the helper's. Its wait for that ack is the
+  helper's bound too (`online_within_ms`, 60 s). Within the window a
+  `wifi.confirm` is answered `success` at once, and so is a second one (the
+  app resends every 10 s); after it, or with no change waiting, `failure`,
+  `no Wi-Fi change waits for a confirmation`. A confirmation is answered
+  once: `success` and handed to the helper, or `failure` and not. Without
+  one, the lamp goes back to its old network, the link is made again over
+  it, and `wifi.set` `failure` follows, `the app did not confirm the new
+  Wi-Fi within 120 s; the lamp is back on its old Wi-Fi`. The errors are
+  setup's page's words (`a Wi-Fi
   password has 8 to 63 characters`, `the Wi-Fi name is longer than 32
   bytes`, …) or what the change came to: `wrong WiFi password: the router
   rejected the key; the lamp is back on its old Wi-Fi`, `connected to the new
   WiFi, but the lamp's server could not be reached; the lamp is back on its
-  old Wi-Fi`, or `…; the old Wi-Fi did not come back within 60 s, and the
+  old Wi-Fi`, or `…; the old Wi-Fi did not come back after 3 tries, and the
   lamp keeps trying it`. Also `a Wi-Fi change is already under way` (one at a
   time) and `the lamp is not on its broker`.
 - **The result may come only after the lamp is back online:** the lamp's link
   to the app is over the very network that changes. The helper is waited on
-  180 s over a local socket the network change does not touch, and results
-  are handed to the broker only while connected and kept until its PubAck.
-  One handed and lost with the old connection goes again, first, on the next
-  one, with the same `request_id`. Kept in `lamp-cloud`'s memory only: a
-  `lamp-cloud` restarted mid-change loses its result (the change itself
-  finishes in root's helper either way).
+  10 min for each line over a local socket the network change does not touch, and results
+  are handed to the broker only while connected, at QoS 1 on `fd_channel`
+  (as every reply, `keys.*`'s too), and kept until its PubAck. One handed and
+  lost with the old connection goes again, first, on the next one, with the
+  same `request_id`. A change that never joined (a wrong password, a network
+  out of range) leaves the old link alive, and its failure goes out on it
+  (Mobile on lamp-0c89, #1959: the result lost there was the app's). Kept in
+  `lamp-cloud`'s memory only: a `lamp-cloud` restarted mid-change loses its
+  result (the change itself finishes in root's helper either way).
+- **The journal (#1959):** one line per step of each change's result: `a
+  change's result, KIND STATUS, request_id ID: handed to the client at QoS
+  1`, `…: sent as packet N`, `…: acked by the broker, packet N`, or `…: no
+  ack before the connection ended (packet N), said again on the next`. The
+  kind, the status and the app's id only, never the data or the error.
 - **Confirmed and the way back:** root's Wi-Fi helper (`setup.md`, "The
   Wi-Fi changed after setup") takes the new network only once it is joined
   with an address and a TCP connection to the broker `lamp-cloud` is on (sent
-  in its line) is made, within 60 s; else the old network comes back, 60 s
-  at most, and never the hotspot. The lamp says what happened aloud, never
+  in its line) is made, within 60 s, and the app's `wifi.confirm` within
+  120 s of the broker's ack of `wifi.joined`; else the old network comes back, `wpa_cli reconfigure` first and up
+  to 3 tries of the radio, and never the hotspot. The lamp says what happened aloud, never
   the network's name or password. **The socket's group is the gate**
   (`lamp-setup-wifi.socket`, group `lampos`, 0660; the unit always passes
   `--enable`): once installed, any `lampos` process can ask for a Wi-Fi

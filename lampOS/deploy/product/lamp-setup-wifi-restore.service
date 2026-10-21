@@ -1,0 +1,22 @@
+# lampOS Wi-Fi changed after setup (#1959's P1, lampOS/docs/setup.md, "The Wi-Fi changed after
+# setup"): at boot, before wpa_supplicant, a change a power cut interrupted puts the old network's
+# file back from .lamp-previous, so the lamp always boots on the network it had. Before dhcpcd too:
+# V1's device-sta-mode drops `nohook wpa_supplicant` from dhcpcd.conf, so dhcpcd's hook may start
+# a wpa_supplicant of its own on the same file (#2617's P3 4).
+[Unit]
+Description=lampOS Wi-Fi changed after setup: the old network back after a cut change
+DefaultDependencies=no
+After=local-fs.target
+Before=wpa_supplicant@wlan0.service dhcpcd.service network-pre.target
+Wants=network-pre.target
+ConditionPathExists=/etc/wpa_supplicant/wpa_supplicant-wlan0.conf.lamp-previous
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/lampOS/setup/current/lamp-setup wifi-restore --boot
+StandardError=journal
+SyslogIdentifier=lamp-setup-wifi-restore
+
+[Install]
+WantedBy=multi-user.target

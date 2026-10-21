@@ -39,6 +39,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # as lamp-cloud's ping asks the backend.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 webpki-roots = "1"
+# A password holding `"` written as its WPA PSK (PBKDF2-HMAC-SHA1, src/wifi.rs):
+# the ring rustls already builds.
+ring = "0.17"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

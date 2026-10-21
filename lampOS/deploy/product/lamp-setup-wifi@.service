@@ -1,7 +1,8 @@
 # lampOS Wi-Fi changed after setup (#1959, lampOS/docs/setup.md, "The Wi-Fi changed after setup"):
 # one request from lamp-cloud on lamp-setup-wifi.socket, as standard input and output. The new
-# network is kept only once joined, with an address and the broker reached, within 60 s; else the
-# old file and the old network come back (60 s more). Never the hotspot. Then the lamp says what
+# network is kept only once joined, with an address and the broker reached, within 60 s, and the
+# app's confirmation within 120 s; else the old file comes back, `wpa_cli reconfigure` first, and
+# the radio up to 3 tries of 60 s, each command bounded. Never the hotspot. Then the lamp says what
 # happened through the voice's say service; with no network back, the lost line at most once a
 # minute for 10 minutes, as the voice's recording `wifi_lost`, never through its model (a missing
 # recording is journalled, and nothing said). The password is never journalled.
@@ -20,8 +21,15 @@ StandardInput=socket
 StandardOutput=socket
 StandardError=journal
 SyslogIdentifier=lamp-setup-wifi
-# The change (2 min at most) and the lost line's 10 minutes.
-RuntimeMaxSec=15min
+# The change (about 10 min at most: 60 s, 60 s for lamp-cloud back online, 120 s for the app, 3
+# tries of 45 s, 10 s and 60 s) and the lost line's 10 minutes.
+RuntimeMaxSec=25min
+# A change cut before it ended (this limit, a kill, a crash) puts the old network's file back
+# from .lamp-previous, and wpa_supplicant re-reads it (#1959's P1). A finished change left none.
+ExecStopPost=/opt/lampOS/setup/current/lamp-setup wifi-restore
+# That restore tries the radio as the way back does, 3 tries of 45 s, 10 s and 60 s: systemd's
+# default 90 s for the stop would cut it (#2617's P3 1).
+TimeoutStopSec=8min
 # #1982's lamp-setup-change@ sandbox, minus what the radio needs.
 NoNewPrivileges=yes
 ProtectSystem=strict

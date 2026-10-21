@@ -24,7 +24,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// `on` takes the kinds below, with `LAMP_CLOUD=on`.
 pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
@@ -41,9 +41,25 @@ pub const WIFI_KIND: &str = "wifi.set";
 /// The Wi-Fi helper's socket (`deploy/product/lamp-setup-wifi.socket`).
 pub const WIFI_SOCKET: &str = "/run/lampos-setup-wifi/wifi.sock";
 
-/// How long the Wi-Fi helper is waited on: 60 s for the new network, 60 s
-/// for the old one, and the radio's restarts and the broker's checks.
-pub const WIFI_WAIT: Duration = Duration::from_secs(180);
+/// How long the Wi-Fi helper is waited on for each of its lines: 60 s for
+/// the new network, 60 s for the link back over it and 120 s for the app's
+/// confirmation, and up to 3 tries of the radio's restart (45 s) and 60 s
+/// for the old one (#1959's P1, #2617's P2-1).
+pub const WIFI_WAIT: Duration = Duration::from_secs(600);
+
+/// The app's confirmation that the lamp reached it over the new network:
+/// `{"request_id"?}`, answered at once: `success` when it came within the
+/// window [`WIFI_JOINED_KIND`] gave, and again for a second one within it;
+/// `failure` after the window, and the lamp goes back (#1959's P1, the
+/// first builder's P2-2 on #2617).
+pub const WIFI_CONFIRM_KIND: &str = "wifi.confirm";
+
+/// Said between `wifi.set`'s `starting` and its result once the new network
+/// is proven and the link is up again over it: "joined, confirm please",
+/// `{"ssid", "confirm_within_s", "request_id"?}`. `wifi.set`'s `success`
+/// comes only once the app's confirmation has kept the network. An app
+/// that does not know this kind never confirms, and the lamp goes back.
+pub const WIFI_JOINED_KIND: &str = "wifi.joined";
 
 /// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`KEYS_KINDS`]: a
 /// person's own DeepSeek and Deepgram keys (#2094, `docs/own-keys.md`).
@@ -243,6 +259,238 @@ pub fn ask(socket: &std::path::Path, line: &str, wait: Duration) -> Result<Optio
     result(&reply)
 }
 
+/// A Wi-Fi change's hold on `lamp-cloud`'s link to the broker (the
+/// reviewer-lead's P2 and the first builder's P2-1 on #2617, Mobile's lost
+/// result on #1959): the network under the link changes, so the old link
+/// is dropped and made again at once, and a change's result is said only
+/// on the new one.
+#[derive(Debug, Default)]
+enum Relink {
+    /// Nothing to do.
+    #[default]
+    Idle,
+    /// The change wants the link dropped and made again.
+    Wanted,
+    /// Dropped; the next connection is over the network the lamp is on now.
+    Making,
+}
+
+/// The app's confirmation, as the change's thread waits for it.
+#[derive(Debug)]
+enum Confirm {
+    /// Handed to the change until `by`, the helper's window as lamp-cloud
+    /// keeps it, started before the helper's own so never ending after it.
+    Waiting(std::sync::mpsc::Sender<Event>, Instant),
+    /// Taken and handed on: a second one within the window is `success`
+    /// again, never handed twice.
+    Taken(Instant),
+}
+
+/// What a Wi-Fi change shares with the broker's loop and with the app's
+/// `wifi.confirm`.
+#[derive(Debug, Default)]
+pub struct WifiLink {
+    relink: Mutex<Relink>,
+    /// Wakes the broker's loop, even in its backoff, when a relink is wanted.
+    asked: tokio::sync::Notify,
+    /// The broker acked [`WIFI_JOINED_KIND`]: the window starts.
+    joined_acked: Mutex<Option<std::sync::mpsc::Sender<Event>>>,
+    confirm: Mutex<Option<Confirm>>,
+}
+
+impl WifiLink {
+    fn want_relink(&self) {
+        if let Ok(mut relink) = self.relink.lock() {
+            *relink = Relink::Wanted;
+        }
+        self.asked.notify_one();
+    }
+
+    fn settled(&self) -> bool {
+        self.relink
+            .lock()
+            .map(|relink| matches!(*relink, Relink::Idle))
+            .unwrap_or(true)
+    }
+}
+
+/// The time left until `by`, at least none.
+fn left(by: Instant) -> Duration {
+    by.saturating_duration_since(Instant::now())
+}
+
+/// The Wi-Fi helper over its socket (#1959's P1, #2617's P2s). Its first
+/// line is the result, or `{"joined": {"ssid", "online_within_ms",
+/// "confirm_within_ms"}}` once the new network is proven. Then the link is
+/// made again, [`WIFI_JOINED_KIND`] is said on it with `confirm_within_s`,
+/// and once the broker acks that, within the helper's `online_within_ms`,
+/// the window starts here and the helper is told `{"online": true}`, which
+/// starts its own. The app's confirmation, if it comes within the window,
+/// goes to the helper as `{"confirm": true}`. The helper's last line is the
+/// result: `wifi.set`'s `success` (kept) or `failure` (the lamp went back,
+/// said after the link is made again over the old network).
+pub fn ask_wifi(
+    socket: &std::path::Path,
+    line: &str,
+    wait: Duration,
+    link: &WifiLink,
+    mut say: impl FnMut(&str, Result<Option<Value>, String>),
+) {
+    let unavailable = || Err("the lamp's settings are not running".to_owned());
+    let Ok(mut stream) = UnixStream::connect(socket) else {
+        return say(WIFI_KIND, unavailable());
+    };
+    if stream
+        .set_read_timeout(Some(wait))
+        .and_then(|()| stream.set_write_timeout(Some(wait)))
+        .and_then(|()| stream.write_all(format!("{line}\n").as_bytes()))
+        .is_err()
+    {
+        return say(WIFI_KIND, unavailable());
+    }
+    let Ok(mut writer) = stream.try_clone() else {
+        return say(WIFI_KIND, unavailable());
+    };
+    let mut lines = BufReader::new(stream.take(8_192));
+    let Some(first) = read_one(&mut lines) else {
+        return say(
+            WIFI_KIND,
+            Err("the lamp's settings did not answer in time".to_owned()),
+        );
+    };
+    let joined = serde_json::from_str::<Value>(first.trim())
+        .ok()
+        .and_then(|first| first.get("joined").cloned());
+    // Not joined: the lamp never left its old network for long, and the
+    // old link survived it (Mobile on lamp-0c89, #1959 21:2x).
+    let Some(joined) = joined else {
+        return say(WIFI_KIND, result(&first));
+    };
+    // After a join, the end: a failure means the lamp went back, off the
+    // network the link was made again over, so it is made again once more;
+    // a network kept leaves the link as it is.
+    let end = |last: Option<String>| {
+        let result = last.map_or_else(
+            || Err("the lamp's settings did not answer in time".to_owned()),
+            |last| result(&last),
+        );
+        if result.is_err() {
+            link.want_relink();
+        }
+        result
+    };
+    let ms = |field: &str| joined.get(field).and_then(Value::as_u64);
+    let (Some(online_ms), Some(confirm_ms), Some(ssid)) = (
+        ms("online_within_ms"),
+        ms("confirm_within_ms"),
+        joined.get("ssid").cloned(),
+    ) else {
+        // Not this helper's line: dropped, so the helper goes back.
+        drop(writer);
+        return say(WIFI_KIND, end(read_one(&mut lines)));
+    };
+    // From here the helper's last line may come at any time (a cut, a
+    // helper that gives up), so it is read on a thread of its own, and
+    // each wait below also ends on it.
+    let (events, heard) = std::sync::mpsc::channel::<Event>();
+    let last_line = events.clone();
+    std::thread::spawn(move || {
+        let _ = last_line.send(Event::Last(read_one(&mut lines)));
+    });
+    if let Ok(mut waiting) = link.joined_acked.lock() {
+        *waiting = Some(events.clone());
+    }
+    link.want_relink();
+    say(
+        WIFI_JOINED_KIND,
+        Ok(Some(
+            json!({"ssid": ssid, "confirm_within_s": confirm_ms / 1_000}),
+        )),
+    );
+    let mut last = None;
+    let mut ended = false;
+    // Until the broker acks `wifi.joined`, within the helper's bound.
+    let online_by = Instant::now() + Duration::from_millis(online_ms);
+    let acked = loop {
+        match heard.recv_timeout(left(online_by)) {
+            Ok(Event::Acked) => break true,
+            Ok(Event::Last(line)) => {
+                (last, ended) = (line, true);
+                break false;
+            }
+            Ok(Event::Confirm) => {}
+            Err(_) => break false,
+        }
+    };
+    if let Ok(mut waiting) = link.joined_acked.lock() {
+        *waiting = None;
+    }
+    if acked {
+        // The window starts here, then at the helper: this one never ends
+        // after the helper's.
+        let by = Instant::now() + Duration::from_millis(confirm_ms);
+        if let Ok(mut confirm) = link.confirm.lock() {
+            *confirm = Some(Confirm::Waiting(events.clone(), by));
+        }
+        if writer.write_all(b"{\"online\":true}\n").is_ok() {
+            let mut confirmed = false;
+            while !confirmed && !ended {
+                match heard.recv_timeout(left(by)) {
+                    Ok(Event::Confirm) => confirmed = true,
+                    Ok(Event::Last(line)) => (last, ended) = (line, true),
+                    Ok(Event::Acked) => {}
+                    Err(_) => break,
+                }
+            }
+            if let Ok(mut confirm) = link.confirm.lock() {
+                // A confirmation is taken under this lock, or not at all.
+                while let Ok(event) = heard.try_recv() {
+                    match event {
+                        Event::Confirm => confirmed = true,
+                        Event::Last(line) => (last, ended) = (line, true),
+                        Event::Acked => {}
+                    }
+                }
+                confirmed &= !ended;
+                *confirm = confirmed.then_some(Confirm::Taken(by));
+            }
+            if confirmed {
+                let _ = writer.write_all(b"{\"confirm\":true}\n");
+            }
+        }
+    }
+    drop(writer);
+    while !ended {
+        match heard.recv_timeout(wait) {
+            Ok(Event::Last(line)) => (last, ended) = (line, true),
+            Ok(_) => {}
+            Err(_) => break,
+        }
+    }
+    if let Ok(mut confirm) = link.confirm.lock() {
+        *confirm = None;
+    }
+    say(WIFI_KIND, end(last));
+}
+
+/// What a joined Wi-Fi change's thread waits on.
+#[derive(Debug)]
+enum Event {
+    /// The broker acked `wifi.joined`.
+    Acked,
+    /// The app's confirmation, within the window.
+    Confirm,
+    /// The helper's last line, or none (closed, or not in time).
+    Last(Option<String>),
+}
+
+/// One line from the helper, or none: closed, or not in time.
+fn read_one(lines: &mut impl BufRead) -> Option<String> {
+    let mut line = String::new();
+    lines.read_line(&mut line).ok().filter(|n| *n > 0)?;
+    Some(line)
+}
+
 /// The keys helper over its socket, as [`ask`], with the failure's code:
 /// the helper's own (`refused`, `unreached`, `bad_field`, `not_allowed`),
 /// or `unavailable` when it isn't there or doesn't answer.
@@ -297,6 +545,21 @@ pub struct Outcome {
 }
 
 impl Outcome {
+    /// What the journal says of it: its kind, its status and the app's
+    /// `request_id`, never its data (a network's name) or its error.
+    pub fn journal(&self) -> String {
+        let status = if self.result.is_ok() {
+            "success"
+        } else {
+            "failure"
+        };
+        let id = self.request_id.as_deref().map_or_else(
+            || "no request_id".to_owned(),
+            |id| format!("request_id {id}"),
+        );
+        format!("a change's result, {} {status}, {id}", self.kind)
+    }
+
     /// The reply for it, as `identity` says it: V1's `success` or `failure`,
     /// with the request's id in `data` if it had one.
     pub fn reply(&self, identity: &crate::wire::Identity, now: &str) -> Value {
@@ -331,6 +594,9 @@ pub struct Changes {
     broker: Mutex<String>,
     /// A Wi-Fi change is under way: a second is refused at once.
     wifi_busy: Arc<AtomicBool>,
+    /// A Wi-Fi change's hold on the broker's link and the app's
+    /// [`WIFI_CONFIRM_KIND`].
+    wifi_link: Arc<WifiLink>,
     /// A keys request is under way: a second fails `busy` (#2094).
     keys_busy: Arc<AtomicBool>,
     done: Arc<Mutex<Vec<Outcome>>>,
@@ -364,6 +630,7 @@ impl Changes {
             keys,
             broker: Mutex::default(),
             wifi_busy: Arc::default(),
+            wifi_link: Arc::default(),
             keys_busy: Arc::default(),
             done: Arc::default(),
         })
@@ -465,19 +732,94 @@ impl Changes {
             return Err("a Wi-Fi change is already under way".into());
         }
         let (done, busy) = (self.done.clone(), self.wifi_busy.clone());
+        let link = self.wifi_link.clone();
         std::thread::spawn(move || {
-            let result = ask(&socket, &line, wait);
+            let say = |kind: &str, result| {
+                if let Ok(mut done) = done.lock() {
+                    done.push(Outcome {
+                        kind: kind.into(),
+                        result,
+                        request_id: request_id.clone(),
+                        code: None,
+                    });
+                }
+            };
+            ask_wifi(&socket, &line, wait, &link, say);
             busy.store(false, Ordering::Release);
-            if let Ok(mut done) = done.lock() {
-                done.push(Outcome {
-                    kind: WIFI_KIND.into(),
-                    result,
-                    request_id,
-                    code: None,
-                });
-            }
         });
         Ok(())
+    }
+
+    /// The broker's loop: whether a Wi-Fi change wants the link dropped and
+    /// made again now. Once per want; the loop then makes one try at once
+    /// and backs off from its first wait.
+    pub fn take_relink(&self) -> bool {
+        let Ok(mut relink) = self.wifi_link.relink.lock() else {
+            return false;
+        };
+        if !matches!(*relink, Relink::Wanted) {
+            return false;
+        }
+        *relink = Relink::Making;
+        true
+    }
+
+    /// The broker's loop: woken when a Wi-Fi change wants the link made
+    /// again (it may wake for nothing: [`Self::take_relink`] says).
+    pub async fn relink_asked(&self) {
+        self.wifi_link.asked.notified().await;
+    }
+
+    /// The broker's loop, at each CONNACK: a link made after a relink is
+    /// over the network the lamp is on now, and the Wi-Fi's results held
+    /// for it go out on it.
+    pub fn online(&self) {
+        if let Ok(mut relink) = self.wifi_link.relink.lock()
+            && matches!(*relink, Relink::Making)
+        {
+            *relink = Relink::Idle;
+        }
+    }
+
+    /// The broker's loop, at a PUBACK of a change's result: once it is
+    /// [`WIFI_JOINED_KIND`]'s, the confirmation window starts.
+    pub fn acked(&self, outcome: &Outcome) {
+        if outcome.kind != WIFI_JOINED_KIND {
+            return;
+        }
+        let waiting = self
+            .wifi_link
+            .joined_acked
+            .lock()
+            .ok()
+            .and_then(|mut w| w.take());
+        if let Some(send) = waiting {
+            let _ = send.send(Event::Acked);
+        }
+    }
+
+    /// The app's [`WIFI_CONFIRM_KIND`]: handed to the change waiting for it
+    /// within its window, and `success` again for a second one within it;
+    /// or why not, after it as before it.
+    pub fn confirm_wifi(&self) -> Result<(), String> {
+        let refused = || "no Wi-Fi change waits for a confirmation".to_owned();
+        let mut confirm = self.wifi_link.confirm.lock().map_err(|_| refused())?;
+        match confirm.take() {
+            Some(Confirm::Waiting(send, by)) if Instant::now() < by => {
+                // Sent under the lock the change's thread takes to stop
+                // waiting: handed on, or refused, never both.
+                if send.send(Event::Confirm).is_err() {
+                    return Err(refused());
+                }
+                *confirm = Some(Confirm::Taken(by));
+                Ok(())
+            }
+            Some(Confirm::Taken(by)) if Instant::now() < by => {
+                *confirm = Some(Confirm::Taken(by));
+                Ok(())
+            }
+            _ => Err(refused()),
+        }
     }
 
     /// Results handed to the broker and lost with the connection before it
@@ -511,12 +853,21 @@ impl Changes {
         });
     }
 
-    /// The results come since the last call, oldest first.
+    /// The results come since the last call, oldest first. A Wi-Fi
+    /// change's are held while its relink is wanted or being made: they go
+    /// out only on the link made after it.
     pub fn take(&self) -> Vec<Outcome> {
-        self.done
-            .lock()
-            .map(|mut done| std::mem::take(&mut *done))
-            .unwrap_or_default()
+        let Ok(mut done) = self.done.lock() else {
+            return Vec::new();
+        };
+        if self.wifi_link.settled() {
+            return std::mem::take(&mut *done);
+        }
+        let (wifi, rest) = std::mem::take(&mut *done)
+            .into_iter()
+            .partition(|outcome| [WIFI_KIND, WIFI_JOINED_KIND].contains(&outcome.kind.as_str()));
+        *done = wifi;
+        rest
     }
 }
 
@@ -749,10 +1100,14 @@ mod tests {
         })
     }
 
-    /// Waits up to 5 s for the first result.
+    /// Waits up to 5 s for the first result, making the link again when a
+    /// Wi-Fi change wants it, as the broker's loop does.
     fn first(changes: &Changes) -> (String, Result<Option<Value>, String>) {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
+            if changes.take_relink() {
+                changes.online();
+            }
             if let Some(done) = changes.take().into_iter().next() {
                 return (done.kind, done.result);
             }
@@ -1029,6 +1384,9 @@ mod tests {
         );
         let until = Instant::now() + Duration::from_secs(5);
         let done = loop {
+            if changes.take_relink() {
+                changes.online();
+            }
             if let Some(done) = changes.take().into_iter().next() {
                 break done;
             }
@@ -1061,6 +1419,203 @@ mod tests {
         }
         // Free again once answered.
         assert!(!changes.wifi_busy.load(Ordering::Acquire));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A Wi-Fi helper on `path` that proves the new network, waits for
+    /// `lamp-cloud`'s word that the app was told, opens its window of
+    /// `window` only then, and keeps the network only with a confirmation
+    /// within it, as `lamp-setup wifi` does; it hands back the lines it took
+    /// after its request, and how long after its window opened each came.
+    fn wifi_helper(
+        path: &std::path::Path,
+        window: Duration,
+    ) -> std::thread::JoinHandle<Vec<String>> {
+        let listener = UnixListener::bind(path).unwrap();
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let reader = BufReader::new(stream.try_clone().unwrap());
+            let mut lines = reader.lines();
+            let _request = lines.next().unwrap().unwrap();
+            let mut stream = stream;
+            let joined = json!({"joined": {"ssid": "New Home", "online_within_ms": 5_000,
+                "confirm_within_ms": window.as_millis() as u64}});
+            stream.write_all(format!("{joined}\n").as_bytes()).unwrap();
+            let (send, heard) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                for line in lines {
+                    let Ok(line) = line else { return };
+                    if send.send(line).is_err() {
+                        return;
+                    }
+                }
+            });
+            let online = heard.recv().unwrap();
+            let deadline = Instant::now() + window;
+            let mut took = vec![online];
+            while let Ok(line) =
+                heard.recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            {
+                took.push(line);
+            }
+            let last: &[u8] = if took.iter().any(|line| line == r#"{"confirm":true}"#) {
+                b"{\"done\":{\"ssid\":\"New Home\"}}\n"
+            } else {
+                b"{\"refused\":\"the app did not confirm the new Wi-Fi within 120 s; the lamp is back on its old Wi-Fi\"}\n"
+            };
+            stream.write_all(last).unwrap();
+            took
+        })
+    }
+
+    /// Waits up to 5 s for the change to want its link made again, as the
+    /// broker's loop does, and says it is up again.
+    fn link_back(changes: &Changes) {
+        let until = Instant::now() + Duration::from_secs(5);
+        while !changes.take_relink() {
+            assert!(Instant::now() < until, "no relink wanted");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        changes.online();
+    }
+
+    /// Waits up to 5 s for the next result.
+    fn next(changes: &Changes) -> Outcome {
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(done) = changes.take().into_iter().next() {
+                return done;
+            }
+            assert!(Instant::now() < until, "no result");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// The reviewer-lead's P2 and P3 and the first builder's P2-1 and P2-2
+    /// on #2617. A proven new network is said `wifi.joined` only once the
+    /// link is made again, with the helper's own window; the window starts
+    /// when the broker acks that, not at the join; a confirmation 1 s before
+    /// its end is handed to the helper once and answered `success`, a second
+    /// one too, and `wifi.set`'s `success` follows once kept, with no
+    /// `failure` and no other relink.
+    #[test]
+    fn p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only() {
+        let path = socket("joined");
+        let serving = wifi_helper(&path, Duration::from_secs(2));
+        let changes = Changes::with_wifi(socket("names"), WAIT, Some((path.clone(), WIFI_WAIT)));
+        assert_eq!(
+            changes.confirm_wifi(),
+            Err("no Wi-Fi change waits for a confirmation".to_owned())
+        );
+        changes.set_broker("broker.test", 1883);
+        let data = json!({"ssid": "New Home", "password": FAKE_PASSWORD, "request_id": "r-8"});
+        changes.start_wifi(&data).unwrap();
+        // Joined: nothing said on the old link, which is dropped first.
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(changes.take().is_empty());
+        link_back(&changes);
+        let joined = next(&changes);
+        let reply = joined.reply(&identity(), "t");
+        assert_eq!(
+            (&reply["kind"], &reply["status"]),
+            (&json!(WIFI_JOINED_KIND), &json!("success"))
+        );
+        // The helper's window, not a constant of lamp-cloud's.
+        assert_eq!(
+            reply["data"],
+            json!({"ssid": "New Home", "confirm_within_s": 2, "request_id": "r-8"})
+        );
+        // The broker's ack is late: the window has not started.
+        std::thread::sleep(Duration::from_millis(1_500));
+        changes.acked(&joined);
+        let acked = Instant::now();
+        std::thread::sleep(Duration::from_secs(1));
+        assert!(acked.elapsed() < Duration::from_millis(1_500));
+        assert_eq!(changes.confirm_wifi(), Ok(()));
+        assert_eq!(changes.confirm_wifi(), Ok(()), "the app's resend");
+        assert_eq!(
+            serving.join().unwrap(),
+            [r#"{"online":true}"#, r#"{"confirm":true}"#]
+        );
+        let kept = next(&changes).reply(&identity(), "t");
+        assert_eq!(
+            (&kept["kind"], &kept["status"], &kept["data"]),
+            (
+                &json!(WIFI_KIND),
+                &json!("success"),
+                &json!({"ssid": "New Home", "request_id": "r-8"})
+            )
+        );
+        let until = Instant::now() + Duration::from_secs(5);
+        while changes.wifi_busy.load(Ordering::Acquire) {
+            assert!(Instant::now() < until, "still busy");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // Kept: no failure follows, and the link stays.
+        assert!(changes.take().is_empty());
+        assert!(!changes.take_relink());
+        assert_eq!(
+            changes.confirm_wifi(),
+            Err("no Wi-Fi change waits for a confirmation".to_owned())
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// The reviewer-lead's P3 on #2617: a confirmation 1 s after the
+    /// helper's window is refused, never handed on, and the lamp's going
+    /// back is said after the link is made again, over the old network.
+    #[test]
+    fn p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only() {
+        let path = socket("joined-late");
+        let serving = wifi_helper(&path, Duration::from_secs(1));
+        let changes = Changes::with_wifi(socket("names"), WAIT, Some((path.clone(), WIFI_WAIT)));
+        changes.set_broker("broker.test", 1883);
+        let data = json!({"ssid": "New Home", "password": FAKE_PASSWORD, "request_id": "r-9"});
+        changes.start_wifi(&data).unwrap();
+        link_back(&changes);
+        let joined = next(&changes);
+        assert_eq!(joined.kind, WIFI_JOINED_KIND);
+        changes.acked(&joined);
+        std::thread::sleep(Duration::from_secs(2));
+        assert_eq!(
+            changes.confirm_wifi(),
+            Err("no Wi-Fi change waits for a confirmation".to_owned())
+        );
+        assert_eq!(serving.join().unwrap(), [r#"{"online":true}"#]);
+        // The way back changed the network under the link: it is made again
+        // before the failure is said.
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(changes.take().is_empty());
+        link_back(&changes);
+        let failed = next(&changes);
+        assert_eq!(failed.kind, WIFI_KIND);
+        assert_eq!(
+            failed.result,
+            Err("the app did not confirm the new Wi-Fi within 120 s; the lamp is back on its old Wi-Fi".to_owned())
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// Mobile on lamp-0c89 (#1959, 21:2x): a change that never joined (a
+    /// wrong password) left the old link alive, so its failure is said on
+    /// it, with no relink.
+    #[test]
+    fn a_failure_with_no_join_is_said_on_the_link_there_is() {
+        let path = socket("wrong-key");
+        let serving = helper(
+            &path,
+            Duration::ZERO,
+            "{\"refused\":\"wrong WiFi password: the router rejected the key; the lamp is back on its old Wi-Fi\"}\n",
+        );
+        let changes = Changes::with_wifi(socket("names"), WAIT, Some((path.clone(), WIFI_WAIT)));
+        changes.set_broker("broker.test", 1883);
+        changes
+            .start_wifi(&json!({"ssid": "New Home", "password": FAKE_PASSWORD}))
+            .unwrap();
+        let failed = next(&changes);
+        assert!(failed.result.is_err());
+        assert!(!changes.take_relink());
+        serving.join().unwrap();
         let _ = std::fs::remove_file(&path);
     }
 

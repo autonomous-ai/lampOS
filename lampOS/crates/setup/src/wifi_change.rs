@@ -9,13 +9,19 @@
 //!    until the new one is confirmed;
 //! 2. the new file is written with setup's own writer ([`wifi::wpa_conf`])
 //!    and the radio is switched with V1's script, as setup's join does;
-//! 3. the new network is confirmed only when it is the one joined, with a
+//! 3. the new network is proven only when it is the one joined, with a
 //!    station address, and the broker `lamp-cloud` is using takes a TCP
-//!    connection, within [`JOIN_WAIT`];
-//! 4. otherwise the old file goes back, the radio again, and the old network
-//!    is waited for, [`BACK_WAIT`] at most. A lamp whose old network does not
-//!    come back either stays on it and keeps trying it: after setup there is
-//!    no setup page behind the hotspot, so the hotspot would strand it.
+//!    connection, within [`JOIN_WAIT`]; and it is kept only once the app
+//!    confirms it, within [`CONFIRM_WAIT`] (#1959's P1);
+//! 4. otherwise the old file goes back, `wpa_cli reconfigure` first so the
+//!    new network is never left loaded, then the radio again, each bounded,
+//!    and the old network is waited for, [`BACK_WAIT`] a try, [`BACK_TRIES`]
+//!    tries. A lamp whose old network does not come back either stays on it
+//!    and keeps trying it: after setup there is no setup page behind the
+//!    hotspot, so the hotspot would strand it;
+//! 5. a helper cut before it ends (killed, `RuntimeMaxSec`, a power cut)
+//!    leaves `.lamp-previous`, which [`restore`] puts back: the unit's
+//!    `ExecStopPost=` and `lamp-setup-wifi-restore.service` at boot.
 //!
 //! The password is in the request line and in the network file, nowhere
 //! else: never in a reply, an error or a journal line, and [`Asked`]'s
@@ -40,8 +46,22 @@ pub const LINE_MOST: usize = 1_024;
 /// How long the new network has to be joined and reach the broker: setup's
 /// own bound (V1's `setupInternetWait`).
 pub const JOIN_WAIT: Duration = wifi::JOIN_WAIT;
-/// How long the old network has to come back after a failed change.
+/// How long the old network has to come back after a failed change, a try.
 pub const BACK_WAIT: Duration = Duration::from_secs(60);
+/// How many times the radio is restarted on the way back (#1959's P1).
+pub const BACK_TRIES: u32 = 3;
+/// How long a proven new network waits for the app's confirmation; without
+/// it the lamp goes back as if the join had failed (#1959's P1: the app
+/// closed, the phone gone).
+pub const CONFIRM_WAIT: Duration = Duration::from_secs(120);
+/// How long a proven new network waits for `lamp-cloud`'s link to be up
+/// again over it, before its [`CONFIRM_WAIT`] starts (the reviewer-lead's
+/// P2 on #2617): the window is the app's, from when it can reach the lamp.
+pub const ONLINE_WAIT: Duration = Duration::from_secs(60);
+/// How late after the window a confirmation `lamp-cloud` took within it may
+/// reach the helper: the line crossing the local socket. `lamp-cloud` takes
+/// none after the window's end, so a confirmation is answered once.
+pub const CONFIRM_SLACK: Duration = Duration::from_millis(500);
 /// The broker's TCP connection, name lookup included.
 pub const BROKER_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -113,6 +133,13 @@ pub trait Rejoin: Host {
     fn broker(&mut self, address: &str) -> bool;
     /// Keep the old network's file beside the live one; `None` removes it.
     fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()>;
+    /// The old network's file kept beside the live one, if there is one.
+    fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>>;
+    /// `wpa_cli reconfigure`, bounded: wpa_supplicant reads its file again.
+    fn reload(&mut self) -> io::Result<()>;
+    /// Tell the asker the new network `ssid` is proven, and wait at most
+    /// `most` for the app's confirmation through it.
+    fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool;
 }
 
 /// How a change ended.
@@ -184,9 +211,16 @@ pub fn change(host: &mut impl Rejoin, country: &str, asked: &Asked) -> Changed {
                 && host.has_station_ip()
                 && host.broker(&asked.broker)
             {
-                // Confirmed: the old file is not needed any more.
-                let _ = host.keep_previous(None);
-                return Changed::Joined;
+                // Proven; kept only once the app confirms it through it.
+                if host.app_confirms(ssid, CONFIRM_WAIT) {
+                    forget_previous(host, conf.as_bytes());
+                    return Changed::Joined;
+                }
+                why = Some(format!(
+                    "the app did not confirm the new Wi-Fi within {} s",
+                    CONFIRM_WAIT.as_secs()
+                ));
+                break;
             }
             if attempt % 3 == 2 && wrong_key_failures(&host.wpa_events()) >= WRONG_KEY_STOP {
                 break;
@@ -194,29 +228,30 @@ pub fn change(host: &mut impl Rejoin, country: &str, asked: &Asked) -> Changed {
             attempt += 1;
             host.sleep(Duration::from_secs(1));
         }
-        let observation = Observation {
-            events: host.wpa_events(),
-            wpa_state: host.wpa_state(),
-            has_ip: host.has_station_ip(),
-            ssid_matched: host.current_ssid().as_deref() == Some(ssid),
-        };
-        why = Some(why_not(&observation));
+        if why.is_none() {
+            let observation = Observation {
+                events: host.wpa_events(),
+                wpa_state: host.wpa_state(),
+                has_ip: host.has_station_ip(),
+                ssid_matched: host.current_ssid().as_deref() == Some(ssid),
+            };
+            why = Some(why_not(&observation));
+        }
     }
     let why = why.unwrap_or_default();
-    // Back: the old file, the radio, and the old network waited for.
-    if host.write_conf(Some(&previous)).is_err() {
-        // The old file stays kept beside the new one, for a person to put back.
+    // Back: the old file, wpa_supplicant told to read it, the radio, and the
+    // old network waited for; each step bounded, the radio tried again. A
+    // write that fails is tried again at once (the first builder's P3 2 on
+    // #2617), not left to the stop's restore.
+    if !put_back(host, &previous) {
+        // The old file stays kept beside the new one, for `restore`.
         return Changed::NotBack {
             why: format!("{why}; the old Wi-Fi could not be put back"),
         };
     }
+    let back = back_on_old(host, Some(&asked.broker));
+    // The live file is the old one now: nothing is left to restore.
     let _ = host.keep_previous(None);
-    let restarted = host.station().is_ok();
-    let broker = asked.broker.clone();
-    let back = restarted
-        && wait_for(host, BACK_WAIT, |host| {
-            host.has_station_ip() && host.broker(&broker)
-        });
     if back {
         Changed::Back {
             why: format!("{why}; the lamp is back on its old Wi-Fi"),
@@ -224,11 +259,103 @@ pub fn change(host: &mut impl Rejoin, country: &str, asked: &Asked) -> Changed {
     } else {
         Changed::NotBack {
             why: format!(
-                "{why}; the old Wi-Fi did not come back within {} s, and the lamp keeps trying it",
-                BACK_WAIT.as_secs()
+                "{why}; the old Wi-Fi did not come back after {BACK_TRIES} tries, and the lamp keeps trying it"
             ),
         }
     }
+}
+
+/// The old file written as the live one, [`BACK_TRIES`] tries a second
+/// apart. Whether it was.
+fn put_back<H: Rejoin>(host: &mut H, previous: &[u8]) -> bool {
+    for try_ in 0..BACK_TRIES {
+        if host.write_conf(Some(previous)).is_ok() {
+            return true;
+        }
+        if try_ + 1 < BACK_TRIES {
+            host.sleep(Duration::from_secs(1));
+        }
+    }
+    false
+}
+
+/// After a confirmation, `.lamp-previous` goes, so no later restore undoes
+/// the change (the first builder's P3 3 on #2617): its removal is tried
+/// [`BACK_TRIES`] times, and if it never goes, it is made the new network's
+/// own file, which a restore then puts back unchanged.
+fn forget_previous<H: Rejoin>(host: &mut H, conf: &[u8]) {
+    for try_ in 0..BACK_TRIES {
+        if host.keep_previous(None).is_ok() {
+            return;
+        }
+        if try_ + 1 < BACK_TRIES {
+            host.sleep(Duration::from_secs(1));
+        }
+    }
+    if host.keep_previous(Some(conf)).is_err() {
+        eprintln!(
+            "lamp-setup: wifi: the old Wi-Fi's kept file could not be removed or replaced; a restore would undo this change"
+        );
+    }
+}
+
+/// The old file is live: `wpa_cli reconfigure` first, so the new network is
+/// never left loaded even when the radio's script fails or hangs, then the
+/// radio's restart; each try waits [`BACK_WAIT`] for an address and, when
+/// one is known, the broker, [`BACK_TRIES`] tries. Whether the old network
+/// is back.
+fn back_on_old<H: Rejoin>(host: &mut H, broker: Option<&str>) -> bool {
+    for _ in 0..BACK_TRIES {
+        let _ = host.reload();
+        let _ = host.station();
+        if wait_for(host, BACK_WAIT, |host| {
+            host.has_station_ip() && broker.is_none_or(|broker| host.broker(broker))
+        }) {
+            return true;
+        }
+    }
+    false
+}
+
+/// What [`restore`] found and did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Restored {
+    /// No old file was kept: no change was cut.
+    Nothing,
+    /// The old file is live again (and, when live, the old network is back
+    /// with an address); the kept file is gone.
+    Put,
+    /// The old file is live again, but the old network did not come back
+    /// after [`BACK_TRIES`] tries: the kept file stays, for the boot's
+    /// restore (the first builder's P3 1 on #2617).
+    NotBack,
+    /// The kept file could not be read, or the old file not written; it
+    /// stays kept (P3 5).
+    Failed,
+}
+
+/// A change cut before it ended (killed, `RuntimeMaxSec`, a power cut):
+/// the old network's file kept beside the live one goes back. `live` after
+/// the helper's own stop (`ExecStopPost=`), with wpa_supplicant running: it
+/// re-reads the file and the radio restarts, with the way back's own
+/// retries, the old network judged back by its address (no broker is known
+/// at the stop). The kept file goes only once that has worked (the first
+/// builder's P3 1 on #2617). At boot (`lamp-setup-wifi-restore.service`,
+/// before wpa_supplicant and dhcpcd) only the file.
+pub fn restore(host: &mut impl Rejoin, live: bool) -> Restored {
+    let previous = match host.read_previous() {
+        Ok(Some(previous)) => previous,
+        Ok(None) => return Restored::Nothing,
+        Err(_) => return Restored::Failed,
+    };
+    if !put_back(host, &previous) {
+        return Restored::Failed;
+    }
+    if live && !back_on_old(host, None) {
+        return Restored::NotBack;
+    }
+    let _ = host.keep_previous(None);
+    Restored::Put
 }
 
 /// What one request came to: the helper's reply line, its journal line, and
@@ -314,8 +441,18 @@ pub fn line_for(changed: &Changed) -> Option<&'static str> {
 pub trait Mouth {
     /// Words for the voice's model to say: only while there is a network.
     fn say(&mut self, text: &str);
-    /// A recording the voice holds, by name: no model, no network.
-    fn play(&mut self, recording: &str);
+    /// A recording the voice holds, by name: no model, no network. Whether
+    /// the voice took it (begun, or waiting to be).
+    fn play(&mut self, recording: &str) -> bool;
+}
+
+/// The lost line: the recording, or, when the voice does not have it (the
+/// clip is not rendered yet, `tools/render-wifi-line.sh`), the same words in
+/// plain text, for a voice that can still speak them (#1959's P1).
+fn say_lost(mouth: &mut impl Mouth) {
+    if !mouth.play(RECORDING_LOST) {
+        mouth.say(SAY_LOST);
+    }
 }
 
 /// After `changed`, the line once; and with neither network back, the lost
@@ -335,7 +472,7 @@ pub fn say_after(
         mouth.say(line);
         return 1;
     }
-    mouth.play(RECORDING_LOST);
+    say_lost(mouth);
     let started = host.now_ms();
     let mut last = started;
     let mut said = 1;
@@ -349,7 +486,7 @@ pub fn say_after(
             return said;
         }
         if now.saturating_sub(last) >= LOST_EVERY.as_millis() as u64 {
-            mouth.play(RECORDING_LOST);
+            say_lost(mouth);
             last = now;
             said += 1;
         }
@@ -382,9 +519,13 @@ impl Mouth for SayService {
         self.say_as("wifi", text);
     }
 
-    fn play(&mut self, recording: &str) {
-        if let Some(said) = self.play_recording(recording) {
-            eprintln!("lamp-setup: wifi: {said}");
+    fn play(&mut self, recording: &str) -> bool {
+        match self.play_recording(recording) {
+            Some(said) => {
+                eprintln!("lamp-setup: wifi: {said}");
+                false
+            }
+            None => true,
         }
     }
 }
@@ -466,6 +607,77 @@ impl ImageRejoin {
     }
 }
 
+/// The asker on the helper's socket (standard input and output), as
+/// [`confirmed_on`].
+pub fn confirmed_on_stdio(ssid: &str, most: Duration) -> bool {
+    confirmed_on(
+        io::BufReader::new(io::stdin()),
+        &mut io::stdout(),
+        ssid,
+        ONLINE_WAIT,
+        most,
+    )
+}
+
+/// The asker's side of a proven new network (#1959's P1, the reviewer-lead's
+/// P2 and P3 and the first builder's P2-1 on #2617). The helper writes
+/// `{"joined": {"ssid", "online_within_ms", "confirm_within_ms"}}`;
+/// `lamp-cloud` drops its link, makes it again over the new network, says
+/// `wifi.joined` to the app and, once the broker acks it, starts its copy
+/// of the window and says `{"online": true}` within `online_most`. Only
+/// then does the helper's window of `most` start, so `lamp-cloud`'s never
+/// ends after it; a confirmation `lamp-cloud` took within its own may take
+/// [`CONFIRM_SLACK`] more to cross the socket. Anything else, the socket
+/// closed, or nothing in time, is no confirmation.
+pub fn confirmed_on<R: io::BufRead + Send + 'static>(
+    reader: R,
+    out: &mut impl io::Write,
+    ssid: &str,
+    online_most: Duration,
+    most: Duration,
+) -> bool {
+    use std::io::BufRead;
+    let mut say = |line: Value| writeln!(out, "{line}").and_then(|()| out.flush()).is_ok();
+    // Two lines at most, each bounded, on a thread of their own: the
+    // waits below bound the change, not the reads.
+    let (send, heard) = mpsc::channel::<Value>();
+    let reading = std::thread::Builder::new()
+        .name("lamp-setup-confirm".into())
+        .spawn(move || {
+            let mut reader = reader;
+            for _ in 0..2 {
+                let mut line = String::new();
+                let read = io::Read::take(&mut reader, LINE_MOST as u64).read_line(&mut line);
+                if read.is_err() || line.is_empty() {
+                    return;
+                }
+                let value = serde_json::from_str(line.trim()).unwrap_or(Value::Null);
+                if send.send(value).is_err() {
+                    return;
+                }
+            }
+        });
+    if reading.is_err() {
+        return false;
+    }
+    let joined = json!({"joined": {
+        "ssid": ssid,
+        "online_within_ms": online_most.as_millis() as u64,
+        "confirm_within_ms": most.as_millis() as u64,
+    }});
+    if !say(joined) {
+        return false;
+    }
+    if heard.recv_timeout(online_most).ok() != Some(json!({"online": true})) {
+        return false;
+    }
+    let deadline = Instant::now() + most + CONFIRM_SLACK;
+    heard
+        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        .ok()
+        == Some(json!({"confirm": true}))
+}
+
 impl Default for ImageRejoin {
     fn default() -> Self {
         Self::new()
@@ -540,11 +752,35 @@ impl Rejoin for ImageRejoin {
 
     fn keep_previous(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {
         match bytes {
+            // Written, synced and its folder synced.
             Some(bytes) => crate::serve::write_private(&self.previous, bytes),
-            None => match std::fs::remove_file(&self.previous) {
-                Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
-                _ => Ok(()),
-            },
+            None => {
+                match std::fs::remove_file(&self.previous) {
+                    Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+                    _ => {}
+                }
+                // The removal on disk before the change is said kept (P3 3).
+                match self.previous.parent() {
+                    Some(folder) => std::fs::File::open(folder)?.sync_all(),
+                    None => Ok(()),
+                }
+            }
         }
+    }
+
+    fn read_previous(&mut self) -> io::Result<Option<Vec<u8>>> {
+        match std::fs::read(&self.previous) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn reload(&mut self) -> io::Result<()> {
+        self.image.reconfigure()
+    }
+
+    fn app_confirms(&mut self, ssid: &str, most: Duration) -> bool {
+        confirmed_on_stdio(ssid, most)
     }
 }
