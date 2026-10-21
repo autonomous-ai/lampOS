@@ -1407,8 +1407,11 @@ newest, whichever reader that was.
 - **The model:** Google's Blendshape V2 (`face_blendshapes.onnx`, Apache
   2.0), 1,882,583 bytes, pinned by SHA-256 in `blendshapes.rs`, run under
   tract. It comes from the same MediaPipe download as the mouth's mesh
-  (`models/blendshapes/SOURCE.md`, made by `training/mouth/make.sh`). No
-  build or release carries it yet.
+  (`models/blendshapes/SOURCE.md`, made by `training/mouth/make.sh`).
+  Install places it at `/opt/lampOS/eyes/models/face_blendshapes.onnx`,
+  with the mesh at `face_mesh_v2.onnx` beside it, from the models release
+  (`deploy/product/models.json`, 22 Oct). The product's unit passes
+  neither, so both stay off until `--seems` is turned on.
 - **The brows' long face (`LAMP_SEEMS_BROW_LOW=on`, #2132; off unless
   set).** With it, a face is also `negative` with the brows drawn down
   (`browDown`, left and right's mean) at or over 0.80 and the smiles under
@@ -1664,7 +1667,9 @@ points run on the tracked face box, as #720's comments propose. Its model
 is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
 
 **Measuring the mouth with Face Mesh V2 (`--mouth-model PATH`, none unless
-given, #720).** With it, the largest face in each look is cut out of the
+given, #720).** Install places the pinned model at
+`/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
+and the product's unit doesn't pass it. With it, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and the journal says

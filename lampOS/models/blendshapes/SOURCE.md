@@ -8,7 +8,7 @@ seems, from 52 movements of their face, read from Face Mesh V2's points
 
 | | |
 |---|---|
-| File | `face_blendshapes.onnx`, 1,882,583 bytes. Not in git, since a part's models come from a release (`deploy/product/models.json`). Until one carries it, `training/mouth/make.sh` makes it, and it is placed by hand |
+| File | `face_blendshapes.onnx`, 1,882,583 bytes. Not in git, since a part's models come from a release: `models-2026-10-16` carries it with `face_blendshapes.LICENSE.txt` beside it (22 Oct, #1671), and `lamp-update install` places it at `/opt/lampOS/eyes/models/face_blendshapes.onnx` from `deploy/product/models.json`. `training/mouth/make.sh` makes the same file |
 | SHA-256 | `68056086da2409d47891e88b7f44d331d60e3d0bc053f5ff0fd51b0915f11ddd` |
 | Input | `serving_default_input_points:0`, float32 `[1, 146, 2]`: 146 of the mesh's 478 points, x and y, as MediaPipe picks them (`face_blendshapes_graph.cc`, `kLandmarksSubsetIdxs`; `blendshapes::POINTS`) |
 | Output | `StatefulPartitionedCall:0`, float32 `[52]`: the 52 movements from 0 to 1, `_neutral` first, in MediaPipe's order (`kBlendshapeNames`) |
