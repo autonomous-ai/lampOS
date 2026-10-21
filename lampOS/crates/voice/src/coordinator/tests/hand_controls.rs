@@ -1999,6 +1999,40 @@ fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// The reviewer-lead's P3 on #2549: the light a hand's sleep keeps on is
+/// read from the bus the voice has; with none, or nothing said there, it is
+/// none, and the sleep shows the asleep face.
+#[test]
+fn a_hands_sleep_takes_the_persons_light_from_the_bus() {
+    assert_eq!(sleep_light(None), None);
+    let root = std::env::temp_dir().join(format!("lv-sleep-light-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    assert_eq!(sleep_light(Some(&bus)), None, "nothing said");
+    let mut ring = bus
+        .publisher_declared(
+            lamp_msgs::Light::TOPICS[1],
+            &lamp_msgs::Light::declaration(),
+            crate::ring_light::SOURCE,
+        )
+        .unwrap();
+    ring.publish_json(
+        1,
+        &lamp_msgs::Light {
+            on: true,
+            colour: "warm".into(),
+            level: 3,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        sleep_light(Some(&bus)),
+        crate::ring_face::Lit::of(true, "warm", 3)
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// #1371, and the reviewer and Jarvis on #1376: the muted wait's own
 /// closures, around the real privacy wait and its mock GPIO worker (closed
 /// for its first readings, then open), say the voice's health while it

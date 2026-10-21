@@ -493,6 +493,9 @@ fn shutdown_is_explicit_idempotent_and_permanently_rejects_paints() {
         ring.shutdown().unwrap().unwrap().reason,
         BlankReason::Shutdown
     );
+    // What a lit ring leaves when a conversation ends: black (#1362, the
+    // first builder on #1362: a mute's sleep must draw the light again).
+    assert_eq!(*ring.sink.frames.last().unwrap(), EncodedFrame::black());
     assert!(ring.is_stopped());
     assert!(!ring.is_faulted());
     let count = ring.sink.frames.len();

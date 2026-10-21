@@ -62,10 +62,12 @@ pub fn owed_pixels(breath: f32, around: f32) -> [Rgb; PIXEL_COUNT] {
 }
 
 /// A ring writer that shows only the asleep face, the face with an owed
-/// reminder's arc over it ([`owed_pixels`], #1545), or black. Opening it sends
-/// black; [`AsleepRing::shutdown`] sends black again. It holds no authority
-/// and grants none: the voice uses it only while no turn can run, and closes
-/// it before its ring worker opens the device again.
+/// reminder's arc over it ([`owed_pixels`], #1545), the person's own light
+/// at rest while a hand's sleep keeps it on ([`AsleepRing::show_light`],
+/// #1362), or black. Opening it sends black; [`AsleepRing::shutdown`] sends
+/// black again. It holds no authority and grants none: the voice uses it
+/// only while no turn can run, and closes it before its ring worker opens
+/// the device again.
 pub struct AsleepRing<S: FrameSink> {
     sink: S,
 }
@@ -93,6 +95,24 @@ impl<S: FrameSink> AsleepRing<S> {
         self.sink
             .write_frame(&encode(&owed_pixels(breath, around), ceiling))
     }
+
+    /// The person's own light as their ring showed it at rest, `pixels`
+    /// under `ceiling` (#1362): a hand's sleep doesn't switch off a light
+    /// they chose (the first builder on #1362, 21 Oct 15:1x). The voice
+    /// draws these from the light the person asked for; no channel is above
+    /// `ceiling`.
+    pub fn show_light(
+        &mut self,
+        pixels: &[Rgb; PIXEL_COUNT],
+        ceiling: crate::ChannelCeiling,
+    ) -> io::Result<()> {
+        self.sink.write_frame(&encode(pixels, ceiling))
+    }
+
+    /// The writer goes and its last frame stays on the ring, for the next
+    /// writer to take over: the person's light through a wake, so it doesn't
+    /// blink off while the conversation's ring starts (#1362).
+    pub fn leave(self) {}
 
     /// Black, then the writer is gone.
     pub fn shutdown(mut self) -> io::Result<()> {
@@ -148,6 +168,26 @@ mod tests {
         assert_eq!(frames.0.len(), 3);
         assert_eq!(frames.0[0], EncodedFrame::black());
         assert_eq!(frames.0[1], encode(&asleep_pixels(0.5), ceiling));
+        assert_eq!(frames.0[2], EncodedFrame::black());
+    }
+
+    /// #1362: the person's own light is shown as given, under the ceiling.
+    #[test]
+    fn the_persons_light_is_shown_under_the_ceiling() {
+        let mut frames = Frames(Vec::new());
+        let ceiling = ChannelCeiling::new(48).unwrap();
+        let pixels = [Rgb::new(200, 200, 200); PIXEL_COUNT];
+        let mut ring = AsleepRing::new(&mut frames).unwrap();
+        ring.show_light(&pixels, ceiling).unwrap();
+        ring.shutdown().unwrap();
+        assert_eq!(frames.0[1], encode(&pixels, ceiling));
+        assert_eq!(
+            frames.0[1],
+            encode(
+                &pixels.map(|pixel| pixel.capped(ceiling)),
+                ChannelCeiling::new(120).unwrap()
+            )
+        );
         assert_eq!(frames.0[2], EncodedFrame::black());
     }
 

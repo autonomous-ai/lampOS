@@ -419,6 +419,37 @@ and whether it yields to the slide). It is drawn:
   back in that wait, even once the slide opens: then the ring is dark until
   the lamp wakes.
 
+**With the person's light on, the light wins** (the first builder on #1362,
+21 Oct 15:1x). On this lamp the ring is the room light, and a creature that
+dozes off doesn't switch off someone's reading light (rule 8).
+- **Why the wait draws it:** the conversation's ring worker writes black as
+  the mute stops it (`GuardedRing::shutdown`, pinned in `lamp_ring`'s tests),
+  so a light left alone would go dark at every hand's sleep.
+- **What it draws:** when the sleep's look begins, the voice reads the last
+  light the ring's light said (`light/state` from `ring`, however old, as
+  the ring stopped saying it at the mute; `ring_asleep::persons_light`). If
+  it was on, the sleep draws that light back at once, from the black, as the
+  person's ring drew it at rest (`ring_face::Face`, the same colour, level
+  and slow breath), with one slow dip of a step as it settles: up to a level
+  lower over 0.6 s, held to 2 s, back up to their light by 4 s
+  (`ring_asleep::LIGHT_DIP`, `dip_share`; one level's glow down, or half the
+  lowest, `Lit::step_down_share`). Then it is their light, and nothing
+  more: the fold and the breath say asleep.
+- **With the light off,** never said, or said by another part, the sleep
+  shows the asleep face as above.
+- **The rest is the same:** the writer is the asleep face's
+  (`AsleepRing::show_light`, under the same ceiling), and the slide's
+  hand-over is the same either way: a closing slide blacks it at once.
+- **The wake keeps the light up:** a wake that opens the lamp (the tap, or
+  the wait ending on it) leaves the person's light on the ring and closes
+  the device without black (`Asleep::release`, `AsleepRing::leave`), so it
+  doesn't blink off while the conversation's ring starts, after its provider,
+  capture and speaker; that ring then draws it again (the reviewer-lead on
+  #2549). A sleep that ends any other way, and the asleep face, end black.
+- **Not drawn here:** a light changed from the app during the sleep (with
+  `LAMP_LIGHT_WHILE_MUTED=on` it is said and taken) is not drawn until the
+  lamp wakes.
+
 It is stopped, black and closed, before the wait returns, as the long face
 is. Expression gives no look-up for a tap while the software mute holds
 (#1282). It sees the slide only on the Controls route, so on this route a

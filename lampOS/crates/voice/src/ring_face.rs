@@ -106,6 +106,16 @@ impl Lit {
     pub fn colours() -> [&'static str; 10] {
         Self::TINTS.map(|(name, _)| name)
     }
+
+    /// One level dimmer, as a share of this light's glow: the next level
+    /// down's over this one's, or half of the lowest (#1362's one dip).
+    pub fn step_down_share(&self) -> f32 {
+        let index = usize::from(self.level.clamp(1, LEVELS)) - 1;
+        match index {
+            0 => 0.5,
+            _ => LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0,
+        }
+    }
 }
 
 /// The quietest and the loudest block that move the face, in dBFS.
@@ -2251,5 +2261,17 @@ mod tests {
             writes.load(std::sync::atomic::Ordering::SeqCst) <= written + 1,
             "nothing written under privacy but black"
         );
+    }
+
+    /// #1362's one dip: a level lower, as a share of the light's own glow.
+    #[test]
+    fn one_step_down_is_the_next_level_or_half_the_lowest() {
+        let share = |level| Lit::of(true, "white", level).unwrap().step_down_share();
+        assert_eq!(share(1), 0.5);
+        for level in 2..=LEVELS {
+            let index = usize::from(level) - 1;
+            assert_eq!(share(level), LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0);
+            assert!((0.2..1.0).contains(&share(level)), "{level}");
+        }
     }
 }
