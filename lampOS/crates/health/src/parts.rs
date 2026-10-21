@@ -4,7 +4,9 @@
 //! of itself that it has gone quiet, because a part that has gone quiet
 //! says nothing. That is said here, of a part not heard from for longer
 //! than the stale time, and of a part that is expected and has never
-//! reported at all.
+//! reported at all. A part that stops on purpose says so first
+//! ([`Diagnostic::is_stopping`]), and is forgotten rather than counted as
+//! a part that stopped working (#2415's P3).
 //!
 //! [`health`] is the whole of the rule and touches nothing: the reports,
 //! the time and what is expected go in, and a `Health` comes out.
@@ -50,6 +52,11 @@ pub enum Taken {
     NotAName,
     /// It is from a part not heard before, and 64 are kept already.
     Full,
+    /// It says its part is stopping on purpose
+    /// ([`Diagnostic::is_stopping`], #2415's P3): the part is forgotten, so
+    /// its silence from now on is not counted as a part that stopped
+    /// working. It is tracked again from its next report.
+    Forgotten,
 }
 
 /// The newest report of every part that has reported.
@@ -67,6 +74,13 @@ impl Parts {
     pub fn take(&mut self, report: &Diagnostic, at: Instant) -> Taken {
         if !is_name(&report.name) {
             return Taken::NotAName;
+        }
+        // A part stopping on purpose is forgotten, not kept: its silence
+        // from now on is not a part that stopped working (#2415's P3), and
+        // it takes no room.
+        if report.is_stopping() {
+            self.kept.remove(&report.name);
+            return Taken::Forgotten;
         }
         if self.kept.len() >= MOST_PARTS && !self.kept.contains_key(&report.name) {
             return Taken::Full;
@@ -515,6 +529,8 @@ pub fn mark_selftest(health: &mut Health, item: HealthItem) {
 ///   never reported, or never said `ok`, never counts. Nor does one whose
 ///   last word was `error`: it keeps that level while quiet, and the
 ///   lamp's `error` already says it, so one failure is not told twice.
+///   Nor does one that said it is stopping ([`Taken::Forgotten`]): it is
+///   no longer kept.
 ///
 /// What comes out passes `Health::check`.
 pub fn health(
@@ -1469,6 +1485,103 @@ mod tests {
             now - ms(400_000),
         );
         assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 400_000);
+    }
+
+    /// #2415's P3: own keys turned off at runtime (the voice's second worker
+    /// starts again with `LAMP_OWN_KEYS` off) and the second worker dropped
+    /// (#960) each end with `voice-keys` saying `stopping`. lamp-health
+    /// forgets the part: five minutes and more later it is not quiet, not
+    /// listed and not missing, and the lamp is ok, so Not feeling well never
+    /// droops for it.
+    #[test]
+    fn a_part_that_says_it_is_stopping_is_forgotten_and_never_quiet() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        // Own keys turned off, and the second worker dropped: the same
+        // fact, as the voice says it in both.
+        for _case in ["own keys off", "second worker dropped"] {
+            let mut parts = Parts::new();
+            parts.take(&report(Level::Ok, "voice", ""), now - ms(100));
+            parts.take(
+                &report(Level::Ok, "voice-keys", "").with("uses", "own"),
+                now - ms(400_000),
+            );
+            assert_eq!(
+                parts.take(&Diagnostic::stopping("voice-keys"), now - ms(399_000)),
+                Taken::Forgotten
+            );
+            let lamp = health(parts.reports(), now, &["voice".to_owned()], STALE);
+            assert_eq!(lamp.check(), Ok(()));
+            assert_eq!(lamp.quiet_ms, 0);
+            assert_eq!(lamp.level, Level::Ok);
+            assert!(lamp.items.iter().all(|item| item.name != "voice-keys"));
+            assert!(lamp.missing.is_empty());
+        }
+        // A part never heard from that says it is stopping is not kept
+        // either, and takes no room, even with 64 kept already.
+        let mut parts = Parts::new();
+        for number in 0..MOST_PARTS {
+            parts.take(&report(Level::Ok, &format!("m{number:02}"), ""), now);
+        }
+        assert_eq!(
+            parts.take(&Diagnostic::stopping("voice-keys"), now),
+            Taken::Forgotten
+        );
+        assert_eq!(parts.reports().len(), MOST_PARTS);
+    }
+
+    /// #2415's P3: a part that goes quiet without saying `stopping` (a
+    /// crash) still counts in `quiet_ms`; and a part that said `stopping`
+    /// and then says it is well again is tracked again, quiet and all.
+    #[test]
+    fn a_part_quiet_without_stopping_still_counts_and_one_back_from_stopping_is_tracked() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        let mut parts = Parts::new();
+        parts.take(
+            &report(Level::Ok, "voice-keys", "").with("uses", "own"),
+            now - ms(301_000),
+        );
+        let lamp = health(parts.reports(), now, &[], STALE);
+        assert_eq!((lamp.level, lamp.quiet_ms), (Level::Stale, 301_000));
+        // Stopping, then well again (the switch turned back on), then
+        // quiet: tracked from its return.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "voice-keys", ""), now - ms(900_000));
+        parts.take(&Diagnostic::stopping("voice-keys"), now - ms(800_000));
+        assert!(parts.reports().is_empty());
+        parts.take(&report(Level::Ok, "voice-keys", ""), now - ms(310_000));
+        assert!(parts.reports()["voice-keys"].heard_well);
+        let lamp = health(parts.reports(), now, &[], STALE);
+        assert_eq!((lamp.level, lamp.quiet_ms), (Level::Stale, 310_000));
+        // Back from stopping with a warning first: not heard well yet, so
+        // its quiet does not count until it says `ok`.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "voice-keys", ""), now - ms(900_000));
+        parts.take(&Diagnostic::stopping("voice-keys"), now - ms(800_000));
+        parts.take(
+            &report(Level::Warn, "voice-keys", "refused"),
+            now - ms(310_000),
+        );
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 0);
+    }
+
+    /// #2415's P3: a report in the old shape, with other facts and no
+    /// `state`, is kept as before; so is a `state` that is not `stopping`.
+    #[test]
+    fn a_report_in_the_old_shape_is_kept_as_before() {
+        let now = Instant::now();
+        let mut parts = Parts::new();
+        let old: Diagnostic = serde_json::from_str(
+            "{\"level\":\"ok\",\"name\":\"voice-keys\",\"message\":\"\",\
+             \"values\":[{\"key\":\"uses\",\"value\":\"own\"}]}",
+        )
+        .unwrap();
+        assert_eq!(parts.take(&old, now), Taken::Kept);
+        assert!(parts.reports()["voice-keys"].heard_well);
+        assert_eq!(
+            parts.take(&report(Level::Ok, "eyes", "").with("state", "running"), now),
+            Taken::Kept
+        );
+        assert_eq!(parts.reports().len(), 2);
     }
 
     #[test]

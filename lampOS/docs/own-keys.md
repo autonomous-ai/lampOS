@@ -150,9 +150,13 @@ never one quiet for good, which would keep the lamp `stale` and, after 5
 minutes, droop "Not feeling well" (the reviewer's P2 on #2167). Its bus publisher is named `voice_keys`, as the bus takes no `-` in a
 publisher's name; before #2167's fix it was `voice-keys`, which the bus
 refused, so the part never reported at all. Turning the
-switch off, or dropping the second worker (#960), does leave `voice-keys`
-quiet until `lamp-health` restarts: restart it with the voice when the
-switch is turned off.
+switch off, or dropping the second worker (#960), says once that
+`voice-keys` is stopping (`state` = `stopping`, #2415's P3): the second
+worker says it at its start with the switch off, and the voice says it when
+it drops the second worker with the switch on. `lamp-health` forgets the
+part instead of counting it quiet, so the lamp doesn't droop "Not feeling
+well" for it, and tracks it again when it next reports
+([health.md](health.md), "Stopping on purpose").
 
 **A key that later fails** (a rotation): a request the person's endpoint
 refuses with 401 or 403 before any answer goes through the relay it went

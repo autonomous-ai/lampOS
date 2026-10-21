@@ -734,6 +734,28 @@ impl Diagnostic {
         }
     }
 
+    /// The fact that says a part's state beside its level; with
+    /// [`Self::STOPPING`] the part is stopping on purpose (#2415's P3).
+    pub const STATE: &str = "state";
+    /// [`Self::STATE`]'s value of a part that stops on purpose.
+    pub const STOPPING: &str = "stopping";
+
+    /// `name` is stopping on purpose, not failing: an `ok` report with
+    /// `state` = `stopping`. lamp-health forgets the part rather than count
+    /// its silence as a part that stopped working; it is tracked again once
+    /// it reports again. A fact, not a field or a level, so a reader a
+    /// version behind takes it as one more well report (#1505's rule).
+    pub fn stopping(name: &str) -> Self {
+        Self::new(Level::Ok, name, "stopped on purpose").with(Self::STATE, Self::STOPPING)
+    }
+
+    /// Whether this report says its part is stopping on purpose.
+    pub fn is_stopping(&self) -> bool {
+        self.values
+            .iter()
+            .any(|value| value.key == Self::STATE && value.value == Self::STOPPING)
+    }
+
     /// The same with one more fact beside it.
     #[must_use]
     pub fn with(mut self, key: &str, value: impl ToString) -> Self {
@@ -1837,6 +1859,33 @@ mod tests {
         assert!(
             serde_json::from_str::<Light>("{\"on\":true,\"colour\":\"red\",\"level\":300}")
                 .is_err()
+        );
+    }
+
+    /// #2415's P3: a part that stops on purpose says so with one more fact,
+    /// `state` = `stopping`, on an `ok` report: no new field and no new
+    /// level, so a reader a version behind takes it as a well report and a
+    /// reader a version ahead reads an old report as not stopping.
+    #[test]
+    fn a_part_stopping_on_purpose_says_so_in_a_fact_an_older_reader_takes() {
+        let stopping = Diagnostic::stopping("voice-keys");
+        assert!(stopping.is_stopping());
+        assert_eq!(stopping.level, Level::Ok);
+        let text = "{\"level\":\"ok\",\"name\":\"voice-keys\",\"message\":\"stopped on purpose\",\
+                    \"values\":[{\"key\":\"state\",\"value\":\"stopping\"}]}";
+        round_trip(&stopping, text);
+        // The old shape, and any other fact, is not a stop.
+        let old: Diagnostic = serde_json::from_str(
+            "{\"level\":\"ok\",\"name\":\"voice-keys\",\"message\":\"\",\
+             \"values\":[{\"key\":\"uses\",\"value\":\"own\"}]}",
+        )
+        .unwrap();
+        assert!(!old.is_stopping());
+        assert!(!Diagnostic::ok("voice-keys").is_stopping());
+        assert!(
+            !Diagnostic::ok("voice-keys")
+                .with(Diagnostic::STATE, "running")
+                .is_stopping()
         );
     }
 
