@@ -160,73 +160,80 @@ fn write_a_store_fixture() {
     fs::write(path, sql).unwrap();
 }
 
-/// Each kept state, opened as an update's restart opens it (the same boot,
-/// later), reads with its items as they were.
+/// Each kept state, opened as an update's restart opens it, the same boot
+/// later and after a reboot (the reviewer-lead's P3 on #2422: a snoozed
+/// timer's elapsed deadline is the boot's that set it), reads with its items
+/// as they were, the snooze still due at its wall time.
 #[test]
 fn each_kept_state_reads_with_its_items() {
     let kept: [(&str, &[u8]); 1] = [(
         "2026-10-21",
         include_bytes!("../fixtures/stores/state-2026-10-21.json"),
     )];
+    let rebooted = ClockSample {
+        unix_ms: WALL + 120_000,
+        boot_ms: 5_000,
+        boot_id: "schedule-kept-reboot".into(),
+        wall_trusted: true,
+    };
     for (day, bytes) in kept {
-        let disk = Memory(Rc::new(RefCell::new(Some(bytes.to_vec()))));
-        let mut engine = Engine::open(disk, "Etc/UTC", &now(120_000), FRESH)
-            .unwrap_or_else(|error| panic!("{day}: {error}"));
-        assert_eq!(engine.store_id(), STORE, "{day}: the same store");
-        let list = engine
-            .answer(
-                Request::List {
-                    after_id: 0,
-                    limit: 8,
-                    pending_only: false,
-                },
-                &now(120_000),
-            )
-            .unwrap();
-        let texts: Vec<&str> = list["items"]
-            .as_array()
-            .unwrap_or_else(|| panic!("{day}: {list}"))
-            .iter()
-            .map(|item| item["text"].as_str().unwrap())
-            .collect();
-        assert_eq!(
-            texts,
-            [
-                "Take the bread out",
-                "Call the plumber",
-                "Water the plants",
-                "Put the bins out"
-            ],
-            "{day}"
-        );
-        let snoozed = engine
-            .answer(Request::Get { id: 1 }, &now(120_000))
-            .unwrap();
-        let item = &snoozed["item"];
-        assert_eq!(
-            (
-                item["snoozed"].as_bool(),
-                item["delivery"].as_u64(),
-                item["local"].as_str()
-            ),
-            (
-                Some(true),
-                Some(2),
-                Some("2026-10-14T08:06:00+00:00[Etc/UTC]")
-            ),
-            "{day}: {snoozed}"
-        );
-        let weekly = engine
-            .answer(Request::Get { id: 4 }, &now(120_000))
-            .unwrap();
-        assert_eq!(
-            (
-                weekly["item"]["repeat"]["weekday"].as_str(),
-                weekly["item"]["local"].as_str()
-            ),
-            (Some("monday"), Some("2026-10-19T07:00:00+00:00[Etc/UTC]")),
-            "{day}: {weekly}"
-        );
+        for (how, at) in [("later", now(120_000)), ("rebooted", rebooted.clone())] {
+            let day = format!("{day}, {how}");
+            let disk = Memory(Rc::new(RefCell::new(Some(bytes.to_vec()))));
+            let mut engine = Engine::open(disk, "Etc/UTC", &at, FRESH)
+                .unwrap_or_else(|error| panic!("{day}: {error}"));
+            assert_eq!(engine.store_id(), STORE, "{day}: the same store");
+            let list = engine
+                .answer(
+                    Request::List {
+                        after_id: 0,
+                        limit: 8,
+                        pending_only: false,
+                    },
+                    &at,
+                )
+                .unwrap();
+            let texts: Vec<&str> = list["items"]
+                .as_array()
+                .unwrap_or_else(|| panic!("{day}: {list}"))
+                .iter()
+                .map(|item| item["text"].as_str().unwrap())
+                .collect();
+            assert_eq!(
+                texts,
+                [
+                    "Take the bread out",
+                    "Call the plumber",
+                    "Water the plants",
+                    "Put the bins out"
+                ],
+                "{day}"
+            );
+            let snoozed = engine.answer(Request::Get { id: 1 }, &at).unwrap();
+            let item = &snoozed["item"];
+            assert_eq!(
+                (
+                    item["snoozed"].as_bool(),
+                    item["delivery"].as_u64(),
+                    item["local"].as_str()
+                ),
+                (
+                    Some(true),
+                    Some(2),
+                    Some("2026-10-14T08:06:00+00:00[Etc/UTC]")
+                ),
+                "{day}: {snoozed}"
+            );
+            let weekly = engine.answer(Request::Get { id: 4 }, &at).unwrap();
+            assert_eq!(
+                (
+                    weekly["item"]["repeat"]["weekday"].as_str(),
+                    weekly["item"]["local"].as_str()
+                ),
+                (Some("monday"), Some("2026-10-19T07:00:00+00:00[Etc/UTC]")),
+                "{day}: {weekly}"
+            );
+        }
     }
 }
 
