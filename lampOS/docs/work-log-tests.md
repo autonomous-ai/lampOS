@@ -1,5 +1,45 @@
 # Tests work log
 
+## 2026-10-22 00:32:49 +0700 — cloud helpers end with their scenarios; #2698 pushed
+
+Ready for lamp-voice: no — [#2698](https://github.com/autonomous-ai/lampOS/pull/2698)
+is draft for its exact-head native checks. Kind: test harness only.
+
+Pushed `2525000185b26cd14e7ef17b27d5b98e7675b391` on
+`tests/1806-cloud-helper-finish`, Part of #1806, `builder:tests`, from
+`b87b3e91ad04b5811fe441efa118773d33416630`. The three reconnect helpers now
+hold their socket until the scenario has stopped and awaited lamp-cloud,
+then finish at the existing join. The entire production prefix and all
+three scenario bodies/assertions remain byte-identical. Actual join,
+late-ACK and backoff timings remain. Only the former three-second final
+hold is removed; the new final receive has a fifteen-second failure bound.
+Earlier blocking socket accept/read calls are unchanged.
+
+All three exact cases passed 3/3 before and 3/3 after. Comparable Mac sums
+of separate processes: 15.8306 / 14.9751 / 14.9690 s before,
+6.9680 / 6.0285 / 6.0244 s after. First stale-link use remains 2.3298 s,
+over its two-second target; later runs are about 1.38 s, will about 1.39 s,
+and backoff about 3.25 s. The backoff scenario still exceeds three seconds;
+#1806 remains open. No device-latency claim.
+
+Three controls compiled and failed original assertions: confirmation
+started before publication (35.758988 ms, below the required second),
+replacement connection without its will, and bad backoff reset (about
+701 ms, above the 600 ms bound). All source bytes were restored before
+sequential final fmt, all-target cloud Clippy, cloud tests (165 passed,
+zero failed, one existing ignored manual reports-fixture writer), workspace
+build and diff check. The staged evidence also passed diff hygiene, JSON,
+local-link, patch-application and source-hash checks.
+[Verification record](https://github.com/autonomous-ai/lampOS/tree/2525000185b26cd14e7ef17b27d5b98e7675b391/lampOS/docs/verification/cloud-helper-finish-20261022).
+
+[ARM64 #5229](https://github.com/autonomous-ai/lampOS/actions/runs/39644520470)
+and [Linux Clippy #1238](https://github.com/autonomous-ai/lampOS/actions/runs/39644520298)
+are running. Posted [the PR on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6322351277).
+#2679, #2647 and #2693 remain ready; their latest review-thread check found
+none unanswered. The next audit targets remaining policy integration
+fixture waits while native CI runs. No ARM64 build on the Mac, no device
+access, and no task source left uncommitted.
+
 ## 2026-10-22 00:19:50 +0700 — skills add-on completion ready on native ARM64
 
 Ready for lamp-voice: [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)
