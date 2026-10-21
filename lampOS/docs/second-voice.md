@@ -3013,14 +3013,35 @@ systemd-run --pty --wait \
 **The route's speech socket** (`LAMP_SECOND_SPEECH_SOCKET=on`, off unless
 set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
 `--wire --socket` measures:
-- **As each answer begins,** while its chat thinks, the configured voice
-  opens ElevenLabs' `stream-input` socket for that request and sends the
-  voice's settings (`Tts::open_ahead`, `Services::open_speech_ahead`).
+- **As each line begins** (its `Start`, the first speech block), while
+  the person still speaks, the configured voice opens ElevenLabs' socket
+  for that request and sends the voice's settings (`Tts::open_at_line`,
+  `Services::open_speech_at_line`, #2602). Opened as the chat was asked,
+  as before, Flash's `stream-input` socket took 704–730 ms to open on
+  lamp-4ace (the first builder, 02:00 on #2602), so its first audio came
+  about 330 ms after HTTP's (633 ms against 298 ms); at the line's start
+  that open is paid while the person speaks.
+  - A request with no line (a written one) has it opened as its answer
+    begins (`Tts::open_ahead`, `Services::open_speech_ahead`). For a
+    request whose line opened it, that ask keeps the line's socket.
   - It's the configured voice only, and ElevenLabs only; Gemini's voice and
-    OpenAI's have none.
-  - A socket opened before, for an older request, is closed.
-  - The journal says `request N: the speech socket is open, M ms after it
-    was asked`, or that it didn't open and why, in kinds only.
+    OpenAI's have none. With the switch off nothing opens.
+  - One socket per request: a socket opened before, for an older request,
+    is closed.
+  - **A request that ends without using it** (judged not for the lamp,
+    heard nothing, given up, cancelled, or dropped by a newer line) closes
+    it at once (`Tts::close_ahead`, `Services::close_speech`), a dialogue
+    one told `close_socket` first, so no session is held between turns.
+    The line's task holds the close, so it runs even when the task is
+    aborted before it ran; an open asked late for a request already over
+    opens nothing. The journal says `request N: ended with its speech
+    socket unused: closed`.
+  - The journal says `request N: the speech socket is open, M ms after the
+    line began` (or `after its answer began`), or that it didn't open and
+    why, in kinds only. At the answer's first piece with words it says,
+    once a request, `the speech socket was open when its first piece was
+    ready, M ms before`, or `not open yet when its first piece was ready, M
+    ms after it was asked`. No words.
 - **The first of the request's pieces that finds it open** speaks on it:
   - the piece, made at once (`flush`), and the end;
   - its audio comes as the HTTP piece's does, in packets as loud;
@@ -3085,7 +3106,8 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
   `stream-input` exactly as above.
   - **Its shape:** `…/ws/elevenlabs/text-to-dialogue/stream-input?model_id=eleven_v4_turbo&output_format=pcm_24000`,
     no voice in the path and no `inactivity_timeout`: ElevenLabs' dialogue
-    reference doesn't list it, and the socket never waits for text. The first message names the one voice
+    reference doesn't list it; a socket that waits is sent `keep_alive`
+    instead. The first message names the one voice
     (`{"voices":[id]}`, no speed: the dialogue takes only `stability`).
     The piece goes as `{"inputs":[{"text","voice_id"}]}`, then
     `{"flush":true}`, then `{"close_socket":true}`. Audio is base64
@@ -3096,19 +3118,42 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
     concurrent dialogue sessions, idle too (105, then
     `too_many_concurrent_requests`), and ElevenLabs closes it after 20 s
     with no message from the lamp.
-  - **So it opens on the reply, never ahead:** as the answer begins
-    nothing is opened; the answer's first piece with words opens it
-    (`request N: the dialogue speech socket is open, M ms after its piece
-    was ready`) and sends its input, `flush` and `close_socket` at once,
-    so it is never held between turns and nothing waits on it. Its other
-    pieces go over HTTP in `eleven_v4_turbo`, as with `stream-input`.
-  - **Its open has 400 ms** (`DIALOGUE_OPEN_WITHIN`, the reviewer-lead's
-    P2 on #2658): it opens on the piece's own path, so the connect and
-    upgrade get 400 ms, less than a kept HTTP connection's first audio
-    (420–690 ms on lamp-4ace), not the 10 s connect bound. Past it the
-    piece goes over HTTP, journaled with no words (`request N: the dialogue
-    speech socket was slow to open: not open M ms after its piece was
-    ready`); a slow open refuses and pauses nothing.
+  - **Opened at the line, kept alive** (#2602: opened at the piece, it was
+    never open within its 400 ms on lamp-4ace, 16 of 16): it opens as the
+    line begins, with the 10 s connect bound, and while it waits for the
+    answer's first piece it is sent `{"keep_alive":true}` every 10 s
+    (`KEEP_ALIVE_EVERY`, half the 20 s idle close). A `keep_alive` that
+    fails drops it, and the piece goes over HTTP. The first piece with
+    words takes it and sends its input, `flush` and `close_socket`; its
+    other pieces go over HTTP in `eleven_v4_turbo`, as with
+    `stream-input`. A request that ends without it closes it at once, as
+    above, so it is held only from the line's start to its answer's first
+    piece, never between turns.
+  - **Opened at the answer** (a written request, with no line): nothing is
+    opened as the answer begins; the answer's first piece with words opens
+    it (`request N: the dialogue speech socket is open, M ms after its
+    piece was ready`) and sends its input, `flush` and `close_socket` at
+    once.
+  - **The line's socket is waited for as its opens measure** (the first
+    builder at 02:36 on #2602: the upgrade's p50 was 481 ms and p90 503 ms
+    on lamp-c0a4, so a fixed 400 ms always missed, and it timed out 16 of
+    16 on lamp-4ace). A piece that finds it still opening waits until its
+    ask plus the p90 of the last 10 dialogue opens (ask to open, at the
+    line or at the piece) and 150 ms (`DIALOGUE_WAIT_MARGIN`), within 400
+    ms (`DIALOGUE_WAIT_FLOOR`) and 1.2 s (`DIALOGUE_WAIT_CAP`); before any
+    open was measured, 900 ms (`DIALOGUE_WAIT_FIRST`, lamp-4ace's 704–730
+    ms and the margin). Counted from the ask, so the time the person spoke
+    is already spent: a piece ready late waits little or not at all. Not
+    open by then, the piece goes over HTTP (`… was slow to open: not open
+    M ms after its piece was ready, K ms after it was asked (bound B
+    ms)`), and the socket, once open, is left for a later piece or closed
+    with its request.
+  - **Opened at the piece it has 400 ms** (`DIALOGUE_OPEN_WITHIN`, the
+    reviewer-lead's P2 on #2658) for its connect and upgrade, less than a
+    kept HTTP connection's first audio (420–690 ms on lamp-4ace). Past it
+    the piece goes over HTTP, journaled with no words (`request N: the
+    dialogue speech socket was slow to open: not open M ms after its piece
+    was ready`); a slow open refuses and pauses nothing.
   - **Its failures** are `stream-input`'s: a 4400, 4404 or 4422 close
     refuses v4 for the rest of the voice's run; a 429 at the upgrade or a
     4429 close pauses the sockets for 60 s; a close, error or silence
@@ -3119,8 +3164,9 @@ set; #2135's row, the first builder on #1722, 20 Oct 10:37), the change
   - **Not carried:** the whole answer on one dialogue socket. The voice
     asks each piece's speech apart and at once, and the dialogue socket
     marks no piece's end before `close_socket`, so it would need the
-    answer's end told to the voice, and `keep_alive` while the chat is
-    slow.
+    answer's end told to the voice. Not kept warm between turns either:
+    only `stream-input` could be, since an idle dialogue socket holds a
+    session.
 
 ### How much the prompt cache holds (`probe-cache`)
 

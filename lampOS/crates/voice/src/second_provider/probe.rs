@@ -200,7 +200,7 @@ fn chat_stream(
 }
 
 enum Voice {
-    Configured(Tts),
+    Configured(Box<Tts>),
     Gemini(GeminiTts),
 }
 
@@ -306,9 +306,9 @@ pub async fn run(
     )];
     let mut voices: Vec<(String, Arc<Voice>)> = vec![(
         format!("speech={}", config.tts_provider.name().replace(' ', "_")),
-        Arc::new(Voice::Configured(
+        Arc::new(Voice::Configured(Box::new(
             Tts::new(&config).map_err(io::Error::other)?,
-        )),
+        ))),
     )];
     match super::worker::gemini_key(&provider, credentials.as_deref()) {
         Ok(key) => {

@@ -49,6 +49,11 @@ struct Script {
     drops_after: Mutex<VecDeque<Option<usize>>>,
     /// The requests a speech socket was asked for ([`Services::open_speech_ahead`]).
     sockets_asked: Mutex<Vec<u64>>,
+    /// The requests a speech socket was asked for as their line began
+    /// ([`Services::open_speech_at_line`]), and those whose socket was let
+    /// go ([`Services::close_speech`]).
+    sockets_at_line: Mutex<Vec<u64>>,
+    sockets_closed: Mutex<Vec<u64>>,
     /// How many times a listener was asked for its words so far, at a pause
     /// ([`Listener::flush`], `LAMP_SECOND_EARLY_FINALIZE`).
     flushed: Arc<AtomicUsize>,
@@ -204,6 +209,14 @@ impl Services for Script {
 
     fn open_speech_ahead(&self, request: u64) {
         self.sockets_asked.lock().unwrap().push(request);
+    }
+
+    fn open_speech_at_line(&self, request: u64) {
+        self.sockets_at_line.lock().unwrap().push(request);
+    }
+
+    fn close_speech(&self, request: u64) {
+        self.sockets_closed.lock().unwrap().push(request);
     }
 }
 
@@ -7930,6 +7943,58 @@ async fn each_answer_asks_for_its_speech_socket_as_it_begins() {
     engine.submit(written(2, "Say ORCHID."));
     turn(&mut engine).await;
     assert_eq!(*script.sockets_asked.lock().unwrap(), [1, 2]);
+}
+
+/// #2602 (the first builder on lamp-4ace, 02:00): the speech socket is
+/// asked for as the line begins, before its words or its chat, so its open
+/// is paid while the person speaks. A line answered, one with no words
+/// (unanswered) and one dropped by a newer line each let their socket go.
+#[tokio::test]
+async fn each_line_opens_its_speech_socket_as_it_begins_and_lets_it_go_at_its_end() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new([vec![text("It is noon."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    assert_eq!(
+        *script.sockets_at_line.lock().unwrap(),
+        [1],
+        "at the line's start"
+    );
+    assert!(script.asked.lock().unwrap().is_empty(), "before the chat");
+    assert!(script.sockets_asked.lock().unwrap().is_empty());
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    assert_eq!(
+        *script.sockets_asked.lock().unwrap(),
+        [1],
+        "the answer asks again"
+    );
+    let closed = |request| script.sockets_closed.lock().unwrap().contains(&request);
+    assert!(closed(1), "answered: let go");
+    // Heard nothing: not answered.
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    assert_eq!(script.asked.lock().unwrap().len(), 1, "no chat for it");
+    assert!(closed(2), "unanswered: let go");
+    // A line dropped by a newer one before its end.
+    engine.submit(start(3));
+    engine.submit(audio(3, 1));
+    engine.submit(start(4));
+    for _ in 0..100 {
+        if closed(3) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(closed(3), "replaced: let go");
+    assert!(!closed(4), "the newer one's kept");
+    assert_eq!(*script.sockets_at_line.lock().unwrap(), [1, 2, 3, 4]);
 }
 
 /// #1854's follow-up: with `LAMP_SECOND_WRITTEN_WAIT=on` a turn the

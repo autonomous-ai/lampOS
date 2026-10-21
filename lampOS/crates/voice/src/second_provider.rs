@@ -1979,6 +1979,11 @@ impl Engine {
                 // The voice's connection opened while the person speaks, not
                 // by the answer's first sentence (#1712).
                 tokio::spawn(self.shared.services.warm());
+                // Its speech socket opened now too, with the switch
+                // (`LAMP_SECOND_SPEECH_SOCKET`): its ~720 ms open is paid
+                // while the person speaks, not after the chat is asked
+                // (#2602, the first builder on lamp-4ace).
+                self.shared.services.open_speech_at_line(request);
                 // The down line rendered by a person's first line too, not
                 // only after a turn: a lamp started while the relay is down
                 // has it for that line (lamp-52e6, #1195's run of 21 Oct).
@@ -2167,9 +2172,13 @@ impl Engine {
                 });
                 let memory_scope = self.memory_scope(request, session, true);
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
+                // Its speech socket let go however the line ends: answered,
+                // judged not for the lamp, given up, or dropped by a newer
+                // line, its task aborted before it ran too.
+                let closes = ClosesSpeech(self.shared.services.clone(), request);
                 let task = tokio::spawn(spoken(
                     self.shared.clone(),
-                    (request, lease, marks.clone()),
+                    (request, lease, marks.clone(), closes),
                     heard,
                     checked,
                     said.clone(),
@@ -2770,14 +2779,19 @@ impl Shared {
 /// judges not said to the lamp are not either.
 async fn spoken(
     shared: Arc<Shared>,
-    context: (u64, Option<crate::memory_scope::ScopeLease>, Arc<Marks>),
+    context: (
+        u64,
+        Option<crate::memory_scope::ScopeLease>,
+        Arc<Marks>,
+        ClosesSpeech,
+    ),
     mut heard: mpsc::Receiver<LinePart>,
     checked: Option<Arc<AtomicBool>>,
     said: Arc<Mutex<(u64, u64)>>,
     before: Option<String>,
     continues_from: Option<u64>,
 ) {
-    let (request, scope, marks) = context;
+    let (request, scope, marks, _closes) = context;
     // Known from its start, so a chat begun on its early words is asked
     // with it too.
     let cut_in: Vec<String> = marks
@@ -4572,6 +4586,16 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     Ok(())
 }
 
+/// A request's speech socket, closed when the task holding this ends, by
+/// its end or its abort ([`Services::close_speech`]).
+struct ClosesSpeech(Arc<dyn Services>, u64);
+
+impl Drop for ClosesSpeech {
+    fn drop(&mut self) {
+        self.0.close_speech(self.1);
+    }
+}
+
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
@@ -4594,8 +4618,10 @@ async fn answer(
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let heard_at = Instant::now();
     // Its speech socket opened now, while the chat thinks, with the switch
-    // (`LAMP_SECOND_SPEECH_SOCKET`).
+    // (`LAMP_SECOND_SPEECH_SOCKET`), unless its line opened it; closed
+    // when the answer ends, however it ends.
     shared.services.open_speech_ahead(request);
+    let _closes = ClosesSpeech(shared.services.clone(), request);
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
     let announcement = (shared.announce && shared.announcement_due()).then(|| {

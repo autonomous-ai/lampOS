@@ -196,15 +196,18 @@ pub(crate) struct SocketRequest {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SocketShape {
     /// `text-to-speech/{voice}/stream-input`: text in as it comes; opened
-    /// ahead, as the chat is asked.
+    /// ahead, as the line begins ([`Tts::open_at_line`]) or as the chat is
+    /// asked.
     StreamInput,
     /// `text-to-dialogue/stream-input`, the one v4 is served on (#2602,
     /// #2135): `stream-input` closes on v4 with 4400 `unsupported_model`.
     /// Each open one holds one of the account's concurrent dialogue
     /// sessions, idle too (105, then `too_many_concurrent_requests`), and
-    /// it is closed after 20 s without a message from the lamp, so it is
-    /// opened only when its piece is ready, never ahead, and told
-    /// `close_socket` with that piece.
+    /// it is closed after 20 s without a message from the lamp. Opened as
+    /// the line begins ([`Tts::open_at_line`]), it is sent `keep_alive`
+    /// every [`KEEP_ALIVE_EVERY`] while it waits, and closed when its request
+    /// ends without it; asked as the chat is, it is opened only when its
+    /// piece is ready. It is told `close_socket` with its piece.
     Dialogue,
 }
 
@@ -261,8 +264,8 @@ pub(crate) fn socket_request(
     let shape = socket_shape(model);
     // `inactivity_timeout` only on `stream-input`, which is opened ahead and
     // waits for the answer. ElevenLabs' dialogue reference does not list it
-    // (its idle close is a fixed 20 s), and the dialogue socket never waits:
-    // it opens when its piece is ready and is told `close_socket` with it.
+    // (its idle close is a fixed 20 s): a dialogue socket that waits is sent
+    // `keep_alive` instead ([`KEEP_ALIVE_EVERY`]).
     let path = match shape {
         SocketShape::StreamInput => format!(
             "text-to-speech/{id}/stream-input?model_id={model}&output_format=pcm_24000&inactivity_timeout={SOCKET_INACTIVITY_S}"
@@ -330,6 +333,17 @@ pub(crate) fn socket_piece(text: &str) -> Option<Value> {
     }
     Some(json!({"text": format!("{} ", text.trim()), "flush": true}))
 }
+
+/// A dialogue socket's message while it waits for its piece: it counts as
+/// the lamp's message, so the service doesn't close it idle.
+pub(crate) fn socket_keep_alive() -> Value {
+    json!({"keep_alive": true})
+}
+
+/// How often a dialogue socket opened as the line began is sent
+/// [`socket_keep_alive`] while it waits for its piece: half the service's
+/// 20 s idle close.
+pub const KEEP_ALIVE_EVERY: Duration = Duration::from_secs(10);
 
 /// A speech socket's last message: no more words, so the rest is made and
 /// the socket ends.
@@ -556,6 +570,24 @@ pub struct Tts {
     /// Until when no socket is opened: the dialogue sessions were all held
     /// ([`TOO_MANY`], [`SOCKET_BUSY_PAUSE`]).
     paused_until: Mutex<Option<Instant>>,
+    /// Told each time a socket that was opening opens or goes: a dialogue
+    /// piece ready first waits on it ([`DIALOGUE_OPEN_WITHIN`]).
+    changed: tokio::sync::Notify,
+    /// The request whose first piece's readiness the journal has told.
+    noted: Mutex<Option<u64>>,
+    /// Requests up to this one are over ([`Tts::close_ahead`]): an open
+    /// asked for one of them late, as its spawned task runs, opens nothing.
+    closed_through: Mutex<u64>,
+    /// How often a waiting dialogue socket is sent `keep_alive`
+    /// ([`KEEP_ALIVE_EVERY`]).
+    keep_alive: Duration,
+    /// `LAMP_SECOND_SPEECH_SOCKET=on`: sockets are opened at all
+    /// ([`Tts::speaking_on_a_socket`]); off, nothing opens.
+    socket_on: AtomicBool,
+    /// The latest dialogue sockets' opens, ask to open, at most
+    /// [`UPGRADES_KEPT`]: the line's socket is waited for by them
+    /// ([`Tts::dialogue_wait`]).
+    upgrades: Mutex<VecDeque<Duration>>,
 }
 
 /// A speech socket, ElevenLabs' `stream-input` or its dialogue one.
@@ -568,26 +600,154 @@ type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 pub const SOCKET_FIRST_AUDIO_WITHIN: Duration = Duration::from_millis(1_500);
 
 /// The longest the dialogue socket may take to open, once its piece is
-/// ready, before the piece goes over HTTP instead. It is opened on the
-/// piece's own path (never ahead, [`SocketShape::Dialogue`]), so a slow
-/// relay handshake would hold the answer's first sound for up to
-/// [`CONNECT`], 10 s; a kept HTTP connection's first audio is 420 to 690
-/// ms on lamp-4ace, so the socket gets less than that to be worth it (the
-/// reviewer-lead's P2 on #2658). `stream-input`, opened ahead while the
-/// chat thinks, keeps [`CONNECT`].
+/// ready, before the piece goes over HTTP instead. Opened on the piece's
+/// own path (asked as the chat is, [`SocketShape::Dialogue`]), a slow relay
+/// handshake would hold the answer's first sound for up to [`CONNECT`],
+/// 10 s; a kept HTTP connection's first audio is 420 to 690 ms on
+/// lamp-4ace, so the socket gets less than that to be worth it (the
+/// reviewer-lead's P2 on #2658). Opened as the line began, it has
+/// [`CONNECT`] until its piece is ready, and this much past that.
+/// `stream-input`, opened ahead, keeps [`CONNECT`].
 pub const DIALOGUE_OPEN_WITHIN: Duration = Duration::from_millis(400);
 
+/// The dialogue socket opened as the line began is waited for, from its
+/// ask, as long as the p90 of its latest opens ([`UPGRADES_KEPT`]) and this
+/// margin, within [`DIALOGUE_WAIT_FLOOR`] and [`DIALOGUE_WAIT_CAP`]. A
+/// fixed 400 ms always missed: the upgrade's p50 was 481 ms and its p90 503
+/// ms on lamp-c0a4, and it timed out 16 of 16 on lamp-4ace (the first
+/// builder at 02:36 on #2602).
+pub const DIALOGUE_WAIT_MARGIN: Duration = Duration::from_millis(150);
+/// The least the line's dialogue socket is waited for from its ask: the
+/// budget the socket opened at the piece has.
+pub const DIALOGUE_WAIT_FLOOR: Duration = DIALOGUE_OPEN_WITHIN;
+/// The most: past it a piece over HTTP has long had its first audio (633
+/// ms on the socket against 298 over HTTP on lamp-4ace, #2602).
+pub const DIALOGUE_WAIT_CAP: Duration = Duration::from_millis(1_200);
+/// Before any open was measured: lamp-4ace's opens (704 to 730 ms) and the
+/// margin, about.
+pub const DIALOGUE_WAIT_FIRST: Duration = Duration::from_millis(900);
+/// The opens the bound is read from: enough for a p90 that follows the
+/// relay as it slows or speeds up.
+const UPGRADES_KEPT: usize = 10;
+
+/// The p90 of `upgrades` and [`DIALOGUE_WAIT_MARGIN`], within the floor and
+/// the cap; [`DIALOGUE_WAIT_FIRST`] before any.
+fn dialogue_wait_from(upgrades: &VecDeque<Duration>) -> Duration {
+    if upgrades.is_empty() {
+        return DIALOGUE_WAIT_FIRST;
+    }
+    let mut sorted: Vec<Duration> = upgrades.iter().copied().collect();
+    sorted.sort();
+    let p90 = sorted[(sorted.len() * 9).div_ceil(10) - 1];
+    (p90 + DIALOGUE_WAIT_MARGIN).clamp(DIALOGUE_WAIT_FLOOR, DIALOGUE_WAIT_CAP)
+}
+
 /// The speech socket opened ahead of a request's answer (#2135's row; the
-/// first builder on #1722, 20 Oct 10:37): opened as its chat is asked, so
-/// its first piece goes to a socket already open. A piece that finds it
-/// still opening goes over HTTP as before.
+/// first builder on #1722, 20 Oct 10:37): opened as its line begins, or as
+/// its chat is asked, so its first piece goes to a socket already open. A
+/// `stream-input` piece that finds it still opening goes over HTTP as
+/// before; a dialogue one waits [`DIALOGUE_OPEN_WITHIN`] for it.
 enum Ahead {
     /// The dialogue socket for the request, opened by its first piece with
     /// words ([`SocketShape::Dialogue`]): nothing is held until then.
     OnReply(u64, Box<SocketRequest>),
-    Opening(u64),
-    /// Open for the request since then, told the voice's settings.
+    /// Opening for the request on that endpoint since it was asked.
+    Opening(u64, SocketShape, Instant),
+    /// `stream-input` open for the request since then, told the voice's
+    /// settings.
     Open(u64, Box<Socket>, Instant),
+    /// A dialogue socket open for the request since then, kept alive while
+    /// it waits for its piece.
+    Kept(u64, Kept, Instant),
+}
+
+/// A waiting dialogue socket, shared with its `keep_alive` task, which
+/// holds it only weakly; `None` once taken, or once a `keep_alive` failed.
+type KeptSocket = Arc<tokio::sync::Mutex<Option<Socket>>>;
+
+/// A dialogue socket opened as its line began, and its request, whose
+/// voice its piece names.
+struct Kept {
+    socket: KeptSocket,
+    request: Box<SocketRequest>,
+}
+
+/// When a speech socket was asked for: the journal says from when it took
+/// to open.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Asked {
+    /// As the request's line began ([`Tts::open_at_line`]).
+    AtLine,
+    /// As its chat was asked ([`Tts::open_ahead`]).
+    AtAnswer,
+}
+
+impl Asked {
+    fn began(self) -> &'static str {
+        match self {
+            Asked::AtLine => "the line began",
+            Asked::AtAnswer => "its answer began",
+        }
+    }
+}
+
+/// `socket` closed in the background: a dialogue one told `close_socket`
+/// first, so its session is freed at once. Without a runtime it is dropped.
+fn close_later(socket: Socket, shape: SocketShape) {
+    let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+        return;
+    };
+    runtime.spawn(async move {
+        let mut socket = socket;
+        let _ = tokio::time::timeout(Duration::from_secs(2), async {
+            if shape == SocketShape::Dialogue {
+                let close = json!({"close_socket": true}).to_string();
+                let _ = socket.send(Frame::Text(close.into())).await;
+            }
+            let _ = socket.close(None).await;
+        })
+        .await;
+    });
+}
+
+/// An old request's socket let go: closed when it was open.
+fn retire(old: Option<Ahead>) {
+    match old {
+        Some(Ahead::Open(_, socket, _)) => close_later(*socket, SocketShape::StreamInput),
+        Some(Ahead::Kept(_, kept, _)) => {
+            let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+                return;
+            };
+            runtime.spawn(async move {
+                if let Some(socket) = kept.socket.lock().await.take() {
+                    close_later(socket, SocketShape::Dialogue);
+                }
+            });
+        }
+        _ => {}
+    }
+}
+
+/// `kept` sent `keep_alive` every `every` until it is taken or let go; a
+/// send that fails drops it, so its piece goes over HTTP.
+fn keep_alive(kept: std::sync::Weak<tokio::sync::Mutex<Option<Socket>>>, every: Duration) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(every).await;
+            let Some(kept) = kept.upgrade() else {
+                return;
+            };
+            let mut socket = kept.lock().await;
+            let Some(open) = socket.as_mut() else {
+                return;
+            };
+            let message = socket_keep_alive().to_string();
+            if open.send(Frame::Text(message.into())).await.is_err() {
+                *socket = None;
+                return;
+            }
+        }
+    });
 }
 
 impl Tts {
@@ -628,6 +788,12 @@ impl Tts {
             socketed: Mutex::new(None),
             refused: Mutex::new(None),
             paused_until: Mutex::new(None),
+            changed: tokio::sync::Notify::new(),
+            noted: Mutex::new(None),
+            closed_through: Mutex::new(0),
+            keep_alive: KEEP_ALIVE_EVERY,
+            socket_on: AtomicBool::new(false),
+            upgrades: Mutex::new(VecDeque::with_capacity(UPGRADES_KEPT)),
         })
     }
 
@@ -711,10 +877,32 @@ impl Tts {
     /// With `LAMP_SECOND_SPEECH_SOCKET=on`, a speech socket opened now for
     /// `request`'s answer, its voice's settings sent, for the first of its
     /// pieces that finds it open ([`Self::speak_for`]). ElevenLabs only; one
-    /// opened before, for an older request, is closed. Nothing on failure:
-    /// the pieces go over HTTP as before.
+    /// opened before, for an older request, is closed; one already asked
+    /// for this request, as its line began, is kept. A dialogue socket is
+    /// not opened now but by its first piece. Nothing on failure: the
+    /// pieces go over HTTP as before.
     pub async fn open_ahead(&self, request: u64) {
-        if !self.opens_ahead() {
+        self.open(request, Asked::AtAnswer).await;
+    }
+
+    /// With `LAMP_SECOND_SPEECH_SOCKET=on`, a speech socket opened now, as
+    /// `request`'s line begins, so its ~720 ms open (the first builder on
+    /// #2602, lamp-4ace) is paid while the person still speaks: `stream-input`
+    /// waits with its `inactivity_timeout`, a dialogue socket is sent
+    /// `keep_alive` ([`KEEP_ALIVE_EVERY`]). Closed when the request ends
+    /// without it ([`Self::close_ahead`]).
+    pub async fn open_at_line(&self, request: u64) {
+        self.open(request, Asked::AtLine).await;
+    }
+
+    /// The switch, `LAMP_SECOND_SPEECH_SOCKET` ([`Self::open_at_line`],
+    /// [`Self::open_ahead`]): off, no socket is opened.
+    pub fn speaking_on_a_socket(&self, on: bool) {
+        self.socket_on.store(on, Ordering::Relaxed);
+    }
+
+    async fn open(&self, request: u64, asked: Asked) {
+        if !self.socket_on.load(Ordering::Relaxed) || !self.opens_ahead() {
             return;
         }
         let Ok(socket) = socket_request(
@@ -725,17 +913,50 @@ impl Tts {
         ) else {
             return;
         };
-        self.open_ahead_on(request, &socket).await;
+        self.open_on(request, &socket, asked).await;
     }
 
+    #[cfg(test)]
     async fn open_ahead_on(&self, request: u64, socket: &SocketRequest) {
-        if let Ok(mut ahead) = self.ahead.lock() {
-            *ahead = Some(match socket.shape {
-                SocketShape::StreamInput => Ahead::Opening(request),
+        self.open_on(request, socket, Asked::AtAnswer).await;
+    }
+
+    async fn open_on(&self, request: u64, socket: &SocketRequest, asked: Asked) {
+        let from = Instant::now();
+        {
+            let Ok(mut ahead) = self.ahead.lock() else {
+                return;
+            };
+            if self
+                .closed_through
+                .lock()
+                .is_ok_and(|through| request <= *through)
+            {
+                return;
+            }
+            // Asked as its line began: the answer keeps that one.
+            if asked == Asked::AtAnswer
+                && matches!(
+                    &*ahead,
+                    Some(
+                        Ahead::OnReply(of, _)
+                            | Ahead::Opening(of, ..)
+                            | Ahead::Open(of, ..)
+                            | Ahead::Kept(of, ..)
+                    ) if *of == request
+                )
+            {
+                return;
+            }
+            let next = match (socket.shape, asked) {
                 // Not opened now: it would hold a dialogue session while
                 // the chat thinks.
-                SocketShape::Dialogue => Ahead::OnReply(request, Box::new(socket.clone())),
-            });
+                (SocketShape::Dialogue, Asked::AtAnswer) => {
+                    Ahead::OnReply(request, Box::new(socket.clone()))
+                }
+                (shape, _) => Ahead::Opening(request, shape, from),
+            };
+            retire(ahead.replace(next));
         }
         // From the ask, not the open: a piece that goes over HTTP while the
         // socket still opens is said in the socket's model too, so one
@@ -743,10 +964,9 @@ impl Tts {
         if let Ok(mut socketed) = self.socketed.lock() {
             *socketed = Some(request);
         }
-        if socket.shape == SocketShape::Dialogue {
+        if socket.shape == SocketShape::Dialogue && asked == Asked::AtAnswer {
             return;
         }
-        let from = Instant::now();
         let opened = open_socket(socket, CONNECT).await;
         // A 429 at the upgrade pauses the sockets; a 400, 404 or 422 there
         // refuses the model, as its 4400, 4404 or 4422 close does, so the
@@ -760,17 +980,40 @@ impl Tts {
         let Ok(mut ahead) = self.ahead.lock() else {
             return;
         };
-        // Only if it is still this request's: a newer one's is left alone.
-        if !matches!(*ahead, Some(Ahead::Opening(of)) if of == request) {
+        // Only if it is still this request's: a newer one's is left alone,
+        // and one let go meanwhile (its request ended) is closed.
+        if !matches!(*ahead, Some(Ahead::Opening(of, ..)) if of == request) {
+            if let Ok(socket_open) = opened {
+                close_later(socket_open, socket.shape);
+            }
             return;
         }
+        if opened.is_ok() && socket.shape == SocketShape::Dialogue {
+            self.upgraded(from.elapsed());
+        }
         match opened {
-            Ok(socket) => {
+            Ok(open) => {
                 eprintln!(
-                    "lamp-voice second: request {request}: the speech socket is open, {} ms after it was asked",
-                    from.elapsed().as_millis()
+                    "lamp-voice second: request {request}: the speech socket is open, {} ms after {}",
+                    from.elapsed().as_millis(),
+                    asked.began()
                 );
-                *ahead = Some(Ahead::Open(request, Box::new(socket), Instant::now()));
+                let now = Instant::now();
+                *ahead = Some(match socket.shape {
+                    SocketShape::StreamInput => Ahead::Open(request, Box::new(open), now),
+                    SocketShape::Dialogue => {
+                        let kept: KeptSocket = Arc::new(tokio::sync::Mutex::new(Some(open)));
+                        keep_alive(Arc::downgrade(&kept), self.keep_alive);
+                        Ahead::Kept(
+                            request,
+                            Kept {
+                                socket: kept,
+                                request: Box::new(socket.clone()),
+                            },
+                            now,
+                        )
+                    }
+                });
             }
             Err(error) => {
                 eprintln!(
@@ -779,6 +1022,47 @@ impl Tts {
                 *ahead = None;
             }
         }
+        drop(ahead);
+        self.changed.notify_waiters();
+    }
+
+    /// `request` is over, answered or not (judged not for the lamp, given
+    /// up, cancelled or replaced): its socket, or an older request's, still
+    /// waiting or opening, is closed, so no dialogue session is held
+    /// between turns. A newer request's is left alone.
+    pub fn close_ahead(&self, request: u64) {
+        let old = {
+            let Ok(mut ahead) = self.ahead.lock() else {
+                return;
+            };
+            if let Ok(mut through) = self.closed_through.lock() {
+                *through = (*through).max(request);
+            }
+            let of = match &*ahead {
+                Some(
+                    Ahead::OnReply(of, _)
+                    | Ahead::Opening(of, ..)
+                    | Ahead::Open(of, ..)
+                    | Ahead::Kept(of, ..),
+                ) => *of,
+                None => return,
+            };
+            if of > request {
+                return;
+            }
+            let old = ahead.take();
+            if matches!(
+                old,
+                Some(Ahead::Open(..) | Ahead::Kept(..) | Ahead::Opening(..))
+            ) {
+                eprintln!(
+                    "lamp-voice second: request {of}: ended with its speech socket unused: closed"
+                );
+            }
+            old
+        };
+        retire(old);
+        self.changed.notify_waiters();
     }
 
     /// The socket opened ahead for `request`, when it is open: taken, so one
@@ -792,6 +1076,25 @@ impl Tts {
                 None
             }
         }
+    }
+
+    /// The dialogue socket opened as `request`'s line began, when it is
+    /// open, taken with `text`'s messages; a piece with no words leaves it.
+    /// `None` too when its `keep_alive` failed: the piece goes over HTTP.
+    async fn take_kept(&self, request: u64, text: &str) -> Option<(Socket, Instant, Vec<Value>)> {
+        let (kept, at, messages) = {
+            let mut ahead = self.ahead.lock().ok()?;
+            let messages = match &*ahead {
+                Some(Ahead::Kept(of, kept, _)) if *of == request => kept.request.messages(text)?,
+                _ => return None,
+            };
+            match ahead.take() {
+                Some(Ahead::Kept(_, kept, at)) => (kept, at, messages),
+                _ => return None,
+            }
+        };
+        let socket = kept.socket.lock().await.take()?;
+        Some((socket, at, messages))
     }
 
     /// The dialogue socket waiting for `request`'s first piece with words,
@@ -808,15 +1111,113 @@ impl Tts {
         }
     }
 
+    /// The journal's line, once a request, on whether its socket was open
+    /// as its first piece with words was ready, in ms. No words.
+    fn note_ready(&self, request: u64, text: &str) {
+        if without_tags(text).trim().is_empty() {
+            return;
+        }
+        let Ok(mut noted) = self.noted.lock() else {
+            return;
+        };
+        if *noted == Some(request) {
+            return;
+        }
+        let Ok(ahead) = self.ahead.lock() else {
+            return;
+        };
+        let told = match &*ahead {
+            Some(Ahead::Open(of, _, at) | Ahead::Kept(of, _, at)) if *of == request => format!(
+                "open when its first piece was ready, {} ms before",
+                at.elapsed().as_millis()
+            ),
+            Some(Ahead::Opening(of, _, from)) if *of == request => format!(
+                "not open yet when its first piece was ready, {} ms after it was asked",
+                from.elapsed().as_millis()
+            ),
+            _ => return,
+        };
+        *noted = Some(request);
+        eprintln!("lamp-voice second: request {request}: the speech socket was {told}");
+    }
+
+    /// A dialogue socket opened in `took`, from its ask: kept for the bound.
+    fn upgraded(&self, took: Duration) {
+        if let Ok(mut upgrades) = self.upgrades.lock() {
+            if upgrades.len() == UPGRADES_KEPT {
+                upgrades.pop_front();
+            }
+            upgrades.push_back(took);
+        }
+    }
+
+    /// How long from its ask the line's dialogue socket is waited for
+    /// ([`dialogue_wait_from`]).
+    fn dialogue_wait(&self) -> Duration {
+        self.upgrades
+            .lock()
+            .map_or(DIALOGUE_WAIT_FIRST, |upgrades| {
+                dialogue_wait_from(&upgrades)
+            })
+    }
+
+    /// When `request`'s dialogue socket was asked for, while it still opens.
+    fn dialogue_opening(&self, request: u64) -> Option<Instant> {
+        let ahead = self.ahead.lock().ok()?;
+        match &*ahead {
+            Some(Ahead::Opening(of, SocketShape::Dialogue, asked)) if *of == request => {
+                Some(*asked)
+            }
+            _ => None,
+        }
+    }
+
+    /// A dialogue piece with words ready while its socket, asked for as the
+    /// line began, still opens: it waits for it until the ask and the
+    /// measured bound ([`Self::dialogue_wait`]), then goes over HTTP.
+    async fn wait_for_dialogue(&self, request: u64, text: &str) {
+        if without_tags(text).trim().is_empty() {
+            return;
+        }
+        let from = Instant::now();
+        let Some(asked) = self.dialogue_opening(request) else {
+            return;
+        };
+        let bound = self.dialogue_wait();
+        let deadline = tokio::time::Instant::from_std(asked + bound);
+        loop {
+            let changed = self.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.dialogue_opening(request).is_none() {
+                return;
+            }
+            if tokio::time::timeout_at(deadline, changed).await.is_err() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the dialogue speech socket was slow to open: not open {} ms after its piece was ready, {} ms after it was asked (bound {} ms)",
+                    from.elapsed().as_millis(),
+                    asked.elapsed().as_millis(),
+                    bound.as_millis()
+                );
+                return;
+            }
+        }
+    }
+
     /// `turn`'s piece on its speech socket: the one opened ahead, or the
     /// dialogue socket opened now. `None` when it has none, so it goes over
     /// HTTP; `Some(Ok(None))` when nothing in it would be spoken.
     async fn on_socket(&self, text: &str, turn: Turn) -> Option<Result<Option<TtsStream>>> {
+        self.note_ready(turn.request, text);
         if let Some((socket, opened)) = self.take_ahead(turn.request) {
             let Some(piece) = socket_piece(text) else {
                 return Some(Ok(None));
             };
             let messages = vec![piece, socket_end()];
+            return Some(self.speak_on(socket, opened, messages, text, turn).await);
+        }
+        self.wait_for_dialogue(turn.request, text).await;
+        if let Some((socket, opened, messages)) = self.take_kept(turn.request, text).await {
             return Some(self.speak_on(socket, opened, messages, text, turn).await);
         }
         let (request, messages) = self.take_on_reply(turn.request, text)?;
@@ -834,6 +1235,7 @@ impl Tts {
                 return Some(Err(error));
             }
         };
+        self.upgraded(from.elapsed());
         eprintln!(
             "lamp-voice second: request {}: the dialogue speech socket is open, {} ms after its piece was ready",
             turn.request,
@@ -1607,9 +2009,10 @@ mod tests {
     }
 
     /// A local dialogue socket: it counts the connections it accepts, reads
-    /// the opening, the input, `flush` and `close_socket` into `read`, then
-    /// sends `answers` as [`socket_serving`] does, and holds the socket open
-    /// after them, so only the client's reading ends a piece.
+    /// the opening, any `keep_alive`, the input, `flush` and `close_socket`
+    /// into `read`, then sends `answers` as [`socket_serving`] does, and
+    /// holds the socket open after them, so only the client's reading ends a
+    /// piece. A close before `close_socket` ends it.
     async fn dialogue_serving(
         answers: Vec<&'static str>,
     ) -> (String, Arc<AtomicUsize>, Arc<Mutex<Vec<Value>>>) {
@@ -1621,7 +2024,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             counted.fetch_add(1, Ordering::SeqCst);
             let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
-            while kept.lock().unwrap().len() < 4 {
+            while kept.lock().unwrap().last() != Some(&json!({"close_socket": true})) {
                 match ws.next().await {
                     Some(Ok(Frame::Text(text))) => kept
                         .lock()
@@ -1699,6 +2102,219 @@ mod tests {
         other.open_ahead_on(8, &local_dialogue("127.0.0.1:9")).await;
         assert!(other.take_on_reply(9, "Hi.").is_none());
         assert!(other.take_on_reply(8, "Hi.").is_some());
+    }
+
+    /// #2602 (the first builder on lamp-4ace, 02:00: v4's socket, opened at
+    /// the piece, was never open within its 400 ms, 16 of 16): opened as the
+    /// line begins, the dialogue socket is sent `keep_alive` while it waits,
+    /// the answer's ask keeps it, and the first piece speaks on it, with no
+    /// second connection.
+    #[tokio::test]
+    async fn a_dialogue_socket_opened_at_the_line_is_kept_alive_for_its_first_piece() {
+        let (address, accepted, read) = dialogue_serving(vec![
+            r#"{"audio":"AQACAA==","alignment":null}"#,
+            r#"{"is_final":true}"#,
+        ])
+        .await;
+        let tts = Tts {
+            keep_alive: Duration::from_millis(30),
+            ..Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap()
+        };
+        tts.open_on(7, &local_dialogue(&address), Asked::AtLine)
+            .await;
+        assert_eq!(accepted.load(Ordering::SeqCst), 1, "opened at the line");
+        assert!(matches!(
+            *tts.ahead.lock().unwrap(),
+            Some(Ahead::Kept(7, ..))
+        ));
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        tts.open_ahead_on(7, &local_dialogue(&address)).await;
+        assert_eq!(said(&tts, "Hello there.", 7).await, [2, 4]);
+        assert_eq!(accepted.load(Ordering::SeqCst), 1, "no second connection");
+        let read: Vec<Value> = read.lock().unwrap().clone();
+        assert_eq!(read[0], json!({"voices": ["21m00Tcm4TlvDq8ikWAM"]}));
+        let alive = read.iter().filter(|m| **m == socket_keep_alive()).count();
+        assert!(alive >= 2, "kept alive while it waited: {read:?}");
+        assert_eq!(
+            read[read.len() - 3..],
+            [
+                json!({"inputs": [{"text": "Hello there.", "voice_id": "21m00Tcm4TlvDq8ikWAM"}]}),
+                json!({"flush": true}),
+                json!({"close_socket": true}),
+            ]
+        );
+        let told = tts.told(7).unwrap();
+        assert!(told.contains("1 of 1 pieces began"), "{told}");
+    }
+
+    /// A local dialogue socket whose upgrade is answered `delay` after its
+    /// connection, as a slow relay's: it then reads up to `close_socket` and
+    /// answers one packet and `is_final`.
+    async fn slow_dialogue(delay: Duration) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(delay).await;
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            loop {
+                match ws.next().await {
+                    Some(Ok(Frame::Text(text))) if text.as_str().contains("close_socket") => break,
+                    Some(Ok(_)) => {}
+                    _ => return,
+                }
+            }
+            for answer in [r#"{"audio":"AQACAA=="}"#, r#"{"is_final":true}"#] {
+                ws.send(Frame::Text(answer.into())).await.unwrap();
+            }
+            std::future::pending::<()>().await;
+        });
+        address
+    }
+
+    /// The first builder at 02:36 on #2602: the line's dialogue socket is
+    /// waited for as long as its measured opens say (p90 and a margin, from
+    /// its ask), not a fixed 400 ms: an open slower than 400 ms but within
+    /// that bound is kept for the piece; one past it gives the piece to
+    /// HTTP at the bound. Floor, cap and the bound before any open hold.
+    #[tokio::test]
+    async fn the_lines_dialogue_socket_is_waited_for_as_its_measured_opens_say() {
+        let measured: VecDeque<Duration> =
+            [480, 481, 490, 495, 503].map(Duration::from_millis).into();
+        assert_eq!(dialogue_wait_from(&measured), Duration::from_millis(653));
+        assert_eq!(dialogue_wait_from(&VecDeque::new()), DIALOGUE_WAIT_FIRST);
+        let fast: VecDeque<Duration> = [Duration::from_millis(50)].into();
+        assert_eq!(dialogue_wait_from(&fast), DIALOGUE_WAIT_FLOOR);
+        let slow: VecDeque<Duration> = [Duration::from_secs(3)].into();
+        assert_eq!(dialogue_wait_from(&slow), DIALOGUE_WAIT_CAP);
+        for (delay, on_socket) in [(550, true), (900, false)] {
+            let address = slow_dialogue(Duration::from_millis(delay)).await;
+            let (url, _, asked) = keeping(vec![5, 0, 6, 0], false).await;
+            let tts = Tts {
+                upgrades: Mutex::new(measured.clone()),
+                ..Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap()
+            };
+            let socket = local_dialogue(&address);
+            let from = Instant::now();
+            let piece = async {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                let spoken = said(&tts, "Hello there.", 7).await;
+                (spoken, from.elapsed())
+            };
+            let (_, (spoken, took)) = tokio::join!(tts.open_on(7, &socket, Asked::AtLine), piece);
+            if on_socket {
+                assert_eq!(spoken, [2, 4], "{delay} ms: kept for the piece");
+                assert!(asked.lock().unwrap().is_empty(), "{delay} ms");
+            } else {
+                assert_eq!(spoken, [10, 12], "{delay} ms: over HTTP");
+                assert_eq!(asked.lock().unwrap().len(), 1);
+                assert!(
+                    took >= Duration::from_millis(640) && took < Duration::from_millis(880),
+                    "at the bound: {took:?}"
+                );
+            }
+            tts.close_ahead(7);
+        }
+    }
+
+    /// #2602: `stream-input` opened as the line begins is the one the
+    /// answer's first piece speaks on; the answer's own ask keeps it.
+    #[tokio::test]
+    async fn the_first_piece_speaks_on_the_socket_opened_at_the_line() {
+        let (address, server) = socket_serving(vec![
+            r#"{"audio":"AQACAA==","isFinal":false}"#,
+            r#"{"audio":null,"isFinal":true}"#,
+        ])
+        .await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        tts.open_on(7, &local_socket(&address), Asked::AtLine).await;
+        assert!(matches!(
+            *tts.ahead.lock().unwrap(),
+            Some(Ahead::Open(7, ..))
+        ));
+        tts.open_ahead_on(7, &local_socket("127.0.0.1:9")).await;
+        assert_eq!(said(&tts, "Hello there.", 7).await, [2, 4]);
+        assert_eq!(
+            served(server).await,
+            [
+                socket_opening(),
+                socket_piece("Hello there.").unwrap(),
+                socket_end()
+            ]
+        );
+    }
+
+    /// #2602: a request that ends without its socket (unanswered, given
+    /// up, cancelled or replaced) closes it at once: a dialogue one told
+    /// `close_socket`, so no session is held between turns. A newer
+    /// request's is left alone, and an open asked late for an ended one
+    /// opens nothing.
+    #[tokio::test]
+    async fn a_request_ended_unanswered_closes_its_socket() {
+        let (address, accepted, read) = dialogue_serving(Vec::new()).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
+        tts.open_on(7, &local_dialogue(&address), Asked::AtLine)
+            .await;
+        tts.close_ahead(6);
+        assert!(
+            tts.ahead.lock().unwrap().is_some(),
+            "a newer request's stays"
+        );
+        tts.close_ahead(7);
+        assert!(tts.ahead.lock().unwrap().is_none());
+        for _ in 0..100 {
+            if read.lock().unwrap().len() == 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(
+            *read.lock().unwrap(),
+            [
+                json!({"voices": ["21m00Tcm4TlvDq8ikWAM"]}),
+                json!({"close_socket": true}),
+            ]
+        );
+        tts.open_on(7, &local_dialogue(&address), Asked::AtLine)
+            .await;
+        assert!(
+            tts.ahead.lock().unwrap().is_none(),
+            "ended: not opened again"
+        );
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+        // One let go while it still opens is closed once it opens.
+        let (address, server) = socket_serving(Vec::new()).await;
+        let socket = local_socket(&address);
+        let opening = tts.open_on(8, &socket, Asked::AtLine);
+        let closing = async {
+            tokio::task::yield_now().await;
+            tts.close_ahead(8);
+        };
+        tokio::join!(opening, closing);
+        assert!(tts.ahead.lock().unwrap().is_none());
+        assert_eq!(served(server).await, [socket_opening()], "closed, unused");
+    }
+
+    /// `LAMP_SECOND_SPEECH_SOCKET` off: no socket opens, at the line or at
+    /// the answer; on, the line's open connects.
+    #[tokio::test]
+    async fn with_the_switch_off_no_socket_opens() {
+        let (address, accepted) = upgrade_answering(None).await;
+        let tts = Tts::with(
+            TtsProvider::ElevenLabs,
+            &format!("https://{address}"),
+            "k",
+            None,
+        )
+        .unwrap();
+        tts.open_at_line(3).await;
+        tts.open_ahead(3).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(accepted.load(Ordering::SeqCst), 0, "off: nothing opens");
+        assert!(tts.ahead.lock().unwrap().is_none());
+        tts.speaking_on_a_socket(true);
+        let _ = tokio::time::timeout(Duration::from_millis(300), tts.open_at_line(4)).await;
+        assert_eq!(accepted.load(Ordering::SeqCst), 1, "on: opened at the line");
     }
 
     /// The backend on #2135: past 105 open dialogue sessions the service
@@ -2056,11 +2672,12 @@ mod tests {
     #[tokio::test]
     async fn a_socket_still_opening_or_not_opened_leaves_its_pieces_to_http() {
         let tts = Tts::with(TtsProvider::ElevenLabs, PROXY, "k", None).unwrap();
-        *tts.ahead.lock().unwrap() = Some(Ahead::Opening(9));
+        *tts.ahead.lock().unwrap() =
+            Some(Ahead::Opening(9, SocketShape::StreamInput, Instant::now()));
         assert!(tts.take_ahead(9).is_none());
         assert!(matches!(
             *tts.ahead.lock().unwrap(),
-            Some(Ahead::Opening(9))
+            Some(Ahead::Opening(9, ..))
         ));
         let refused = SocketRequest {
             url: "ws://127.0.0.1:9/x".to_owned(),

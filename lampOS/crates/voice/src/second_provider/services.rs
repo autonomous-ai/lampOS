@@ -77,6 +77,17 @@ pub trait Services: Send + Sync + 'static {
     fn open_speech_ahead(&self, request: u64) {
         let _ = request;
     }
+    /// `request`'s line begins: nothing, unless its voice opens its speech
+    /// socket now, while the person speaks ([`Tts::open_at_line`],
+    /// `LAMP_SECOND_SPEECH_SOCKET=on`).
+    fn open_speech_at_line(&self, request: u64) {
+        let _ = request;
+    }
+    /// `request` is over, answered or not: its speech socket still unused,
+    /// or an older one's, is closed ([`Tts::close_ahead`]).
+    fn close_speech(&self, request: u64) {
+        let _ = request;
+    }
 }
 
 /// One open utterance.
@@ -136,9 +147,6 @@ pub struct Net {
     /// `LAMP_SECOND_SPEECH_WARM=on`: the configured voice's connection is
     /// opened as a line begins ([`Tts::warm`]).
     warm_speech: bool,
-    /// `LAMP_SECOND_SPEECH_SOCKET=on`: a speech socket is opened as each
-    /// answer begins, for its first piece ([`Tts::open_ahead`]).
-    speech_socket: bool,
     /// With the person's own DeepSeek key (`LAMP_OWN_KEYS`, #2094): the
     /// relay's chat a request goes to when their endpoint refuses it (401,
     /// 403) before any answer, and what is told of each refusal.
@@ -168,8 +176,8 @@ pub const CHAT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_WARM";
 /// Where the worker reads whether the configured voice's connection is
 /// opened as a line begins: `on`, and nothing else.
 pub const SPEECH_WARM_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_WARM";
-/// Where the worker reads whether a speech socket is opened as each answer
-/// begins (#2135's row): `on`, and nothing else.
+/// Where the worker reads whether a speech socket is opened as each line
+/// begins, for its answer (#2135's row, #2602): `on`, and nothing else.
 pub const SPEECH_SOCKET_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_SOCKET";
 /// Where the voice reads the speech socket's own model (#2135, the backend at
 /// 17:5x on 21 Oct): a model ElevenLabs' `stream-input` serves, or
@@ -195,7 +203,6 @@ impl Net {
             declare,
             warm_chat: false,
             warm_speech: false,
-            speech_socket: false,
             refused_to: None,
             config: Arc::new(config),
         })
@@ -220,12 +227,15 @@ impl Net {
         self
     }
 
-    /// A speech socket is opened as each answer begins, while its chat
-    /// thinks, and the first of its pieces that finds it open speaks on it
-    /// ([`Tts::open_ahead`], `LAMP_SECOND_SPEECH_SOCKET=on`, #2135's row).
+    /// A speech socket is opened as each line begins, while the person
+    /// speaks, and the first of its answer's pieces that finds it open
+    /// speaks on it ([`Tts::open_at_line`], `LAMP_SECOND_SPEECH_SOCKET=on`,
+    /// #2135's row; #2602: opened as the chat was asked, Flash's took 704 to
+    /// 730 ms and v4's was never open in time). A request with no line, a
+    /// written one, has it opened as its answer begins ([`Tts::open_ahead`]).
     /// Only the configured voice, and only ElevenLabs.
-    pub fn speaking_on_a_socket(mut self, on: bool) -> Self {
-        self.speech_socket = on;
+    pub fn speaking_on_a_socket(self, on: bool) -> Self {
+        self.tts.speaking_on_a_socket(on);
         self
     }
 
@@ -541,11 +551,23 @@ impl Services for Net {
 
     fn open_speech_ahead(&self, request: u64) {
         // The configured voice only when it is the lamp's one voice.
-        if !self.speech_socket || self.gemini_tts.is_some() {
+        if self.gemini_tts.is_some() {
             return;
         }
         let tts = self.tts.clone();
         tokio::spawn(async move { tts.open_ahead(request).await });
+    }
+
+    fn open_speech_at_line(&self, request: u64) {
+        if self.gemini_tts.is_some() {
+            return;
+        }
+        let tts = self.tts.clone();
+        tokio::spawn(async move { tts.open_at_line(request).await });
+    }
+
+    fn close_speech(&self, request: u64) {
+        self.tts.close_ahead(request);
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {

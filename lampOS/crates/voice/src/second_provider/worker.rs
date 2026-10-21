@@ -968,14 +968,14 @@ pub fn services(
             "lamp-voice second: the configured voice's connection is opened as a line begins (LAMP_SECOND_SPEECH_WARM)"
         );
     }
-    // A speech socket opened as each answer begins (#2135's row).
+    // A speech socket opened as each line begins (#2135's row, #2602).
     let speech_socket = std::env::var(super::services::SPEECH_SOCKET_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on");
     if speech_socket {
         eprintln!(
-            "lamp-voice second: a speech socket is opened as each answer begins, for its first piece (LAMP_SECOND_SPEECH_SOCKET)"
+            "lamp-voice second: a speech socket is opened as each line begins, for its answer's first piece (LAMP_SECOND_SPEECH_SOCKET)"
         );
     }
     Ok(net
