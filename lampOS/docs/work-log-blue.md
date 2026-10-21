@@ -321,3 +321,9 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - the rate dropped the rounds between;
   - the camera's evidence is weak (an overexposed band).
 - The lamp is restored and released to Nine. #2682 strikes the lamp-runs row; the set-off case stays open.
+
+## 21–22 Oct, 23:4x–01:1x: part 2 in the merge lane; its lamp row scripted
+
+- **First builder (23:46):** #2666 was ready but had drifted. Rebased as `01bc12064` (range-diff `=`, workspace clippy clean, ARM64 and x86 CI green). #2667 (`743ece8df`) and #2675 (`83e46d7d8`) were restacked, each range-diff `=`.
+- The Reviewer-lead set #2666 for 17:10Z, but it was still open at 01:0x. #2682 (the #2640 row struck) merged.
+- **First builder (00:42):** the next step is part 2's 75c9 row script, so it runs as soon as #2675 is in. It is written: `blue-lamp2.sh` and the probe add-on `probe-say` (a quoted say after 20 s of the voice resting). The plan is posted on #2530. It runs on the CI build that holds all three PRs.
