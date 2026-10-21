@@ -20,6 +20,7 @@ mod fixture_child;
 pub mod fixture_schedule;
 mod health;
 mod health_timing;
+mod kept;
 mod retrieval;
 mod server;
 mod timing;
