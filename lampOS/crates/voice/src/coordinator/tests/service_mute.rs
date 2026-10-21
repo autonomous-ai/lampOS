@@ -449,9 +449,15 @@ fn shutdown_after_unreadable(
     let (mut privacy, mut privacy_channels, privacy_input) =
         Worker::cooperative_fixture(&directory.path, "privacy");
     if let Some(code) = fault {
+        // Aged: stamped 1.7 s back, past the channel's `HELD_UP_US` (1.5 s),
+        // instead of a 1.7 s sleep before the cycle closes (#1806). Nothing
+        // reads the channel in between, so its own grace stays none either way.
+        let back = if aged { 1_700_000 } else { 0 };
         privacy_channels
             .control
-            .send(WorkerEvent::Fault { code: code.into() })
+            .send_with(WorkerEvent::Fault { code: code.into() }, || {
+                monotonic_us().saturating_sub(back)
+            })
             .unwrap();
     }
     if killed {
@@ -463,9 +469,6 @@ fn shutdown_after_unreadable(
     while privacy.try_exit().unwrap().is_none() {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
-    }
-    if aged {
-        thread::sleep(Duration::from_millis(1_700));
     }
     let mut rig = Rig {
         expression_out: None,
