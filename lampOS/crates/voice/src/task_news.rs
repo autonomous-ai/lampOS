@@ -171,6 +171,17 @@ enum Wake {
     Settled,
 }
 
+/// A sign-in by voice followed by the news (#1676), with its switch: the
+/// sign-ins whose question was heard whole, as `send_heard` passes it on,
+/// and how long after a question not heard it is offered again
+/// ([`crate::sign_in::ASK_AGAIN_AFTER`] on a lamp).
+#[derive(Clone)]
+struct SignInFollow {
+    on: bool,
+    heard: Arc<Mutex<BTreeSet<u64>>>,
+    again_after: Duration,
+}
+
 /// One piece of news, ready to tell.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct News {
@@ -391,13 +402,15 @@ fn asked(made: Option<&crate::made_skill::Keeping>, key: &str) {
 
 /// Tell the tasks part in `directory` of each piece of news heard as it
 /// comes from `heard`, and again every [`READ_EVERY`] while it can't take
-/// one, for [`TOLD_PASSES`] passes; a made skill's as asked ([`asked`]).
-/// Ends when the news is let go.
+/// one, for [`TOLD_PASSES`] passes; a made skill's as asked ([`asked`]);
+/// a sign-in's question as heard whole in `heard_whole`, so it isn't offered
+/// again. Ends when the news is let go.
 fn send_heard(
     directory: &Path,
     heard: &Receiver<(String, u64)>,
     stopping: &AtomicBool,
     made: Option<&crate::made_skill::Keeping>,
+    heard_whole: &Mutex<BTreeSet<u64>>,
 ) {
     let mut unsent: Vec<(String, u32)> = Vec::new();
     loop {
@@ -407,6 +420,10 @@ fn send_heard(
                 // later request (#1676). Told once; a question not taken
                 // there (done, or another sign-in) opens nothing.
                 if let Some(id) = crate::sign_in::asked_of(&key) {
+                    // Heard whole: never offered again (`AskAgain`).
+                    if let Ok(mut heard_whole) = heard_whole.lock() {
+                        heard_whole.insert(id);
+                    }
                     if !crate::sign_in::tell_asked(directory, id, request) {
                         eprintln!(
                             "lamp-voice: the sign-in question heard ({key}) was not taken by the tasks part"
@@ -694,7 +711,11 @@ impl TaskNews {
     ) -> Option<Self> {
         let directory = directory.to_path_buf();
         // A sign-in by voice is followed only with its switch (#1676).
-        let sign_in = std::env::var(crate::agent_tasks::SIGN_IN_ENVIRONMENT).as_deref() == Ok("on");
+        let sign_in = SignInFollow {
+            on: std::env::var(crate::agent_tasks::SIGN_IN_ENVIRONMENT).as_deref() == Ok("on"),
+            heard: Arc::new(Mutex::new(BTreeSet::new())),
+            again_after: crate::sign_in::ASK_AGAIN_AFTER,
+        };
         let (offer, offered) = mpsc::channel();
         let (told, heard_told) = mpsc::channel();
         let told_already = Arc::new(Mutex::new(BTreeSet::new()));
@@ -762,11 +783,12 @@ impl TaskNews {
         let (heard, to_send) = mpsc::channel();
         {
             let (directory, stopping) = (directory.clone(), stopping.clone());
+            let asked = sign_in.heard.clone();
             std::thread::Builder::new()
                 .name("lamp-voice-task-heard".into())
                 .spawn(move || {
                     let made = crate::made_skill::Keeping::from_environment();
-                    send_heard(&directory, &to_send, &stopping, made.as_ref())
+                    send_heard(&directory, &to_send, &stopping, made.as_ref(), &asked)
                 })
                 .ok()?;
         }
@@ -782,7 +804,7 @@ impl TaskNews {
                     &shared,
                     &clock,
                     WOKEN_GAP,
-                    sign_in,
+                    &sign_in,
                 )
             })
             .ok()?;
@@ -1004,8 +1026,9 @@ impl TaskNews {
 /// Read the tasks part every [`READ_EVERY`], and at once when a task newly
 /// settled is seen on `tasks/status` ([`Wake::Settled`], #560), though
 /// never sooner than `woken_gap` ([`WOKEN_GAP`] on the lamp) after the read
-/// before, with the tasks part's own clock (`clock`). With `sign_in`, a
-/// sign-in's news too (#1676).
+/// before, with the tasks part's own clock (`clock`). With `sign_in` on, a
+/// sign-in's news too (#1676), its question offered again when it wasn't
+/// heard whole ([`crate::sign_in::AskAgain`]).
 #[allow(clippy::too_many_arguments)]
 fn read_forever(
     directory: &Path,
@@ -1015,18 +1038,26 @@ fn read_forever(
     shared: &Mutex<BTreeSet<String>>,
     clock: &dyn Fn() -> Option<BootClock>,
     woken_gap: Duration,
-    sign_in: bool,
+    sign_in: &SignInFollow,
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
     let mut follow = crate::sign_in::Follow::default();
+    let mut again = crate::sign_in::AskAgain::default();
+    // Told: kept in the file, but a sign-in's question only followed, so
+    // that one not heard whole is offered again (`AskAgain`).
+    let keep = |key: &str, again: &mut crate::sign_in::AskAgain| {
+        if !again.told(key, std::time::Instant::now()) {
+            keep_told(told_file, key);
+        }
+    };
     let made = crate::made_skill::Keeping::from_environment();
     loop {
         // A settled task's wake waiting here is answered by the read just
         // below.
         while let Ok(wake) = told.try_recv() {
             if let Wake::Told(key) = wake {
-                keep_told(told_file, &key);
+                keep(&key, &mut again);
             }
         }
         // Read again each time: the provider worker keeps there what the
@@ -1046,7 +1077,24 @@ fn read_forever(
         // A sign-in the person began by voice (#1676, `crate::sign_in`): its
         // code if it came late, the question once approved in Harness, and
         // how it ended, each told once; read again soon while one is open.
-        let (sign_in_news, sign_in_open) = if sign_in {
+        let (sign_in_news, sign_in_open) = if sign_in.on {
+            // A question taken to be told but not heard whole (cut short,
+            // or its turn not heard) is offered again while it is asked.
+            let heard = sign_in
+                .heard
+                .lock()
+                .map(|heard| heard.clone())
+                .unwrap_or_default();
+            // Heard whole: kept as told from now, as other news is.
+            for key in again.heard(&heard) {
+                keep_told(told_file, &key);
+            }
+            for key in again.due(sign_in.again_after, std::time::Instant::now()) {
+                eprintln!(
+                    "lamp-voice: the sign-in's question ({key}) was not heard whole: offered again"
+                );
+                offered.remove(&key);
+            }
             crate::sign_in::news(directory, &offered, &mut follow)
         } else {
             (Vec::new(), false)
@@ -1088,7 +1136,7 @@ fn read_forever(
                 break;
             }
             match told.recv_timeout(left) {
-                Ok(Wake::Told(key)) => keep_told(told_file, &key),
+                Ok(Wake::Told(key)) => keep(&key, &mut again),
                 Ok(Wake::Settled) => next = next.min(read_at + woken_gap),
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
@@ -1990,7 +2038,13 @@ mod tests {
         let stopping = AtomicBool::new(false);
         heard.send(("sign-in-5-asking".to_owned(), 42)).unwrap();
         drop(heard);
-        send_heard(&directory, &hearing, &stopping, None);
+        send_heard(
+            &directory,
+            &hearing,
+            &stopping,
+            None,
+            &Mutex::new(BTreeSet::new()),
+        );
         assert_eq!(
             seen.recv_timeout(Duration::from_secs(5)).unwrap(),
             serde_json::json!({"op":"sign_in_asked","id":5,"request":42})
@@ -3422,6 +3476,98 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The 21 Oct lamp-75c9 rerun's (3), #2602: a sign-in's question cut
+    /// short (taken to be told, never heard whole) is offered again once
+    /// [`crate::sign_in::ASK_AGAIN_AFTER`] has passed while the tasks part
+    /// still says `asking`, and not kept as told until it is heard whole.
+    /// Heard whole the second time, it isn't offered again, and it is kept. 150 ms here, where the lamp waits 30 s.
+    #[test]
+    fn a_sign_ins_question_cut_short_is_offered_again_until_heard_whole() {
+        let root = std::env::temp_dir().join(format!("task-news-ask-again-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // The tasks part: no tasks, and a sign-in asking all along.
+        for (name, answer) in [
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","items":[]}),
+            ),
+            (
+                "voice.sock",
+                json!({"ok":true,"sign_in":"asking","email":"someone@example.com","id":7}),
+            ),
+        ] {
+            let listener = UnixListener::bind(root.join(name)).unwrap();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let mut stream = stream.unwrap();
+                    let mut line = String::new();
+                    BufReader::new(&stream).read_line(&mut line).unwrap();
+                    writeln!(stream, "{answer}").unwrap();
+                }
+            });
+        }
+        let (offer, offered) = mpsc::channel();
+        let (wake, woken) = mpsc::channel();
+        let told_file = root.join("told");
+        let follow = SignInFollow {
+            on: true,
+            heard: Arc::new(Mutex::new(BTreeSet::new())),
+            again_after: Duration::from_millis(150),
+        };
+        let reader = {
+            let (directory, told_file, follow) = (root.clone(), told_file.clone(), follow.clone());
+            std::thread::spawn(move || {
+                let shared = Mutex::new(BTreeSet::new());
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    Duration::from_millis(20),
+                    &follow,
+                );
+            })
+        };
+        let question = |offered: &Receiver<News>| {
+            let news = offered.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_eq!(news.key, "sign-in-7-asking");
+            assert!(
+                news.note.contains("someone at example dot com"),
+                "{}",
+                news.note
+            );
+        };
+        question(&offered);
+        // Taken to be told, and cut short: nothing comes to `heard`.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        std::thread::sleep(Duration::from_millis(60));
+        wake.send(Wake::Settled).unwrap();
+        assert!(
+            offered.recv_timeout(Duration::from_millis(60)).is_err(),
+            "offered again before its wait"
+        );
+        std::thread::sleep(Duration::from_millis(150));
+        wake.send(Wake::Settled).unwrap();
+        question(&offered);
+        assert!(!read_told(&told_file).contains("sign-in-7-asking"));
+        // Told again and heard whole this time: never offered again.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        follow.heard.lock().unwrap().insert(7);
+        for _ in 0..3 {
+            std::thread::sleep(Duration::from_millis(120));
+            wake.send(Wake::Settled).unwrap();
+        }
+        assert!(offered.recv_timeout(Duration::from_millis(200)).is_err());
+        // Kept as told once heard, so a restart doesn't say it again.
+        assert!(read_told(&told_file).contains("sign-in-7-asking"));
+        drop(wake);
+        reader.join().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     /// #560: the tasks part is read at once when a task settles, not at the
     /// next of the ten-second reads; news told is kept at once and has
     /// nothing read. The least gap between two woken reads is 200 ms here,
@@ -3459,7 +3605,11 @@ mod tests {
                     &shared,
                     &|| Some(now()),
                     woken_gap,
-                    false,
+                    &SignInFollow {
+                        on: false,
+                        heard: Arc::new(Mutex::new(BTreeSet::new())),
+                        again_after: crate::sign_in::ASK_AGAIN_AFTER,
+                    },
                 );
             })
         };

@@ -44,6 +44,85 @@ const ASK_DEADLINE: Duration = Duration::from_millis(1_000);
 /// comes soon after the person approves in Harness (the reviewer's P3).
 pub const READ_OPEN_EVERY: Duration = Duration::from_secs(2);
 
+/// A sign-in's question taken to be told but not heard whole is offered
+/// again this long after it was taken, while the tasks part still says
+/// `asking` (the 21 Oct lamp-75c9 rerun's (3), #2602): on lamp-75c9 talk
+/// in the room cut it short a second after it began, it was kept as told,
+/// and the person's yes was refused as `not_told` from then on. Past a
+/// question's own turn and its tail, so one being told isn't told twice.
+pub const ASK_AGAIN_AFTER: Duration = Duration::from_secs(30);
+
+/// How many times in all a sign-in's question is taken to be told: once,
+/// and twice again if it isn't heard whole. Harness gives the person a few
+/// minutes to answer, and a room this busy is let be after that.
+pub const ASKED_MOST: u32 = 3;
+
+/// Each sign-in's question taken to be told, by id: when it was last taken
+/// (`None` once offered again) and how many times ([`ASK_AGAIN_AFTER`]).
+#[derive(Debug, Default)]
+pub struct AskAgain {
+    told: std::collections::BTreeMap<u64, (Option<Instant>, u32)>,
+}
+
+impl AskAgain {
+    /// The news `key` was taken to be told at `now`. Whether it is a
+    /// sign-in's question, followed here rather than kept as told.
+    pub fn told(&mut self, key: &str, now: Instant) -> bool {
+        let Some(id) = asked_of(key) else {
+            return false;
+        };
+        let (at, times) = self.told.entry(id).or_insert((None, 0));
+        *at = Some(now);
+        *times += 1;
+        true
+    }
+
+    /// The questions followed here that were heard whole since (`heard`,
+    /// the sign-ins whose question was): let go, to be kept as told, so a
+    /// restart doesn't say them again (the reviewer-lead's P3 1 on #2702).
+    pub fn heard(&mut self, heard: &std::collections::BTreeSet<u64>) -> Vec<String> {
+        let ids: Vec<u64> = self
+            .told
+            .keys()
+            .filter(|id| heard.contains(id))
+            .copied()
+            .collect();
+        ids.into_iter()
+            .map(|id| {
+                self.told.remove(&id);
+                key(id, "asking")
+            })
+            .collect()
+    }
+
+    /// The questions to offer again at `now`: taken to be told `after` ago
+    /// or more, not heard whole (call [`Self::heard`] first), and taken
+    /// fewer than [`ASKED_MOST`] times. Each is given once a telling. One
+    /// told the last time is let go once its wait has passed (the
+    /// reviewer-lead's P3 2 on #2702): it is in `offered` and never
+    /// offered again.
+    pub fn due(&mut self, after: Duration, now: Instant) -> Vec<String> {
+        let waited =
+            |at: &Option<Instant>| at.is_some_and(|at| now.saturating_duration_since(at) >= after);
+        self.told
+            .retain(|_, (at, times)| *times < ASKED_MOST || !waited(at));
+        let mut due = Vec::new();
+        for (id, (at, _)) in &mut self.told {
+            if waited(at) {
+                *at = None;
+                due.push(key(*id, "asking"));
+            }
+        }
+        due
+    }
+
+    /// How many questions are followed: for a test.
+    #[cfg(test)]
+    fn followed(&self) -> usize {
+        self.told.len()
+    }
+}
+
 /// The newest sign-in's code and email, never kept anywhere but here: what
 /// [`scrub`] takes out of what the thread keeps. Kept until `until`, then
 /// forgotten (the reviewer's P3 5 on #2137).
@@ -1191,6 +1270,42 @@ mod tests {
         assert!(said[4].contains("not set up"), "{said:?}");
         forget();
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// The 21 Oct lamp-75c9 rerun's (3), #2602: a question taken to be told
+    /// is due again once its wait has passed, once a telling, and never
+    /// once heard whole; at most [`ASKED_MOST`] tellings in all. Other news
+    /// isn't followed.
+    #[test]
+    fn a_question_not_heard_whole_is_due_again_a_few_times_at_most() {
+        let after = ASK_AGAIN_AFTER;
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let none = std::collections::BTreeSet::new();
+        let mut again = AskAgain::default();
+        assert!(!again.told("sign-in-1-code", at(0)));
+        assert!(!again.told("s1:2:3", at(0)));
+        assert!(again.told("sign-in-1-asking", at(0)));
+        assert!(again.heard(&none).is_empty());
+        assert!(again.due(after, at(29)).is_empty());
+        assert_eq!(again.due(after, at(30)), ["sign-in-1-asking"]);
+        // Once a telling.
+        assert!(again.due(after, at(90)).is_empty());
+        assert!(again.told("sign-in-1-asking", at(40)));
+        assert_eq!(again.due(after, at(70)), ["sign-in-1-asking"]);
+        // The third telling is the last, and let go once its wait passed.
+        assert!(again.told("sign-in-1-asking", at(80)));
+        assert!(again.due(after, at(100)).is_empty());
+        assert_eq!(again.followed(), 1);
+        assert!(again.due(after, at(110)).is_empty());
+        assert_eq!(again.followed(), 0);
+        // Heard whole: let go, to be kept as told, and never due.
+        assert!(again.told("sign-in-2-asking", at(0)));
+        let heard = std::collections::BTreeSet::from([2]);
+        assert_eq!(again.heard(&heard), ["sign-in-2-asking"]);
+        assert!(again.heard(&heard).is_empty());
+        assert!(again.due(after, at(100)).is_empty());
+        assert_eq!(again.followed(), 0);
     }
 
     /// The reviewer's P2 and P3 on #2137: a sign-in first seen done gets no
