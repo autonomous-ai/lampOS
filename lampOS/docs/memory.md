@@ -426,7 +426,7 @@ the unchanged legacy client, used unless the new Days client is selected.
       (the voice's client against the real store: the turn goes, an earlier
       conversation stays).
   - Tests: `remember::tests::with_the_switch_what_recall_gave_and_everything_can_be_forgotten`
-    (requests and scopes, the switch off), and `crates/memory/tests/it/voice_forget.rs`
+    (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
 
@@ -569,7 +569,7 @@ the unchanged legacy client, used unless the new Days client is selected.
     `forget_about_for_someone_known_tells_of_the_rooms_from_before`,
     `forget_about_that_stops_part_way_says_some_may_be_forgotten` and
     `without_the_about_switch_forget_is_as_before`. And
-    `crates/memory/tests/it/voice_forget_about.rs`, the voice's client against
+    `crates/memory/tests/voice_forget_about.rs`, the voice's client against
     the real store: both bicycle things go, coffee stays, another person's
     bicycle stays; in the room's, what this conversation kept goes, matched
     without accents, and one kept by an earlier session stays.
@@ -606,7 +606,7 @@ the unchanged legacy client, used unless the new Days client is selected.
     refused and why.
   - **Privacy:** with it on, each conversation's text leaves the lamp once
     more, to the same model ([service-privacy.md](service-privacy.md)).
-  - **Tests:** `crates/memory/tests/it/voice_observe.rs` (the voice's client,
+  - **Tests:** `crates/memory/tests/voice_observe.rs` (the voice's client,
     the real store, a scripted model: kept, then closed with nothing);
     `days::an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place`;
     `remember::tests::the_observation_pass_reads_only_the_models_one_json_object`;
