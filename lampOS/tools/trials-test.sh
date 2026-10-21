@@ -247,7 +247,7 @@ answer() { # ROW
     for n in "${!ins[@]}"; do
       if [[ ${ins[$n]} == bus:* ]]; then
         printf '%s\n' "${examples[$n]}" >"$T/bus-$n"
-        (sleep 1; cp "$T/bus-$n" "$T/bus/$(printf '%s' "${ins[$n]#bus:}" | tr / _)") &
+        (sleep 1; cat "$T/bus-$n" >"$T/bus/$(printf '%s' "${ins[$n]#bus:}" | tr / _)") &
       else
         printf '%s\t%s\n' "${ins[$n]}" "${examples[$n]}" >>"$T/answer-all"
       fi
@@ -653,6 +653,38 @@ grep -lx 'lamp-expression serve --head-touch --bus-root /run/lampos-bus --zone s
 # Run once more, Expression is back on its own line, with --enable.
 tr '\0' ' ' <"$T/proc/$(cat "$T/pids/lamp-expression.service")/cmdline" | grep -q -- "--enable" && ok ||
   bad "mood: Expression not put back with --enable"
+
+# The breath in either key order: Mood writes "phase" first, lamp-bus
+# latest prints the keys sorted (#1670, 21 Oct); the plain pace never passes.
+lines_into proofs proofs_of mood
+for m in '{"breath":{"phase":0.42,"pace":1.15}}' '{"breath":{"pace":1.0195297,"phase":0.9976621}}'; do
+  printf '%s\n' "$m" | grep -qE -- "${proofs[2]}" && ok || bad "mood: the breath not matched in $m"
+done
+printf '%s\n' '{"breath":{"pace":1.0,"phase":0.42}}' | grep -qE -- "${proofs[2]}" && bad "mood: the plain pace matched" || ok
+
+# No body (75c9): Expression plans no drift and says its joints are missing;
+# the row passes on the rest and says the drift wasn't checked.
+reset
+printf '{"on":true,"colour":"orange","level":3}\n' >"$T/bus/light_state"
+answer mood
+nobody='{"behaviours":[],"body":false,"enabled":false,"light":false,"missing":["fresh measured joints"],"stamp":{"at_us":1,"clock_id":"c","sequence":1},"warnings":[]}'
+printf '%s\n' "$nobody" >"$T/bus-3"
+printf '%s\n' "$nobody" >"$T/bus-4"
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood without a body passes on the rest" 0 $?
+wait
+has "mood: the drift said not checked" "$T/out" "not checked: the drift, a body move"
+
+# A body, and still no drift: the row fails on it.
+reset
+printf '{"on":true,"colour":"orange","level":3}\n' >"$T/bus/light_state"
+answer mood
+still='{"behaviours":["breathing"],"body":false,"enabled":false,"light":false,"missing":[],"stamp":{"at_us":1,"clock_id":"c","sequence":1},"warnings":[]}'
+printf '%s\n' "$still" >"$T/bus-3"
+printf '%s\n' "$still" >"$T/bus-4"
+"$SCRIPT" mood >"$T/out" 2>&1; check "mood with a body and no drift fails" 1 $?
+wait
+has "mood: says the drift didn't come" "$T/out" "no fresh expression/state matching"
+hasnt "mood: nothing said not checked" "$T/out" "not checked"
 
 # Someone known: the familiar level is said, and the row fails with the
 # message that says it.

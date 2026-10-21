@@ -119,6 +119,11 @@ MOOD_BIN=${TRIALS_MOOD_BIN:-/opt/lampOS/mood/current/lamp-mood}
 #            not have come: judged once, when every proof has been seen, over
 #            the journal since the switches went on, or a bus topic's newest
 #            message. Its EXAMPLE is the line that would fail the row
+#   UNCHECKED optional: lines "N|IN|REASON|REGEX", N a proof's place in
+#            PROOFS from 1. Once every other proof has been seen, proof N not
+#            yet seen is not looked for when IN's newest says REGEX: the row
+#            passes on the others and says "not checked: REASON", for a proof
+#            this lamp can't give (a body move on a lamp without a body)
 # In SETASIDE, SETUP and AFTER, @SKILLS_DIR@, @SKILLS_USER@ and @SKILLS_GROUP@
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ and
 # @MEMORY_SOCKET@ are lamp-memory's --dir and --socket, @EYES_KNOWN_FILE@ is
@@ -137,7 +142,7 @@ mood       Mood's minute with the body moving: lampOS/tools/mood-minute.sh --cla
 updates    the update stack (#1680: #1788 to #1945, open): updates.md's rehearsal, a file channel and a test key, not a switch"
 
 define() {
-  ABOUT= NOTE= SETASIDE= SETUP= PAUSE= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT= PROOFS= ABSENT=
+  ABOUT= NOTE= SETASIDE= SETUP= PAUSE= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT= PROOFS= ABSENT= UNCHECKED=
   case $1 in
     light-out)
       # #1721 and #1747 (on lamp-voice and #1712). The skill's trigger is
@@ -548,11 +553,18 @@ run now=$(@BUS@ latest light/state 2>/dev/null | grep "^{" | cut -d" " -f2- || t
       # voice ring_mood.rs taken_line, expression runtime.rs liveliness_line.
       # Expression in shadow, a drift asked for: alive.rs names "drifting".
       # Nobody known: mood.rs leaves familiar out with no humans/familiar.
+      # lamp-bus latest prints a message's keys sorted ("pace" before
+      # "phase"), so the breath is matched in either order (#1670, 21 Oct).
       PROOFS='lamp-voice.service|the ring breathes with Mood: pace (0\.[0-9]{2}|1\.(0[1-9]|[1-9][0-9]))|lamp-voice ring: the ring breathes with Mood: pace 0.81
 lamp-expression.service|Mood.s liveliness -?0\.(0[1-9]|[1-9][0-9])|lamp-expression: Mood'"'"'s liveliness -0.31
-bus:mood/state|"breath": ?\{"phase": ?[0-9.e-]+, ?"pace": ?(0\.[0-9]+|1\.0*[1-9][0-9]*|1\.[1-9][0-9]*)\}|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"session_id":"s","awake":0.15,"energy":0.3,"warmth":0.5,"asleep":false,"familiarity":"unknown","breath":{"phase":0.42,"pace":0.81}}
-bus:expression/state|"enabled": ?false.*"drifting"|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"enabled":false,"behaviours":["breathing","drifting"],"missing":[],"warnings":[],"body":false,"light":false}'
-      ABSENT='bus:mood/state|"familiar": ?"|{"stamp":{"clock_id":"c","at_us":1,"sequence":1},"session_id":"s","awake":0.15,"energy":0.3,"warmth":0.5,"asleep":false,"familiarity":"unknown","familiar":"regular","breath":{"phase":0.42,"pace":0.81}}'
+bus:mood/state|"breath": ?\{("phase": ?[0-9.e-]+, ?"pace": ?(0\.[0-9]+|1\.0*[1-9][0-9]*|1\.[1-9][0-9]*)|"pace": ?(0\.[0-9]+|1\.0*[1-9][0-9]*|1\.[1-9][0-9]*), ?"phase": ?[0-9.e-]+)\}|{"asleep":false,"awake":0.15,"breath":{"pace":0.81,"phase":0.42},"energy":0.3,"familiarity":"unknown","session_id":"s","stamp":{"at_us":1,"clock_id":"c","sequence":1},"warmth":0.5}
+bus:expression/state|"enabled": ?false|{"behaviours":["breathing","drifting"],"body":false,"enabled":false,"light":false,"missing":[],"stamp":{"at_us":1,"clock_id":"c","sequence":1},"warnings":[]}
+bus:expression/state|"behaviours": ?\[[^]]*"drifting"|{"behaviours":["breathing","drifting"],"body":false,"enabled":false,"light":false,"missing":[],"stamp":{"at_us":1,"clock_id":"c","sequence":1},"warnings":[]}'
+      # The drift is a body move: on a lamp with no body (75c9, its poses not
+      # yet measured) Expression plans none and says the joints are missing,
+      # so it is said not checked there, never passed (#1670, 21 Oct).
+      UNCHECKED='5|bus:expression/state|the drift, a body move: Expression has no fresh measured joints|"missing": ?\[[^]]*"fresh measured joints"'
+      ABSENT='bus:mood/state|"familiar": ?"|{"asleep":false,"awake":0.15,"breath":{"pace":0.81,"phase":0.42},"energy":0.3,"familiar":"regular","familiarity":"unknown","session_id":"s","stamp":{"at_us":1,"clock_id":"c","sequence":1},"warmth":0.5}'
       # By day the first lines say 1.00 and 0.00 at once; a clap's change
       # is said a minute after them.
       WAIT=120 ;;
@@ -952,6 +964,27 @@ last_said() { # MARK IN
   fi
 }
 
+# With every proof seen but those UNCHECKED names, each of those whose IN
+# says its REGEX is set aside as "not checked: REASON", and the row found.
+# Uses trial()'s mark, saw and found.
+unchecked() {
+  local n in why regex rest left=() k
+  for k in "${!saw[@]}"; do [[ -n ${saw[$k]} ]] || left+=("$k"); done
+  # Only once nothing is left but proofs it names.
+  for k in "${left[@]}"; do
+    lines "$UNCHECKED" | cut -d'|' -f1 | grep -qx "$((k + 1))" || return 0
+  done
+  for k in "${left[@]}"; do
+    while IFS= read -r line; do
+      n=${line%%|*}; rest=${line#*|}; in=${rest%%|*}; rest=${rest#*|}; why=${rest%%|*}; regex=${rest#*|}
+      [[ $n == "$((k + 1))" ]] || continue
+      [[ -n $(seen "$mark" "$in" "$regex") ]] && saw[$k]="not checked: $why"
+    done < <(lines "$UNCHECKED")
+  done
+  found=1
+  for k in "${!saw[@]}"; do [[ -n ${saw[$k]} ]] || found=; done
+}
+
 trial() { # ROW [--dry]
   local row=$1 dry=${2:-} line
   define "$row" || { echo "no row '$row'; trials.sh list shows them" >&2; exit 2; }
@@ -972,6 +1005,9 @@ trial() { # ROW [--dry]
       printf '  absent in %s: /%s/\n' "$(proof_in "$line")" "$(proof_regex "$line")"
       printf '  absent example: %s\n' "$(proof_example "$line")"
     done < <(lines "$ABSENT")
+    while IFS='|' read -r n in why regex; do
+      printf '  unchecked proof %s when %s says /%s/: %s\n' "$n" "$in" "$regex" "$why"
+    done < <(lines "$UNCHECKED")
     [[ -z $FIRST ]] || printf '  first: /%s/, then:\n' "$FIRST"
     [[ -z $FIRST ]] || printf '  first example: %s\n' "$FIRSTEX"
     lines "$THEN" | sed 's/^/  then: /'
@@ -1086,6 +1122,7 @@ trial() { # ROW [--dry]
     done
     found=1
     for n in "${!saw[@]}"; do [[ -n ${saw[$n]} ]] || found=; done
+    [[ -n $found || -z $UNCHECKED ]] || unchecked
     if [[ -n $found ]]; then
       local bad
       while IFS= read -r line; do
