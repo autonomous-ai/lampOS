@@ -5182,6 +5182,14 @@ A usage limit paused me from about 00:40 to 06:2x.
   - The gate's one failure was the `BUS_TOPICS` census, fixed.
 - **#2394 merged** at 07:58 (the 2.5 s open-name window).
 
+## 2026-10-21, 09:17 ICT: b0802's fall read (not the open name); (a) claimed, a tone baseline per known person
+
+- **b0802's 7 of 12** (the first builder, 09:05): I read #2392 and #2394 against "Hey Lamp, good morning!". Of the 221 played lines in the tools, only `open-name.sh`'s "Hey Lamp, my name is" opens a name.
+  - The first builder's journal read (09:12): no open-name line in the day's run. The greeting's name was heard 1.5 s after the line was played, past #2376's 700 ms at-the-start window.
+  - So it's a timing edge in #2376, Seventh's, and not #2392 or #2394.
+- **(a), claimed on #1722:** a voice-tone baseline for each known person, keyed by the memory person id, at most 8, in memory only. It's dropped when the person's words ask to forget their face, and every baseline when they ask to forget everything.
+- **(b), Mood reading `voice/tone`,** waits on a base: #2353 is on lamp-voice and #2427 on #1712.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
