@@ -771,3 +771,38 @@ Ready for lamp-voice: yes (already in; closing the loop)
   restart) — not anything in #2194's app or lamp-cloud code.
 - Nothing left to verify on #2194 from the app side. Thanked Mobile on
   [the issue](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6309445475).
+
+## 2026-10-21 — built the Wi-Fi row Mobile found missing (ecm-sds-mobile#21)
+
+Ready for lamp-voice: n/a (app-side; the lamp side, #1959/#1995, has
+been in since 20 Oct)
+
+- Mobile's 13:5x on #1722: lamp-0c89's "Change the Wi-Fi" row couldn't
+  run today because the app has no `wifi.set` at all — only
+  timezone/name/rename. My earlier 13:1x status comment claiming
+  Wi-Fi was already covered was wrong; corrected it. Claimed the gap
+  (Mobile offered either of us take it).
+- Before writing anything: spawned a fork to read the real
+  `crates/cloud/src/settings.rs` (`wifi_line`, `Changes::start_wifi`)
+  for whether the same empty-probe trick used for timezone/name/rename
+  is safe here too. It isn't as-is — an empty-string `ssid` is a VALID
+  shape the lamp would act on, not a safe refusal, unlike those three
+  single-value kinds. Only a probe with no `ssid` key at all refuses
+  before any write. Built the entity/notifier around that finding,
+  not around assumed symmetry with the existing kinds.
+- Own notifier (not folded into `LampSettingsNotifier`): the wait
+  needs care, since root's helper takes up to 180 s plus 60 s for the
+  network to settle, and the app's own MQTT link to the lamp
+  necessarily drops for part of that — confirmed
+  `BuddyMqttDataSource.envelopes` is connection-agnostic (survives a
+  reconnect) before trusting a 4-minute wait on it. Added
+  `LampWifiChangeTimedOut` as its own case, since a timeout here is
+  genuinely ambiguous (the change may have gone through while the app
+  couldn't see it), not a plain failure.
+- 18 new tests (entity parsing/validation only, matching this app's
+  own convention — no MQTT plumbing test, same as `lamp_own_keys` and
+  the rest). analyze 24 (today's real baseline), test -j2 830/0.
+- Opened [ecm-sds-mobile#21](https://github.com/autonomous-ai/ecm-sds-mobile/pull/21),
+  flagged the timeout wording as my own judgment call with nothing to
+  match it against. Reported on
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6309884814).
