@@ -736,3 +736,23 @@ Ready for lamp-voice: n/a
   body; the commit message never had it. Checked #2360 too — clean.
 - This is a standing rule for every lampOS PR from here on, not a
   one-off fix.
+
+## 2026-10-21 — #2194's real end-to-end: passed, one P3 checked and not mine alone to fix
+
+Ready for lamp-voice: yes (already in; this is verification, not new code)
+
+- Mobile ran the real device trial on lamp-0c89 (#1396): "No update
+  published yet", "Up to date", and "stale"'s wording + clearing on
+  `lamp-update.service` stop/start — all pass exactly as written.
+  `checking`/`fetching`/`switching`/`watching`/`restoring` still need a
+  real second build on the channel, not run yet.
+- Mobile's P3: reopening the update page shows the last fetched value,
+  only pull-to-refresh asks the lamp again. Checked against
+  `_LampOwnKeysRow`, `_LampSchedulesRow` and `_LampFacesRow` — all
+  three share the exact same pattern (plain `Navigator.push`, no
+  invalidate; the row stays mounted behind the pushed page so its
+  provider is never disposed). Not a gap specific to update_status —
+  it's the app's existing convention for every read-only device page.
+  Flagged this on [#2194](https://github.com/autonomous-ai/lampOS/issues/2194#issuecomment-6307552573)
+  rather than quietly patching only mine, since fixing it would be a
+  cross-cutting UX call across 4+ pages.
