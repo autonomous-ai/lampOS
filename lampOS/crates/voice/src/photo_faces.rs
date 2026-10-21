@@ -124,7 +124,12 @@ impl Watch {
                     Ok(mut state) if !state.stop => state.want.take(),
                     _ => return,
                 };
+                // A name asked already is not asked again: the loop can
+                // want it once more while the eyes are still answering the
+                // first (Mobile on lamp-0c89, #1968: asked twice, 16 s
+                // apart).
                 if let Some(name) = want
+                    && !was_asked(&name)
                     && asking(&socket, &name)
                     && let Ok(mut state) = shared.lock()
                 {
@@ -358,6 +363,45 @@ mod tests {
                 .contains(&json!({"photo_asked": "Hoa"}))
         );
         drop(watch);
+        forget_asked();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    /// As the coordinator's loop drives it, which wants the face again on
+    /// every pass until the eyes have answered: the eyes are told once and
+    /// the question is said once, even when they take their time (Mobile on
+    /// lamp-0c89, #1968: asked twice, 16 s apart).
+    #[test]
+    fn a_slow_answer_from_the_eyes_is_still_asked_and_said_once() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let (socket, lines) = eyes("slow", |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Quillo"})
+            } else {
+                std::thread::sleep(Duration::from_millis(150));
+                json!({"asked": true})
+            }
+        });
+        forget_asked();
+        let watch = Watch::start(socket.clone());
+        let mut said = 0;
+        let until = std::time::Instant::now() + Duration::from_secs(2);
+        while std::time::Instant::now() < until {
+            if watch.asked().is_some() {
+                said += 1;
+            } else if let Some(name) = watch.to_ask() {
+                watch.ask(name);
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        drop(watch);
+        let told = lines
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line.get("photo_asked").is_some())
+            .count();
+        assert_eq!((said, told), (1, 1));
         forget_asked();
         let _ = std::fs::remove_file(socket);
     }
