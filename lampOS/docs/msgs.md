@@ -146,6 +146,7 @@ at the crate root. Their new topics do not change any existing type:
 | `ExpressionState` | `expression/state` | latest | 200 / 500 ms | Planned behaviors, shadow/enabled status, missing facts and warnings |
 | `ExpressionRestRequest` | `expression/rest_request` | event | 1,000 / 500 ms | Skills' leased rest, wake or cancel intent, bound to the host clock, publisher, Expression session and episode |
 | `ExpressionRestState` | `expression/rest_state` | latest | 200 / 500 ms | Expression's correlated planning receipt: idle, resting, waking, completed, cancelled or refused, a refusal with its optional `reason` (at most 160 bytes, absent otherwise) |
+| `ExpressionSleepClaim` | `expression/sleep_claim` | latest | 60,000 / 180,000 ms | lamp-skills' live claim on the night's sleep (#940): the skill's name (`night-sleep`) and `on`; Expression treats one older than 180 s as none and sleeps by its own schedule, the fallback for one release |
 
 `ClockStamp` identifies the host boot and shared `CLOCK_MONOTONIC` time in
 microseconds. It is distinct from the bus header's private `at_us`.

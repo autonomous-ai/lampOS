@@ -202,8 +202,8 @@ pub const PRODUCT: &[(&str, &str)] = &[
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Ten keep their folders'
-/// own default: nine enabled, and Bedtime and Morning disabled by its own
+/// `tests/install.rs` holds the two lists equal). Eleven keep their folders'
+/// own default: ten enabled, and Bedtime and Morning disabled by its own
 /// `enabled = false` until its lamp comparison (#1672); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -221,6 +221,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "stuffy-air",
     "dance",
     "bedtime-morning",
+    // When the lamp sleeps at night (#940): Expression's built-in trigger,
+    // moved into a skill. Enabled, but inert while the product units leave
+    // LAMP_SKILL_ROUTINES and LAMP_REST_REQUESTS off; the built-in sleep runs.
+    "night-sleep",
     // A failed part shown as a creature a little unwell (#1681): row 8 on
     // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
     "not-feeling-well",
@@ -438,6 +442,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("dance", "SKILL.md"),
     skill_file!("bedtime-morning", "skill.toml"),
     skill_file!("bedtime-morning", "SKILL.md"),
+    skill_file!("night-sleep", "skill.toml"),
+    skill_file!("night-sleep", "SKILL.md"),
     skill_file!("not-feeling-well", "skill.toml"),
     skill_file!("not-feeling-well", "SKILL.md"),
     // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.

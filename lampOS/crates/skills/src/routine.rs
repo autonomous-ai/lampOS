@@ -9,8 +9,8 @@ use lamp_bus::{Bus, Publisher};
 use lamp_local_time::LocalTime;
 use lamp_msgs::{
     ClockStamp, ExpressionRestOp as Op, ExpressionRestPhase as Phase,
-    ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionState, Faces,
-    MicrophonePrivacy, Voice, VoiceMute, VoiceState,
+    ExpressionRestRequest as Request, ExpressionRestState as Receipt, ExpressionSleepClaim,
+    ExpressionState, Faces, MicrophonePrivacy, Voice, VoiceMute, VoiceState,
 };
 use serde::Deserialize;
 use std::{
@@ -877,6 +877,25 @@ impl Manager {
     }
 }
 
+/// The core skill that holds when the lamp sleeps at night (#940).
+pub const NIGHT_SLEEP: &str = "night-sleep";
+
+/// What lamp-skills says on `expression/sleep_claim` (#940): while the
+/// folder `dir/night-sleep` loads as a skill granted the night's sleep, a
+/// claim naming it, on while it is enabled and not `stopped` (turned off by a
+/// person, or snoozed). Turned off, it still claims the night: a person
+/// chose a lamp that does not sleep, and Expression must not sleep by
+/// itself. With no such folder, or one that does not load, no claim, and
+/// Expression sleeps by its own schedule (its fallback, for one release).
+pub fn sleep_claim(dir: &std::path::Path, stopped: bool) -> Option<ExpressionSleepClaim> {
+    let skill = crate::load(&dir.join(NIGHT_SLEEP)).ok()?;
+    let granted = skill.permissions.grants("sleep");
+    granted.then_some(ExpressionSleepClaim {
+        on: skill.enabled && !stopped,
+        skill: skill.name,
+    })
+}
+
 /// Why the lamp must not be moved: put to sleep by hand (the voice's mute,
 /// reason `sleep`), or kept private (the voice's own mute, or the privacy
 /// switch closed on `voice/privacy`), as Expression reads them
@@ -1048,6 +1067,7 @@ mod tests {
                         warnings: vec![],
                         body: false,
                         light: false,
+                        asleep: None,
                     },
                 )
                 .unwrap();

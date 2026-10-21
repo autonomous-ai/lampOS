@@ -622,6 +622,10 @@ pub(crate) struct Life {
     /// Retained through a routine's wake so a lost lease can end its clip.
     /// A reflex or manual sleep takes this ownership away immediately.
     rest_owner: Option<RestOwner>,
+    /// The routine's rest is the night's sleep, from the skill that claims
+    /// it (#940): held as the built-in sleep is, and woken by the first face
+    /// out of the night as it is.
+    routine_sleep: bool,
     called: bool,
     name_called: bool,
     name_wake: NameWake,
@@ -722,6 +726,7 @@ impl Life {
             phase: Phase::Awake,
             scheduling: Scheduling::default(),
             rest_owner: None,
+            routine_sleep: false,
             called: false,
             name_called: false,
             name_wake: NameWake::new(name_age_us, delivery_us),
@@ -750,18 +755,18 @@ impl Life {
         matches!(self.phase, Phase::Asleep { .. })
     }
 
-    /// Select the source of routine decisions, dropping the old scheduler's
-    /// pose without a wake clip. A manual sleep is never released here.
+    /// Select the source of routine decisions, dropping a routine's pose
+    /// without a wake clip when its skills are no longer heard. A manual
+    /// sleep is never released here, and neither is the built-in sleep when
+    /// a skill claims the night again (#940): it sleeps on until a reflex or
+    /// the first face out of the night wakes it, as it would have.
     pub(crate) fn set_scheduling(&mut self, scheduling: Scheduling, now_us: u64) {
         if self.scheduling == scheduling {
             return;
         }
         self.scheduling = scheduling;
         self.nobody_since = None;
-        if matches!(
-            self.rest_owner,
-            Some(RestOwner::Autonomous | RestOwner::Routine)
-        ) {
+        if self.rest_owner == Some(RestOwner::Routine) {
             if self.called || self.name_called || self.sleep_asked {
                 self.rest_owner = None;
             } else {
@@ -774,11 +779,18 @@ impl Life {
     /// fences. These checks only admit an already validated routine intent
     /// against the planner's current posture and Voice context.
     pub(crate) fn routine_allowed(&self, now_us: u64, context: &Context) -> bool {
+        !self.muted() && self.sleep_allowed(now_us, context)
+    }
+
+    /// What the night's sleep needs to begin (#940): the built-in sleep's
+    /// own conditions, a free body and a resting voice, and nothing of a
+    /// person's at the lamp. Unlike another routine, a privacy mute does not
+    /// keep it awake, as it never kept the built-in sleep awake.
+    fn sleep_allowed(&self, now_us: u64, context: &Context) -> bool {
         self.scheduling == Scheduling::Skills
             && self.alive.sleep.is_some()
             && context.free
             && context.voice == Some(Voice::Resting)
-            && !self.muted()
             && self.voice_asleep(now_us) != Some(true)
             && self.hand.is_none()
             && self.lean == 0.0
@@ -791,8 +803,25 @@ impl Life {
     /// Begin routine rest, or renew the same rest without restarting its
     /// settling. No request can take over an existing manual/automatic sleep
     /// or a wake/release already in progress.
-    pub(crate) fn request_routine_rest(&mut self, now_us: u64, context: &Context) -> bool {
-        if !self.routine_allowed(now_us, context) {
+    /// `sleep`: the rest is the night's sleep, from the skill that claims it
+    /// (#940). Renewed, it is held as the built-in sleep is: only a reflex,
+    /// manual sleep or its lease ends it, never the voice listening, a
+    /// privacy mute or the body's state.
+    pub(crate) fn request_routine_rest(
+        &mut self,
+        now_us: u64,
+        context: &Context,
+        sleep: bool,
+    ) -> bool {
+        if sleep && self.routine_sleep && self.routine_owned() && self.asleep() {
+            return true;
+        }
+        let allowed = if sleep {
+            self.sleep_allowed(now_us, context)
+        } else {
+            self.routine_allowed(now_us, context)
+        };
+        if !allowed {
             return false;
         }
         if self.routine_owned() && self.asleep() {
@@ -803,6 +832,7 @@ impl Life {
         }
         self.phase = Phase::Asleep { since: now_us };
         self.rest_owner = Some(RestOwner::Routine);
+        self.routine_sleep = sleep;
         self.nobody_since = None;
         self.name_wake.clear(false);
         true
@@ -975,8 +1005,13 @@ impl Life {
         }
         self.nobody_since = None;
         // Morning: the first person seen after the night wakes it. At
-        // night a face does not: only its name, a touch or a reminder.
-        if self.scheduling == Scheduling::Autonomous && self.asleep() && !self.night(stamp_us) {
+        // night a face does not: only its name, a touch or a reminder. The
+        // night's sleep a skill holds (#940) wakes so too, as does the
+        // built-in one kept when a skill claimed the night again.
+        let scheduled = self.scheduling == Scheduling::Autonomous
+            || self.rest_owner == Some(RestOwner::Autonomous)
+            || (self.routine_sleep && self.routine_owned());
+        if scheduled && self.asleep() && !self.night(stamp_us) {
             self.called();
         }
         let area = |face: &&lamp_msgs::Face| (face.xmax - face.xmin) * (face.ymax - face.ymin);
@@ -1562,7 +1597,7 @@ mod routine_tests {
     fn routine() -> Life {
         let mut life = life();
         life.set_scheduling(Scheduling::Skills, START);
-        assert!(life.request_routine_rest(START, &resting()));
+        assert!(life.request_routine_rest(START, &resting(), false));
         life.step(START, &resting());
         life
     }
@@ -1659,7 +1694,7 @@ mod routine_tests {
         life.set_scheduling(Scheduling::Skills, START);
         let now = night(&mut life);
         assert_eq!(life.phase, Phase::Awake);
-        assert!(life.request_routine_rest(now, &resting()));
+        assert!(life.request_routine_rest(now, &resting(), false));
         life.daytime(now + SECOND, 7 * 60);
         life.faces(now + SECOND, &faces(true), 0.5);
         assert!(life.step(now + SECOND, &resting()).asleep);
@@ -1669,7 +1704,7 @@ mod routine_tests {
     #[test]
     fn routine_rest_and_wake_require_the_current_free_resting_context() {
         let mut life = life();
-        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(!life.request_routine_rest(START, &resting(), false));
         life.set_scheduling(Scheduling::Skills, START);
         for context in [
             Context {
@@ -1689,12 +1724,12 @@ mod routine_tests {
                 free: true,
             },
         ] {
-            assert!(!life.request_routine_rest(START, &context));
+            assert!(!life.request_routine_rest(START, &context, false));
         }
         life.set_privacy_muted(true);
-        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(!life.request_routine_rest(START, &resting(), false));
         life.set_privacy_muted(false);
-        assert!(life.request_routine_rest(START, &resting()));
+        assert!(life.request_routine_rest(START, &resting(), false));
         life.set_privacy_muted(true);
         assert!(!life.wake_routine(START + SECOND, &resting()));
         life.set_privacy_muted(false);
@@ -1726,13 +1761,13 @@ mod routine_tests {
     #[test]
     fn renewing_rest_does_not_restart_it_and_wake_is_once() {
         let mut life = routine();
-        assert!(life.request_routine_rest(START + SECOND, &resting()));
+        assert!(life.request_routine_rest(START + SECOND, &resting(), false));
         assert_eq!(life.phase, Phase::Asleep { since: START });
         let now = START + 5 * SECOND;
         assert!(life.wake_routine(now, &resting()));
         assert!(life.routine_owned());
         assert!(!life.wake_routine(now + SECOND, &resting()));
-        assert!(!life.request_routine_rest(now + SECOND, &resting()));
+        assert!(!life.request_routine_rest(now + SECOND, &resting(), false));
         assert!(
             life.step(now + SECOND, &resting())
                 .names
@@ -1750,7 +1785,7 @@ mod routine_tests {
         life.step(START, &resting());
         life.head_touch(START, &head(TouchGesture::Tap, START));
         assert!(life.looking_up());
-        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(!life.request_routine_rest(START, &resting(), false));
         assert!(
             life.step(START + 20_000, &resting())
                 .names
@@ -1774,7 +1809,7 @@ mod routine_tests {
             assert_eq!(after.keep, before.keep);
             assert!(!life.routine_owned());
             assert!(!life.release_routine(now));
-            assert!(!life.request_routine_rest(now, &resting()));
+            assert!(!life.request_routine_rest(now, &resting(), false));
             let mut previous = after.offsets;
             for elapsed in (20_000..=4 * SECOND).step_by(20_000) {
                 let next = life.step(now + elapsed, &resting());
@@ -1823,9 +1858,9 @@ mod routine_tests {
         let mut life = life();
         life.set_scheduling(Scheduling::Skills, START);
         life.head_touch(START, &head(TouchGesture::Hold, START));
-        assert!(!life.request_routine_rest(START, &resting()));
+        assert!(!life.request_routine_rest(START, &resting(), false));
         assert!(life.step(START, &resting()).asleep);
-        assert!(!life.request_routine_rest(START + SECOND, &resting()));
+        assert!(!life.request_routine_rest(START + SECOND, &resting(), false));
         assert!(!life.wake_routine(START + SECOND, &resting()));
         assert!(!life.release_routine(START + SECOND));
         life.head_touch(START + SECOND, &head(TouchGesture::Tap, START + SECOND));
@@ -1899,15 +1934,20 @@ mod routine_tests {
     }
 
     #[test]
-    fn changing_schedulers_releases_only_the_previous_schedulers_rest() {
+    fn changing_schedulers_releases_only_a_routines_rest() {
+        // A skill claiming the night again (#940) does not wake the built-in
+        // sleep: it sleeps on, and the first face of the morning wakes it.
         let mut automatic = life();
         let now = night(&mut automatic);
         automatic.set_scheduling(Scheduling::Skills, now);
+        assert!(automatic.step(now, &resting()).asleep);
+        automatic.daytime(now + SECOND, 7 * 60);
+        automatic.faces(now + SECOND, &faces(true), 0.5);
         assert!(
             automatic
-                .step(now, &resting())
+                .step(now + SECOND, &resting())
                 .names
-                .contains(&"releasing rest")
+                .contains(&"waking")
         );
         let mut routine = routine();
         routine.set_scheduling(Scheduling::Autonomous, START + SECOND);
@@ -1924,5 +1964,42 @@ mod routine_tests {
         manual.set_scheduling(Scheduling::Skills, START + SECOND);
         assert!(manual.step(START + SECOND, &resting()).asleep);
         assert!(!manual.release_routine(START + SECOND));
+    }
+    /// The night's sleep a skill claims (#940) begins on the built-in
+    /// sleep's conditions, a privacy mute not among them, and is renewed
+    /// through what does not wake the built-in sleep.
+    #[test]
+    fn the_nights_sleep_begins_and_holds_as_the_built_in_one() {
+        let mut life = life();
+        life.set_scheduling(Scheduling::Skills, START);
+        life.set_privacy_muted(true);
+        assert!(!life.request_routine_rest(START, &resting(), false));
+        assert!(life.request_routine_rest(START, &resting(), true));
+        assert!(life.routine_owned() && life.routine_sleep);
+        // Renewed while the voice listens and the body is held.
+        let listening = Context {
+            voice: Some(Voice::Listening),
+            free: false,
+        };
+        assert!(life.request_routine_rest(START + SECOND, &listening, true));
+        assert!(life.step(START + SECOND, &listening).asleep);
+        // The first face out of the night wakes it, as it wakes the
+        // built-in sleep; a face at night does not.
+        life.daytime(START + 2 * SECOND, 23 * 60 + 30);
+        life.faces(START + 2 * SECOND, &faces(true), 0.5);
+        assert!(life.step(START + 2 * SECOND, &resting()).asleep);
+        life.daytime(START + 3 * SECOND, 7 * 60);
+        life.faces(START + 3 * SECOND, &faces(true), 0.5);
+        assert!(
+            life.step(START + 3 * SECOND, &resting())
+                .names
+                .contains(&"waking")
+        );
+        assert!(!life.routine_owned());
+        // Another routine's rest is not woken by a face, as before.
+        let mut other = routine();
+        other.daytime(START + SECOND, 7 * 60);
+        other.faces(START + SECOND, &faces(true), 0.5);
+        assert!(other.step(START + SECOND, &resting()).asleep);
     }
 }

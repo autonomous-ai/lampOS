@@ -963,6 +963,20 @@ fn serve(
     let mut subscribers: Vec<Subscriber> = Vec::new();
     let mut seen = None;
     let mut looked: Option<Instant> = None;
+    // Night sleep's live claim (#940), with routines on: said at each
+    // reload and every minute, so Expression knows the night is a skill's.
+    let mut claim = if options.routines {
+        Some((
+            bus.publisher_declared(
+                lamp_msgs::ExpressionSleepClaim::TOPIC,
+                &lamp_msgs::ExpressionSleepClaim::declaration(),
+                lamp_msgs::ExpressionSleepClaim::SOURCE,
+            )?,
+            None::<u64>,
+        ))
+    } else {
+        None
+    };
     eprintln!(
         "lamp-skills: skills from {}, the Policy's ask {}, a skill's light {}",
         dir.display(),
@@ -1039,6 +1053,10 @@ fn serve(
                 }
                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
                 eprintln!("lamp-skills: loaded {names:?}");
+                // A changed folder may change night sleep's claim: said now.
+                if let Some((_, said)) = &mut claim {
+                    *said = None;
+                }
                 if let Some(manager) = &mut routines {
                     manager.reload_skills(&skills, lamp_ipc::monotonic_us());
                 }
@@ -1109,6 +1127,20 @@ fn serve(
                 keep_tools(tools, &ask, &engine)?;
             }
             let _ = out.alive();
+        }
+        if let Some((publisher, said)) = &mut claim {
+            let at = lamp_ipc::monotonic_us();
+            if said.is_none_or(|said| {
+                at.saturating_sub(said) >= lamp_msgs::EXPRESSION_SLEEP_CLAIM_EVERY_US
+            }) {
+                *said = Some(at);
+                let stopped = engine.stopped(lamp_skills::routine::NIGHT_SLEEP, clock::now_us());
+                if let Some(night) = lamp_skills::routine::sleep_claim(dir, stopped)
+                    && let Err(error) = publisher.publish_json(at, &night)
+                {
+                    eprintln!("lamp-skills: night sleep's claim not said: {error}");
+                }
+            }
         }
         let now_us = clock::now_us();
         // Anchor the wall sample before reading it or checking trust. Slow

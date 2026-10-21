@@ -2173,6 +2173,7 @@ dependencies = [
  "hound",
  "lamp-body",
  "lamp-bus",
+ "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
  "lamp-msgs",

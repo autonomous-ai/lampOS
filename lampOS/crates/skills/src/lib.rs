@@ -953,8 +953,11 @@ pub struct Permissions {
 /// core`: `onboarding`, a say from the voice's onboarding invitations
 /// (`say = { from = "onboarding" }`) and their first snapshot; and
 /// `prepare_unplug`, the composite unplug operation (`body = {
-/// prepare_unplug = true }`), its reads and the reserved never-mind tool.
-pub const CORE_GRANTS: [&str; 2] = ["onboarding", "prepare_unplug"];
+/// prepare_unplug = true }`), its reads and the reserved never-mind tool;
+/// and `sleep`, the night's sleep (#940, Night sleep): the creature's own,
+/// so its runs ask nobody, the Policy or `LAMP_SKILLS_ASK`, and its steps
+/// are its rest alone, no light, sound or words.
+pub const CORE_GRANTS: [&str; 3] = ["onboarding", "prepare_unplug", "sleep"];
 
 /// An add-on's say grant, the one value of `[permissions] say`: its words
 /// reach the voice quoted and untrusted, never as an instruction.
@@ -2508,8 +2511,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         .as_ref()
         .map(|ask| ask.policy.clone())
         .unwrap_or_default();
-    // An add-on asks nobody here: each proposal goes to its judge.
-    if !triggers.is_empty() && policy.is_empty() && kind != SkillKind::Addon {
+    // An add-on asks nobody here: each proposal goes to its judge. Nor
+    // does the night's sleep (#940): it is the creature's own.
+    let sleep = file.permissions.grants("sleep");
+    if sleep && file.ask.is_some() {
+        return Err("a skill granted core = [\"sleep\"] asks nobody: no [ask]".into());
+    }
+    if !triggers.is_empty() && policy.is_empty() && kind != SkillKind::Addon && !sleep {
         return Err("[ask] names the Policy's question".into());
     }
     if let Some(tool) = &file.tool {
@@ -3344,6 +3352,16 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         // release only ([`UnplugLines::built_in`], [`unplug_words`]).
         (None, _) => None,
     };
+    // The night's sleep is its rest alone: nothing a person sees or hears
+    // comes from it beyond what Expression's sleep does (#940).
+    if file.permissions.grants("sleep")
+        && (file.tool.is_some()
+            || steps
+                .iter()
+                .any(|(_, step)| !matches!(step, Step::Call(Call::Rest(_)))))
+    {
+        return Err("a skill granted core = [\"sleep\"] has only rest steps and no tool".into());
+    }
     let skill = Skill {
         name,
         description,
@@ -5298,7 +5316,10 @@ impl Engine {
                     continue;
                 }
                 watch.waiting_us = None;
-                let acts = self.skip_ask || self.ask_policy || skill.kind == SkillKind::Addon;
+                let acts = self.skip_ask
+                    || self.ask_policy
+                    || skill.kind == SkillKind::Addon
+                    || skill.permissions.grants("sleep");
                 // Spoken to since the window opened today (the first
                 // builder's ruling on bedtime-morning): no greeting, and a
                 // daily trigger's day is spent, said once.
@@ -5627,16 +5648,17 @@ fn decide(
     made: impl FnOnce() -> Vec<Call>,
 ) -> Run {
     // An add-on asks nobody here: what it proposes goes to its judge, which
-    // keeps or drops each proposal (`docs/addons.md`).
-    if skill.kind == SkillKind::Addon {
+    // keeps or drops each proposal (`docs/addons.md`). Nor does the night's
+    // sleep (#940): it is the creature's own, as the built-in one was.
+    let unasked = match (skill.kind, skill.permissions.grants("sleep")) {
+        (SkillKind::Addon, _) => Some("an add-on: its proposals go to the judge on addon/proposal"),
+        (_, true) => Some("the lamp's own sleep: asked of nobody"),
+        _ => None,
+    };
+    if let Some(why) = unasked {
         let events = vec![
             event(&skill.name, SkillStage::Triggered, held, None),
-            event(
-                &skill.name,
-                SkillStage::Answered,
-                "an add-on: its proposals go to the judge on addon/proposal".into(),
-                Some(true),
-            ),
+            event(&skill.name, SkillStage::Answered, why.into(), Some(true)),
         ];
         return Run {
             generation: generation.cloned(),

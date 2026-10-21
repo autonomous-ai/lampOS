@@ -36,7 +36,7 @@ fn roundtrip<T: Serialize + DeserializeOwned + Debug + PartialEq>(value: &T) {
 #[test]
 fn optional_expression_topics_have_own_types_and_do_not_replace_light_setting() {
     let topics = expression_topics();
-    assert_eq!(topics.len(), 11);
+    assert_eq!(topics.len(), 12);
     assert_eq!(first_topics().len(), 17);
     for (topic, declaration) in &topics {
         assert_eq!(declaration_of(topic).as_ref(), Some(declaration));
@@ -130,6 +130,7 @@ fn every_new_wire_type_round_trips_and_ignores_future_fields() {
         warnings: vec![],
         body: false,
         light: false,
+        asleep: None,
     };
     state.check().unwrap();
     roundtrip(&state);
@@ -301,6 +302,7 @@ fn off_setting_stays_off_and_shadow_reports_cannot_claim_outputs() {
         warnings: vec![],
         body: true,
         light: false,
+        asleep: None,
     };
     assert!(state.check().is_err());
     state.body = false;

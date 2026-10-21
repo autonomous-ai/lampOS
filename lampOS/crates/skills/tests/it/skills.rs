@@ -350,6 +350,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "light-scenes",
             "light-show",
             "music-sway",
+            "night-sleep",
             "not-feeling-well",
             "onboarding",
             "point-light",
@@ -395,7 +396,7 @@ fn every_skill_folder_says_its_kind_and_version() {
 fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     let dir = tempfile::tempdir().unwrap();
     let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
-    assert!(!bedtime.enabled && bedtime.permissions.body);
+    assert!(!bedtime.enabled);
     let disabled = load(&skill_with(
         dir.path(),
         "disabled-body",

@@ -1,0 +1,52 @@
+# When the lamp sleeps at night (#940): the trigger Expression's built-in
+# sleep had (crates/expression/src/alive.rs), as a skill. How it sleeps (the
+# bow, the breath, the settle) and every reflex that wakes it stay
+# Expression's. Its numbers are today's (deploy/product/settings/
+# expression.json, `alive.sleep`): night 23:00 to 06:00, 15 minutes.
+enabled = true
+needs = ["eyes", "voice", "body"]
+kind = "core"
+version = "1.0.0"
+
+[permissions]
+topics = ["humans/faces/tracked", "voice/state", "expression/state"]
+body = true
+# The creature's own: asked of nobody, and its rest is all it does.
+core = ["sleep"]
+
+# Nobody seen for 15 minutes. The night is the skill's [active] hours, not
+# the trigger's window, so that someone gone since 22:30 is slept on at
+# 23:00, as before, not 15 minutes after it.
+[[trigger]]
+name = "night"
+topic = "humans/faces/tracked"
+present = false
+for = "15m"
+# Expression refusing it (the body held, a hand on the head) is tried again
+# a minute later, not at every look of the eyes.
+cooldown = "1m"
+
+[active]
+from = "23:00"
+to = "06:00"
+
+# The voice resting all those 15 minutes: Expression's nobody-clock began
+# again whenever the voice was not resting.
+[[while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "15m"
+
+# Awake all those 15 minutes: woken by a reflex, it sleeps again only after
+# nobody for as long, as before.
+[[while]]
+topic = "expression/state"
+field = "asleep"
+equals = false
+for = "15m"
+
+# Held until a reflex or the first face out of the night wakes it, as
+# Expression's sleep was: to 22:59, the rest's longest window.
+[[do]]
+rest = { op = "rest", during = { from = "23:00", to = "22:59" } }

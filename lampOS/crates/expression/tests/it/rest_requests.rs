@@ -3,8 +3,8 @@ use lamp_expression::{Catalogue, Engine, Input, Output, runtime};
 use lamp_msgs::{
     ClockStamp, Concentration, ExpressionBody, ExpressionRestOp as Op,
     ExpressionRestPhase as Phase, ExpressionRestRequest as Request, ExpressionRestState as Receipt,
-    ExpressionState, JointState, MuteReason, NameHeard, Pause, Voice, VoiceEvent, VoiceMute,
-    VoiceProgress, VoiceTiming,
+    ExpressionSleepClaim, ExpressionState, JointState, MuteReason, NameHeard, Pause, Voice,
+    VoiceEvent, VoiceMute, VoiceProgress, VoiceTiming,
 };
 use std::{
     fs,
@@ -723,7 +723,27 @@ impl Drop for Root {
     }
 }
 
+/// Night sleep's claim (#940), as lamp-skills says it: with none, Expression
+/// sleeps by its own schedule and takes no skill's rest.
+fn publish_claim(bus: &Bus, now: u64) {
+    bus.publisher_declared(
+        ExpressionSleepClaim::TOPIC,
+        &ExpressionSleepClaim::declaration(),
+        ExpressionSleepClaim::SOURCE,
+    )
+    .unwrap()
+    .publish_json(
+        now,
+        &ExpressionSleepClaim {
+            skill: "night-sleep".into(),
+            on: true,
+        },
+    )
+    .unwrap();
+}
+
 fn publish_context(bus: &Bus, now: u64) {
+    publish_claim(bus, now);
     bus.publisher_declared(VoiceProgress::TOPIC, &VoiceProgress::declaration(), "voice")
         .unwrap()
         .publish_json(1, &progress(voice(now, 1)))
@@ -789,6 +809,7 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
     let mut joint_publisher = bus
         .publisher_declared(JointState::TOPIC, &JointState::declaration(), "body")
         .unwrap();
+    publish_claim(&bus, START);
     let mut context = |at, sequence| {
         voice_publisher
             .publish_json(at, &progress(voice(at, sequence)))
@@ -897,4 +918,100 @@ fn default_service_declares_no_new_rest_transport() {
             .is_empty()
     );
     assert!(bus.latest(Receipt::TOPIC).unwrap().is_none());
+}
+
+/// The claimed skill's rest is the night's sleep (#940): it begins with the
+/// microphones private, as the built-in sleep does, and a sound the voice
+/// listens to, a new voice turn or the body held do not end it, while a
+/// conversation does. Without the claim, the same rest is a routine's.
+#[test]
+fn the_claimed_nights_sleep_holds_through_what_does_not_wake_the_built_in_one() {
+    for claimed in [true, false] {
+        let mut fixture = Fixture::new(true);
+        let claim = ExpressionSleepClaim {
+            skill: "sample-routine".into(),
+            on: true,
+        };
+        let other = ExpressionSleepClaim {
+            skill: "night-sleep".into(),
+            on: true,
+        };
+        fixture
+            .engine
+            .set_sleep_claim(fixture.now, Some(if claimed { &claim } else { &other }));
+        fixture.engine.set_privacy_muted(true);
+        assert_eq!(fixture.offer(1, Op::Rest).is_ok(), claimed);
+        if !claimed {
+            return;
+        }
+        fixture.now += 100_000;
+        let mut listening = voice(fixture.now, fixture.sequence + 1);
+        listening.state = Voice::Listening;
+        listening.turn += 1;
+        listening.request += 1;
+        fixture
+            .engine
+            .ingest(fixture.now, voice_input(listening.clone()))
+            .unwrap();
+        fixture
+            .engine
+            .ingest(
+                fixture.now,
+                Input::Concentration(Concentration {
+                    stamp: stamp(fixture.now, 1),
+                    concentrating: true,
+                }),
+            )
+            .unwrap();
+        fixture.offer(1, Op::Rest).unwrap();
+        assert_eq!(fixture.receipt().phase, Phase::Resting);
+        let output = fixture.engine.tick(fixture.now);
+        assert!(
+            output
+                .state
+                .behaviours
+                .iter()
+                .any(|name| name == "falling asleep")
+        );
+        assert_eq!(output.state.asleep, Some(true));
+        fixture.now += 100_000;
+        let mut talking = listening;
+        talking.stamp = stamp(fixture.now, fixture.sequence + 2);
+        talking.state = Voice::Thinking;
+        fixture
+            .engine
+            .ingest(fixture.now, voice_input(talking))
+            .unwrap();
+        assert_eq!(fixture.receipt().phase, Phase::Cancelled);
+    }
+}
+
+/// Night sleep's claim is live, not only retained (#940): one older than
+/// three minutes, or not lamp-skills', is no claim, and the journal says
+/// which way the night goes.
+#[test]
+fn a_sleep_claim_counts_only_while_fresh_and_from_skills() {
+    let root = Root::new();
+    let bus = Bus::new(&root.0).unwrap();
+    publish_claim(&bus, START);
+    let latest = || bus.latest(ExpressionSleepClaim::TOPIC).unwrap();
+    let fresh = runtime::sleep_claim_in(latest(), START + 179_999_999).unwrap();
+    assert_eq!(fresh.skill, "night-sleep");
+    assert!(runtime::sleep_claim_in(latest(), START + 180_000_000).is_none());
+    assert!(runtime::sleep_claim_in(None, START).is_none());
+    bus.publisher_declared(
+        ExpressionSleepClaim::TOPIC,
+        &ExpressionSleepClaim::declaration(),
+        "voice",
+    )
+    .unwrap()
+    .publish_json(START, &fresh)
+    .unwrap();
+    assert!(runtime::sleep_claim_in(latest(), START).is_none());
+    assert!(runtime::sleep_claim_line(None).contains("fallback kept for one release (#940)"));
+    let off = ExpressionSleepClaim { on: false, ..fresh };
+    assert!(
+        runtime::sleep_claim_line(Some(&off))
+            .starts_with("night-sleep claims the night's sleep (off")
+    );
 }

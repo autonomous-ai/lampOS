@@ -1000,9 +1000,16 @@ remain speaker-owner reports.
 ## Leased skill rest requests
 
 `LAMP_REST_REQUESTS=on` enables generic skill-owned rest intake. It is off
-for every other value. In this mode Skills chooses routine timing and
-Expression stops its automatic night/absence sleep and morning/face wake
-decisions. The existing renderer, name/touch/reminder/conversation reflexes,
+for every other value. In this mode, while lamp-skills claims the night
+(`expression/sleep_claim`, fresh for 180 s), Skills chooses routine timing
+and Expression stops its automatic night/absence sleep decision; with no
+fresh claim it sleeps by its own schedule, the fallback for one release
+(#940, [alive.md](alive.md#night-sleep-is-a-skill)); the product units leave it
+off for now, so the built-in sleep runs there. The claimed skill's
+rest (`night-sleep`) is held as the built-in sleep is, through the voice
+listening, a new voice turn, a privacy mute or a held body, and the first
+face out of the night wakes it; every other skill's rest keeps the gate
+below. The existing renderer, name/touch/reminder/conversation reflexes,
 manual sleep and privacy behavior remain. `--enable` still independently
 controls actuator requests; the rest switch adds no writer or raw-joint
 interface. See [Bedtime and Morning](bedtime-morning.md) for the disabled

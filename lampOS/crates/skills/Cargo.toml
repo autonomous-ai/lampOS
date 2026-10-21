@@ -55,6 +55,9 @@ rustix = { version = "=1.1.5", features = ["pipe", "fs", "event", "net", "proces
 [dev-dependencies]
 tempfile = "3"
 hound.workspace = true
+# Night sleep's replay through both routes (`tests/it/night_sleep.rs`, #940):
+# Expression's planner, tested against, never linked.
+lamp-expression = { path = "../expression" }
 
 [lints]
 workspace = true

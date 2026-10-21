@@ -2389,6 +2389,13 @@ mod tests {
                 500,
             ),
             ("output/caps", OutputCaps::TYPE, Kind::Latest, 1_000, 3_000),
+            (
+                "expression/sleep_claim",
+                ExpressionSleepClaim::TYPE,
+                Kind::Latest,
+                60_000,
+                180_000,
+            ),
         ] {
             let declared = declaration_of(topic).unwrap();
             assert_eq!(declared.type_name, type_name);

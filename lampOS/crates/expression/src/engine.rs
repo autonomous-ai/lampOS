@@ -365,6 +365,9 @@ pub struct Engine {
     routine: Option<rest::Rest>,
     routine_paused: bool,
     privacy_muted: bool,
+    /// The skill that claims the night's sleep (#940), while its claim is
+    /// fresh: only with rest requests on.
+    sleep_claim: Option<String>,
 }
 
 impl Engine {
@@ -431,6 +434,7 @@ impl Engine {
             routine: None,
             routine_paused: false,
             privacy_muted: false,
+            sleep_claim: None,
         })
     }
 
@@ -465,6 +469,44 @@ impl Engine {
         }
         self.routine = Some(rest::Rest::default());
         self
+    }
+
+    /// The skill's claim on the night's sleep (#940), fresh, or none. Only
+    /// with rest requests on: a claim gives the night to skills (`on` or
+    /// not: off is a person's choice that it not sleep), and the claimed
+    /// skill's rest is held as the built-in sleep is. With none, Expression
+    /// sleeps by its own schedule again.
+    ///
+    /// FALLBACK (#940, for one release): no claim, or a stale one, is a
+    /// lamp-skills that is down or older than night-sleep, so the built-in
+    /// schedule runs as it did before skills held the night. The release
+    /// after removes it.
+    pub fn set_sleep_claim(
+        &mut self,
+        now_us: u64,
+        claim: Option<&lamp_msgs::ExpressionSleepClaim>,
+    ) {
+        if self.routine.is_none() {
+            return;
+        }
+        let skill = claim.map(|claim| claim.skill.clone());
+        if skill.is_none()
+            && self.sleep_claim.is_some()
+            && let Some(routine) = &mut self.routine
+        {
+            routine.withdraw(now_us, "no skill claims the night any more", &mut self.life);
+        }
+        self.sleep_claim = skill;
+        if let Some(life) = &mut self.life {
+            life.set_scheduling(
+                if claim.is_some() {
+                    alive::Scheduling::Skills
+                } else {
+                    alive::Scheduling::Autonomous
+                },
+                now_us,
+            );
+        }
     }
 
     fn routine_gate(&self, now_us: u64) -> rest::Gate {
@@ -503,6 +545,8 @@ impl Engine {
         rest::Gate {
             eligible: why_not.is_none(),
             why_not,
+            off: (!self.enabled || self.fault.is_some()).then_some("Expression is off or faulted"),
+            sleep: self.sleep_claim.clone(),
             owner: voice.map(|voice| rest::Owner {
                 session: voice.session_id.clone(),
                 turn: voice.turn,
@@ -1379,6 +1423,7 @@ impl Engine {
             warnings: Vec::new(),
             body: false,
             light: false,
+            asleep: None,
         };
         if self.catalogue.timing.body_lag_us.is_none() {
             state.missing.push("measured body lag".into());
@@ -1531,6 +1576,7 @@ impl Engine {
             routine.after_tick(now_us, &mut self.life);
         }
         let asleep = planned.as_ref().is_some_and(|planned| planned.asleep);
+        state.asleep = planned.as_ref().map(|planned| planned.asleep);
         let mut offsets = self.catalogue.postures.for_voice(body_mode);
         let return_scale = self.first_audio.map_or(1.0, |first| {
             let t = self.catalogue.timing;

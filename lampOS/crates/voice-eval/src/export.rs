@@ -686,6 +686,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/light",
     "expression/rest_request",
     "expression/rest_state",
+    "expression/sleep_claim",
     "expression/state",
     "expression/unplug_state",
     "eyes/camera_closed",

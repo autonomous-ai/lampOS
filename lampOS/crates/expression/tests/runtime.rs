@@ -323,6 +323,7 @@ fn a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is() {
         warnings: warnings.iter().map(|text| (*text).to_owned()).collect(),
         body: enabled,
         light: enabled,
+        asleep: None,
     };
     let well = runtime::Counts::default();
     let note = "short audio notice; return shortened, arrival unverified";
