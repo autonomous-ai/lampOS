@@ -1796,7 +1796,8 @@ after a take-over, but now for every turn:
   `LAMP_QUIET_GOING_ON_SAME_ONE=on` or `LAMP_GOING_ON_NOT_OWN=on` start it
   too, without `LAMP_SPOKEN_TO`: their sign of someone else reads its
   prints, and lamp-52e6 ran them with no print all run (#2341). Without
-  `LAMP_SPOKEN_TO` the prints feed only that sign: this check
+  `LAMP_SPOKEN_TO` the prints feed only that sign and a trusted session's
+  hold (below): this check
   (`Heeding::voice_going_on`) ends no conversation, so a person's own short
   follow-up that reads low still goes on. With none of the
   three the journal says "the same voice is judged only with
@@ -1969,7 +1970,8 @@ after a take-over, but now for every turn:
   #829's own check reads the same bar (one bar since the first builder's
   03:50 on #1722; [same-voice.md](same-voice.md)) and, with
   `LAMP_SPOKEN_TO`, holds a line under it before this rule reads it
-  (without it the print feeds only this rule, #2428); with the eyes' speaking faces
+  (without it the print feeds only this rule, #2428, and a trusted
+  session's hold); with the eyes' speaking faces
   (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from `humans/faces/tracked` on
   the bus), a face seen speaking it not turned to the lamp, none of them the answered
   caller's, whether or not the caller's face is known (the first builder at

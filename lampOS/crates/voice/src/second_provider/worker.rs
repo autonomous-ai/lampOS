@@ -6161,7 +6161,8 @@ mod tests {
     /// played as "the session has heard enough to be trusted". With either
     /// switch that line is held, the caller's own lines in the same trusted
     /// session are still answered, and the other voice's line begun over the
-    /// lamp's sound, which has no print, is played as before.
+    /// lamp's sound, which has no print, is played as before, as is its line
+    /// that calls the lamp by name or answers the lamp's question.
     #[test]
     fn a_trusted_session_does_not_carry_to_another_voice() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -6186,10 +6187,10 @@ mod tests {
             }
         }
         let said = (10_000_000, 11_000_000);
-        let quiet = |going_on| Signs {
+        let quiet = |going_on, lamp_asked| Signs {
             room: Room::Quiet,
             going_on,
-            lamp_asked: false,
+            lamp_asked,
             turned: Some(false),
             names: Vec::new(),
             near: false,
@@ -6200,7 +6201,8 @@ mod tests {
                     voice: i16,
                     over_the_lamps_voice: bool,
                     words: &str,
-                    going_on: bool| {
+                    going_on: bool,
+                    lamp_asked: bool| {
             heeding.hear(
                 request,
                 Heard::Began {
@@ -6209,13 +6211,14 @@ mod tests {
             );
             heeding.hear(request, Heard::Samples(&[voice; 48_000]));
             heeding.hear(request, Heard::Ended);
-            heeding.judge(request, said, words, quiet(going_on))
+            heeding.judge(request, said, words, quiet(going_on, lamp_asked))
         };
         let other = "Honestly I think we should book the train tickets tonight before the prices go up again.";
         assert_eq!(other.split_whitespace().count(), 16);
         // `switch`: 0 none, 1 `LAMP_QUIET_GOING_ON_SAME_ONE`, 2
-        // `LAMP_GOING_ON_NOT_OWN`. The other voice's line, then the caller's.
-        let scene = |switch: u8, over: bool| {
+        // `LAMP_GOING_ON_NOT_OWN`. The other voice's line (its words, and
+        // whether it answers the lamp's question), then the caller's.
+        let scene = |switch: u8, over: bool, words: &str, lamp_asked: bool| {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             let mut heeding = Heeding::new(false, true, None, None);
@@ -6227,27 +6230,50 @@ mod tests {
             }
             heeding.checking_the_voice(Box::new(Voice::default()));
             let call = "Hey Lamp, what's the weather today?";
-            assert_eq!(line(&mut heeding, 1, 1, false, call, false), None);
+            assert_eq!(line(&mut heeding, 1, 1, false, call, false, false), None);
             let follow = "And what about tomorrow?";
-            assert_eq!(line(&mut heeding, 2, 1, false, follow, true), None);
+            assert_eq!(line(&mut heeding, 2, 1, false, follow, true, false), None);
             // Past its first two lines the session is trusted: the
             // caller's own line, going on or not, is answered.
             let trusted = "Is it going to rain on the weekend?";
-            assert_eq!(line(&mut heeding, 3, 1, false, trusted, false), None);
-            let held = line(&mut heeding, 4, -1, over, other, false);
+            assert_eq!(line(&mut heeding, 3, 1, false, trusted, false, false), None);
+            // An answer to the lamp's question comes while the conversation
+            // is going on.
+            let held = line(&mut heeding, 4, -1, over, words, lamp_asked, lamp_asked);
             let after = "What about Sunday morning?";
-            assert_eq!(
-                line(&mut heeding, 5, 1, false, after, false),
-                None,
-                "switch {switch}: the caller's own line after it is answered"
-            );
-            held
+            (held, line(&mut heeding, 5, 1, false, after, false, false))
         };
         let not_carried = Some(crate::second_provider::TRUSTED_NOT_CARRIED);
-        assert_eq!(scene(0, false), None, "without a switch, as before");
-        assert_eq!(scene(1, false), not_carried);
-        assert_eq!(scene(2, false), not_carried);
-        assert_eq!(scene(1, true), None, "begun over the lamp: no print");
+        // The caller's own line after another voice's is answered.
+        assert_eq!(
+            scene(0, false, other, false),
+            (None, None),
+            "without a switch, as before"
+        );
+        assert_eq!(scene(1, false, other, false), (not_carried, None));
+        assert_eq!(scene(2, false, other, false), (not_carried, None));
+        assert_eq!(
+            scene(1, true, other, false),
+            (None, None),
+            "begun over the lamp: no print"
+        );
+        // Anyone may call the lamp, or answer its question.
+        let named = "Hey Lamp, can you book the train tickets for tonight before the prices go up?";
+        let answer = "Yes, the one at seven, before the prices go up again tonight please.";
+        for switch in [1, 2] {
+            // The named line begins the other voice's own conversation, so
+            // the first caller's line after it, with no sign, is held.
+            assert_eq!(
+                scene(switch, false, named, false),
+                (None, not_carried),
+                "switch {switch}: named"
+            );
+            assert_eq!(
+                scene(switch, false, answer, true),
+                (None, None),
+                "switch {switch}: answers the lamp"
+            );
+        }
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
