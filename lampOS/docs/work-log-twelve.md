@@ -505,3 +505,4 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - 22 Oct 03:4x–04:1x: #2729 (draft, line-start speech socket, measured dialogue bound) run on c0a4 in three arms: the socket always ready, but sound p50 3424 (flash) and 3957 (v4) vs 3325 over HTTP; #2727 (probe asks for the socket's own model) opened.
 - 22 Oct 04:xx: #2727 merged; #2729 closed on the first builder's call (socket off), recorded in #2734 (docs); #2735 day-stages --lines (split-line count), on c0a4 5 of 12 played lines heard as 2 turns, all fragments silence_fallback.
 - 22 Oct 05:xx–06:3x: turn-end follow-up: short = the 0.8 s speech floor (+ start blocks uncounted); #2751 LAMP_ENDPOINT_LEAST_SPEECH_MS + speech_ms; replay 72 clips, c0a4 A/B wait p50 602 → 438 ms. #2707 closed.
+- 22 Oct 06:xx–07:1x: #2751 merged (before the P2 fix) → #2756 (floor at least 500 + Hey Lamp test); #2619 P2 fixed, rebased, Reviewer-lead clear, waits on Mobile.
