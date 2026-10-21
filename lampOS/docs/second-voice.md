@@ -1694,7 +1694,17 @@ after a take-over, but now for every turn:
   answered). The busy-room battery on lamp-4ace is its check.
 - **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
   `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live, and
-  only as the lamp's only voice (a standby beside Live loads none). The
+  only as the lamp's only voice (a standby beside Live loads none). Here
+  `LAMP_QUIET_GOING_ON_SAME_ONE=on` or `LAMP_GOING_ON_NOT_OWN=on` start it
+  too, without `LAMP_SPOKEN_TO`: their sign of someone else reads its
+  prints, and lamp-52e6 ran them with no print all run (#2341). Without
+  `LAMP_SPOKEN_TO` the prints feed only that sign: this check
+  (`Heeding::voice_going_on`) ends no conversation, so a person's own short
+  follow-up that reads low still goes on. With none of the
+  three the journal says "the same voice is judged only with
+  LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE or LAMP_GOING_ON_NOT_OWN on:
+  not judged". Tests: `worker::tests::same_voice_starts_for_the_rules_that_read_it`,
+  `worker::tests::a_low_print_without_spoken_to_keeps_the_conversation_going`. The
   worker starts the same `lamp-same-voice` child; the engine hands it every
   chunk of a spoken line (`Engine::hearing`), of which `Voices` keeps the
   first ones to print (a line begun over the lamp's voice is not printed),
@@ -1859,8 +1869,9 @@ after a take-over, but now for every turn:
   down to 0.35, other voices up to 0.29); no print, a line begun over the
   lamp's voice or under 1.5 s, is never another voice and goes on (02:19).
   #829's own check reads the same bar (one bar since the first builder's
-  03:50 on #1722; [same-voice.md](same-voice.md)) and holds a line under it
-  before this rule reads it; with the eyes' speaking faces
+  03:50 on #1722; [same-voice.md](same-voice.md)) and, with
+  `LAMP_SPOKEN_TO`, holds a line under it before this rule reads it
+  (without it the print feeds only this rule, #2428); with the eyes' speaking faces
   (`LAMP_EYES_SPEAKING=on` on lamp-eyes, read from `humans/faces/tracked` on
   the bus), a face seen speaking it not turned to the lamp, none of them the answered
   caller's, whether or not the caller's face is known (the first builder at

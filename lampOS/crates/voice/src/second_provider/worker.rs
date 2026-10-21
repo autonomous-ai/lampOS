@@ -2008,28 +2008,22 @@ pub fn serve(
             files.bus_root.as_deref(),
             thread.clone(),
         )));
-        // The same-voice check (#829), as the Live worker starts it: its
-        // child loads its model now, and only beside `LAMP_SPOKEN_TO=on`.
-        // Only as the lamp's only voice: a standby beside Live loads none.
-        let same_voice = files.same_voice.clone().filter(|_| route.only_voice);
-        let mut hears = false;
-        match (files.spoken_to, same_voice) {
-            (true, Some(model)) => match crate::same_voice::Prints::beside_voice(model) {
-                Ok(prints) => {
-                    if let Ok(mut heeding) = heeding.lock() {
-                        heeding.checking_the_voice(Box::new(prints));
-                    }
-                    hears = true;
-                }
-                Err(error) => {
-                    eprintln!("lamp-voice second: the same voice is not judged: {error}");
-                }
+        let quiet_same_one =
+            std::env::var(crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT)
+                .is_ok_and(|value| value == "on");
+        let not_own = std::env::var(crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on");
+        // The same-voice check (#829): its child loads its model now. Only
+        // as the lamp's only voice: a standby beside Live loads none.
+        let hears = checking_the_voice_for(
+            &heeding,
+            files.same_voice.clone().filter(|_| route.only_voice),
+            files.spoken_to || quiet_same_one || not_own,
+            |model| {
+                crate::same_voice::Prints::beside_voice(model)
+                    .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
             },
-            (false, Some(_)) => eprintln!(
-                "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO=on: not judged"
-            ),
-            (_, None) => {}
-        }
+        );
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -2106,9 +2100,7 @@ pub fn serve(
         }
         // In a quiet room, a conversation going on holds only for the one the
         // lamp answered (`LAMP_QUIET_GOING_ON_SAME_ONE=on`).
-        if std::env::var(crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
-        {
+        if quiet_same_one {
             eprintln!(
                 "lamp-voice second: in a quiet room, a line let out only as the conversation going on is held when another voice or another face than the caller's is heard or seen speaking it (LAMP_QUIET_GOING_ON_SAME_ONE)"
             );
@@ -2157,9 +2149,7 @@ pub fn serve(
         );
         // The lamp's own answers to lines let out only as the conversation
         // going on keep no conversation going (`LAMP_GOING_ON_NOT_OWN=on`).
-        if std::env::var(crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
-        {
+        if not_own {
             eprintln!(
                 "lamp-voice second: the lamp's answers to lines let out only as the conversation going on keep no conversation going (LAMP_GOING_ON_NOT_OWN)"
             );
@@ -2978,6 +2968,10 @@ pub(crate) struct Heeding {
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// #829's conversation check reads [`Self::voices`] only beside
+    /// `LAMP_SPOKEN_TO` ([`Self::as_the_only_voice`]); without it the prints
+    /// feed only [`Self::someone_else`] (#2428).
+    voice_ends_going_on: bool,
     /// `LAMP_NAMED_ALWAYS=on` (#2191, [`Self::always_answering_named`]).
     named_always: bool,
     /// The request judged last, if it began with the lamp's name said to a
@@ -2993,6 +2987,43 @@ pub(crate) struct Heeding {
     said_until_free_us: Option<u64>,
     /// `LAMP_BUSY_CALLED_STRICT=on` ([`crate::attention::Attention::narrow_the_call`]).
     busy_called_strict: bool,
+}
+
+/// The same-voice check (#829) on `heeding`, its child made by `start` with
+/// `model`, when a rule reads its prints (`read`): `LAMP_SPOKEN_TO`'s
+/// conversation check, or `LAMP_QUIET_GOING_ON_SAME_ONE`'s and
+/// `LAMP_GOING_ON_NOT_OWN`'s voice sign of someone else
+/// ([`Heeding::someone_else`]), which lamp-52e6 runs without
+/// `LAMP_SPOKEN_TO` (#2341). #829's own conversation check still reads them
+/// only beside `LAMP_SPOKEN_TO` ([`Heeding::voice_going_on`]). Whether the
+/// voice is heard.
+fn checking_the_voice_for(
+    heeding: &Mutex<Heeding>,
+    model: Option<PathBuf>,
+    read: bool,
+    start: impl FnOnce(PathBuf) -> std::io::Result<Box<dyn crate::same_voice::Printer>>,
+) -> bool {
+    match (read, model) {
+        (true, Some(model)) => match start(model) {
+            Ok(printer) => {
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.checking_the_voice(printer);
+                }
+                true
+            }
+            Err(error) => {
+                eprintln!("lamp-voice second: the same voice is not judged: {error}");
+                false
+            }
+        },
+        (false, Some(_)) => {
+            eprintln!(
+                "lamp-voice second: the same voice is judged only with LAMP_SPOKEN_TO, LAMP_QUIET_GOING_ON_SAME_ONE or LAMP_GOING_ON_NOT_OWN on: not judged"
+            );
+            false
+        }
+        (_, None) => false,
+    }
 }
 
 /// The rule's two switches on `engine` and `heeding`, each on its own.
@@ -3411,6 +3442,7 @@ impl Heeding {
             going_on_same_one: false,
             began_over: None,
             voices: None,
+            voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
             not_own: false,
@@ -3464,7 +3496,9 @@ impl Heeding {
 
     /// A line in another voice than the conversation's is no part of it
     /// (#829), judged by `printer` as the Live worker judges it: with
-    /// `LAMP_SAME_VOICE_MODEL`, only beside `LAMP_SPOKEN_TO=on`.
+    /// `LAMP_SAME_VOICE_MODEL`, beside `LAMP_SPOKEN_TO=on`, or here beside
+    /// `LAMP_QUIET_GOING_ON_SAME_ONE=on` or `LAMP_GOING_ON_NOT_OWN=on`
+    /// ([`checking_the_voice_for`]).
     pub(crate) fn checking_the_voice(&mut self, printer: Box<dyn crate::same_voice::Printer>) {
         self.voices = Some(crate::same_voice::Voices::new(printer));
     }
@@ -3503,6 +3537,14 @@ impl Heeding {
         let Some(voices) = self.voices.as_mut() else {
             return (going_on, false, false, None);
         };
+        // Without `LAMP_SPOKEN_TO` (#829's check never ran there) the print
+        // is only read, for [`Self::someone_else`]: a person's own short
+        // follow-up that reads low still goes on (the first builder at
+        // 09:14 on #2428).
+        if !self.voice_ends_going_on {
+            let likeness = going_on.then(|| voices.likeness(request)).flatten();
+            return (going_on, false, false, likeness);
+        }
         let attention = &self.attention;
         let under_the_mark = !going_on
             && crate::room_told::room()
@@ -3769,6 +3811,7 @@ impl Heeding {
         self.keeps_room = true;
         self.attention.hold_remarks(remarks);
         self.attention.speak_when_spoken_to(spoken_to);
+        self.voice_ends_going_on = spoken_to;
         self.attention.judge_by_day(by_day);
     }
 
@@ -5474,6 +5517,68 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
+    /// The reviewer's P3 on #2428: with `LAMP_QUIET_GOING_ON_SAME_ONE` and no
+    /// `LAMP_SPOKEN_TO`, a low print is read for `someone_else` alone; #829's
+    /// conversation check, never run there, does not end the conversation
+    /// for it, so a person's own short follow-up that reads low still goes
+    /// on. With `LAMP_SPOKEN_TO` it ends it, as before.
+    #[test]
+    fn a_low_print_without_spoken_to_keeps_the_conversation_going() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = (10_000_000, 11_000_000);
+        let hear = |heeding: &mut Heeding, request: u64, voice: i16| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+        };
+        for spoken_to in [false, true] {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, spoken_to, false);
+            heeding.going_on_quiet_only_for_the_same_one();
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            // A calls the lamp: A's voice is the conversation's.
+            hear(&mut heeding, 1, 1);
+            let call = "Lamp, what time is it?";
+            assert_eq!(heeding.heed(1, said, call, None), None);
+            // A line going on from it reads low.
+            hear(&mut heeding, 2, -1);
+            let (going_on, other, _, likeness) = heeding.voice_going_on(2, true);
+            assert!(
+                likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW),
+                "spoken_to {spoken_to}: {likeness:?}"
+            );
+            assert_eq!(going_on, !spoken_to, "spoken_to {spoken_to}");
+            assert_eq!(other, spoken_to, "spoken_to {spoken_to}");
+        }
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
     /// #2191 (lamp-52e6, 20 Oct 15:2x): in a busy room, after the lamp
     /// answered one named line, office talk between two others that came
     /// within the going-on window was answered, "a conversation with the
@@ -5557,6 +5662,44 @@ mod tests {
             judge(true, office, signs(Room::Quiet, true, false, false)),
             None
         );
+    }
+
+    /// lamp-52e6 at 08:33 on #2341: `LAMP_QUIET_GOING_ON_SAME_ONE=on` and
+    /// `LAMP_SAME_VOICE_MODEL`, no `LAMP_SPOKEN_TO`, and no print all run:
+    /// the child started only with `LAMP_SPOKEN_TO`, so `someone_else` never
+    /// had a voice to read. Either rule that reads it starts it now; with
+    /// none of the three, nothing is started.
+    #[test]
+    fn same_voice_starts_for_the_rules_that_read_it() {
+        struct Voice;
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, _request: u64, _samples: &[i16]) -> bool {
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                None
+            }
+        }
+        let starts = |spoken_to: bool, quiet_same_one: bool, not_own: bool| {
+            let heeding = Mutex::new(Heeding::new(true, true, None, None));
+            let mut started = false;
+            let hears = super::checking_the_voice_for(
+                &heeding,
+                Some(PathBuf::from("/models/campplus.onnx")),
+                spoken_to || quiet_same_one || not_own,
+                |_| {
+                    started = true;
+                    Ok(Box::new(Voice) as Box<dyn crate::same_voice::Printer>)
+                },
+            );
+            assert_eq!(heeding.lock().unwrap().voices.is_some(), started);
+            assert_eq!(hears, started);
+            started
+        };
+        assert!(starts(false, true, false));
+        assert!(starts(false, false, true));
+        assert!(starts(true, false, false));
+        assert!(!starts(false, false, false));
     }
 
     /// #2191 on a lamp without `LAMP_SPOKEN_TO` (lamp-52e6 and lamp-4ace):
