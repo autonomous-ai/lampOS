@@ -3959,12 +3959,11 @@ impl Heeding {
             return (going_on, false, false, None);
         };
         // Without `LAMP_SPOKEN_TO` (#829's check never ran there) the print
-        // is only read, for [`Self::someone_else`]: a person's own short
-        // follow-up that reads low still goes on (the first builder at
-        // 09:14 on #2428).
+        // is only read, for [`Self::someone_else`] and a trusted session's
+        // line, going on or not: a person's own short follow-up that reads
+        // low still goes on (the first builder at 09:14 on #2428).
         if !self.voice_ends_going_on {
-            let likeness = going_on.then(|| voices.likeness(request)).flatten();
-            return (going_on, false, false, likeness);
+            return (going_on, false, false, voices.likeness(request));
         }
         let attention = &self.attention;
         let under_the_mark = !going_on
@@ -4809,6 +4808,31 @@ impl Heeding {
         {
             verdict = Some(crate::attention::Verdict::Hold(
                 crate::second_provider::QUIET_GOING_ON_HELD,
+            ));
+        }
+        // A session's trust is the caller's, earned in their voice: it does
+        // not carry to a line whose print says someone else (under
+        // `DIFFERENT_BELOW`), let out by trust with no sign of its own but
+        // the conversation going on (the first builder at 09:40 on #2428:
+        // lamp-52e6's request 11, another voice's 16 words at 0.23, played
+        // as "the session has heard enough to be trusted"). A line begun
+        // over the lamp's sound has no print, so it is never held so.
+        if (self.quiet_same_one || self.not_own)
+            && matches!(
+                verdict,
+                Some(crate::attention::Verdict::Play(crate::attention::TRUSTED))
+            )
+            && matches!(
+                attention.sign(turned),
+                None | Some(crate::attention::GOING_ON)
+            )
+            && !lamp_asked
+            && seen
+                .likeness
+                .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW)
+        {
+            verdict = Some(crate::attention::Verdict::Hold(
+                crate::second_provider::TRUSTED_NOT_CARRIED,
             ));
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
@@ -6128,6 +6152,102 @@ mod tests {
             assert_eq!(going_on, !spoken_to, "spoken_to {spoken_to}");
             assert_eq!(other, spoken_to, "spoken_to {spoken_to}");
         }
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// lamp-52e6's re-run at 09:5x on #2428: with `LAMP_GOING_ON_NOT_OWN`
+    /// and `LAMP_QUIET_GOING_ON_SAME_ONE`, no `LAMP_SPOKEN_TO`, another
+    /// voice's 16 words (cosine 0.23) in a session past its first lines were
+    /// played as "the session has heard enough to be trusted". With either
+    /// switch that line is held, the caller's own lines in the same trusted
+    /// session are still answered, and the other voice's line begun over the
+    /// lamp's sound, which has no print, is played as before.
+    #[test]
+    fn a_trusted_session_does_not_carry_to_another_voice() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is the
+        /// caller's voice, -1 another's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = (10_000_000, 11_000_000);
+        let quiet = |going_on| Signs {
+            room: Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = |heeding: &mut Heeding,
+                    request: u64,
+                    voice: i16,
+                    over_the_lamps_voice: bool,
+                    words: &str,
+                    going_on: bool| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            heeding.judge(request, said, words, quiet(going_on))
+        };
+        let other = "Honestly I think we should book the train tickets tonight before the prices go up again.";
+        assert_eq!(other.split_whitespace().count(), 16);
+        // `switch`: 0 none, 1 `LAMP_QUIET_GOING_ON_SAME_ONE`, 2
+        // `LAMP_GOING_ON_NOT_OWN`. The other voice's line, then the caller's.
+        let scene = |switch: u8, over: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let mut heeding = Heeding::new(false, true, None, None);
+            heeding.as_the_only_voice(false, false, false);
+            match switch {
+                1 => heeding.going_on_quiet_only_for_the_same_one(),
+                2 => heeding.not_counting_own_answers(),
+                _ => {}
+            }
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            let call = "Hey Lamp, what's the weather today?";
+            assert_eq!(line(&mut heeding, 1, 1, false, call, false), None);
+            let follow = "And what about tomorrow?";
+            assert_eq!(line(&mut heeding, 2, 1, false, follow, true), None);
+            // Past its first two lines the session is trusted: the
+            // caller's own line, going on or not, is answered.
+            let trusted = "Is it going to rain on the weekend?";
+            assert_eq!(line(&mut heeding, 3, 1, false, trusted, false), None);
+            let held = line(&mut heeding, 4, -1, over, other, false);
+            let after = "What about Sunday morning?";
+            assert_eq!(
+                line(&mut heeding, 5, 1, false, after, false),
+                None,
+                "switch {switch}: the caller's own line after it is answered"
+            );
+            held
+        };
+        let not_carried = Some(crate::second_provider::TRUSTED_NOT_CARRIED);
+        assert_eq!(scene(0, false), None, "without a switch, as before");
+        assert_eq!(scene(1, false), not_carried);
+        assert_eq!(scene(2, false), not_carried);
+        assert_eq!(scene(1, true), None, "begun over the lamp: no print");
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 

@@ -265,6 +265,13 @@ pub const QUIET_GOING_ON_SAME_ONE_ENVIRONMENT: &str = "LAMP_QUIET_GOING_ON_SAME_
 /// back: ".
 pub(crate) const QUIET_GOING_ON_HELD: &str = "a quiet room: a conversation with the lamp is going on, but the line is someone else's: another voice than the conversation's, or a face speaking it, not turned to the lamp, that is not the one it answered";
 
+/// Why the second route holds a line let out only by a trusted session
+/// when its voice print says someone else's than the conversation's, with
+/// `LAMP_QUIET_GOING_ON_SAME_ONE` or `LAMP_GOING_ON_NOT_OWN` on (the first
+/// builder at 09:40 on #2428), as its journal says it after "held back: ".
+pub(crate) const TRUSTED_NOT_CARRIED: &str =
+    "the session's trust is the caller's, and the line's voice print says someone else";
+
 /// Where the worker reads whether a spoken turn's chat is given only the
 /// functions a spoken turn mostly needs, and the rest behind one call
 /// (`worker::few_tools`): `on`, and nothing else (#1712, the first builder
