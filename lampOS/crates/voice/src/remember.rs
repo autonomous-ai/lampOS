@@ -1435,6 +1435,13 @@ pub fn told_for_session(socket: &Path, session: u64, person: Option<&str>) -> St
     told_for_fresh_session(socket, session, person, false)
 }
 
+/// Whether something was kept since the note was last asked
+/// ([`DaysClient::kept_since_note`]), the mark taken; never without the
+/// Days client.
+pub fn kept_since_note() -> bool {
+    days_client().is_some_and(DaysClient::kept_since_note)
+}
+
 /// Whether the next session should be opened fresh, with no resumption
 /// ([`DaysClient::wants_fresh_session`]); never without the Days client.
 pub fn wants_fresh_session() -> bool {
@@ -1704,6 +1711,10 @@ pub struct DaysClient {
     resumes: AtomicBool,
     /// When a fresh open was last tried and didn't resume.
     fresh_tried: Mutex<Option<Instant>>,
+    /// Something kept with `remember` since this was last asked
+    /// ([`DaysClient::kept_since_note`], #2540): a session's note, frozen
+    /// for its run of turns, doesn't have it.
+    kept_since_note: AtomicBool,
     /// The conversation the writer is in: whose, and the exchanges of it
     /// journalled so far. With [`forget_all_on`], a thing remembered in it
     /// is kept with them, so forgetting it removes them too (#1693).
@@ -2198,6 +2209,7 @@ impl DaysClient {
                 std::env::var(JOURNAL_RESUMES_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             fresh_tried: Mutex::new(None),
+            kept_since_note: AtomicBool::new(false),
             current,
             hand_ons,
             early,
@@ -2669,6 +2681,10 @@ impl DaysClient {
             } else {
                 vec![]
             };
+            // Kept, told or not: the store has it now (#2540).
+            if !ids.is_empty() {
+                self.kept_since_note.store(true, Ordering::Release);
+            }
             (told, ids)
         };
         if !scope_current(lease) || !crate::tools::sendable(&told) || started.elapsed() >= deadline
@@ -3025,6 +3041,13 @@ impl DaysClient {
             .ok()
             .and_then(|mut context| context.inhibit(why));
         say(said);
+    }
+
+    /// Whether something was kept with `remember` since this was last asked,
+    /// the mark taken (#2540): the second route then asks its frozen note
+    /// again, so a name told mid-run is in the run's next turns.
+    pub fn kept_since_note(&self) -> bool {
+        self.kept_since_note.swap(false, Ordering::AcqRel)
     }
 
     /// Whether the next session should be a fresh one
@@ -6158,6 +6181,74 @@ mod tests {
         assert_eq!(current, Current::default());
     }
 
+    /// The first builder's P2 on #2615 (#2540): the note asked again after
+    /// something kept opens the next Days session, as a person change does,
+    /// and the one before is closed mid-conversation. The store has no ask
+    /// that reads a session's snapshot again under its own name
+    /// (`session_open` gives the same frozen note), but nothing is split:
+    /// the writer's conversation is ended by its own quiet, never by a
+    /// session closing while it goes on. Both exchanges are one
+    /// conversation, ended once with both ids, so what was kept is kept
+    /// with all of it, and "forget that" reaches all of it.
+    #[test]
+    fn a_note_asked_again_mid_conversation_splits_nothing() {
+        let (socket, served) = memory("asked-again", 5, |request| {
+            match (request["op"].as_str(), request["heard"].as_str()) {
+                (Some("append_linked"), Some("before")) => json!({"ok":true,"id":9}),
+                (Some("append_linked"), _) => json!({"ok":true,"id":10}),
+                (Some("session_close"), _) => json!({"ok":true}),
+                _ => json!({"ok":true,"submitted":false,"reason":"model_unconfigured"}),
+            }
+        });
+        let now = Instant::now();
+        let current = Mutex::new(Current::default());
+        let (send, receive) = sync_channel(8);
+        let exchange = |heard: &str, finished| DaysJob::Exchange {
+            at_unix_ms: unix_ms(),
+            finished,
+            heard: heard.into(),
+            said: "answer".into(),
+            sources: vec![],
+            rules: vec![],
+            person: Some("p-a".into()),
+            forgotten: 0,
+        };
+        send.send(exchange("before", now - Duration::from_secs(2)))
+            .unwrap();
+        // The re-ask's open of the next session closes the one before, the
+        // room's and the person's (`open_fresh_session_within`).
+        send.send(DaysJob::Close("voice-test-1".into(), None))
+            .unwrap();
+        send.send(DaysJob::Close("voice-test-1".into(), Some("p-a".into())))
+            .unwrap();
+        send.send(exchange("after", now)).unwrap();
+        send.send(DaysJob::End).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &current,
+            &HandOns::default(),
+            None,
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked p-a",
+                "session_close room",
+                "session_close p-a",
+                "append_linked p-a",
+                "conversation_end p-a"
+            ]
+        );
+        assert_eq!(read[4]["source_ids"], json!([9, 10]), "{:?}", read[4]);
+    }
+
     /// Another face in one look, the room's conversation ended between, or
     /// the switch off: nothing is moved, and the room's conversation ends
     /// as before, with its own exchange.
@@ -6918,6 +7009,40 @@ mod tests {
         }
     }
 
+    /// #2540: a thing the store kept marks the second route's frozen note to
+    /// be asked again, once; a `remember` the store refused, and a recall,
+    /// leave it.
+    #[test]
+    fn a_thing_kept_marks_the_note_to_be_asked_again_once() {
+        let (socket, served) = memory("kept-since", 3, |request| {
+            match (request["op"].as_str(), request["text"].as_str()) {
+                (Some("remember"), Some("takes coffee black")) => json!({"ok":true,"id":26}),
+                (Some("remember"), _) => json!({"ok":false,"error":"the store is full"}),
+                _ => json!({"ok":true,"entries":[]}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let run = |name: &str, args: Value| {
+            client.run_at(&call(name, args), FIRST_READ, NOW, Some(&EAST), None)
+        };
+        assert!(!client.kept_since_note(), "nothing kept yet");
+        assert_eq!(
+            run(REMEMBER, json!({"text":"takes coffee black"})),
+            (json!({"remembered": true}), true)
+        );
+        assert!(client.kept_since_note(), "kept: the note is asked again");
+        assert!(!client.kept_since_note(), "once");
+        let _ = run(REMEMBER, json!({"text":"likes tea"}));
+        let _ = run(RECALL, json!({"about":"coffee"}));
+        assert!(
+            !client.kept_since_note(),
+            "a refusal or a recall keeps nothing"
+        );
+        assert_eq!(served.join().unwrap().len(), 3);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
     /// #2176, `LAMP_MEMORY_REMEMBER_ONCE`: with the switch, `remember` asks
     /// for `once`, and a thing kept already is told as such; off, the
     /// request is as before.
@@ -7339,6 +7464,7 @@ mod tests {
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
             fresh_tried: Mutex::new(None),
+            kept_since_note: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,
@@ -7499,6 +7625,7 @@ mod tests {
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(false),
             fresh_tried: Mutex::new(None),
+            kept_since_note: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,
@@ -7642,6 +7769,7 @@ mod tests {
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(resumes),
             fresh_tried: Mutex::new(None),
+            kept_since_note: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
             hand_ons: Arc::new(HandOns::default()),
             early: false,

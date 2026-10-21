@@ -1015,6 +1015,31 @@ order is kept. A written turn is the same from the chat on.
   `worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again`,
   and the thread told after a quiet in
   `worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules`.
+  - **After something kept** (#2540, from Fourth's replay of the forgotten
+    name on #1722): a `remember` the store keeps, told or not, marks the
+    run's note (`DaysClient::kept_since_note`). The run's next turn asks it
+    again, the same ask, so a name told mid-run is in that run's later
+    turns, not only in a recall the model may never ask once the 300 s of
+    exchanges have gone by.
+  - **Its journal** says "something was kept: this turn asks the memory's
+    note again", once for each turn that asks again.
+  - **Not asked again:** a `remember` the store refused, and a recall. A
+    confirmed forget already opens a fresh session (`wants_fresh_session`).
+  - **Nothing is split by it** (the first builder's P2 on #2615): the ask
+    opens the run's next Days session and closes the one before, as a
+    person change does, since the store has no ask that reads a session's
+    snapshot again under its own name. The memory's writer ends a
+    conversation by its own quiet (45 s) or a change of person, never by a
+    session closing while it goes on, and its journal lines name no
+    session. So the exchanges before and after the ask are one
+    conversation: a thing kept is kept with all of it, and "forget that"
+    reaches all of it
+    (`remember::tests::a_note_asked_again_mid_conversation_splits_nothing`).
+  - **No switch:** it costs one note ask per turn after a keep. Tests:
+    `remember::tests::a_thing_kept_marks_the_note_to_be_asked_again_once`,
+    and the replay table in `memory/tests/it/voice_name.rs`, where a name
+    kept with `remember` and asked a minute later in the same run is now in
+    the note.
 - **Each turn is logged** as "lamp-voice second: request N ...": the words
   heard and how long after the line, the state of the words at the line's
   end (above), each chat round's first event (the first text or tool
