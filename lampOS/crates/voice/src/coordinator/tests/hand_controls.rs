@@ -1136,6 +1136,8 @@ thread_local! {
     /// From this time, on the scenario clock, the privacy worker kept fresh
     /// says the switch is closed.
     static PRIVACY_CLOSED_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// The privacy worker fails once, 100 ms into its silent span (#2602).
+    static PRIVACY_FAULT_IN_GAP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The loop's rig with a camera of its own, whose side records each
     /// authority it is given (#2602, the first builder's P1 on #2623).
     static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -1215,6 +1217,16 @@ impl SteppedPeer {
                 muted: PRIVACY_CLOSED_FROM
                     .with(std::cell::Cell::get)
                     .is_some_and(|from| now_us >= from),
+            })?;
+        }
+        if self.privacy
+            && PRIVACY_SILENT
+                .with(std::cell::Cell::get)
+                .is_some_and(|(from, _)| now_us >= from + 100_000)
+            && PRIVACY_FAULT_IN_GAP.with(|fault| fault.replace(false))
+        {
+            self.peer.control.send(WorkerEvent::Fault {
+                code: "privacy worker fault (test)".into(),
             })?;
         }
         if self.speaker {
@@ -2308,6 +2320,29 @@ fn a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens() {
             .iter()
             .any(|row| row["kind"] == "camera_unavailable"),
         "the camera stayed up until the gap"
+    );
+}
+
+/// #2602 (the first builder's P3s on #2623, 19:3x): the privacy worker
+/// failing in a ridden gap ends it as every exit in a gap does, marked
+/// `ended` with why.
+#[test]
+fn a_privacy_worker_failing_in_a_ridden_gap_marks_its_end() {
+    PRIVACY_FAULT_IN_GAP.with(|fault| fault.set(true));
+    let (ran, _) = gap_run(true, 1_500_000, (300_000, 600_000), None);
+    PRIVACY_FAULT_IN_GAP.with(|fault| fault.set(false));
+    assert_eq!(gap_marks(&ran, "began").len(), 1);
+    assert!(gap_marks(&ran, "reopened").is_empty());
+    assert_eq!(gap_marks(&ran, "ended").len(), 1, "{}", ran.error);
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "privacy_gap" && row["why"] == "privacy worker failed")
+    );
+    assert!(
+        ran.error.contains("privacy worker fault (test)"),
+        "{}",
+        ran.error
     );
 }
 
