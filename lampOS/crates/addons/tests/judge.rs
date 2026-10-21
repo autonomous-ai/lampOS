@@ -154,11 +154,22 @@ fn run(
     let bus = Bus::new(dir.path()).unwrap();
     let mut ring = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
     let mut said = bus.subscribe(AddonDecision::TOPIC, "test").unwrap();
-    let _judge = judge(dir.path(), enabled);
-    // It subscribes to addon/proposal once it runs; off, it never does.
-    let deadline = Instant::now() + Duration::from_secs(if enabled { 10 } else { 2 });
-    while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty() {
-        std::thread::sleep(Duration::from_millis(50));
+    let mut judge = judge(dir.path(), enabled);
+    // It subscribes to addon/proposal once it runs. Off, it says so and ends
+    // without subscribing: its end waited for, not 2 s of no subscriber
+    // (#1806).
+    let deadline = Instant::now() + Duration::from_secs(10);
+    if enabled {
+        while Instant::now() < deadline && bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty()
+        {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    } else {
+        while judge.0.try_wait().unwrap().is_none() {
+            assert!(Instant::now() < deadline, "off, it did not end");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(bus.subscribers(AddonProposal::TOPIC).unwrap().is_empty());
     }
     if product {
         // Long enough that a sleep mute never said is known never said.
@@ -172,16 +183,49 @@ fn run(
     skills
         .publish_json(lamp_ipc::monotonic_us(), &glow(lamp_ipc::monotonic_us()))
         .unwrap();
-    let mut requests = Vec::new();
-    while let Some(message) = ring.recv(Duration::from_millis(1_500)).unwrap() {
-        requests.push(message.parse().unwrap());
+    // The judge says its decision on a proposal after the light it asks for
+    // it, so once the decision is read the light is there too: waited for,
+    // not 1.5 s of quiet from the ring (#1806). A proposal it does not judge
+    // says nothing, so one of lamp-skills' under another name follows it,
+    // is judged after it, and ends the wait. Off, it has ended already.
+    if enabled && source != "skills" {
+        bus.publisher_declared(
+            AddonProposal::TOPIC,
+            &AddonProposal::declaration(),
+            "skills",
+        )
+        .unwrap()
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &AddonProposal {
+                addon: LAST.into(),
+                ..glow(lamp_ipc::monotonic_us())
+            },
+        )
+        .unwrap();
     }
-    let mut decisions = Vec::new();
-    while let Some(message) = said.recv(Duration::from_millis(300)).unwrap() {
+    let mut decisions: Vec<AddonDecision> = Vec::new();
+    while enabled && decisions.is_empty() {
+        let left = deadline.saturating_duration_since(Instant::now());
+        assert!(!left.is_zero(), "no decision");
+        if let Some(message) = said.recv(left).unwrap() {
+            decisions.push(message.parse().unwrap());
+        }
+    }
+    while let Some(message) = said.recv(Duration::ZERO).unwrap() {
         decisions.push(message.parse().unwrap());
     }
+    let mut requests: Vec<LightRequest> = Vec::new();
+    while let Some(message) = ring.recv(Duration::ZERO).unwrap() {
+        requests.push(message.parse().unwrap());
+    }
+    requests.retain(|request| request.claim.source != format!("addon:{LAST}"));
+    decisions.retain(|decision| decision.addon != LAST);
     (requests, decisions)
 }
+
+/// The add-on of the proposal that ends the wait after one not judged.
+const LAST: &str = "the-last-glow";
 
 #[test]
 fn a_calm_lamp_keeps_an_add_ons_light_and_asks_it_of_the_ring_at_idle() {
