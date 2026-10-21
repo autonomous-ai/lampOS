@@ -82,3 +82,20 @@ Ready for lamp-voice: no (not lampOS code)
   the branch answered every `addon` command. Not shown: a device; none
   implements the device side yet.
 - Told the first builder on #1722.
+
+## 2026-10-21 — the first add-on code, #2514
+
+Ready for lamp-voice: yes (#2514), once its ARM64 run is green
+
+- The first builder's next for blue (13:5x, #2499): `lamp_msgs::AddonProposal`
+  and lamp-skills writing it for `kind = "addon"`, off unless
+  `LAMP_ADDONS=on`. Claimed on #1722 at 14:0x; no issue for it yet.
+- `blue/addon-proposal` at `5d4f76b36` (rebased on lamp-voice `9596fb457`).
+  Off unless set: without the switch no add-on is loaded and the topic is
+  never declared (`tests/it/addon.rs`).
+- Gate on the laptop: fmt; clippy -D warnings for lamp-msgs, lamp-skills,
+  lamp-voice-eval, lamp-cloud; their tests all ok (lamp-skills `it` 221,
+  5 new); workspace build and `--no-run`. Not on a lamp: nothing reads
+  `addon/proposal` yet.
+- openharness#1485: the reviewer's 8 findings fixed in `a7af5bb85`, each
+  answered; its CI waits for a maintainer's approval (a fork's PR).
