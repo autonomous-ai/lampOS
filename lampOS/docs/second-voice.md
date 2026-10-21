@@ -2343,6 +2343,25 @@ after a take-over, but now for every turn:
   couldn't read keeps the sign, so with their speaking read off nothing
   changes. Risk: a person turned to the lamp and asking, whose mouth reads
   still, needs its name in a busy room.
+- **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
+  or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
+  builder at 09:40 on #2428). Past its first two lines a session is trusted
+  (`attention::FRESH_REQUESTS`), and a line is let out as "the session has
+  heard enough to be trusted" in any room the strict busy rule doesn't
+  cover. On lamp-52e6 at 09:5x (#2428's re-run), another voice's 16-word
+  line (cosine 0.23) was played so, and only the model's `not_for_me` kept
+  the lamp quiet. With either switch, a line let out by trust, with no sign
+  of its own but the conversation going on (no name, no call, nobody
+  turned, not said close to it, no tap) and no answer to the lamp's
+  question, is held when its print scores under 0.30 against the
+  conversation's (`same_voice::DIFFERENT_BELOW`), going on or not: `held
+  back: the session's trust is the caller's, and the line's voice print
+  says someone else`. The caller's own lines in the same session are
+  answered as before. A line begun over the lamp's sound, or under 1.5 s,
+  has no print and is never held so. Without `LAMP_SPOKEN_TO` the print is
+  read for every line (`Heeding::voice_going_on`); with it, trust alone lets
+  nothing out. Test:
+  `worker::tests::a_trusted_session_does_not_carry_to_another_voice`.
 - **Its own answers keep nothing going** (`LAMP_GOING_ON_NOT_OWN=on`, the
   first builder's 17:2x task on #1722). A conversation goes on, on this
   route, by the thread's window (45 s from the start of any answer of the
