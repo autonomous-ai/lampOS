@@ -181,3 +181,26 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
     `mood/nudge` written by `lamp-addons`, held in `lamp-mood`'s engine
     inside its clamps.
   - Then the lamp-75c9 run.
+
+## 2026-10-21 — #2577: the mood nudge (part 1b); #2553 cleared
+
+- **The reviewer-lead re-read #2553 on `c1af23e28`:** the P2 and two P3s
+  are closed, the ARM64 run is green, and it merges on that head. Their
+  one new P3 is fixed in #2577, so #2553's green head stays:
+  - a restarted voice (a new publisher boot on `voice/state`) made the old
+    `voice/mute` reading go stale and held the lamp asleep;
+  - the judge now forgets the old mute and waits 3 s afresh.
+- **#2577 (stacked on #2553):** the first builder's question-1 answer.
+  - `MoodNudge` on `mood/nudge`, written only by `lamp-addons`.
+  - `lamp-mood` adds it before its own clamps: energy ±0.1, warmth up only;
+    held until `until_us`, fading over the last minute; the newest replaces
+    the last; none taken asleep.
+  - The judge drops a colder mood.
+  - Gate: all green under umask 022, except a `lamp-schedule` test this
+    branch doesn't touch. It fails one run in three on its own on this
+    laptop.
+- **Lamp run, ready:**
+  - #2553's ARM64 artifact (run 39575120939) is downloaded, and
+    `lamp-addons`, `lamp-skills` and `lamp-mood` match its SHA256SUMS.
+  - Run copies of both examples load in `lamp-skills test`.
+  - Waiting on lamp-75c9's lock (Eighth).
