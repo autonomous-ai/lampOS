@@ -192,13 +192,18 @@ written whole and never over another record, as in `--out`.
 
 Exit status: 0 the run passed, 1 it failed, 3 it is incomplete, 2 no record
 was made (an argument or an input was refused, or the record could not be
-written). A record kept in `--out` but refused by the place also exits 2,
-and says so with the `--out` path to copy there by hand once the place can
-take it, since the same run can't be made again:
-- one already there;
-- a device id that can't be a folder of its own there: one starting with a
-  dot, such as `..`, or with an upper-case letter, since a share may not
-  tell `Lamp-4ACE` from `lamp-4ace`;
+written). With `--records`, a device id that can't be a folder of its own
+there is refused before anything is written, `--out` included, and the
+refusal says why (El on #3091): one starting with a dot, such as `..`, one
+with an upper-case letter, since a share may not tell `Lamp-4ACE` from
+`lamp-4ace`, or one lamps share (`autonomous`, `orangepi`, `lamp-`; below),
+for which it says to give the lamp its own, such as
+`lamp-<the last four of its serial>`.
+
+A record kept in `--out` but refused by the place also exits 2. Where the
+place could take it later, it says so with the `--out` path to copy there by
+hand, since the same run can't be made again:
+- one already there (no copy);
 - a lamp folder that is a link to elsewhere, which is never followed;
 - a place that can't make hard links. A record is put in place by a hard
   link from a part file, so it's never half there and never replaces
@@ -395,8 +400,10 @@ nothing after it when no serial could be read. Such a name is no lamp's own
 (`lamp_msgs::SelfTest::is_own_name`: a `-` and a suffix after it): the
 self-test leaves it out of its report, and the station treats a report naming
 it as one that names no lamp, by `selftest_without_lamp` (El on #3073). So two
-such lamps never match each other's reports, and their records never share a
-folder under a matched name.
+such lamps never match each other's reports. `--records` refuses such a name
+as `--device` too, so their records never share a folder: give a lamp with no
+own name a label with a suffix of its own, such as its sticker's
+`lamp-<last four of its serial>`.
 
 A lamp on a build from before reports named their lamp is recorded, but under
 version 0's `incomplete` it never reaches `pass` until it updates. Update the
