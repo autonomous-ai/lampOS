@@ -34,7 +34,8 @@ against lamp-06c1.
   fails, or a login the broker refuses, is tried again after a wait that
   doubles from 1 s to a minute, and the journal hears of it once, not on
   every try.
-  With `LAMP_CLOUD_OFFLINE_WILL=on`, each connection also leaves the broker a
+  With `LAMP_CLOUD_OFFLINE_WILL=on` (set in the product unit, #2636), each
+  connection also leaves the broker a
   will: the identity with `"type": "offline"` on `fd_channel`, QoS 1, not
   retained, said 30 s after the broker finds the connection lost
   (`WILL_DELAY_S`, MQTT v5's will delay). The backend takes it as the lamp
@@ -53,6 +54,10 @@ against lamp-06c1.
   - **A lost network or a power cut** is found by the keepalive (60 s, about
     90 s in practice), then the 30 s delay, so up to about 2 minutes. That's
     still well under the 5 to 8 minutes without it.
+  - **The session outlasts the delay.** The broker says a will at the
+    earlier of its delay and the session's end, so the connection's 60 s
+    session expiry (`SESSION_EXPIRY_S`, longer than `WILL_DELAY_S`, checked
+    when lamp-cloud is built) lets the 30 s hold.
 - **Answers on `fd_channel`, at QoS 1, in V1's shapes** (`mqtt.md`): every
   reply carries `device` (`lamp`), `generation` (`lamp-v2`), `type`, `version`
   (the installed build, `<sequence>+<commit>`), `id`, `mac` (the lamp's
