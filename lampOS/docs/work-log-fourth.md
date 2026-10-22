@@ -6872,6 +6872,38 @@ Ready for lamp-voice: no
 - Read every new Queue and own-PR comment; clean root advanced to ec5428a34.
   Coordination remains on Queue/PR, with no lamp, SSH or owner relay.
 
+## 2026-10-22, 23:33: native receipts and private-context correction
+
+Ready for lamp-voice: no
+
+- Current carries #3064 3c0540d0f and #3014 3e0a651f9 each passed native
+  ARM64: 10,545 passed, 0 failed, 67 skipped, one same-voice journal leak
+  reported by nextest. Linux Clippy passed. Runs 39810373937/39810373841
+  and 39810363669/39810363771, respectively, qualify those heads only.
+- Review confirms the name-note cases closed but finds the inherited
+  person's private memory note still disclosed. Took the Second-route
+  note/history/hits correction, including original room admission versus
+  narrowed private scope and Engine revalidation of cached private messages
+  after asynchronous waits. Both PRs remain draft/held until this correction
+  is qualified. Live and private tool-write policy are outside this claim.
+- Found shared Cargo target contamination when switching worktrees: a photo
+  test linked another branch's Eyes library. Retained that failed attempt;
+  invalidating tracked Rust/Cargo source mtimes before each exclusive gate
+  makes the selected source compile. The repeated #3014 Mac gate passes fmt,
+  strict workspace Clippy, 77 tests / 0 failed / 1 existing ignored and
+  workspace build. Those counts do not close the new review finding.
+- #2988's source-fresh gate found inaccurate help and an old positive fixture
+  lacking newly required proof. Corrected the help without loosening its
+  assertions, and made the existing refusal fixture use a proved request.
+  The gate is continuing; no new photo head or acceptance is claimed yet.
+- Inactive store #3072 at 5dda95448 passed affected-crate ARM64 1,366 / 0 / 9
+  and terminal Linux Clippy (39809400066/39809400165), and is ready for review.
+  Its controller core has 14 authored, unrun fixtures; original frame time
+  stays distinct from delivery time, and commit/restart cannot imply rollback.
+  No account RPC, environment activation or complete consent flow exists yet.
+- No lamp, SSH, provider/model call or physical acceptance in these checks.
+  The owner name row remains held for the first builder and person.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
