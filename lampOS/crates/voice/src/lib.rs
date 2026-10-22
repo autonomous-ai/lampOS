@@ -125,6 +125,7 @@ pub mod say;
 pub mod second_config;
 pub mod second_look;
 pub mod second_provider;
+pub mod seems_told;
 pub mod session_fact;
 pub mod session_tools;
 pub mod short_turns;

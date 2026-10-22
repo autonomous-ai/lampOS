@@ -1392,6 +1392,34 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
     }
 }
 
+/// `humans/seems` as the eyes say it, read every second while the voice runs
+/// (`LAMP_SECOND_SEEMS=on`): a fresh read (within `HumanSeems::LASTS`)
+/// with the time it was said; a FER+ read in `latest`, while both readers
+/// run, breaks the run of Blendshape V2's (`crate::seems_told`).
+async fn seems_task(bus: lamp_bus::Bus, seems: Arc<Mutex<crate::seems_told::SeemsTold>>) {
+    let mut every = tokio::time::interval(Duration::from_secs(1));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        let fresh_ms = lamp_msgs::HumanSeems::LASTS.as_millis() as u64;
+        let now_ms = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let read = bus
+            .latest(lamp_msgs::HumanSeems::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+            .and_then(|message| {
+                let said_ms = message.header.at_unix_ms;
+                Some((message.parse::<lamp_msgs::HumanSeems>().ok()?, said_ms))
+            });
+        if let Ok(mut seems) = seems.lock() {
+            seems.seen(read, monotonic_us());
+        }
+    }
+}
+
 /// The most requests remembered as given the air's note and not yet heard.
 const AIR_GIVEN_MOST: usize = 4;
 
@@ -1411,18 +1439,68 @@ fn air_noting(
     crate::second_provider::TaskNote,
     crate::second_provider::AirHeard,
 ) {
+    let spent = air.clone();
+    noting_once(
+        move |now| air.lock().ok()?.due(now),
+        move |request, now| {
+            if let Ok(mut air) = spent.lock() {
+                air.told(now);
+                eprintln!("lamp-voice second: request {request} is told the air is stuffy");
+            }
+        },
+        busy,
+        clock,
+    )
+}
+
+/// How a known person seems, from their face (`LAMP_SECOND_SEEMS=on`,
+/// `crate::seems_told`): given and spent as the air's note is
+/// ([`air_noting`]), not in a busy room. Which requests may be given it (a
+/// known person in view, spoken) is the engine's to say.
+fn seems_noting(
+    seems: Arc<Mutex<crate::seems_told::SeemsTold>>,
+    busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+    clock: fn() -> u64,
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::AirHeard,
+) {
+    let spent = seems.clone();
+    noting_once(
+        move |now| seems.lock().ok()?.due(now),
+        move |request, now| {
+            if let Ok(mut seems) = spent.lock() {
+                seems.told(now);
+                eprintln!("lamp-voice second: request {request} is told how the person seems");
+            }
+        },
+        busy,
+        clock,
+    )
+}
+
+/// A note `due` says, given to a request unless the room is `busy`, and
+/// `told` (request, now) once any request given it begins to be heard.
+fn noting_once(
+    due: impl Fn(u64) -> Option<String> + Send + Sync + 'static,
+    told: impl Fn(u64, u64) + Send + Sync + 'static,
+    busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+    clock: fn() -> u64,
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::AirHeard,
+) {
     // The requests given the note and not yet heard, the newest last: any of
     // their answers spends it (two can be given it before the first's answer
     // plays; the reviewer's P3 on #2083). A few at most.
     let given: Arc<Mutex<std::collections::VecDeque<u64>>> = Arc::default();
     let giving = given.clone();
-    let spent = air.clone();
     let note: crate::second_provider::TaskNote = Arc::new(move |request| {
         let now = clock();
         if busy(now) {
             return None;
         }
-        let note = air.lock().ok()?.due(now)?;
+        let note = due(now)?;
         let mut giving = giving.lock().ok()?;
         if giving.len() == AIR_GIVEN_MOST {
             giving.pop_front();
@@ -1436,10 +1514,7 @@ fn air_noting(
             return;
         }
         given.clear();
-        if let Ok(mut air) = spent.lock() {
-            air.told(clock());
-            eprintln!("lamp-voice second: request {request} is told the air is stuffy");
-        }
+        told(request, clock());
     });
     (note, heard)
 }
@@ -2021,6 +2096,32 @@ pub fn serve(
         };
         let (note, heard) = air_noting(told.clone(), busy, monotonic_us);
         engine = engine.noting_the_air(note, heard);
+    }
+    // How a known person seems, with `LAMP_SECOND_SEEMS=on` and the bus
+    // (#1671): a note on tone only, never said.
+    let seems = files
+        .second_seems
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten()
+        .map(|bus| {
+            (
+                bus,
+                Arc::new(Mutex::new(crate::seems_told::SeemsTold::default())),
+            )
+        });
+    if let Some((_, told)) = &seems {
+        let busy = |now| {
+            crate::room_told::room()
+                .lock()
+                .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
+        };
+        let (note, heard) = seems_noting(told.clone(), busy, monotonic_us);
+        engine = engine.noting_how_they_seem(note, heard);
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
@@ -2711,6 +2812,12 @@ pub fn serve(
             "lamp-voice second: a stuffy room is told beside what a person says (LAMP_AIR_FACTS)"
         );
         runtime.spawn(air_task(bus, told));
+    }
+    if let Some((bus, told)) = seems {
+        eprintln!(
+            "lamp-voice second: how a known person seems is told beside what they say (LAMP_SECOND_SEEMS)"
+        );
+        runtime.spawn(seems_task(bus, told));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
