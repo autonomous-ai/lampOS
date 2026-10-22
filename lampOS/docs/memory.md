@@ -1051,7 +1051,12 @@ the unchanged legacy client, used unless the new Days client is selected.
   ask once, briefly, how it went, never at the start of an answer to
   something else.", their words quoted as untrusted. An undated thread is
   told the old sentence. **Marked when the lamp asks:** a dated one is
-  given unmarked (`"until_asked": true`), and the voice watches that
+  given unmarked (`"until_asked": true`), and so is an undated thread or
+  promise, with the switch or without: `follow_up` sends `"until_asked":
+  true` whenever `LAMP_MEMORY_THREADS` asks for one (the first builder on
+  #2602, 22 Oct 13:1x, after lamp-06c1 on 22 Oct told an undated thread
+  at "good morning", recorded it as given, and never asked). The voice
+  watches that
   person's exchanges: when one sentence of the lamp's own finished reply
   is itself a question (ending in `?` or `？`) and holds two of the
   event's key words, or one of its own that is not a when word (a
@@ -1105,7 +1110,10 @@ the unchanged legacy client, used unless the new Days client is selected.
   `days::an_adopted_offer_is_the_new_persons_to_mark`,
   `days::a_dated_one_given_until_asked_is_offered_again_until_marked_asked`,
   `days::a_dated_one_never_asked_is_offered_at_most_three_times`,
-  `days::until_asked_holds_back_only_a_dated_one`,
+  `days::an_undated_thread_given_until_asked_is_offered_again_until_asked`,
+  `days::an_undated_thread_never_asked_is_offered_at_most_three_times`,
+  `days::without_until_asked_an_undated_thread_is_recorded_when_given`,
+  `remember::tests::an_undated_thread_held_until_asked_is_waited_on_without_events`,
   `days::the_follow_up_asked_request_marks_and_a_forget_takes_the_offer`,
   `local_time::tests::a_named_day_is_read_back_and_said_as_a_person_would`,
   `days::a_bad_event_day_is_dropped_and_the_observation_kept`,

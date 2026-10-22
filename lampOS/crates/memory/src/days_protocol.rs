@@ -91,9 +91,10 @@ enum Extra {
         /// it, first (`Days::follow_up_with`). Without it, as before.
         #[serde(default)]
         events: bool,
-        /// #1693 (the first builder on #2602, 22 Oct 09:4x): with
-        /// `events`, a dated one is marked asked by `follow_up_asked`, not
-        /// when given (`Days::follow_up_until_asked`). Without it, as before.
+        /// #1693 (the first builder on #2602, 22 Oct 09:4x, and 13:1x for
+        /// an undated one): the one given, dated or not, is marked asked by
+        /// `follow_up_asked`, not when given (`Days::follow_up_until_asked`).
+        /// Without it, as before.
         #[serde(default)]
         until_asked: bool,
     },
