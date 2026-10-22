@@ -2935,7 +2935,9 @@ pub fn serve(
                 );
                 let near = heeding.clone();
                 engine = engine.hearing_the_name_near(Arc::new(move |began_us| {
-                    near.lock().ok()?.near_name(began_us)
+                    near.lock().map_or((None, false), |mut heeding| {
+                        (heeding.near_name(began_us), heeding.turned_to_the_lamp())
+                    })
                 }));
             } else {
                 eprintln!(
@@ -4761,6 +4763,15 @@ impl Heeding {
                 false
             }
         }
+    }
+
+    /// Whether the eyes' newest look has a face turned to the lamp
+    /// (`crate::bus_out::someone_turned_to_lamp`), for a first word of the
+    /// lamp's name's shape (`LAMP_NAME_NEAR`): nothing fresh is no.
+    pub(crate) fn turned_to_the_lamp(&self) -> bool {
+        self.bus
+            .as_ref()
+            .is_some_and(|(bus, _)| crate::bus_out::someone_turned_to_lamp(bus) == Some(true))
     }
 
     /// The best score of lamp-name's near hearings (`name/near`) that
