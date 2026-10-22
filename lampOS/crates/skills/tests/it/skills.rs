@@ -2042,16 +2042,14 @@ fn a_chance_held_back_by_a_talk_waits_for_its_end_within_the_wait() {
     let runs = runs_at(&skill, &talking);
     assert_eq!(runs.iter().map(|run| run.0).collect::<Vec<_>>(), [3120]);
     // A talk that outlasts the wait (from 3,000 s, ten minutes, to 3,600 s):
-    // the chance is spent, as without one.
+    // the chance is spent, as without one, and the journal's one line
+    // saying so is all that runs (#2861).
     let mut long = messages.clone();
     long.push((2950, "voice/state", r#"{"state":"speaking"}"#));
     long.push((3700, "voice/state", r#"{"state":"resting"}"#));
     long.sort_by_key(|message| message.0);
-    assert!(
-        runs_at(&skill, &long).is_empty(),
-        "{:?}",
-        runs_at(&skill, &long)
-    );
+    let runs = runs_at(&skill, &long);
+    assert!(runs.len() == 1 && runs[0].1.is_empty(), "{runs:?}");
     // They leave during the talk, longer than the gap: the sitting and its
     // chance are over, and the next sitting has 50 minutes of its own.
     let mut gone: Vec<_> = talking
