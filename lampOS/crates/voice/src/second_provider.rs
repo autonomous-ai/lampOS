@@ -949,7 +949,8 @@ struct Shared {
     /// ([`Engine::joining_cut_words`]).
     same_speaker: Option<SameSpeaker>,
     /// Takes a request whose answer was never played out of the thread, when
-    /// its words are joined into a later line ([`Engine::unsaying_joined`]).
+    /// its words are joined into a later line or answered in a held line's
+    /// place ([`Engine::unsaying_joined`]).
     unsay_joined: Option<Arc<dyn Fn(u64) + Send + Sync>>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
@@ -2400,6 +2401,8 @@ impl Engine {
     /// and its question goes with the joined line, asked once with both
     /// (the first builder on #2602, 23 Oct 02:43: lamp-4ace's "Twenty past
     /// eight in…", never played, kept as said, and only Saigon answered).
+    /// Words answered in a held line's place, not joined (#1712's carry),
+    /// are unsaid too ([`unsay_carried`], reviewer-three's P3 on #3129).
     /// Before any turn only.
     pub fn unsaying_joined(mut self, unsay: Arc<dyn Fn(u64) + Send + Sync>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
@@ -4696,6 +4699,7 @@ async fn spoken(
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
             let (words, said_by, parts) = if empty || name_refused(&shared, request, &carried) {
+                unsay_carried(&shared, request, &carried);
                 (carried.text(), carried.said_by, carried.parts.clone())
             } else {
                 // While the join waits for a print, the carried words are
@@ -4721,7 +4725,10 @@ async fn spoken(
                 }
                 match joined {
                     (joined, None, parts) => (joined, request, parts),
-                    (_, Some(carried), _) => (carried.text(), carried.said_by, carried.parts),
+                    (_, Some(carried), _) => {
+                        unsay_carried(&shared, request, &carried);
+                        (carried.text(), carried.said_by, carried.parts)
+                    }
                 }
             };
             eprintln!(
@@ -5418,6 +5425,37 @@ async fn joined_with_cut(
         );
     }
     (words_of(&parts), None, parts)
+}
+
+/// Words cut short and answered in held line `request`'s place, not joined
+/// (#1712's carry): they are carried only while none of their answer was
+/// heard, so any of it the thread kept was never played. With
+/// [`Engine::unsaying_joined`] (`LAMP_JOIN_CUT_WORDS`) those answers leave
+/// the thread as a joined line's do, newest first so the oldest question
+/// leads: the request that last answered them (a held line's, when carried
+/// through one) and each piece's own (reviewer-three's P3 on #3129: else
+/// "Twenty past eight in…" stays the lamp's words and London is asked again
+/// after it).
+fn unsay_carried(shared: &Shared, request: u64, carried: &Carried) {
+    let Some(unsay) = shared.unsay_joined.as_ref() else {
+        return;
+    };
+    let mut unsaid: Vec<u64> = carried
+        .parts
+        .iter()
+        .map(|part| part.request)
+        .chain([carried.request])
+        .filter(|piece| *piece != request)
+        .collect();
+    unsaid.sort_unstable_by(|a, b| b.cmp(a));
+    unsaid.dedup();
+    for piece in &unsaid {
+        unsay(*piece);
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: the words answered in its place had none of their answers played; those answers are not kept as the lamp's words ({} requests, LAMP_JOIN_CUT_WORDS)",
+        unsaid.len()
+    );
 }
 
 /// Opens a listener for the next line under privacy `generation` and keeps

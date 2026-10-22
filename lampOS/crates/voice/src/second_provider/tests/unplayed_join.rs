@@ -23,6 +23,19 @@ async fn asked_after_a_cut(
     held: &'static str,
     unsaying: bool,
 ) -> Vec<Message> {
+    let asked = chats_after_a_cut(answer, held, unsaying, false).await;
+    asked.last().unwrap().clone()
+}
+
+/// As [`asked_after_a_cut`]; with `held_line`, request 2 is held by the
+/// rule and not joined (two voices), so request 1's words, cut short, are
+/// answered in its place (#1712's carry). What each chat was asked.
+async fn chats_after_a_cut(
+    answer: &'static str,
+    held: &'static str,
+    unsaying: bool,
+    held_line: bool,
+) -> Vec<Vec<Message>> {
     let (release, hold) = tokio::sync::oneshot::channel();
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(LONDON.to_owned()), Ok(SAIGON.to_owned())].into()),
@@ -67,8 +80,16 @@ async fn asked_after_a_cut(
         Arc::new(move || *clock.lock().unwrap()),
     )
     .announcing(false)
-    .heeding(Arc::new(|_, _, _, _| None))
-    .joining_cut_words(Arc::new(|_, _| Joined::Same("the same voice said both")));
+    .heeding(Arc::new(move |request, _, _, _| {
+        (held_line && request == 2).then_some("not said to the lamp")
+    }))
+    .joining_cut_words(Arc::new(move |_, _| {
+        if held_line {
+            Joined::Not("two voices (cosine 0.12)".to_owned())
+        } else {
+            Joined::Same("the same voice said both")
+        }
+    }));
     if unsaying {
         let unsaid = thread.clone();
         engine = engine.unsaying_joined(Arc::new(move |request| {
@@ -128,8 +149,7 @@ async fn asked_after_a_cut(
         }
     }
     drop(release);
-    let asked = script.asked.lock().unwrap();
-    asked.last().unwrap().clone()
+    script.asked.lock().unwrap().clone()
 }
 
 /// A cut answer with no sound played, then a joined follow-up: the model is
@@ -171,6 +191,50 @@ async fn an_answer_cut_after_it_began_playing_keeps_its_words() {
         assert!(
             asked.contains(&Message::assistant(answer)),
             "{unsaying}: {asked:?}"
+        );
+    }
+}
+
+/// Reviewer-three's P3 on #3129: words answered in a held line's place, not
+/// joined (#1712's carry), had none of their answer played either. With the
+/// unsaying, the model is asked London again with no partial answer in the
+/// history; without it (as before), "Twenty past eight" was the lamp's words
+/// there, after which London was asked again.
+#[tokio::test]
+async fn words_carried_into_a_held_line_leave_their_unplayed_answer() {
+    let chats = chats_after_a_cut(ANSWER, ANSWER, true, true).await;
+    assert_eq!(chats.len(), 2, "London answered in the held line's place");
+    let asked = chats.last().unwrap();
+    assert_eq!(asked.last().unwrap(), &Message::user(LONDON), "{asked:?}");
+    assert!(
+        !format!("{asked:?}").contains("Twenty past eight"),
+        "{asked:?}"
+    );
+    assert!(
+        !format!("{asked:?}").contains(SAIGON),
+        "the held line's words are not asked: {asked:?}"
+    );
+    let before = chats_after_a_cut(ANSWER, ANSWER, false, true).await;
+    let before = before.last().unwrap();
+    assert_eq!(before.last().unwrap(), &Message::user(LONDON), "{before:?}");
+    assert!(
+        before.contains(&Message::assistant(ANSWER)),
+        "without it the unplayed text was history: {before:?}"
+    );
+}
+
+/// An answer that began playing is never carried: a held line after it
+/// answers nothing in its place, and the thread keeps the answer as before.
+#[tokio::test]
+async fn a_held_line_after_a_played_answer_changes_nothing() {
+    let answer = "Twenty past eight in London. It is a fine evening there.";
+    for unsaying in [true, false] {
+        let chats = chats_after_a_cut(answer, "It is a fine evening there.", unsaying, true).await;
+        assert_eq!(chats.len(), 1, "{unsaying}: nothing asked again: {chats:?}");
+        assert_eq!(
+            chats[0].last().unwrap(),
+            &Message::user(LONDON),
+            "{chats:?}"
         );
     }
 }
