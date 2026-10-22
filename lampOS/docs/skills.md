@@ -1495,7 +1495,10 @@ and a package can't carry one of its own (no path in a package begins with
 a dot). A core skill, one put on from a folder, and one installed before
 this keep none, and one whose `skill.toml` version no longer matches the
 kept manifest's (changed by hand) is no longer that package's: each lists
-no `sha256` ([cloud.md](cloud.md), "The skills page").
+no `sha256` ([cloud.md](cloud.md), "The skills page"). The record says which
+package was installed; it doesn't hash the folder again, so a hand edit to
+`SKILL.md` or a file that keeps the version still lists that package's
+`sha256`.
 
 **The signature.** `lamp-skill.sig`, beside the manifest, is one line of
 JSON, `{"key": FINGERPRINT, "signature": BASE64}`: Ed25519 over the

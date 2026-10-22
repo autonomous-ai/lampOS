@@ -505,7 +505,9 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   Kept in the skill's folder at install ([skills.md](skills.md), "What an
   installed package keeps"); a newer package's replaces it. Null for a
   core skill, one put on from a folder, one installed before the lamp kept
-  it, and one whose version was changed by hand since.
+  it, and one whose version was changed by hand since. It names the package
+  installed, not the folder as it is now: a hand edit that keeps the
+  version still lists the package's `sha256`.
 - **`can_remove`**: false for a core skill, true for the others.
 - **`can_turn_off`**: the skill loads and is not part of the lamp itself
   (#2815): true for every one but those granted a core operation (`core =
