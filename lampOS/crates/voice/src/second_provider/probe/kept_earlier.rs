@@ -23,6 +23,9 @@ pub struct Line {
     pub kept: &'static str,
     pub answered: &'static str,
     pub said: &'static str,
+    /// The model's correction with a word neither the old fact's nor
+    /// heard, so `LAMP_MEMORY_KEEP_HEARD` keeps the heard line instead.
+    pub corrected: &'static str,
 }
 
 pub const LINES: [Line; 2] = [
@@ -32,6 +35,7 @@ pub const LINES: [Line; 2] = [
         kept: "Favourite colour is violet.",
         answered: "Violet, got it.",
         said: "Actually it's green now, not violet.",
+        corrected: "Favourite colour changed to green.",
     },
     Line {
         name: "vi-kept-earlier",
@@ -39,6 +43,7 @@ pub const LINES: [Line; 2] = [
         kept: "Màu yêu thích là màu tím.",
         answered: "Màu tím, mình nhớ rồi.",
         said: "À thật ra giờ là màu xanh lá rồi, không phải màu tím nữa.",
+        corrected: "Màu yêu thích đã đổi thành xanh lá.",
     },
 ];
 
@@ -85,6 +90,122 @@ impl Line {
             Message::user(self.said),
         ]
     }
+}
+
+/// The heard fallback (#2510, the reviewer-lead's P3 at #2590's merge):
+/// the correction's `remember`, with `replaces` 8, sent as the heard line
+/// without it ([`crate::remember::heard::call_with`]), and its answer as the
+/// voice tells it ([`crate::remember::heard::answered`]); `before`, as it
+/// was told before `not_replaced`. Then the reply is asked for.
+impl Line {
+    pub fn fallback_messages(&self, character: &str, before: bool) -> Vec<Message> {
+        let model = lamp_gemini::ToolCall {
+            id: "call_1".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text": self.corrected, "replaces": KEPT_ID}),
+        };
+        let old = || Some(self.kept.to_owned());
+        let as_heard = crate::remember::heard::call_with(&model, Some(self.said), old);
+        let told = crate::remember::answer_for(
+            crate::remember::REMEMBER,
+            &json!({"ok": true, "id": KEPT_ID + 1}),
+            0,
+            None,
+        )
+        .unwrap_or_default();
+        let told = crate::remember::told_kept(told, KEPT_ID + 1, crate::remember::replaces_on());
+        let told = crate::remember::heard::answered(
+            told,
+            &model,
+            as_heard.as_ref(),
+            crate::remember::replaces_on() && !before,
+        );
+        let call = ToolCall {
+            id: model.id.clone(),
+            name: model.name.clone(),
+            args: model.args.clone(),
+            extra: None,
+        };
+        let mut messages = self.messages(character);
+        messages.push(Message::assistant_calls(None, std::slice::from_ref(&call)));
+        messages.push(Message::tool(call.id, told.to_string()));
+        messages
+    }
+}
+
+/// Words that say the old fact changed, folded to lower case.
+pub const CHANGED: &[&str] = &[
+    "updated",
+    "update",
+    "changed",
+    "replaced",
+    "switched",
+    "no longer",
+    "not violet",
+    "instead of violet",
+    "cập nhật",
+    "đã đổi",
+    "đổi thành",
+    "thay",
+    "không còn",
+    "không phải màu tím",
+    "không phải tím",
+];
+
+/// Words that say the old fact is still kept.
+pub const OLD_STAYS: &[&str] = &["still", "both", "as well", "vẫn", "cả hai", "cả màu tím"];
+
+fn has(words: &str, any: &[&str]) -> bool {
+    let words = words.to_lowercase();
+    any.iter().any(|phrase| words.contains(phrase))
+}
+
+/// Whether a reply after the heard fallback says the old fact changed and
+/// not that it stays.
+pub fn says_changed(words: &str) -> bool {
+    has(words, CHANGED) && !has(words, OLD_STAYS)
+}
+
+/// The fallback arm's counts for one line: asked, said changed, said the
+/// old one stays.
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub struct Fallback {
+    pub asked: u32,
+    pub changed: u32,
+    pub stays: u32,
+}
+
+/// Each line's fallback asked `runs` times, `before` as it was told before
+/// `not_replaced`.
+pub async fn ask_fallback(chat: &Chat, character: &str, runs: u32, before: bool) -> Vec<Fallback> {
+    let mut tallies = vec![Fallback::default(); LINES.len()];
+    for _ in 0..runs {
+        for (line, tally) in LINES.iter().zip(tallies.iter_mut()) {
+            match super::says_kept::asked(chat, &line.fallback_messages(character, before)).await {
+                Ok((_, words)) => {
+                    tally.asked += 1;
+                    tally.changed += u32::from(says_changed(&words));
+                    tally.stays += u32::from(has(&words, OLD_STAYS));
+                }
+                Err(error) => println!("kept-earlier fallback line={} failed: {error}", line.name),
+            }
+        }
+    }
+    tallies
+}
+
+/// One line a case and arm.
+pub fn fallback_verdict(arm: &str, tallies: &[Fallback]) -> Vec<String> {
+    LINES
+        .iter()
+        .zip(tallies)
+        .map(|(line, tally)| {
+            format!(
+                "kept-earlier fallback arm={arm} line={} asked={} said-changed={} said-old-stays={}",
+                line.name, tally.asked, tally.changed, tally.stays
+            )
+        })
+        .collect()
 }
 
 /// One line's counts.
@@ -194,6 +315,54 @@ mod tests {
             "{told}"
         );
         assert!(LINES[1].said.contains("xanh lá"));
+    }
+
+    #[test]
+    fn the_fallback_is_the_heard_line_told_not_replaced_only_now() {
+        for line in &LINES {
+            let told = |before: bool| -> Value {
+                let messages = line.fallback_messages("C", before);
+                assert_eq!(messages.len(), 8);
+                let content = messages[7]
+                    .content
+                    .as_ref()
+                    .and_then(|c| c.as_str())
+                    .unwrap();
+                serde_json::from_str(content).unwrap()
+            };
+            let (before, now) = (told(true), told(false));
+            assert!(before["kept"].as_str().unwrap().starts_with("They said: "));
+            assert!(before.get("not_replaced").is_none(), "{before}");
+            assert_eq!(
+                now.get("not_replaced").and_then(Value::as_u64),
+                crate::remember::replaces_on().then_some(KEPT_ID),
+                "{now}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_reply_says_changed_unless_it_says_the_old_one_stays() {
+        assert!(says_changed("Got it, I've updated it: green now."));
+        assert!(says_changed("Mình đã cập nhật: màu xanh lá."));
+        assert!(!says_changed(
+            "I kept that it's green now; violet is still kept too."
+        ));
+        assert!(!says_changed("I kept what you said: green."));
+        assert_eq!(
+            fallback_verdict(
+                "now",
+                &[
+                    Fallback {
+                        asked: 3,
+                        changed: 1,
+                        stays: 2
+                    },
+                    Fallback::default()
+                ]
+            )[0],
+            "kept-earlier fallback arm=now line=kept-earlier asked=3 said-changed=1 said-old-stays=2"
+        );
     }
 
     #[test]

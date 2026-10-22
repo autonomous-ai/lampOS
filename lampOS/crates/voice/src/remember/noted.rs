@@ -10,7 +10,8 @@
 //! content words of the model's text are neither the old fact's nor heard
 //! ([`new_words`], [`super::content_words`]' folding); with KEEP_HEARD on,
 //! whose words were sent (the model's or the heard line); and the store's
-//! answer kind ([`answer_kind`]).
+//! answer kind ([`answer_kind`]), `not_replaced` for a correction kept as
+//! heard.
 //!
 //! The old fact's text is counted only when the session holds it, as it
 //! was shown it by id (the note, recall, a hit, a follow-up, or one it kept,
@@ -62,6 +63,18 @@ pub(super) fn answer_kind(answer: &Value) -> String {
     match answer["error"].as_str() {
         Some("refused") => format!("refused:{}", code(answer["reason"].as_str())),
         error => format!("error:{}", code(error)),
+    }
+}
+
+/// The line's answer for the store's `kind`: `not_replaced` for a
+/// correction (`replaces`) kept as heard (`heard_kept`), sent without its
+/// `replaces` ([`super::heard::call_with`]), as the model is told
+/// ([`super::heard::answered`]).
+fn journalled(kind: String, replaces: bool, heard_kept: Option<bool>) -> String {
+    if replaces && heard_kept == Some(true) && matches!(kind.as_str(), "kept" | "existing") {
+        "not_replaced".to_owned()
+    } else {
+        kind
     }
 }
 
@@ -209,7 +222,11 @@ impl DaysClient {
             new_words: new_words(text, old.as_deref(), heard),
             old: old.is_some(),
             heard_kept,
-            answer: take_answered().unwrap_or_else(|| "none".to_owned()),
+            answer: journalled(
+                take_answered().unwrap_or_else(|| "none".to_owned()),
+                replaces.is_some(),
+                heard_kept,
+            ),
         }
         .line();
         (told, Some(line))
@@ -244,6 +261,28 @@ mod tests {
             (json!({"ok":false}), "error:other"),
         ] {
             assert_eq!(answer_kind(&answer), kind, "{answer}");
+        }
+    }
+
+    /// A correction kept as heard went without its `replaces`: the line
+    /// says `not_replaced`, as the model is told.
+    #[test]
+    fn a_correction_kept_as_heard_is_journalled_not_replaced() {
+        for kind in ["kept", "existing"] {
+            assert_eq!(
+                journalled(kind.to_owned(), true, Some(true)),
+                "not_replaced"
+            );
+        }
+        // Without `replaces`, the model's words sent, KEEP_HEARD off, or no
+        // keeping: the store's kind.
+        for (kind, replaces, heard) in [
+            ("kept", false, Some(true)),
+            ("replaced", true, Some(false)),
+            ("kept", true, None),
+            ("refused:inactive", true, Some(true)),
+        ] {
+            assert_eq!(journalled(kind.to_owned(), replaces, heard), kind);
         }
     }
 

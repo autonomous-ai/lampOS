@@ -1392,10 +1392,12 @@ fn run_call_with_scope(
                     None => crate::remember::run_of(socket, call, deadline, request),
                 },
             );
-            let told = match &as_heard {
-                Some((_, kept)) => crate::remember::heard::told(told, kept),
-                None => told,
-            };
+            let told = crate::remember::heard::answered(
+                told,
+                model,
+                as_heard.as_ref(),
+                crate::remember::replaces_on(),
+            );
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
