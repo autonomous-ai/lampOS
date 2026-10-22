@@ -118,7 +118,9 @@ one plain path (`reset-plan-product.json`, the rule on #2060), and
 `LAMP_OWN_KEYS=on`:
 - `own_deepseek.key` there: DeepSeek's chat, its search and the memory's
   observation pass go to the person's endpoint with their key, over
-  `LAMP_SECOND_DEEPSEEK_BASE_URL`.
+  `LAMP_SECOND_DEEPSEEK_BASE_URL`, `deepseek_base_url` or the voice's own
+  default for the company relay; whichever of those it was is kept as the
+  relay a refused key falls back to.
 - `own_deepgram.key` there: speech to text goes straight to Deepgram.
 - Otherwise the relay. One journal line each, naming whose key and the
   host, never the key or a path: `DeepSeek: the person's own key, at

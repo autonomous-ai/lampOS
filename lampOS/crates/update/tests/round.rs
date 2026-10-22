@@ -2559,6 +2559,71 @@ fn a_round_places_second_json_before_a_voice_unit_that_needs_it() {
     );
 }
 
+/// #2978, El's P1: the product's voice unit no longer names DeepSeek's
+/// address. A round onto a build carrying that unit keeps the
+/// `second.json` install placed (the previous updater's `SECOND`), and the
+/// voice reading that kept file under the unit's environment still reaches
+/// DeepSeek through the company relay, with no `deepseek.key` and nothing
+/// pinned, so `LAMP_RELAY_ROUTES` may route its chat.
+#[test]
+fn a_round_keeping_second_json_still_reaches_deepseek_through_the_relay() {
+    use lamp_update::install;
+    let product = include_str!("../../../deploy/product/lamp-voice.service");
+    assert!(!product.contains("Environment=LAMP_SECOND_DEEPSEEK_BASE_URL"));
+    let mut lamp = Lamp::installed();
+    let kept = lamp.read(install::SECOND_PATH);
+    let texts: Vec<(String, String)> = lamp_update::install::parts()
+        .into_iter()
+        .map(|part| part.binary)
+        .chain(["lamp-turn-end".to_owned()])
+        .map(|name| {
+            let text = if name == "lamp-skills" {
+                skills_with_checks("2", "")
+            } else {
+                format!("{name} 2")
+            };
+            (name, text)
+        })
+        .collect();
+    let binaries: Vec<(&str, &str)> = texts
+        .iter()
+        .map(|(name, text)| (name.as_str(), text.as_str()))
+        .collect();
+    lamp.publish(2, &binaries, &[("lamp-voice.service", product)]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(install::SECOND_PATH), kept);
+    let unit = lamp.read("/etc/systemd/system/lamp-voice.service");
+    let environment: std::collections::HashMap<String, std::ffi::OsString> = unit
+        .lines()
+        .filter_map(|line| line.strip_prefix("Environment="))
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(name, value)| (name.to_owned(), value.into()))
+        .collect();
+    // The kept file as the voice reads it, its key at a path in the test's
+    // root.
+    use std::os::unix::fs::PermissionsExt;
+    let private = |path: &std::path::Path, text: &str| {
+        fs::write(path, text).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    };
+    let key = lamp.root.join("relay-credential");
+    private(&key, "relay-secret\n");
+    let read = lamp.root.join("second-as-read.json");
+    private(
+        &read,
+        &kept.replace("/etc/lampOS/voice/credential", &key.display().to_string()),
+    );
+    let config = lamp_voice::second_config::load_from_path(&read)
+        .unwrap()
+        .with_environment(|name| environment.get(name).cloned())
+        .unwrap();
+    assert_eq!(
+        config.hosted.deepseek_base_url.as_deref(),
+        Some("https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek")
+    );
+    assert!(!config.pinned.chat);
+}
+
 /// The same round when `second.json` cannot be placed (here a folder in
 /// its place): nothing is written, the old voice unit stays and nothing is
 /// restarted, so the voice that runs keeps running.
