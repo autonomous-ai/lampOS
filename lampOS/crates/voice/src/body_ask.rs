@@ -3,9 +3,13 @@
 //! what it needs a person to do ([`lamp_body::ask::asks`]). The voice
 //! says that line once when the body first lets go, and again only when the
 //! lamp's name is heard (`name/heard`, at the called note's score), at most
-//! once in [`AGAIN_AFTER_US`]: never for each report, and never for another
-//! part's diagnostic. "Stopped asking" (`lamp_body::ask::STOPPED_ASKING`)
-//! is never said; called by name after it, the last ask is.
+//! once in [`AGAIN_AFTER_US`] (two minutes: a lamp named in a meeting
+//! does not repeat its plea at each mention): never for each report, and
+//! never for another part's diagnostic. An ask that changes within one
+//! let-go is not said by itself; a call says the last one read.
+//! "Stopped asking" (`lamp_body::ask::STOPPED_ASKING`) is never said;
+//! called by name after it, the last ask read is, and nothing if this voice
+//! read none (started after the body stopped asking).
 //!
 //! - **Said** through the say service ([`crate::say::OwnAsks`]): the same
 //!   queue and gates as a skill's `text`, at priority 8, not begun after a
@@ -31,8 +35,11 @@ const SKILL: &str = "body";
 const PRIORITY: u8 = crate::say::URGENT_FROM;
 /// Not begun in a minute (the room busy), it is not said until called.
 const EXPIRES_MS: u64 = 60_000;
-/// Called by name, the ask is said again at most this often.
-pub const AGAIN_AFTER_US: u64 = 10_000_000;
+/// Called by name, the ask is said again at most this often, counted from
+/// when it was handed to the say service. Longer than [`EXPIRES_MS`], so an
+/// ask is never handed over again while the last one may still wait.
+pub const AGAIN_AFTER_US: u64 = 120_000_000;
+const _: () = assert!(AGAIN_AFTER_US > EXPIRES_MS * 1_000);
 /// No ask read for this long: the episode is over.
 pub const GONE_AFTER_US: u64 = 10_000_000;
 /// The bus's name for this reader.
@@ -149,10 +156,7 @@ fn run(mut reports: lamp_bus::Subscriber, mut names: lamp_bus::Subscriber, asks:
             }
         };
         while let Ok(Some(message)) = names.recv(Duration::ZERO) {
-            let plain = message
-                .parse::<NameHeard>()
-                .is_ok_and(|heard| heard.score >= crate::called::LEAST_SCORE);
-            if plain && line.is_none() {
+            if is_called(message.parse::<NameHeard>()) && line.is_none() {
                 line = ask.called(now_us);
             }
         }
@@ -161,6 +165,12 @@ fn run(mut reports: lamp_bus::Subscriber, mut names: lamp_bus::Subscriber, asks:
             say(asks, &line);
         }
     }
+}
+
+/// A `name/heard` read: a call when it parsed and scored at least the
+/// called note's [`crate::called::LEAST_SCORE`].
+fn is_called(heard: std::io::Result<NameHeard>) -> bool {
+    heard.is_ok_and(|heard| heard.score >= crate::called::LEAST_SCORE)
 }
 
 /// Hand the ask over without waiting; its outcome is journalled from a
@@ -227,17 +237,56 @@ mod tests {
     }
 
     #[test]
-    fn called_by_name_it_is_said_again_never_twice_in_ten_seconds() {
+    fn called_by_name_it_is_said_again_never_twice_in_two_minutes() {
         let mut ask = BodyAsk::default();
         assert_eq!(ask.called(0), None, "nothing asked, nothing said");
         assert!(ask.read(&asking(ASK), 1_000_000).is_some());
-        // Called a second later: just said.
-        assert_eq!(ask.called(2_000_000), None);
-        assert_eq!(ask.called(12_000_000).as_deref(), Some(ASK));
-        assert_eq!(ask.called(12_500_000), None);
+        // Kept going: the body resends every 2 s.
+        let keep = |ask: &mut BodyAsk, until_us: u64| {
+            for at in (1_000_000..=until_us).step_by(2_000_000) {
+                ask.read(&asking(ASK), at);
+            }
+        };
+        keep(&mut ask, 1_000_000 + AGAIN_AFTER_US);
+        // Called just inside the gap: not said; at it exactly: said.
+        assert_eq!(ask.called(AGAIN_AFTER_US), None);
+        assert_eq!(ask.called(1_000_000 + AGAIN_AFTER_US).as_deref(), Some(ASK));
+        assert_eq!(ask.called(1_000_000 + AGAIN_AFTER_US + 500_000), None);
         // After it stopped asking, called by name says the last ask.
-        assert_eq!(ask.read(&asking(STOPPED_ASKING), 13_000_000), None);
-        assert_eq!(ask.called(30_000_000).as_deref(), Some(ASK));
+        assert_eq!(
+            ask.read(&asking(STOPPED_ASKING), 2_000_000 + AGAIN_AFTER_US),
+            None
+        );
+        assert_eq!(
+            ask.called(1_000_000 + 2 * AGAIN_AFTER_US).as_deref(),
+            Some(ASK)
+        );
+    }
+
+    #[test]
+    fn a_voice_that_read_only_stopped_asking_says_nothing_when_called() {
+        let mut ask = BodyAsk::default();
+        assert_eq!(ask.read(&asking(STOPPED_ASKING), 0), None);
+        assert_eq!(ask.called(AGAIN_AFTER_US), None);
+    }
+
+    #[test]
+    fn another_parts_report_does_not_end_the_bodys_let_go() {
+        let mut ask = BodyAsk::default();
+        let mut eyes = asking("the camera is not answering");
+        eyes.name = "eyes".into();
+        assert!(ask.read(&asking(ASK), 0).is_some());
+        assert_eq!(ask.read(&eyes, 1_000_000), None);
+        assert_eq!(ask.read(&asking(ASK), 2_000_000), None);
+    }
+
+    #[test]
+    fn only_a_name_heard_at_the_called_score_is_a_call() {
+        let heard = |score| Ok(NameHeard { score, ago_ms: 0 });
+        assert!(is_called(heard(crate::called::LEAST_SCORE)));
+        assert!(is_called(heard(1.0)));
+        assert!(!is_called(heard(crate::called::LEAST_SCORE - 0.01)));
+        assert!(!is_called(Err(std::io::Error::other("not a name"))));
     }
 
     #[test]
@@ -264,7 +313,11 @@ mod tests {
         assert!(ask.read(&asking(ASK), 0).is_some());
         ask.tick(GONE_AFTER_US - 1);
         assert_eq!(ask.read(&asking(ASK), GONE_AFTER_US - 1), None);
-        ask.tick(2 * GONE_AFTER_US);
+        // Exactly GONE_AFTER_US since the last ask read: over.
+        ask.tick(2 * GONE_AFTER_US - 2);
+        assert!(ask.episode.is_some(), "one short of the gap");
+        ask.tick(2 * GONE_AFTER_US - 1);
+        assert!(ask.episode.is_none(), "at the gap");
         assert_eq!(ask.called(2 * GONE_AFTER_US), None);
         assert_eq!(
             ask.read(&asking(ASK), 2 * GONE_AFTER_US).as_deref(),
@@ -281,5 +334,21 @@ mod tests {
         let (turn, priority, ticket, quoted) = says.take(now).unwrap();
         assert_eq!(turn, format!("{} {ASK}", crate::say::AS_WRITTEN));
         assert_eq!((priority, ticket.skill(), quoted), (8, "body", false));
+    }
+
+    #[test]
+    fn an_ask_the_socket_would_refuse_is_refused_and_never_queued() {
+        let mut says = crate::say::Says::idle_for_test();
+        let long = "a".repeat(crate::say::MOST_WORDS_BYTES + 1);
+        for text in ["", "  ", "two\nlines", long.as_str()] {
+            let answered = says.own_asks().text(SKILL, text, PRIORITY, EXPIRES_MS);
+            assert!(matches!(
+                answered.try_recv(),
+                Ok(Answer::Done(crate::say::Outcome::Refused(_)))
+            ));
+        }
+        let now = lamp_ipc::monotonic_us();
+        says.poll(now);
+        assert!(says.take(now).is_none());
     }
 }
