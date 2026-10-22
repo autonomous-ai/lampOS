@@ -1,0 +1,68 @@
+{
+  "observed_at_utc": "2026-10-22T17:58:23.466903+00:00",
+  "head": "996511111e195d455cd7f41b1542a2699e35c1bf",
+  "base_at_push": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+  "checks": {
+    "arm64": {
+      "run": 39824358667,
+      "job": 119983584749,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39824358667/job/119983584749",
+      "required_job_status": "completed",
+      "required_job_conclusion": "success",
+      "started_at": "2026-10-22T17:37:46Z",
+      "completed_at": "2026-10-22T17:57:30Z",
+      "workflow_status_observed": "completed",
+      "workflow_conclusion_observed": "success",
+      "workflow_note": "The terminal required job determines this check; workflow aggregation is retained separately.",
+      "tested_merge_short": "bab1994",
+      "tested_head": "996511111e195d455cd7f41b1542a2699e35c1bf",
+      "tested_base": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+      "test_seconds": 179.647,
+      "totals": {
+        "passed": 10583,
+        "failed": 0,
+        "skipped": 67,
+        "leaky_passes": 1
+      },
+      "named_result_lines": [
+        "2026-10-22T17:56:08.2006228Z         PASS [   1.108s] ( 6207/10583) lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "2026-10-22T17:56:09.5056998Z         PASS [   0.153s] ( 6229/10583) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round",
+        "2026-10-22T17:56:13.2192203Z         PASS [   3.794s] ( 6600/10583) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill"
+      ],
+      "raw_log_sha256": "acdccc917647afad78d0293591873e24f6930c908b16dc9904af8d644256e6b5",
+      "raw_log_bytes": 2537267,
+      "log_command": [
+        "gh",
+        "run",
+        "view",
+        "39824358667",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--job",
+        "119983584749",
+        "--log"
+      ],
+      "leaky_result_lines": [
+        "2026-10-22T17:56:47.1765050Z         LEAK [   0.233s] ( 8562/10583) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ]
+    },
+    "clippy": {
+      "run": 39824358767,
+      "job": 119983584751,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39824358767/job/119983584751",
+      "required_job_status": "completed",
+      "required_job_conclusion": "success",
+      "started_at": "2026-10-22T17:37:44Z",
+      "completed_at": "2026-10-22T17:52:31Z",
+      "workflow_status_observed": "completed",
+      "workflow_conclusion_observed": "success",
+      "workflow_note": "The terminal required job determines this check; workflow aggregation is retained separately.",
+      "tested_merge_short": "bab1994",
+      "tested_head": "996511111e195d455cd7f41b1542a2699e35c1bf",
+      "tested_base": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+      "raw_log_sha256": "47bd90b1ae183959ed6416308acd1a998e7e5d8ce311a0a9d8911e6d2d2d3350",
+      "raw_log_bytes": 75526
+    }
+  },
+  "limits": "Exact pushed head's required jobs only. No downloaded-artifact, physical power-cut, flash, release publication, or device acceptance is claimed. Original failed consumer gate remains unwaived. First owns any later current-base train qualification."
+}

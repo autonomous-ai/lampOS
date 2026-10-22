@@ -1,0 +1,15 @@
+{
+  "integration": "28f796223aeabedb39756e5bdb7e76c3d223a8c9",
+  "source_head": "996511111e195d455cd7f41b1542a2699e35c1bf",
+  "command": [
+    "git",
+    "merge-tree",
+    "--write-tree",
+    "origin/lamp-voice",
+    "HEAD"
+  ],
+  "exit": 0,
+  "stdout": "4fab5ba061c2199d81f37ea44cb2bd29672e1d29\n",
+  "stderr": "",
+  "limit": "Read-only conflict check, no branch change and no combined compilation/test qualification."
+}
