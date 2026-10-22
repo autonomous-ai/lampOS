@@ -32,6 +32,7 @@ of the lines addressed to a similar name.
 | `--not-while-speaking` | `on`: a hearing that began while `voice/state` said `speaking`, or within 0.6 s after, is not said ("Not its own voice") | off: every hearing is said |
 | `--quiet-below` | A level in dBFS, from -90 to -30: the models rest while the last 2.03 s held no sample this loud ("Resting while the room is quiet") | off: the models always run |
 | `--step-ms` | 80, 40, 20 or 10: a step's score is the highest of 80 / `--step-ms` grids of steps, each this much later than the one before, so a name that falls between two steps of 80 ms is scored where it lies ("Where the steps fall", #694). The models' work grows about as many times | 80: one grid, as always |
+| `--wake` | With `--step-ms` under 80, a score from 0.01 to 0.5: the later grids run their models only while the first grid's name score is over it, and briefly after, scoring the steps just before as they wake, so a name they hear best comes up to 0.4 s late ("Woken grids", #694). Refused at 80 | off: every grid always runs |
 | `--rescue-model` | A second name model of `name.onnx`'s shape, outside the models directory: where `name.onnx` reached `--rescue-gate` at a step or in the 1 s before it, that step's score is the higher of the two ("A second model to rescue a call", #1546). Refused unless its SHA-256 is `--rescue-sha256` | off: no second model |
 | `--rescue-sha256` | The rescue model's SHA-256, 64 lower-case hex digits; required with `--rescue-model` | — |
 | `--rescue-gate` | A score from 0.05 to 0.95 | 0.5 |
@@ -138,6 +139,75 @@ left in each of the first two are one voice the model scores 0.65–0.80
 wherever it lies, whose clean file scores 0.84: its reach, not the step.
 Off (80) until its cost is measured on a lamp beside a voice turn.
 
+**Woken grids (`--wake`, #694).** On lamp-75c9, beside a voice turn, `--step-ms
+10` took 76% of a core against 9% at 80. Almost all of a step is the second
+model: on a laptop, 2.14 ms of it, against 63 µs for the first and 11 µs for
+the name's. So a shared first model saves nothing. With `--wake SCORE` the
+later grids make only their frames until the first grid's name score goes
+over SCORE. Then they make the embeddings they passed over, from the frames
+kept for them (the newest 20, `hear::KEPT`), score their last five
+positions (`hear::BACK`), and stay awake for 8 steps after the score was
+last over the bar (`hear::AWAKE_STEPS`). A score given late goes into the
+next step (`Grids::first`), so a name a later grid hears best is heard up
+to 0.4 s after it was said, plus the time the catch-up takes, within the two
+bounds below; past them it is let go.
+
+The later grids run on a thread of their own (`hear::Woken`), so the first
+grid's steps, and its own hearing, never wait for them: a wake's catch-up
+took 0.95 to 1.16 s of one core on lamp-75c9. Done on lamp-name's own loop,
+as #2759 first did, it held back the first grid. Three of four played calls
+that 80 ms alone heard were lost (22 Oct, 07:36–08:31: 11.9% of a core at
+80, 79.9% at 10, 15.3% woken; 11 wakes in 18 minutes with nobody saying the
+name). `check` and the tests wait for the thread at each block
+(`Hearer::waiting`), so a file scores the same every time.
+
+Two bounds keep the thread honest (reviewer-two on #2759):
+- **At most a second and a half waits for it** (`hear::MOST_QUEUED`, 75
+  blocks): a wake's catch-up takes about a second on lamp-75c9, and at half
+  a second 55 overruns came of 35 wakes in 18 minutes (22 Oct 10:3x).
+  If it falls further behind, what waits is let go, and the later grids
+  start afresh at the first grid's next whole step, so each keeps its place.
+  A forget goes ahead of anything waiting. The minute line counts these as
+  `overruns=`.
+- **A late score never hears a call twice.** A later grid's score that comes
+  late, for a step where the first grid heard a call (`--least` or more
+  within six steps of it), leaves the name and the rescue out; a stop word
+  the first grid heard (`--stop-least`) leaves the stop out. One for a call
+  the first grid missed is heard, once, if it comes while the first grid's
+  steps around it are still kept: 48 steps (`hear::RECENT`), so up to about
+  3.4 s late. Older, or of work let go by an overrun, it is let go whole,
+  even a call only it heard. Without this, one played call's fine score, a
+  second late and past the hold-off, opened a second hearing.
+
+`check` and the real-model test wait for the thread, so they show what
+the grids hear, not how far behind the thread falls on a lamp. That is the
+lamp run's to measure (`overruns=`, `longest_block_ms`).
+
+Even at its worst place, each of the 15 lines above took the first grid's
+score over 0.04. In 30 s of Piper talk with no name, it never went over
+0.01, and in a held synthesised chord never over 0.02. So `--wake 0.03`
+wakes on every line wherever it falls, and not on that talk. On the 120
+(lines × places), woken at 0.03 scored each as highly as always awake (104
+of 120 at 0.9, against 80 at 80 ms). The real models' test is
+`step_models::woken_grids_hear_what_the_grids_always_awake_hear`. With
+three positions back, warm1 moved 10 ms lost its 0.96, which was four back.
+
+Its cost, `check`'s whole run on a laptop:
+
+| sound | 80 ms | 10 ms woken at 0.03 | 10 ms always awake |
+|---|---|---|---|
+| 90 s of talk, no name | 2.44 s | 2.90 s | 19.05 s |
+| 60 s near silence | 1.65 s | 1.95 s | 12.58 s |
+| the 120 recorded calls | 25.1 s | 82.1 s | 139.4 s |
+
+So about 1.2 times 80's work while no name is near, and 10's while one is.
+A real room wakes it more often than clean files do: 4ace's office heard
+the name at 0.9 or more 227 times in a day. Off until its CPU on a lamp is
+measured.
+With `--wake`, the minute line also says `wakes=` (times the later grids
+woke that minute) and `woken_steps=` (the steps they were awake for), so a
+room's cost is read from the journal.
+
 A name that is said raises the score for several steps in a row. That is
 one hearing (`src/said.rs`): it is said once, when the score falls again
 or after 0.8 s, with the highest score it reached and how long ago it
@@ -146,7 +216,12 @@ is not heard twice. The score said is never over 1, whatever the models
 gave (one over 1 fails the message's own check and would not be sent).
 
 After sound was lost, or the microphone was closed for more than half a
-second, the models start afresh: they need about two seconds of sound
+second, the models start afresh. Both are read from the blocks themselves:
+a skipped count, or half a second or more between two by the voice's own
+monotonic clock (the bus message's `at_us`), or a new publisher (the voice
+restarted). Not by when lamp-name got to them, since a woken grid's
+catch-up can keep blocks waiting, and not by a wall clock, which a lamp
+with no battery clock has set 30 to 70 s after boot (#2759). Then the models start afresh: they need about two seconds of sound
 before they give a score again. A hearing that was open at that moment is
 said then, dated from its first high score (it was dated 0.8 s earlier
 than that until 2026-10-14, which left a call 0.7 s, not 1.5 s, to count

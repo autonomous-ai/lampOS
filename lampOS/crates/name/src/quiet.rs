@@ -122,6 +122,11 @@ impl<M: Models> Quiet<M> {
         }
     }
 
+    /// The models it rests.
+    pub fn models(&self) -> &M {
+        &self.models
+    }
+
     /// Steps whole since the last forget: the last score given is of this
     /// one, counted from 1.
     pub fn steps(&self) -> usize {
