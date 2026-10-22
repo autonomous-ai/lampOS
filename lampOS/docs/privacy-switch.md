@@ -267,11 +267,14 @@ already running. The journal says once each time the yes comes or goes. The
 eyes still look: the camera, the gaze, presence, who is there and the
 speaking read are unchanged. The voice's
 onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
-whether the lamp may notice from the person's face how they seem, to answer
-more warmly (never said aloud, nothing of the face kept), and keeps only a
-yes; a no or silence leaves no file, as never asked does. `redo_setup`, a
+whether the lamp may notice from the faces it sees how people seem, to
+answer more warmly (never said aloud, no picture of a face kept), and keeps
+only a yes: a yes for this lamp, covering everyone it sees, not the yes of
+the one who answered; a no or silence leaves no file, as never asked does. `redo_setup`, a
 forget of everything and the reset plan remove it, as `room-sounds.json`
-([onboarding.md](onboarding.md), "Face expressions"). Without the ask (the
+([onboarding.md](onboarding.md), "Face expressions"). Those are the only
+ways to take it back: a forget of everything, a redo of the step, or the
+reset. There is no separate "stop noticing my face" yet. Without the ask (the
 product's unit doesn't set it yet), a test lamp's yes is written by hand, as
 root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
