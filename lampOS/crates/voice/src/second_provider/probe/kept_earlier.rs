@@ -55,6 +55,7 @@ pub fn kept_answer() -> Value {
         &json!({"ok": true, "id": KEPT_ID}),
         0,
         None,
+        None,
     )
     .unwrap_or_default();
     crate::remember::told_kept(told, KEPT_ID, crate::remember::replaces_on())
@@ -110,6 +111,7 @@ impl Line {
             crate::remember::REMEMBER,
             &json!({"ok": true, "id": KEPT_ID + 1}),
             0,
+            None,
             None,
         )
         .unwrap_or_default();
