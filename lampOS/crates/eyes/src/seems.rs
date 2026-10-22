@@ -36,7 +36,8 @@ pub const EXPRESSIONS: [&str; 8] = [
 /// A face is read at most this often.
 pub const READ_EVERY: Duration = Duration::from_secs(2);
 
-/// Where the person's yes to having their face's expression read is kept,
+/// Where the lamp's yes to having faces' expressions read, covering everyone
+/// it sees, is kept,
 /// beside the room sounds' yes lamp-ears reads
 /// (`lamp_ears::classes::ROOM_SOUNDS_FILE`, the same folder and modes):
 /// `{"face_expressions":"yes", ...}`, present only while the yes stands
