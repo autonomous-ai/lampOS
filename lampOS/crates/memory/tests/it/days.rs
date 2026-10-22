@@ -1866,37 +1866,120 @@ fn a_dated_one_never_asked_is_offered_at_most_three_times() {
     }
 }
 
-/// With `until_asked`, an undated thread is recorded when given, as ever;
-/// and without `events` it has no effect at all.
+/// #1693 (the first builder on #2602, 22 Oct 13:1x, after lamp-06c1 on 22
+/// Oct: an undated thread was told at "good morning", recorded as given,
+/// and never asked): with `until_asked`, an undated thread takes the dated
+/// one's path, with `events` or without. Given, it is offered, not
+/// recorded; the same day, nothing; the next day, offered again; once the
+/// voice says the lamp asked, recorded and never again.
 #[test]
-fn until_asked_holds_back_only_a_dated_one() {
-    let scratch = Scratch::new("event-until-undated");
-    let mut store = scratch.open(30, NOW);
-    let minh = person("p-minh");
-    let commute = thread(&mut store, &minh, NOW, "Tired of the commute");
-    store.maintain(NOW + DAY).unwrap();
-    let given = store
-        .follow_up_until_asked(&minh, true, true)
-        .unwrap()
-        .unwrap();
-    assert_eq!(given["id"], commute);
-    assert_eq!(given.get("until_asked"), None);
-    assert!(!store.follow_up_asked(&minh, commute).unwrap());
-    store.maintain(NOW + 2 * DAY).unwrap();
-    assert_eq!(
-        store.follow_up_until_asked(&minh, true, true).unwrap(),
-        None
-    );
-    // Without events, a dated one is recorded when given.
-    let id = wedding(&mut store, &minh);
-    store.maintain(MONDAY + 6 * DAY).unwrap();
-    let given = store
-        .follow_up_until_asked(&minh, false, true)
-        .unwrap()
-        .unwrap();
-    assert_eq!(given["id"], id);
-    assert_eq!(given.get("until_asked"), None);
-    assert_eq!(offer_rows(&scratch), 0);
+fn an_undated_thread_given_until_asked_is_offered_again_until_asked() {
+    for events in [false, true] {
+        let scratch = Scratch::new(&format!("thread-until-asked-{events}"));
+        let mut store = scratch.open(30, NOW);
+        let minh = person("p-minh");
+        let commute = thread(&mut store, &minh, NOW, "Tired of the commute");
+        let offered = json!({"id":commute,"category":"thread","text":"Tired of the commute","until_asked":true});
+        store.maintain(NOW + DAY).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, events, true).unwrap(),
+            Some(offered.clone()),
+            "events {events}"
+        );
+        assert_eq!(
+            follow_up_rows(&scratch, "p-minh"),
+            0,
+            "told, not asked: not counted"
+        );
+        assert_eq!(offer_rows(&scratch), 1);
+        store.maintain(NOW + DAY + 3_600_000).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, events, true).unwrap(),
+            None,
+            "one a day"
+        );
+        store.maintain(NOW + 2 * DAY).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, events, true).unwrap(),
+            Some(offered),
+            "the next session, offered again"
+        );
+        assert!(store.follow_up_asked(&minh, commute).unwrap());
+        assert_eq!(follow_up_rows(&scratch, "p-minh"), 1, "asked: counted");
+        for at in [NOW + 3 * DAY, NOW + 4 * DAY, NOW + 8 * DAY] {
+            store.maintain(at).unwrap();
+            assert_eq!(
+                store.follow_up_until_asked(&minh, events, true).unwrap(),
+                None,
+                "{at}"
+            );
+        }
+    }
+}
+
+/// An undated thread the lamp is never heard asking about is offered in at
+/// most `FOLLOW_UP_OFFERS` sessions, each on its own day, as a dated one:
+/// the last is recorded as given and carries no `until_asked`.
+#[test]
+fn an_undated_thread_never_asked_is_offered_at_most_three_times() {
+    for events in [false, true] {
+        let scratch = Scratch::new(&format!("thread-offers-{events}"));
+        let mut store = scratch.open(30, NOW);
+        let minh = person("p-minh");
+        let commute = thread(&mut store, &minh, NOW, "Tired of the commute");
+        let held = json!(true);
+        for (day, until_asked) in [(1, Some(&held)), (2, Some(&held)), (3, None)] {
+            store.maintain(NOW + day * DAY).unwrap();
+            let given = store
+                .follow_up_until_asked(&minh, events, true)
+                .unwrap()
+                .expect("offered");
+            assert_eq!(given["id"], commute, "day {day}");
+            assert_eq!(given.get("until_asked"), until_asked, "day {day}");
+        }
+        assert_eq!(
+            follow_up_rows(&scratch, "p-minh"),
+            1,
+            "the last offer is recorded"
+        );
+        assert!(!store.follow_up_asked(&minh, commute).unwrap());
+        for at in [NOW + 4 * DAY, NOW + 5 * DAY, NOW + 9 * DAY] {
+            store.maintain(at).unwrap();
+            assert_eq!(
+                store.follow_up_until_asked(&minh, events, true).unwrap(),
+                None,
+                "{at}"
+            );
+        }
+    }
+}
+
+/// Without `until_asked` (the voice's `LAMP_MEMORY_THREADS` off never asks
+/// at all), an undated thread is recorded when given, as before, and no
+/// offer is kept.
+#[test]
+fn without_until_asked_an_undated_thread_is_recorded_when_given() {
+    for events in [false, true] {
+        let scratch = Scratch::new(&format!("thread-not-held-{events}"));
+        let mut store = scratch.open(30, NOW);
+        let minh = person("p-minh");
+        let commute = thread(&mut store, &minh, NOW, "Tired of the commute");
+        store.maintain(NOW + DAY).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, events, false).unwrap(),
+            Some(json!({"id":commute,"category":"thread","text":"Tired of the commute"}))
+        );
+        assert_eq!(
+            (follow_up_rows(&scratch, "p-minh"), offer_rows(&scratch)),
+            (1, 0)
+        );
+        assert!(!store.follow_up_asked(&minh, commute).unwrap());
+        store.maintain(NOW + 2 * DAY).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, events, false).unwrap(),
+            None
+        );
+    }
 }
 
 /// The protocol: `follow_up` with `until_asked` and `follow_up_asked`;

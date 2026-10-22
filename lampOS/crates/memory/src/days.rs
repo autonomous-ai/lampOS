@@ -32,7 +32,7 @@ pub const FOLLOW_UP_EVERY_MS: u64 = 86_400_000;
 /// days after it, instead of [`FOLLOW_UP_WITHIN_MS`] from when it was said.
 pub const FOLLOW_UP_WITHIN_DAYS: u32 = 14;
 /// With `until_asked` (#1693, the first builder on #2602, 22 Oct 09:4x), a
-/// dated one the lamp has not been heard asking about is offered in at most
+/// follow-up, dated or not (13:1x), the lamp has not been heard asking about is offered in at most
 /// this many sessions, each on its own day ([`FOLLOW_UP_EVERY_MS`]): the
 /// first and at most two more, so it never nags. The last offer is recorded
 /// as given, as without `until_asked`.
@@ -1133,16 +1133,17 @@ impl Days {
         self.follow_up_until_asked(person, events, false)
     }
 
-    /// [`Self::follow_up_with`], and with `until_asked` (and `events`; the
-    /// voice's `LAMP_MEMORY_EVENTS`, the first builder on #2602, 22 Oct
-    /// 09:4x) a dated one is marked asked when the lamp asks, not when it
-    /// is given: given, it is counted as offered (`follow_up_offers`) and
+    /// [`Self::follow_up_with`], and with `until_asked` (the voice's
+    /// `LAMP_MEMORY_THREADS`; the first builder on #2602, 22 Oct 09:4x for
+    /// a dated one, 13:1x for an undated thread or promise, with `events`
+    /// or without) the one given is marked asked when the lamp asks, not
+    /// when it is given: given, it is counted as offered (`follow_up_offers`) and
     /// its answer carries `"until_asked":true`, and it stays eligible
     /// until the voice says the lamp asked ([`Self::follow_up_asked`]) or
     /// it has been offered [`FOLLOW_UP_OFFERS`] times, the last of which is
     /// recorded as given in its transaction as ever. An offer counts as a
     /// give for the one a day, so it is offered again on a later day at the
-    /// earliest. An undated one is recorded when given, as without it.
+    /// earliest.
     pub fn follow_up_until_asked(
         &mut self,
         person: &Person,
@@ -1210,9 +1211,12 @@ impl Days {
         let Some((rid, id, text, category, on)) = found else {
             return Ok(None);
         };
-        // A dated one with `until_asked` is offered, and recorded as given
-        // only on its last offer; anything else is recorded now, as ever.
-        let held = if until_asked && events && on.is_some() {
+        // With `until_asked`, whatever is given is offered, and recorded as
+        // given only on its last offer: a dated one, and an undated thread
+        // or promise too (the first builder on #2602, 22 Oct 13:1x, after
+        // lamp-06c1 told one at "good morning" and never asked). Without
+        // it, recorded now, as ever.
+        let held = if until_asked {
             let offers: u32 = tx.query_row(
                 "INSERT INTO follow_up_offers(rid,person,offers,offered_unix_ms) VALUES(?1,?2,1,?3) ON CONFLICT(rid) DO UPDATE SET offers=offers+1,offered_unix_ms=excluded.offered_unix_ms RETURNING offers",
                 params![rid, person.as_str(), now],

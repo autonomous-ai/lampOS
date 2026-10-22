@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS event_days (
     day TEXT NOT NULL
 );
 -- #1693, the voice's LAMP_MEMORY_EVENTS (the first builder on #2602,
--- 22 Oct 09:4x): a dated one given with `until_asked`, not yet asked about:
+-- 22 Oct 09:4x; an undated one too, 13:1x, the voice's LAMP_MEMORY_THREADS):
+-- a follow-up given with `until_asked`, not yet asked about:
 -- how many sessions it was offered in and when last. It is recorded in
 -- `follow_ups` when the voice says the lamp asked (`follow_up_asked`) or on
 -- its last offer. Its row goes with the entry when that is forgotten or
