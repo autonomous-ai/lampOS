@@ -149,13 +149,33 @@ fn said_through(samples: usize, now_us: u64) {
 /// go: with [`name_or_follow_up`], only when it began no longer than
 /// [`crate::name_or_follow_up::FOLLOW_UP_FOR`] after they ended, or while
 /// they played, however long it went on; without it, always, and the
-/// thread's window alone decides.
+/// thread's window alone decides. Read in a busy room only: elsewhere the
+/// thread's window decides with the switch too.
 fn follows_up_from(began_us: Option<u64>) -> bool {
     !name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
         || follows_up_at(
             said_until_us().load(std::sync::atomic::Ordering::Relaxed),
             began_us.unwrap_or_else(monotonic_us),
         )
+}
+
+/// With [`name_or_follow_up`], two faces or more in the eyes' newest fresh
+/// look (`eyes`) are two people at the lamp, and the room is busy at once
+/// ([`crate::room_told::RoomTold::two_people`]); said when it turns so, for
+/// `request`.
+fn two_faces_make_it_busy(eyes: Option<&lamp_bus::Bus>, request: u64) {
+    if name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
+        && eyes
+            .and_then(crate::bus_out::faces_in_view)
+            .is_some_and(|faces| faces >= 2)
+        && crate::room_told::room()
+            .lock()
+            .is_ok_and(|mut room| room.two_people(monotonic_us()))
+    {
+        eprintln!(
+            "lamp-voice provider: request {request}: two faces in view: the room is busy (LAMP_NAME_OR_FOLLOW_UP)"
+        );
+    }
 }
 
 /// [`follows_up_from`]'s reading of words played until `until_us` (zero:
@@ -1820,7 +1840,14 @@ async fn serve_with_visual<C: Connect>(
     // for a lamp spoken to.
     let eyes = BUS_ROOT
         .get()
-        .filter(|_| busy_needs_face || attention_busy || addressed || sounds_checked || spoken_to)
+        .filter(|_| {
+            busy_needs_face
+                || attention_busy
+                || addressed
+                || sounds_checked
+                || spoken_to
+                || name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
+        })
         .and_then(|root| lamp_bus::Bus::new(root).ok());
     // Whether each request was said to the lamp from close to it: the eyes'
     // looks of the last 30 s, and the topic it is published on. A bus that
@@ -1887,19 +1914,21 @@ async fn serve_with_visual<C: Connect>(
     let mut let_go: Option<Notice> = None;
     attention.speak_when_spoken_to(spoken_to);
     attention.judge_by_day(SPOKEN_TO_BY_DAY.load(std::sync::atomic::Ordering::Relaxed));
-    // At a desk, a face turned to the lamp is no sign, and a conversation
-    // goes on only shortly after its words (`LAMP_NAME_OR_FOLLOW_UP`).
+    // At a desk, in a busy room, a face turned to the lamp is no sign, and
+    // a conversation goes on only shortly after its words; the talk the
+    // lamp holds makes the room busy (`LAMP_NAME_OR_FOLLOW_UP`).
     let face_or_window = name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed);
     attention.need_name_or_follow_up(face_or_window);
     if face_or_window {
         eprintln!(
-            "lamp-voice provider: a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words (LAMP_NAME_OR_FOLLOW_UP)",
+            "lamp-voice provider: in a busy room, a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words; held talk and two faces make the room busy (LAMP_NAME_OR_FOLLOW_UP)",
             crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
         );
     }
     // With it, only talk between people makes the room busy (#829).
     if let Ok(mut room) = crate::room_told::room().lock() {
         room.count_only_talk(spoken_to);
+        room.count_held_talk(face_or_window);
     }
     // The record of whom it answered, off unless set.
     let mut first_output = FIRST_OUTPUT.get().and_then(|directory| {
@@ -2612,10 +2641,13 @@ async fn serve_with_visual<C: Connect>(
                     if let Some(says) = policy.says(request) {
                         attention.policy_said(request, Some(says));
                     } else {
+                        // `LAMP_NAME_OR_FOLLOW_UP`: two faces make the room
+                        // busy, and there a line goes on by when it began.
+                        two_faces_make_it_busy(eyes.as_ref(), request);
                         let (room, going_on) = now();
-                        // `LAMP_NAME_OR_FOLLOW_UP`: by when the line began.
                         let going_on = going_on
-                            && follows_up_from(attention.window().map(|(began, _)| began));
+                            && (room != crate::room_told::Room::Busy
+                                || follows_up_from(attention.window().map(|(began, _)| began)));
                         let turned = eyes.as_ref().and_then(crate::bus_out::someone_turned_to_lamp);
                         // Whether it answers the lamp's own question, read as
                         // the judging reads it below: such a line never waits.
@@ -2761,12 +2793,15 @@ async fn serve_with_visual<C: Connect>(
                         Event::Audio { lineage, .. } | Event::OutputTranscript { lineage, .. } | Event::ToolCall { lineage, .. }
                             if !matches!(event, Event::ToolCall { call, .. } if !crate::attention::answers(&call.name)) => {
                             let sampled_start_us = monotonic_us();
+                            // `LAMP_NAME_OR_FOLLOW_UP`: two faces make the
+                            // room busy, and there a follow-up is one begun
+                            // soon after the lamp's words, however long it
+                            // goes on before its answer.
+                            two_faces_make_it_busy(eyes.as_ref(), lineage.request.get());
                             let (room, going_on) = now();
-                            // `LAMP_NAME_OR_FOLLOW_UP`: a follow-up is one
-                            // begun soon after the lamp's words, however
-                            // long it goes on before its answer.
                             let going_on = going_on
-                                && follows_up_from(attention.window().map(|(began, _)| began));
+                                && (room != crate::room_told::Room::Busy
+                                    || follows_up_from(attention.window().map(|(began, _)| began)));
                             let request = lineage.request.get();
                             let turned = (attention_busy && room == crate::room_told::Room::Busy
                                 || attention.sound_in_hand()
@@ -2830,13 +2865,15 @@ async fn serve_with_visual<C: Connect>(
                             // too: a question in the conversation's voice goes
                             // on, and a statement in it is talk past the lamp
                             // (the reviewer on #1636).
-                            // With `LAMP_NAME_OR_FOLLOW_UP`, only for a line
-                            // begun soon after the lamp's words, as above.
+                            // With `LAMP_NAME_OR_FOLLOW_UP`, in a busy room,
+                            // only for a line begun soon after the lamp's
+                            // words, as above.
                             let under_the_mark = !going_on
                                 && intake.handoff.voices.is_some()
                                 && crate::room_told::room().lock().is_ok_and(|room| room.ended_only_by_another_voice())
                                 && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()))
-                                && follows_up_from(attention.window().map(|(began, _)| began));
+                                && (room != crate::room_told::Room::Busy
+                                    || follows_up_from(attention.window().map(|(began, _)| began)));
                             let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
                                 voices.at_verdict(request, going_on || under_the_mark, attention.called_for_itself())
                             });
