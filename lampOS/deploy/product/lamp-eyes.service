@@ -29,7 +29,7 @@ Environment=LAMP_EYES_SPEAKING=on
 # How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the
-# person's kept yes in /var/lib/lampOS/consent/face-expressions.json (privacy-switch.md). The mesh
+# lamp's kept yes, for everyone it sees, in /var/lib/lampOS/consent/face-expressions.json (privacy-switch.md). The mesh
 # and the read run on their own thread, off the look, so the speaking read above stays on the
 # corners (eyes.md).
 # The full look: the camera at 1280x960, and "what do you see" answered from one still, at most 1024

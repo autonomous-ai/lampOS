@@ -1451,7 +1451,8 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   (`lamp_msgs::HumanSeems`, good for 5 s): a kind and a confidence only.
   No name, print or picture is kept or said. With no face near, nothing is
   said, and a reader treats no fresh value as not known.
-- **Only with the person's yes** (the reviewer-lead's P2 on #2872), kept
+- **Only with the lamp's yes, for everyone it sees** (the reviewer-lead's
+  P2 on #2872), kept
   as the ears keep the yes to room sounds: `seems::due` reads
   `/var/lib/lampOS/consent/face-expressions.json` when a read is due, and
   only a JSON object whose `face_expressions` is exactly `"yes"` counts
@@ -1520,7 +1521,7 @@ line and isn't read.
 
 **Only for the session:** it reads whoever is near the lamp, not only the
 labelled person, so at a desk it would keep the reads of anyone who stops by
-and never said yes. Nothing is read at all without the person's kept yes
+and never said yes. Nothing is read at all without the lamp's kept yes
 (`face-expressions.json`, above), so the session needs it too. Turn `--seems-log` on for the labelled session alone,
 with nobody else near, and off right after it; don't leave it running to its
 cap. Measure and delete it before a lamp is passed on (a reset wipes it too).
