@@ -296,10 +296,12 @@ mod tests {
         }
         // Every switch attention.md names that the product voice sets is in the group above, or
         // here, left out of a moved lamp's voice on purpose: a new attention switch can't be
-        // forgotten (the Reviewer-lead's P3 on #2883).
-        const NOT_THE_GROUP: [&str; 7] = [
+        // forgotten (the Reviewer-lead's P3 on #2883). Head touch goes on with the product's
+        // own pins and its try (#1362); a moved lamp's controls carry no head lines yet.
+        const NOT_THE_GROUP: [&str; 8] = [
             "LAMP_CLOCK",
             "LAMP_FIRST_OUTPUT",
+            "LAMP_HEAD_TOUCH",
             "LAMP_KERNEL_CLOCK",
             "LAMP_PROVIDER_PATIENCE",
             "LAMP_SECOND_LOOK",
