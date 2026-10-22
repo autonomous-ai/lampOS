@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fs,
-    io::{Read, Seek, SeekFrom},
+    io::{self, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
@@ -20,6 +20,53 @@ pub const KEPT: usize = 20;
 /// read is on every push. A file first read when it is longer is read from
 /// this far before its end: only the newest turns are kept.
 const MOST_READ: u64 = 4 << 20;
+
+/// Why the session records could not be read. Paths and OS error text
+/// stay out of the snapshot sent to the page.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadFailure {
+    Permission,
+    Missing,
+    Other,
+}
+
+impl From<io::Error> for ReadFailure {
+    fn from(error: io::Error) -> Self {
+        match error.kind() {
+            io::ErrorKind::PermissionDenied => Self::Permission,
+            io::ErrorKind::NotFound => Self::Missing,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// Whether the last complete read succeeded, or kept rows may be stale.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReadStatus {
+    #[default]
+    Pending,
+    Current,
+    Unavailable(ReadFailure),
+    Stale(ReadFailure),
+}
+
+/// The rows and their read status travel together through the stream.
+#[derive(Clone, Debug, Default)]
+pub struct Snapshot {
+    pub turns: Vec<Turn>,
+    pub status: ReadStatus,
+}
+
+impl Snapshot {
+    pub(crate) fn failed(mut self, why: ReadFailure) -> Self {
+        self.status = if self.turns.is_empty() {
+            ReadStatus::Unavailable(why)
+        } else {
+            ReadStatus::Stale(why)
+        };
+        self
+    }
+}
 
 /// One turn, as far as its records have come.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -134,6 +181,7 @@ const KINDS: [&str; 12] = [
 /// The turns read so far, and where each file's read ended.
 #[derive(Debug, Default)]
 pub struct Turns {
+    status: ReadStatus,
     /// The session being read.
     session: Option<PathBuf>,
     /// Each events file's bytes read so far.
@@ -144,6 +192,13 @@ pub struct Turns {
 }
 
 impl Turns {
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            turns: self.newest(),
+            status: self.status,
+        }
+    }
+
     /// The turns kept, newest first.
     pub fn newest(&self) -> Vec<Turn> {
         self.turns.values().rev().cloned().collect()
@@ -152,45 +207,58 @@ impl Turns {
     /// Read on in the newest session under `sessions`: a newer session
     /// starts the turns again.
     pub fn read_on(&mut self, sessions: &Path) {
-        let Some(newest) = newest_session(sessions) else {
-            return;
+        self.status = match self.try_read_on(sessions) {
+            Ok(()) => ReadStatus::Current,
+            Err(error) if self.turns.is_empty() => ReadStatus::Unavailable(error.into()),
+            Err(error) => ReadStatus::Stale(error.into()),
+        };
+    }
+
+    fn try_read_on(&mut self, sessions: &Path) -> io::Result<()> {
+        let Some(newest) = newest_session(sessions)? else {
+            *self = Self::default();
+            return Ok(());
         };
         if self.session.as_ref() != Some(&newest) {
-            *self = Self {
+            // Keep the previous session's rows, marked stale, until a
+            // complete first read of the new session is possible.
+            let mut next = Self {
                 session: Some(newest.clone()),
                 ..Self::default()
             };
+            next.read_session(&newest)?;
+            *self = next;
+            return Ok(());
         }
-        let Ok(entries) = fs::read_dir(newest.join("metadata")) else {
-            return;
-        };
-        let mut files: Vec<PathBuf> = entries
-            .filter_map(Result::ok)
-            .filter(|entry| {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                name.starts_with("events-")
-                    && name.ends_with(".jsonl")
-                    && entry.file_type().is_ok_and(|kind| kind.is_file())
-            })
-            .map(|entry| entry.path())
-            .collect();
-        files.sort();
-        for file in files {
-            self.read_file(&file);
-        }
+        self.read_session(&newest)
     }
 
-    fn read_file(&mut self, file: &Path) {
-        let from = self.read.get(file).copied().unwrap_or_default();
-        let Ok(mut opened) = fs::File::open(file) else {
-            return;
-        };
-        let Ok(length) = opened.metadata().map(|meta| meta.len()) else {
-            return;
-        };
+    fn read_session(&mut self, session: &Path) -> io::Result<()> {
+        let mut files = Vec::new();
+        for entry in fs::read_dir(session.join("metadata"))? {
+            let entry = entry?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("events-")
+                && name.ends_with(".jsonl")
+                && entry.file_type()?.is_file()
+            {
+                files.push(entry.path());
+            }
+        }
+        files.sort();
+        for file in files {
+            self.read_file(&file)?;
+        }
+        Ok(())
+    }
+
+    fn read_file(&mut self, file: &Path) -> io::Result<()> {
+        let previous = self.read.get(file).copied().unwrap_or_default();
+        let mut opened = fs::File::open(file)?;
+        let length = opened.metadata()?.len();
         // A file shorter than was read is another file of the same name.
-        let from = if length < from { 0 } else { from };
+        let from = if length < previous { 0 } else { previous };
         // First read, and long: its last part, from the first line begun
         // in it.
         let (from, mid_line) = if from == 0 && length > MOST_READ {
@@ -198,13 +266,19 @@ impl Turns {
         } else {
             (from, false)
         };
-        if length == from || opened.seek(SeekFrom::Start(from)).is_err() {
-            return;
+        if length == from {
+            return Ok(());
         }
+        opened.seek(SeekFrom::Start(from))?;
+        // Neither the cursor nor the unfinished line advances on a
+        // failed read, so recovery retries all the unread bytes.
+        let mut added = Vec::new();
+        let took = opened.take(MOST_READ).read_to_end(&mut added)?;
         let mut bytes = self.partial.remove(file).unwrap_or_default();
-        let Ok(took) = opened.take(MOST_READ).read_to_end(&mut bytes) else {
-            return;
+        if from != previous || length < previous {
+            bytes.clear();
         };
+        bytes.append(&mut added);
         self.read.insert(file.to_owned(), from + took as u64);
         if mid_line {
             let begun = bytes
@@ -221,6 +295,7 @@ impl Turns {
         for line in bytes.split(|byte| *byte == b'\n') {
             self.take_line(line);
         }
+        Ok(())
     }
 
     /// One line of the records: taken only when it is one of [`KINDS`].
@@ -283,19 +358,43 @@ impl Turns {
 }
 
 /// The newest session's folder under `sessions`, by when it last changed.
-pub fn newest_session(sessions: &Path) -> Option<PathBuf> {
-    fs::read_dir(sessions)
-        .ok()?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-        .max_by_key(|entry| entry.metadata().and_then(|meta| meta.modified()).ok())
-        .map(|entry| entry.path())
+pub fn newest_session(sessions: &Path) -> io::Result<Option<PathBuf>> {
+    let mut newest = None;
+    for entry in fs::read_dir(sessions)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let modified = entry.metadata()?.modified()?;
+        if newest.as_ref().is_none_or(|(at, _)| modified >= *at) {
+            newest = Some((modified, entry.path()));
+        }
+    }
+    Ok(newest.map(|(_, path)| path))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::{io::Write, os::unix::fs::PermissionsExt, time::SystemTime};
+
+    /// Restore even after an assertion fails. These tests must run as an
+    /// ordinary user: the read refusal itself is asserted, never skipped.
+    struct Unreadable(PathBuf, fs::Permissions);
+
+    impl Unreadable {
+        fn new(path: &Path) -> Self {
+            let old = fs::metadata(path).unwrap().permissions();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o0)).unwrap();
+            Self(path.to_owned(), old)
+        }
+    }
+
+    impl Drop for Unreadable {
+        fn drop(&mut self) {
+            fs::set_permissions(&self.0, self.1.clone()).unwrap();
+        }
+    }
 
     fn folder(name: &str) -> PathBuf {
         let root =
@@ -313,6 +412,144 @@ mod tests {
             .unwrap()
             .write_all(text.as_bytes())
             .unwrap();
+    }
+
+    #[test]
+    fn denied_root_metadata_and_file_keep_the_read_status_and_recover() {
+        for layer in ["root", "metadata", "file"] {
+            let sessions = folder(&format!("denied-{layer}"));
+            let metadata = sessions.join("s1/metadata");
+            fs::create_dir_all(&metadata).unwrap();
+            let file = metadata.join("events-0.jsonl");
+            append(
+                &file,
+                "{\"kind\":\"answer_first_audio\",\"turn\":1,\"after_decision_ms\":117}\n",
+            );
+            let denied = match layer {
+                "root" => &sessions,
+                "metadata" => &metadata,
+                _ => &file,
+            };
+            let mut turns = Turns::default();
+            assert_eq!(turns.snapshot().status, ReadStatus::Pending);
+            let hold = Unreadable::new(denied);
+            let error = if layer == "file" {
+                fs::File::open(denied).unwrap_err()
+            } else {
+                fs::read_dir(denied).unwrap_err()
+            };
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            turns.read_on(&sessions);
+            assert_eq!(
+                turns.snapshot().status,
+                ReadStatus::Unavailable(ReadFailure::Permission),
+                "{layer}"
+            );
+            assert!(turns.newest().is_empty());
+            drop(hold);
+            turns.read_on(&sessions);
+            assert_eq!(turns.snapshot().status, ReadStatus::Current);
+            assert_eq!(turns.newest()[0].first_audio_ms(), Some(117));
+
+            // Keep half a line across the refusal. Recovery must not lose
+            // it or advance the cursor beyond bytes that were not read.
+            append(&file, "{\"kind\":\"turn_finished\",\"turn\":1,");
+            turns.read_on(&sessions);
+            append(&file, "\"outcome\":\"audio_written_unscored\"}\n");
+            let hold = Unreadable::new(denied);
+            turns.read_on(&sessions);
+            let snapshot = turns.snapshot();
+            assert_eq!(snapshot.status, ReadStatus::Stale(ReadFailure::Permission));
+            assert_eq!(snapshot.turns.len(), 1);
+            assert_eq!(snapshot.turns[0].outcome, None);
+            assert_eq!(snapshot.turns[0].first_audio_ms(), Some(117));
+            drop(hold);
+            turns.read_on(&sessions);
+            let snapshot = turns.snapshot();
+            assert_eq!(snapshot.status, ReadStatus::Current);
+            assert_eq!(snapshot.turns.len(), 1);
+            assert_eq!(snapshot.turns[0].outcome.as_deref(), Some("played"));
+            fs::remove_dir_all(sessions).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_denied_new_session_keeps_the_old_rows_stale_until_it_can_be_read() {
+        let sessions = folder("denied-new");
+        let first = sessions.join("s1/metadata");
+        fs::create_dir_all(&first).unwrap();
+        append(
+            &first.join("events-0.jsonl"),
+            "{\"kind\":\"answer_first_audio\",\"turn\":19,\"after_decision_ms\":117}\n",
+        );
+        let mut turns = Turns::default();
+        turns.read_on(&sessions);
+        assert_eq!(turns.newest()[0].turn, 19);
+        let second = sessions.join("s2/metadata");
+        fs::create_dir_all(&second).unwrap();
+        append(
+            &second.join("events-0.jsonl"),
+            "{\"kind\":\"answer_first_audio\",\"turn\":1,\"after_decision_ms\":197}\n",
+        );
+        // An explicit ordering avoids a sleep and filesystem clock ties.
+        for (session, seconds) in [("s1", 1), ("s2", 2)] {
+            fs::File::open(sessions.join(session))
+                .unwrap()
+                .set_times(
+                    fs::FileTimes::new().set_modified(
+                        SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(seconds),
+                    ),
+                )
+                .unwrap();
+        }
+        let hold = Unreadable::new(&second);
+        turns.read_on(&sessions);
+        let snapshot = turns.snapshot();
+        assert_eq!(snapshot.status, ReadStatus::Stale(ReadFailure::Permission));
+        assert_eq!(snapshot.turns.len(), 1);
+        assert_eq!(snapshot.turns[0].turn, 19);
+        drop(hold);
+        turns.read_on(&sessions);
+        let snapshot = turns.snapshot();
+        assert_eq!(snapshot.status, ReadStatus::Current);
+        assert_eq!(snapshot.turns.len(), 1);
+        assert_eq!(snapshot.turns[0].turn, 1);
+        assert_eq!(snapshot.turns[0].first_audio_ms(), Some(197));
+        fs::remove_dir_all(sessions).unwrap();
+    }
+
+    #[test]
+    fn missing_and_failed_reads_are_distinct_from_an_empty_readable_session() {
+        let root = folder("missing");
+        let sessions = root.join("sessions");
+        let mut turns = Turns::default();
+        turns.read_on(&sessions);
+        assert_eq!(
+            turns.snapshot().status,
+            ReadStatus::Unavailable(ReadFailure::Missing)
+        );
+        fs::create_dir(&sessions).unwrap();
+        turns.read_on(&sessions);
+        assert_eq!(turns.snapshot().status, ReadStatus::Current);
+        assert!(turns.newest().is_empty());
+        fs::create_dir(sessions.join("s1")).unwrap();
+        turns.read_on(&sessions);
+        assert_eq!(
+            turns.snapshot().status,
+            ReadStatus::Unavailable(ReadFailure::Missing)
+        );
+        fs::create_dir(sessions.join("s1/metadata")).unwrap();
+        turns.read_on(&sessions);
+        assert_eq!(turns.snapshot().status, ReadStatus::Current);
+        assert!(turns.newest().is_empty());
+        let invalid = root.join("not-a-directory");
+        fs::write(&invalid, []).unwrap();
+        turns.read_on(&invalid);
+        assert_eq!(
+            turns.snapshot().status,
+            ReadStatus::Unavailable(ReadFailure::Other)
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     /// A turn's steps from its records, each step's own time and the

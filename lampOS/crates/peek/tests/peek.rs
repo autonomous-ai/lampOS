@@ -14,8 +14,9 @@ use lamp_peek::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::{Read, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::TcpStream,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -683,6 +684,178 @@ fn record(file: &Path, line: &str) {
         .open(file)
         .unwrap();
     writeln!(file, "{line}").unwrap();
+}
+
+/// Keep one authenticated connection through refusal and recovery, as
+/// the browser does. Chunk-size lines are ignored between SSE events.
+struct EventStream(BufReader<TcpStream>);
+
+impl EventStream {
+    fn open(rig: &Rig) -> Self {
+        let mut stream = TcpStream::connect(("127.0.0.1", rig.port)).unwrap();
+        stream.set_read_timeout(Some(WAIT)).unwrap();
+        write!(
+            stream,
+            "GET /events HTTP/1.1\r\nHost: localhost\r\nCookie: peek={TOKEN}\r\n\r\n"
+        )
+        .unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        assert!(line.starts_with("HTTP/1.1 200"), "{line}");
+        loop {
+            line.clear();
+            assert_ne!(reader.read_line(&mut line).unwrap(), 0);
+            if line == "\r\n" {
+                break;
+            }
+        }
+        Self(reader)
+    }
+
+    fn until(
+        &mut self,
+        ready: impl Fn(&BTreeMap<String, String>) -> bool,
+    ) -> BTreeMap<String, String> {
+        let started = Instant::now();
+        let mut sections = BTreeMap::new();
+        let mut name = None;
+        let mut data = Vec::new();
+        let mut line = String::new();
+        loop {
+            line.clear();
+            assert_ne!(self.0.read_line(&mut line).unwrap(), 0, "stream ended");
+            let line = line.trim_end_matches(['\r', '\n']);
+            if let Some(value) = line.strip_prefix("event: ") {
+                name = Some(value.to_owned());
+            } else if let Some(value) = line.strip_prefix("data: ") {
+                data.push(value.to_owned());
+            } else if line.is_empty()
+                && let Some(name) = name.take()
+            {
+                sections.insert(name, data.join("\n"));
+                data.clear();
+                if page::SECTIONS
+                    .iter()
+                    .all(|(id, _)| sections.contains_key(*id))
+                    && ready(&sections)
+                {
+                    return sections;
+                }
+            }
+            assert!(started.elapsed() < WAIT, "stream did not reach its state");
+        }
+    }
+}
+
+struct Unreadable(PathBuf, fs::Permissions);
+
+impl Unreadable {
+    fn new(path: &Path) -> Self {
+        let old = fs::metadata(path).unwrap().permissions();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o0)).unwrap();
+        Self(path.to_owned(), old)
+    }
+}
+
+impl Drop for Unreadable {
+    fn drop(&mut self) {
+        fs::set_permissions(&self.0, self.1.clone()).unwrap();
+    }
+}
+
+/// A real permission refusal reaches the same live stream as the rows.
+/// After access returns, the warning clears without a restart or reload.
+#[test]
+fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
+    const WORD: &str = "Ossifrage";
+    const PERMISSION: &str = "Can't read the voice's sessions: permission.";
+    const STALE: &str = "Last read is stale.";
+    let rig = Rig::new("read-status", Some(TOKEN));
+    let metadata = rig.root.join("sessions/private-session-name/metadata");
+    fs::create_dir_all(&metadata).unwrap();
+    let events = metadata.join("events-0.jsonl");
+    record(
+        &events,
+        r#"{"kind":"transcript","turn":431,"text":"Ossifrage"}"#,
+    );
+    record(
+        &events,
+        r#"{"kind":"answer_first_audio","turn":431,"after_decision_ms":117,"note":"Ossifrage"}"#,
+    );
+    let mut writer = fs::OpenOptions::new().append(true).open(&events).unwrap();
+    let hold = Unreadable::new(&events);
+    assert_eq!(
+        fs::File::open(&events).unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied,
+        "the permission fixture must run as an ordinary user"
+    );
+    let (status, _, denied) = rig.ask("GET", "/events", "", "");
+    assert_eq!(status, 401);
+    assert!(!denied.contains("event:") && !denied.contains(PERMISSION));
+    let safe = |sections: &BTreeMap<String, String>| {
+        let all = format!("{sections:?}");
+        for private in [WORD, "private-session-name", rig.root.to_str().unwrap()] {
+            assert!(!all.contains(private), "a private value reached the stream");
+        }
+    };
+    let started = Instant::now();
+    let mut stream = EventStream::open(&rig);
+    let sections = stream.until(|sections| {
+        sections["turns"].contains(PERMISSION) && sections["overview"].contains(PERMISSION)
+    });
+    let first = started.elapsed();
+    safe(&sections);
+    assert!(!sections["turns"].contains("No turn"));
+    assert!(!sections["turns"].contains(STALE));
+    assert!(!sections["turns"].contains("117 ms"));
+
+    let started = Instant::now();
+    drop(hold);
+    let sections = stream.until(|sections| {
+        sections["turns"].contains("117 ms") && sections["overview"].contains("newest 117 ms")
+    });
+    let readable = started.elapsed();
+    safe(&sections);
+    assert!(!sections["turns"].contains(PERMISSION));
+
+    let started = Instant::now();
+    let hold = Unreadable::new(&events);
+    // The producer's retained descriptor still writes while a new
+    // reader is refused; those bytes must be read on recovery.
+    writeln!(
+        writer,
+        "{{\"kind\":\"answer_first_audio\",\"turn\":432,\"after_decision_ms\":197}}"
+    )
+    .unwrap();
+    let sections = stream.until(|sections| {
+        sections["turns"].contains(STALE) && sections["overview"].contains(STALE)
+    });
+    let stale = started.elapsed();
+    safe(&sections);
+    assert!(sections["turns"].contains("117 ms"));
+    assert!(!sections["turns"].contains("197 ms"));
+    assert!(!sections["overview"].contains("newest 117 ms"));
+
+    let started = Instant::now();
+    drop(hold);
+    let sections = stream.until(|sections| {
+        sections["turns"].contains("197 ms") && sections["overview"].contains("newest 197 ms")
+    });
+    let recovered = started.elapsed();
+    safe(&sections);
+    assert!(!sections["turns"].contains(PERMISSION));
+    assert!(!sections["turns"].contains(STALE));
+    assert_eq!(sections["turns"].matches("<td>432</td>").count(), 1);
+    for (boundary, elapsed) in [
+        ("first_denied", first),
+        ("first_readable", readable),
+        ("stale", stale),
+        ("recovered", recovered),
+    ] {
+        eprintln!("peek_read_status {boundary}_us={}", elapsed.as_micros());
+        assert!(elapsed < Duration::from_secs(2), "{boundary}: {elapsed:?}");
+    }
 }
 
 /// #2141's second step (the lead on #1711, 20 Oct): the one page's stream

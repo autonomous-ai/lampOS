@@ -8,7 +8,7 @@
 //! under a name of its own (DNS rebinding; the reviewer on #2150, P3 6).
 use crate::{
     page,
-    turns::{Turn, Turns},
+    turns::{ReadFailure, Snapshot, Turns},
     units::{self, UnitRow},
     view,
     watch::Seen,
@@ -54,7 +54,9 @@ struct Served {
     /// once (the reviewer on #2259, P3).
     status: tokio::sync::Mutex<Option<(Instant, Status)>>,
     turns: Arc<Mutex<Turns>>,
-    turns_read: Mutex<Option<Instant>>,
+    /// Wait asynchronously for an in-flight read; never hold a blocking
+    /// filesystem lock on the server's runtime thread.
+    turns_read: Arc<tokio::sync::Mutex<Option<(Instant, Snapshot)>>>,
 }
 
 /// What the views read.
@@ -75,7 +77,7 @@ pub fn router(peek: Arc<Peek>) -> Router {
         peek,
         status: tokio::sync::Mutex::new(None),
         turns: Arc::default(),
-        turns_read: Mutex::new(None),
+        turns_read: Arc::default(),
     });
     Router::new()
         .route("/", get(index))
@@ -310,33 +312,37 @@ async fn status_now(served: &Arc<Served>) -> (Instant, Status) {
 
 /// The turns, read on in the newest session first, at most once a second
 /// whoever asks.
-async fn turns_now(served: &Arc<Served>) -> Vec<Turn> {
-    let due = {
-        let mut read = served
-            .turns_read
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let due = read.is_none_or(|at| at.elapsed() >= Duration::from_secs(1));
-        if due {
-            *read = Some(Instant::now());
-        }
-        due
-    };
-    if due {
-        let (turns, sessions) = (Arc::clone(&served.turns), served.peek.sessions.clone());
-        let _ = tokio::task::spawn_blocking(move || {
-            turns
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .read_on(&sessions);
-        })
-        .await;
+async fn turns_now(served: &Arc<Served>) -> Snapshot {
+    let mut kept = Arc::clone(&served.turns_read).lock_owned().await;
+    if let Some((at, snapshot)) = kept.as_ref()
+        && at.elapsed() < Duration::from_secs(1)
+    {
+        return snapshot.clone();
     }
-    served
-        .turns
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .newest()
+    let (turns, sessions) = (Arc::clone(&served.turns), served.peek.sessions.clone());
+    let read = tokio::task::spawn_blocking(move || {
+        let mut turns = turns.lock().unwrap_or_else(PoisonError::into_inner);
+        turns.read_on(&sessions);
+        let snapshot = turns.snapshot();
+        // The read owns this guard even if its requesting stream closes.
+        // Another request waits for the same read, then uses its cache.
+        *kept = Some((Instant::now(), snapshot.clone()));
+        snapshot
+    })
+    .await;
+    match read {
+        Ok(snapshot) => snapshot,
+        Err(_) => {
+            let mut kept = served.turns_read.lock().await;
+            let snapshot = kept
+                .as_ref()
+                .map(|(_, snapshot)| snapshot.clone())
+                .unwrap_or_default()
+                .failed(ReadFailure::Other);
+            *kept = Some((Instant::now(), snapshot.clone()));
+            snapshot
+        }
+    }
 }
 
 /// The camera's frame now, as `/cam.svg` draws it.
@@ -449,6 +455,83 @@ async fn events(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime() {
+        let root = std::env::temp_dir().join(format!("lamp-peek-read-lock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let served = Arc::new(Served {
+            peek: Arc::new(Peek {
+                bus: Bus::new(&root).unwrap(),
+                seen: Arc::default(),
+                token: None,
+                sessions: root.join("sessions"),
+                units: Arc::new(Vec::new),
+            }),
+            status: tokio::sync::Mutex::new(None),
+            turns: Arc::default(),
+            turns_read: Arc::default(),
+        });
+        let (held, locked) = std::sync::mpsc::channel();
+        let (release, wait) = std::sync::mpsc::channel();
+        let holder = std::thread::spawn({
+            let turns = Arc::clone(&served.turns);
+            move || {
+                let _guard = turns.lock().unwrap();
+                held.send(()).unwrap();
+                // A broken runtime lock cannot hang the test forever.
+                wait.recv_timeout(Duration::from_secs(3)).is_ok()
+            }
+        });
+        locked.recv().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let (responsive, serialized, pending) = runtime.block_on(async {
+            let started = Instant::now();
+            let first = tokio::spawn({
+                let served = Arc::clone(&served);
+                async move { turns_now(&served).await }
+            });
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while served.turns_read.try_lock().is_ok() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("the first read never acquired its cache guard");
+            first.abort();
+            assert!(first.await.unwrap_err().is_cancelled());
+            let serialized = served.turns_read.try_lock().is_err();
+            // Poll the second request once, rather than assuming a
+            // spawned task ran. It must yield on the held async guard.
+            let mut second = std::pin::pin!(turns_now(&served));
+            let polled = std::future::poll_fn(|context| {
+                std::task::Poll::Ready(std::future::Future::poll(second.as_mut(), context))
+            })
+            .await;
+            let pending = polled.is_pending();
+            let responsive = started.elapsed();
+            let _ = release.send(());
+            let snapshot = match polled {
+                std::task::Poll::Pending => second.await,
+                std::task::Poll::Ready(snapshot) => snapshot,
+            };
+            assert_eq!(
+                snapshot.status,
+                crate::turns::ReadStatus::Unavailable(ReadFailure::Missing)
+            );
+            (responsive, serialized, pending)
+        });
+        let released = holder.join().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(released, "the runtime could not release the held read");
+        assert!(responsive < Duration::from_secs(1), "{responsive:?}");
+        assert!(serialized, "cancellation released the in-flight read lock");
+        assert!(pending, "another request bypassed the in-flight read");
+    }
 
     #[test]
     fn a_form_value_is_read_as_typed() {

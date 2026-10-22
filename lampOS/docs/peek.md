@@ -51,6 +51,33 @@ release, the first read of a 63 MB session took 7.5 ms, a read of one more
 turn 0.26 ms, a read with nothing new 0.08 ms, and making the section of 20
 turns 0.03 ms. Not yet timed on a lamp.
 
+The rows carry a read status (#2789, piece 1). If the sessions root,
+newest session's metadata folder, or an event file refuses access, Turns
+says **"Can't read the voice's sessions: permission."** A missing path
+says the sessions are not available yet; another I/O failure says the read
+failed. These are fixed messages: no path, OS error text, or record's words
+are sent to the browser. A readable empty session still says there is no
+turn yet, so emptiness is distinct from a failed read.
+
+Previously read rows remain visible with **"Last read is stale."** while
+access is denied. This also holds when a newer session cannot yet be read:
+its first successful read replaces the old session's rows. Overview marks
+its first-audio summary unavailable or stale instead of presenting old
+numbers as current. The next successful read clears the warning, including
+on an already open event stream; no restart or page reload is needed.
+
+One blocking worker reads the files, shared by all streams and cached for
+one second after completion. Waiting streams yield the runtime thread, and
+closing the requesting stream does not release the in-flight read or start
+another one. The host target is under 2 s from a permission change to the
+changed Turns and Overview events, with ordinary local file reads and a
+responsive or cached unit-status read. The existing unit-status deadline
+can still delay an entire push by up to 10 s ([below](#what-status-costs));
+this is not a deadline for arbitrary filesystem stalls or a lamp timing
+claim. This piece grants no new filesystem permission. The dedicated
+reader group, deployment unit and authorized lamp check remain separate
+parts of #2789.
+
 ### Two sessions' stages side by side: `tools/day-stages.sh`
 
 For comparing two sessions stage by stage (the first builder, 22 Oct: day
@@ -294,3 +321,22 @@ own, and asks for it over HTTP:
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.
+- `turns::tests::denied_root_metadata_and_file_keep_the_read_status_and_recover`:
+  real permission refusals at all three boundaries, first-read unavailable
+  and later stale rows, and an unfinished line recovered without losing bytes.
+  Permission tests assert that the OS refuses the read; run them as an ordinary
+  user, as native ARM64 CI does.
+- `turns::tests::a_denied_new_session_keeps_the_old_rows_stale_until_it_can_be_read`
+  and `turns::tests::missing_and_failed_reads_are_distinct_from_an_empty_readable_session`:
+  a denied new session keeps the old rows until recovery; missing, failed,
+  and successfully empty reads stay distinct.
+- `serve::tests::a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime`:
+  a held filesystem-side lock and a cancelled requester keep one read in
+  flight while another task can still run on the single runtime thread.
+- `the_stream_reports_denied_sessions_and_recovers_without_words_or_paths`:
+  one authenticated HTTP event stream moves from denied to readable, then
+  stale and recovered; an unauthenticated request sees no events or error
+  status. Synthetic words and paths stay out, old metrics are marked stale,
+  and unread bytes appear once after recovery. It prints the first denied
+  read and each permission-change-to-event duration and checks the host's
+  under-2-second target with a fast synthetic unit-status reader.
