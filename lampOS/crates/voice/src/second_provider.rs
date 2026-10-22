@@ -1372,7 +1372,7 @@ impl Engine {
                 // before any of its words or its end (the reviewer's P2 on
                 // #2616).
                 if scope.held() {
-                    crate::remember::keep_out(request);
+                    crate::remember::held_by_gap(request);
                 }
                 scope
             } else {

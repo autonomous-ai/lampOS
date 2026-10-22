@@ -1059,7 +1059,13 @@ the unchanged legacy client, used unless the new Days client is selected.
   day and the question in different sentences, and does not count). The
   mark is apart from the journal: a remember or forget turn's reply,
   kept out of the journal, still marks it ("I'll remember that. How was
-  your sister's wedding?"). Not seen (a paraphrase with none of its own
+  your sister's wedding?"), but a reply in a request admitted held only
+  by a known face's gap (`LAMP_FACE_GAP_HOLD`) never marks it, as its
+  line may be someone else's (`remember::held_by_gap`; reviewer-two on
+  #2894). One waits for each person: another's offer between never
+  takes it, and it is kept across a session's close and another person
+  at the lamp, until marked or their next offer (at most 16 people).
+  Not seen (a paraphrase with none of its own
   words, "how did the big day go?", a question by its day alone, "how
   was Saturday?", a statement, "your sister's wedding sounds lovely", or
   a reply in another language than its words), it is offered again on a
@@ -1089,6 +1095,10 @@ the unchanged legacy client, used unless the new Days client is selected.
   `remember::tests::with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask`,
   `remember::tests::the_writer_sends_the_mark_as_follow_up_asked`,
   `remember::tests::a_question_in_a_remember_turn_marks_the_follow_up_but_is_not_journalled`,
+  `remember::tests::a_reply_in_a_face_s_gap_never_marks_their_follow_up`,
+  `remember::tests::each_person_s_dated_follow_up_waits_for_them`,
+  `days::a_re_dated_event_is_offered_afresh`,
+  `days::an_adopted_offer_is_the_new_persons_to_mark`,
   `days::a_dated_one_given_until_asked_is_offered_again_until_marked_asked`,
   `days::a_dated_one_never_asked_is_offered_at_most_three_times`,
   `days::until_asked_holds_back_only_a_dated_one`,
