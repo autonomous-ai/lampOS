@@ -25,6 +25,7 @@ for = "20s"               # music that goes on, not a ringtone or a clip from a 
 gap = "5s"                # a quiet bar or a missed score does not end the music
 rearm = { below = 0.3, for = "5m" }  # once a piece of music; again only after five minutes without it
 cooldown = "30m"          # rare: at most twice an hour, whatever plays
+wait = "1m"               # a turn when the 20 s come (lamp-52e6, 22 Oct: the voice took a piano for speech): it sways once the turn ends, while the music still plays
 
 [[while]]                 # no hand on the lamp: never while someone adjusts the head (the reviewer on #1927)
 topic = "body/hand"

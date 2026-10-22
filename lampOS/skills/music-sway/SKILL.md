@@ -13,7 +13,10 @@ hour, whatever plays.
 
 It never sways while it is speaking, listening or thinking, nor with a hand
 on it, and keeps still
-at night (23:00 to 06:00, the lamp's local time). A short clip (a ringtone, a
+at night (23:00 to 06:00, the lamp's local time). If the voice is in a turn
+when the twenty seconds come (it sometimes takes music for speech), the sway
+waits for the turn to end, up to a minute, and comes then only if the music
+still plays. A short clip (a ringtone, a
 video) is not music that goes on, and a quiet bar does not end it.
 
 It hears music by the ears' room sound scores (`ears/classes`, with

@@ -23,6 +23,7 @@ lamp-skills`, which runs every skill's cases).
 | `a-second-piece-within-half-an-hour-gets-nothing` | A minute of music, six minutes quiet (rearmed), two minutes of a second piece | Pass: one sway at 20 s only (`cooldown = "30m"`) |
 | `music-under-the-bar-gets-nothing` | Five minutes of music scored 0.55 | Pass: nothing (`above = 0.6`) |
 | `a-mute-in-the-music-starts-it-over` | 12 s of music, 10 s muted (`unavailable`), then music | Pass: one sway at 42 s, not 20 s (the mute is past `gap = "5s"`) |
+| `piano-the-voice-takes-for-speech` | lamp-52e6's own scores from the played test (22 Oct, 10:35): 90 s of a piano from the Mac speaker, the hold ripe at 57 s; a written `voice/state` of eight short turns over it (2.5 s listening, 1.5 s thinking), one from 55 s to 59 s, as the voice took the piano for speech (its recording was not kept: 71 resting, 23 listening and 14 thinking messages while it played) | Pass: one sway at 59 s, when that turn ends (`wait = "1m"`). Without the `wait`, nothing: the chance held back at 57 s was spent and the rearm line disarmed the piece, which is what the played test saw |
 | `jazz-through-lamp-52e6s-microphone` | lamp-52e6's own scores (#2399): 20 s of an empty office, 120 s of a jazz vocal track, 30 s of a line over it; the voice resting beside it | Pass: one sway at 43 s, 22 s into the track (its dips under 0.6 stay within the gap) |
 
 The threshold (0.6, 20 s, a 5 s gap) holds through lamp-52e6's microphone
