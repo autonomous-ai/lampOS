@@ -1,0 +1,31 @@
+{
+  "source_pr": 3012,
+  "source_head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+  "merged_train_pr": 3078,
+  "merged_commit": "3d1de9ba0928bcc92d845631dbc0a8b43b465476",
+  "integration_after_train": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+  "train_head": "b07999155c443044a5afbd16081a304138005ad4",
+  "train_base": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "range_diff": "1:  baacc2746 = 1:  3d1de9ba0 lampOS: test updater process death and CLI self-handover",
+  "arm64": {
+    "run": 39818015000,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39818015000",
+    "conclusion": "success",
+    "source_head": "b07999155c443044a5afbd16081a304138005ad4",
+    "log_sha256": "139104e9c560dc08beb145ce3d29ae1b9da12b10de69b559296c07e6ac392bcd",
+    "log_bytes": 2529833,
+    "results": [
+      "2026-10-22T17:13:57.8195923Z         PASS [   0.153s] ( 6225/10583) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round",
+      "2026-10-22T17:14:01.4696515Z         PASS [   3.798s] ( 6599/10583) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill",
+      "2026-10-22T17:14:36.5616413Z         LEAK [   0.217s] ( 8562/10583) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "2026-10-22T17:14:56.6774762Z      Summary [ 180.694s] 10583 tests run: 10583 passed (1 leaky), 67 skipped"
+    ],
+    "passed": 10583,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passes": 1
+  },
+  "clippy_run": 39818014953,
+  "clippy_conclusion": "success",
+  "limits": "Combined PR-train native qualification. No downloaded artifact verification, lamp run, physical unplug, real-key publication or #3085 qualification claimed."
+}
