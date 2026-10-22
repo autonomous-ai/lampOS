@@ -1568,6 +1568,11 @@ fn addon_says(bus: &Bus, proposals: Arc<Mutex<Proposals>>, say_socket: PathBuf) 
                 else {
                     continue;
                 };
+                // A say the judge dropped costs the add-ons nothing of their
+                // hour's says; its add-on waits five minutes.
+                if decision.act == "say" && decision.choice == "dropped" {
+                    held.limits.dropped(decision.proposal, now_us);
+                }
                 let Some(at) = held
                     .saying
                     .iter()

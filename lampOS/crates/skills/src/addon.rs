@@ -10,15 +10,25 @@ pub const EVERY_US: u64 = 10_000_000;
 /// And this many an hour at most, an add-on.
 pub const AN_HOUR: usize = 20;
 /// `say` proposals an hour, between all the add-ons: the lamp speaking
-/// unprompted is rare, whoever suggests it.
+/// unprompted is rare, whoever suggests it. One the judge drops is not
+/// counted ([`Limits::dropped`]): a talking room, where every say is
+/// dropped, never spends the hour before its quiet (lamp-75c9, 22 Oct
+/// 07:25).
 pub const SAYS_AN_HOUR: usize = 4;
+/// After the judge drops one of its says, an add-on proposes nothing for
+/// this long: a talking room is never asked every few seconds, and its
+/// first quiet still gets one say (the first builder on #2530, 07:3x).
+pub const AFTER_A_DROP_US: u64 = 300_000_000;
 const HOUR_US: u64 = 3_600_000_000;
 
 /// What the add-ons have proposed lately, by add-on.
 #[derive(Debug, Default)]
 pub struct Limits {
     sent: HashMap<String, VecDeque<u64>>,
-    says: VecDeque<u64>,
+    /// The says proposed within the hour: their numbers, add-ons and when.
+    says: VecDeque<(u64, String, u64)>,
+    /// When the judge last dropped a say of each add-on's.
+    dropped: HashMap<String, u64>,
     last: u64,
 }
 
@@ -33,7 +43,18 @@ impl Limits {
     ) -> Result<AddonProposal, String> {
         let sent = self.sent.entry(proposal.addon.clone()).or_default();
         sent.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
-        self.says.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
+        self.says
+            .retain(|(_, _, at)| now_us.saturating_sub(*at) < HOUR_US);
+        if self
+            .dropped
+            .get(&proposal.addon)
+            .is_some_and(|at| now_us.saturating_sub(*at) < AFTER_A_DROP_US)
+        {
+            return Err(format!(
+                "not proposed: {} s after the judge dropped its say",
+                AFTER_A_DROP_US / 1_000_000
+            ));
+        }
         if sent
             .back()
             .is_some_and(|last| now_us.saturating_sub(*last) < EVERY_US)
@@ -64,9 +85,25 @@ impl Limits {
         self.last = number;
         sent.push_back(now_us);
         if proposal.act == "say" {
-            self.says.push_back(now_us);
+            self.says
+                .push_back((number, proposal.addon.clone(), now_us));
         }
         Ok(numbered)
+    }
+
+    /// The judge dropped say `proposal` at `now_us`: it no longer counts
+    /// toward [`SAYS_AN_HOUR`], and its add-on waits [`AFTER_A_DROP_US`]
+    /// before proposing again. A number not counted here changes nothing.
+    pub fn dropped(&mut self, proposal: u64, now_us: u64) {
+        let Some(at) = self
+            .says
+            .iter()
+            .position(|(number, ..)| *number == proposal)
+        else {
+            return;
+        };
+        let (_, addon, _) = self.says.remove(at).expect("found above");
+        self.dropped.insert(addon, now_us);
     }
 }
 
@@ -140,6 +177,44 @@ mod tests {
         assert!(limits.admit(&say("e"), 10).unwrap_err().contains("say"));
         // A mood is not a say.
         assert!(limits.admit(&mood("e"), 10).is_ok());
+    }
+
+    /// lamp-75c9, 22 Oct 07:25: in a talking room the judge dropped four
+    /// says, and the quiet after it found the hour spent. A say the judge
+    /// drops no longer counts; one it keeps, or has not yet decided, does.
+    #[test]
+    fn a_say_the_judge_dropped_does_not_spend_the_hours_four() {
+        let mut limits = Limits::default();
+        let numbers: Vec<u64> = ["a", "b", "c", "d"]
+            .iter()
+            .enumerate()
+            .map(|(n, addon)| limits.admit(&say(addon), 1 + n as u64).unwrap().proposal)
+            .collect();
+        assert!(limits.admit(&say("e"), 10).is_err(), "four counted");
+        // The judge drops two of them: two places free.
+        limits.dropped(numbers[0], 10);
+        limits.dropped(numbers[2], 10);
+        // A number this part never counted changes nothing.
+        limits.dropped(999_999, 10);
+        assert!(limits.admit(&say("e"), 11).is_ok());
+        assert!(limits.admit(&say("f"), 12).is_ok());
+        assert!(limits.admit(&say("g"), 13).is_err(), "four counted again");
+    }
+
+    /// A drop holds that add-on, and only it, five minutes: not a say
+    /// asked again every few seconds of a talking room.
+    #[test]
+    fn a_drop_holds_that_add_ons_next_proposal_five_minutes() {
+        let mut limits = Limits::default();
+        let number = limits.admit(&say("a"), 1).unwrap().proposal;
+        limits.admit(&say("b"), 2).unwrap();
+        limits.dropped(number, 1_000);
+        let why = limits
+            .admit(&mood("a"), 1_000 + AFTER_A_DROP_US - 1)
+            .unwrap_err();
+        assert!(why.contains("after the judge dropped"), "{why}");
+        assert!(limits.admit(&say("b"), 1_000 + EVERY_US).is_ok());
+        assert!(limits.admit(&say("a"), 1_000 + AFTER_A_DROP_US).is_ok());
     }
 
     #[test]

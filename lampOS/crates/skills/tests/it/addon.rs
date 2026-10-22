@@ -550,6 +550,128 @@ fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {
     assert_eq!(a_say_decided("kept", "rule"), None);
 }
 
+/// Four add-ons' says, then a fifth's (on `listening`), with the four
+/// dropped by the judge first or not decided at all, then the four's
+/// trigger again: what the fifth did, in the journal.
+fn a_fifth_say(drop_the_four: bool) -> String {
+    let dir = tempfile::Builder::new()
+        .prefix("ad")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    for name in ["says-a", "says-b", "says-c", "says-d"] {
+        addon_with(&root.join("skills"), name, SAYS);
+    }
+    addon_with(
+        &root.join("skills"),
+        "says-e",
+        &SAYS.replace("equals = \"resting\"", "equals = \"listening\""),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    for (flag, path) in [
+        ("--dir", root.join("skills")),
+        ("--bus-root", root.join("bus")),
+        ("--gaze-socket", root.join("gaze.sock")),
+        ("--mood-socket", root.join("mood.sock")),
+        ("--actions-socket", root.join("actions.sock")),
+        ("--say-socket", root.join("say.sock")),
+    ] {
+        command.arg(flag).arg(path);
+    }
+    command
+        .env_remove("LAMP_SKILLS_ASK")
+        .env(lamp_skills::ADDONS_ENVIRONMENT, "on")
+        .stderr(std::fs::File::create(root.join("stderr")).unwrap());
+    let _running = Running(command.spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline
+        && (bus.subscribers(VoiceState::TOPIC).unwrap().is_empty()
+            || bus
+                .subscribers(lamp_msgs::AddonDecision::TOPIC)
+                .unwrap()
+                .is_empty())
+    {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let mut voice = bus
+        .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
+        .unwrap();
+    voice
+        .publish_json(1, &serde_json::json!({ "state": "resting" }))
+        .unwrap();
+    let mut four = Vec::new();
+    while four.len() < 4 {
+        let message = proposals
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("four proposed");
+        four.push(message.parse::<AddonProposal>().unwrap());
+    }
+    if drop_the_four {
+        let mut judge = bus
+            .publisher_declared(
+                lamp_msgs::AddonDecision::TOPIC,
+                &lamp_msgs::AddonDecision::declaration(),
+                "addons",
+            )
+            .unwrap();
+        for proposal in &four {
+            judge
+                .publish_json(
+                    1,
+                    &lamp_msgs::AddonDecision {
+                        proposal: proposal.proposal,
+                        addon: proposal.addon.clone(),
+                        act: "say".into(),
+                        choice: "dropped".into(),
+                        by: "rule".into(),
+                        why: "the room is busy, or that is not known".into(),
+                    },
+                )
+                .unwrap();
+        }
+        // Read on the decisions' thread, once a second at most.
+        std::thread::sleep(Duration::from_millis(1_500));
+    }
+    voice
+        .publish_json(2, &serde_json::json!({ "state": "listening" }))
+        .unwrap();
+    let fifth = proposals.recv(Duration::from_secs(3)).unwrap();
+    voice
+        .publish_json(3, &serde_json::json!({ "state": "resting" }))
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
+    match fifth {
+        Some(message) => format!(
+            "proposed by {}\n{journal}",
+            message.parse::<AddonProposal>().unwrap().addon
+        ),
+        None => journal,
+    }
+}
+
+/// lamp-75c9, 22 Oct 07:25: four says dropped in a talking room spent the
+/// hour, and the quiet after found nothing left. A say the judge drops is
+/// no longer counted toward the four; four not yet decided still are.
+#[test]
+fn says_the_judge_dropped_do_not_spend_the_hour() {
+    let journal = a_fifth_say(true);
+    assert!(journal.starts_with("proposed by says-e"), "{journal}");
+    // A drop holds that add-on five minutes (the first builder on #2530).
+    assert!(
+        journal.contains("says-a Done: not proposed: 300 s after the judge dropped its say"),
+        "{journal}"
+    );
+    let journal = a_fifth_say(false);
+    assert!(
+        journal.contains("says-e Done: not proposed: 4 say proposals an hour"),
+        "{journal}"
+    );
+}
+
 /// The model may leave a quoted line unsaid: the journal says `said
 /// nothing`, with the add-on and the proposal, never the words.
 #[test]
