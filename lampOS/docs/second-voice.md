@@ -994,6 +994,65 @@ order is kept. A written turn is the same from the chat on.
     candidates let go after an end, with the switch and without. Then one
     in a busy room, someone else speaking within 2.5 s of "my name is": it
     is not joined.
+- **With `LAMP_SECOND_NAME_CARRIES=on`, a line that is only the lamp's
+  name waits for the line after it, which is then said by it** (off unless
+  set; branch `first/name-carries`, 22 Oct). In played round r01 on
+  lamp-4ace that night, "Lamp, I need a gift for my sister … What should I
+  get her?" with a natural pause after "Lamp," came as pieces. The name's
+  piece (heard as "Life." or "Louvre," for "Lamp", or as the name with
+  more) was held, as a short sound or as said to nobody, and each later
+  piece as said to nobody: the name was in the held piece. 4 of 38
+  requests were lost so. "lamp" and "hey lamp" are short words already
+  (`not_speech::SHORT_WORDS`), so a short sound held so was a misheard
+  name or more than the name. `marks.called` (the coordinator heard the
+  name) had only rescued a line with no words. With the switch:
+  - **Which line waits** (`name_alone`): its words are only
+    `key_terms::NAME` ("Lamp"), any case and punctuation, "hey" or "ok"
+    before it at most; or the coordinator ended it as only the name
+    (`ProviderInput::Called`), whatever its words. Such a line is never
+    held as a short sound, and its answer waits up to `NAME_CARRIES_FOR`
+    (2.5 s) after its end, as `OPEN_NAME_WITHIN`'s wait does. A line itself
+    said by a name never waits again.
+  - **A line begun in that wait is said by the name.** Its Start takes the
+    wait (`Engine::name_said_before`); `begin` drops the name's request,
+    which gets no answer. The line is never held as a short sound. The
+    rule is given its words with "Lamp, " before them, unless they begin
+    with the name already (the kept sound put the name's words first,
+    within `CARRY_AFTER_END`), and its window from the name's first sound,
+    so the name heard there counts for it and earns the name note
+    (`LAMP_NAME_NOTE`), as a heard name does. It is asked with those words.
+    A line said by the name with no words of its own is the call.
+  - **Never carried** across sessions or privacy generations, after a
+    stop, past the wait, or to any line but the one begun just after the
+    name. Nor into a line the eyes saw a face speak that they did not see
+    say the name (`another_face`, read with `LAMP_SECOND_SPEAKING_FACE` or
+    `LAMP_EYES_SPEAKING`; with neither, nothing is seen and the face isn't
+    checked). Nobody seen saying the name tells nothing.
+  - **With no line in the wait,** the name is answered as a call:
+    `CALLED_NOTE`, its words when they are the name or more than one, the
+    name (`CALLED_WORDS`) for one word misheard or none.
+  - **The journal**, counts only, never the words: `request N: only the
+    lamp's name: its answer waits for the line after it
+    (LAMP_SECOND_NAME_CARRIES)`, then `request M is said by the name of
+    request N`, or `request N: no line came after its name: answered as a
+    call`; a line the eyes refuse says so, and a start that may not carry
+    the name says why.
+  - **What it costs:** a lone call is answered up to 2.5 s later than
+    before; every other line is as it was.
+  - **What it doesn't do:** the coordinator isn't told of the wait, so its
+    answer wait (`LAMP_WAIT_KEEPS_ANSWER`) and the body's motors judge a
+    sound begun in it as they judge any sound while an answer is awaited:
+    a short one may be let go, and a line admitted after the 2.5 s is not
+    carried. A name with more words after it ("Lamp. So") is carried only
+    with `Called`.
+  - **Tests:** `second_provider::tests::name_carries` (a line 1.2 s, 2 s
+    and 2.4 s after "Lamp." or a misheard name with `Called`; a lone call;
+    a short sound that is no name; a line 3 s later; another session, a
+    stop and another face; the switch off).
+  - **For a lamp:** played name lines with a 0.4–2.4 s pause after
+    "Lamp,", heard right and misheard, lone calls, and a colleague's line
+    within 2.5 s of a call: no request lost, lone calls answered, nothing
+    carried to another face.
 - **With `LAMP_SECOND_QUIET_HELD=on` the quiet after a pause isn't sent**
   (off unless set; needs `LAMP_SECOND_EARLY_FINALIZE=on`; the backend on
   #2135 and the first builder on #1722, 21 Oct 13:1x). Deepgram bills each

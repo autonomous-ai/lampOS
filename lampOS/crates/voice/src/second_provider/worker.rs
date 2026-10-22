@@ -2548,6 +2548,18 @@ pub fn serve(
         );
         engine = engine.waiting_for_a_name(true);
     }
+    // A line that is only the lamp's name waits for the line after it, which
+    // is then said by it.
+    if std::env::var(crate::second_provider::NAME_CARRIES_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a line that is only the lamp's name is answered no sooner than 2.5 s after its end, and a line begun before then is said by it (LAMP_SECOND_NAME_CARRIES)"
+        );
+        engine = engine.carrying_the_name(true);
+    }
     // The lamp's own words heard back are held as its echo, or taken out
     // of a mixed line's start or end (#2997).
     if std::env::var(crate::second_provider::OWN_ECHO_ENVIRONMENT)

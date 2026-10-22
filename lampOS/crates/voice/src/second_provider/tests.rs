@@ -7,6 +7,7 @@ mod music_current;
 mod music_policy;
 mod music_scope;
 mod music_warm_name;
+mod name_carries;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
