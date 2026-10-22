@@ -7147,6 +7147,45 @@ Ready for lamp-voice: no
   RAM-only queued operation; that limit is explicit, not a deletion promise.
   No lamp, model call, runtime or person acceptance is claimed.
 
+## 2026-10-23, 02:37: store merged; controller native green; HTTP privacy counter retained
+
+Ready for lamp-voice: yes (#3097); no (#3064, #3014, #2988, writer)
+
+- #3072 is merged by First through train 7 as `43bc29f9b`. Its reviewed
+  head/source identity and exact-head native receipt remain recorded above;
+  First qualified the combined carry and closed the PR.
+- #3097 at `421bb5b2a` is out of draft. ARM64 39837000048 passed
+  10,664/0/67 skipped, one leaky pass, four doctests, twelve separate
+  process checks and relay; Linux clippy 39837000132 passed. Artifact
+  12452283434 digest is
+  `86c85939d37be7a749b551d00f8bc710e59127d11fb913e27172f3bf75e6ea29`.
+  Fourteen and reviewer-two read the final resolution clean, both final P3s
+  closed. Clean pinned-main `001a3d714` carry preview retains every switch
+  row and exact controller/store bytes; it is not a combined test gate.
+  First's train 8 #3112 now owns that actual carry/native gate.
+- Common correction `e467e198f` was committed and pushed after source-stable
+  Mac fmt/strict workspace clippy/build and full Voice 3,490/0/14 ignored
+  in 605.46 s. The two held-gap fixture fixes retain all original assertions.
+  Warm synthetic name helper 220 us first/51 us repeat is not lamp latency.
+- The subsequent main001 integration retains all 15 name-carry and four
+  near-name controls plus 23 private Engine controls. Focused tests and
+  strict clippy pass; full Voice was deliberately stopped with exit 143,
+  not passed, before a new source-traced dispatch correction.
+- The actual-Net HTTP counter now fails as intended: 0/1, exit 101,
+  0.03 s. Ten barrier-controlled cases cover near-to-own and own-key-to-relay.
+  Six positive private/room/neutral cases pass; each of four proof-lost or
+  revoked cases sends one forbidden fallback request, zero allowed. Proof
+  loss retains a current request lease. Complete request-body barriers avoid
+  sleeps or absence polling. Receipt:
+  `/private/tmp/fourth-speaker-foundation-checks-20261022/services-fallback-audit/red-control.log`.
+  The same sticky permission must reach every actual backend send, including
+  after awaits; outer post-await output guards are insufficient. This common
+  boundary fix is distinct from #3107's delayed-hedge permission correction.
+- Name and Photo remain draft, awaiting qualified common/current-main source.
+  The separately claimed inactive writer source is in progress on its own
+  branch, with no Cargo, RPC or runtime activation yet. No lamp/model call,
+  physical acceptance or memory score increase is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
