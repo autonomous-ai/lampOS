@@ -1774,14 +1774,32 @@ pub fn serve(
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
     // A few emotion tags, given to the voice only when it reads them
-    // (ElevenLabs), with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
+    // (ElevenLabs, with a model that reads them, the speech socket's too),
+    // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
     let speech_tags = (std::env::var(crate::second_provider::SPEECH_TAGS_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on"))
     .then(|| {
-        route.voice_provider(config.tts_provider)
-            == Some(crate::second_config::TtsProvider::ElevenLabs)
+        let provider = crate::second_config::TtsProvider::ElevenLabs;
+        let socket = (std::env::var(crate::second_provider::SPEECH_SOCKET_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on"))
+        .then(|| {
+            std::env::var(crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT)
+                .ok()
+                .filter(|model| !model.trim().is_empty())
+                .unwrap_or_else(|| super::net::default_model(provider).to_owned())
+        });
+        route.voice_provider(config.tts_provider) == Some(provider)
+            && crate::second_provider::speech_tags::read_by(
+                config
+                    .tts_model
+                    .as_deref()
+                    .unwrap_or(super::net::default_model(provider)),
+                socket.as_deref(),
+            )
     });
     let net = services(
         config,
@@ -1884,7 +1902,7 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-    let character = if speech_tags.is_some() {
+    let character = if speech_tags == Some(true) {
         format!("{character}{}", crate::second_provider::speech_tags::NOTE)
     } else {
         character

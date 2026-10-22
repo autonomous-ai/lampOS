@@ -567,13 +567,18 @@ order is kept. A written turn is the same from the chat on.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set; #2901, the lead's proposal on #1711, 22 Oct). The
   spoken turns' character is followed by a short note
-  (`speech_tags::NOTE`): the voice reads `[laughs]`, `[sighs]`,
+  (`speech_tags::NOTE`), only when the voice reads tags (below): the voice reads `[laughs]`, `[sighs]`,
   `[whispers]` and `[excited]`, to be used rarely, only where a person
   would make that sound, at most one a reply. Each piece of the reply goes
   through `speech_tags::Tags` before it is said. The voice is given only a
-  listed tag, the first of the reply, and only when it is ElevenLabs
-  (`eleven_v4_turbo` reads them); any other `[...]` is dropped, and with
-  OpenAI or Gemini every tag is. A `[` left open at a piece's end (up to 24
+  listed tag, the first of the reply, and only when it is ElevenLabs with
+  a model that reads them (`speech_tags::READING_MODELS`,
+  `eleven_v4_turbo`): `LAMP_SECOND_SPEECH_MODEL` (or `tts_model`) set to
+  it, and with `LAMP_SECOND_SPEECH_SOCKET=on` the socket's model
+  (`LAMP_SECOND_SPEECH_SOCKET_MODEL`) too. The route's default,
+  `eleven_flash_v2_5`, would say a tag as a word, so with it the chat is
+  not told and every tag is dropped, as with OpenAI or Gemini. Any other
+  `[...]` is dropped. A `[` left open at a piece's end (up to 24
   characters) waits for the next piece, so "[lau" then "ghs] ok" is said as
   `[laughs] ok`; a tag with no words after it waits for the next words. The
   lamp's words, which go to the transcript, the thread, the own-words list

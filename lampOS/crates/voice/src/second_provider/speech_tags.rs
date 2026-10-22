@@ -5,7 +5,8 @@
 //! reply is cut here into what the voice is given and the lamp's words.
 //!
 //! The voice is given only a listed tag, at most one a reply, and none when
-//! it doesn't read them (OpenAI, Gemini). Any other `[...]` is dropped. The
+//! it doesn't read them (OpenAI, Gemini, or an ElevenLabs model other than
+//! [`READING_MODELS`]'s, which would say the tag as a word). Any other `[...]` is dropped. The
 //! lamp's words, which go to the transcript, the thread, the own-words list
 //! and the body, never carry a tag. A tag cut across two pieces ("[lau",
 //! "ghs] ok") is held until it closes.
@@ -15,6 +16,19 @@ pub const LISTED: [&str; 4] = ["[laughs]", "[sighs]", "[whispers]", "[excited]"]
 
 /// Told after the character in spoken turns, with the switch on.
 pub const NOTE: &str = " Your voice can read a few tags: [laughs], [sighs], [whispers] and [excited]. Use one rarely, only where a person would make that sound, never more than one in a reply, and no other words in square brackets.";
+
+/// The ElevenLabs models that read the tags as how a line sounds: any
+/// other says them as words (`eleven_flash_v2_5`, the route's default).
+pub const READING_MODELS: [&str; 1] = ["eleven_v4_turbo"];
+
+/// Whether ElevenLabs speaks each piece of a reply with a model that reads
+/// tags: the voice's model (`tts_model`, or the provider's default) and,
+/// with the speech socket on, the socket's own model too, which says every
+/// piece of an answer whose socket opened.
+pub fn read_by(model: &str, socket_model: Option<&str>) -> bool {
+    READING_MODELS.contains(&model)
+        && socket_model.is_none_or(|socket| READING_MODELS.contains(&socket))
+}
 
 /// The longest unclosed `[...]` held for its `]` in the next piece; a longer
 /// one is no tag, and its `[` is dropped.
@@ -119,6 +133,16 @@ mod tests {
 
     fn said(tags: &mut Tags, piece: &str) -> (String, String) {
         tags.piece(piece)
+    }
+
+    #[test]
+    fn only_a_model_that_reads_tags_is_given_them() {
+        assert!(read_by("eleven_v4_turbo", None));
+        assert!(read_by("eleven_v4_turbo", Some("eleven_v4_turbo")));
+        // The route's default model, and a socket on the default model,
+        // would say "laughs" as a word.
+        assert!(!read_by("eleven_flash_v2_5", None));
+        assert!(!read_by("eleven_v4_turbo", Some("eleven_flash_v2_5")));
     }
 
     #[test]
