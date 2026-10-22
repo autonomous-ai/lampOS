@@ -1937,6 +1937,11 @@ impl Engine {
         heard: bool,
     ) -> Option<crate::memory_scope::RequestScope> {
         self.memory.as_ref().map(|(worker, cache)| {
+            // A heard line with the camera allowed, its turn told and kept
+            // by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`): admitted as
+            // the room's only because no known face was cached yet, its
+            // keeps look again (#2807, `ScopeLease::keeper_within`).
+            let late = heard && self.memory_camera_allowed && self.scopes_context();
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
                 let scope = cache.snapshot(now);
@@ -1962,14 +1967,16 @@ impl Engine {
             } else {
                 crate::memory_scope::ScopeSnapshot::room()
             };
-            crate::memory_scope::RequestScope::new(
-                crate::memory_scope::RequestKey {
-                    worker: *worker,
-                    session,
-                    request,
-                },
-                scope,
-            )
+            let key = crate::memory_scope::RequestKey {
+                worker: *worker,
+                session,
+                request,
+            };
+            if late {
+                crate::memory_scope::RequestScope::looking_later(key, scope, cache.clone())
+            } else {
+                crate::memory_scope::RequestScope::new(key, scope)
+            }
         })
     }
 

@@ -13463,3 +13463,68 @@ async fn the_words_so_far_are_told_only_with_the_switch() {
         assert_eq!(told, expected, "on: {on}");
     }
 }
+
+/// #2807: right after a restart the face cache holds nobody yet, so a
+/// remembered face's first line is admitted as the room's. With its turn
+/// told by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`) its keep looks
+/// again and finds the face the eyes name by then; its reads stay the
+/// room's. Without that switch, or with the camera closed, it never looks.
+#[tokio::test]
+async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "keep-late-engine-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "A").unwrap();
+    let a = crate::remember::person_id("A");
+    let lease_of = |engine: &Engine| {
+        engine
+            .turn
+            .as_ref()
+            .unwrap()
+            .memory_scope
+            .as_ref()
+            .unwrap()
+            .lease()
+    };
+    for (scoped, camera) in [(true, true), (false, true), (true, false)] {
+        let cache = Arc::new(FaceCache::default());
+        let (engine, _, _) = scripted(Arc::new(Script::default()));
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let system: Option<ScopedSystem> = scoped
+            .then(|| Arc::new(|_: &ScopeLease| Told::from("SYSTEM".to_owned())) as ScopedSystem);
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            system,
+        );
+        engine.memory_camera(camera, 1);
+        engine.submit(start(1));
+        let lease = lease_of(&engine);
+        assert_eq!(
+            lease.scope().unwrap().person(),
+            None,
+            "admitted as the room's"
+        );
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        let keeper = lease.keeper_within(std::time::Duration::ZERO);
+        if scoped && camera {
+            assert_eq!(keeper.as_deref(), Some(a.as_str()));
+        } else {
+            assert_eq!(keeper, None, "scoped {scoped}, camera {camera}");
+        }
+        assert_eq!(
+            lease.scope().unwrap().person(),
+            None,
+            "reads stay the room's"
+        );
+    }
+    std::fs::remove_file(&path).unwrap();
+}

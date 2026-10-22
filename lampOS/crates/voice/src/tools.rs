@@ -1460,6 +1460,33 @@ fn run_call_with_scope(
                 heard_kept,
                 lease,
                 || match lease {
+                    // A keep in a line admitted as the room's before the
+                    // eyes named anyone goes to the known face they name by
+                    // now (#2807); the room's only when nobody known is.
+                    Some(lease) if model.name == crate::remember::REMEMBER => {
+                        let started = std::time::Instant::now();
+                        match lease.keeper_within(crate::memory_scope::KEEPER_WAIT) {
+                            Some(person) => {
+                                eprintln!(
+                                    "lamp-voice: request {request}: a keep in a line admitted as the room's goes to the known face the eyes name now ({} ms)",
+                                    started.elapsed().as_millis()
+                                );
+                                crate::remember::run_scoped_for(
+                                    socket,
+                                    call,
+                                    deadline.saturating_sub(started.elapsed()),
+                                    lease,
+                                    &person,
+                                )
+                            }
+                            None => crate::remember::run_scoped(
+                                socket,
+                                call,
+                                deadline.saturating_sub(started.elapsed()),
+                                lease,
+                            ),
+                        }
+                    }
                     Some(lease) => crate::remember::run_scoped(socket, call, deadline, lease),
                     None => crate::remember::run_of(socket, call, deadline, request),
                 },
@@ -4439,5 +4466,102 @@ mod tests {
             std::fs::remove_file(dir.join(CALL_SOCKET)).unwrap();
         }
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// One `remember` answered through the memory's route for a line
+    /// admitted as `admitted` with a late look at `cache`, `fill` run on the
+    /// way: what the memory was asked.
+    fn kept_by_late_look(
+        name: &str,
+        cache: std::sync::Arc<crate::memory_scope::FaceCache>,
+        fill: impl FnOnce() + Send + 'static,
+    ) -> Value {
+        let socket =
+            std::env::temp_dir().join(format!("keep-late-{name}-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream.write_all(b"{\"ok\":true,\"id\":1}\n").unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let request = 2_807;
+        let owner = crate::memory_scope::RequestScope::looking_later(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([0x28; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            cache.snapshot(std::time::Instant::now()),
+            cache,
+        );
+        fill();
+        let settings = Settings {
+            memory: Some(socket.clone()),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "k1".into(),
+            name: crate::remember::REMEMBER.into(),
+            args: json!({"text":"Her sister's wedding is this Saturday."}),
+        };
+        let told = answer_scoped(&settings, &call, request, false, &owner.lease());
+        assert_eq!(told["remembered"], true, "{told}");
+        let asked = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        asked
+    }
+
+    /// #2807 on lamp-c0a4: right after a voice restart, a face just
+    /// remembered said a dated event in the session's first line, which was
+    /// admitted before the eyes named them, as the room's; its keep went to
+    /// `everyone`. The keep now goes to the face the eyes name by then, or
+    /// within a short wait, never the room.
+    #[test]
+    fn the_restarts_first_line_from_a_remembered_face_is_kept_as_theirs() {
+        let ann = crate::remember::person_id("Ann");
+        let face = |name: &str| {
+            let path =
+                std::env::temp_dir().join(format!("keep-late-face-{name}-{}", std::process::id()));
+            std::fs::write(&path, "Ann").unwrap();
+            let seen = crate::known_faces::FaceObservation::read(&path);
+            std::fs::remove_file(path).unwrap();
+            seen
+        };
+        // Named between the line's start and its keep.
+        let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
+        let filled = cache.clone();
+        let seen = face("before");
+        let asked = kept_by_late_look("before", cache, move || {
+            filled.replace(filled.begin_refresh(), seen);
+        });
+        assert_eq!(asked["person"], json!(ann), "{asked}");
+        // Named only while the keep waits for the eyes.
+        let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
+        let filled = cache.clone();
+        let seen = face("during");
+        let asked = kept_by_late_look("during", cache, move || {
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(80));
+                filled.replace(filled.begin_refresh(), seen);
+            });
+        });
+        assert_eq!(asked["person"], json!(ann), "{asked}");
+    }
+
+    /// A genuinely unknown speaker's keep (nobody known by the end of the
+    /// wait) keeps the documented room rule: "said in this room; speaker
+    /// unknown", with no person, as before.
+    #[test]
+    fn an_unknown_speakers_keep_is_the_rooms_as_documented() {
+        let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
+        let started = std::time::Instant::now();
+        let asked = kept_by_late_look("nobody", cache, || {});
+        assert!(asked.get("person").is_none(), "{asked}");
+        assert!(started.elapsed() < Duration::from_millis(1_200), "bounded");
     }
 }
