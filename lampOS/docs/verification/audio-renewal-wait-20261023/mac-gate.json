@@ -1,0 +1,76 @@
+{
+  "base": "23132abf97cc7a1d675039358aa07de694b3fa8d",
+  "host": "Darwin arm64",
+  "rust": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "diff_sha256": "ed156751c05e4bdce32eee9bd465381ac385beae3b77d6259f801e10487fb809",
+  "inputs": {
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+    "lampOS/docs/requested-audio.md": "134707e3bd0c1613f6cc8d79dbf495287b01ddefe579b822ad5d9c027d7e5b40",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+    "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+  },
+  "inputs_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 5.378,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 36.481,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 469.875,
+      "log_bytes": 4875,
+      "log_sha256": "ed2b54d1846011c614d37af9943af3f354ed77f7a63a90d3e2581aa3c1f9a929",
+      "result_lines": [
+        "test result: ok. 3447 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 399.80s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 269 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.76s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ]
+}

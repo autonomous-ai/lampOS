@@ -1,0 +1,92 @@
+{
+  "head": "f913461d92b7928e5361c51de357ca7aef4b1a8d",
+  "base": "3989219969f2460e6cfd69d32d06a58dd5c2e269",
+  "host": "Darwin arm64",
+  "rust": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "inputs": {
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+    "lampOS/docs/requested-audio.md": "134707e3bd0c1613f6cc8d79dbf495287b01ddefe579b822ad5d9c027d7e5b40",
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs": "f0641f3ca4bee52d1b3d725343bdc67d4d7dbc202738f69270e798395a38aa5c",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+    "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+  },
+  "inputs_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 5.443,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": [],
+      "aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 28.489,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": [],
+      "aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 313.247,
+      "log_bytes": 4876,
+      "log_sha256": "b062e42ff4902a485f3e9c7862772fdf24211144cc17c6ee2029f30d2bd52954",
+      "result_lines": [
+        "test result: ok. 3448 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 254.22s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 269 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.42s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "aggregate": {
+        "passed": 3728,
+        "failed": 0,
+        "ignored": 14
+      }
+    }
+  ]
+}

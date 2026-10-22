@@ -1,3 +1,21 @@
+## Current checkpoint: 2026-10-23 01:58 +07, audio-renewal fixture pushed
+
+Ready for lamp-voice: no (official PR ARM64, Linux Clippy and external read pending)
+
+One commit `f913461d9` on `second/audio-renewal-wait` contains the latest
+integration head at push, `398921996`. Its equal range-diff preserves the
+validated fixture. Final native Mac formatting and strict all-target Voice
+Clippy passed; all Voice tests passed **3,728 / 0 / 14 ignored**.
+[Source binding, complete local outputs and deliberate failing controls](verification/audio-renewal-wait-20261023/README.md)
+retain both original ARM64 failures separately. Production bytes are unchanged.
+Second is opening the non-draft PR, then following its official CI and read.
+
+#3085 is merged through #3100; #3095's corrected package read is posted clean.
+#2810's attended unplug and #1812's real signed-release run remain with First
+and the person at the lamp. No lamp or real-release operation occurred.
+
+---
+
 ## Current checkpoint: 2026-10-23 01:45 +07, diagnostics merged and audio-renewal fixture under gate
 
 Ready for lamp-voice: no (new audio-renewal fixture; #3085 is merged)

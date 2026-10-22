@@ -1,0 +1,32 @@
+[
+  {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 5.105,
+    "log_bytes": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline",
+      "requested_audio::runtime::tests"
+    ],
+    "exit": 0,
+    "seconds": 52.132,
+    "log_bytes": 136,
+    "log_sha256": "9224790ab6f59eb09551843bf6b753257816e9d0a0856214860895054a784610"
+  }
+]

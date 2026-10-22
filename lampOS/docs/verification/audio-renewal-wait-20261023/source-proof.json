@@ -1,0 +1,7 @@
+{
+  "base_file_sha256": "635aace9f582a1ad81c89893b55723ca1570858fefca9f5241ee977ad3dde819",
+  "candidate_file_sha256": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+  "production_prefix_unchanged": true,
+  "changed_names_confined_to_crate": "rg across crates finds WorkerSteps, SteppedWorkerTime, resume_next and the regression name only in lamp-voice/src/requested_audio/runtime.rs",
+  "limits": "The forced cache contention control demonstrates one legitimate cancellation path, not attribution of the two original ARM64 failures."
+}

@@ -1,0 +1,19 @@
+
+running 1 test
+
+thread '<unnamed>' (64988912) panicked at crates/voice/src/requested_audio/runtime.rs:1191:18:
+fixture must release the parked worker: Timeout
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant' (64988908) panicked at crates/voice/src/requested_audio/runtime.rs:1118:18:
+called `Result::unwrap()` on an `Err` value: Timeout
+requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant --- FAILED
+
+failures:
+
+failures:
+    requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3460 filtered out; finished in 3.02s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
