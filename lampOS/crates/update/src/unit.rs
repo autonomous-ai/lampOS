@@ -225,6 +225,31 @@ mod tests {
         assert_eq!(ceiling(&generic), ceiling(&product), "{generic}");
     }
 
+    /// #2943: the generic voice unit names the recorded failure lines where
+    /// the product unit does, in the same language, so a lamp moved from V1
+    /// says why it can't answer rather than nothing.
+    #[test]
+    fn the_generic_voice_says_its_failures_as_the_product_does() {
+        let exec = |unit: &str| {
+            unit.lines()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .unwrap()
+                .to_owned()
+        };
+        let product = exec(include_str!("../../../deploy/product/lamp-voice.service"));
+        let generic = exec(include_str!("../../../deploy/units/lamp-voice.service"));
+        for flag in ["--failure-notice-dir", "--failure-notice-language"] {
+            let value = |exec: &str| {
+                exec.split_whitespace()
+                    .skip_while(|word| *word != flag)
+                    .nth(1)
+                    .map(str::to_owned)
+            };
+            assert!(value(&product).is_some(), "{flag}: {product}");
+            assert_eq!(value(&generic), value(&product), "{flag}: {generic}");
+        }
+    }
+
     /// The product's "who it answers" switches, and the bus they read the
     /// name and the faces from: the generic voice unit carries each, so a
     /// lamp moved from V1 answers only when spoken to (Migrate on #2602,
