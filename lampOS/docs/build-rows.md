@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-22 19:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-22 22:09 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 89.8% over 72 rows. Quality 61.9% over 16 rows.**
+**Build 90.0% over 72 rows. Quality 61.9% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -37,8 +37,8 @@ Written by the first builder from the team's review page at 2026-10-22 19:47 (+0
 | One install for a new lamp | 1.00 | #811 | nine | Shown 19 Oct 15:1x on a second lamp, lamp-c0a4: build 3162 installed over V1 from a test-signed local channel, all 45 files equal to the build’s checksums, V1 stopped and kept, no reboot; |
 | No internet at home | 1.00 | #830 #1242 #1256 #1247 | nine | 21 Oct 14:1x: its lamp runs passed on lamp-75c9 (Nine): the outage found with nobody speaking, the offline line once, “back online” after, and the unavailable face. |
 | Everything is a skill, core and installable, no one-off code | 0.70 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh | 22 Oct 15:1x, up from 0.65: look for things’ walk, its note, places, order and words now live in its skill’s file, read by the voice from lamp-skills’ tools file (Thirteen, #2916, a16545d92; |
-| An owner makes their own skill | 0.70 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 15:1x, up from 0.65: a skill typed in the app is taken on the voice’s own socket, handed over as its brief and told aloud (LAMP_APP_MAKE_SKILL, blue’s #2887 carried as #2935, merged 15:00 as 8613304e4). |
-| A Skills Store to publish skills | 0.55 | #1698 #2801 #2802 | fourteen | 22 Oct 11:4x, up from 0.45: a sent skill is checked and waits for review before it is listed, shown on the test environment (Backend3, #2802): its files, checksums and permissions shown in the lamp’s words, a changed byt… |
+| An owner makes their own skill | 0.78 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 22:0x, up from 0.75: a developer’s path to make a skill by hand, in skill-creator’s README (#3055 merged, Blue). |
+| A Skills Store to publish skills | 0.60 | #1698 #2801 #2802 | fourteen | 22 Oct 22:0x, up from 0.55: an installed package keeps its sha256 and skills.list gives it beside the catalogue’s (Backend3, #3042 merged; |
 | Updates over the internet, by themselves | 0.65 | #737 #1812 | migrate, second | 20 Oct 06:11: shown again on lamp-4ace on the merged code (El’s test, three cases: a good build kept, one that fails to start put back in under 2 min, one that never confirms put back after its 10 min), the lamp left exa… |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, ten, backend, third, eighth, twelve | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
@@ -49,7 +49,7 @@ Written by the first builder from the team's review page at 2026-10-22 19:47 (+0
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen, fifth, third | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
 | Never tips itself over | 1.00 | #1072 #704 | eighth | Built with V1’s limits; |
-| One inner state (mood) every behaviour reads, and familiarity *(not a ship gate)* | 0.70 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, ten | 21 Oct 15:4x, up from 0.6: on lamp-75c9 (Nine, #1670) the ring and Expression took Mood’s breath, and a clap quickened it: pace 1.00 to 1.15, liveliness 0 to 0.31 a minute after, easing back. |
+| One inner state (mood) every behaviour reads, and familiarity *(not a ship gate)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, ten | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
 | Joys: sways to music, watches you leave, core skills | 0.70 | #1669 #1707 #1748 #2832 #2833 #2834 | sixth | 21 Oct 14:3x: the glance at a laugh is taken out of the row (the lead on #1711: you never asked for it; |
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
 | Bedtime and Morning as a skill, with night caps on light and volume | 0.65 | #1672 #1732 #2803 #2804 | jarvis, second | 22 Oct, up from 0.5: evening, the glow, bedtime twice and a night sound’s end passed on lamp-06c1 (Jarvis, 21–22 Oct). |
