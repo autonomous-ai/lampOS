@@ -1,0 +1,45 @@
+{
+  "old_head": "fa63fa363c18d4f66e82af602b7924eb4660d194",
+  "old_base": "d747ebb0f25d26996c6d273e8e3f8b8af6a477e5",
+  "new_base": "9e7eec6e5352d605598a6fd3bac2dd9fe924496c",
+  "source_hashes_before": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "cloud_tree_before": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "upstream_changed_files": [
+    "lampOS/docs/eyes.md",
+    "lampOS/tools/seems-session-test.sh",
+    "lampOS/tools/seems-session.sh"
+  ],
+  "new_head": "c37fe695c9cfe92d6d0c489706ec2e7f036de7a8",
+  "source_hashes_after": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "cloud_tree_after": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "range_diff": "1:  fa63fa363 = 1:  c37fe695c lampOS: report currently failed product units",
+  "all_crate_source_manifests_tests_and_workspace_lock_unchanged": true,
+  "local_gate_retained_from_head": "87154f0530c1b1cf3519f748cc9d5919424cf72e",
+  "local_gate_retained_counts": {
+    "passed": 177,
+    "failed": 0,
+    "ignored": 1,
+    "filtered out": 0
+  },
+  "fresh_fmt": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.127,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remote_base_verified_before_push": "9e7eec6e5352d605598a6fd3bac2dd9fe924496c"
+}

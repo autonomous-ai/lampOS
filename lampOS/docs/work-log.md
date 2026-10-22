@@ -1,3 +1,34 @@
+## Current checkpoint: 2026-10-22 09:24 +07, failed-unit head includes Eyes tools base
+
+**#2764:** Pushed `c37fe695c9cfe92d6d0c489706ec2e7f036de7a8` on
+`9e7eec6e5352d605598a6fd3bac2dd9fe924496c`, with the remote base checked
+immediately before push. [Equal range-diff and input proof](verification/report-failed-units-rebase-9e7ee-20261022/README.md)
+show no Cloud change. This base advance only changes Eyes tools/docs;
+all crate sources, tests, manifests and Cargo.lock are unchanged. Fresh fmt
+passed **5.127 s**. Strict Cloud Clippy and **177/0/1/0** are retained
+from `87154f053`, not newly executed. ARM64 **39710858994** and Clippy
+**39710858812** are running; readiness is pending. Reviewer-two owns merge.
+
+[Previous-head native evidence](verification/report-failed-units-rebase-d747-native-20261022/README.md)
+qualifies only `fa63fa363`: **10002 passed / 0 failed / 63 skipped**
+(one leaky pass), **175.155 s**, four doc tests, twelve process-harness tests,
+relay and three added Cloud tests. Both runs tested merge `18334e7f8` with
+parents `d747ebb0f` and `fa63fa363`. The API's embedded PR association
+already reflected the subsequent rebase; the receipt records that separately
+and binds the tested identity to both run head hashes, checkout merge and
+immutable parents. The initial offline qualification refusal is retained;
+CI itself passed. No result is carried forward as a new-head native run.
+
+**Music P3:** Positive and restored tests pass; the required unshown mutant
+fails at the intended boundary. Separate-branch source review found no P1/P2.
+Full Voice fmt and strict Clippy pass; Voice/consumer tests continue.
+**#1757** and **#2767** remain green and mergeable with First.
+No device action, full local workspace gate or local ARM64 build.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 09:18 +07, failed-unit rebase and Music regression control
 
 **#2764:** Pushed `fa63fa363c18d4f66e82af602b7924eb4660d194` on
