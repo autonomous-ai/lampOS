@@ -128,7 +128,9 @@ level_check() {
   local s; s=$(lamp "date +%s")
   python3 ./scenario.py "desk-kit-$LABEL-level" "${DESK_KIT_ASKER:-Daniel}|Hey Lamp, what time is it in Tokyo?|10" >/dev/null 2>&1
   local words close
-  words=$(lamp "sudo -n journalctl -u lamp-voice --since @$s --no-pager" | grep -oE 'request [0-9]+ heard [0-9]+ words' | head -1 | grep -oE '[0-9]+ words' | cut -d' ' -f1)
+  # The words from the line's own HEARD rows, after its PLAY: the journal's first request after a restart can be
+  # a stray sound with 0 words (52e6, 18:00).
+  words=$(ls -t "$PLAYED_OUT"/scenarios/*-desk-kit-$LABEL-level.txt 2>/dev/null | head -1 | xargs awk '/ PLAY /{p=1; next} p && / HEARD /{n=NF-2; if (n>m) m=n} END{print m+0}')
   close=$(lamp "S=\$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); sudo -n sh -c \"cat /var/lib/lampOS/voice/sessions/\$S/metadata/events-*.jsonl\"" |
     python3 -c 'import json,sys
 n=None
