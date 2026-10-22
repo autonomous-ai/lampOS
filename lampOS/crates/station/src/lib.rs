@@ -10,6 +10,8 @@
 //!   inputs, by the rules in the doc.
 //! - [`store`]: the record written whole and then renamed, never over
 //!   another.
+//! - [`complete`]: whether a record kept is complete against a matrix
+//!   version, for the pilot (#2795): every check judged, none missing.
 //!
 //! Nothing here opens a device or a socket; the station tool reads files and
 //! writes one.
@@ -21,6 +23,7 @@ use jiff::Timestamp;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
+pub mod complete;
 pub mod inputs;
 pub mod matrix;
 pub mod record;
