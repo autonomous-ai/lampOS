@@ -12,7 +12,7 @@ use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
     ClockStamp, REQUESTED_AUDIO_LEASE_US, REQUESTED_AUDIO_PLAY_US, REQUESTED_AUDIO_START_US,
     RequestedAudioContext, RequestedAudioLease, RequestedAudioOffer, RequestedAudioOperation,
-    RequestedAudioOutcome, RequestedAudioPhase, SpeakerState,
+    RequestedAudioOutcome, RequestedAudioPhase, SpeakerState, Voice, VoiceState,
 };
 use std::{
     io::{BufRead, BufReader, Read, Write},
@@ -692,6 +692,64 @@ fn publish_state(publisher: &mut Publisher, generation: u64, muted: bool) {
         muted,
     };
     publisher.publish_json(state.stamp.at_us, &state).unwrap();
+}
+
+#[test]
+fn requested_audio_keeps_voice_state_non_resting_until_final_retirement() {
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let bus = Bus::new(test._directory.path.join("bus")).unwrap();
+    let mut out = crate::bus_out::BusOut::on(&bus).unwrap();
+    let mut state = |test: &Test, stage: &str, expected: Voice| {
+        tell_voice_of_turn(
+            &mut out,
+            test.snapshot,
+            test.reply.as_ref().map(|current| current.notice.origin()),
+            monotonic_us(),
+        );
+        let message = bus.latest(VoiceState::TOPIC).unwrap().unwrap();
+        assert_eq!(
+            message.parse::<VoiceState>().unwrap().state,
+            expected,
+            "{stage}"
+        );
+    };
+
+    let offer = test.load(1);
+    let original_owner = test.reply.as_ref().unwrap().owner;
+    test.confirmed();
+    assert!(test.prepare());
+    assert_eq!(
+        test.reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::RequestedAudio
+    );
+    // MusicSway and LaughGlance require Resting. The recording keeps its
+    // spoken turn even before the speaker accepts its first sample.
+    state(&test, "recording prepared", Voice::Thinking);
+    let first = test.dispatch().unwrap();
+    assert_eq!(first.permit.owner(), original_owner);
+    assert!(!first.end_of_speech);
+    state(&test, "first chunk outstanding", Voice::Thinking);
+    test.accept(&first, 120);
+    state(&test, "first chunk partly accepted", Voice::Speaking);
+    test.accept(&first, 120);
+    state(&test, "first chunk accepted", Voice::Speaking);
+
+    let last = test.dispatch().unwrap();
+    assert_eq!(last.permit.owner(), original_owner);
+    assert!(last.end_of_speech);
+    state(&test, "last chunk outstanding", Voice::Speaking);
+    test.accept(&last, 240);
+    assert!(!test.finish_if_settled());
+    state(&test, "last chunk accepted but unretired", Voice::Speaking);
+
+    test.retire(&last);
+    assert_eq!(test.snapshot.owner(), Some(original_owner));
+    state(&test, "retired but turn not completed", Voice::Thinking);
+    assert!(test.finish_if_settled());
+    assert!(test.snapshot.owner().is_none());
+    state(&test, "retired and turn completed", Voice::Resting);
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Completed);
 }
 
 #[test]

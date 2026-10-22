@@ -1,0 +1,204 @@
+{
+  "attempts": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": null,
+      "elapsed_seconds": 0.36178504198323935,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "<exclusive-host-target>",
+        "RUST_TEST_THREADS": "1"
+      },
+      "exit_code": 101,
+      "outcome": "failed_before_test_execution",
+      "raw_log_basename": "positive.log",
+      "raw_log_sha256": "64b9e55bb839977e3ad697d706a8cf66830ee97de65b05654960020a7c205df6",
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator.rs": "902484349e2ed5282d42e097b6c8acf3bdf407fee239871c6b176df28aa479b1",
+        "lampOS/crates/voice/src/coordinator/notices.rs": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+      },
+      "stage": "positive",
+      "summaries": [],
+      "tests_executed": false
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered": 3183,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1
+      },
+      "elapsed_seconds": 47.52148895803839,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "<exclusive-host-target>",
+        "RUST_TEST_THREADS": "1"
+      },
+      "exit_code": 0,
+      "outcome": "passed",
+      "raw_log_basename": "positive-host.log",
+      "raw_log_sha256": "8515780059680c1a563604dbcd4a385c989455aff7365b903aad2ab7a8c8077d",
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator.rs": "902484349e2ed5282d42e097b6c8acf3bdf407fee239871c6b176df28aa479b1",
+        "lampOS/crates/voice/src/coordinator/notices.rs": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+      },
+      "stage": "positive-host",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3183 filtered out; finished in 0.04s"
+      ],
+      "tests_executed": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 1,
+        "filtered": 3183,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 0
+      },
+      "elapsed_seconds": 36.345152791938744,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "<exclusive-host-target>",
+        "RUST_TEST_THREADS": "1"
+      },
+      "exit_code": 101,
+      "outcome": "expected_assertion_failure",
+      "raw_log_basename": "mutant-host.log",
+      "raw_log_sha256": "28386405724c30af1d8e7c4ee58b13cd6cdc8f113a461eacfa580acc8423c327",
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator.rs": "902484349e2ed5282d42e097b6c8acf3bdf407fee239871c6b176df28aa479b1",
+        "lampOS/crates/voice/src/coordinator/notices.rs": "86f638cae7d9c08c60c703c19558d10c41da52c163384478b41e9f417f1cbc4b",
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+      },
+      "stage": "mutant-host",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3183 filtered out; finished in 0.02s"
+      ],
+      "tests_executed": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered": 3183,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1
+      },
+      "elapsed_seconds": 36.237965459004045,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "<exclusive-host-target>",
+        "RUST_TEST_THREADS": "1"
+      },
+      "exit_code": 0,
+      "outcome": "passed",
+      "raw_log_basename": "restored-host.log",
+      "raw_log_sha256": "1255004bb0bdc776328567764f992c7b57e111d52a216e6738b7e222142a7df0",
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator.rs": "902484349e2ed5282d42e097b6c8acf3bdf407fee239871c6b176df28aa479b1",
+        "lampOS/crates/voice/src/coordinator/notices.rs": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+      },
+      "stage": "restored-host",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3183 filtered out; finished in 0.05s"
+      ],
+      "tests_executed": true
+    }
+  ],
+  "base": "bd1d79a5ad1c4ce1fcd4f6674702265cc879b8b0",
+  "intended_failure": "recording prepared: actual Resting, expected Thinking",
+  "mutant_patch_sha256": "e1eaece19233d21c3c79bfdd0d9a6439d04af5959b5629ec958a65ad2a87b2c0",
+  "mutation": "Only add RequestedAudio to SpeechOrigin::unshown()",
+  "notices_restored_byte_for_byte": true,
+  "permission_failure": "The first launch failed to open the Cargo target build lock with EPERM before compilation or test execution. The later host executions are separate attempts.",
+  "raw_logs_in_bundle": false,
+  "restored_notices_sha256": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+  "schema": 1,
+  "source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "902484349e2ed5282d42e097b6c8acf3bdf407fee239871c6b176df28aa479b1",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+  },
+  "test": "coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement",
+  "working_directory": "lampOS"
+}
