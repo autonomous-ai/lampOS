@@ -31,6 +31,12 @@ pub const FOLLOW_UP_EVERY_MS: u64 = 86_400_000;
 /// An observation with an event day is asked about at most this many local
 /// days after it, instead of [`FOLLOW_UP_WITHIN_MS`] from when it was said.
 pub const FOLLOW_UP_WITHIN_DAYS: u32 = 14;
+/// With `until_asked` (#1693, the first builder on #2602, 22 Oct 09:4x), a
+/// dated one the lamp has not been heard asking about is offered in at most
+/// this many sessions, each on its own day ([`FOLLOW_UP_EVERY_MS`]): the
+/// first and at most two more, so it never nags. The last offer is recorded
+/// as given, as without `until_asked`.
+pub const FOLLOW_UP_OFFERS: u32 = 3;
 pub const NOTE_BYTES: usize = 1200;
 pub const UNUSED_DAYS: u64 = 30;
 pub const MAX_RECORDS: u64 = 50_000;
@@ -491,6 +497,8 @@ impl Days {
                 )?;
                 if moved > 0 {
                     tx.execute("DELETE FROM follow_ups WHERE rid=?", [rid])?;
+                    // And its offers: the new day is offered afresh.
+                    tx.execute("DELETE FROM follow_up_offers WHERE rid=?", [rid])?;
                 } else {
                     tx.execute(
                         "INSERT OR IGNORE INTO event_days(rid,day) VALUES(?1,?2)",
@@ -1122,6 +1130,25 @@ impl Days {
         person: &Person,
         events: bool,
     ) -> Result<Option<serde_json::Value>> {
+        self.follow_up_until_asked(person, events, false)
+    }
+
+    /// [`Self::follow_up_with`], and with `until_asked` (and `events`; the
+    /// voice's `LAMP_MEMORY_EVENTS`, the first builder on #2602, 22 Oct
+    /// 09:4x) a dated one is marked asked when the lamp asks, not when it
+    /// is given: given, it is counted as offered (`follow_up_offers`) and
+    /// its answer carries `"until_asked":true`, and it stays eligible
+    /// until the voice says the lamp asked ([`Self::follow_up_asked`]) or
+    /// it has been offered [`FOLLOW_UP_OFFERS`] times, the last of which is
+    /// recorded as given in its transaction as ever. An offer counts as a
+    /// give for the one a day, so it is offered again on a later day at the
+    /// earliest. An undated one is recorded when given, as without it.
+    pub fn follow_up_until_asked(
+        &mut self,
+        person: &Person,
+        events: bool,
+        until_asked: bool,
+    ) -> Result<Option<serde_json::Value>> {
         if person.as_str() == Person::EVERYONE || person.as_str().starts_with("r-") {
             return Err(Error::new(
                 "bad_person",
@@ -1130,8 +1157,10 @@ impl Days {
         }
         let now = self.now;
         let tx = self.db.transaction()?;
+        // An offer not yet asked about counts as a give (#1693): one a day.
+        // Without offers, the newest of `follow_ups` as before.
         let lately: Option<u64> = tx.query_row(
-            "SELECT max(asked_unix_ms) FROM follow_ups WHERE person=?",
+            "SELECT max(at) FROM (SELECT asked_unix_ms AS at FROM follow_ups WHERE person=?1 UNION ALL SELECT offered_unix_ms FROM follow_up_offers WHERE person=?1)",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -1181,16 +1210,47 @@ impl Days {
         let Some((rid, id, text, category, on)) = found else {
             return Ok(None);
         };
-        tx.execute(
-            "INSERT INTO follow_ups(rid,person,asked_unix_ms) VALUES(?1,?2,?3)",
-            params![rid, person.as_str(), now],
-        )?;
+        // A dated one with `until_asked` is offered, and recorded as given
+        // only on its last offer; anything else is recorded now, as ever.
+        let held = if until_asked && events && on.is_some() {
+            let offers: u32 = tx.query_row(
+                "INSERT INTO follow_up_offers(rid,person,offers,offered_unix_ms) VALUES(?1,?2,1,?3) ON CONFLICT(rid) DO UPDATE SET offers=offers+1,offered_unix_ms=excluded.offered_unix_ms RETURNING offers",
+                params![rid, person.as_str(), now],
+                |r| r.get(0),
+            )?;
+            offers < FOLLOW_UP_OFFERS
+        } else {
+            false
+        };
+        if !held {
+            tx.execute(
+                "INSERT INTO follow_ups(rid,person,asked_unix_ms) VALUES(?1,?2,?3)",
+                params![rid, person.as_str(), now],
+            )?;
+        }
         tx.commit()?;
         let mut given = serde_json::json!({"id":id,"category":category,"text":text});
         if let Some(on) = on {
             given["on"] = on.into();
         }
+        if held {
+            given["until_asked"] = true.into();
+        }
         Ok(Some(given))
+    }
+
+    /// The lamp asked about follow-up `id`, given with `until_asked` (#1693,
+    /// the first builder on #2602, 22 Oct 09:4x): recorded as given now, so
+    /// never given again. Only one of this person's that was offered and
+    /// not yet recorded; anything else (another's, unknown, forgotten,
+    /// never offered, already recorded) changes nothing and is `false`.
+    pub fn follow_up_asked(&mut self, person: &Person, id: u64) -> Result<bool> {
+        let now = self.now;
+        let marked = self.db.execute(
+            "INSERT OR IGNORE INTO follow_ups(rid,person,asked_unix_ms) SELECT e.rid,?1,?3 FROM entries e JOIN follow_up_offers o ON o.rid=e.rid WHERE e.person=?1 AND e.id=?2 AND o.person=?1",
+            params![person.as_str(), id, now],
+        )?;
+        Ok(marked > 0)
     }
 
     pub fn session_close(&mut self, person: &Person, session: &str) -> Result<()> {
@@ -1687,6 +1747,10 @@ impl Days {
         // still its own.
         tx.execute(
             "UPDATE follow_ups SET person=?1 WHERE rid IN (SELECT rid FROM adopting)",
+            [to.as_str()],
+        )?;
+        tx.execute(
+            "UPDATE follow_up_offers SET person=?1 WHERE rid IN (SELECT rid FROM adopting)",
             [to.as_str()],
         )?;
         tx.execute(

@@ -2,7 +2,7 @@
 //! snapshots and migration. No model, network connection or lamp is involved.
 use lamp_memory::{
     Options, Person, Store,
-    days::{DATABASE, Days, NOTE_BYTES},
+    days::{DATABASE, Days, FOLLOW_UP_OFFERS, NOTE_BYTES},
     days_protocol,
     store::{Ask, Entry, Kind},
     tidy::{Category, Input, Output, Proposal},
@@ -1781,6 +1781,162 @@ fn an_event_is_given_only_to_the_person_who_said_it() {
     store.maintain(MONDAY + 8 * DAY).unwrap();
     assert_eq!(store.follow_up_with(&minh, true).unwrap(), None);
     assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
+}
+
+fn offer_rows(scratch: &Scratch) -> u64 {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row("SELECT count(*) FROM follow_up_offers", [], |r| r.get(0))
+        .unwrap()
+}
+
+/// #1693 (the first builder on #2602, 22 Oct 09:4x): with `until_asked`, a
+/// dated one is given without being marked asked, so a session where the
+/// lamp never asked is followed by another offer on a later day, at most
+/// one a day; once the voice says the lamp asked, never again. Only its own
+/// person marks it, and only once.
+#[test]
+fn a_dated_one_given_until_asked_is_offered_again_until_marked_asked() {
+    let scratch = Scratch::new("event-until-asked");
+    let mut store = scratch.open(30, NOW);
+    let (minh, mai) = (person("p-minh"), person("p-mai"));
+    let id = wedding(&mut store, &minh);
+    let offered = json!({"id":id,"category":"thread","text":"Sister's wedding is on Saturday","on":"2026-10-24","until_asked":true});
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        Some(offered.clone())
+    );
+    // The same day, a later session: one a day.
+    store.maintain(MONDAY + 6 * DAY + 3_600_000).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        None
+    );
+    // The next day, not asked yet: offered again.
+    store.maintain(MONDAY + 7 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        Some(offered)
+    );
+    assert!(!store.follow_up_asked(&mai, id).unwrap(), "not hers");
+    assert!(store.follow_up_asked(&minh, id).unwrap());
+    assert!(!store.follow_up_asked(&minh, id).unwrap(), "once");
+    for at in [MONDAY + 8 * DAY, MONDAY + 9 * DAY, MONDAY + 12 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, true, true).unwrap(),
+            None,
+            "{at}"
+        );
+    }
+}
+
+/// A dated one the lamp is never heard asking about is offered in at most
+/// `FOLLOW_UP_OFFERS` sessions, each on its own day: the last is recorded
+/// as given, as without `until_asked`, and carries no `until_asked`.
+#[test]
+fn a_dated_one_never_asked_is_offered_at_most_three_times() {
+    let scratch = Scratch::new("event-offers");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    assert_eq!(FOLLOW_UP_OFFERS, 3);
+    let held = json!(true);
+    for (day, until_asked) in [(6, Some(&held)), (7, Some(&held)), (8, None)] {
+        store.maintain(MONDAY + day * DAY).unwrap();
+        let given = store
+            .follow_up_until_asked(&minh, true, true)
+            .unwrap()
+            .expect("offered");
+        assert_eq!(given["id"], id, "day {day}");
+        assert_eq!(given.get("until_asked"), until_asked, "day {day}");
+    }
+    assert!(
+        !store.follow_up_asked(&minh, id).unwrap(),
+        "already recorded"
+    );
+    for at in [MONDAY + 9 * DAY, MONDAY + 10 * DAY, MONDAY + 15 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, true, true).unwrap(),
+            None,
+            "{at}"
+        );
+    }
+}
+
+/// With `until_asked`, an undated thread is recorded when given, as ever;
+/// and without `events` it has no effect at all.
+#[test]
+fn until_asked_holds_back_only_a_dated_one() {
+    let scratch = Scratch::new("event-until-undated");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let commute = thread(&mut store, &minh, NOW, "Tired of the commute");
+    store.maintain(NOW + DAY).unwrap();
+    let given = store
+        .follow_up_until_asked(&minh, true, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(given["id"], commute);
+    assert_eq!(given.get("until_asked"), None);
+    assert!(!store.follow_up_asked(&minh, commute).unwrap());
+    store.maintain(NOW + 2 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        None
+    );
+    // Without events, a dated one is recorded when given.
+    let id = wedding(&mut store, &minh);
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    let given = store
+        .follow_up_until_asked(&minh, false, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(given["id"], id);
+    assert_eq!(given.get("until_asked"), None);
+    assert_eq!(offer_rows(&scratch), 0);
+}
+
+/// The protocol: `follow_up` with `until_asked` and `follow_up_asked`;
+/// unknown fields refused, as every new operation's; a forget takes the
+/// offer with its entry (`ON DELETE CASCADE`).
+#[test]
+fn the_follow_up_asked_request_marks_and_a_forget_takes_the_offer() {
+    let scratch = Scratch::new("event-asked-protocol");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    let at = MONDAY + 6 * DAY;
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh","events":true,"until_asked":true}),
+        at,
+    );
+    assert_eq!(answer["follow_up"]["until_asked"], true, "{answer}");
+    assert_eq!(offer_rows(&scratch), 1);
+    let (answer, log) = request(
+        &mut store,
+        json!({"op":"follow_up_asked","person":"p-minh","id":id,"why":"x"}),
+        at,
+    );
+    assert_eq!(answer["ok"], false, "{answer}");
+    assert!(log.contains("bad_request"), "{log}");
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up_asked","person":"p-mai","id":id}),
+        at,
+    );
+    assert_eq!(answer, json!({"ok":true,"asked":false}));
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up_asked","person":"p-minh","id":id}),
+        at,
+    );
+    assert_eq!(answer, json!({"ok":true,"asked":true}));
+    assert!(store.forget(&minh, id).unwrap() >= 1);
+    assert_eq!(offer_rows(&scratch), 0);
 }
 
 /// The event day kept for observation `id` of `person`'s, if any; `None`
