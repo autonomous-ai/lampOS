@@ -16,6 +16,7 @@ pub const MOST_MANIFEST_BYTES: u64 = 65_536;
 
 // Consent remains a mechanism even when the rest of a note is editable data.
 const FACE_CONSENT: &str = "only after a clear yes call remember_my_face";
+/// Room sounds and face expressions alike.
 const ROOM_SOUNDS_CONSENT: &str = "done only after a clear yes";
 
 #[derive(Clone, Debug, Deserialize)]
@@ -70,7 +71,7 @@ pub(crate) struct Words {
 }
 
 impl Definition {
-    /// Exactly the eight mechanisms, in the skill's order. Data cannot add an
+    /// Exactly the nine mechanisms, in the skill's order. Data cannot add an
     /// actuator, relax a physical check, or remove the privacy flow's priority.
     pub fn checked(self) -> Result<Self, String> {
         let distinct: BTreeSet<_> = self.order.iter().copied().collect();
@@ -80,7 +81,7 @@ impl Definition {
             || !distinct.iter().all(|step| self.steps.contains_key(step))
         {
             return Err(
-                "[onboarding] order and steps must each name all eight steps exactly once".into(),
+                "[onboarding] order and steps must each name all nine steps exactly once".into(),
             );
         }
         if !(1..=31_536_000).contains(&self.reoffer_after_s) {
@@ -101,7 +102,7 @@ impl Definition {
             )?;
             let consent = match step {
                 Step::WhoYouAre => Some(FACE_CONSENT),
-                Step::RoomSounds => Some(ROOM_SOUNDS_CONSENT),
+                Step::RoomSounds | Step::FaceExpressions => Some(ROOM_SOUNDS_CONSENT),
                 _ => None,
             };
             if consent.is_some_and(|clause| {

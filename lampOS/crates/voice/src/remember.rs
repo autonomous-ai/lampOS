@@ -2218,7 +2218,8 @@ pub struct DaysClient {
     /// [`ROOM_NOT_ASKER_ENVIRONMENT`], read when the client is made (#2176).
     room_not_asker: AtomicBool,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
-    /// removed by any forget of everything (#2110).
+    /// removed by any forget of everything (#2110), and the face expressions
+    /// yes beside it.
     room_sounds: PathBuf,
     /// [`JOURNAL_RESUMES_ENVIRONMENT`], read when the client is made.
     resumes: AtomicBool,
@@ -3674,19 +3675,25 @@ impl DaysClient {
                     return lost((gone(), false));
                 }
             }
-            // And the household's yes to music and laughter: "a forget or
-            // the reset wipes it" (the lead on #2110), whoever asked.
+            // And the household's yes to music and laughter, and to how a
+            // face seems: "a forget or the reset wipes it" (the lead on
+            // #2110), whoever asked.
             if call.name == FORGET_EVERYTHING {
-                match std::fs::remove_file(&self.room_sounds) {
-                    Ok(()) => eprintln!(
-                        "lamp-voice provider: forget everything removed {}",
-                        self.room_sounds.display()
-                    ),
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                    Err(error) => eprintln!(
-                        "lamp-voice provider: forget everything could not remove {}: {error}",
-                        self.room_sounds.display()
-                    ),
+                for consent in [
+                    self.room_sounds.clone(),
+                    crate::onboarding::face_expressions_beside(&self.room_sounds),
+                ] {
+                    match std::fs::remove_file(&consent) {
+                        Ok(()) => eprintln!(
+                            "lamp-voice provider: forget everything removed {}",
+                            consent.display()
+                        ),
+                        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                        Err(error) => eprintln!(
+                            "lamp-voice provider: forget everything could not remove {}: {error}",
+                            consent.display()
+                        ),
+                    }
                 }
             }
             let (told, ids) = if call.name == REMEMBER && told["remembered"] == true {
@@ -6227,9 +6234,12 @@ mod tests {
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
-        // The household's room sounds yes goes with it (#2110).
+        // The household's room sounds yes goes with it (#2110), and the
+        // face expressions yes beside it.
         let consent = socket.with_extension("room-sounds.json");
         std::fs::write(&consent, b"{}").unwrap();
+        let face = crate::onboarding::face_expressions_beside(&consent);
+        std::fs::write(&face, b"{}").unwrap();
         let mut client = client;
         client.room_sounds = consent.clone();
         let (told, _) = client.run_at(
@@ -6241,6 +6251,7 @@ mod tests {
         );
         assert_eq!(told["forgotten"], false, "{told}");
         assert!(!consent.exists());
+        assert!(!face.exists());
         let read = served.join().unwrap();
         assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
         drop(client);
