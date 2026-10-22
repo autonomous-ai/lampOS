@@ -772,30 +772,36 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
 /// `LAMP_NAME_OR_FOLLOW_UP` on Live, through the worker's own loop with the
 /// room and the conversation as it keeps them (`attention_now`): after "Hey
 /// Lamp, how much is one hundred dollars in euros?" was answered, a
-/// follow-up said 5 s after the lamp's words ended is answered as the
-/// conversation going on, and one said 12 s after, without the name, is
-/// held, inside the thread's 45 s; with the name it is answered. Without the
-/// switch the 12 s one is answered too.
-#[tokio::test]
+/// follow-up begun 5 s after the lamp's words ended is answered as the
+/// conversation going on, and so is one begun then that goes on 7 s, its
+/// answer 12 s after the words (reviewer-two's P2 on #2967: the window runs
+/// to the line's start, not its verdict); one begun 12 s after, without the
+/// name, is held, inside the thread's 45 s; with the name it is answered.
+/// Without the switch the 12 s one is answered too. On the logical clock,
+/// so that the long line's 7 s pass in a moment.
+#[tokio::test(start_paused = true)]
 async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
+    let _clock = logical_clock();
     let follow_up = "And what about tomorrow?";
-    for (on, ago_s, line, answered) in [
-        (true, 5, follow_up, true),
-        (true, 12, follow_up, false),
-        (true, 12, "Hey Lamp, and what about tomorrow?", true),
-        (false, 12, follow_up, true),
+    for (on, ago_s, long_s, line, answered) in [
+        (false, 12, 0, follow_up, true),
+        (true, 12, 0, "Hey Lamp, and what about tomorrow?", true),
+        (true, 12, 0, follow_up, false),
+        (true, 5, 0, follow_up, true),
+        (true, 5, 7, follow_up, true),
     ] {
         assert_eq!(
-            after_the_lamps_words(on, ago_s, line).await,
+            after_the_lamps_words(on, ago_s, long_s, line).await,
             answered,
-            "{on} {ago_s} s: {line}"
+            "{on}, begun {ago_s} s after the words, {long_s} s long: {line}"
         );
     }
 }
 
-/// Whether `line`, said `ago_s` s after the lamp's words to the euros
-/// question ended, was answered, with `LAMP_NAME_OR_FOLLOW_UP` `on` or not.
-async fn after_the_lamps_words(on: bool, ago_s: u64, line: &str) -> bool {
+/// Whether `line`, begun `ago_s` s after the lamp's words to the euros
+/// question ended and going on `long_s` s before its end, was answered, with
+/// `LAMP_NAME_OR_FOLLOW_UP` `on` or not.
+async fn after_the_lamps_words(on: bool, ago_s: u64, long_s: u64, line: &str) -> bool {
     use std::sync::atomic::Ordering::Relaxed;
     let _mark = OwnMark::kept();
     let _room = OwnRoom::fresh();
@@ -808,7 +814,34 @@ async fn after_the_lamps_words(on: bool, ago_s: u64, line: &str) -> bool {
     .await;
     // The words the worker counted ended `ago_s` s ago.
     said_until_us().store(monotonic_us().saturating_sub(ago_s * 1_000_000), Relaxed);
-    let played = played(&mut rig, &mut dial, line).await;
+    let request = rig.speak(&mut dial, false, false).await;
+    // The person goes on speaking, then ends.
+    rig.pump(Duration::from_secs(long_s)).await;
+    let owner = rig.snapshot.owner().unwrap();
+    rig.owner.input_ended(real_time(), owner).unwrap();
+    rig.publish();
+    rig.parent
+        .data
+        .send(ProviderInput::End {
+            request,
+            privacy_generation: rig.snapshot.microphone_generation(),
+            sound: false,
+            cut_in: false,
+        })
+        .unwrap();
+    let end = rig.service_message(&mut dial).await;
+    assert!(end["realtimeInput"].get("activityEnd").is_some(), "{end}");
+    dial.service.send(heard(line)).await;
+    dial.service.send(provider_audio(7, 240)).await;
+    dial.service.send(idle_complete()).await;
+    let mut played = false;
+    loop {
+        match rig.output().await {
+            ProviderOutput::Audio { request: of, .. } if of == request => played = true,
+            ProviderOutput::TurnComplete { request: of, .. } if of == request => break,
+            _ => {}
+        }
+    }
     rig.stop().await;
     name_or_follow_up().store(before, Relaxed);
     said_until_us().store(0, Relaxed);
