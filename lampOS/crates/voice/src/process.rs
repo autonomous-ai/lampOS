@@ -1421,6 +1421,7 @@ fn second_route_worker_environment(
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::OPEN_NAME_ENVIRONMENT,
+        crate::second_provider::NAME_CARRIES_ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
@@ -1527,6 +1528,7 @@ mod tests {
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
+            crate::second_provider::NAME_CARRIES_ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -2061,6 +2063,7 @@ mod tests {
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
+                    || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
@@ -2186,6 +2189,7 @@ mod tests {
                     "LAMP_SECOND_LOOK_NOTE=on",
                     "LAMP_SECOND_LOOK_WALK=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
+                    "LAMP_SECOND_NAME_CARRIES=on",
                     "LAMP_SECOND_OPEN_NAME=on",
                     "LAMP_SECOND_OWN_ECHO=on",
                     "LAMP_SECOND_PREPARED=on",
