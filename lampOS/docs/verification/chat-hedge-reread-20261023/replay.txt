@@ -1,0 +1,23 @@
+
+running 2 tests
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: chat request going out on the client's pool; the first request of this client
+lamp-voice second: request 1 chat round 1 had not begun in 2500 ms; asked once more on a fresh connection
+lamp-voice second: request 1 chat round 1 had not begun in 3 ms; the turn ends unanswered
+lamp-voice second: a service answered HTTP 401, naming no code
+lamp-voice second: chat request going out on the client's pool; the first request of this client
+lamp-voice second: chat request 158 bytes, 1 messages, 0 tools; its answer began in 0 ms; the first request of this client
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: chat answer: its first words or call 0 ms and its end 0 ms after it was asked; no usage given
+lamp-voice second: request 1 chat round 1 had not begun in 2500 ms; not asked again: its scope has lapsed
+lamp-voice second: request 1 chat round 1 had not begun in 0 ms; the turn ends unanswered
+lamp-voice second: chat request going out on a connection of its own; the last request 0 s before
+.lamp-voice second: a service answered HTTP 401, naming no code
+lamp-voice second: chat request going out on a connection of its own; the last request 0 s before
+lamp-voice second: chat request 158 bytes, 1 messages, 0 tools; its answer began in 0 ms; the last request 0 s before; its tools and first message as the last request's
+lamp-voice second: chat answer: its first words or call 0 ms and its end 0 ms after it was asked; no usage given
+.
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3502 filtered out; finished in 0.02s
+

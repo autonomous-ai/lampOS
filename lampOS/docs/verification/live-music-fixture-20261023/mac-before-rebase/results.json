@@ -1,0 +1,78 @@
+{
+  "base": "43bc29f9b3163e03165148813c27af9e073e615c",
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin",
+  "candidate_patch_sha256": "db4c9181dc675a1d1bda2c340dee04c16b32fa103704a3e005dfd4148b5a38b9",
+  "bound_files": 6509,
+  "input_manifest_sha256": "2478554782ea899a4db1767f1003a4cd12c96601d1cd7407511b7d49b31ffe6c",
+  "changed_files": {
+    "lampOS/crates/voice/src/provider_worker.rs": "c2a68501b617fd66877edd081a5a5080cc4bf83d990f47848640e86df70578e3",
+    "lampOS/docs/requested-audio.md": "e2098b5381f978155ed7a2515201ee595f4e6772636bf7ffbe3a31d0bd144393"
+  },
+  "commands": [
+    {
+      "label": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.136,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "label": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 34.435,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "label": "voice-tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 326.06,
+      "log_bytes": 4925,
+      "log_sha256": "aa3ccf16ea6bfb8eda3afb7ad684d036460b65c3f9a2332bf429a850ecf7c155",
+      "result_lines": [
+        "test result: ok. 3485 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 265.62s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 270 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.44s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "inputs_unchanged": true
+}

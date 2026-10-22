@@ -75,3 +75,18 @@ bytes or API. The separate decline/music fixture has the same source
 ordering, but its module-local `one_at_a_time` atomic is not `ONE_THREAD`;
 its assigned owner received that finding. This receipt does not qualify a
 correction to that separate fixture or waive the original Linux failure.
+
+## Mac gate and current-base carry
+
+The uninstrumented two-file candidate passed the changed Voice crate gate
+on base `43bc29f9b`: **3,766 passed, 0 failed, 14 ignored**, across six result
+lines, with no filtering. Formatting passed in 5.136 s; strict all-target
+Voice Clippy passed in 34.435 s; the complete Voice command took 326.060 s.
+`mac-before-rebase/` retains the exact candidate patch, complete command
+outputs and source binding. All 6,509 bound files stayed unchanged.
+
+The patch was committed as `e488aa9ff`, then rebased onto the new integration
+head `7b3e6aef8` as `226c4e89b`. `rebase.json` retains the equal range-diff.
+Both changed files are byte-identical across that carry. A new current-base
+Mac gate is running; this earlier pass does not stand in for its result or
+the PR's official ARM64 and Linux Clippy gates.

@@ -1,0 +1,33 @@
+{
+  "head": "1d03e57b531843a8abe39091d7d711437dab8b33",
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "an_ask_again_",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 51.363,
+  "log_bytes": 1892,
+  "log_sha256": "9d6e020147dfd6bbfb1df85a4862117dee16de1e5e0e7024b1325a11157998ea",
+  "bound_files": 6509,
+  "inputs_unchanged": true,
+  "input_manifest_sha256": "635d0af68b8c38f78042f1c28c7345869763d3c22f2a0166e88988262bacb164",
+  "source_files": {
+    "lampOS/crates/voice/src/second_provider.rs": "5c52d2e5bb0b5b488075fa51241fc3cb0a0291e796ae2bfd3383df679790538f",
+    "lampOS/crates/voice/src/second_provider/services.rs": "5fed412404cef50194dde266f7e1677caaa3c2223840c14d15442294f342514c",
+    "lampOS/crates/voice/src/second_provider/net/chat.rs": "c6d980af9e8fe45cd1123d0e0749be2bf1cb6e05e01af4c100cb6578ab06bc39",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "b81ab79349991b922abde91eae869d7f5a630284c940daf790cffb7877b100d7"
+  },
+  "result_lines": [
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3502 filtered out; finished in 0.02s"
+  ]
+}

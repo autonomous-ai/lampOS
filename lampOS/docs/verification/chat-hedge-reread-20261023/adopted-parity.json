@@ -1,0 +1,22 @@
+[
+  {
+    "original": "second_review_delayed_chat_hedge_does_not_resend_camera_revoked_personal_context",
+    "adopted": "an_ask_again_never_sends_a_personal_context_revoked_before_it",
+    "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+    "body_identical_except_name": true,
+    "body_identical_after_rustfmt": true,
+    "expected_sha256": "97bf2e168382de3e5f16b16881b6e1e4f6a643707aa2f0f4f0bd7a7dda23b199",
+    "actual_sha256": "97bf2e168382de3e5f16b16881b6e1e4f6a643707aa2f0f4f0bd7a7dda23b199",
+    "formatted_sha256": "a7a3f61ac8902782d80ca7cdc5a4022361eb5fea88eb611945c6ef2ac7fc7152"
+  },
+  {
+    "original": "second_review_hedge_keeps_the_own_key_refusal_relay",
+    "adopted": "an_ask_again_keeps_the_own_key_refusal_relay",
+    "path": "lampOS/crates/voice/src/second_provider/services.rs",
+    "body_identical_except_name": false,
+    "body_identical_after_rustfmt": true,
+    "expected_sha256": "79ac3bba88511f23a6021918b4ace3e6f70a09cb6a915e144917a73b4eb1d103",
+    "actual_sha256": "752c68a3b328d94a3d7f36eb81975ccfc637cfcdeb0466979962209faa85ef57",
+    "formatted_sha256": "1e3d4117593921cee203e89084fa319649fb3b6f1ec0097034ec021caa67aeca"
+  }
+]

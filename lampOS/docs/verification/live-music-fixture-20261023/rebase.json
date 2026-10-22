@@ -1,0 +1,6 @@
+{
+  "before": "e488aa9ff5fea11a80c88dcc1a935fe99aae5b4c",
+  "base": "7b3e6aef8968963756151b9a0c7900eb0cd8680c",
+  "head": "226c4e89b7625d6dadcebd77053d91e057c3944b",
+  "range_diff": "1:  e488aa9ff = 1:  226c4e89b lampOS: start the music fixture after acquiring worker state\n"
+}
