@@ -73,6 +73,17 @@ lamp"):
 - With `lamp.env` there it does nothing. It stays active, whatever became of
   the stand.
 
+Since 22 Oct, for lamps moved from V1, `lamp-voice.service` carries the
+product unit's "who it answers" switches at the product's values (with
+`LAMP_ROOM_FACTS`), and the bus they read the name and the faces from
+(`LAMP_BUS`, `LAMP_BUS_AUDIO`); `lamp-eyes.service` publishes the faces there
+(`LAMP_BUS=on`). A test in `crates/update/src/unit.rs` keeps the two units the
+same, and fails on a switch `docs/attention.md` names that is in neither list. `LAMP_NAMES` is
+left out: it needs the eyes' who socket, which the generic eyes unit does not
+serve. `busy-near` judges a busy room as `busy` does until the package runs
+`lamp-ears`. The second route (`LAMP_VOICE_ROUTE=second`) is left out too,
+since nothing in this package writes `/etc/lampOS/voice/second.json`.
+
 `lamp-body.service` is `Type=notify` with `WatchdogSec=5`: the body says
 when it is ready and that its loop is alive. The others are `Type=simple`
 until each calls the keeper's helper; then each becomes `Type=notify` with

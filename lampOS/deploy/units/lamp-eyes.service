@@ -23,6 +23,8 @@ RuntimeDirectory=lampos-eyes
 RuntimeDirectoryMode=0755
 # Looking is never worth a late word.
 Nice=10
+# The faces on the bus (humans/faces/tracked), which the voice's name note and spoken-to rule read (#2883).
+Environment=LAMP_BUS=on
 ExecStart=/opt/lampOS/eyes/@EYES_SHA256@/lamp-eyes --device @CAMERA_DEVICE@ --lock-directory @CAMERA_LOCK_DIR@ --usb @CAMERA_USB@ --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg
 Restart=on-failure
 RestartSec=5s
