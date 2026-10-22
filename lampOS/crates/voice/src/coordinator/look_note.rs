@@ -15,8 +15,9 @@
 //! is taken as a skill's look is, and goes as the search's next look turn,
 //! naming the place, so the finding is still the model's. The skill's
 //! refusal past its looks (its `give_up`) goes once as a written turn, and
-//! the search is over. The person speaking, another turn, a session change
-//! or a stop by hand ends it at once.
+//! the search is over. The person speaking, another turn, a session change,
+//! a stop by hand or a push on the body (`body/hand`, #2904) ends it at
+//! once; a push drops the held look's picture too.
 //!
 //! The note, the walk's places in order and the words for where each look
 //! was taken are the skill's own, in its file's `[search]` (`note`, `walk`,
@@ -375,6 +376,18 @@ impl LookNote {
         self.pending = None;
         self.step = None;
         self.walk_line = None;
+    }
+
+    /// A push on the body (`body/hand`, #2904) ends the search as a stop by
+    /// hand does. `None` with no search begun; else the turn whose skill's
+    /// look is held, if one: its picture is not to go.
+    pub fn pushed(&mut self) -> Option<Option<u64>> {
+        if self.search.is_none() && self.held.is_none() {
+            return None;
+        }
+        let held = self.held;
+        self.clear();
+        Some(held)
     }
 
     /// The person speaking, another turn, a session or worker change, or a

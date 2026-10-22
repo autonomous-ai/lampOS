@@ -854,7 +854,11 @@ search ends, so a search skill errors only past its looks (#2280). A walk
 step dropped while its call is in flight (the person spoke within its
 1.5 s) still turns the head: the skill made the pose, and the line that
 ended the step came before it began, so it may hold until its `for`; a
-check for the lamp row, not yet handled. When the turn is over the look's
+check for the lamp row, not yet handled. A push on the body that ends a
+search here ends it for the second route too (#2904): the held look's
+picture is dropped, no note or walk follows, no look runs for 30 s in a
+turn the lamp wrote, and the person's next request is told they stopped
+the search with a hand ([second-voice.md](second-voice.md)). When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is
 answered at once while the still takes up to 2.5 s. If no still with
