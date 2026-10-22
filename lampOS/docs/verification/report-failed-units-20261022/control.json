@@ -1,0 +1,51 @@
+{
+  "mode": "control",
+  "started_at": "2026-10-22T07:14:02.169549+07:00",
+  "base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe",
+  "sources_before": {
+    "crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68"
+  },
+  "stages": [
+    {
+      "name": "failed-list-omitted-control",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-cloud",
+        "--lib",
+        "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "timed_out": false,
+      "elapsed_seconds": 30.28,
+      "log_name": "failed-list-omitted-control.log",
+      "log_sha256": "1c2e58fa49c75738ac3a167da5988ed71247682887648f4e6ad6e3c6bd507bae",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 150 filtered out; finished in 0.49s"
+      ],
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "filtered out": 150
+      }
+    }
+  ],
+  "status": "expected-failure-observed",
+  "sources_after": {
+    "crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T07:14:32.470635+07:00"
+}

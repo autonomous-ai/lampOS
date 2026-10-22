@@ -3,8 +3,10 @@
 //! `info` carries it, and `sent_at` set once and kept on every send again,
 //! since the backend drops a duplicate by `(device, seq, sent_at)`. A field
 //! renamed or retyped here is `lamp-report/2`.
-use lamp_cloud::reports::{Lamp, Places, Reports, Seen, Sources, topic};
-use serde_json::Value;
+use lamp_cloud::reports::{
+    ID_MOST, Lamp, MOST_BYTES, Places, RECOVERY_NOT_READY, Reports, Seen, Sources, UNITS, topic,
+};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 
 fn places(name: &str) -> Places {
@@ -70,9 +72,17 @@ fn every_report_carries_the_agreed_fields_and_sent_at_is_set_once() {
     assert_eq!(health["generation"], "lamp-v2");
     assert_eq!(health["id"], "dev-42");
     assert_eq!(health["kind"], "health");
-    for field in ["level", "parts", "missing", "other_parts", "restarts"] {
+    for field in [
+        "level",
+        "parts",
+        "missing",
+        "other_parts",
+        "restarts",
+        "failed_units",
+    ] {
         assert!(health.get(field).is_some(), "{field}");
     }
+    assert_eq!(health["failed_units"], json!([]));
     // Sent again after a drop: the same message, `sent_at` and all, though
     // time has gone on.
     reports.unhand(None);
@@ -93,6 +103,52 @@ fn every_report_carries_the_agreed_fields_and_sent_at_is_set_once() {
     agreed.push("clock_synced");
     agreed.sort_unstable();
     assert_eq!(fields, agreed);
+}
+
+#[test]
+fn failed_units_are_canonical_in_schema_one_and_kept_on_retransmit() {
+    let places = places("failed-units");
+    let root = places.own.parent().unwrap().to_owned();
+    let mut reports = Reports::open(places);
+    let mut seen = Seen {
+        // Even a forged public Seen cannot add names or duplicates to the wire.
+        failed_units: UNITS.iter().rev().copied().collect(),
+        restarts: [("lamp-update.service", 0)].into(),
+        waits: [("lamp-update.service", RECOVERY_NOT_READY)].into(),
+        ..Seen::default()
+    };
+    seen.failed_units
+        .extend(["PRIVATE_FAILED_UNIT", "lamp-update.service"]);
+    reports.health(1_792_382_400, None, &seen).unwrap();
+    let id = "x".repeat(ID_MOST);
+    let first = reports.due(&id);
+    assert_eq!(first.len(), 1);
+    assert!(first[0].1.len() <= MOST_BYTES);
+    assert!(!first[0].1.contains("PRIVATE_FAILED_UNIT"));
+    let health: Value = serde_json::from_str(&first[0].1).unwrap();
+    let mut expected = UNITS.to_vec();
+    expected.sort_unstable();
+    assert_eq!(health["failed_units"], json!(expected));
+    assert_eq!(health["schema"], "lamp-report/1");
+    assert_eq!(
+        health["waits"],
+        json!({"lamp-update.service": RECOVERY_NOT_READY})
+    );
+    reports.unhand(None);
+    assert_eq!(reports.due(&id), first);
+    reports.acked(first[0].0);
+
+    // The next observation has recovered; restart counts and waits have
+    // independent meanings and stay exactly as observed.
+    seen.failed_units.clear();
+    reports.health(1_792_383_300, None, &seen).unwrap();
+    let next = reports.due(&id);
+    assert_eq!(next.len(), 1);
+    let recovered: Value = serde_json::from_str(&next[0].1).unwrap();
+    assert_eq!(recovered["failed_units"], json!([]));
+    assert_eq!(recovered["restarts"], health["restarts"]);
+    assert_eq!(recovered["waits"], health["waits"]);
+    let _ = std::fs::remove_dir_all(root);
 }
 
 /// What the app's device-page switch reads (mobile on #1683): `reports.get`

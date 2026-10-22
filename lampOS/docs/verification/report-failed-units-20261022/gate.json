@@ -1,0 +1,102 @@
+{
+  "mode": "gate",
+  "started_at": "2026-10-22T07:14:32.565326+07:00",
+  "base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe",
+  "sources_before": {
+    "crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 5.181,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 22.708,
+      "log_name": "clippy.log",
+      "log_sha256": "4722b400ae49cbb939b2bb855b9cf78b34b1233a32cf11081b36b5b8a18deeb3",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-cloud",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 48.723,
+      "log_name": "tests.log",
+      "log_sha256": "4ae962f2b988076a675e112e8875d12086cb57606257d5335bdb479333944b0c",
+      "summaries": [
+        "test result: ok. 150 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 39.76s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 177,
+        "failed": 0,
+        "ignored": 1,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "passed",
+  "sources_after": {
+    "crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T07:15:49.198706+07:00"
+}
