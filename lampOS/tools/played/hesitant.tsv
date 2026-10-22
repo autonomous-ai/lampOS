@@ -1,0 +1,39 @@
+# Hesitant asks for desk-kit.sh, one line per variant; trial N plays each ask's variant N (round robin).
+# mark: L (to the lamp). ask: its name. variant: 1, 2, 3, or "then" (an un-named follow-up said after whichever
+# variant played). keys: words the heard request must all hold to count as answered whole ("a/b" = either).
+# wait: seconds after the line before the next one. text: what is said; {0.4} is a 0.4 s pause inside the line.
+#mark	ask	variant	keys	wait	text
+L	cat	1	name cat	12	Lamp, what's a {0.6} a good name for a small grey cat?
+L	cat	2	name cat	12	Hey Lamp, um {0.5} what's a good name {0.3} for a small grey cat?
+L	cat	3	name cat	12	Lamp, what's a good name for a, uh {0.8} a small grey cat?
+L	capital	1	capital australia	12	Hey Lamp, what's the {0.7} capital of Australia?
+L	capital	2	capital australia	12	Lamp, uh {0.4} what's the capital of, um {0.6} Australia?
+L	capital	3	capital australia	12	Lamp, what's the cap {0.3} the capital of Australia?
+L	egg	1	boil egg	7	Lamp, how long does it {0.5} take to boil an egg?
+L	egg	2	boil egg	7	Hey Lamp, um {0.9} how long do I boil an egg?
+L	egg	3	boil egg	7	Lamp, how long to boil, uh {0.6} an egg, a hard one?
+L	egg	then	soft	12	And a soft one?
+L	spider	1	legs spider	12	Hey Lamp, how many {0.6} legs does a spider have?
+L	spider	2	legs spider	12	Lamp, how many legs does a, uh {0.5} a spider have?
+L	elephant	1	fact elephant/elephants	12	Lamp, tell me a short {0.8} fact about elephants.
+L	elephant	2	fact elephant/elephants	12	Hey Lamp, um {0.4} tell me a fact {0.4} about elephants.
+L	elephant	3	fact elephant/elephants	12	Lamp, tell me a short fact about, uh {0.7} elephants.
+L	owl	1	joke owl/owls	7	Lamp, can you {0.6} tell me a joke about owls?
+L	owl	2	joke owl/owls	7	Hey Lamp, tell me a, um {0.5} a joke about owls.
+L	owl	then	another	12	Another one?
+L	moon	1	far moon	12	Lamp, how far is the moon from us, like {0.7} roughly?
+L	moon	2	far moon	12	Hey Lamp, uh {0.3} how far away is the moon, I wonder, if
+L	moon	3	far moon	12	Lamp, how far {0.9} how far away is the moon?
+L	happy	1	word happy	12	Lamp, give me {0.6} one word for happy.
+L	happy	2	word happy	12	Hey Lamp, what's another word for, um {0.8} happy?
+L	tokyo	1	time tokyo	7	Hey Lamp, what time is it {0.5} in Tokyo?
+L	tokyo	2	time tokyo	7	Lamp, um {0.6} what's the time in Tokyo right now?
+L	tokyo	then	london	12	And in London?
+L	spell	1	spell necessary	12	Lamp, how do you spell {0.7} necessary?
+L	spell	2	spell necessary	12	Hey Lamp, how do you, uh {0.4} spell necessary?
+L	spell	3	spell necessary	12	Lamp, how do you spell, um, nec {0.3} necessary?
+L	leap	1	days leap	12	Hey Lamp, how many days are in a {0.6} a leap year?
+L	leap	2	days leap	12	Lamp, um {0.2} how many days does a leap year have, or
+L	mountain	1	mountain africa	12	Lamp, what's the tallest {0.5} mountain in Africa?
+L	mountain	2	mountain africa	12	Hey Lamp, what's the tallest, uh {0.9} mountain in Africa?
+L	mountain	3	mountain africa	12	Lamp, what's the tall {0.4} the tallest mountain in Africa?

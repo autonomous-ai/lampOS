@@ -4,6 +4,7 @@
 usage: scenario.py NAME STEP [STEP ...]
   STEP is  VOICE|TEXT|WAIT_AFTER_SECONDS      e.g.  "Daniel|Lamp, how are you today?|9"
            or  pause|SECONDS
+           or  wav|PATH|WAIT_AFTER_SECONDS|LABEL   a wav played as it is, its PLAY line "wav: LABEL"
 Speech is synthesised once with macOS `say`, kept in $PLAYED_OUT/prompts/generated/ and reused. A played voice is a smoke
 test: the lamp's voice microphone hears replayed speech worse than a person. Output is also saved under
 $PLAYED_OUT/scenarios/ (PLAYED_OUT defaults to ~/lamp-played). The lamp is reached with lamp_ssh beside this file
@@ -48,8 +49,12 @@ def main():
         parts = step.split('|')
         if parts[0] == 'pause':
             time.sleep(float(parts[1])); continue
-        voice, text, wait = parts[0], parts[1], float(parts[2])
-        path = wav_for(voice, text)
+        if parts[0] == 'wav':
+            voice, path, wait = 'wav', parts[1], float(parts[2])
+            text = parts[3] if len(parts) > 3 else os.path.basename(path)
+        else:
+            voice, text, wait = parts[0], parts[1], float(parts[2])
+            path = wav_for(voice, text)
         at = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
         subprocess.run(['/usr/bin/afplay', path], check=True)
         done = time.monotonic()
