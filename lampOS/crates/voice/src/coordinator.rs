@@ -334,6 +334,14 @@ fn own_line(current: &Reply, lamp_began: Option<u64>) -> bool {
             || lamp_began == Some(current.owner.turn()))
 }
 
+/// A line the lamp started on its own, sounding ([`Reply::reached_speaker`])
+/// in a room busy as it began (`busy`, `LAMP_OWN_LINE_OVER_TALK`): talk over
+/// it is the room's. The duplex mask doesn't yield to it, and a candidate
+/// with no name, stop word or face turned to the lamp is let go.
+fn busy_room_line(current: &Reply, busy: bool, lamp_began: Option<u64>) -> bool {
+    busy && own_line(current, lamp_began) && current.reached_speaker()
+}
+
 /// What the own line's wait knows besides the candidate and the reply.
 #[derive(Clone, Copy, Debug, Default)]
 struct OwnLineWait {
@@ -387,9 +395,12 @@ fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) 
 /// the lamp still stop it, unless the room was `busy` as the line began
 /// (`LAMP_OWN_LINE_OVER_TALK`): then talk with no name, no stop word and no
 /// face turned to the lamp in it is let go as the room's (`busy_room`), once
-/// the line has reached the speaker (its playback started, or samples were
-/// handed to it, so a line paused for a yield still counts): provider audio
-/// still queued short of a speaker block is no sounding line yet.
+/// the line has reached the speaker ([`Reply::reached_speaker`]: the speaker
+/// accepted some of it, so a line paused since still counts): audio queued,
+/// or handed over and not yet accepted, is no sounding line yet. While it
+/// sounds so, the duplex mask doesn't yield to that talk
+/// ([`crate::turn_taking::PlaybackMask::room_talk`]), so the line plays on
+/// with no gap.
 fn while_own_line_waits(
     wait: OwnLineWait,
     reply: Option<&Reply>,
@@ -426,7 +437,7 @@ fn while_own_line_waits(
         } else if on && let_go_goes_on && !named && !theirs {
             WhileOwnLineWaits::LetGo("goes_on")
         } else if busy
-            && (current.handed > 0 || current.playback.is_some())
+            && busy_room_line(current, busy, lamp_began)
             && !named
             && !theirs
             && !in_it(stop_began_us)
@@ -954,6 +965,9 @@ struct Reply {
     /// Its samples handed to the speaker so far: how much of it was played
     /// when a line or a Stop cut it (`LAMP_SAID_AS_HEARD`).
     handed: u64,
+    /// The speaker has accepted some of it (its playback started), now or
+    /// before a pause: it has sounded. Never reset.
+    sounded: bool,
     generation_done: bool,
     provider_idle: bool,
     input_sequence: u64,
@@ -1101,6 +1115,11 @@ impl Reply {
         // The gate receipt describes a dispatchable first block. A lone held
         // tail, empty queue, or prior unretired final cursor is not a start.
         self.has_speaker_chunk() && self.start.open(at_us, self.pcm.len(), self.generation_done)
+    }
+
+    /// It has reached the speaker: accepted, now or before a pause.
+    fn reached_speaker(&self) -> bool {
+        self.sounded || self.playback.is_some()
     }
 
     fn has_speaker_chunk(&self) -> bool {
@@ -3057,6 +3076,7 @@ fn service_speaker_control(
                     if current.playback.is_none() {
                         let token = owner.playback_started(now(), pending.permit)?;
                         current.playback = Some(token);
+                        current.sounded = true;
                         *snapshot = owner.snapshot(now())?;
                         io.publish_speaker_snapshot(*snapshot)?;
                         *last_publish = monotonic_us();
@@ -5205,6 +5225,8 @@ fn conversation_with_gate(
     let own_line_over_talk =
         own_line_over_talk || TEST_OWN_LINE_OVER_TALK.with(std::cell::Cell::get);
     let mut own_line_busy: Option<(u64, bool)> = None;
+    // The line whose talk let go as a busy room's the journal was told of.
+    let mut busy_room_told: Option<u64> = None;
     // When `lamp-name` last heard a stop word beginning, for that.
     let mut stop_began_us: Option<u64> = None;
     let own_line_eyes = (own_line_keeps || own_line_over_talk)
@@ -7688,6 +7710,21 @@ fn conversation_with_gate(
                 // Counts only validated, fresh frames reaching the hearing path.
                 accepted.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
+            // Talk over the lamp's own line in a busy room doesn't pause it
+            // (`LAMP_OWN_LINE_OVER_TALK`): withheld for a yield, the line's
+            // audio left the speaker playing zeros, and the say ended
+            // `dropped` with playback gaps though its talk was let go
+            // (lamp-52e6, 22 Oct).
+            playback_mask.room_talk(
+                own_line_over_talk
+                    && reply.as_ref().is_some_and(|current| {
+                        busy_room_line(
+                            current,
+                            own_line_busy == Some((current.owner.turn(), true)),
+                            lamp_began,
+                        )
+                    }),
+            );
             let (heard, yielded) = hear_capture_block(
                 &mut playback_mask,
                 reply,
@@ -8197,9 +8234,15 @@ fn conversation_with_gate(
                                         .or(own_let_go);
                             }
                             if why == "busy_room" {
-                                eprintln!(
-                                    "lamp-voice: talk over the lamp's own line in a busy room, with no name or face turned to it, was let go; the line goes on"
-                                );
+                                // Talk goes on as many candidates, each its
+                                // own record: the journal says it once a line.
+                                let turn = reply.as_ref().map(|current| current.owner.turn());
+                                if busy_room_told != turn {
+                                    busy_room_told = turn;
+                                    eprintln!(
+                                        "lamp-voice: talk over the lamp's own line in a busy room, with no name or face turned to it, is let go; the line goes on"
+                                    );
+                                }
                             } else {
                                 eprintln!(
                                     "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
@@ -12508,6 +12551,7 @@ fn commit_written_turn(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -12703,6 +12747,7 @@ fn commit_admitted_input(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     // One candidate's audio, already bounded by the admission's hold. The
     // standard hold's prefix fits the standing bound as it always has, and
@@ -12809,6 +12854,7 @@ fn commit_offline_input(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     current.input_sequence = accepted.audio.len() as u64;
     if accepted.ended {
@@ -12973,6 +13019,7 @@ fn commit_back_online(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
@@ -13071,6 +13118,7 @@ fn continue_after_early_end(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     // At most a pre-roll, as a new candidate's opening is.
     let bound = PROVIDER_QUEUE_BOUND.max(opening.len() + 2) + usize::from(count_only);
@@ -14882,6 +14930,7 @@ mod tests {
                 start: StartGate::new(0),
                 need: StartNeed::default(),
                 handed: 0,
+                sounded: false,
             },
             permit,
         )
@@ -15890,6 +15939,7 @@ mod tests {
             start: StartGate::new(0),
             need: StartNeed::default(),
             handed: 0,
+            sounded: false,
         });
         let started = monotonic_us();
         let observed = started + 20_000;
@@ -16178,6 +16228,7 @@ mod tests {
             start: StartGate::new(0),
             need: StartNeed::default(),
             handed: 0,
+            sounded: false,
         });
         handle_playback_discard(
             &mut owner,

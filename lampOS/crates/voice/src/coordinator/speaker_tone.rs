@@ -231,6 +231,7 @@ pub(super) fn commit_sound_turn(
         start: playout_start.gate(),
         need: StartNeed::default(),
         handed: 0,
+        sounded: false,
     };
     owner.input_ended(now(), current.owner)?;
     snapshot = owner.snapshot(now())?;
