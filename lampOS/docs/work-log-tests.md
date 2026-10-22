@@ -1,5 +1,57 @@
 # Tests work log
 
+## 2026-10-22 07:21:55 +0700 — two rebases green; add-ons conflict published; Skills drift reproduced
+
+#2703 at `37305d9ce` passed [ARM64 #5407](https://github.com/autonomous-ai/lampOS/actions/runs/39696025998)
+in 21m00s: 9,906 passed (one leaky), 63 skipped; nextest 170.658 s.
+Clippy #1415 passed in 2m31s. Its unchanged range-diff and ready request to
+Reviewer-two are [on Queue #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329509188).
+#2646 at `304cac668` passed [ARM64 #5408](https://github.com/autonomous-ai/lampOS/actions/runs/39696030009)
+in 19m09s: 6,333 passed (one leaky), 28 skipped; nextest 116.617 s.
+Clippy #1416 passed in 2m23s. It is merged as `515e43d3a`; its unchanged
+range-diff/result are [posted](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329509565).
+Both native merge checkouts used integration base `e2b2f596d`.
+
+#2693's [ARM64 #5410](https://github.com/autonomous-ai/lampOS/actions/runs/39696094934)
+failed: the rebased fixture still matched `quiet-note` after upstream
+renamed its add-on to `quiet-say`. It ran 4,875/9,906 tests: 4,874 passed,
+one failed, 63 skipped; fail-fast left 5,031 unrun. The PR is draft, and
+[the correction was claimed](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329510328).
+The exact stale-name fixture failed locally at its intended 10 s timeout.
+The corrected fixture uses its loaded name for completion correlation;
+enabled and disabled each passed three runs, and all three original
+negative controls failed as intended. Final gates are running. Initial
+metadata disproved a no-reverse-dependency assumption before tests; the
+actual twelve-package closure is now included in the gates.
+
+#2647's resolved rebase is pushed as `c1c14d671` on `74b90c317`, with all
+11 upstream judge tests plus the CLI test. All 50 local tests, eight
+controls, strict Clippy, formatting and workspace build passed. The
+[compact rebase evidence](https://github.com/autonomous-ai/lampOS/blob/c1c14d6718963c3092dda7ac7e6051f1c48a5eab/lampOS/docs/verification/addons-rebase-20261022/README.md)
+records source/restoration hashes and the default-forwarding coverage gap.
+Linux Clippy is green; [ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39698596702)
+is running. Draft remains until green.
+
+#2637's P3 correction is pushed as `0950fc4ad`: 209 Tasks, 3,238 serial
+Voice and 2,806 dependent tests passed (6,253 total, 28 existing ignored),
+with strict Clippy, formatting and workspace build. The earlier Skills
+journal failure and three passing unchanged-base comparisons remain in
+its compact evidence. Linux Clippy is green; ARM64 is running.
+
+#2653's initial baseline Mood sample failed with `Mood bus I/O did not
+stop`; all three baseline Expression samples passed. The final sources
+were restored byte for byte. The continuation preserves that observation,
+finishes only the remaining baseline samples, and requires final samples,
+controls and gates to pass. Expression's natural success and Mood's 600 ms
+finite run stay restored; only the other three speedups remain.
+
+#2625 is rebased locally onto `0566796d7` and draft. Its three zero-skip
+ACKs can all come from one skip drain, so they do not prove a main-loop
+pass. The fixture will use the existing guard-mode mark completion events;
+[claimed on Queue](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329556555).
+Photo-faces seam and row 72 follow. No ARM64 build on the Mac or device
+access; cloud confirmation remains on hold for the owner's list.
+
 ## 2026-10-22 07:01:13 +0700 — requested rebases pushed; review corrections continue
 
 Ready checks on rebased source are pending. At the owner's request, #2703,
