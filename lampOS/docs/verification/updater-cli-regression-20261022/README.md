@@ -59,3 +59,24 @@ Update/workspace inputs stayed identical during the run. The receipt names
 the integration and precommit head plus source hashes; no commit hash is
 misrepresented as including its then-uncommitted new test files. The next
 public replacement still needs its own official ARM64 and Clippy runs.
+
+## Official qualification and review, 23:22 +07
+
+[native.json](native.json) binds exact head `baacc2746` to tested merge
+`6199378` against `17167b1ba`. [ARM64 39810342673](https://github.com/autonomous-ai/lampOS/actions/runs/39810342673)
+and [Linux Clippy39810342675](https://github.com/autonomous-ai/lampOS/actions/runs/39810342675)
+completed successfully. Native nextest: **10,531 passed / 0 failed /
+67 skipped**, one retained existing leaky Voice pass. CLI checker **0.147 s**,
+seven-cut checker **3.592 s**, both explicit PASS. Separately four doctests,
+twelve process checks and relay passed. Artifact12441490647 is API metadata
+only; its archive/payloads were not independently downloaded or verified.
+
+[Reviewer-lead's fresh CLI read](https://github.com/autonomous-ai/lampOS/pull/3012#issuecomment-6345696778)
+found no issue and requested removal of draft after ARM64. The PR is now
+non-draft on that qualified head; [ready.json](ready.json) records this. The
+noted P3 is that SIGKILL of the entire checker may leave its temporary
+fixture directory; normal/drop/panic cleanup is not a SIGKILL guarantee.
+Integration advanced to `a37144927` during CI. Reviewer-lead has the final
+current-base carry/merge; old-base success is not relabelled as qualification
+of that newer integration. The attended unplug and real release remain
+unexecuted and assigned to the people identified in the worksheet.

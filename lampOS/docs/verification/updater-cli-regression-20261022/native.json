@@ -1,0 +1,76 @@
+{
+  "head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+  "integration_base": "17167b1ba34b519eaac0aaf8ff8c418f0507263d",
+  "tested_merge_short": "6199378",
+  "arm64_run": 39810342673,
+  "clippy_run": 39810342675,
+  "conclusion": "success",
+  "required_jobs": [
+    {
+      "id": 119934571108,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342673/job/119934571108",
+      "started_at": "2026-10-22T16:01:50Z",
+      "completed_at": "2026-10-22T16:21:47Z",
+      "active_step": [],
+      "run_id": 39810342673,
+      "head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    },
+    {
+      "id": 119934571439,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342675/job/119934571439",
+      "started_at": "2026-10-22T16:01:48Z",
+      "completed_at": "2026-10-22T16:09:12Z",
+      "active_step": [],
+      "run_id": 39810342675,
+      "head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    }
+  ],
+  "nextest": {
+    "passed": 10531,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passes": 1,
+    "test_seconds": 178.992
+  },
+  "checkers": {
+    "self-cli-exec": {
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "passed": true,
+      "test_seconds": 0.147
+    },
+    "self-process-cuts": {
+      "name": "persisted_self_switches_survive_sigkill",
+      "passed": true,
+      "test_seconds": 3.592
+    }
+  },
+  "case_counting": "CLI positive/off-control are one named checker; seven SIGKILL cuts are another named checker. Internal cases are not added to suite count.",
+  "separate_harnesses": {
+    "doc_passed": 4,
+    "process_passed": 12,
+    "process_failed": 0,
+    "relay": "ok"
+  },
+  "leak_rows": [
+    "2026-10-22T16:21:03.0799536Z         LEAK [   0.217s] ( 8519/10531) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "raw_log_sha256": "41f62be879dcda4e7e727adc14f3bf2c55d8a93b1e2ae8b19427b0a118ca84e7",
+  "artifact_metadata": {
+    "id": 12441490647,
+    "name": "lampos-arm64-baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+    "size_in_bytes": 114436939,
+    "api_digest": "sha256:df4e1c1dc11c9f91e87144eb955da42382dd287bd9a25535acfa22062e0a7279",
+    "scope": "API metadata only; archive not downloaded or independently verified. No updater payload hash asserted."
+  },
+  "limits": "Qualified exact source head merged against17167b1ba. Integration advanced during CI; final current-base carry/merge is with Reviewer-lead. No new real release, signing key, service/timer, cold boot, lamp or physical cut result."
+}

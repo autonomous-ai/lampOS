@@ -11,7 +11,9 @@
   "message": "lampOS: test updater process death and CLI self-handover",
   "arm64_run": 39810342673,
   "clippy_run": 39810342675,
-  "official_status": "in_progress, not qualified",
+  "official_status": "both required exact-head jobs completed success",
   "range_diff_sha256": "3929aac2e2ed749245b18d63a22f8fb68191420e992b5e1f5227c0a489db88a3",
-  "note": "Equal original seven-cut rebase followed by the reviewed CLI regression extension; final formatting passes and all36 bound Update/workspace inputs match the complete local307/0/4 gate. Transitive combined head requires its fresh official CI."
+  "note": "Equal original seven-cut rebase followed by the reviewed CLI regression extension; final formatting passes and all36 bound Update/workspace inputs match the complete local307/0/4 gate. Transitive combined head requires its fresh official CI.",
+  "readiness": "non-draft following Reviewer-lead fresh read/direction; final latest-base carry remains with merger",
+  "current_integration_at_readiness": "a37144927b92eb64badfa8623d3d7d7ad57938db"
 }
