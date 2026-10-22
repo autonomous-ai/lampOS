@@ -38,6 +38,14 @@ on or removed.
   (speeds, poses, reaches) are left out: they configure, they don't turn a
   behaviour on.
 
+## Reserved repair controller name
+
+`LAMP_FACE_REPAIR` is reserved by the inactive face-repair controller core.
+The core does not read it: setting it in the environment enables no runtime,
+RPC or product capability. Its constructor takes an explicit boolean for host
+controls. Neither product nor lamp units set it. It is outside the behavior
+counts until the separately reviewed runtime integration implements the switch.
+
 ## The count
 
 The counts aren't kept on this page: a test works them out from the rows, so

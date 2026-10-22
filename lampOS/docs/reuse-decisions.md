@@ -1,5 +1,40 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Face repair controller core (2026-10-22)
+
+The V1 paths were checked directly in this checkout:
+`system/server/device/delivery/mqtt/face_enroll_handler.go` validates label,
+base64 and photo size before a `starting` acknowledgement, then calls HAL
+from a goroutine under `faceEnrollMu`.
+`system/server/device/delivery/mqtt/face_owners_handler.go` shares that lock
+for removal. Keep early validation, truthful progress and one writer, with
+slow work outside the input callback. Change the unbounded per-request
+goroutine admission to one pending RAM transaction and four terminal
+receipts in the inert Rust core; a future writer still needs runtime wiring.
+
+`hal/routes/sensing.py::face_enroll` calls
+`hal/drivers/sensing/perceptions/processors/faceid/perception.py::enroll_from_bytes`,
+which saves a photo before training. Its `remove_photo` deletes the person's
+directory when the last photo goes; `remove_person` deletes that directory
+and reloads the remaining people. These are photo enrollment/deletion
+paths, not atomic repair preserving a stable memory record. Do not port
+them as repair. Reuse the Rust `RepairTarget`/`replace_prints` handoff and
+explicit `NotWritten`/`Indeterminate` outcomes instead.
+
+The [controller core](eyes.md#face-repair-controller-core-inactive) adds
+account-generation/ticket binding, an exact boot-qualified candidate,
+original frame acquisition times and a consumed completion. Its
+`ConsentProof` trusts ingress that is not yet implemented; it does not
+verify a speaker or activate a capability. Keep frame-delivery rejection,
+but give trusted runtime privacy/account changes their own `invalidate(now)`
+entry point: they must drop pending RAM without depending on another camera
+frame or an old account ticket. A consumed write stays `Committing` until
+its real completion; the API registers no RPC or app/model route.
+Proposed source time bounds and
+the unmeasured under-1-ms host target are documented separately from any
+first-builder decision or device result. No V1 consent parity, runtime
+integration or reboot rollback guarantee is claimed.
+
 ## Atomic face repair store (2026-10-22)
 
 The evidence here is the existing Rust `crates/eyes/src/who.rs`, not a V1
@@ -19,9 +54,9 @@ matching print. Only this new operation adds parent-directory sync and an
 explicit `Indeterminate` outcome after rename; ordinary save durability is
 unchanged. The narrow fault hook covers write/sync/rename boundaries without
 a general I/O abstraction. This is an [inactive store component](eyes.md#atomic-face-repair-store-inactive):
-account approval, fresh capture, proved lamp consent, expiry and cancellation
-remain caller work. No runtime, V1 parity, biometric proof or device result is
-claimed.
+account approval, fresh capture, proved lamp consent and revocation inputs
+remain caller work. The controller core adds only bounded RAM staging and
+expiry. No runtime, V1 parity, biometric proof or device result is claimed.
 
 For the interrupted-write review on #3072, keep Setup's existing exact-path,
 symlink-safe reset implementation. Replace the variable repair filenames
@@ -33,6 +68,16 @@ before rename. Historical Update plan fixtures keep their original bytes
 and hashes as migration evidence; the new product-plan hash is added to
 `RESET_PLAN_SHIPPED`. No broader deletion or ordinary-save durability change
 is introduced.
+
+The follow-up forget review keeps the same two exact unlink operations and
+shares them with `People::forget_at`, before any canonical or RAM mutation.
+An already-open store must not report a completed forget while an unfinished
+repair copy still contains the person; cleanup failure returns an error.
+Actual-forget fixtures check full-copy removal, unchanged other records and
+IDs, unremovable directories and temporary symlinks before any reopen. The
+repair fault fixture now checks the exact `.repair.new` path before startup
+could hide a cleanup failure. No directory sweep, secure-erasure guarantee,
+or runtime repair activation is added.
 
 ## Bedtime and Morning as a core skill (#1672, 2026-10-19)
 

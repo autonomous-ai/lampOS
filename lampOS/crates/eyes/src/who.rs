@@ -545,13 +545,7 @@ impl People {
     /// ownership as saving. A failure to clean a temporary or set aside a
     /// record is an error, so the eyes do not start in that state.
     pub fn open(path: PathBuf) -> Result<Self> {
-        for suffix in [".new", ".repair.new"] {
-            match std::fs::remove_file(temporary_path(&path, suffix)) {
-                Ok(()) => {}
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.into()),
-            }
-        }
+        discard_unfinished(&path)?;
         let mut bytes = Vec::new();
         match File::open(&path) {
             Ok(file) => {
@@ -1149,6 +1143,10 @@ impl People {
     /// Forgets this name's prints, and writes the file before it answers.
     /// Whether there were any.
     ///
+    /// First unlink the exact uncommitted `.new` and `.repair.new` copies,
+    /// which may still contain this person. A cleanup error aborts before
+    /// changing the canonical store or RAM; it can never report completion.
+    ///
     /// The set-aside records too (#1505, the reviewer on #1558): that name's
     /// entries leave every set-aside file with a list of people, which is
     /// rewritten 0600 or removed when nothing is left. A set-aside file that
@@ -1167,6 +1165,7 @@ impl People {
 
     /// [`Self::forget`], asked at `now_unix_s`.
     pub fn forget_at(&mut self, name: &str, now_unix_s: u64) -> Result<Forgot> {
+        discard_unfinished(&self.path)?;
         let name = name.trim();
         // Their counts not yet scored go too (#1670).
         self.unscored.retain(|counted| !same_name(counted, name));
@@ -1346,8 +1345,22 @@ fn temporary_path(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(temporary)
 }
 
+/// Uncommitted copies are never adopted as records. Under the exclusive
+/// writer, startup and forgetting unlink these exact entries without following
+/// symlinks or traversing an unexpected directory. A failure is not completion.
+fn discard_unfinished(path: &Path) -> io::Result<()> {
+    for suffix in [".new", ".repair.new"] {
+        match std::fs::remove_file(temporary_path(path, suffix)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
 /// One exact sibling, included in the reset plan. The exclusive writer must
-/// not overwrite a stale file or symlink; only startup unlinks leftovers.
+/// not overwrite a stale file or symlink; startup and forgetting unlink leftovers.
 fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
     let temporary = temporary_path(path, ".repair.new");
     let file = std::fs::OpenOptions::new()
@@ -2465,6 +2478,13 @@ mod tests {
                 })
             );
             assert_eq!(people.people, expected, "{step:?}");
+            assert_eq!(
+                std::fs::symlink_metadata(people.path.with_file_name("people.json.repair.new"))
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::NotFound,
+                "the exact repair temporary is gone before startup cleanup"
+            );
             let reopened = People::open(people.path.clone())
                 .unwrap()
                 .with_stable_ids(true);
@@ -2472,18 +2492,6 @@ mod tests {
             assert_eq!(
                 reopened.id_of("Fixture Target"),
                 Some(lamp_msgs::known::person_id("Fixture Original"))
-            );
-            assert!(
-                std::fs::read_dir(people.path.parent().unwrap())
-                    .unwrap()
-                    .all(|entry| {
-                        !entry
-                            .unwrap()
-                            .file_name()
-                            .to_string_lossy()
-                            .contains(".repair-")
-                    }),
-                "failed temporary copies do not accumulate"
             );
         }
     }
@@ -2562,6 +2570,114 @@ mod tests {
                 b"unrelated synthetic setting"
             );
         }
+    }
+
+    #[test]
+    fn forget_removes_complete_uncommitted_people_copies_without_reopening() {
+        let mut people = repair_people("forget-uncommitted-copies");
+        let bytes = std::fs::read(&people.path).unwrap();
+        let other = people.people[1].clone();
+        let other_id = people.id_of("Fixture Other");
+        let scored_at = people.scored_at;
+        let directory = people.path.parent().unwrap().to_owned();
+        for name in ["people.json.new", "people.json.repair.new"] {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(directory.join(name))
+                .unwrap();
+            file.write_all(&bytes).unwrap();
+            let copy: Kept =
+                serde_json::from_slice(&std::fs::read(directory.join(name)).unwrap()).unwrap();
+            assert_eq!(copy.people, people.people);
+        }
+        let neighbor = directory.join("people.json.repair.new.keep");
+        std::fs::write(&neighbor, b"unrelated synthetic setting").unwrap();
+
+        assert_eq!(
+            people.forget_at("Fixture Target", 606).unwrap(),
+            Forgot {
+                forgot: true,
+                unsearched: 0
+            }
+        );
+        // Check the actual forget result before open can clean anything up.
+        for name in ["people.json.new", "people.json.repair.new"] {
+            assert_eq!(
+                std::fs::symlink_metadata(directory.join(name))
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::NotFound
+            );
+        }
+        let canonical: Kept =
+            serde_json::from_slice(&std::fs::read(&people.path).unwrap()).unwrap();
+        assert_eq!(canonical.people.as_slice(), std::slice::from_ref(&other));
+        assert_eq!(people.people, [other]);
+        assert_eq!(canonical.scored_at_unix_s, scored_at);
+        assert_eq!(people.id_of("Fixture Other"), other_id);
+        assert!(people.who(&repair_print(0)).is_none());
+        assert_eq!(
+            std::fs::read(neighbor).unwrap(),
+            b"unrelated synthetic setting"
+        );
+    }
+
+    #[test]
+    fn forget_refuses_unremovable_temporary_before_mutating_the_store() {
+        for name in ["people.json.new", "people.json.repair.new"] {
+            let mut people = repair_people(&format!("forget-unremovable-{name}"));
+            let original = people.people.clone();
+            let bytes = std::fs::read(&people.path).unwrap();
+            let counted = people.counted.clone();
+            let unscored = people.unscored.clone();
+            let unexpected = people.path.with_file_name(name);
+            std::fs::create_dir(&unexpected).unwrap();
+            let retained = unexpected.join("uncommitted-people");
+            std::fs::write(&retained, &bytes).unwrap();
+            let neighbor = people.path.with_file_name("people.json.repair.new.keep");
+            std::fs::write(&neighbor, b"unrelated synthetic setting").unwrap();
+
+            assert!(people.forget_at("Fixture Target", 606).is_err());
+            assert_eq!(people.people, original);
+            assert_eq!(people.counted, counted);
+            assert_eq!(people.unscored, unscored);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+            assert_eq!(std::fs::read(retained).unwrap(), bytes);
+            assert_eq!(
+                std::fs::read(neighbor).unwrap(),
+                b"unrelated synthetic setting"
+            );
+        }
+    }
+
+    #[test]
+    fn forget_unlinks_temporary_symlinks_without_following_them() {
+        use std::os::unix::fs::symlink;
+        let mut people = repair_people("forget-uncommitted-links");
+        let other = people.people[1].clone();
+        let directory = people.path.parent().unwrap().to_owned();
+        let neighbor = directory.join("unrelated");
+        std::fs::write(&neighbor, b"unrelated synthetic setting").unwrap();
+        for name in ["people.json.new", "people.json.repair.new"] {
+            symlink(&neighbor, directory.join(name)).unwrap();
+        }
+
+        assert!(people.forget_at("Fixture Target", 606).unwrap().forgot);
+        for name in ["people.json.new", "people.json.repair.new"] {
+            assert_eq!(
+                std::fs::symlink_metadata(directory.join(name))
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::NotFound
+            );
+        }
+        assert_eq!(people.people, [other]);
+        assert_eq!(
+            std::fs::read(neighbor).unwrap(),
+            b"unrelated synthetic setting"
+        );
     }
 
     #[test]

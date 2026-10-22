@@ -1003,11 +1003,12 @@ after 1.5 s: the same request was answered 3.5 s after the end of speech.
 ### Atomic face repair store (inactive)
 
 `who::People::repair_target` and `replace_prints` are public Rust store APIs
-with no runtime caller, controller, RPC, or switch yet. Ordinary `remember`
-and `remember_one` behavior stays unchanged. The opaque, non-cloneable target
-holds the whole existing record; taking it neither removes that record nor
-frees its name. One replacement attempt consumes the target. It must still
-belong to the same live `People` instance, with the same record and no
+with no runtime caller, RPC, or activated switch. The inert controller core
+below prepares a work item; no service invokes either component yet.
+Ordinary `remember` and `remember_one` behavior stays unchanged. The opaque,
+non-cloneable target holds the whole existing record; taking it neither
+removes that record nor frees its name. One replacement attempt consumes the
+target. It must still belong to the same live `People` instance, with the same record and no
 intervening committed save. This requires an exclusive process-local writer;
 it is not a lock or transaction shared by separately opened stores.
 
@@ -1021,6 +1022,16 @@ JSON record. Cleanup does not follow a temporary symlink and does not remove
 a directory in its place; any error except an absent file refuses startup.
 The current product, example and lamp-06c1 reset plans list both exact
 siblings alongside `people.json`. No glob or wider directory wipe is added.
+
+Before runtime repair activation, the forget path also shares this exact
+cleanup: `People::forget_at` removes both unfinished siblings before changing
+the canonical records or RAM. It does not wait for a later `People::open`.
+An unlink failure returns an error instead of reporting a completed forget
+while a temporary could still hold every person. Temporary symlink entries
+are unlinked without following them; unexpected directories and neighboring
+files are not swept. Existing set-aside and pending-forget handling follows
+only after cleanup succeeds. This is file removal, not secure-erasure or
+power-loss proof, and adds no RPC or runtime repair activation.
 
 A successful replacement changes only the face prints and clears
 `tell_visits`: a new capture cannot inherit the old face's consent to named
@@ -1045,6 +1056,64 @@ follows the visible replacement; a directory-sync failure returns
 reload and reconcile that outcome before reporting a result, rather than
 blindly retrying. Host fault fixtures cover these boundaries; they do not
 establish power-loss durability or lamp timing.
+
+### Face repair controller core (inactive)
+
+`face_repair::Controller` adds bounded RAM staging, not an available lamp
+capability. There is no RPC, environment read, model, camera/microphone
+adapter or runtime activation. `LAMP_FACE_REPAIR` is only a declared name;
+the constructor receives an explicit enabled value and exact Eyes boot.
+One random ticket binds a store target and authenticated account generation
+for at most 120 seconds before commit handoff; polls never renew it. The
+first single candidate pins the exact `boot/fN`, with no retargeting. Trusted
+runtime privacy or account changes must call `invalidate(now)` immediately,
+without waiting for another frame or supplying the previous account/ticket.
+Before handoff this drops the pending target, consent and prints and records
+`Cancelled`; `observe` also rejects changed account or denied privacy on a
+frame delivery. A fresh observation of another candidate, disappearance or
+multiple faces cancels. Future ingress must also call `tick` on capture ticks
+so missing fresh observations or expired deadlines need no app poll.
+`invalidate` returns `Off` when disabled and `Unknown` without active work;
+existing expiry and terminal receipts remain unchanged. It is a trusted
+runtime API only, with no RPC or app/model route registered.
+
+`FrameObservation::acquired_at` must be the frame's original monotonic
+acquisition time, bound by the adapter to that frame's candidate, never its
+delivery time. Old, future and repeated frames cannot refresh presence or
+supply new prints. Capture requires five distinct latest observed frames
+acquired after consent, each yielding a finite unit-length 128-value print.
+Only those 128 values are copied into staging; excess caller allocation capacity
+is not retained in capture state or the handed-off work.
+Current source bounds are `FRESH_PROOF = 3 s`, candidate freshness 3 s,
+`CONSENT_FOR = 30 s` and `CAPTURE_FOR = 4 s`. These are proposed bounds in
+the code, not a timing decision from the first builder or measured lamp
+limits.
+
+`ConsentProof::from_trusted_ingress` is a constructor seam, not a verifier
+or current runtime authority. Its future caller must prove an explicit
+spoken yes to this ticket's already-asked question, the admitted microphone
+request/session/worker and exactly the pinned face speaking during that
+request's actual audio interval. Account initiation, model text or a visible
+face does not establish that consent. The core checks supplied ticket,
+candidate and time bindings; the authenticated account must then explicitly
+attest the exact staged candidate before `begin_commit` consumes the target,
+proof and prints once.
+
+The phases are `Waiting`, `Capturing`, `Staged` and `Committing`.
+`CommitWork` hands the consumed data to one exclusive store writer off the
+capture path; the core performs no write. Once handed off, cancellation,
+runtime invalidation or expiry cannot promise rollback: `invalidate` returns
+`Committing`, and status remains `Committing` until the opaque
+completion returns `Committed`, `Refused`, `NotWritten` or `Indeterminate`.
+At most four terminal receipts remain in RAM. Eviction or restart makes a
+ticket unknown; after a write handoff, the file may hold the complete old
+or new record. Unknown never means unchanged: reload and reconcile the
+store, retaining the store's explicit post-rename uncertainty.
+
+The host target for bounded in-memory state/capture calls is under 1 ms,
+currently unmeasured. `start` additionally requests OS entropy. Eighteen
+controller fixtures pass on the development Mac; no model,
+hardware, power-loss or end-to-end approval flow is qualified here.
 
 ### One name for one face, and only a name they said (`LAMP_NAMES=checked`)
 
