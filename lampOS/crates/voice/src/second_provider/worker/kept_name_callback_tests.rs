@@ -38,6 +38,11 @@ fn child(name: &str, mode: &str, markers: usize) -> bool {
         "days" | "days-room" => {
             command.env(crate::remember::DAYS_ENVIRONMENT, "on");
         }
+        "days-resumes" => {
+            command
+                .env(crate::remember::DAYS_ENVIRONMENT, "on")
+                .env(crate::remember::JOURNAL_RESUMES_ENVIRONMENT, "on");
+        }
         "unrecognized" => {
             command.env(crate::remember::DAYS_ENVIRONMENT, "ON");
         }
@@ -71,6 +76,9 @@ struct Store {
     snapshots: BTreeMap<(String, Option<String>), Value>,
     /// Snapshot opens, by their count from 0, answered only after a wait.
     slow_opens: Option<(std::ops::RangeInclusive<usize>, Duration)>,
+    /// The snapshot open, by its count from 0, held until a `release`, and
+    /// where it is said that it came ([`Memory::hold_open`]).
+    hold_open: Option<(usize, std::sync::mpsc::Sender<()>)>,
 }
 
 impl Store {
@@ -83,6 +91,24 @@ impl Store {
             .filter(|request| request["op"] == "session_open")
             .count();
         (request["op"] == "session_open" && opens.contains(&count)).then_some(delay)
+    }
+
+    /// Whether `request` is the open to hold: said as it comes.
+    fn holds(&mut self, request: &Value) -> bool {
+        let count = self
+            .requests
+            .iter()
+            .filter(|request| request["op"] == "session_open")
+            .count();
+        let held = request["op"] == "session_open"
+            && self
+                .hold_open
+                .as_ref()
+                .is_some_and(|(open, _)| *open == count);
+        if held && let Some((_, came)) = self.hold_open.take() {
+            let _ = came.send(());
+        }
+        held
     }
 
     fn answer(&mut self, request: Value) -> Value {
@@ -100,7 +126,7 @@ impl Store {
                     request["session"].as_str().unwrap().to_owned(),
                     person.clone(),
                 );
-                let text = (person == self.person).then_some(&self.kept);
+                let text = (person == self.person && !self.kept.is_empty()).then_some(&self.kept);
                 self.snapshots.entry(key).or_insert_with(|| {
                     json!({"ok":true,"snapshot":{
                         "session":request["session"],"opened_unix_ms":1,"generation":1,
@@ -115,6 +141,11 @@ impl Store {
                 }).clone()
             }
             "kept" => json!({"ok":true,"entries":[{"text":self.kept}]}),
+            "forget_last" => {
+                let removed = u64::from(!self.kept.is_empty());
+                self.kept.clear();
+                json!({"ok":true,"removed":removed})
+            }
             "session_close" | "conversation_end" => json!({"ok":true}),
             op => panic!("unexpected memory operation: {op}"),
         }
@@ -145,6 +176,7 @@ impl Memory {
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
         let worker = std::thread::spawn(move || {
+            let mut held: Option<(UnixStream, Value)> = None;
             for stream in listener.incoming() {
                 if stopping.load(Ordering::Acquire) {
                     break;
@@ -161,12 +193,25 @@ impl Memory {
                     .read_line(&mut line)
                     .unwrap();
                 let request: Value = serde_json::from_str(&line).unwrap();
+                // The held open answered, the store going on meanwhile.
+                if request["op"] == "release" {
+                    if let Some((mut held, answer)) = held.take() {
+                        let _ = writeln!(held, "{answer}");
+                    }
+                    writeln!(stream, "{}", json!({"ok":true})).unwrap();
+                    continue;
+                }
                 // Waited without the store held, so nothing else waits on it.
                 let delay = serving.lock().unwrap().delay(&request);
                 if let Some(delay) = delay {
                     std::thread::sleep(delay);
                 }
+                let holds = serving.lock().unwrap().holds(&request);
                 let answer = serving.lock().unwrap().answer(request);
+                if holds {
+                    held = Some((stream, answer));
+                    continue;
+                }
                 writeln!(stream, "{answer}").unwrap();
             }
         });
@@ -187,6 +232,23 @@ impl Memory {
             .iter()
             .filter(|request| request["op"] == op)
             .count()
+    }
+
+    /// Holds the snapshot open that is the `open`th from 0 until
+    /// [`Self::release`]: the store answers everything else meanwhile. Said
+    /// on the receiver as it comes.
+    fn hold_open(&self, open: usize) -> std::sync::mpsc::Receiver<()> {
+        let (came, comes) = std::sync::mpsc::channel();
+        self.state.lock().unwrap().hold_open = Some((open, came));
+        comes
+    }
+
+    /// The held open answered.
+    fn release(&self) {
+        let mut stream = UnixStream::connect(&self.socket).unwrap();
+        writeln!(stream, "{}", json!({"op":"release"})).unwrap();
+        let mut line = String::new();
+        BufReader::new(stream).read_line(&mut line).unwrap();
     }
 
     fn settings(&self) -> crate::tools::Settings {
@@ -251,6 +313,22 @@ fn keep(memory: &Memory, scope: &RequestScope, text: &str) -> Value {
             true,
             crate::remember::REMEMBER.into(),
             json!({"text":text}),
+            lease,
+        ))
+}
+
+fn forget(memory: &Memory, scope: &RequestScope) -> Value {
+    let runner = super::scoped_tool_runner(memory.settings(), None, None, false);
+    let lease = scope.lease();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(runner(
+            lease.key().request,
+            true,
+            crate::remember::FORGET.into(),
+            json!({}),
             lease,
         ))
 }
@@ -337,6 +415,17 @@ impl Lines {
             .block_on(self.ahead.clone().ready(Some(scope.lease())));
         let told = payload((self.context)(Some(&scope.lease())));
         (told.contains(NEW), told.contains(OLD))
+    }
+
+    /// Whether a read is going on.
+    fn reading(&self) -> bool {
+        self.ahead
+            .sessions
+            .lock()
+            .unwrap()
+            .asked
+            .as_ref()
+            .is_some_and(super::NoteAsk::reading)
     }
 
     /// Waits, at most 2 s, until no read is going on.
@@ -473,6 +562,121 @@ fn a_refresh_let_go_untold_gives_the_keep_back() {
         6,
         "asked again for the keep given back"
     );
+}
+
+/// Reviewer-two's reproduction on #3016 (20:16): the other side of the
+/// boundary [`a_refresh_let_go_untold_gives_the_keep_back`] covers. A keep's
+/// refresh, asked as a line begins whose line is cancelled, is voided by a
+/// privacy change while it is still read; it ends after. The voided read
+/// gives back the keep it took before any note is chosen, so the person's
+/// next turns are told the new name, not the old one they were told before
+/// (`[(false, true), (false, true)]`).
+#[test]
+fn review_keep_survives_privacy_void_while_the_refresh_is_reading() {
+    if !child(
+        "review_keep_survives_privacy_void_while_the_refresh_is_reading",
+        "days",
+        2,
+    ) {
+        return;
+    }
+    let memory = Memory::new(Some(crate::remember::person_id(OWNER)));
+    crate::remember::start(memory.socket.clone(), None);
+    memory.state.lock().unwrap().slow_opens = Some((2..=3, Duration::from_millis(100)));
+    let lines = Lines::new(memory.socket.clone());
+    let first = scope(1, ScopeSnapshot::of(OWNER));
+    lines.begins(&first);
+    assert_eq!(lines.answered(&first), (false, true));
+    assert_eq!(
+        keep(&memory, &scope(2, ScopeSnapshot::of(OWNER)), NEW)["remembered"],
+        true
+    );
+    let cancelled = scope(3, ScopeSnapshot::of(OWNER));
+    lines.begins(&cancelled);
+    cancelled.revoke();
+    assert!(lines.reading(), "the refresh is still read");
+    lines.ahead.forget();
+    lines.read_done();
+    let next: Vec<(bool, bool)> = (4..=5)
+        .map(|request| {
+            let line = scope(request, ScopeSnapshot::of(OWNER));
+            lines.begins(&line);
+            lines.answered(&line)
+        })
+        .collect();
+    assert_eq!(next, [(true, false), (true, false)]);
+}
+
+/// Reviewer-two's reproduction on #3016 (20:22), with journalling resumed
+/// by a fresh session (`LAMP_MEMORY_JOURNAL_RESUMES`): the person's note,
+/// cached with the old name, is forgotten in the store by an actual forget;
+/// the resume read for their next line is held at the store until a second
+/// forget is sent, so its answer is from before that forget; the fresh
+/// read then backs off, and nothing kept asks for another. Their next turn
+/// is told neither the forgotten old name nor anything read before the
+/// forgets: once the store may have changed, the cached note and the
+/// rejected read are both let go, whatever the pacing. Before, it was told
+/// the old name, `(false, true)`.
+#[test]
+fn review_an_invalid_resume_read_never_returns_the_forgotten_cached_note() {
+    if !child(
+        "review_an_invalid_resume_read_never_returns_the_forgotten_cached_note",
+        "days-resumes",
+        0,
+    ) {
+        return;
+    }
+    let memory = Memory::new(Some(crate::remember::person_id(OWNER)));
+    crate::remember::start(memory.socket.clone(), None);
+    let lines = Lines::new(memory.socket.clone());
+    let first = scope(1, ScopeSnapshot::of(OWNER));
+    lines.begins(&first);
+    assert_eq!(
+        lines.answered(&first),
+        (false, true),
+        "the old name is cached"
+    );
+    assert_eq!(
+        forget(&memory, &scope(2, ScopeSnapshot::of(OWNER)))["forgotten"],
+        true
+    );
+    assert!(
+        crate::remember::wants_fresh_session(),
+        "journalling stopped: a resume read is due"
+    );
+    let came = memory.hold_open(2);
+    let reading = scope(3, ScopeSnapshot::of(OWNER));
+    lines.begins(&reading);
+    came.recv_timeout(Duration::from_secs(2))
+        .expect("the read's open reached the store");
+    assert!(lines.reading(), "a read is in flight");
+    // Its send alone changes what a read may hold.
+    let _ = forget(&memory, &scope(4, ScopeSnapshot::of(OWNER)));
+    memory.release();
+    lines.read_done();
+    {
+        let sessions = lines.ahead.sessions.lock().unwrap();
+        let asked = sessions.asked.as_ref().expect("the read is kept");
+        assert!(
+            asked.complete() && !asked.current(),
+            "read before the second forget"
+        );
+        assert!(
+            !sessions.note.as_deref().unwrap_or_default().contains(OLD),
+            "the cached old name went when the store changed"
+        );
+    }
+    assert!(
+        !crate::remember::wants_fresh_session(),
+        "resume pacing backs off"
+    );
+    assert!(
+        !crate::remember::kept_since_note_peek(),
+        "no keep asks for it"
+    );
+    let next = scope(5, ScopeSnapshot::of(OWNER));
+    lines.begins(&next);
+    assert_eq!(lines.answered(&next), (false, false));
 }
 
 fn evict_name(person: Option<&str>) {
