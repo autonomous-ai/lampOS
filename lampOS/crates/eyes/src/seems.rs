@@ -35,6 +35,58 @@ pub const EXPRESSIONS: [&str; 8] = [
 ];
 /// A face is read at most this often.
 pub const READ_EVERY: Duration = Duration::from_secs(2);
+
+/// Where the person's yes to having their face's expression read is kept,
+/// beside the room sounds' yes lamp-ears reads
+/// (`lamp_ears::classes::ROOM_SOUNDS_FILE`, the same folder and modes):
+/// `{"face_expressions":"yes", ...}`, present only while the yes stands
+/// (privacy-switch.md, "Face reads stay off without a yes").
+pub const FACE_EXPRESSIONS_FILE: &str = "/var/lib/lampOS/consent/face-expressions.json";
+const FACE_EXPRESSIONS_MOST_BYTES: u64 = 4096;
+
+/// Whether `path` holds a yes: a JSON object whose `face_expressions` is
+/// exactly `"yes"`. Missing, unreadable, over 4096 bytes, not JSON, or
+/// anything else is no, as with the ears' `room_sounds_yes`.
+pub fn face_expressions_yes(path: &Path) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let mut text = String::new();
+    if file
+        .take(FACE_EXPRESSIONS_MOST_BYTES + 1)
+        .read_to_string(&mut text)
+        .is_err()
+        || text.len() as u64 > FACE_EXPRESSIONS_MOST_BYTES
+    {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(&text)
+        .is_ok_and(|value| value.get("face_expressions").and_then(|v| v.as_str()) == Some("yes"))
+}
+
+/// Whether a reader reads the near face now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Due {
+    /// Less than [`READ_EVERY`] since its last read, or its last ask.
+    NotYet,
+    /// Due, but no yes is kept at the consent file: no read, asked again
+    /// after [`READ_EVERY`].
+    NoYes,
+    /// Due, with the yes: read.
+    Now,
+}
+
+/// [`Due`] for a reader last read (or last asked) at `read_at`; the yes in
+/// `consent` ([`face_expressions_yes`]) is read only once the time has come.
+pub fn due(read_at: Option<std::time::Instant>, consent: &Path) -> Due {
+    if read_at.is_some_and(|at| at.elapsed() < READ_EVERY) {
+        Due::NotYet
+    } else if face_expressions_yes(consent) {
+        Due::Now
+    } else {
+        Due::NoYes
+    }
+}
 /// A face is read only with its eyes at least this far apart, in the look's
 /// pixels: under it, a read says nothing but `unsure` (Ten on #2602, 22 Oct
 /// 02:4x: a smile Blendshape V2 reads 0.87 with the eyes 9.9 px apart reads
@@ -223,6 +275,48 @@ mod tests {
         let mut turned = face(0.12, 0.0);
         turned.marks[1] = (140.0 + 7.5, 90.0 + 7.5);
         assert!(near_face(&[turned], 240.0).is_some());
+    }
+
+    /// The yes to face reads is read as the ears read the yes to room
+    /// sounds: only a JSON object whose `face_expressions` is exactly
+    /// `"yes"`. With none, a due reader doesn't read (nothing goes on
+    /// `humans/seems`); with it, it does; before its time, the file isn't
+    /// asked.
+    #[test]
+    fn a_face_is_read_only_with_the_persons_kept_yes() {
+        let folder = std::env::temp_dir().join(format!("face-expressions-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("face-expressions.json");
+        let _ = std::fs::remove_file(&file);
+        assert!(!face_expressions_yes(&file), "missing");
+        assert_eq!(due(None, &file), Due::NoYes);
+        let read = |text: &str| {
+            std::fs::write(&file, text).unwrap();
+            face_expressions_yes(&file)
+        };
+        assert!(read(
+            r#"{"version":1,"face_expressions":"yes","at_unix_s":1792500000}"#
+        ));
+        assert_eq!(due(None, &file), Due::Now);
+        let long_ago = std::time::Instant::now().checked_sub(READ_EVERY);
+        assert_eq!(due(long_ago, &file), Due::Now);
+        assert_eq!(due(Some(std::time::Instant::now()), &file), Due::NotYet);
+        let padded = format!(
+            r#"{{"face_expressions":"yes","pad":"{}"}}"#,
+            "x".repeat(4096)
+        );
+        for no in [
+            r#"{"face_expressions":"no"}"#,
+            r#"{"face_expressions":"Yes"}"#,
+            r#"{"face_expressions":true}"#,
+            r#"{"room_sounds":"yes"}"#,
+            r#"{"face_expressions":"yes""#,
+            padded.as_str(),
+        ] {
+            assert!(!read(no), "{no}");
+            assert_eq!(due(None, &file), Due::NoYes, "{no}");
+        }
+        std::fs::remove_dir_all(&folder).unwrap();
     }
 
     fn even(value: f32) -> Vec<f32> {

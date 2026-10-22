@@ -208,9 +208,15 @@ impl Mesh {
     /// This face's 478 landmarks, x, y and z each, in the crop's pixels
     /// (0 to [`SIDE`], the eyes level). `None` for a face with no crop.
     pub fn landmarks(&mut self, picture: &Picture, face: &Face) -> Result<Option<Vec<f32>>> {
-        let Some(input) = crop(picture, face) else {
-            return Ok(None);
-        };
+        match crop(picture, face) {
+            Some(input) => self.landmarks_of(input).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    /// The landmarks for one [`crop`], so the crop can be cut on the look
+    /// and the mesh run elsewhere (the seems worker, [`crate::latest`]).
+    pub fn landmarks_of(&mut self, input: Vec<f32>) -> Result<Vec<f32>> {
         let landmarks = match &mut self.engine {
             Engine::Tract(plan) => {
                 let input = Tensor::from_shape(&[1, SIDE, SIDE, 3], &input)?;
@@ -238,7 +244,7 @@ impl Mesh {
                 landmarks
             }
         };
-        Ok(Some(landmarks))
+        Ok(landmarks)
     }
 }
 
