@@ -200,7 +200,7 @@ fn sky(code: i64) -> &'static str {
     }
 }
 
-/// The days of the week, as the forecast's dates name them.
+/// The days of the week, Sunday first.
 const WEEKDAYS: [&str; 7] = [
     "Sunday",
     "Monday",
@@ -211,21 +211,34 @@ const WEEKDAYS: [&str; 7] = [
     "Saturday",
 ];
 
-/// The day of the week of a `YYYY-MM-DD` date, as the forecast names its
-/// days (Sakamoto's method).
-fn weekday(date: &str) -> Option<&'static str> {
+/// The days since 1 January 1970 of a `YYYY-MM-DD` date, as the forecast
+/// dates its days (Hinnant's `days_from_civil`).
+fn day_number(date: &str) -> Option<i64> {
     let mut parts = date.splitn(3, '-').map(|part| part.parse::<i64>().ok());
-    let (mut year, month, day) = (parts.next()??, parts.next()??, parts.next()??);
+    let (year, month, day) = (parts.next()??, parts.next()??, parts.next()??);
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
-    const OFFSET: [i64; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
-    if month < 3 {
-        year -= 1;
-    }
-    let index = (year + year / 4 - year / 100 + year / 400 + OFFSET[month as usize - 1] + day)
-        .rem_euclid(7);
-    Some(WEEKDAYS[index as usize])
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let of_era = year - era * 400;
+    let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    Some(era * 146_097 + of_era * 365 + of_era / 4 - of_era / 100 + of_year - 719_468)
+}
+
+/// The day of the week of a `YYYY-MM-DD` date, as the forecast names its
+/// days. 1 January 1970 was a Thursday.
+fn weekday(date: &str) -> Option<&'static str> {
+    day_number(date).map(|day| WEEKDAYS[(day + 4).rem_euclid(7) as usize])
+}
+
+/// The place's own day at `unix_now` (seconds since 1970, UTC), as a
+/// [`day_number`]: the time moved by the forecast's offset
+/// (`utc_offset_seconds`, the place's with `timezone=auto`), never the
+/// lamp's. `None` for a forecast without one.
+pub fn place_day(forecast: &Value, unix_now: i64) -> Option<i64> {
+    let offset = forecast["utc_offset_seconds"].as_i64()?;
+    Some((unix_now + offset).div_euclid(86_400))
 }
 
 /// The day a call asks about.
@@ -235,7 +248,8 @@ pub enum Day {
     Ahead,
     Today,
     Tomorrow,
-    /// The first day of the forecast with this weekday, today's included.
+    /// The first day of the forecast from today on with this weekday,
+    /// today's included.
     Weekday(&'static str),
 }
 
@@ -292,15 +306,51 @@ fn degrees(value: &Value) -> Option<i64> {
     value.as_f64().map(|value| value.round() as i64)
 }
 
-/// The forecast's day `day` (0 for today) in a few words: its name, its
-/// low and high, its sky and its chance of rain. Today and tomorrow carry
-/// their weekday too, so "this weekend" asked on a Friday is plain (the
-/// reviewer on #2185). `None` for a day it lacks, or a later day without a
-/// date to name it by.
-fn day_said(daily: &Value, day: usize) -> Option<String> {
-    let at = |field: &str| daily[field].get(day).cloned().unwrap_or(Value::Null);
+/// The forecast's days from the place's `today` on (a [`day_number`]):
+/// each row and how many days after today it is, from the row's own date.
+/// The reviewers on #2969: a forecast kept from 23:59 at the place said
+/// the day before as today after the place's midnight, when today was the
+/// first row. Without `today`, a forecast just as it came, its first row
+/// is today. A row without a date counts from its place. `None` when
+/// `today` is given and no row has its date: the forecast is too old to
+/// tell today from.
+fn days_from(daily: &Value, today: Option<i64>) -> Option<Vec<(usize, i64)>> {
+    let rows = daily["weather_code"].as_array().map_or(0, Vec::len);
+    let dated = |row: usize| {
+        daily["time"]
+            .get(row)
+            .and_then(Value::as_str)
+            .and_then(day_number)
+    };
+    let (first, today) = match today {
+        Some(today) => (
+            (0..rows).position(|row| dated(row) == Some(today))?,
+            Some(today),
+        ),
+        None => (0, dated(0)),
+    };
+    Some(
+        (first..rows)
+            .filter_map(|row| {
+                let after = match (dated(row), today) {
+                    (Some(day), Some(today)) => day - today,
+                    _ => (row - first) as i64,
+                };
+                (after >= 0).then_some((row, after))
+            })
+            .collect(),
+    )
+}
+
+/// The forecast's row `row`, `after` days after today, in a few words: its
+/// name, its low and high, its sky and its chance of rain. Today and
+/// tomorrow carry their weekday too, so "this weekend" asked on a Friday is
+/// plain (the reviewer on #2185). `None` for a row it lacks, or a later day
+/// without a date to name it by.
+fn day_said(daily: &Value, row: usize, after: i64) -> Option<String> {
+    let at = |field: &str| daily[field].get(row).cloned().unwrap_or(Value::Null);
     let named = at("time").as_str().and_then(weekday);
-    let name = match (day, named) {
+    let name = match (after, named) {
         (0, Some(named)) => format!("Today, {named},"),
         (0, None) => "Today".to_owned(),
         (1, Some(named)) => format!("Tomorrow, {named},"),
@@ -321,47 +371,72 @@ fn day_said(daily: &Value, day: usize) -> Option<String> {
     Some(said)
 }
 
-/// The forecast in a few words for `place`: now, today and tomorrow (with
-/// their weekdays when dated) and each later day by its name, in degrees
-/// Celsius. `None` without the weather now.
+/// The forecast in a few words for `place`, as it came: now, today and
+/// tomorrow (with their weekdays when dated) and each later day by its
+/// name, in degrees Celsius. `None` without the weather now.
 pub fn summary(answer: &Value, place: &str) -> Option<String> {
-    let mut said = now_said(answer, place)?;
-    let daily = &answer["daily"];
-    let days = daily["weather_code"].as_array().map_or(0, Vec::len);
-    for day in (0..days).filter_map(|day| day_said(daily, day)) {
-        said.push(' ');
-        said.push_str(&day);
-    }
-    Some(said)
+    said_for(answer, place, Day::Ahead, None)
 }
 
-/// The forecast in a few words for `place` and the day asked: every day
-/// with the weather now for [`Day::Ahead`], today's with the weather now
-/// for today, and the one day alone for any other. `None` for a day the
-/// forecast does not reach.
-pub fn said_for(answer: &Value, place: &str, day: Day) -> Option<String> {
-    let index = match day {
-        Day::Ahead => return summary(answer, place),
-        Day::Today => 0,
-        Day::Tomorrow => 1,
-        Day::Weekday(name) => answer["daily"]["time"]
-            .as_array()?
+/// The forecast in a few words for `place` and the day asked, its days
+/// told from the place's `today` ([`days_from`]): every day from today with
+/// the weather now for [`Day::Ahead`], today's with the weather now for
+/// today, and the one day alone for any other. `None` for a day the
+/// forecast does not reach, and for [`Day::Ahead`] without the weather now.
+pub fn said_for(answer: &Value, place: &str, day: Day, today: Option<i64>) -> Option<String> {
+    let daily = &answer["daily"];
+    let days = days_from(daily, today)?;
+    if day == Day::Ahead {
+        let mut said = now_said(answer, place)?;
+        for line in days
             .iter()
-            .position(|date| date.as_str().and_then(weekday) == Some(name))?,
-    };
-    let line = day_said(&answer["daily"], index)?;
-    match now_said(answer, place).filter(|_| index == 0) {
+            .filter_map(|&(row, after)| day_said(daily, row, after))
+        {
+            said.push(' ');
+            said.push_str(&line);
+        }
+        return Some(said);
+    }
+    let &(row, after) = days.iter().find(|&&(row, after)| match day {
+        Day::Today => after == 0,
+        Day::Tomorrow => after == 1,
+        Day::Weekday(name) => {
+            daily["time"]
+                .get(row)
+                .and_then(Value::as_str)
+                .and_then(weekday)
+                == Some(name)
+        }
+        Day::Ahead => false,
+    })?;
+    let line = day_said(daily, row, after)?;
+    match now_said(answer, place).filter(|_| after == 0) {
         Some(now) => Some(format!("{now} {line}")),
         None => Some(format!("In {place}: {line}")),
     }
 }
 
-/// One place's forecast as it came, the names it was asked by, and when.
+/// One place's forecast as it came, the names it was asked by, the
+/// place's own day it came on, and when.
 struct Kept {
     names: Vec<String>,
     place: Place,
     forecast: Arc<Value>,
+    day: i64,
     at: Instant,
+}
+
+/// The time now, in seconds since 1970 (UTC): the lamp's clock, and a set
+/// one in a test.
+pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
+
+/// The lamp's own clock.
+pub fn wall_clock() -> Clock {
+    Arc::new(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64)
+    })
 }
 
 /// What a call was answered, and for the journal what it asked and how it
@@ -374,20 +449,23 @@ pub struct Answered {
 }
 
 /// The weather the model asks for, the lamp's own place for a call that
-/// names none, and each place's forecast kept [`KEPT_FOR`], at most
-/// [`MOST_PLACES`] of them.
+/// names none, and each place's forecast kept [`KEPT_FOR`] and never past
+/// that place's midnight, at most [`MOST_PLACES`] of them.
 pub struct Weather {
     here: Option<String>,
     fetch: Fetch,
+    clock: Clock,
     kept: Mutex<Vec<Kept>>,
 }
 
 impl Weather {
-    /// Nothing is fetched until a call asks.
-    pub fn new(here: Option<String>, fetch: Fetch) -> Self {
+    /// Nothing is fetched until a call asks. `clock` tells each call's
+    /// place its own day ([`place_day`]).
+    pub fn new(here: Option<String>, fetch: Fetch, clock: Clock) -> Self {
         Self {
             here,
             fetch,
+            clock,
             kept: Mutex::new(Vec::new()),
         }
     }
@@ -415,7 +493,9 @@ impl Weather {
             },
             day.said()
         );
-        let (told, how) = match tokio::time::timeout(WITHIN, self.looked_up(place, day)).await {
+        let now = (self.clock)();
+        let (told, how) = match tokio::time::timeout(WITHIN, self.looked_up(place, day, now)).await
+        {
             Ok(answered) => answered,
             Err(_) => (
                 json!({"error": UNREACHED}),
@@ -425,7 +505,8 @@ impl Weather {
         Answered { told, asked, how }
     }
 
-    async fn looked_up(&self, place: Option<&str>, day: Day) -> (Value, String) {
+    /// The call's answer, its days told from the place's own day at `now`.
+    async fn looked_up(&self, place: Option<&str>, day: Day, now: i64) -> (Value, String) {
         let Some(name) = place.or(self.here.as_deref()) else {
             return (json!({"error": NO_HERE}), "no place, and none here".into());
         };
@@ -435,9 +516,9 @@ impl Weather {
             return (json!({"error": NOT_FOUND}), "no such place".into());
         };
         let key = query.to_lowercase();
-        if let Some((place, forecast)) = self.kept_by_name(&key) {
+        if let Some((place, forecast, today)) = self.kept_by_name(&key, now) {
             return (
-                answer_for(&place, &forecast, day),
+                answer_for(&place, &forecast, day, today),
                 "from what was kept".into(),
             );
         }
@@ -456,9 +537,9 @@ impl Weather {
         let Some(place) = place else {
             return (json!({"error": NOT_FOUND}), "no such place".into());
         };
-        if let Some(forecast) = self.kept_by_place(&place, &key) {
+        if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
-                answer_for(&place, &forecast, day),
+                answer_for(&place, &forecast, day, today),
                 "its place looked up, its weather from what was kept".into(),
             );
         }
@@ -466,13 +547,7 @@ impl Weather {
             return (json!({"error": UNREACHED}), "no forecast request".into());
         };
         let forecast = match (self.fetch)(url).await {
-            Ok(forecast) if summary(&forecast, &place.name).is_some() => Arc::new(forecast),
-            Ok(_) => {
-                return (
-                    json!({"error": UNREACHED}),
-                    "the forecast came with nothing for now".into(),
-                );
-            }
+            Ok(forecast) => Arc::new(forecast),
             Err(error) => {
                 return (
                     json!({"error": UNREACHED}),
@@ -480,46 +555,62 @@ impl Weather {
                 );
             }
         };
-        let answered = answer_for(&place, &forecast, day);
-        self.keep(key, place, forecast);
+        // The place's today must be one of its rows, with the weather now:
+        // a forecast without either is no answer, and is not kept.
+        let Some(today) = place_day(&forecast, now)
+            .filter(|&today| said_for(&forecast, &place.name, Day::Ahead, Some(today)).is_some())
+        else {
+            return (
+                json!({"error": UNREACHED}),
+                "the forecast came with nothing for today there".into(),
+            );
+        };
+        let answered = answer_for(&place, &forecast, day, today);
+        self.keep(key, place, forecast, (today, now));
         (answered, "fetched".into())
     }
 
-    /// The kept places still fresh, the stale ones put out.
-    fn fresh(&self) -> std::sync::MutexGuard<'_, Vec<Kept>> {
+    /// The kept places still fresh at `now`: under [`KEPT_FOR`] old, and
+    /// fetched on the place's own day now, so the first call after that
+    /// place's midnight fetches again. The others are put out.
+    fn fresh(&self, now: i64) -> std::sync::MutexGuard<'_, Vec<Kept>> {
         let mut kept = self
             .kept
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        kept.retain(|kept| kept.at.elapsed() < KEPT_FOR);
+        kept.retain(|kept| {
+            kept.at.elapsed() < KEPT_FOR && place_day(&kept.forecast, now) == Some(kept.day)
+        });
         kept
     }
 
-    /// The fresh place a call's name found before, and its forecast.
-    fn kept_by_name(&self, name: &str) -> Option<(Place, Arc<Value>)> {
-        let kept = self.fresh();
+    /// The fresh place a call's name found before, its forecast, and the
+    /// place's day.
+    fn kept_by_name(&self, name: &str, now: i64) -> Option<(Place, Arc<Value>, i64)> {
+        let kept = self.fresh(now);
         let hit = kept
             .iter()
             .find(|kept| kept.names.iter().any(|kept_name| kept_name == name))?;
-        Some((hit.place.clone(), hit.forecast.clone()))
+        Some((hit.place.clone(), hit.forecast.clone(), hit.day))
     }
 
-    /// The fresh forecast of a place a call's name has just found, the name
-    /// kept with it from now on.
-    fn kept_by_place(&self, place: &Place, name: &str) -> Option<Arc<Value>> {
-        let mut kept = self.fresh();
+    /// The fresh forecast of a place a call's name has just found, and the
+    /// place's day, the name kept with it from now on.
+    fn kept_by_place(&self, place: &Place, name: &str, now: i64) -> Option<(Arc<Value>, i64)> {
+        let mut kept = self.fresh(now);
         let hit = kept.iter_mut().find(|kept| kept.place == *place)?;
         if hit.names.len() >= MOST_NAMES {
             hit.names.remove(0);
         }
         hit.names.push(name.to_owned());
-        Some(hit.forecast.clone())
+        Some((hit.forecast.clone(), hit.day))
     }
 
-    /// Keep a place's forecast just fetched, in place of one kept before
-    /// for it, the oldest put out past [`MOST_PLACES`].
-    fn keep(&self, name: String, place: Place, forecast: Arc<Value>) {
-        let mut kept = self.fresh();
+    /// Keep a place's forecast just fetched on the place's day `day` at
+    /// `now`, in place of one kept before for it, the oldest put out past
+    /// [`MOST_PLACES`].
+    fn keep(&self, name: String, place: Place, forecast: Arc<Value>, (day, now): (i64, i64)) {
+        let mut kept = self.fresh(now);
         kept.retain(|other| other.place != place);
         for other in kept.iter_mut() {
             other.names.retain(|other_name| *other_name != name);
@@ -532,14 +623,16 @@ impl Weather {
             names: vec![name],
             place,
             forecast,
+            day,
             at: Instant::now(),
         });
     }
 }
 
-/// The model's answer for a place's forecast and the day asked.
-fn answer_for(place: &Place, forecast: &Value, day: Day) -> Value {
-    match said_for(forecast, &place.name, day) {
+/// The model's answer for a place's forecast and the day asked, its days
+/// told from the place's `today`.
+fn answer_for(place: &Place, forecast: &Value, day: Day, today: i64) -> Value {
+    match said_for(forecast, &place.name, day, Some(today)) {
         Some(said) => json!({"place": place.name, "weather": said}),
         None => json!({"place": place.name, "error": NO_SUCH_DAY}),
     }
@@ -646,10 +739,11 @@ mod tests {
                "generationtime_ms": 0.6})
     }
 
-    /// A forecast from Tuesday 20 Oct 2026, its temperature now `now`, so
-    /// each place's is told apart.
+    /// A forecast from Tuesday 20 Oct 2026 at a place 7 hours ahead of
+    /// UTC, its temperature now `now`, so each place's is told apart.
     fn forecast(now: f64) -> Value {
         json!({
+            "utc_offset_seconds": 25_200, "timezone": "Asia/Bangkok",
             "current": {"temperature_2m": now, "apparent_temperature": now + 4.0,
                         "relative_humidity_2m": 70, "weather_code": 2},
             "daily": {
@@ -661,6 +755,39 @@ mod tests {
                 "precipitation_probability_max": [40, 60, 10, 70, 80, 50, 0]
             }
         })
+    }
+
+    /// Seconds since 1970 (UTC) at `hour`:`minute` on `date` at a place
+    /// `offset` seconds ahead of UTC.
+    fn unix(date: &str, hour: i64, minute: i64, offset: i64) -> i64 {
+        day_number(date).unwrap() * 86_400 + hour * 3_600 + minute * 60 - offset
+    }
+
+    /// A clock set at noon on Tuesday 20 Oct 2026 at [`forecast`]'s place.
+    fn tuesday_noon() -> Clock {
+        let now = unix("2026-10-20", 12, 0, 25_200);
+        Arc::new(move || now)
+    }
+
+    /// A wall clock that moves only when a test moves it, with the
+    /// runtime's paused time beside it.
+    struct Wall(Arc<std::sync::atomic::AtomicI64>);
+
+    impl Wall {
+        fn at(unix: i64) -> Self {
+            Self(Arc::new(std::sync::atomic::AtomicI64::new(unix)))
+        }
+
+        fn clock(&self) -> Clock {
+            let now = self.0.clone();
+            Arc::new(move || now.load(std::sync::atomic::Ordering::Relaxed))
+        }
+
+        async fn pass(&self, seconds: u64) {
+            self.0
+                .fetch_add(seconds as i64, std::sync::atomic::Ordering::Relaxed);
+            tokio::time::advance(Duration::from_secs(seconds)).await;
+        }
     }
 
     /// A fetcher with canned answers that keeps each URL asked: Hanoi and
@@ -726,7 +853,11 @@ mod tests {
     #[tokio::test]
     async fn the_weather_of_a_place_named_is_that_places() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(Some("Ho Chi Minh City, Vietnam".into()), fetch);
+        let weather = Weather::new(
+            Some("Ho Chi Minh City, Vietnam".into()),
+            fetch,
+            tuesday_noon(),
+        );
         let answered = weather.answer(&json!({"place": "Hanoi"})).await;
         assert_eq!(
             answered.told["place"], "Hanoi, Vietnam",
@@ -753,7 +884,11 @@ mod tests {
     #[tokio::test]
     async fn the_weather_with_no_place_is_the_lamps_own() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(Some("Ho Chi Minh City, Vietnam".into()), fetch);
+        let weather = Weather::new(
+            Some("Ho Chi Minh City, Vietnam".into()),
+            fetch,
+            tuesday_noon(),
+        );
         for args in [json!({}), json!({"place": "  ", "day": null})] {
             let answered = weather.answer(&args).await;
             assert_eq!(answered.told["place"], "Ho Chi Minh City, Vietnam");
@@ -770,7 +905,7 @@ mod tests {
         }
         assert!(canned.urls()[0].contains("name=Ho+Chi+Minh+City&"));
         let (nothing, fetch) = Canned::new();
-        let nowhere = Weather::new(None, fetch);
+        let nowhere = Weather::new(None, fetch, tuesday_noon());
         assert_eq!(
             nowhere.answer(&json!({})).await.told,
             json!({"error": NO_HERE})
@@ -783,7 +918,7 @@ mod tests {
     #[tokio::test]
     async fn the_weather_for_a_day_is_that_days() {
         let (_canned, fetch) = Canned::new();
-        let weather = Weather::new(None, fetch);
+        let weather = Weather::new(None, fetch, tuesday_noon());
         let asked = |day: &str| json!({"place": "Hanoi", "day": day});
         let tomorrow = weather.answer(&asked("tomorrow")).await;
         assert_eq!(
@@ -818,8 +953,8 @@ mod tests {
         let short = json!({"current": {"temperature_2m": 20.0, "weather_code": 3},
                            "daily": {"weather_code": [3], "temperature_2m_max": [24],
                                      "temperature_2m_min": [18]}});
-        assert_eq!(said_for(&short, "Hue", Day::Tomorrow), None);
-        assert_eq!(said_for(&short, "Hue", Day::Weekday("Friday")), None);
+        assert_eq!(said_for(&short, "Hue", Day::Tomorrow, None), None);
+        assert_eq!(said_for(&short, "Hue", Day::Weekday("Friday"), None), None);
     }
 
     /// A place the geocoding doesn't find answers so, never another
@@ -827,7 +962,7 @@ mod tests {
     #[tokio::test]
     async fn the_weather_of_an_unknown_place_is_an_error() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(Some("Hanoi, Vietnam".into()), fetch);
+        let weather = Weather::new(Some("Hanoi, Vietnam".into()), fetch, tuesday_noon());
         let answered = weather.answer(&json!({"place": "Atlantis"})).await;
         assert_eq!(
             answered.told,
@@ -848,7 +983,7 @@ mod tests {
     #[tokio::test]
     async fn the_weather_not_reached_is_an_error_and_not_kept() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(None, fetch);
+        let weather = Weather::new(None, fetch, tuesday_noon());
         canned
             .failing
             .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -872,7 +1007,7 @@ mod tests {
     async fn the_weather_not_reached_in_time_is_an_error() {
         let slow: Fetch = Arc::new(|_| Box::pin(std::future::pending()));
         let waited = Instant::now();
-        let answered = Weather::new(None, slow)
+        let answered = Weather::new(None, slow, tuesday_noon())
             .answer(&json!({"place": "Hanoi"}))
             .await;
         assert_eq!(answered.told, json!({"error": UNREACHED}));
@@ -885,10 +1020,11 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_weather_of_a_place_is_kept_ten_minutes() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(Some("Hanoi, Vietnam".into()), fetch);
+        let wall = Wall::at(unix("2026-10-20", 12, 0, 25_200));
+        let weather = Weather::new(Some("Hanoi, Vietnam".into()), fetch, wall.clock());
         weather.answer(&json!({"place": "Hanoi"})).await;
         assert_eq!(canned.count(), 2);
-        tokio::time::advance(Duration::from_secs(9 * 60)).await;
+        wall.pass(9 * 60).await;
         let saturday = weather
             .answer(&json!({"place": "hanoi", "day": "Saturday"}))
             .await;
@@ -897,7 +1033,7 @@ mod tests {
         let here = weather.answer(&json!({"day": "tomorrow"})).await;
         assert_eq!(here.how, "from what was kept", "the lamp's place is Hanoi");
         assert_eq!(canned.count(), 2, "no fetch for either");
-        tokio::time::advance(Duration::from_secs(60)).await;
+        wall.pass(60).await;
         let later = weather.answer(&json!({"place": "Hanoi"})).await;
         assert_eq!(later.how, "fetched");
         assert_eq!(canned.count(), 4, "the place and its forecast again");
@@ -907,7 +1043,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_weather_keeps_sixteen_places_the_oldest_out() {
         let (canned, fetch) = Canned::new();
-        let weather = Weather::new(None, fetch);
+        let weather = Weather::new(None, fetch, tuesday_noon());
         for n in 1..=MOST_PLACES + 1 {
             weather.answer(&json!({"place": format!("Town {n}")})).await;
             tokio::time::advance(Duration::from_secs(1)).await;
@@ -917,7 +1053,7 @@ mod tests {
         assert_eq!(second.how, "from what was kept");
         let first = weather.answer(&json!({"place": "Town 1"})).await;
         assert_eq!(first.how, "fetched", "the oldest was put out");
-        assert_eq!(weather.fresh().len(), MOST_PLACES);
+        assert_eq!(weather.fresh(tuesday_noon()()).len(), MOST_PLACES);
     }
 
     /// The function the model is told: its name, both words optional, and
@@ -945,5 +1081,139 @@ mod tests {
         let bare = json!({"results": [{"name": "Singapore", "country": "Singapore",
                                        "latitude": 1.29, "longitude": 103.85}]});
         assert_eq!(found(&bare).unwrap().name, "Singapore");
+    }
+
+    /// Honolulu's week from Thursday 22 Oct 2026, ten hours behind UTC, each
+    /// day told apart by its numbers and its sky.
+    fn honolulu() -> Value {
+        json!({
+            "utc_offset_seconds": -36_000, "timezone": "Pacific/Honolulu",
+            "current": {"temperature_2m": 24.0, "apparent_temperature": 26.0,
+                        "relative_humidity_2m": 75, "weather_code": 1},
+            "daily": {
+                "time": ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25",
+                         "2026-10-26", "2026-10-27", "2026-10-28"],
+                "weather_code": [0, 1, 2, 3, 61, 63, 80],
+                "temperature_2m_max": [22, 23, 24, 25, 26, 27, 28],
+                "temperature_2m_min": [18, 19, 20, 21, 22, 23, 24],
+                "precipitation_probability_max": [0, 10, 20, 30, 40, 50, 60]
+            }
+        })
+    }
+
+    /// A fetcher that finds every name as Honolulu and answers its week
+    /// as [`honolulu`] has it, whenever it is asked, counting each fetch.
+    fn honolulu_fetch() -> (Arc<std::sync::atomic::AtomicUsize>, Fetch) {
+        let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = fetched.clone();
+        let fetch: Fetch = Arc::new(move |url: String| {
+            count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Box::pin(async move {
+                Ok(if url.contains("geocoding-api") {
+                    geocoded("Honolulu", "United States", 21.30694, -157.85833)
+                } else {
+                    honolulu()
+                })
+            })
+        });
+        (fetched, fetch)
+    }
+
+    /// The reviewers on #2969: a forecast kept from 23:59 at the place said
+    /// "tomorrow" for the wrong day after the place's midnight, and "today"
+    /// for the day before. Honolulu at 23:59 on Thursday is Friday in UTC
+    /// and 16:59 on Friday in Hanoi, the lamp's place: its days are told
+    /// from its own date, and two minutes later, past its midnight, it is
+    /// fetched again and Friday is today, though its rows still begin on
+    /// Thursday.
+    #[tokio::test(start_paused = true)]
+    async fn the_weather_after_the_places_midnight_is_for_its_new_day() {
+        use std::sync::atomic::Ordering;
+        let (fetched, fetch) = honolulu_fetch();
+        let wall = Wall::at(unix("2026-10-22", 23, 59, -36_000));
+        let weather = Weather::new(Some("Hanoi, Vietnam".into()), fetch, wall.clock());
+        let asked = |day: &str| json!({"place": "Honolulu", "day": day});
+        let said = |answered: Answered| answered.told["weather"].as_str().unwrap().to_owned();
+        assert_eq!(
+            said(weather.answer(&asked("tomorrow")).await),
+            "In Honolulu, United States: Tomorrow, Friday, 19 to 23°C, mainly clear, 10% chance of rain."
+        );
+        let today = said(weather.answer(&asked("today")).await);
+        assert!(
+            today.ends_with(" Today, Thursday, 18 to 22°C, clear, 0% chance of rain."),
+            "{today}"
+        );
+        assert_eq!(fetched.load(Ordering::Relaxed), 2);
+        wall.pass(2 * 60).await;
+        let tomorrow = weather.answer(&asked("tomorrow")).await;
+        assert_eq!(tomorrow.how, "fetched", "the place's midnight passed");
+        assert_eq!(
+            said(tomorrow),
+            "In Honolulu, United States: Tomorrow, Saturday, 20 to 24°C, partly cloudy, 20% chance of rain."
+        );
+        assert_eq!(fetched.load(Ordering::Relaxed), 4);
+        let today = weather.answer(&asked("today")).await;
+        assert_eq!(today.how, "from what was kept");
+        let today = said(today);
+        assert!(
+            today.starts_with("In Honolulu, United States now: 24°C, mainly clear")
+                && today.ends_with(" Today, Friday, 19 to 23°C, mainly clear, 10% chance of rain."),
+            "{today}"
+        );
+        let ahead = said(weather.answer(&json!({"place": "Honolulu"})).await);
+        assert!(ahead.contains(" Today, Friday,"), "{ahead}");
+        assert!(ahead.contains(" Tomorrow, Saturday,"), "{ahead}");
+        assert!(
+            !ahead.contains("Thursday"),
+            "yesterday is never said: {ahead}"
+        );
+        // A weekday is the next one from today on: Saturday tomorrow, and
+        // no Thursday, which is yesterday's row and next week's past the
+        // forecast.
+        assert_eq!(
+            said(weather.answer(&asked("Saturday")).await),
+            "In Honolulu, United States: Tomorrow, Saturday, 20 to 24°C, partly cloudy, 20% chance of rain."
+        );
+        assert_eq!(
+            weather.answer(&asked("Thursday")).await.told,
+            json!({"place": "Honolulu, United States", "error": NO_SUCH_DAY})
+        );
+        assert_eq!(
+            fetched.load(Ordering::Relaxed),
+            4,
+            "the new day's forecast kept"
+        );
+    }
+
+    /// A place's day is its own: 10:30 UTC on 22 Oct is the 23rd 14 hours
+    /// ahead and still the 22nd 10 hours behind. A forecast whose rows lack
+    /// the place's today is no answer, and is not kept, so the next call
+    /// fetches again.
+    #[tokio::test]
+    async fn the_weather_is_told_from_the_places_own_date() {
+        let utc = unix("2026-10-22", 10, 30, 0);
+        let ahead = json!({"utc_offset_seconds": 50_400});
+        assert_eq!(place_day(&ahead, utc), day_number("2026-10-23"));
+        assert_eq!(place_day(&honolulu(), utc), day_number("2026-10-22"));
+        assert_eq!(place_day(&json!({}), utc), None);
+        let week = honolulu();
+        let friday = day_number("2026-10-23");
+        assert!(
+            said_for(&week, "Honolulu", Day::Today, friday)
+                .unwrap()
+                .ends_with(" Today, Friday, 19 to 23°C, mainly clear, 10% chance of rain.")
+        );
+        let late = day_number("2026-11-05");
+        assert_eq!(said_for(&week, "Honolulu", Day::Ahead, late), None);
+        let (fetched, fetch) = honolulu_fetch();
+        let weather = Weather::new(None, fetch, Arc::new(move || unix("2026-11-05", 9, 0, 0)));
+        let answered = weather.answer(&json!({"place": "Honolulu"})).await;
+        assert_eq!(answered.told, json!({"error": UNREACHED}));
+        assert_eq!(
+            answered.how,
+            "the forecast came with nothing for today there"
+        );
+        weather.answer(&json!({"place": "Honolulu"})).await;
+        assert_eq!(fetched.load(std::sync::atomic::Ordering::Relaxed), 4);
     }
 }
