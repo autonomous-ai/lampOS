@@ -11,6 +11,7 @@ pub mod faces;
 pub mod guard;
 pub mod lamp;
 pub mod light;
+pub mod make_skill;
 pub mod online;
 pub mod photos;
 pub mod ping;

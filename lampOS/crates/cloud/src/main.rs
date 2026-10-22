@@ -18,6 +18,7 @@ use std::time::Duration;
 use tokio::sync::watch;
 
 const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] | lamp-cloud exit-note UNIT\n\
+  | lamp-cloud make-skill make WORDS REQUEST_ID | made REQUEST_ID (the played check, #2813)\n\
   With LAMP_CLOUD=on, and CREDENTIALS_DIRECTORY holding account, key and build\n\
   (the unit's LoadCredential=); a rotated login is kept in STATE_DIRECTORY.";
 
@@ -88,6 +89,16 @@ fn exit_note(unit: &str) -> ExitCode {
 fn main() -> ExitCode {
     let mut bus_root = None;
     let mut arguments = std::env::args().skip(1);
+    // The played check's own ask of lamp-voice's app-make socket, as the
+    // app's `skills.make` and `skills.made` make it (#2813): no switch,
+    // since it is run by hand, as lampos (lamp-cloud's own user, so the
+    // socket's group is what lets it in), on a lamp under test.
+    if std::env::args().nth(1).as_deref() == Some("make-skill") {
+        let rest: Vec<String> = std::env::args().skip(2).collect();
+        let (told, code) = lamp_cloud::make_skill::command(&rest);
+        println!("{told}");
+        return ExitCode::from(code);
+    }
     if std::env::args().nth(1).as_deref() == Some("exit-note") {
         return match std::env::args().nth(2) {
             Some(unit) => exit_note(&unit),
@@ -192,6 +203,10 @@ fn main() -> ExitCode {
         .then(|| lamp_keeper::restart::SOCKET.into()),
         // Guard mode on and off from the owner's app (#2562): only with LAMP_GUARD_FROM_APP=on.
         guard: lamp_cloud::guard::from_environment(),
+        // A skill typed in the app (#2813): only with LAMP_APP_MAKE_SKILL=on and the skills page.
+        make_skill: skills::on_from_environment()
+            .then(lamp_cloud::make_skill::from_environment)
+            .flatten(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -222,6 +237,7 @@ fn main() -> ExitCode {
         update_page: false,
         restart: None,
         guard: None,
+        make_skill: None,
     };
     runtime.block_on(async move {
         let looks = async move {

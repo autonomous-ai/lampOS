@@ -21,7 +21,13 @@
 # - no ("No, not now."): nothing put on within 30 s, and the list unchanged.
 # PLAYS SOUND IN THE ROOM. About 4 minutes an arm. Needs `sudo -n` on the lamp and its voice quiet for 45 s. Not
 # between 12:00 and 14:00 on weekdays, when the office rests. Bash 3.2 (macOS's) or later.
-# Settings: as the kit's (README.md), and MAKE_SETTLE (20 s after the stand-in is in), NOT_NOW_WAIT (30 s), LAMP_SSH,
+# With MAKE_FROM=app (#2813), the ask comes as the owner's app sends it, typed: CLOUD=PATH, an ARM64 lamp-cloud from the
+# same build, is put beside the stand-in, and its `make-skill make|made`, run as lampos (lamp-cloud's own user, so the
+# socket's group is what lets it in), asks lamp-voice's app-make socket with the very
+# calls the app's skills.make and skills.made make (`LAMP_APP_MAKE_SKILL=on` on the stand-in's drop-in too), with
+# no spoken ask and no yes to the hand-over; the app's view is read back (`{"made": ...}`) as kept with the same SHA-256,
+# then on (yes arm) or still off (no arm). The lamp still asks aloud, and only the spoken yes puts it on.
+# Settings: as the kit's (README.md), and MAKE_FROM (voice, or app), MAKE_SETTLE (20 s after the stand-in is in), NOT_NOW_WAIT (30 s), LAMP_SSH,
 # QUIET_GATE, SAY and AFPLAY (the kit's own, or the tests' stand-ins). Its stand-in test is make-skill-test.sh.
 set -u
 cd "$(dirname "$0")" || exit 9
@@ -41,6 +47,10 @@ OUT="$PLAYED_OUT/scenarios/make-skill-$L.txt"
 REMOTE=/usr/local/lib/played-stand-in   # /run may be noexec; this folder is removed when the run ends
 SKILLS=/opt/lampOS/skills/current/lamp-skills
 REQUEST="Hey Lamp, make me a skill that reminds me to stand up every hour."
+FROM=${MAKE_FROM:-voice}
+case $FROM in voice|app) ;; *) echo "make-skill.sh: MAKE_FROM is voice or app" >&2; exit 2 ;; esac
+APP_WORDS="a skill that reminds me to stand up every hour"
+[ "$FROM" = voice ] || [ -f "${CLOUD:-}" ] || { echo "make-skill.sh: MAKE_FROM=app needs CLOUD=PATH, an ARM64 lamp-cloud" >&2; exit 2; }
 
 if [ "$(date +%u)" -le 5 ] && [ "$(date +%H)" -ge 12 ] && [ "$(date +%H)" -lt 14 ] && [ "${LAMP_PLAY_AT_LUNCH:-}" != yes ]; then
   echo "make-skill.sh: not between 12:00 and 14:00 local, when the office rests" >&2
@@ -53,6 +63,7 @@ env=$(lamp 'systemctl show -p ActiveState -p Environment lamp-voice') || { echo 
 case $env in *ActiveState=active*) ;; *) echo "make-skill.sh: lamp-voice is not active; nothing changed" >&2; exit 3 ;; esac
 case $env in *LAMP_TASKS_DIR=*) ;; *) echo "make-skill.sh: lamp-voice has no tasks part (LAMP_TASKS_DIR); nothing changed" >&2; exit 3 ;; esac
 case $env in *LAMP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
+case $env in *LAMP_APP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_APP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
 lamp 'systemctl is-active -q lamp-skills-manage.socket' || { echo "make-skill.sh: the skills helper's socket is not active; nothing changed" >&2; exit 3; }
 "$QUIET_GATE" 45 || { echo "make-skill.sh: the lamp is not quiet: nothing played" >&2; exit 3; }
 
@@ -102,10 +113,15 @@ trap 'lamp "sudo -n rm -rf $REMOTE"' EXIT
 "$LAMP_SSH" "sudo -n mkdir -p $REMOTE && sudo -n tee $REMOTE/harness-fixture >/dev/null && sudo -n chmod 0755 $REMOTE/harness-fixture" < "$FIXTURE" || exit 9
 printf '%s\n' "$PLAN" | "$LAMP_SSH" "sudo -n tee $REMOTE/plan.json >/dev/null" || exit 9
 SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_TARGET=auto PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on"
+[ "$FROM" = app ] && SETUP_ENV="PLAYED_REMOTE=$REMOTE PLAYED_TARGET=auto PLAYED_VOICE_ENV='LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on'"
 if [ -n "${TASKS:-}" ]; then
   echo "lamp-tasks for this run: $(shasum -a 256 "$TASKS" | cut -c1-12)" | tee -a "$OUT"
   "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-tasks >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-tasks" < "$TASKS" || exit 9
   SETUP_ENV="$SETUP_ENV PLAYED_TASKS=$REMOTE/lamp-tasks"
+fi
+if [ "$FROM" = app ]; then
+  echo "lamp-cloud for this run: $(shasum -a 256 "$CLOUD" | cut -c1-12)" | tee -a "$OUT"
+  "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-cloud >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-cloud" < "$CLOUD" || exit 9
 fi
 
 # The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens, with any skill this run put
@@ -194,6 +210,20 @@ check() {  # NAME LINE-OR-EMPTY: PASS with the line, or FAIL
   fi
 }
 listed() { lamp "sudo -n $SKILLS list"; }
+app_make() {  # REQUEST_ID: the app's skills.make, by lamp-cloud's own call; `making`, or `refused: WHY`
+  lamp "sudo -n -u lampos $REMOTE/lamp-cloud make-skill make '$APP_WORDS' $1"
+}
+app_made() {  # REQUEST_ID: the app's view of its ask, by lamp-cloud's own skills.made call: `STATE SHA256`
+  lamp "sudo -n -u lampos $REMOTE/lamp-cloud make-skill made $1"
+}
+same() {  # VALUE WANTED...: VALUE when it is one of WANTED, else nothing (Bash 3.2: no case inside $( ))
+  local value=$1 wanted
+  shift
+  for wanted in "$@"; do
+    [ "$value" = "$wanted" ] && { printf '%s\n' "$value"; return 0; }
+  done
+  return 0
+}
 
 for arm in $ARMS; do
   echo "--- arm: $arm" | tee -a "$OUT"
@@ -201,6 +231,13 @@ for arm in $ARMS; do
   news=$(called new); shows=$(called show)
   asks=$(said | grep -oE 'Shall I put it on the lamp' | wc -l)
   before=$(listed)
+  RID="make-skill-$arm-$START"
+  if [ "$FROM" = app ]; then
+    # Typed in the app: the words to the voice's socket, as lamp-cloud's skills.make; no yes to the hand-over.
+    asked=$(app_make "$RID")
+    echo "$(date +%H:%M:%S) APP skills.make $RID: $asked" | tee -a "$OUT"
+    check "asked by the app" "$(same "$asked" making)"
+  else
   # The ask. The lamp may first ask whether to hand it over (its own confirm), or offer at once.
   heard=$(answered)
   line Samantha "$REQUEST"
@@ -221,11 +258,24 @@ for arm in $ARMS; do
     sleep 1
     line Samantha "Yes, please."
   fi
+  fi
   check "handed over" "$(wait_called new "$news" 40)"
   check "the answer read" "$(wait_called show "$shows" 90)"
   kept=$(wait_for "$START" 'a skill made by voice is (kept|not kept)' 120)
   case $kept in *"is kept"*) check "made" "$kept" ;; *) check "made" ""; [ -n "$kept" ] && echo "  $kept" | tee -a "$OUT"; continue ;; esac
   sha=$(printf '%s' "$kept" | sed -n 's/.*sha256 \([0-9a-f]\{64\}\).*/\1/p')
+  if [ "$FROM" = app ]; then
+    view=$(app_made "$RID")
+    check "the app told it kept, the same SHA-256" "$([ -n "$sha" ] && same "$view" "kept $sha" "asked $sha")"
+  fi
+  # The voice tells news only to someone there: seen, or heard asking within 120 s (El on #2889). Nothing was said
+  # in this arm, so a greeting, and its answer to its end; or a face in view does the same. Only while the ask hasn't
+  # come already: a face in view brings it soon after the keep, and the yes or no must answer the ask, not a greeting.
+  if [ "$FROM" = app ] && [ "$(said | grep -oE 'Shall I put it on the lamp' | wc -l)" -le "$asks" ]; then
+    heard=$(answered)
+    line Samantha "Hey Lamp, I'm back at my desk."
+    wait_answered "$heard" 40 >/dev/null
+  fi
   check "asked to put it on" "$(wait_said "$asks" 'Shall I put it on the lamp' 120)"
   heard=$(answered)
   wait_answered "$heard" 30 >/dev/null
@@ -246,6 +296,10 @@ for arm in $ARMS; do
     row=$([ -n "$name" ] && listed | grep -E "^$name +" | head -n 1)
     check "enabled" "$([ -n "$row" ] && ! printf '%s' "$row" | grep -qE 'disabled;|not loaded' && echo "$row")"
     check "loaded by lamp-skills" "$([ -n "$name" ] && wait_for "$ASKED" "lamp-skills: loaded .*\"$name\"" 30)"
+    if [ "$FROM" = app ]; then
+      view=$(app_made "$RID")
+      check "the app told it on" "$([ -n "$sha" ] && same "$view" "on $sha")"
+    fi
     if [ -n "$name" ] && lamp "sudo -n $SKILLS remove $name" >/dev/null 2>&1; then
       PUT_ON=$(printf '%s' "$PUT_ON" | sed "s/ $name//")
       check "removed" "$(listed | grep -qE "^$name +" || echo "$name is not listed")"
@@ -261,6 +315,10 @@ for arm in $ARMS; do
     wrong=$(printf '%s\n' "$late" | sed -n 's/.*is on the lamp: \([a-z0-9-]*\), sha256.*/\1/p' | tail -n 1)
     [ -n "$wrong" ] && PUT_ON="$PUT_ON $wrong"
     check "nothing installed" "$([ -z "$early$late" ] && [ "$(listed)" = "$before" ] && echo "no install line, the list unchanged")"
+    if [ "$FROM" = app ]; then
+      view=$(app_made "$RID")
+      check "the app told it still off" "$([ -n "$sha" ] && same "$view" "asked $sha" "left_off $sha")"
+    fi
   fi
   journal "$START" | grep -E 'make_skill|put_on_made_skill|made skill|made by voice|telling news' | cut -c1-220 >> "$OUT"
 done

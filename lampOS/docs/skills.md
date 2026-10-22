@@ -1762,7 +1762,8 @@ and the socket's group),
 `task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed`,
 and
 `agent_tasks::tests::a_hand_over_prepares_and_confirms_at_once`. The app's
-side, `skills.make` and `skills.made` in `lamp-cloud`, follows.
+side is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
+"A skill typed in the app").
 
 ## V1's moves and emotions: what we take
 
