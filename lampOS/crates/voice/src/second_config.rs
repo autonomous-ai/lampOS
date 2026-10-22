@@ -351,7 +351,10 @@ fn place_if_missing(
 /// stop words', the wait words'), with the unit's key terms
 /// ([`KEY_TERMS_ENV`]) over the file's, as the worker reads them. Without
 /// them those streams asked with the lamp's name alone (#2602: the relay's
-/// 1-term sessions beside the worker's 10-term ones).
+/// 1-term sessions beside the worker's 10-term ones). A bad
+/// [`KEY_TERMS_ENV`] is refused in the journal and the file's key terms are
+/// kept: these listeners do not go unheard over it (the worker, reading it
+/// through [`SecondConfig::with_environment`], still fails on it).
 pub fn load_from_env() -> io::Result<Option<SecondConfig>> {
     from_setting(std::env::var_os(SECOND_CONFIG_ENV), |name| {
         std::env::var_os(name)
@@ -363,9 +366,15 @@ pub(crate) fn from_setting(
     var: impl Fn(&str) -> Option<OsString>,
 ) -> io::Result<Option<SecondConfig>> {
     match value {
-        Some(path) if !path.is_empty() => load_from_path(Path::new(&path))?
-            .with_key_terms_from(var)
-            .map(Some),
+        Some(path) if !path.is_empty() => {
+            let file = load_from_path(Path::new(&path))?;
+            Ok(Some(file.clone().with_key_terms_from(var).unwrap_or_else(
+                |error| {
+                    eprintln!("lamp-voice second: {error}: refused, the file's key terms are kept");
+                    file
+                },
+            )))
+        }
         _ => Ok(None),
     }
 }
