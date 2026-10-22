@@ -1,0 +1,37 @@
+# Recovery (#3020, lampOS/docs/setup.md, "When the saved network is gone"): on a set-up lamp whose saved
+# network is gone, 90 s off every known network, and not joining one, opens setup's own hotspot and page
+# so the app can set a new network, its marker and the person's data kept. Off: without
+# LAMP_WIFI_RECOVERY=on (a drop-in, lamp-setup-recover.service.d/on.conf) it says so and exits at once.
+[Unit]
+Description=lampOS: setup's hotspot again when the saved network is gone
+After=network-pre.target
+# A set-up lamp only: before the marker, setup itself serves.
+ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/serve.json
+
+[Service]
+Type=simple
+# Root: it moves the radio between station and hotspot, as setup does.
+User=root
+# /run/lampos-setup-recover/on while it runs with its switch on: lamp-cloud reads it for system.info's recovery.
+RuntimeDirectory=lampos-setup-recover
+RuntimeDirectoryMode=0755
+ExecStart=/opt/lampOS/setup/current/lamp-setup recover --config /etc/lampOS/setup/serve.json --enable
+Restart=on-failure
+RestartSec=20
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-setup-recover
+# As setup's Wi-Fi helper (lamp-setup-wifi@.service), which moves the radio the same way (the
+# Reviewer-lead's P3 on #3024). /etc: the Wi-Fi file and V1's device-sta-mode and device-ap-mode, which
+# edit files in /etc. /run: wpa_supplicant's socket, systemctl, its own runtime folder. /tmp: wpa_cli's
+# reply socket, which wpa_supplicant must reach, so the real /tmp.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc /run /tmp
+ProtectHome=yes
+PrivateTmp=no
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

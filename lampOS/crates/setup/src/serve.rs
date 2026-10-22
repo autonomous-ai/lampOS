@@ -618,6 +618,45 @@ pub trait Save {
     fn own_key(&mut self, _given: &crate::keys::Given) -> crate::keys::Verdict {
         crate::keys::Verdict::Unreached
     }
+    /// Whether a setup's answers are kept at all. Only [`NetworkOnly`] keeps
+    /// none, so the status then goes on saying what the lamp kept before
+    /// (reviewer-two's P3 on #3024).
+    fn keeps_settings(&self) -> bool {
+        true
+    }
+}
+
+/// What recovery saves of a setup request (#3020, El's P1 on #3024): the
+/// network only, which the join itself writes. Every other field the app's
+/// setup flow sends (the key, the name, the zone, the backend's link, the
+/// reports answer, own keys) is ignored, not refused, so the app's one full
+/// request still works, and nobody on the open hotspot can change the
+/// settings a set-up lamp's owner kept; the network itself is the one thing
+/// such a request sets. The fields are still checked as at first setup, so a
+/// malformed one is refused before anything is joined. The marker is
+/// already there. `S` is what a first setup would have saved to, never
+/// written.
+pub struct NetworkOnly<S>(pub S);
+
+impl<S> Save for NetworkOnly<S> {
+    fn credential(&mut self, _key: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn name(&mut self, _name: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn timezone(&mut self, _zone: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn backend(&mut self, _link: &Backend) -> io::Result<()> {
+        Ok(())
+    }
+    fn marker(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn keeps_settings(&self) -> bool {
+        false
+    }
 }
 
 /// The temporary files a setup that crashed mid-write may have left, each of
@@ -699,6 +738,28 @@ fn put_in_place(temporary: &Path, path: &Path) -> io::Result<()> {
 /// The wording of the reports question the person answered (#1683): a
 /// later wording that asks for more starts at no until they are asked again.
 pub const REPORTS_ASKED: u64 = 1;
+
+/// The answer on reports the last setup kept at `path`, read as lamp-cloud
+/// reads setup's record: a yes only with `"share": true` to a wording this
+/// setup knows (`asked` at most [`REPORTS_ASKED`]) and no field but
+/// `share`, `asked` and `at`; missing, unreadable, a later wording or a newer
+/// build's field is a no. A later change in the app is lamp-cloud's own
+/// record, not this one (reviewer-two's P3 on #3024).
+pub fn kept_share_reports(path: &Path) -> bool {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .is_some_and(|kept| {
+            kept.as_object().is_some_and(|fields| {
+                fields
+                    .keys()
+                    .all(|field| ["share", "asked", "at"].contains(&field.as_str()))
+            }) && kept["share"] == Value::Bool(true)
+                && kept["asked"]
+                    .as_u64()
+                    .is_some_and(|asked| asked <= REPORTS_ASKED)
+        })
+}
 
 /// What setup keeps of the person's answer on reports, at `at`.
 pub fn reports_record(share: bool, at: SystemTime) -> Value {
@@ -991,7 +1052,7 @@ pub fn run(
                 }
             })
             .and_then(|()| save.marker());
-            {
+            if save.keeps_settings() {
                 let mut status = status.lock().unwrap();
                 status.share_reports = saved.is_ok() && reports_kept;
                 status.own_keys = own_answers;
