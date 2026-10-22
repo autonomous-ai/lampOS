@@ -694,6 +694,10 @@ struct Shared {
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
+    /// With `LAMP_MEMORY_EVENTS`: the line a greeting turn's own
+    /// instructions are given for a dated follow-up
+    /// ([`Engine::asking_after_events`], #2805).
+    event_turn: Option<Remembered>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -1213,6 +1217,7 @@ impl Engine {
                 though_held: false,
                 staff: None,
                 remembered: None,
+                event_turn: None,
                 name_note: None,
                 conversation_alone: None,
                 named_ask: None,
@@ -1802,6 +1807,20 @@ impl Engine {
     pub fn remembering(mut self, note: Remembered) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.remembered = Some(note);
+        }
+        self
+    }
+
+    /// With `LAMP_MEMORY_EVENTS` (the first builder on #2805, 22 Oct
+    /// 20:28): a spoken request, not one held only by a gap, is asked with
+    /// `note`'s line last among its notes, its own instructions, when the
+    /// person at the lamp was offered a dated follow-up this session and the
+    /// line greets (`crate::remember::event_turn_note`): the note's heading
+    /// alone was never taken on lamp-c0a4. `note` gives it once. Before any
+    /// turn only.
+    pub fn asking_after_events(mut self, note: Remembered) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.event_turn = Some(note);
         }
         self
     }
@@ -3716,6 +3735,31 @@ async fn spoken(
                 .is_some_and(|scope| scope.person().is_some() && !scope.held())
         })
         .and_then(|(note, _)| note(request));
+    // A dated follow-up of the person's, asked first in a greeting turn's
+    // own instructions, last among its notes (the first builder on #2805,
+    // 22 Oct 20:28); never in a line held only by a gap, which may be
+    // someone else's.
+    // Off the runtime's thread: whose turn it is may read the face file.
+    let event = match shared
+        .event_turn
+        .clone()
+        .filter(|_| !held_by_gap(scope.as_ref()))
+    {
+        Some(note) => {
+            let words = text.clone();
+            let lease = scope.clone();
+            tokio::task::spawn_blocking(move || note(request, &words, lease.as_ref()))
+                .await
+                .ok()
+                .flatten()
+        }
+        None => None,
+    }
+    .inspect(|_| {
+            eprintln!(
+                "lamp-voice second: request {request}: a greeting, and the model is told to ask first how their dated follow-up went"
+            );
+        });
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -3749,6 +3793,7 @@ async fn spoken(
         .chain(called)
         .chain(air)
         .chain(seems)
+        .chain(event)
         .collect();
     if let Some(carried) = carried {
         eprintln!(

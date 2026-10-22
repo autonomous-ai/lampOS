@@ -2046,6 +2046,8 @@ pub fn serve(
     // session the turn is opened for (the reviewer's P2 on #2268).
     let sessions = Arc::new(Mutex::new(Sessions::reopening_after_quiet(reopen_quiet)));
     let hits_sessions = sessions.clone();
+    // Whose a greeting turn is, for a dated follow-up's line (#2805).
+    let (event_sessions, event_who) = (sessions.clone(), who.clone());
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
@@ -2325,6 +2327,25 @@ pub fn serve(
             crate::remember::HITS_ENVIRONMENT
         ),
         (false, _) => {}
+    }
+    // A dated follow-up the session was offered, asked first in a greeting
+    // turn's own instructions (`LAMP_MEMORY_EVENTS`, the first builder on
+    // #2805, 22 Oct 20:28): whose the turn is, as memory's hits read it.
+    if crate::remember::events_on() {
+        eprintln!(
+            "lamp-voice second: a greeting from someone offered a dated follow-up is told to ask how it went first ({})",
+            crate::remember::EVENTS_ENVIRONMENT
+        );
+        engine = engine.asking_after_events(Arc::new(move |request, heard, lease| {
+            let person = hits_whose(
+                request,
+                lease,
+                &event_sessions,
+                event_who.as_deref(),
+                Instant::now(),
+            )?;
+            crate::remember::event_turn_note(person.as_deref(), heard)
+        }));
     }
     // Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first
     // builder on #1722, 00:08): the eyes' faces, read every 100 ms on their
