@@ -1,5 +1,34 @@
 # Tests work log
 
+## 2026-10-22 22:23 +0700 — broker TLS carry published
+
+Ready for lamp-voice: no; draft [#3062](https://github.com/autonomous-ai/lampOS/pull/3062).
+
+At Reviewer-lead's addressed #2587 request, carried source 60d4efb86 onto
+c6d50559a as owned tests/2587-cloud-tls-rebased, head 6622e83e2. Only original
+four files differ; the three fallible-option adapters preserve the complete
+current Will and Wi-Fi reconstruction. Original TLS/test/docs and unrelated
+upstream bytes are retained by the exact reverse-delta audit. Source branch
+is untouched; existing parsing-test P3 is unchanged.
+
+Native fmt, strict Cloud all-target Clippy, full serial Cloud 194/0/2 and
+workspace build pass. [Receipts](verification/cloud-tls-rebase-20261022/)
+retain raw logs, range-diff and hashes. ARM 39803867884 and Clippy 39803867845
+are active. Reviewer-lead owns the resolution read/merge; final ancestry
+and exact native checks remain. Off unless set; backend/lamp activation row
+unrun. No device action, SSH or ARM64 build on the Mac.
+
+#3023 full serial Voice 3,376/0/14 and integration 261/0 pass; required ARM #6040
+10,491/0/67 and Clippy #2044 now have actual SUCCESS job status. Its combined
+consumer command hit its 30-minute outer watchdog; the exact incomplete log
+is retained. Completed targets pass, and only unfinished Update round,
+Voice Eval, doctests and workspace build are continuing. No timeout is
+relabeled as success. Final base window is requested on Queue.
+
+#2693 is rebased locally 67079627b with equal range-diff; independent Skills
+gate follows the active probes. First's two #3046 search/push cases are now
+being run alone on unchanged head 16b1a2a15 on Mac and ARM64, with no fixes.
+
 ## 2026-10-22 19:58 +0700 — final Voice fixture qualification delivered
 
 Ready for lamp-voice: no; draft [#3023](https://github.com/autonomous-ai/lampOS/pull/3023).

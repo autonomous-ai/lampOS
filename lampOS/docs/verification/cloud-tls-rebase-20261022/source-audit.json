@@ -1,0 +1,32 @@
+{
+  "source_head": "60d4efb86f025e9731202b956c90af9b1410e508",
+  "target_base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "online_rs_sha256": "592abf21b9a93c55298c0d307b8c5a90397b36cdf8fb6173c768fa0bf532585b",
+  "online_rs_upstream_exact_after_reversing_original_tls_and_conflict_adapters": true,
+  "original_tls_wrapper_constructor_and_unit_test_byte_identical": true,
+  "adapters": [
+    "options_with_will returns Option and propagates TLS setup failure; all Will values unchanged",
+    "initial made() Option guard uses original fail-closed diagnostic",
+    "Wi-Fi made() Option guard drops old client/events before original fail-closed diagnostic and pending"
+  ],
+  "other_files": {
+    "lampOS/crates/cloud/src/beat.rs": {
+      "sha256": "8338e60e96ddbe69635f5a64c2cbf4462c221ae61ee7b22ab59bfa7c5cce6835",
+      "upstream_preserved_after_removing_original_tls_delta": true,
+      "original_delta_sha256": "cd862eb7e82701bd1d1f7686df5df4a5612ceb660387c92b6a1dc2847b1c7a66"
+    },
+    "lampOS/docs/cloud.md": {
+      "sha256": "733c490ddf538c49171a9e94e70b51c687787fbef51b8a2084ed1070cb421cc6",
+      "upstream_preserved_after_removing_original_tls_delta": true,
+      "original_delta_sha256": "461980938f6efa26b51d9b8666f127e08ba68b0a397f9cab912c368c691fe949"
+    },
+    "lampOS/docs/switches.md": {
+      "sha256": "5c068a8ddb88ea3da8f8ffa8217607dba90d23a3ef241ec284f4e93e9a16d0d7",
+      "upstream_preserved_after_removing_original_tls_delta": true,
+      "original_delta_sha256": "066ba2516a61f7b68da6ca6f2463e9b6d2ae8453da808502d0f3ca2f5f7bab6d"
+    }
+  },
+  "cargo_run": false,
+  "no_new_product_design": true,
+  "existing_p3_exact_on_parser_test": "Recorded by reviewer; outside resolution-only carry and unchanged"
+}
