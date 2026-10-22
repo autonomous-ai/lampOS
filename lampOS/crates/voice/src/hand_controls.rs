@@ -657,6 +657,12 @@ impl HandControls {
         Ok(owner)
     }
 
+    /// Retain a pending wake alongside another fixture's scheduled inputs.
+    #[cfg(test)]
+    pub(crate) fn set_woken_for_test(&mut self, woken_us: u64) {
+        self.woken = Some(woken_us);
+    }
+
     /// Queues each scheduled input whose time the poll's clock has reached.
     #[cfg(test)]
     fn release_scheduled(&mut self, now_us: u64) {

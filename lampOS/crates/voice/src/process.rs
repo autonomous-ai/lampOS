@@ -1446,6 +1446,8 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+        // Read by the second worker, which tells the coordinator (#3026).
+        crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
         crate::same_voice::CALLER_ONLY_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
@@ -1520,6 +1522,7 @@ mod tests {
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+            crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
@@ -2053,6 +2056,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
+                    || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
@@ -2198,6 +2202,7 @@ mod tests {
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",
+                    "LAMP_SECOND_UNFINISHED_WAIT=on",
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_TASKS_NAMED_ASK=on",

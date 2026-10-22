@@ -57,6 +57,12 @@ struct Lamp {
     /// reads this load while it does, as lamp-52e6's head pitch did after a
     /// power cut. Servo, above, counts, load.
     heavy: Option<(usize, f32, f32, u16)>,
+    /// One servo lifts (toward fewer counts) no faster than this many
+    /// counts a second, as a head rising slowly against its weight.
+    climb: Option<(usize, f32)>,
+    /// One servo lifts only in bursts: for this long, then still for this
+    /// long, over and over, as lamp-52e6's head creeps back up.
+    creep: Option<(usize, Duration, Duration)>,
     silent_from: Option<Duration>,
     silent_until: Option<Duration>,
     event: Option<(Duration, usize, Event)>,
@@ -154,6 +160,8 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             wall: None,
             short: None,
             heavy: None,
+            climb: None,
+            creep: None,
             silent_from: None,
             silent_until: None,
             event: None,
@@ -276,7 +284,20 @@ impl Lamp {
                     wanted = (wanted + by).min(servo.position);
                 }
             }
-            let moved = (wanted - servo.position).clamp(-fastest * step, fastest * step);
+            let rising = match self.climb {
+                Some((slow, most)) if slow == index => most.min(fastest),
+                _ => fastest,
+            };
+            let rising = match self.creep {
+                Some((slow, moving, still))
+                    if slow == index
+                        && now.as_micros() % (moving + still).as_micros() >= moving.as_micros() =>
+                {
+                    0.0
+                }
+                _ => rising,
+            };
+            let moved = (wanted - servo.position).clamp(-rising * step, fastest * step);
             servo.position += moved;
             if let Some((walled, at)) = self.wall
                 && walled == index
@@ -3202,6 +3223,257 @@ fn a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest() {
             "{after:?} against {before:?}"
         );
     }
+}
+
+const GLANCE_FROM: Duration = Duration::from_secs(10);
+const GLANCE_UNTIL: Duration = Duration::from_millis(11_000);
+
+/// The glance of the rest-glance tests: from `GLANCE_FROM` to
+/// `GLANCE_UNTIL` Expression dips the head of a lamp resting where the
+/// factory's self-test finds it, and `set` gives the lamp and the limits
+/// what the test needs. Each step's time, and the pitch's goal and position.
+fn rest_glance(
+    set: impl FnOnce(&mut Lamp, &mut Limits),
+) -> (BodyReport, Vec<(Duration, u16, u16)>) {
+    rest_glances(set, vec![(GLANCE_FROM, GLANCE_UNTIL, 40.0)])
+}
+
+/// The same with these glances: from, until and the pitch asked.
+fn rest_glances(
+    set: impl FnOnce(&mut Lamp, &mut Limits),
+    glances: Vec<(Duration, Duration, f32)>,
+) -> (BodyReport, Vec<(Duration, u16, u16)>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(16));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    // Found standing, as the factory's self-test finds it, its head at its
+    // goal there.
+    for (servo, at) in lamp
+        .servos
+        .iter_mut()
+        .zip([2_015, 2_650, 2_600, 2_044, 1_900])
+    {
+        servo.position = f32::from(at);
+        servo.goal = at;
+    }
+    let mut limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .map(|limits| Limits {
+        rest_glance: true,
+        ..limits
+    })
+    .unwrap();
+    set(&mut lamp, &mut limits);
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || Asked {
+            toward: None,
+            seen: None,
+            gesture: None,
+            expression: glances
+                .iter()
+                .find(|(from, until, _)| (*from..*until).contains(&time.get()))
+                .map(|(_, _, pitch)| [*pitch, 0.0, 0.0]),
+            called: false,
+            still: false,
+            paused: false,
+            unplug: false,
+            held_by_test: false,
+            asleep: false,
+            woken: false,
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.goals[0], glimpse.positions[0])),
+    );
+    (report, seen)
+}
+
+/// A head that stops short only when it lifts, as lamp-52e6's does (26
+/// counts short in the factory's self-test on #2818): dipped by a glance at
+/// rest, it is led back up to where it rested, and is back within the
+/// self-test's 12 counts within its 3 s, not left resting 26 below.
+#[test]
+fn a_resting_head_dipped_by_a_glance_is_led_back_up_where_it_stops_short_lifting() {
+    let (report, seen) = rest_glance(|lamp, _| {
+        // Lifting, the head stops 26 short of its goal; it dips all the way.
+        lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(GLANCE_FROM);
+    let lowest = seen
+        .iter()
+        .filter(|step| step.0 >= GLANCE_FROM && step.0 < GLANCE_UNTIL)
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 30, "dipped from {before} to {lowest}");
+    let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// How far the goal is above where the head was read: led, it is more than
+/// `ARRIVED_COUNTS`.
+fn lead_of(step: &(Duration, u16, u16)) -> f32 {
+    f32::from(step.2) - f32::from(step.1)
+}
+
+/// A head that arrives is no longer led: a free head back within
+/// `ARRIVED_COUNTS` of its way is never led at all, and one led back up
+/// from 26 short (above) has its goal back at its way once it is there.
+#[test]
+fn a_resting_head_back_within_its_way_after_a_glance_is_not_led() {
+    let (report, seen) = rest_glance(|_, _| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let most = seen.iter().map(lead_of).fold(f32::MIN, f32::max);
+    assert!(most <= ARRIVED_COUNTS, "a free head led {most} counts");
+    let (report, seen) = rest_glance(|lamp, _| lamp.heavy = Some((PITCH, 0.0, 26.0, 25)));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        seen.iter()
+            .any(|step| lead_of(step) > GLANCE_LIFT_LEAD / 2.0)
+    );
+    let back = GLANCE_UNTIL + Duration::from_secs(1);
+    for step in seen.iter().filter(|step| step.0 >= back) {
+        assert!(
+            lead_of(step).abs() <= ARRIVED_COUNTS,
+            "at {:?} the goal is {} and the head {}",
+            step.0,
+            step.1,
+            step.2
+        );
+    }
+}
+
+/// A head held part way up by a hand as a glance lets it go back: a glance
+/// is judged with a gesture's bounds, so neither the load nor the tracking
+/// check ends a lead into the hand. It is led for no more steps than the
+/// tracking check lets a head stay off its goal, and then pushes no
+/// harder than its way. The hand reads 150, under the run's own bound.
+#[test]
+fn a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand() {
+    let held = (GLANCE_UNTIL, GLANCE_UNTIL + Duration::from_secs(3));
+    let mut tracking_steps = 0;
+    let (report, seen) = rest_glance(|lamp, limits| {
+        lamp.hand = Some((held.0, held.1, PITCH, 1_920.0));
+        lamp.strains.push((held.0, held.1, PITCH, 150));
+        tracking_steps = usize::from(limits.tracking_steps);
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let led = seen
+        .iter()
+        .filter(|step| (held.0..held.1).contains(&step.0) && lead_of(step) > GLANCE_LIFT_LEAD)
+        .count();
+    assert!(
+        led <= usize::from(GLANCE_LEAD_STILL_STEPS) + 1,
+        "led {led} steps into a hand"
+    );
+}
+
+/// A head that stops 26 short lifting and rises slowly, 2 counts a step,
+/// keeps closing on its way, so it stays led until it arrives: on #2818
+/// lamp-52e6's reached its way only 10 s later once its lead was cut after
+/// a count of steps rather than when it stopped closing.
+#[test]
+fn a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives() {
+    let mut tracking_steps = 0;
+    let (report, seen) = rest_glance(|lamp, limits| {
+        lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+        lamp.climb = Some((PITCH, 100.0));
+        tracking_steps = usize::from(limits.tracking_steps);
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    // Led for longer than the tracking check's steps, while it closes.
+    let led = seen
+        .iter()
+        .filter(|step| step.0 >= GLANCE_UNTIL && lead_of(step) > GLANCE_LIFT_LEAD / 2.0)
+        .count();
+    assert!(led > tracking_steps + 1, "led {led} steps only");
+    // And back within the self-test's 12 counts within its 3 s.
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(GLANCE_FROM);
+    let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// A head that creeps back up from 40 counts down, 2 counts a step for
+/// 100 ms and then still for 400 ms, over and over, as lamp-52e6's did on
+/// #2818: its pauses are not a hand, so it keeps its lead through them and
+/// is back within the self-test's 12 counts within its 3 s.
+#[test]
+fn a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead() {
+    let (report, seen) = rest_glance(|lamp, _| {
+        lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+        lamp.climb = Some((PITCH, 100.0));
+        lamp.creep = Some((
+            PITCH,
+            Duration::from_millis(100),
+            Duration::from_millis(400),
+        ));
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(GLANCE_FROM);
+    let lowest = seen
+        .iter()
+        .filter(|step| step.0 >= GLANCE_FROM && step.0 < GLANCE_UNTIL)
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 36, "dipped from {before} to {lowest}");
+    let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// The self-test's moves come before a lamp that has just stood up has
+/// rested a second, and each next one before it rests again: still at
+/// rest, its head is led back up from the dip all the same, not left where
+/// it stopped short. On lamp-52e6 it rested 17 below after the factory's
+/// self-test, and no lead began (#2818).
+#[test]
+fn a_head_dipped_before_its_rest_has_lasted_is_led_back_up() {
+    let ms = Duration::from_millis;
+    let dip = (ms(1_800), ms(2_800));
+    let (report, seen) = rest_glances(
+        |lamp, _| lamp.heavy = Some((PITCH, 0.0, 26.0, 25)),
+        vec![(ms(400), ms(1_200), -40.0), (dip.0, dip.1, 40.0)],
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(dip.0);
+    let lowest = seen
+        .iter()
+        .filter(|step| (dip.0..dip.1).contains(&step.0))
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 30, "dipped from {before} to {lowest}");
+    let after = at(dip.1 + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
 }
 
 #[test]

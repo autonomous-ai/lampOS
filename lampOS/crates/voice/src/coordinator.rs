@@ -7,7 +7,7 @@
 #[cfg(test)]
 use crate::scenario_clock::monotonic_us;
 use crate::{
-    activity::{Activity, ObservedAudio, TurnDetector},
+    activity::{Activity, EndpointDecision, ObservedAudio, TurnDetector},
     admission::{
         AcceptanceBasis, Accepted, CaptureLineage, Context as AdmissionContext, Decision, Hold,
         InputAdmission, Rejection, Step as AdmissionStep, Update as AdmissionUpdate,
@@ -1268,6 +1268,9 @@ struct Rig {
     /// A sound just after a line that ended before its name goes on from it
     /// (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
     open_name: bool,
+    /// A due end of the line in hand held while the second route's words so
+    /// far end unfinished (`LAMP_SECOND_UNFINISHED_WAIT`, [`crate::unfinished_words`]).
+    unfinished_wait: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -3391,6 +3394,8 @@ fn observe_provider_output(
         | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }
         | ProviderOutput::InputDiscarded { .. } => {}
+        // About the line still heard, for the detector, taken by the loop.
+        ProviderOutput::WordsEnd { .. } => {}
         // Only a provider configured to take a silent earlier response as
         // over reports this. It grants nothing here: the request still needs
         // its own Started before any of its output is usable.
@@ -4083,6 +4088,7 @@ fn spawn_rig(
         early_end_blocks: options.early_end_blocks,
         early_finalize: early_finalize::from_environment(),
         open_name: open_name::from_environment(),
+        unfinished_wait: crate::unfinished_words::on(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -5078,8 +5084,59 @@ fn conversation_with_gate(
     notices: &FailureNotices,
     controls: &mut Option<HandControls>,
     reminders: &mut Option<crate::reminders::Reminders>,
+    gate: PrivacyGate,
+    #[cfg(test)] host_deadline: Option<Instant>,
+) -> Result<()> {
+    // Keep the pending cue outside the conversation body so ordinary and
+    // error returns can record why a consumed wake was cancelled.
+    let mut waking = None;
+    let result = conversation_with_gate_inner(
+        rig,
+        owner,
+        lifetime,
+        trace,
+        startup,
+        reply,
+        cues,
+        termination,
+        notices,
+        controls,
+        reminders,
+        gate,
+        #[cfg(test)]
+        host_deadline,
+        &mut waking,
+    );
+    if let Some((woken_us, _)) = waking {
+        let recorded = trace.record(json!({
+            "kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":monotonic_us(),
+            "plays":false,"why":"conversation_ended",
+            "boundary":"the waking input's acquisition to this decision; no sound was committed"
+        }));
+        // Preserve the original result if the recorder accepts the row
+        // (including its existing bounded-drop policy). A recorder error
+        // must not retain a physical-mute restart token.
+        return service_privacy::finish(result, recorded);
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+fn conversation_with_gate_inner(
+    rig: &mut Rig,
+    owner: &mut Controller,
+    lifetime: Lifetime,
+    trace: &mut SessionState,
+    startup: StartupEvents,
+    reply: &mut Option<Reply>,
+    cues: &mut Option<CueSink>,
+    termination: &Termination,
+    notices: &FailureNotices,
+    controls: &mut Option<HandControls>,
+    reminders: &mut Option<crate::reminders::Reminders>,
     mut gate: PrivacyGate,
     #[cfg(test)] host_deadline: Option<Instant>,
+    waking: &mut Option<(u64, u64)>,
 ) -> Result<()> {
     let mut cloud = startup.cloud;
     let mut output_flow = startup.output_flow;
@@ -5314,7 +5371,7 @@ fn conversation_with_gate(
         None
     };
     let mut sighed_for: Option<u64> = None;
-    let mut waking = controls
+    *waking = controls
         .as_mut()
         .and_then(|controls| controls.take_woken(monotonic_us()))
         .map(|woken_us| (woken_us, monotonic_us()));
@@ -5734,6 +5791,9 @@ fn conversation_with_gate(
     let mut early_finalize = rig
         .early_finalize
         .then(early_finalize::EarlyFinalize::default);
+    // A due end held while the second route's words so far end unfinished
+    // (`LAMP_SECOND_UNFINISHED_WAIT`): off unless set.
+    let unfinished_wait = rig.unfinished_wait;
     if let Some(early) = early.as_ref() {
         record(
             trace,
@@ -7044,6 +7104,21 @@ fn conversation_with_gate(
                         "first_answer_audio_ms":audio_ms}),
                     )?;
                 }
+                // The second route's words so far end unfinished, or no
+                // longer do: a due end of the line in hand waits a little
+                // longer while they do (`LAMP_SECOND_UNFINISHED_WAIT`).
+                ProviderOutput::WordsEnd {
+                    request,
+                    unfinished,
+                } => {
+                    if unfinished_wait
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        detector.words_end(unfinished);
+                    }
+                }
                 ProviderOutput::RequestedAudio {
                     request,
                     session,
@@ -7980,6 +8055,13 @@ fn conversation_with_gate(
                 frame.echo.is_some().then_some(probability),
                 observed_at_us,
             )?;
+            // An end held for unfinished words, let go: counts only.
+            if let Some(waited) = detector.take_unfinished_wait() {
+                eprintln!(
+                    "{}",
+                    waited.told(reply.as_ref().map(|current| current.owner.turn()))
+                );
+            }
             check_speaker_progress(speaker_pending.as_ref(), observed_at_us)?;
             let discarded_endpoint = submission_draining && input_ended;
             if discarded_endpoint {
@@ -9014,7 +9096,7 @@ fn conversation_with_gate(
                     if let Some(current) = reply.as_ref() {
                         let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,
                                 "last_block_host_read_us":audio.captured_at_us,
-                                "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
+                                "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), EndpointDecision::quiet_ms),
                                 "acoustic_speech_end":null});
                         if near_call {
                             endpoint_record["onboarding_near_call"] = json!(
@@ -9179,7 +9261,7 @@ fn conversation_with_gate(
                     }
                     answer_audio.decided(current.owner.turn(), at);
                     let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,"last_block_host_read_us":input_end_us,
-                        "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
+                        "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), EndpointDecision::quiet_ms),
                         "acoustic_speech_end":null});
                     if as_sound {
                         endpoint_record["let_through_as_sound"] = json!(true);
@@ -10815,29 +10897,38 @@ fn conversation_with_gate(
         // the first thing this conversation says, once it is quiet and
         // listening is ready, within a second and a half of its start or not
         // at all. Not held to the tap's 30 s: the person asked for it.
-        if let (Some(sound), Some((woken_us, began_us))) = (head_cue.as_ref(), waking) {
+        if let (Some(sound), Some((woken_us, began_us))) = (head_cue.as_ref(), *waking) {
             let at_us = monotonic_us();
-            let decided = crate::head_cue::may_hum(&crate::head_cue::Now {
-                at_us,
-                began_us: woken_us,
-                allowed: snapshot.microphone_permission() == Permission::Allowed,
-                quiet: reply.is_none()
-                    && provider_queue.is_empty()
-                    && speaker_pending.is_none()
-                    && !admission.owns_stream()
-                    && admission.idle_for_reminder()
-                    && !submission_draining
-                    && !paused
-                    && playback_mask.available(at_us),
-                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
-                reply_owed: look_wanted.is_some(),
-                last_said_us: last_spoke_us,
-                last_hum_us: None,
-            });
-            let waits = matches!(decided, Err("not_quiet" | "listening_not_ready"))
-                && at_us.saturating_sub(began_us) < WAKE_HUM_WITHIN_US;
+            let decided = crate::head_cue::may_wake_hum(
+                &crate::head_cue::Now {
+                    at_us,
+                    began_us: woken_us,
+                    allowed: snapshot.microphone_permission() == Permission::Allowed,
+                    quiet: reply.is_none()
+                        && provider_queue.is_empty()
+                        && speaker_pending.is_none()
+                        && !admission.owns_stream()
+                        && admission.idle_for_reminder()
+                        && !submission_draining
+                        && !paused
+                        && playback_mask.available(at_us),
+                    listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                    reply_owed: look_wanted.is_some(),
+                    last_said_us: last_spoke_us,
+                    last_hum_us: None,
+                },
+                began_us,
+            );
+            // Startup privacy stabilization is temporary. Keep this one wake
+            // pending without extending its original deadline or playing while
+            // the microphones are denied; may_wake_hum checks expiry first
+            // and an expired cue is always terminal.
+            let waits = matches!(
+                decided,
+                Err("microphone_not_allowed" | "not_quiet" | "listening_not_ready")
+            );
             if !waits {
-                waking = None;
+                *waking = None;
                 record(
                     trace,
                     json!({"kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":at_us,
@@ -11721,10 +11812,6 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
             .map(|played| gates.at_us.saturating_sub(played)),
     }
 }
-
-/// How long a wake from a hand's sleep waits for its conversation to be
-/// quiet and ready for its "hm?" (#1362): a late one would not answer it.
-const WAKE_HUM_WITHIN_US: u64 = 1_500_000;
 
 /// What the ring is told of the turn in hand, from what plays in it. The
 /// head tap's "hm?" (#711), the same hum after an empty "Sorry?" (#1417)
@@ -14274,6 +14361,7 @@ mod tests {
             early_end_blocks: None,
             early_finalize: false,
             open_name: false,
+            unfinished_wait: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,

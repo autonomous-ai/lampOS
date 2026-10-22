@@ -703,6 +703,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
     };
     let (mut owner, current, permit) = active_reply();
     let old_owner = current.owner;
@@ -799,6 +800,9 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         .zip(pids)
         .map(|((peer, input), pid)| SteppedPeer {
             speaker: false,
+            capture: None,
+            provider: false,
+            provider_inputs: Vec::new(),
             privacy: false,
             privacy_said_us: None,
             source: None,
@@ -1100,6 +1104,10 @@ struct Ran {
     /// When each authority reached the rig's camera's side, with
     /// `RIG_CAMERA` (stepped only).
     camera_authorities: Vec<u64>,
+    /// Capture's permission/start/frame history for opted-in wake scenarios.
+    capture: Option<SteppedCapture>,
+    /// Commands actually received on the provider data socket in wake scenarios.
+    provider_inputs: Vec<ProviderInput>,
     error: String,
     /// When the loop ended, on the clock it ran on.
     ended_us: u64,
@@ -1145,6 +1153,12 @@ thread_local! {
     /// The loop's rig with a camera of its own, whose side records each
     /// authority it is given (#2602, the first builder's P1 on #2623).
     static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Opt in to a capture peer that waits for Allowed and StartCapture, then
+    /// returns fresh silent frames from this time. Other fixtures stay silent.
+    static WAKE_CAPTURE_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    /// Before the first privacy reading, pause at the first time until the
+    /// second. The initial closed-permission pass runs before this fault.
+    static WAKE_PRIVACY_START_PAUSE: std::cell::Cell<Option<(u64, u64)>> = const { std::cell::Cell::new(None) };
 }
 
 struct SourcePeer {
@@ -1155,10 +1169,54 @@ struct SourcePeer {
     failed: bool,
 }
 
+#[derive(Default)]
+struct SteppedCapture {
+    authority: Option<Snapshot>,
+    granted_at_us: Option<u64>,
+    started_at_us: Option<u64>,
+    /// Acquisition time and microphone generation of each frame sent.
+    frames: Vec<(u64, u64)>,
+}
+
+fn silent_capture_frame(at: u64, privacy_generation: u64, frame_sequence: u64) -> MicrophoneFrame {
+    MicrophoneFrame {
+        raw: None,
+        linear: None,
+        epoch: 1,
+        dsp_epoch: 1,
+        privacy_generation,
+        frame_sequence,
+        read_completed_at_us: at,
+        probability: 0.0,
+        echo: None,
+        reference: Default::default(),
+        samples: vec![0; 160],
+        timing: crate::wire::CaptureTiming {
+            first_read_started_at_us: at,
+            last_read_started_at_us: at,
+            successful_reads: 1,
+            alsa_status_monotonic_us: None,
+            status_observed_at_us: at,
+            available_frames: 0,
+            delayed_frames: 0,
+            processing_completed_at_us: at,
+            aec_queue_delay_ms: 0,
+            reference: crate::wire::ReferenceTiming {
+                playback_epoch: 1,
+                clock_started_at_us: Some(at),
+                ..crate::wire::ReferenceTiming::default()
+            },
+        },
+    }
+}
+
 /// A fixture worker's side read on the stepped clock, as the thread in
 /// [`run_loop_with`] reads it on the host's.
 struct SteppedPeer {
     speaker: bool,
+    capture: Option<SteppedCapture>,
+    provider: bool,
+    provider_inputs: Vec<ProviderInput>,
     /// The privacy worker's side, which [`PRIVACY_FRESH_UNTIL`] may keep
     /// fresh, and when it last said the switch open.
     privacy: bool,
@@ -1200,6 +1258,14 @@ impl SteppedPeer {
                     self.told.push(snapshot)
                 }
                 Control::Authority { snapshot } => {
+                    if let Some(capture) = &mut self.capture
+                        && WAKE_CAPTURE_FROM.with(std::cell::Cell::get).is_some()
+                    {
+                        if snapshot.microphone_permission() == Permission::Allowed {
+                            capture.granted_at_us.get_or_insert(monotonic_us());
+                        }
+                        capture.authority = Some(snapshot);
+                    }
                     if let Some(source) = &mut self.source {
                         source.permitted = snapshot.microphone_permission() == Permission::Allowed;
                     }
@@ -1207,14 +1273,73 @@ impl SteppedPeer {
                         self.authorities.push(monotonic_us());
                     }
                 }
-                // A loop kept running past the privacy freshness (#1362's
-                // hold tests) gets as far as asking for capture: nothing is
-                // owed back.
-                Control::StartCapture | Control::ProviderOutputCapacity { .. } => {}
+                Control::StartCapture => {
+                    if let Some(capture) = &mut self.capture
+                        && WAKE_CAPTURE_FROM.with(std::cell::Cell::get).is_some()
+                    {
+                        capture.started_at_us.get_or_insert(monotonic_us());
+                    }
+                }
+                Control::ProviderOutputCapacity { .. } => {}
                 other => panic!("unexpected command to a head-touch fixture worker: {other:?}"),
             }
         }
+        if self.privacy
+            && self.keeping
+            && let Some((pause_at_us, resume_at_us)) =
+                WAKE_PRIVACY_START_PAUSE.with(std::cell::Cell::get)
+        {
+            let at_us = monotonic_us();
+            if at_us < pause_at_us {
+                return Ok(());
+            }
+            WAKE_PRIVACY_START_PAUSE.with(|pause| pause.set(None));
+            // All peers have drained their initial authority before the
+            // pause. The Open below is acquired after it, never backdated.
+            crate::scenario_clock::elapse_for_fault(Duration::from_micros(
+                resume_at_us.saturating_sub(at_us),
+            ))?;
+        }
         let now_us = monotonic_us();
+        if self.keeping
+            && let Some(from_us) = WAKE_CAPTURE_FROM.with(std::cell::Cell::get)
+        {
+            if let Some(capture) = &mut self.capture
+                && capture.started_at_us.is_some()
+                && let Some(authority) = capture.authority
+                && authority.microphone_permission() == Permission::Allowed
+                && authority.issued_at().as_micros() <= now_us
+                && now_us < authority.expires_at().as_micros()
+                && now_us >= from_us
+                && capture
+                    .frames
+                    .last()
+                    .is_none_or(|(at, _)| now_us >= at + 10_000)
+            {
+                let generation = authority.microphone_generation();
+                if capture.frames.is_empty() {
+                    let mut started = super::capture_started(NoiseSuppression::On);
+                    if let WorkerEvent::CaptureStarted {
+                        privacy_generation, ..
+                    } = &mut started
+                    {
+                        *privacy_generation = generation;
+                    }
+                    self.peer.control.send(started)?;
+                }
+                self.peer.data.send(silent_capture_frame(
+                    now_us,
+                    generation,
+                    capture.frames.len() as u64 + 1,
+                ))?;
+                capture.frames.push((now_us, generation));
+            }
+            if self.provider {
+                while let Some(input) = self.peer.data.receive::<ProviderInput>()? {
+                    self.provider_inputs.push(input);
+                }
+            }
+        }
         if self.privacy
             && self.source.as_ref().is_none_or(|source| !source.failed)
             && PRIVACY_FRESH_UNTIL
@@ -1431,6 +1556,7 @@ fn run_loop_ringed(
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
     };
     // Every worker's side is read while the loop runs, as a worker reads
     // it: a message is stale 100 ms after it is sent. The speaker's keeps
@@ -1472,6 +1598,9 @@ fn run_loop_ringed(
                 .enumerate()
                 .map(|(index, ((speaker, peer, input), pid))| SteppedPeer {
                     speaker,
+                    capture: (index == 1).then(SteppedCapture::default),
+                    provider: index == 2,
+                    provider_inputs: Vec::new(),
                     // The fourth side: speaker, capture, provider, privacy.
                     privacy: index == 3,
                     privacy_said_us: None,
@@ -1568,41 +1697,34 @@ fn run_loop_ringed(
     // (the reviewer and the seventh on #1207).
     let (mut owner, mut reply) = start();
     let mut controls = Some(controls());
+    let mut startup = StartupEvents::default();
+    if WAKE_CAPTURE_FROM.with(std::cell::Cell::get).is_some() {
+        stepped
+            .as_ref()
+            .expect("wake scenario uses stepped peers")
+            .borrow_mut()[2]
+            .peer
+            .control
+            .send(WorkerEvent::ProviderLink {
+                link: super::ready_link(1, 1),
+            })
+            .unwrap();
+        startup
+            .poll(&mut rig.provider.channels, "provider")
+            .unwrap();
+        assert_eq!(startup.cloud.ready_session(), Some(1));
+    }
     if capture_frame && let Some(shared) = &stepped {
         let at = monotonic_us();
         // The peers are in the order made above: the capture's is second.
         shared.borrow_mut()[1]
             .peer
             .data
-            .send(crate::wire::MicrophoneFrame {
-                raw: None,
-                linear: None,
-                epoch: 1,
-                dsp_epoch: 1,
-                privacy_generation: owner.snapshot(now()).unwrap().microphone_generation(),
-                frame_sequence: 1,
-                read_completed_at_us: at,
-                probability: 0.0,
-                echo: None,
-                reference: Default::default(),
-                samples: vec![0; 160],
-                timing: crate::wire::CaptureTiming {
-                    first_read_started_at_us: at,
-                    last_read_started_at_us: at,
-                    successful_reads: 1,
-                    alsa_status_monotonic_us: None,
-                    status_observed_at_us: at,
-                    available_frames: 0,
-                    delayed_frames: 0,
-                    processing_completed_at_us: at,
-                    aec_queue_delay_ms: 0,
-                    reference: crate::wire::ReferenceTiming {
-                        playback_epoch: 1,
-                        clock_started_at_us: Some(at),
-                        ..crate::wire::ReferenceTiming::default()
-                    },
-                },
-            })
+            .send(silent_capture_frame(
+                at,
+                owner.snapshot(now()).unwrap().microphone_generation(),
+                1,
+            ))
             .unwrap();
     }
     let error = conversation_with_controls(
@@ -1610,7 +1732,7 @@ fn run_loop_ringed(
         &mut owner,
         Lifetime::Serve,
         &mut trace,
-        StartupEvents::default(),
+        startup,
         &mut reply,
         &mut None,
         &Termination::inactive(),
@@ -1645,6 +1767,7 @@ fn run_loop_ringed(
     let (mut told, mut chunks) = (Vec::new(), Vec::new());
     let (mut capture_authorities, mut chunk_times) = (Vec::new(), Vec::new());
     let (mut camera_authorities, mut speaker_authorities) = (Vec::new(), Vec::new());
+    let (mut capture, mut provider_inputs) = (None, Vec::new());
     let with_camera = RIG_CAMERA.with(std::cell::Cell::get);
     for peer in threads {
         let (peer, peer_told, peer_chunks) = peer.join().unwrap();
@@ -1663,6 +1786,7 @@ fn run_loop_ringed(
         }
         if index == 1 {
             capture_authorities = peer.authorities.clone();
+            capture = peer.capture;
         }
         if with_camera && index == last {
             camera_authorities = peer.authorities.clone();
@@ -1670,6 +1794,7 @@ fn run_loop_ringed(
         chunk_times.extend(peer.chunk_times);
         told.extend(peer.told);
         chunks.extend(peer.chunks);
+        provider_inputs.extend(peer.provider_inputs);
     }
     for worker in [
         &mut rig.speaker,
@@ -1687,6 +1812,8 @@ fn run_loop_ringed(
         chunk_times,
         speaker_authorities,
         camera_authorities,
+        capture,
+        provider_inputs,
         error: message,
         ended_us,
         trace,
@@ -2885,6 +3012,323 @@ fn woken_from_a_hands_sleep_the_lamp_says_hm_first() {
     let hum = crate::head_cue::hum(crate::head_cue::DBFS);
     let first = ran.chunks.first().expect("the hum reached the speaker");
     assert_eq!(first.samples, hum[..240]);
+}
+
+/// Wake with the real initial Unknown permission and privacy stabilization.
+/// Only this fixture opts into capture: after Allowed and StartCapture, its
+/// first fresh frame is withheld until `capture_after_us` from loop setup.
+fn wake_run(
+    capture_after_us: u64,
+    closed_after_us: Option<u64>,
+    controls: impl FnOnce(u64) -> HandControls,
+) -> (Ran, u64) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            WAKE_CAPTURE_FROM.with(|from| from.set(None));
+            WAKE_PRIVACY_START_PAUSE.with(|pause| pause.set(None));
+            PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
+            PRIVACY_CLOSED_FROM.with(|from| from.set(None));
+            PRIVACY_SILENT.with(|span| span.set(None));
+            PRIVACY_FAULT_IN_GAP.with(|fault| fault.set(false));
+        }
+    }
+    let _reset = Reset;
+    let began = std::cell::Cell::new(0);
+    let ran = run_loop_with(
+        || {
+            let at = monotonic_us();
+            began.set(at);
+            WAKE_CAPTURE_FROM.with(|from| from.set(Some(at + capture_after_us)));
+            PRIVACY_FRESH_UNTIL.with(|until| until.set(Some(at + 2_000_000)));
+            PRIVACY_CLOSED_FROM.with(|from| from.set(closed_after_us.map(|after| at + after)));
+            controls(at)
+        },
+        || (Controller::new(new_boot().unwrap(), now()), None),
+        false,
+        Clocking::Stepped,
+    );
+    let (ready_index, ready) = ran
+        .trace
+        .iter()
+        .enumerate()
+        .find(|(_, row)| row["kind"] == "provider_ready")
+        .expect("provider readiness consumed");
+    assert_eq!(ready["link"]["session"], 1);
+    let ready_at = ready["coordinator_observed_at_us"].as_u64().unwrap();
+    assert_eq!(ready_at, began.get());
+    for (index, cue) in ran
+        .trace
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row["kind"] == "head_wake_cue")
+    {
+        assert!(ready_index < index);
+        assert!(ready_at <= cue["at_us"].as_u64().unwrap());
+    }
+    (ran, began.get())
+}
+
+fn pending_wake(at_us: u64) -> HandControls {
+    HandControls::with_test_woken("test-hand-clock", at_us).unwrap()
+}
+
+fn no_wake_sound(ran: &Ran) {
+    assert!(ran.chunks.is_empty(), "no sound sent to the speaker");
+    assert!(ran.provider_inputs.is_empty(), "no provider request");
+    assert!(
+        ran.trace.iter().all(|row| {
+            !(row["kind"] == "head_wake_cue" && row["plays"] == true
+                || row["kind"] == "input_admitted" && row["admission_basis"] == "head_wake_cue")
+        }),
+        "no wake turn admitted"
+    );
+}
+
+/// A suppressed pending wake has one terminal decision, including exits
+/// that return before the ordinary cue block can run.
+fn refused_wake(ran: &Ran, why: &str) -> u64 {
+    no_wake_sound(ran);
+    let cues: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_wake_cue")
+        .collect();
+    assert_eq!(
+        cues.len(),
+        1,
+        "one terminal decision: {cues:?}; {}",
+        ran.error
+    );
+    assert_eq!(cues[0]["plays"], false, "{}", cues[0]);
+    assert_eq!(cues[0]["why"], why, "{}", cues[0]);
+    cues[0]["at_us"].as_u64().unwrap()
+}
+
+/// #2487: the first pass has no microphone permission. Keep the wake pending
+/// through the physical switch's real 60 ms stabilization, then require a
+/// retained frame from the new microphone generation before saying its hm.
+#[test]
+fn a_wake_waits_for_microphone_permission_and_fresh_capture_before_one_hm() {
+    let (ran, began) = wake_run(0, None, pending_wake);
+    let initial = ran
+        .told
+        .first()
+        .expect("initial closed authority published");
+    assert_eq!(initial.microphone_permission(), Permission::Unknown);
+    assert!(!initial.listening_ready(initial.issued_at()));
+    let capture = ran.capture.as_ref().unwrap();
+    let granted = capture.granted_at_us.expect("microphone opened");
+    let started = capture.started_at_us.expect("capture explicitly started");
+    let (retained, generation) = *capture.frames.first().expect("fresh capture returned");
+    assert!(granted >= began + crate::privacy::REOPEN_STABLE_US);
+    assert!(started >= granted && retained >= started);
+    assert!(generation > initial.microphone_generation());
+    assert!(capture.frames.iter().all(|(_, given)| *given == generation));
+
+    let cues: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_wake_cue")
+        .collect();
+    assert_eq!(cues.len(), 1, "one decision: {cues:?}; {}", ran.error);
+    assert_eq!(cues[0]["plays"], true, "{}", cues[0]);
+    assert_eq!(cues[0]["acquired_at_us"], began);
+    let decided = cues[0]["at_us"].as_u64().unwrap();
+    assert!(decided >= retained);
+    let admissions: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "input_admitted")
+        .collect();
+    assert_eq!(admissions.len(), 1, "one local turn: {admissions:?}");
+    assert_eq!(admissions[0]["admission_basis"], "head_wake_cue");
+    assert!(admissions[0]["provider_session"].is_null());
+    assert!(ran.provider_inputs.is_empty(), "no provider data sent");
+    let first = ran.chunks.first().expect("the hm reached the speaker");
+    assert_eq!(
+        first.samples,
+        crate::head_cue::hum(crate::head_cue::DBFS)[..240]
+    );
+    let dispatched = *ran.chunk_times.first().unwrap();
+    assert!(dispatched >= decided);
+    // This is scenario time to the local socket, not ALSA/acoustic latency.
+    eprintln!(
+        "wake fixture: permission={} us, capture={} us, decision={} us, first speaker send={} us",
+        granted - began,
+        retained - began,
+        decided - began,
+        dispatched - began
+    );
+    assert!(dispatched - began <= 500_000, "{} us", dispatched - began);
+}
+
+/// #3021: one pass waits with Unknown permission, then the coordinator is
+/// stalled from 2 ms to the original 1.5 s deadline. Its first Open reading
+/// is acquired after that stall and is still stabilizing at the next pass.
+/// This does not extend the one-second startup-unavailable grace: no loop
+/// passes run during the pause, and its next reading is genuinely fresh.
+#[test]
+fn a_wake_expires_while_permission_is_unavailable_and_later_open_cannot_revive_it() {
+    let within = crate::head_cue::WAKE_WITHIN_US;
+    let (ran, began) = wake_run(0, None, |at| {
+        WAKE_PRIVACY_START_PAUSE.with(|pause| pause.set(Some((at + 2_000, at + within))));
+        pending_wake(at)
+    });
+    let decided = refused_wake(&ran, "wake_window_expired");
+    assert_eq!(decided, began + within + 2_000);
+    let before_decision: Vec<_> = ran
+        .told
+        .iter()
+        .filter(|state| state.issued_at().as_micros() <= decided)
+        .collect();
+    assert!(!before_decision.is_empty());
+    assert!(
+        before_decision
+            .iter()
+            .all(|state| state.microphone_permission() == Permission::Unknown),
+        "permission was never allowed before the expiry decision"
+    );
+    assert!(ran.trace.iter().all(|row| row["kind"] != "physical_mute"));
+    let capture = ran.capture.as_ref().unwrap();
+    let granted = capture.granted_at_us.expect("fresh Open later stabilized");
+    assert!(granted >= began + within + crate::privacy::REOPEN_STABLE_US);
+    assert!(granted > decided);
+    let started = capture.started_at_us.expect("capture later started");
+    assert!(started >= granted);
+    let first_frame = capture
+        .frames
+        .first()
+        .expect("fresh capture later arrived")
+        .0;
+    assert!(first_frame >= started && ran.ended_us > first_frame);
+}
+
+/// A slide closed throughout, closed during stabilization, or closed after
+/// permission while capture is still unavailable cancels the pending cue.
+#[test]
+fn a_wake_never_speaks_with_privacy_closed_or_closed_while_waiting() {
+    for closed_after_us in [0, 40_000, 100_000] {
+        let (mut ran, began) = wake_run(500_000, Some(closed_after_us), pending_wake);
+        assert_eq!(refused_wake(&ran, "conversation_ended"), ran.ended_us);
+        let muted = ran
+            .trace
+            .iter()
+            .find(|row| row["kind"] == "physical_mute")
+            .expect("the physical switch ends this conversation");
+        assert!(muted["at_us"].as_u64().unwrap() >= began + closed_after_us);
+        let capture = ran.capture.as_ref().unwrap();
+        assert!(capture.frames.is_empty());
+        if closed_after_us < crate::privacy::REOPEN_STABLE_US {
+            assert!(capture.granted_at_us.is_none());
+            assert!(capture.started_at_us.is_none());
+            assert!(
+                ran.told
+                    .iter()
+                    .all(|state| state.microphone_permission() != Permission::Allowed)
+            );
+        } else {
+            assert!(capture.granted_at_us.is_some());
+            assert!(capture.started_at_us.is_some());
+        }
+        assert!(
+            ran.controls
+                .as_mut()
+                .unwrap()
+                .take_woken(ran.ended_us)
+                .is_none()
+        );
+    }
+}
+
+/// A sleep queued while the cue waits for permission still wins on its own
+/// pass. The old wake cannot survive this conversation's cancellation.
+#[test]
+fn returning_to_sleep_cancels_a_wake_waiting_for_permission() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!(
+        "lv-pending-wake-sleep-{}-{}",
+        std::process::id(),
+        lamp_ipc::monotonic_us()
+    ));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let (mut ran, began) = wake_run(0, None, |at| {
+        let mut controls =
+            HandControls::with_test_hold("test-hand-clock", at, 2_970_000, 3_200_000, &record)
+                .unwrap();
+        controls.set_woken_for_test(at);
+        controls
+    });
+    slept_on_time(&ran, began + 30_000);
+    assert_eq!(refused_wake(&ran, "conversation_ended"), ran.ended_us);
+    let capture = ran.capture.as_ref().unwrap();
+    assert!(capture.granted_at_us.is_none() && capture.frames.is_empty());
+    assert!(
+        ran.controls
+            .as_mut()
+            .unwrap()
+            .take_woken(ran.ended_us)
+            .is_none()
+    );
+    fs::remove_dir_all(&directory).unwrap();
+}
+
+#[test]
+fn a_privacy_worker_fault_reports_a_pending_wake_once() {
+    let (ran, began) = wake_run(0, None, |at| {
+        // The existing worker-fault seam fires 100 ms into this gap: 20 ms
+        // after startup here, before the no-reading freshness bound.
+        PRIVACY_SILENT.with(|span| span.set(Some((at - 80_000, at + 200_000))));
+        PRIVACY_FAULT_IN_GAP.with(|fault| fault.set(true));
+        pending_wake(at)
+    });
+    assert!(
+        ran.error.contains("privacy worker fault (test)"),
+        "{}",
+        ran.error
+    );
+    assert_eq!(refused_wake(&ran, "conversation_ended"), ran.ended_us);
+    assert!((began + 20_000..began + 50_000).contains(&ran.ended_us));
+    let capture = ran.capture.as_ref().unwrap();
+    assert!(capture.granted_at_us.is_none() && capture.frames.is_empty());
+}
+
+/// Capture becoming ready near the bound can speak. A first frame at the
+/// deadline or later cannot revive the wake even though capture subsequently
+/// stays fresh. The pure gate tests pin readiness at the exact microsecond.
+#[test]
+fn a_wakes_capture_readiness_must_arrive_before_its_original_deadline() {
+    let within = crate::head_cue::WAKE_WITHIN_US;
+    for (capture_after_us, plays) in [
+        (within - 20_000, true),
+        (within, false),
+        (within + 20_000, false),
+    ] {
+        let (ran, began) = wake_run(capture_after_us, None, pending_wake);
+        let capture = ran.capture.as_ref().unwrap();
+        assert_eq!(capture.frames.first().unwrap().0, began + capture_after_us);
+        let cues: Vec<_> = ran
+            .trace
+            .iter()
+            .filter(|row| row["kind"] == "head_wake_cue")
+            .collect();
+        assert_eq!(cues.len(), 1, "{cues:?}; {}", ran.error);
+        assert_eq!(cues[0]["plays"], plays, "{}", cues[0]);
+        let decided = cues[0]["at_us"].as_u64().unwrap();
+        if plays {
+            assert!(decided >= began + capture_after_us);
+            assert!(decided < began + within);
+            assert!(!ran.chunks.is_empty());
+        } else {
+            assert_eq!(decided, began + within);
+            assert_eq!(cues[0]["why"], "wake_window_expired");
+            no_wake_sound(&ran);
+            assert!(ran.ended_us > began + capture_after_us);
+        }
+        assert!(ran.provider_inputs.is_empty());
+    }
 }
 
 #[test]

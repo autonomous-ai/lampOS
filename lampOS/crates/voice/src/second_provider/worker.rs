@@ -2558,6 +2558,16 @@ pub fn serve(
         );
         engine = engine.preparing(true);
     }
+    // Whether a line's words so far end unfinished, told to the
+    // coordinator, which holds its end a little longer then (#3026).
+    if crate::unfinished_words::on() {
+        eprintln!(
+            "lamp-voice second: a line whose words so far end unfinished is told, and its end waits up to {} ms more ({})",
+            u64::from(crate::unfinished_words::WAIT_BLOCKS) * 10,
+            crate::unfinished_words::ENVIRONMENT
+        );
+        engine = engine.telling_unfinished_words(true);
+    }
     // Each turn's tools in the journal, names and counts only (#2510).
     if crate::remember::days_from_environment()
         && std::env::var(crate::remember::REPLACES_ENVIRONMENT)

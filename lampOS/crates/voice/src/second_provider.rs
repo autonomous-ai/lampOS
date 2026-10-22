@@ -749,6 +749,9 @@ struct Shared {
     /// A spoken turn's chat begins on the line's early words
     /// ([`Engine::preparing`]).
     prepare: bool,
+    /// The coordinator is told whether a line's words so far end unfinished
+    /// ([`Engine::telling_unfinished_words`]).
+    unfinished_words: bool,
     /// Each turn's journal line on its tools ([`Engine::noting_turn_tools`],
     /// `LAMP_MEMORY_REPLACES`, #2510).
     note_tools: bool,
@@ -1236,6 +1239,7 @@ impl Engine {
                 skill_look: None,
                 search_pushed: None,
                 prepare: false,
+                unfinished_words: false,
                 note_tools: false,
                 #[cfg(test)]
                 tools_journal: None,
@@ -1636,6 +1640,17 @@ impl Engine {
     pub fn preparing(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.prepare = on;
+        }
+        self
+    }
+
+    /// While a spoken line is heard, the coordinator is told whenever its
+    /// words so far come to end on an unfinished word, or no longer do
+    /// (`LAMP_SECOND_UNFINISHED_WAIT=on`, `ProviderOutput::WordsEnd`,
+    /// [`crate::unfinished_words`]). Before any turn only.
+    pub fn telling_unfinished_words(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.unfinished_words = on;
         }
         self
     }
@@ -2906,6 +2921,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
+        | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
@@ -3152,8 +3168,23 @@ async fn spoken(
         None
     };
     let mut prepared: Option<Prepared> = None;
+    // Whether the words so far end unfinished, told to the coordinator as
+    // it changes, while the line is heard (`LAMP_SECOND_UNFINISHED_WAIT`).
+    let mut words_said = if shared.unfinished_words {
+        listener.said()
+    } else {
+        None
+    };
+    let mut told_unfinished = None;
     loop {
         tokio::select! {
+            Some(words) = next_said(&mut words_said) => {
+                let unfinished = crate::unfinished_words::trailing(&words);
+                if unfinished != told_unfinished {
+                    told_unfinished = unfinished;
+                    shared.emit(ProviderOutput::WordsEnd { request, unfinished }).await;
+                }
+            }
             part = heard.recv() => match part {
                 None => break,
                 Some(LinePart::Sound(samples, fresh)) => {
@@ -3245,23 +3276,36 @@ async fn spoken(
             }
         }
     }
-    // A forget held for a yes: who the eyes saw saying this line, kept for
-    // its answer ([`take_held_forget`], #2377). Read only while one is held.
-    if let Some((eyes, known)) = &shared.forget_sight
-        && shared
+    // Who the eyes saw saying this line, with the known person and their
+    // face as they were when it was heard: for a forget held for a yes
+    // ([`take_held_forget`], #2377), and for a line asking to forget, whose
+    // "forget my face" on a room's line forgets only a face seen saying it
+    // (`known_faces::forget_name`, El's P2 on #3018). Read only then.
+    if let Some((eyes, known)) = &shared.forget_sight {
+        let held = shared
             .held_forget
             .lock()
-            .is_ok_and(|hold| hold.held.is_some())
-    {
-        let speakers = eyes.speakers(begun, finishing);
-        let known = known.clone();
-        let pair =
-            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+            .is_ok_and(|hold| hold.held.is_some());
+        let asks = crate::remember::asks_to_forget(&text);
+        if held || asks {
+            // Each id with the eyes' boot, the known face's too: after the
+            // eyes start again a passing id names someone else (#3037).
+            let speakers = eyes.speakers_with_boot(begun, finishing);
+            let (eyes, known) = (eyes.clone(), known.clone());
+            let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
                 .await
                 .ok()
                 .flatten();
-        if let Ok(mut hold) = shared.held_forget.lock() {
-            hold.sight = Some((request, speakers, pair));
+            if asks {
+                crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                    request,
+                    speakers: speakers.clone(),
+                    known: pair.clone(),
+                });
+            }
+            if held && let Ok(mut hold) = shared.held_forget.lock() {
+                hold.sight = Some((request, speakers, pair));
+            }
         }
     }
     // Onboarding's sentence (#1803): its words go to the coordinator to
@@ -4158,6 +4202,21 @@ fn plain_words(words: &str) -> String {
 }
 
 /// The next of a listener's early words; never, once there are none.
+/// The next result's words while the line is heard; pending once there are
+/// none to come.
+async fn next_said(said: &mut Option<mpsc::UnboundedReceiver<String>>) -> Option<String> {
+    let Some(receiver) = said.as_mut() else {
+        return std::future::pending().await;
+    };
+    match receiver.recv().await {
+        Some(words) => Some(words),
+        None => {
+            *said = None;
+            std::future::pending().await
+        }
+    }
+}
+
 async fn next_early(early: &mut Option<mpsc::UnboundedReceiver<net::Early>>) -> Option<net::Early> {
     let Some(receiver) = early.as_mut() else {
         return std::future::pending().await;

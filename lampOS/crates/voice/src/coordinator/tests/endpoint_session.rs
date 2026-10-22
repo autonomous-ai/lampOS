@@ -555,6 +555,7 @@ fn provider_peer(
     ready_after: Option<Duration>,
     refused: Option<crate::provider_worker::Fault>,
     shape: Option<fn(u64) -> i16>,
+    words_end: Option<crate::unfinished_words::Trailing>,
 ) -> PeerStep {
     assert!(reply.is_none_or(|reply| reply.packets <= PEER_STEP_BUDGET));
     let mut ready = false;
@@ -665,6 +666,12 @@ fn provider_peer(
                         session,
                         waiting_for_barrier: false,
                     });
+                    if let Some(class) = words_end {
+                        outbox.push_back(ProviderOutput::WordsEnd {
+                            request,
+                            unfinished: Some(class),
+                        });
+                    }
                 }
                 ProviderInput::Audio { request, .. } => {
                     seen.provider.push("audio");
@@ -1067,6 +1074,11 @@ struct Lamp {
     fixture_at_ms: Option<u64>,
     /// `LAMP_SECOND_EARLY_FINALIZE`: a line's words asked for at a pause.
     early_finalize: bool,
+    /// `LAMP_SECOND_UNFINISHED_WAIT`: a due end held while the words so far
+    /// end unfinished.
+    unfinished_wait: bool,
+    /// The provider tells this end of each line's words so far as it starts.
+    words_end: Option<crate::unfinished_words::Trailing>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1165,6 +1177,7 @@ fn run_policy_with_peers_held(
             lamp.provider_ready_after,
             lamp.provider_refused,
             lamp.reply_shape,
+            lamp.words_end,
         ),
         speaker_peer(
             speaker_peer_channels,
@@ -1206,6 +1219,7 @@ fn run_policy_with_peers_held(
         early_end_blocks: None,
         early_finalize: lamp.early_finalize,
         open_name: false,
+        unfinished_wait: lamp.unfinished_wait,
         faint_level: None,
         provider,
         capture,
@@ -1469,6 +1483,47 @@ fn a_lines_pause_reaches_the_provider_only_with_the_switch() {
     off.result.as_ref().unwrap();
     assert!(!off.seen.provider.contains(&"paused"));
     assert!(off.seen.provider.contains(&"end"));
+}
+
+/// The Reviewer-lead on #3045 (P3): through the coordinator, the provider's
+/// `WordsEnd` reaches the detector only with `LAMP_SECOND_UNFINISHED_WAIT`,
+/// and the endpoint record's quiet includes the hold. An uncertain verdict
+/// ends on the 1.2 s window, held 1.3 s more; the model's incomplete wait
+/// (1.5 s) is not held again (El's P2).
+#[test]
+fn words_end_holds_the_lines_end_only_with_the_switch() {
+    let _one = one_session();
+    let run = |unfinished_wait, probability| {
+        let session = run_policy_with_peers(
+            TurnTaking::V1Baseline,
+            6,
+            one_question,
+            EndpointRig::double(delayed(probability, Duration::from_millis(60))),
+            None,
+            None,
+            PeerMode::Stepped,
+            Lamp {
+                unfinished_wait,
+                words_end: Some(crate::unfinished_words::Trailing::Filler),
+                ..Lamp::default()
+            },
+        );
+        session.result.as_ref().unwrap();
+        let rows = endpoint_rows(&session);
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        let row = rows[0];
+        (
+            row["endpoint"]["basis"].as_str().unwrap().to_owned(),
+            row["endpoint"]["unfinished_wait_ms"].as_u64(),
+            row["includes_silence_wait_ms"].as_u64().unwrap(),
+        )
+    };
+    assert_eq!(
+        run(true, 0.5),
+        ("model_uncertain".into(), Some(1_300), 2_500)
+    );
+    assert_eq!(run(false, 0.5), ("model_uncertain".into(), None, 1_200));
+    assert_eq!(run(true, 0.001), ("model_incomplete".into(), None, 1_500));
 }
 
 fn endpoint_rows(session: &Session) -> Vec<&Value> {
@@ -1814,6 +1869,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
         faint_level: None,
         speaker,
         capture,

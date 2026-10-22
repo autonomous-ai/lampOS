@@ -1287,10 +1287,26 @@ rule 8). Without it, a lamp at rest is not stirred, exactly as before.
   the head and the base came to rest, not on home, and the head goes back
   there when the requests run out, at the speed the pose follows at, and
   rests again. The base is not written. Rising or folding, or a mood other
-  than rest, ends the glance and the lamp goes on as before.
+  than rest, ends the glance and the lamp goes on as before. Where it
+  rested is where it has rested for a second, or, as a glance begins,
+  where a head already still at rest is held: the factory's self-test may
+  begin before that second and asks its next move within it, and laid on
+  the pose instead, lamp-52e6's head was not led back (no lead in the
+  journal) and rested 17 below (#2818).
 - **Led from below.** A head lifting from rest has its goal 40 counts
   ahead (`GLANCE_LIFT_LEAD`), never past its bounds: from below,
-  lamp-52e6's head did not start for a goal 30 ahead.
+  lamp-52e6's head did not start for a goal 30 ahead. So is a head coming
+  back up after a glance dipped it, for as long as it reads more than 6
+  counts below its way back: unled, lamp-52e6's stopped 26 short of where
+  it rested and rested there, and the factory's `head_move` failed (#2818).
+  Led without coming a count closer for 1 s (`GLANCE_LEAD_STILL_STEPS`),
+  it is led no more until it is back: a glance is judged as a gesture, so
+  nothing else ends a lead into a hand or a stall. A head creeping back
+  against its weight, with pauses, keeps its lead: cut after 200 ms,
+  lamp-52e6's rested 15 to 19 low. The journal says when a lead starts and
+  ends, and why (`glance lead starts` / `ends: arrived` / `ends: no
+  progress for 1 s` / `ends: the glance is over`), with the head, its way
+  and its goal.
 - **Judged as a gesture.** While it glances and for half a second after,
   a head that lags or strains is let go as in a gesture, and the run goes
   on. The load, warmth and wire checks stay.
@@ -1300,7 +1316,9 @@ counts up, 500 of tilt and 40 of turn for 1.5 s: the goal rose 80 to 90
 (50 and the lead), the tilt stayed within its one count, the turn did not
 move, and four seconds later every goal was within 6 of where it rested.
 Without the switch, the same run writes exactly what a run asked nothing
-writes.
+writes. Stood, with a head that stops 26 short of any goal it lifts to,
+dipped 40 for a second: back within 2 counts of where it rested in 3 s
+(26 short without the lead back).
 
 **On lamp-52e6, 2026-10-14, 18:02 to 18:11**
 ([readings](verification/rest-glance-lamp-52e6-20261014/README.md)),

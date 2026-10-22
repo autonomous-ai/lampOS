@@ -109,6 +109,12 @@ pub trait Listener: Send {
     fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
         None
     }
+    /// Each result's words as they come, interim and final, for one taker
+    /// (`LAMP_SECOND_UNFINISHED_WAIT`); none from a listener that never has
+    /// any.
+    fn said(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
+        None
+    }
     /// Whether it can still take a line: one kept ready whose socket has
     /// closed since cannot ([`crate::second_provider::Engine::keeping_a_listener_ready`]).
     fn open(&self) -> bool {
@@ -130,6 +136,9 @@ impl Listener for SttStream {
     }
     fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
         self.take_early()
+    }
+    fn said(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
+        self.take_words()
     }
     fn flush(&self) -> net::Result<()> {
         SttStream::paused(self)

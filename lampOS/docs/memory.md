@@ -465,7 +465,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   the reviewer's P3 1 on #2340). Without that, the engine knows only the
   face at the lamp, not who spoke, so anyone in the room could say the
   yes. With `LAMP_EYES_SPEAKING=on` in the voice's unit as well as the
-  eyes' (and the bus and the eyes' known file), the voice reads the eyes'
+  eyes' (the product's units pin both, #3038; and the bus and the eyes' known file), the voice reads the eyes'
   faces on its own thread ([`speaking_faces`](../crates/voice/src/speaking_faces.rs),
   as `LAMP_SECOND_SPEAKING_FACE` does). The yes runs the call only when,
   over the yes line's own sound, from its start to its end, the held
@@ -1499,10 +1499,26 @@ then use that person's scope:
   second route without `LAMP_SECOND_FACE_NAME` the model is never told the
   name, and on lamp-c0a4 its guess matched nobody. A line naming nobody
   whose line it is sends nothing. A room's line (no known person's) sends
-  nothing for a named person either, unless the known file names that same
-  person, their face at the lamp now: then they are asked for under the
-  eyes' name; else the model hears `NOT_THEIRS` and the eyes are never
-  asked (the first builder on #2602). Forgetting everything (`forget_all`) is as before.
+  nothing for a named person either, unless it is that person's own: the
+  eyes judged speaking through it (`LAMP_EYES_SPEAKING=on` in the voice's
+  own unit as well as the eyes': without it the voice never reads it and
+  every room's forget is `NOT_THEIRS`; the product's `lamp-voice.service`
+  pins it, #3038), the known file, as fresh when the line was heard,
+  named that same person, and their face was the only one seen saying it
+  (read at the line's end with its words, `speaking_faces::LineSeen`, and
+  only for a line whose words ask to forget; each id with the eyes' boot,
+  so a passing id reused after the eyes start again is not theirs: the
+  bare id in `known-face` binds to a boot only when written strictly after
+  its first frame the voice read, and in doubt is refused, #3037 and
+  Fourth's P2 on #3038; the eyes' own `known-speaker` file is to replace
+  it). The second route only: Live (`LAMP_VOICE_ROUTE=gemini`) never
+  records who was seen saying a line, so there a room's forget is always
+  refused. Then they are asked for under the eyes' name; else, with
+  someone else's face speaking while they sit nearest, no face read
+  speaking, a line not judged or a stale known file, the model hears
+  `NOT_THEIRS` and the eyes are never asked (the first builder on #2602,
+  El's P2 and P3 on #3018). The eyes read a moving mouth, not a living
+  face: a photo or a screen showing them is a limit of the eyes. Forgetting everything (`forget_all`) is as before.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`

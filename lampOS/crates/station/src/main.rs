@@ -1,9 +1,11 @@
 //! `lamp-station`: makes one production run's record from the lamp's
 //! self-test report, the station's answers and the coverage matrix, keeps
-//! it in `--out`, and prints the run's verdict (docs/production-testing.md).
+//! it in `--out` (and with `--records`, in the records' place under the
+//! lamp's name), and prints the run's verdict; `lamp-station records` reads
+//! one lamp's records back (docs/production-testing.md).
 use jiff::Timestamp;
 use lamp_station::{
-    Refused, Utc,
+    Refused, Utc, complete,
     inputs::{self, Answers},
     matrix::Matrix,
     record::{self, Device, Given, Occasion, Record, RunVerdict},
@@ -14,15 +16,29 @@ use std::{fs, path::PathBuf, process::ExitCode};
 const USAGE: &str = "usage: lamp-station --matrix PATH --answers PATH [--selftest PATH]
   --device ID --revision REVISION --batch BATCH --lampos-build COMMIT
   --suite VERSION+COMMIT --station station-ID --operator op-DIGITS
-  --occasion routine|retest|qualification [--retest-of RECORD] --out DIR";
+  --occasion routine|retest|qualification [--retest-of RECORD] --out DIR
+  [--records PLACE]
+       lamp-station records --records PLACE --device ID [--matrix PATH]";
 const HELP: &str = "Makes the record of one production test run: every check's verdict and
 measurement, the failures against their limits, and the run's verdict. The
 record is written whole into --out as <run id>.json; one already there is
-never written over. Nothing is sent anywhere.
+never written over. With --records, the folder chosen for the fleet's
+records, it is also kept there as <lamp>/<run id>.json, the same way.
+Nothing is sent anywhere.
+
+`lamp-station records` lists one lamp's records in that place, oldest
+first: each run's verdict, matrix version and tool commit, and a file there
+that is not this lamp's record with why. With --matrix, each is judged
+against that matrix version: complete, or what it lacks, so a run with a
+check left out never reads as passed.
 
 Exit status: 0 the run passed, 1 it failed, 3 it is incomplete (a mandatory
 check missing, skipped, interrupted or not checked), 2 no record was made
-(the arguments or an input were refused, or the record could not be written).";
+(the arguments or an input were refused, or the record could not be written,
+in --out or in --records). `records`: 0 the lamp's latest run passed (and is
+complete, with --matrix) and every file in its folder is its record, 1 not,
+3 the lamp has none, 2 the arguments were refused or the place could not be
+read.";
 
 #[derive(Debug)]
 struct Arguments {
@@ -37,6 +53,7 @@ struct Arguments {
     occasion: Occasion,
     retest_of: Option<PathBuf>,
     out: PathBuf,
+    records: Option<PathBuf>,
 }
 
 fn parse(given: &[String]) -> Result<Option<Arguments>, String> {
@@ -82,10 +99,11 @@ fn parse(given: &[String]) -> Result<Option<Arguments>, String> {
         occasion,
         retest_of: get("--retest-of").map(PathBuf::from),
         out: need("--out")?.into(),
+        records: get("--records").map(PathBuf::from),
     }))
 }
 
-const FLAGS: [&str; 13] = [
+const FLAGS: [&str; 14] = [
     "--matrix",
     "--answers",
     "--selftest",
@@ -99,7 +117,142 @@ const FLAGS: [&str; 13] = [
     "--occasion",
     "--retest-of",
     "--out",
+    "--records",
 ];
+
+/// What `lamp-station records` is given.
+#[derive(Debug, PartialEq)]
+struct Lookup {
+    place: PathBuf,
+    lamp: String,
+    matrix: Option<PathBuf>,
+}
+
+/// `None` for `--help`.
+fn parse_lookup(given: &[String]) -> Result<Option<Lookup>, String> {
+    let (mut place, mut lamp, mut matrix) = (None, None, None);
+    let mut given = given.iter();
+    while let Some(flag) = given.next() {
+        let slot = match flag.as_str() {
+            "-h" | "--help" => return Ok(None),
+            "--records" => &mut place,
+            "--device" => &mut lamp,
+            "--matrix" => &mut matrix,
+            other => return Err(format!("unknown argument {other:?}")),
+        };
+        let value = given
+            .next()
+            .ok_or_else(|| format!("{flag} needs a value"))?;
+        if slot.replace(value.clone()).is_some() {
+            return Err(format!("{flag} is given twice"));
+        }
+    }
+    Ok(Some(Lookup {
+        place: place.ok_or("--records is needed")?.into(),
+        lamp: lamp.ok_or("--device is needed")?,
+        matrix: matrix.map(PathBuf::from),
+    }))
+}
+
+/// One line for each record found, oldest first, and whether the lamp
+/// stands passed: its latest run passed (and is complete against the
+/// matrix, when one is given), and every file in its folder is its record.
+/// So a run that failed and was then retested and passed stands passed,
+/// and a pass followed by a failed run does not (the Reviewer-lead on
+/// #3054). The earlier runs are listed all the same.
+fn standing(lamp: &str, found: &[store::Found], matrix: Option<&Matrix>) -> (Vec<String>, bool) {
+    let mut lines = Vec::new();
+    let mut every_file_a_record = true;
+    let mut latest_passed = false;
+    for (path, read) in found {
+        let line = match read {
+            Err(why) => {
+                every_file_a_record = false;
+                format!("not a record of {lamp}: {}: {why}", path.display())
+            }
+            Ok(record) => {
+                let mut line = format!(
+                    "{} {} matrix v{} tool {}",
+                    record.run_id,
+                    verdict(record.verdict),
+                    record.suite.matrix_version,
+                    record.suite.tool_commit
+                );
+                latest_passed = record.verdict == RunVerdict::Pass;
+                if let Some(matrix) = matrix {
+                    let judged = complete::check(matrix, record);
+                    latest_passed &= judged.complete() && judged.verdict == RunVerdict::Pass;
+                    if judged.complete() {
+                        line.push_str(&format!(", complete: {}", verdict(judged.verdict)));
+                    } else {
+                        let gaps: Vec<String> = judged.gaps.iter().map(|g| g.to_string()).collect();
+                        line.push_str(&format!(", not complete: {}", gaps.join("; ")));
+                    }
+                }
+                line
+            }
+        };
+        lines.push(line);
+    }
+    (lines, every_file_a_record && latest_passed)
+}
+
+/// Lists one lamp's records and says whether it stands passed.
+fn lookup(given: &[String]) -> ExitCode {
+    let lookup = match parse_lookup(given) {
+        Ok(Some(lookup)) => lookup,
+        Ok(None) => {
+            println!("{USAGE}\n\n{HELP}");
+            return ExitCode::SUCCESS;
+        }
+        Err(why) => {
+            eprintln!("lamp-station records: {why}\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    let matrix = match &lookup.matrix {
+        Some(path) => match Matrix::read(path) {
+            Ok(matrix) => Some(matrix),
+            Err(why) => {
+                eprintln!("lamp-station records: {why}");
+                return ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
+    let found = match store::lamp_records(&lookup.place, &lookup.lamp) {
+        Ok(found) => found,
+        Err(error) => {
+            eprintln!("lamp-station records: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if found.is_empty() {
+        println!(
+            "no records of {} in {}",
+            lookup.lamp,
+            lookup.place.display()
+        );
+        return ExitCode::from(3);
+    }
+    let (lines, passed) = standing(&lookup.lamp, &found, matrix.as_ref());
+    for line in lines {
+        println!("{line}");
+    }
+    if passed {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+fn verdict(verdict: RunVerdict) -> &'static str {
+    match verdict {
+        RunVerdict::Pass => "pass",
+        RunVerdict::Fail => "fail",
+        RunVerdict::Incomplete => "incomplete",
+    }
+}
 
 fn read(what: &str, path: &PathBuf) -> Result<String, Refused> {
     fs::read_to_string(path)
@@ -152,17 +305,19 @@ fn summary(record: &Record) -> String {
             unfinished.check, unfinished.reason
         ));
     }
-    let verdict = match record.verdict {
-        RunVerdict::Pass => "pass",
-        RunVerdict::Fail => "fail",
-        RunVerdict::Incomplete => "incomplete",
-    };
-    out.push_str(&format!("run         {} {verdict}\n", record.run_id));
+    out.push_str(&format!(
+        "run         {} {}\n",
+        record.run_id,
+        verdict(record.verdict)
+    ));
     out
 }
 
 fn main() -> ExitCode {
     let given: Vec<String> = std::env::args().skip(1).collect();
+    if given.first().is_some_and(|first| first == "records") {
+        return lookup(&given[1..]);
+    }
     let arguments = match parse(&given) {
         Ok(Some(arguments)) => arguments,
         Ok(None) => {
@@ -175,6 +330,7 @@ fn main() -> ExitCode {
         }
     };
     let out = arguments.out.clone();
+    let place = arguments.records.clone();
     let record = match make(arguments) {
         Ok(record) => record,
         Err(why) => {
@@ -182,11 +338,33 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match store::keep(&out, &record) {
-        Ok(path) => eprintln!("lamp-station: kept {}", path.display()),
+    let kept = match store::keep(&out, &record) {
+        Ok(path) => path,
         Err(error) => {
             eprintln!("lamp-station: no record made: {error}");
             return ExitCode::from(2);
+        }
+    };
+    eprintln!("lamp-station: kept {}", kept.display());
+    if let Some(place) = place {
+        match store::keep_for_lamp(&place, &record) {
+            Ok(path) => eprintln!("lamp-station: kept {}", path.display()),
+            Err(error) => {
+                // The run can't be made again (--out keeps it), so say how
+                // its record reaches the place by hand, unless it's there.
+                let by_hand = if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    String::new()
+                } else {
+                    format!(
+                        "; once the place can take it, copy {} into its lamp's folder there",
+                        kept.display()
+                    )
+                };
+                eprintln!(
+                    "lamp-station: kept in --out, but not in the records' place: {error}{by_hand}"
+                );
+                return ExitCode::from(2);
+            }
         }
     }
     print!("{}", summary(&record));
@@ -257,5 +435,101 @@ mod tests {
         assert!(args(&later).is_err());
         assert!(args(&["--matrix"]).is_err());
         assert!(args(&["--help"]).unwrap().is_none());
+    }
+
+    /// The records' place is off unless given (#2794).
+    #[test]
+    fn the_records_place_is_taken_only_when_given() {
+        assert!(args(&ALL).unwrap().unwrap().records.is_none());
+        let mut with = ALL.to_vec();
+        with.extend(["--records", "/srv/station-records"]);
+        assert_eq!(
+            args(&with).unwrap().unwrap().records,
+            Some(PathBuf::from("/srv/station-records"))
+        );
+        with.extend(["--records", "elsewhere"]);
+        assert!(args(&with).unwrap_err().contains("twice"));
+    }
+
+    #[test]
+    fn records_needs_its_place_and_a_lamp() {
+        let lookup =
+            |given: &[&str]| parse_lookup(&given.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        assert_eq!(
+            lookup(&["--records", "place", "--device", "lamp-4ace"])
+                .unwrap()
+                .unwrap(),
+            Lookup {
+                place: "place".into(),
+                lamp: "lamp-4ace".into(),
+                matrix: None
+            }
+        );
+        let full = lookup(&[
+            "--device",
+            "lamp-4ace",
+            "--matrix",
+            "m.toml",
+            "--records",
+            "place",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(full.matrix, Some(PathBuf::from("m.toml")));
+        assert!(lookup(&["--help"]).unwrap().is_none());
+        assert!(lookup(&["--records", "place", "-h"]).unwrap().is_none());
+        assert!(lookup(&["--device", "lamp-4ace"]).is_err());
+        assert!(lookup(&["--records", "place"]).is_err());
+        assert!(lookup(&["--records", "place", "--device", "a", "--device", "b"]).is_err());
+        assert!(lookup(&["--records", "place", "--device", "a", "--out", "x"]).is_err());
+        assert!(lookup(&["--records"]).is_err());
+    }
+
+    /// The Reviewer-lead on #3054: a lamp stands by its latest run. A
+    /// failed run then a passed retest stands passed; a pass then a failed
+    /// run doesn't; a file in its folder that isn't its record never stands
+    /// passed.
+    #[test]
+    fn a_lamp_stands_by_its_latest_run() {
+        let record = |run: &str, verdict: RunVerdict| {
+            let record = Record {
+                format: record::FORMAT,
+                run_id: run.into(),
+                occasion: Occasion::Routine,
+                verdict,
+                started: "2026-10-19T08:00:00Z".parse().unwrap(),
+                ended: "2026-10-19T08:30:00Z".parse().unwrap(),
+                device: Device {
+                    id: "lamp-4ace".into(),
+                    hardware_revision: "draft-a".into(),
+                    batch: "pilot-1".into(),
+                },
+                lampos_build: "dab3f12".into(),
+                suite: record::Suite {
+                    matrix_version: "0".into(),
+                    matrix_sha256: "0".repeat(64),
+                    matrix_approved: false,
+                    tool_commit: "dab3f12".into(),
+                },
+                station: "station-01".into(),
+                operator: "op-7".into(),
+                retest_of: None,
+                repairs: Vec::new(),
+                selftest: None,
+                checks: Vec::new(),
+                failures: Vec::new(),
+                incomplete: Vec::new(),
+            };
+            (PathBuf::from(format!("{run}.json")), Ok(record))
+        };
+        let failed = record("20261019T080000Z-station-01-lamp-4ace", RunVerdict::Fail);
+        let retested = record("20261019T090000Z-station-01-lamp-4ace", RunVerdict::Pass);
+        let (lines, passed) = standing("lamp-4ace", &[failed.clone(), retested.clone()], None);
+        assert!(passed);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains(" fail "), "{lines:?}");
+        assert!(!standing("lamp-4ace", &[retested.clone(), failed.clone()], None).1);
+        let stray: store::Found = (PathBuf::from("x.json"), Err(Refused("half".into())));
+        assert!(!standing("lamp-4ace", &[failed, retested, stray], None).1);
     }
 }

@@ -787,6 +787,56 @@ order is kept. A written turn is the same from the chat on.
   `a_kept_listener_goes_after_its_time_or_when_listening_stops` and
   `the_first_line_after_a_start_goes_to_a_socket_opened_before_it` (with
   `no_listener_is_opened_before_a_line_outside_a_runtime`).
+- **With `LAMP_SECOND_UNFINISHED_WAIT=on` a line whose words so far end
+  unfinished waits longer before its end** (off unless set; #3026). A
+  line's end is decided by the coordinator's detector from the sound
+  alone: the silence window, or the end-of-turn model's verdict
+  (`activity::TurnDetector`); no rule looked at the words. In the owner's
+  test on lamp-4ace on 22 Oct (19:04–19:08) 5 of 28 lines were cut at a
+  mid-sentence pause ("Lamp, I'm thinking about … going for a run tomorrow
+  morning, is that a good idea?") and the second half was answered alone.
+  With the switch:
+  - **the second route's worker reads each result's words as they come**
+    (`Listener::said`, interim and final) while the line is heard, and
+    tells the coordinator whenever the words so far come to end on an
+    unfinished word, or no longer do (`ProviderOutput::WordsEnd`, the class
+    only, never the words). Unfinished is one list
+    (`unfinished_words::UNFINISHED_WORDS`): a joining word ("about", "the",
+    "a", "and", "to", "so", "like", "but", "or", "of", "for", "with", "my",
+    and Vietnamese "và", "của", "là", "thì", "mà", "để" for a route set to
+    Vietnamese) or a filler ("um", "uh"), compared composed (NFC), so a
+    decomposed "và" matches. No question words: interim results rarely
+    carry the "?", and "tell me why" or "show me how" are whole requests.
+    A last word followed by "?" or "!" was said as an end and is finished;
+  - **the detector holds an end that comes due while they do**
+    (`TurnDetector::words_end`) for at most 1.3 s more of quiet
+    (`unfinished_words::WAIT_BLOCKS`, the first builder's guess for a real
+    pause is 1.2–1.5 s). Speech in that time goes on with the same line;
+    words told finished meanwhile let it end at once; when the wait runs
+    out the line ends as it would have. The 1.3 s is the line's, not a
+    pause's: a hold let go by a noise leaves only what is left of it for
+    the line's next end, and no end is held past the silence window plus
+    1.3 s of quiet. So a person who truly stopped after "um" is answered
+    at most 1.3 s more per line, never on top of Smart Turn's incomplete
+    wait: an end the model held as incomplete (`model_incomplete`, 1.5 s)
+    is not held again. A finished line ("What's the weather in Hanoi?")
+    gets no extra wait. A call's wait that ran out (`--call-wait-ms`) is
+    not held again;
+  - **the journal says each held end, counts only**: `lamp-voice: request
+    N: unfinished words (joining|filler) held its end N ms, more speech
+    came: yes|no`; the endpoint record has `unfinished_wait_ms`, and its
+    `includes_silence_wait_ms` counts the hold.
+
+  The words come back from speech to text a moment after they are said;
+  an end due before the last words are back is judged on the ones before
+  them. Tests: `unfinished_words`'s own, and `tests/it/unfinished_wait.rs`
+  (unfinished words wait and end within the bound, a finished question
+  doesn't wait, a stop after "um" is answered at the bound, with Smart Turn
+  too, a line's holds add up to the bound, words going on keep one line,
+  and without words told nothing changes);
+  `the_words_so_far_are_told_only_with_the_switch` on the worker;
+  `words_end_holds_the_lines_end_only_with_the_switch` through the
+  coordinator.
 - **With `LAMP_SECOND_EARLY_FINALIZE=on` a line's words are asked for at a
   pause** (off unless set; the first builder on #1722, 20 Oct 07:20 and
   07:36). On lamp-4ace Deepgram never ends a line itself: the lamp's quiet

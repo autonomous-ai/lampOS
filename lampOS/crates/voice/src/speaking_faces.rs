@@ -58,6 +58,49 @@ pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Who the eyes saw saying one heard line, read at its end
+/// (`LAMP_EYES_SPEAKING=on`): its request, the faces seen speaking through
+/// it, and the known person with their face ([`known_with_face`]), fresh
+/// as the known file was when the line was heard, not when a call ran.
+/// The engine keeps each id with the eyes' boot (`boot/f3`,
+/// [`SpeakingFaces::speakers_with_boot`], [`SpeakingFaces::known_with_boot`]).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LineSeen {
+    pub request: u64,
+    pub speakers: Speakers,
+    pub known: Option<(String, String)>,
+}
+
+/// Far more lines than run at once: an older answer still running keeps
+/// its own. Each is a request number, a few passing ids and a name, so 64
+/// is cheap; and the store is the process's, so tests running in parallel
+/// (each with request numbers of its own) can't push another's line out
+/// before its call reads it (El on #3038).
+const MOST_LINES_SEEN: usize = 64;
+
+static LINES_SEEN: Mutex<VecDeque<LineSeen>> = Mutex::new(VecDeque::new());
+
+/// Keeps what the eyes saw saying a line, for its calls ([`line_seen`]).
+pub fn saw_line(seen: LineSeen) {
+    if let Ok(mut lines) = LINES_SEEN.lock() {
+        lines.retain(|line| line.request != seen.request);
+        lines.push_back(seen);
+        while lines.len() > MOST_LINES_SEEN {
+            lines.pop_front();
+        }
+    }
+}
+
+/// What the eyes saw saying request `request`'s line, if it was read.
+pub fn line_seen(request: u64) -> Option<LineSeen> {
+    LINES_SEEN
+        .lock()
+        .ok()?
+        .iter()
+        .find(|line| line.request == request)
+        .cloned()
+}
+
 /// Who the eyes saw speaking through a line: the passing ids, none when no
 /// face read speaking or there were too few looks to say.
 pub type Speakers = Vec<String>;
@@ -84,8 +127,15 @@ struct Looks {
     kept: VecDeque<Look>,
     /// The last frame counted, by its publisher's boot and sequence.
     frame: Option<(String, u64)>,
+    /// Each of the eyes' boots, newest last, with the time its first frame
+    /// was read: the boot a file the eyes wrote belongs to
+    /// ([`SpeakingFaces::known_with_boot`]). Instance names only, so kept
+    /// past [`KEPT`] and [`SpeakingFaces::forget`].
+    boots: VecDeque<(String, SystemTime)>,
 }
 
+/// Boots of the eyes remembered with their first frame's time.
+const MOST_BOOTS: usize = 8;
 /// The last [`KEPT`] of looks, fed by one reader and judged at each line's
 /// end. Each of the eyes' frames counts once, however often it is read (the
 /// reviewer on #2008), so a short line can't pass the bar on one frame.
@@ -165,6 +215,16 @@ impl SpeakingFaces {
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
+        if !boot.is_empty() && !looks.boots.iter().any(|(seen, _)| *seen == boot) {
+            // The wall time of `at`, for comparing with a file's time.
+            let first = SystemTime::now()
+                .checked_sub(Instant::now().saturating_duration_since(at))
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            looks.boots.push_back((boot.clone(), first));
+            while looks.boots.len() > MOST_BOOTS {
+                looks.boots.pop_front();
+            }
+        }
         let kept = &mut looks.kept;
         while kept
             .front()
@@ -205,8 +265,45 @@ impl SpeakingFaces {
     /// and no passing id outlives that.
     pub fn forget(&self) {
         if let Ok(mut looks) = self.looks.lock() {
-            *looks = Looks::default();
+            *looks = Looks {
+                boots: std::mem::take(&mut looks.boots),
+                ..Looks::default()
+            };
         }
+    }
+
+    /// [`known_with_face`], the face's passing id with the eyes' boot it
+    /// was written under (`boot/f3`), to compare with
+    /// [`Self::speakers_with_boot`]. The eyes' `-face` file holds the bare
+    /// id only, so its boot is the newest boot whose first frame was read
+    /// strictly before the file was last written (the eyes renew it every
+    /// two seconds), with no tolerance: a file left from before the eyes
+    /// started again, or written at the new boot's first frame, names none
+    /// of the new boot's faces, though it is still fresh (#3037, Fourth's
+    /// P2 on #3038). In doubt it is refused: a new boot's file written just
+    /// before the voice read its first frame waits for the eyes' next
+    /// renewal. `None` with no boot read before it. The eyes' own
+    /// `known-speaker` file (Fourth's) is to replace this.
+    /// When boot `boot`'s first frame was read, for the boundary tests.
+    #[cfg(test)]
+    fn first_frame_of(&self, boot: &str) -> Option<SystemTime> {
+        let looks = self.looks.lock().ok()?;
+        looks
+            .boots
+            .iter()
+            .find(|(seen, _)| seen == boot)
+            .map(|(_, first)| *first)
+    }
+
+    pub fn known_with_boot(&self, known: &Path) -> Option<(String, String)> {
+        let (name, face, written) = known_with_face_written(known)?;
+        let looks = self.looks.lock().ok()?;
+        let (boot, _) = looks
+            .boots
+            .iter()
+            .filter(|(_, first)| *first < written)
+            .max_by_key(|(_, first)| *first)?;
+        Some((name, format!("{boot}/{face}")))
     }
 
     /// The faces that read speaking and turned to the lamp in at least half
@@ -346,18 +443,23 @@ pub fn known_face_of(known: &Path) -> PathBuf {
 /// the face, the name, then the face again, so a name is never paired with
 /// another's face as the eyes replace both. Each fresh as the known file is.
 pub fn known_with_face(known: &Path) -> Option<(String, String)> {
-    let beside = known_face_of(known);
-    let first = face_in(&beside)?;
-    let name = crate::known_faces::known_now(known)?;
-    (face_in(&beside)? == first).then_some((name, first))
+    known_with_face_written(known).map(|(name, face, _)| (name, face))
 }
 
-fn face_in(path: &Path) -> Option<String> {
+/// [`known_with_face`], with when the face's file was last written.
+fn known_with_face_written(known: &Path) -> Option<(String, String, SystemTime)> {
+    let beside = known_face_of(known);
+    let (first, _) = face_in(&beside)?;
+    let name = crate::known_faces::known_now(known)?;
+    let (again, written) = face_in(&beside)?;
+    (again == first).then_some((name, first, written))
+}
+
+fn face_in(path: &Path) -> Option<(String, SystemTime)> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
-    let age = SystemTime::now()
-        .duration_since(file.metadata().ok()?.modified().ok()?)
-        .ok()?;
+    let written = file.metadata().ok()?.modified().ok()?;
+    let age = SystemTime::now().duration_since(written).ok()?;
     if age >= crate::known_faces::FRESH {
         return None;
     }
@@ -366,7 +468,7 @@ fn face_in(path: &Path) -> Option<String> {
     let id = text.trim();
     let digits = id.strip_prefix('f')?;
     (!digits.is_empty() && digits.len() <= 10 && digits.bytes().all(|b| b.is_ascii_digit()))
-        .then(|| id.to_owned())
+        .then(|| (id.to_owned(), written))
 }
 
 /// Whether a line admitted for `person` may be someone else's: a face
@@ -655,6 +757,93 @@ mod tests {
             std::fs::write(known_face_of(&known), wrong).unwrap();
             assert_eq!(known_with_face(&known), None, "{wrong}");
         }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #3037: the known face's id is compared with its boot. The eyes'
+    /// `-face` file holds the bare id, so it takes the boot whose first frame
+    /// was read before it was written: a file still fresh from before the
+    /// eyes started again names none of the new boot's faces, though their
+    /// ids are the same, until the new eyes write it again.
+    #[test]
+    fn the_known_face_takes_the_boot_it_was_written_under() {
+        let dir = std::env::temp_dir().join(format!("speaking-faces-boot-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let eyes = SpeakingFaces::default();
+        // No boot read before the file was written: no pair.
+        assert_eq!(eyes.known_with_boot(&known), None);
+        let now = Instant::now();
+        let ago = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        for index in 0..3u32 {
+            eyes.look(
+                ago(2.8) + EVERY * index,
+                Some((("a", index.into()), &faces(&[("f1", Yes)]))),
+            );
+        }
+        for index in 0..3u32 {
+            eyes.look(
+                ago(1.0) + EVERY * index,
+                Some((("b", index.into()), &faces(&[("f1", Yes)]))),
+            );
+        }
+        let written = |seconds: f32| {
+            std::fs::File::options()
+                .write(true)
+                .open(known_face_of(&known))
+                .unwrap()
+                .set_modified(SystemTime::now() - Duration::from_secs_f32(seconds))
+                .unwrap();
+        };
+        let lan = crate::known_faces::memory_person("Lan");
+        let said = eyes.speakers_with_boot(ago(1.0), now);
+        assert_eq!(said, ["b/f1"]);
+        // Written under the eyes before they started again: Lan's `f1`
+        // was another face, so the new `f1` saying it is not hers.
+        written(1.6);
+        let before = eyes.known_with_boot(&known);
+        assert_eq!(before, Some(("Lan".to_owned(), "a/f1".to_owned())));
+        assert!(!seen_saying(&said, &lan, before));
+        // Written again by the new eyes: hers.
+        written(0.4);
+        let again = eyes.known_with_boot(&known);
+        assert_eq!(again, Some(("Lan".to_owned(), "b/f1".to_owned())));
+        assert!(seen_saying(&said, &lan, again));
+        // A privacy change forgets the looks, not which boot came when.
+        eyes.forget();
+        assert_eq!(
+            eyes.known_with_boot(&known),
+            Some(("Lan".to_owned(), "b/f1".to_owned()))
+        );
+        // Fourth's P2 on #3038: no tolerance. A file written 250, 100 or
+        // 1 ms before the new boot's first frame, or at it, is the old
+        // eyes' and never the new face's; 1 ms after, it is the new boot's.
+        let first = eyes.first_frame_of("b").unwrap();
+        let ms = Duration::from_millis;
+        let at = |time: SystemTime| {
+            std::fs::File::options()
+                .write(true)
+                .open(known_face_of(&known))
+                .unwrap()
+                .set_modified(time)
+                .unwrap();
+            eyes.known_with_boot(&known)
+        };
+        for before in [ms(250), ms(100), ms(1), Duration::ZERO] {
+            let bound = at(first - before);
+            assert_eq!(
+                bound,
+                Some(("Lan".to_owned(), "a/f1".to_owned())),
+                "{before:?}"
+            );
+            assert!(!seen_saying(&said, &lan, bound), "{before:?}");
+        }
+        let bound = at(first + ms(1));
+        assert_eq!(bound, Some(("Lan".to_owned(), "b/f1".to_owned())));
+        assert!(seen_saying(&said, &lan, bound));
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
