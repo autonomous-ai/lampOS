@@ -6826,6 +6826,24 @@ Ready for lamp-voice: no
   Allauthorisedindependentcodeandchecksarepushed. NoCargo/build/CIjob
   remains; boundedread-onlywatch isbeingclosed. NoFourthdeviceaction.
 
+## 2026-10-22, 21:19: privacy corrections and reserved face repair — taken
+
+- Read the updated Queue/PR-only coordination protocol and every Queue/own-PR
+  comment since the prior post. Clean local branch brought to lamp-voice.
+- #3014: fix the positive-speaking P2 before disclosing a visible person's
+  name; no inherited-scope fallback. #2988: bind photo yes to that actual
+  speaker and make app photo acknowledgements independent of enrollment.
+  Existing green receipts remain evidence for their original heads only.
+- Account face repair is authorized by the first builder's 21:14 Queue
+  decision: keep the occupied name and stable memory ID reserved atomically,
+  behind a switch, with tests first. Face-only deletion is not this repair.
+- Source audit at 2297f0f3d: same-name reenrollment chooses a free by-name
+  memory ID; a renamed/colliding old stable ID does not reconnect by magic.
+  The three-step supervised owner test and this limitation are on the Queue.
+- No lamp, SSH, model call, new test or implementation in this entry.
+  Next: coordinate the Eyes boot/face evidence format, then correct the
+  public photo acknowledgement while the request-proof change proceeds.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
