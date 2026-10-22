@@ -136,13 +136,6 @@ struct Looks {
 
 /// Boots of the eyes remembered with their first frame's time.
 const MOST_BOOTS: usize = 8;
-/// A boot's first frame may be read up to this after a file its eyes
-/// wrote: the reader reads every [`EVERY`], and a file's time can be a
-/// clock tick behind. Far shorter than the eyes take to start again
-/// (process, camera and models), so a file the eyes before wrote is
-/// never taken for the new boot's.
-const BOOT_SLACK: Duration = Duration::from_millis(250);
-
 /// The last [`KEPT`] of looks, fed by one reader and judged at each line's
 /// end. Each of the eyes' frames counts once, however often it is read (the
 /// reviewer on #2008), so a short line can't pass the bar on one frame.
@@ -283,17 +276,32 @@ impl SpeakingFaces {
     /// was written under (`boot/f3`), to compare with
     /// [`Self::speakers_with_boot`]. The eyes' `-face` file holds the bare
     /// id only, so its boot is the newest boot whose first frame was read
-    /// before the file was last written (the eyes renew it every two
-    /// seconds), give or take [`BOOT_SLACK`]: a file left from before the
-    /// eyes started again names none of the new boot's faces, though it is
-    /// still fresh (#3037). `None` with no boot read before it.
+    /// strictly before the file was last written (the eyes renew it every
+    /// two seconds), with no tolerance: a file left from before the eyes
+    /// started again, or written at the new boot's first frame, names none
+    /// of the new boot's faces, though it is still fresh (#3037, Fourth's
+    /// P2 on #3038). In doubt it is refused: a new boot's file written just
+    /// before the voice read its first frame waits for the eyes' next
+    /// renewal. `None` with no boot read before it. The eyes' own
+    /// `known-speaker` file (Fourth's) is to replace this.
+    /// When boot `boot`'s first frame was read, for the boundary tests.
+    #[cfg(test)]
+    fn first_frame_of(&self, boot: &str) -> Option<SystemTime> {
+        let looks = self.looks.lock().ok()?;
+        looks
+            .boots
+            .iter()
+            .find(|(seen, _)| seen == boot)
+            .map(|(_, first)| *first)
+    }
+
     pub fn known_with_boot(&self, known: &Path) -> Option<(String, String)> {
         let (name, face, written) = known_with_face_written(known)?;
         let looks = self.looks.lock().ok()?;
         let (boot, _) = looks
             .boots
             .iter()
-            .filter(|(_, first)| *first <= written + BOOT_SLACK)
+            .filter(|(_, first)| *first < written)
             .max_by_key(|(_, first)| *first)?;
         Some((name, format!("{boot}/{face}")))
     }
@@ -810,6 +818,32 @@ mod tests {
             eyes.known_with_boot(&known),
             Some(("Lan".to_owned(), "b/f1".to_owned()))
         );
+        // Fourth's P2 on #3038: no tolerance. A file written 250, 100 or
+        // 1 ms before the new boot's first frame, or at it, is the old
+        // eyes' and never the new face's; 1 ms after, it is the new boot's.
+        let first = eyes.first_frame_of("b").unwrap();
+        let ms = Duration::from_millis;
+        let at = |time: SystemTime| {
+            std::fs::File::options()
+                .write(true)
+                .open(known_face_of(&known))
+                .unwrap()
+                .set_modified(time)
+                .unwrap();
+            eyes.known_with_boot(&known)
+        };
+        for before in [ms(250), ms(100), ms(1), Duration::ZERO] {
+            let bound = at(first - before);
+            assert_eq!(
+                bound,
+                Some(("Lan".to_owned(), "a/f1".to_owned())),
+                "{before:?}"
+            );
+            assert!(!seen_saying(&said, &lan, bound), "{before:?}");
+        }
+        let bound = at(first + ms(1));
+        assert_eq!(bound, Some(("Lan".to_owned(), "b/f1".to_owned())));
+        assert!(seen_saying(&said, &lan, bound));
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
