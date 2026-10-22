@@ -1000,6 +1000,41 @@ can you remember my face? I'm Sam." (played, nobody in view) was answered
 again?", the eyes having looked for 4.2 s. Since 08:39 the eyes say no face
 after 1.5 s: the same request was answered 3.5 s after the end of speech.
 
+### Atomic face repair store (inactive)
+
+`who::People::repair_target` and `replace_prints` are public Rust store APIs
+with no runtime caller, controller, RPC, or switch yet. Ordinary `remember`
+and `remember_one` behavior stays unchanged. The opaque, non-cloneable target
+holds the whole existing record; taking it neither removes that record nor
+frees its name. One replacement attempt consumes the target. It must still
+belong to the same live `People` instance, with the same record and no
+intervening committed save. This requires an exclusive process-local writer;
+it is not a lock or transaction shared by separately opened stores.
+
+A successful replacement changes only the face prints and clears
+`tell_visits`: a new capture cannot inherit the old face's consent to named
+visits. The canonical name, existing stable ID (or missing legacy ID),
+familiarity and added time remain. Other people, scoring state, memory and
+rules are untouched. The store accepts one to five finite, unit-length
+128-value prints and refuses any that recognize another known record,
+including when the target itself matches more strongly.
+
+The future caller must separately bind final account approval, a fresh
+capture and the person's proved yes at the lamp to this target, with expiry
+and cancellation. The snapshot and embedding checks provide neither that
+authority nor biometric identity or liveness proof. No approval ticket,
+capture, expiry controller or consent flow is implemented by these APIs.
+
+Replacement is blocking disk work for a future controller off the capture
+path. Success follows a private temporary file's sync, atomic rename and
+parent-directory sync. A write failure before rename returns `NotWritten`,
+leaving the old canonical file and RAM intact. After rename, RAM immediately
+follows the visible replacement; a directory-sync failure returns
+`Indeterminate`, never a rollback claim. The caller must consume its approval,
+reload and reconcile that outcome before reporting a result, rather than
+blindly retrying. Host fault fixtures cover these boundaries; they do not
+establish power-loss durability or lamp timing.
+
 ### One name for one face, and only a name they said (`LAMP_NAMES=checked`)
 
 Off unless `LAMP_NAMES=checked` in the voice's environment, beside
