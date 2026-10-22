@@ -70,6 +70,7 @@ stream, and `output_caps_topics()` the Actions-owned output restrictions.
 | `BoardState` | `board/state` | latest | 5 s, means nothing after 15 s | The computer's numbers: each temperature by sensor (°C), load per processor, memory in use and disk free as fractions, uptime, and the Wi-Fi signal and whether the clock is set if they could be asked |
 | `NameHeard` | `name/heard` | event | none | The lamp's name was heard in what its microphone hears: how sure the listener was, from 0 to 1, and how many milliseconds before this was sent the name began. A sign, never proof ([name.md](name.md)) |
 | `NameHeard` | `name/rising` | event | none | The same hearing's first sign, as soon as the score reaches the listener's bar and while the name is still being said: the score so far, and how long ago it reached the bar. Its final word, with the highest score, is on `name/heard`; a first sign with none was a near miss (#782, [name.md](name.md)) |
+| `NameHeard` | `name/near` | event | none | A hearing that reached `lamp-name --near`'s lower bar (`LAMP_NAME_NEAR`), when it is over: its highest score, and how long before this was sent it reached that bar. Read only beside a line's first word, never as the name alone ([name.md](name.md)) |
 | `StopHeard` | `stop/heard` | event | none | "Stop", "wait" or "hold on" was heard in what the microphone hears, by `lamp-name`'s `stop.onnx` with `--stop-least` (off unless set): the score at the step it first reached the bar, and how many milliseconds before this was sent. Said at once; a sign, never proof (#828, [stop-word.md](stop-word.md)) |
 | `Pause` | `lamp/pause` | latest | none | Whether the lamp is paused, as `lamp-keeper pause` or `resume` last said; kept until the next, read with `latest` by each part that honours it ([keeper.md](keeper.md), "Named states and the pause") |
 | `UpdateStatus` | `update/status` | latest | every 60 s, lasting 180 s | What lamp-update is doing and last did: the running build, `now` (`idle`, `checking`, `fetching`, `switching`, `watching`, `restoring`) and the last round's outcome by name, build and time, with no reason text; said at each phase by a round that acts, read by lamp-cloud for the app (#2194, [cloud.md](cloud.md)) |
@@ -95,7 +96,7 @@ the bus's lease needs its publisher to call `alive()`.
 added after that table was written and are not in it: this table is where
 they are listed. `lamp/pause` is not one of the first topics either:
 `keeper_topics()` lists it, and `declaration_of()` recognizes it. Nor is
-`memory/rules` or `memory/forgot`: `memory_topics()` lists them; nor `name/rising`, which
+`memory/rules` or `memory/forgot`: `memory_topics()` lists them; nor `name/rising` or `name/near`, which
 `name_topics()` lists; nor `stop/heard`, which `stop_topics()` lists.
 `first_topics()` has them with the others. The last two are the only
 topics with a lifespan: a kept report of how things are must not outlive
