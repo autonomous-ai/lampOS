@@ -4,7 +4,7 @@
 use lamp_body::{calibration::UnitId, moves::Asker};
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--say-socket ABSOLUTE_PATH] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; with\n--say-socket (the voice's say service, /run/lampos-say/say.sock on the product) it also asks the voice to\nsay each such ask aloud once, never waiting on it; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
+const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--force-limit N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way is not lowered, and the lamp runs folded. By default --give-way return and --limp on
 (--give-way off is the body as it was before them, and --limp off keeps giving way without the
 slump). With --give-way, a joint that pushes at its goal without moving for\n1.5 s is told to stop (its goal becomes where it is; torque is never written off); with\n--give-way stay, a head or base joint that gave way and is moved more than 15 counts by\na hand for over a second stays where it was put. With --limp on as well, as the old runtime
 did, a head or base joint that a hand stops and still pushes a second later makes the lamp
@@ -49,10 +49,6 @@ struct Arguments {
     /// `--hold-from FILE`: a hand on the head from a test input (#2668),
     /// for tests on a lamp only; no product unit passes it.
     hold_from: Option<PathBuf>,
-    /// `--say-socket`: the voice's say service, through which a lamp let go
-    /// to be set straight says once what it asks (#2938). Unset, it only
-    /// journals it and puts it on the bus.
-    say_socket: Option<PathBuf>,
 }
 
 /// Every option this build reads. One that is not among them is refused.
@@ -64,7 +60,7 @@ struct Arguments {
 /// updated is the safe failure, not one that moves on bounds it knows to be
 /// incomplete (the first builder on #2071, 20 Oct 06:28; #1680's one
 /// exception, a safety rule).
-const OPTIONS: [&str; 35] = [
+const OPTIONS: [&str; 34] = [
     "--arbitration",
     "--arm-load",
     "--awake-seconds",
@@ -89,7 +85,6 @@ const OPTIONS: [&str; 35] = [
     "--reach",
     "--refused-let-go",
     "--rest-glance",
-    "--say-socket",
     "--servo-acceleration",
     "--servo-speed",
     "--speed",
@@ -192,7 +187,6 @@ fn parse_with(
     let mut moves = None;
     let mut arbitration = None;
     let mut hold_from = None;
-    let mut say_socket = None;
     while let Some(key) = args.next() {
         if key == "--help" {
             if device.is_some()
@@ -229,7 +223,6 @@ fn parse_with(
                 || moves.is_some()
                 || arbitration.is_some()
                 || hold_from.is_some()
-                || say_socket.is_some()
                 || args.next().is_some()
             {
                 return Err("--help must be used alone");
@@ -432,9 +425,6 @@ fn parse_with(
             }
             Some("--moves") if moves.is_none() => moves = Some(PathBuf::from(value)),
             Some("--hold-from") if hold_from.is_none() => hold_from = Some(PathBuf::from(value)),
-            Some("--say-socket") if say_socket.is_none() => {
-                say_socket = Some(PathBuf::from(value));
-            }
             Some("--arbitration") if arbitration.is_none() => {
                 arbitration = Some(match value.to_str() {
                     Some("on") => true,
@@ -603,7 +593,6 @@ fn parse_with(
         moves,
         arbitration: arbitration.unwrap_or(false),
         hold_from,
-        say_socket,
     };
     if result.limp && result.give_way.is_none() {
         return Err("--limp on needs --give-way return or stay");
@@ -621,7 +610,6 @@ fn parse_with(
         .chain(gaze_path)
         .chain(result.moves.as_ref())
         .chain(result.hold_from.as_ref())
-        .chain(result.say_socket.as_ref())
     {
         if !path.is_absolute()
             || path.as_os_str().len() > 100
@@ -991,72 +979,6 @@ fn step_said(notify: &lamp_keeper::Notify, ready: &std::cell::Cell<bool>) {
     notify.alive();
 }
 
-/// What a lamp let go to be set straight asks of a person, said aloud once
-/// per run through the voice's say service (`--say-socket`, #2938), each
-/// sentence once, while the bus keeps saying it every read. The ask goes
-/// on a thread of its own, so the let-go and its reads never wait on the
-/// voice; a voice not up, or one that does not say it, is journalled once.
-#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-struct SaidOnce {
-    socket: Option<PathBuf>,
-    said: Vec<&'static str>,
-}
-
-#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-impl SaidOnce {
-    /// The say service's skill name for the body's asks.
-    const SKILL: &'static str = "body";
-    /// Urgent (`lamp_voice::say::URGENT_FROM`): a lamp that cannot start
-    /// waits only a second's quiet, not a reminder's.
-    const PRIORITY: u8 = 8;
-    /// The voice may keep it waiting for its quiet this long: the body asks
-    /// for ten minutes (`lamp_body::body::WAIT_ASKING`).
-    const EXPIRES_MS: u64 = 600_000;
-
-    /// Ask the voice to say `text`, unless it was asked this run. The
-    /// thread, if one was started, ends once the service has answered.
-    fn say(&mut self, text: &'static str) -> Option<std::thread::JoinHandle<()>> {
-        let socket = self.socket.clone()?;
-        if self.said.contains(&text) {
-            return None;
-        }
-        self.said.push(text);
-        Some(std::thread::spawn(move || {
-            use std::io::BufRead;
-            let stream = match lamp_body::first_stand::say_text(
-                &socket,
-                Self::SKILL,
-                text,
-                Self::PRIORITY,
-                Self::EXPIRES_MS,
-            ) {
-                Ok(stream) => stream,
-                Err(error) => {
-                    eprintln!(
-                        "lamp-body: the voice's say service is not there ({error}); the ask is on the bus only"
-                    );
-                    return;
-                }
-            };
-            for line in std::io::BufReader::new(stream).lines() {
-                let Ok(line) = line else { break };
-                let value: serde_json::Value =
-                    serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
-                if let Some(outcome) = value["outcome"].as_str() {
-                    eprintln!(
-                        "lamp-body: the ask to be set straight, aloud: {outcome} {}",
-                        value["why"].as_str().unwrap_or("")
-                    );
-                    return;
-                }
-            }
-            eprintln!(
-                "lamp-body: the voice's say service went without an answer; the ask is on the bus only"
-            );
-        }))
-    }
-}
-
 #[cfg(not(target_os = "linux"))]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let _ = (arguments.unit_id, arguments.mood_socket, arguments.home);
@@ -1083,7 +1005,6 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.look_at_name,
         arguments.moves,
         arguments.arbitration,
-        arguments.say_socket,
     );
     Err("the body requires Linux; no device was opened".into())
 }
@@ -1340,26 +1261,16 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // Whether the journal last said the test input holds the head.
     let mut hold_said = false;
     // What the body last asked of a person while let go (#2602).
-    let mut waiting_said: Option<&'static str> = None;
-    // And aloud, once each (#2938); no longer asking is never said aloud.
-    let mut aloud = SaidOnce {
-        socket: arguments.say_socket.clone(),
-        said: Vec::new(),
-    };
+    let mut waiting_said: Option<&str> = None;
     let watch = |glimpse: &lamp_body::body::Glimpse| {
         step_said(&notify, &ready);
         if glimpse.waiting != waiting_said {
             waiting_said = glimpse.waiting;
             match waiting_said {
-                Some(say) => {
-                    eprintln!(
-                        "lamp-body: step {} let go, torque off, waiting to be set straight: {say}",
-                        glimpse.step
-                    );
-                    if say != lamp_body::body::STOPPED_ASKING {
-                        drop(aloud.say(say));
-                    }
-                }
+                Some(say) => eprintln!(
+                    "lamp-body: step {} let go, torque off, waiting to be set straight: {say}",
+                    glimpse.step
+                ),
                 None => eprintln!(
                     "lamp-body: step {} set straight: taken hold where it is, starting",
                     glimpse.step
@@ -2295,102 +2206,6 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
-    }
-
-    /// `--say-socket` (#2938): an absolute path, off unless given.
-    #[test]
-    fn say_socket_is_an_absolute_path_and_off_unless_given() {
-        let with = |more: &[&'static str]| parse(args(&[&FULL[..], more].concat()));
-        assert_eq!(with(&[]).unwrap().unwrap().say_socket, None);
-        assert_eq!(
-            with(&["--say-socket", "/run/lampos-say/say.sock"])
-                .unwrap()
-                .unwrap()
-                .say_socket,
-            Some(PathBuf::from("/run/lampos-say/say.sock"))
-        );
-        assert!(with(&["--say-socket", "say.sock"]).is_err());
-    }
-
-    /// The ask to be set straight goes to the say service once, however
-    /// many reads say it; another sentence (the head propped) once too.
-    #[test]
-    fn the_ask_is_said_aloud_once_not_every_read() {
-        let dir = std::env::temp_dir().join(format!("lamp-body-say-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("say.sock");
-        let service = std::os::unix::net::UnixListener::bind(&path).unwrap();
-        let mut aloud = SaidOnce {
-            socket: Some(path),
-            said: Vec::new(),
-        };
-        const BASE: &str = "My base is turned too far.";
-        const PROPPED: &str = "My head is tipped up too far.";
-        let mut threads = Vec::new();
-        for text in [BASE, BASE, BASE, PROPPED, BASE, PROPPED] {
-            threads.extend(aloud.say(text));
-        }
-        assert_eq!(threads.len(), 2);
-        let mut heard = Vec::new();
-        for _ in 0..2 {
-            use std::io::{BufRead, Write};
-            let (mut stream, _) = service.accept().unwrap();
-            let mut line = String::new();
-            std::io::BufReader::new(&stream)
-                .read_line(&mut line)
-                .unwrap();
-            let ask: serde_json::Value = serde_json::from_str(&line).unwrap();
-            assert_eq!(ask["skill"], "body");
-            heard.push(ask["text"].as_str().unwrap().to_owned());
-            stream.write_all(b"{\"outcome\":\"spoken\"}\n").unwrap();
-        }
-        heard.sort();
-        assert_eq!(heard, [BASE, PROPPED]);
-        for thread in threads {
-            thread.join().unwrap();
-        }
-        // Nothing more was asked.
-        service.set_nonblocking(true).unwrap();
-        assert!(service.accept().is_err());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// No say service, or one that never answers: the caller (the let-go's
-    /// read loop) is never kept waiting, and it is not asked again.
-    #[test]
-    fn a_say_service_not_there_or_silent_never_holds_the_let_go() {
-        let started = std::time::Instant::now();
-        let mut gone = SaidOnce {
-            socket: Some(PathBuf::from("/nonexistent/lamp-body/say.sock")),
-            said: Vec::new(),
-        };
-        gone.say("My base is turned too far.")
-            .unwrap()
-            .join()
-            .unwrap();
-        assert!(gone.say("My base is turned too far.").is_none());
-        let dir = std::env::temp_dir().join(format!("lamp-body-silent-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("say.sock");
-        let _silent = std::os::unix::net::UnixListener::bind(&path).unwrap();
-        let mut silent = SaidOnce {
-            socket: Some(path),
-            said: Vec::new(),
-        };
-        let asked = std::time::Instant::now();
-        let thread = silent.say("My base is turned too far.").unwrap();
-        assert!(asked.elapsed() < std::time::Duration::from_millis(50));
-        assert!(!thread.is_finished());
-        assert!(started.elapsed() < std::time::Duration::from_millis(500));
-        // Without a socket nothing is asked at all.
-        let mut off = SaidOnce {
-            socket: None,
-            said: Vec::new(),
-        };
-        assert!(off.say("My base is turned too far.").is_none());
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A lamp's own window for the head beside the base, lamp-4ace's

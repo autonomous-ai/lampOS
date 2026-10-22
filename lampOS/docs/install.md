@@ -166,8 +166,7 @@ build hash taken out. Same board (Orange Pi 4 Pro), two lamps.
 - The body's speeds and limits: `--reach 150,15,1,250 --speed 120
   --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120
   --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on
-  --force-limit 600 --wake on --rest-glance on --look-at-name on
-  --say-socket /run/lampos-say/say.sock`.
+  --force-limit 600 --wake on --rest-glance on --look-at-name on`.
 - The controls' wiring, `controls-pins.json`: a property of the board.
 
 **Different: one lamp's own.** Only these, and each is measured on its lamp
