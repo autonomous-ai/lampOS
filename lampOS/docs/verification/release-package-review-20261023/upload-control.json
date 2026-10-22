@@ -1,0 +1,11 @@
+{
+  "head": "9694ec6333fc3e7461093a1a6723f0f2bd8b8960",
+  "control": "Invoke the existing run_case(build_only=True, signing=False, PACKAGE_FAIL=\"1\") fixture with all external release tools mocked.",
+  "exit": 1,
+  "docker_build_seen": true,
+  "docker_run_seen": false,
+  "published": null,
+  "version": "0.0.9",
+  "finding": "The PACKAGER mock tests PACKAGE_FAIL before its new --fetch-notices branch, so the existing packaging-failure case now stops at notice fetching. It no longer exercises a failure of the final package command after the build.",
+  "severity": "P3 test coverage only; real set -e still stops either failure."
+}

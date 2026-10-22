@@ -1,0 +1,8 @@
+{
+  "source": "28f796223aeabedb39756e5bdb7e76c3d223a8c9",
+  "files": {
+    "deploy/product/models.json": "9ebb34a60c912d56b50ab854e26536fac6a7901336f11546b6877c6a6eaf51b4",
+    "deploy/units/lamp-voice.service": "b0bc5acbc87b2b91b4e82f1f75799457b1e8ad912e2d3818907b49df637a875b",
+    "docs/failure-notices.md": "a67b025d2e88e58d0c0d06f97c1de2386833af5c5d93ce1c613929fa097607d4"
+  }
+}

@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-23 01:13 +07, generic package notice peer read complete
+
+Ready for lamp-voice: yes (#3085; corrected-evidence re-read and First's train remain)
+
+While that read waits, Second checked #3095 `9694ec633`, a public `main`
+release-script PR that intersects #1812's preflight. No P1/P2 found; two
+nonblocking P3s reproduced: cached notices skip their declared byte count,
+and the upload fixture's package-failure injection now fails earlier in
+notice fetching. Final packaging still refuses the byte mismatch, and the
+real shell stops either failure. No source correction was made in another
+builder's lane. [Read and receipts](verification/release-package-review-20261023/README.md).
+
+Independent affected package/upload tests: **41 / 0**, shell syntax pass,
+51 source hashes stable. All five runtime notice pins and the generic
+unit/archive path match `28f796223`. Only synthetic/offline checks ran;
+no real key, release, download, full ARM64 package or device claim.
+
+#3085 remains pushed and non-draft with both native jobs green; First and
+Tests retain its final read/carry. #2810's attended unplug and #1812's real
+release still require First and the person/owner. The completed peer read
+goes on #3095 and Queue #2602; Eighth owns any corrections.
+
+---
+
 ## Current checkpoint: 2026-10-23 01:00 +07, Update fixture diagnostics qualified
 
 Ready for lamp-voice: yes (#3085; re-read and final train remain merge gates)
