@@ -1,3 +1,37 @@
+**Current delivery, 22 October 2026, source `17167b1ba`:** the workflow and
+publisher described below now exist. The original proposal is retained as
+historical design, not a request to implement another publisher. Current
+sources are [ARM64 workflow](https://github.com/autonomous-ai/lampOS/blob/17167b1ba/.github/workflows/lampos-arm64.yml),
+[publisher](https://github.com/autonomous-ai/lampOS/blob/17167b1ba/.github/scripts/lampos-publish.py),
+and [artifact exporter](https://github.com/autonomous-ai/lampOS/blob/17167b1ba/.github/scripts/lampos-publish-artifact.py).
+
+- Signing is conditional on a successful `lamp-voice` **push** run in the
+  public repository and `LAMPOS_UPDATE_PUBLISH=on`. A PR or manual run cannot
+  enter the publication job. Eligible signing builds skip cache restore;
+  the exporter derives current targets from Cargo build evidence instead of
+  a directory glob. The publisher verifies the exact checksum inventory,
+  classifies retained binaries and uses the existing updater's manifest,
+  signing and verification commands. No duplicate helper is needed.
+- The job names `lampos-update-publish`, but the owner still must configure
+  its actual branch protection and provision the real environment key plus
+  trusted installed public half. A named environment alone is not protection.
+  This source reading does not inspect a secret or establish its presence.
+- Initial publication requires explicit bootstrap. Later candidates must be
+  newer than the verified current sequence; immutable-tag collisions and a
+  changed channel are refused. Promotion remains a multi-step public-release
+  operation with retained restoration limits, not an atomic channel swap.
+- Current `.config/nextest.toml` sets `profile.pr.default-filter = 'all()'`;
+  the workflow's comments saying PRs skip realtime are stale. Scope filters
+  and process-harness exclusions still apply. Read the actual run/selection,
+  not those comments, when choosing the release gate.
+- Real signed internet download, quiet switch, bad-release recovery and the
+  attended Body run remain **unexecuted by Second**. #2810's attended unplug
+  remains first. First/owner must provide the approved lamp/person window,
+  isolated bad-release route, real-key/publication activation and monotonic
+  restoration plan. No activation, publication or device action was made.
+
+---
+
 # Internet release preparation for #1812
 
 Proposed preparation, inspected at `34aa8f18c13ed6f12877a60c04bc769330b3ad69`. Second can prepare one reviewable workflow/helper change and its offline acceptance cases after Music. First decides when publication and the real key leave the deferral recorded in [#1812](https://github.com/autonomous-ai/lampOS/issues/1812). No key, release, workflow edit or device operation was made for this plan. The separate whole-lamp/version row stays with Tests/Migrate under #1680.
