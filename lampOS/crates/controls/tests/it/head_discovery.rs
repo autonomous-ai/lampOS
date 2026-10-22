@@ -223,3 +223,73 @@ fn two_pads_touched_together_then_held_one_by_one_are_both_found() {
     }
     assert_eq!(lines[1].active_low_candidate, None);
 }
+
+/// `discover-head --lines-from FILE` (#2818): the candidates' levels from a
+/// test input, so the factory step runs with no hand on the head.
+mod lines_from {
+    use lamp_controls::head_discovery::{Report, run};
+    use std::{fs, path::PathBuf, thread, time::Duration};
+
+    fn file(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("hd-{}-{name}", std::process::id()));
+        let _ = fs::remove_file(&path);
+        path
+    }
+
+    /// Written whole, so a sample never reads a half-written file.
+    fn say(path: &PathBuf, words: &str) {
+        let next = path.with_extension("next");
+        fs::write(&next, words).unwrap();
+        fs::rename(&next, path).unwrap();
+    }
+
+    fn found(report: &Report) -> Vec<u32> {
+        report
+            .lines
+            .iter()
+            .filter(|line| line.active_low_candidate.is_some())
+            .map(|line| line.line)
+            .collect()
+    }
+
+    #[test]
+    fn a_script_touching_97_then_98_finds_both() {
+        let path = file("touch");
+        say(&path, "none");
+        let script = {
+            let path = path.clone();
+            thread::spawn(move || {
+                // Past the settle (0.5 s), then each line held 0.7 s.
+                for (wait, words) in [(700, "97"), (700, "none"), (200, "98"), (700, "none")] {
+                    thread::sleep(Duration::from_millis(wait));
+                    say(&path, words);
+                }
+            })
+        };
+        let report = run(3, 0, Some(&path)).unwrap();
+        script.join().unwrap();
+        let _ = fs::remove_file(&path);
+        assert_eq!(found(&report), [97, 98]);
+        assert!(!report.hardware_mapping_installed);
+    }
+
+    #[test]
+    fn none_finds_nothing() {
+        let path = file("none");
+        say(&path, "none");
+        let report = run(2, 1, Some(&path)).unwrap();
+        let _ = fs::remove_file(&path);
+        assert!(found(&report).is_empty());
+        assert!(report.lines.iter().all(|line| line.rest_changes == Some(0)));
+    }
+
+    #[test]
+    fn a_missing_file_or_a_bad_word_fails_the_read() {
+        assert!(run(2, 0, Some(&file("missing"))).is_err());
+        let path = file("bad");
+        say(&path, "99");
+        let error = run(2, 0, Some(&path)).unwrap_err();
+        let _ = fs::remove_file(&path);
+        assert!(error.to_string().contains("\"99\""), "{error}");
+    }
+}

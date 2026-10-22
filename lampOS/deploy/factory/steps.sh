@@ -34,9 +34,15 @@
 # QUIET_WAIT the seconds waited after lamp-expression stops (61), STOP_WAIT
 # the seconds a stopped body is given to fold and end (12), and
 # AS_BODY_USER=1 runs the body as --body-user under ETC_ROOT too.
+# HEAD_LINES_FROM=FILE, for a test on a lamp with no person (#2818), passes
+# discover-head --lines-from FILE: the head lines read from FILE (the high
+# lines' numbers, or none), which a script writes to touch them. Its found
+# pads never reach the live pins file, here or under ETC_ROOT: they are put
+# in $PINS.test-input beside it, and lamp-controls is not restarted.
 set -uo pipefail
 
-usage() { sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; }
+# The header: the comment lines from line 2 to the first that is not one.
+usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; }
 
 ROOT=${ETC_ROOT:-}
 MEASURE_BIN=${MEASURE_BIN:-/opt/lampOS/body/current/lamp-body-measure}
@@ -329,7 +335,7 @@ step_head_pads() {
   mkdir -p "$(dirname "$report")"
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
   CONTROLS_STOPPED=1
-  "$CONTROLS_BIN" discover-head --seconds 40 --rest-seconds 10 >"$report"
+  "$CONTROLS_BIN" discover-head --seconds 40 --rest-seconds 10 ${HEAD_LINES_FROM:+--lines-from "$HEAD_LINES_FROM"} >"$report"
   local status=$?
   controls_back
   [[ $status == 0 ]] || { fail "discover-head could not read the head lines (report: $report)"; return 1; }
@@ -370,7 +376,17 @@ step_head_pads() {
        else del(.head_rest) end' "$PINS" >"$out" \
     || { fail "could not write the head pads into $out"; return 1; }
   say "head pads: $("$JQ" -c '[.head_pads[] | {line, active_low}]' "$out"), rest: $("$JQ" -c '.head_rest // "not measured"' "$out")"
-  mv "$PINS" "$PINS.before-factory-$STAMP" && mv "$out" "$PINS" || { fail "could not put the head pads in place"; return 1; }
+  # A test input's lines were read with the probes forced off, so its pads
+  # would all be written active-high: they go beside the live pins, never
+  # into them (#2915's P2).
+  if [[ -n ${HEAD_LINES_FROM:-} ]]; then
+    mv -f "$out" "$PINS.test-input" || { fail "could not write the found lines to $PINS.test-input"; return 1; }
+    say "test input: live pins not written, found lines in $PINS.test-input"
+    return 0
+  fi
+  # The profile is copied aside and the new pins renamed over it, so the
+  # pins file is never missing or half written.
+  cp -p "$PINS" "$PINS.before-factory-$STAMP" && mv -f "$out" "$PINS" || { fail "could not put the head pads in place"; return 1; }
   say "head pads in $PINS; the profile's kept as $PINS.before-factory-$STAMP"
   "$SYSTEMCTL" restart lamp-controls || { fail "lamp-controls did not restart with the head pads"; return 1; }
 }
@@ -406,7 +422,7 @@ step_touch() {
   controls_back
   [[ $status == 0 ]] || { fail "calibrate-touch did not give every working pad a threshold (report: $report)"; return 1; }
   say "the touch report: $report"
-  mv "$PINS" "$PINS.before-factory-$STAMP" && mv "$out" "$PINS" || { fail "could not put the calibrated pins in place"; return 1; }
+  cp -p "$PINS" "$PINS.before-factory-$STAMP" && mv -f "$out" "$PINS" || { fail "could not put the calibrated pins in place"; return 1; }
   say "calibrated pins in $PINS; the profile's kept as $PINS.before-factory-$STAMP"
   "$SYSTEMCTL" restart lamp-controls || { fail "lamp-controls did not restart with the calibrated pins"; return 1; }
 }

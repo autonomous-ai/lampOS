@@ -1556,6 +1556,23 @@ product unit passes it, and a test checks every unit under `deploy/`
 covers the words read, a hold and a tap from the file giving the same events
 as the lines (sleep and wake), and the flag refused without `--touch`.
 
+`discover-head --lines-from FILE` (#2818) is the same for the factory's head
+pads step, so it runs whole with no person: the four candidates' levels are
+read from FILE instead of chip 0, at the step's own sample (5 ms). FILE holds
+the line numbers high now, e.g. `97` or `97 98`, or `none`; every candidate
+probes low at idle, so a number written is a touch. The settle, the rest
+seconds, the pulse counting and the report are unchanged. A missing file or a
+word that is no candidate fails the read. stderr says once `lamp-controls:
+head lines from a test input: FILE, not the chip`. No product unit passes it
+(`no_deployed_unit_passes_touch_from` checks both flags); the factory steps
+pass it only under `HEAD_LINES_FROM=FILE`, and then write the pads found to
+`<pins>.test-input`, never the live pins file (install.md). A script writes
+FILE by rename (a temp file, then `mv`), as the test does: FILE is read four
+times a sample, and a truncate-then-write can be read empty, as `none`.
+Tests: `tests/it/head_discovery.rs`
+(`lines_from`) finds 97 and 98 touched in turn, nothing with `none`, and fails
+on a missing file or a bad word.
+
 ## Replay and local records
 
 One written scenario exercises both button taps, a base tap, a released hold,

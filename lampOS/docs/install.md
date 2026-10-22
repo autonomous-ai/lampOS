@@ -601,7 +601,13 @@ active-high, so a line with nothing on it reads as not touched), the rest of
 the pins file kept; anything but two such lines writes nothing. On an MPR121
 it calibrates. Either way `lamp-controls` is started again however the step
 ends, and dry it only says what it would run, without stopping
-`lamp-controls`. Written, step 4 stands the lamp up for the
+`lamp-controls`. For a test with no person, `HEAD_LINES_FROM=FILE` passes
+`discover-head --lines-from FILE`, the head lines read from FILE (the high
+lines' numbers, or `none`), which a script writes to touch them (#2818). Its
+probes are forced off, so its pads would all read active-high: with it the
+live pins file is never written, under `ETC_ROOT` too, the found pads go to
+`<pins>.test-input` beside it ("test input: live pins not written") and
+`lamp-controls` is not restarted. Written, step 4 stands the lamp up for the
 self-test's `head_move`, which checks only a lamp at rest and standing and
 never stands one itself (#2232): after the yes (a hand by the arm as it
 rises, not on it), `lamp-expression`, if it runs, is stopped: it asks the

@@ -226,6 +226,12 @@ lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "the head pads found are written with their polarity and baseline, the rest kept" '[[ $status == 0 ]] && [[ $(jq -c .head_pads "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"line\":97,\"active_low\":false,\"pull\":\"down\"},{\"name\":\"head-2\",\"line\":98,\"active_low\":false,\"pull\":\"down\"}]" ]] && [[ $(jq -c .head_rest "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"rest\":\"low\",\"reads\":\"level\"},{\"name\":\"head-2\",\"rest\":\"low\",\"reads\":\"pulses\"}]" ]] && [[ $(jq -r .chip "$T/root/$PINSF") == /dev/gpiochip0 ]] && ls "$T/root/etc/lampOS/controls/" | grep -q "controls-pins.json.before-factory-"'
 check "each pad is named as it was found (thirteen-P4)" 'grep -q "a head pad on line 97: rests low, level under a hand" "$T/out" && grep -q "a head pad on line 98: rests low, pulses under a hand" "$T/out"'
 check "lamp-controls is stopped for the read, started again, then restarted on the new pins" '[[ $(grep "lamp-controls" "$T/log" | tr "\n" "|") == "systemctl stop lamp-controls|systemctl start lamp-controls|systemctl restart lamp-controls|" ]] && grep -q "^controls discover-head --seconds 40 --rest-seconds 10$" "$T/log"'
+# HEAD_LINES_FROM (#2818): the head lines from a test input, passed through.
+# Its pads never reach the live pins (#2915's P2): they go to a side file.
+lamp; before=$(cat "$T/root/$PINSF")
+HEAD_LINES_FROM=$T/lines ASK_ANSWER=y run --write --from 2 --to 2 --update-key "$KEYFILE"; status=$?
+check "HEAD_LINES_FROM passes discover-head --lines-from" '[[ $status == 0 ]] && grep -q "^controls discover-head --seconds 40 --rest-seconds 10 --lines-from $T/lines$" "$T/log"'
+check "HEAD_LINES_FROM leaves the live pins byte-identical and writes the found lines beside them" '[[ $(cat "$T/root/$PINSF") == "$before" ]] && [[ $(jq -c "[.head_pads[].line]" "$T/root/$PINSF.test-input") == "[97,98]" ]] && grep -q "test input: live pins not written, found lines in $T/root/$PINSF.test-input" "$T/out" && ! ls "$T/root/etc/lampOS/controls/" | grep -q "before-factory-" && ! grep -q "restart lamp-controls" "$T/log"'
 pulled() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":%s,"idle_high":%s,"completed_pulses":%s,"longest_pulse_us":1,"active_low_candidate":%s}' "$@"; }
 lamp; before=$(cat "$T/root/$PINSF")
 FAKE_DISCOVERY="{\"lines\":[$(pulled 37 true true true 2 true),$(pulled 96 true true true 1 null),$(pulled 97 false false false 0 null),$(pulled 98 false true null 0 null)],\"hardware_mapping_installed\":false}" \
