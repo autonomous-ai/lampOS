@@ -8,7 +8,9 @@ builder's design on [#1685](https://github.com/autonomous-ai/lampOS/issues/1685)
 skill (19 Oct, 07:1x). Items 2 to 6 of [#2562](https://github.com/autonomous-ai/lampOS/issues/2562)'s
 design add arrivals by sound, turning it on from the app, one turn of the
 head to an arrival, "I'm off guard", and the privacy switch ending it.
-Naming a known person (its item 1) is not decided: nobody is named.
+Naming a known person (its item 1, the first builder's ruling of 22 Oct)
+is behind its own switch, `LAMP_GUARD_NAMES`, off unless set: without it
+nobody is named.
 
 **Status:** built, with tests; not tried on a lamp, and out of the product's
 install until it is (`install::NOT_PRODUCT_SKILLS`). **Its texts reach the
@@ -151,6 +153,38 @@ yet seen on a lamp.
   a face was seen and not known, and "Someone" when there was a voice or a
   presence but no face near. Never a name: in a shared home, a name would
   tell you whom another person visited.
+- **By name, only with a yes** (#2562 item 1, `LAMP_GUARD_NAMES=on` in
+  `lamp-skills`, off unless set). A face the eyes know is named only when
+  its person said yes to being named: the eyes' `tellable` file beside
+  their known file, the same yes Who was here reads
+  (`lamp_skills::known::tellable_in`). "Minh came in at 18:10 and was here
+  for about 2 minutes." Two known people at one visit, one who said yes
+  and one who didn't: "Minh and someone the lamp knows came in at 18:10…"
+  (`[watch.words]`' `named_and_known`; two names or three are joined by
+  `and`, "Minh and Lan"; a visit keeps at most 3). Known but no yes stays
+  "someone you've introduced me to", a stranger "someone I don't know".
+  **Read as the text goes,** never as the face was seen: a yes taken back,
+  or a forget, before the visit's text is sent names nobody in it. A name
+  comes only from the eyes' known file, a face they know, never from a
+  voice or from what someone says. The name is in the text alone: the
+  journal and `skills/events` say "naming someone the eyes say said yes",
+  never the words. Without a known file the switch names nobody, and the
+  journal says so at start. **Checked again as it leaves the lamp:** a
+  named text goes on `messages/out` with its words as they read with names
+  off (`MessageOut::unnamed`) and who it names as the eyes' person ids,
+  never names (`named`). `lamp-cloud` reads the eyes' `tellable` again just
+  before it sends the text to the broker (`LAMP_CLOUD_KNOWN_FILE`, the same
+  `lamp_msgs::known` reading), and sends the named words only if each one
+  named still said yes; a yes taken back by any of them, a forget, or a
+  file it can't read sends the unnamed words, as does a text it holds while
+  the broker is away or sends again after a failed or lost send. So a text
+  waiting on the bus or in `lamp-cloud` never names someone who took their
+  yes back. And it goes named only straight to the wire: with a send of
+  `lamp-cloud`'s own still not acknowledged by the broker, the MQTT client
+  could hold it behind that one past the eyes' word, so it goes unnamed then
+  too ([messages.md](messages.md), "Unasked texts"). **Too long
+  named:** three long names can make the line longer than a text may be
+  (280 bytes); then the unnamed words go alone, not nothing.
 - **It ends** when you say stop (`turn = "off"`, which needs no voice), or
   `guard.off` from the app, or when the eyes know your own face at the lamp
   again after you'd left: the mark is given back, no text is sent for you
@@ -189,7 +223,7 @@ thing leaves `lamp-skills`:
 | `topics`: `voice/heard` | that someone spoke just before the call: asked out loud |
 | `topics`: `voice/privacy` | the privacy switch, looked at as it goes (the voice says it a hundred times a second, so it is read, never listened to) |
 | `topics`: `ears/classes` | a door, footsteps and speech, as scores, with `LAMP_GUARD_SOUNDS=on` (#2562); no sound is read or kept |
-| `known_faces` | whether the face at the lamp is one the eyes know, and whether it's yours, from the eyes' known file (`lamp-eyes --known-file`, read by `lamp-skills --known-file`); the name read there stays in the program, never in a text, an event or the journal |
+| `known_faces` | whether the face at the lamp is one the eyes know, and whether it's yours, from the eyes' known file (`lamp-eyes --known-file`, read by `lamp-skills --known-file`); the name read there stays in the program, never in an event or the journal, and in a text only with `LAMP_GUARD_NAMES=on` and the eyes' `tellable` yes, read as it goes (#2562) |
 | `messages` | one short line on `messages/out` |
 | `light` | only its faint mark |
 | `body` | only one turn of the head to an arrival, at most one in 2 minutes |
@@ -255,6 +289,29 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   `the_privacy_switch_closed_ends_it_with_one_text`,
   `once_the_switch_has_ended_it_nothing_about_the_desk_is_taken`, and
   "I'm off guard" in `the_face_of_the_person_who_asked_ends_it`.
+  #2562 item 1's names:
+  `two_known_one_tellable_names_one_and_says_someone_the_lamp_knows_for_the_other`
+  (and both named, neither, the order seen),
+  `with_names_off_nobody_is_ever_named`,
+  `a_yes_taken_back_before_the_text_goes_names_nobody` (a no and a
+  forget), `a_voice_alone_never_names`,
+  `a_watch_without_known_faces_names_nobody` and
+  `the_named_lines_have_only_their_own_slots`; the named text's `unnamed`
+  and `named` in the first;
+  `names_too_long_for_one_line_send_the_unnamed_text_not_nothing`.
+  `crates/cloud/src/unasked.rs`,
+  `a_named_text_goes_named_only_at_once_and_is_held_unnamed`;
+  `crates/cloud/tests/it/texts.rs`,
+  `a_named_text_goes_named_only_while_its_yes_stands_as_it_goes` (on a real
+  bus: named with the yes; the yes taken back before lamp-cloud first
+  reads the waiting text, then sent connected, unnamed; held while away,
+  unnamed; no known file, unnamed);
+  `crates/cloud/src/online.rs`,
+  `a_named_text_behind_an_unacknowledged_publish_goes_unnamed` (the real
+  client and event loop, a loopback broker with a receive maximum of 1 and
+  `info`'s PUBACK held: unnamed; nothing ahead: named);
+  `lamp_msgs::chat::tests::a_named_text_carries_its_unnamed_words_and_older_readers_are_unaffected`,
+  `lamp_msgs::known::tests::still_tellable_is_every_one_named_now_and_nothing_unverifiable`.
 - `crates/skills/tests/it/skills.rs`,
   `guard_modes_new_words_come_only_with_their_switch` (#2827): with
   `LAMP_GUARD_WORDS_V2` on, `keep_watch`'s description and `turn` choice in
@@ -317,5 +374,5 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   room; the app's `guard.on` and the turn of the head are not yet seen on a
   lamp. On a host other than Linux no peer is `lamp-cloud`, so the `guard`
   op is refused there unless a test sets `LAMP_SKILLS_ANY_ASKER=on`.
-- Naming a known person who said yes to being named (#2562 item 1) waits
-  for the first builder's answer.
+- Names (#2562 item 1): not seen on a lamp. A text says "was here" also
+  for two people.

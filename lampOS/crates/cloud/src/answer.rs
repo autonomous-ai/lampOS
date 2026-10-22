@@ -431,6 +431,9 @@ pub mod tests {
         /// The skills' lines for the phone (`crate::unasked`): those to
         /// give, and those owed back.
         pub unasked: crate::unasked::Outbox,
+        /// No line is given before this, if set: so a test's lines go after
+        /// the connection's first publishes.
+        pub unasked_from: Option<std::time::Instant>,
         /// Reports (#1683), with their switch.
         pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
         /// The skills page (#1722), with its switch.
@@ -533,7 +536,16 @@ pub mod tests {
         }
         fn unasked(&mut self, _now_ms: u64, give: bool) -> crate::unasked::Heard {
             crate::unasked::Heard {
-                due: if give { self.unasked.due() } else { Vec::new() },
+                // The eyes' word is Real's to check: here each yes stands.
+                due: if give
+                    && self
+                        .unasked_from
+                        .is_none_or(|from| std::time::Instant::now() >= from)
+                {
+                    self.unasked.due_checked(|_| true)
+                } else {
+                    Vec::new()
+                },
                 lines: Vec::new(),
             }
         }

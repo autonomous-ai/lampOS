@@ -277,6 +277,15 @@ fn fault(run: &str, why: &str) -> Value {
 }
 
 /// A task's news while nobody is at the lamp: no run asked for it.
+/// A `chat.event`'s `data` from [`Stream::unasked`] told again with `text`
+/// in place of its own, its `id` and `time` kept: a named text held as its
+/// unnamed words (`crate::unasked`, #2562).
+pub fn retell(data: &mut Value, text: &str) {
+    let event = &mut data["event"];
+    event["summary"] = Value::String(summary(text));
+    event["detail"]["message"] = Value::String(text.to_owned());
+}
+
 fn news(text: &str) -> Value {
     json!({
         "type": "task_news",

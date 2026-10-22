@@ -9,6 +9,56 @@
 //! file is the name alone, `NAME\n`, as before, and memory's id is
 //! [`person_id`] of the name.
 
+/// The eyes' file of names that may be said to others: `tellable` beside
+/// the known file (`lamp-eyes`, `who::tellable_of`), the names of those who
+/// said yes, one a line, kept current by the eyes. Read by Who was here and
+/// guard mode in `lamp-skills`, and by `lamp-cloud` as it sends guard
+/// mode's named text (#1997, #2562).
+pub fn tellable_of(known: &std::path::Path) -> std::path::PathBuf {
+    known.with_file_name("tellable")
+}
+
+/// The most names read from `tellable`: the eyes keep twenty people.
+const MOST_TELLABLE: usize = 20;
+/// The longest name the eyes keep, in bytes with room for any letters.
+const MOST_NAME_BYTES: usize = 160;
+
+/// The names in the `tellable` file at `path`: none when there is no file,
+/// it can't be read, or it is larger than twenty names could be, so a name
+/// is only ever said on the eyes' word that its person said yes.
+pub fn tellable_in(path: &std::path::Path) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    if text.len() > MOST_TELLABLE * (MOST_NAME_BYTES + 1) {
+        return Vec::new();
+    }
+    text.lines()
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && name.len() <= MOST_NAME_BYTES)
+        .take(MOST_TELLABLE)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether each of `named`, [`person_id`]s, is still someone the eyes say
+/// said yes, read now from the `tellable` file beside the known file at
+/// `known` (#2562). No file, one that can't be read, no ids or no known
+/// file: not, so a name is never said that can't be checked.
+pub fn still_tellable(known: Option<&std::path::Path>, named: &[String]) -> bool {
+    let Some(known) = known else {
+        return false;
+    };
+    if named.is_empty() {
+        return false;
+    }
+    let yes: Vec<String> = tellable_in(&tellable_of(known))
+        .iter()
+        .map(|name| person_id(name))
+        .collect();
+    named.iter().all(|id| yes.contains(id))
+}
+
 /// Where the stable id is switched on, for the eyes and the voice alike.
 /// `on` only.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_STABLE_ID";
@@ -91,6 +141,25 @@ pub fn read_known(text: &str) -> Option<(&str, Option<&str>)> {
 
 #[cfg(test)]
 mod tests {
+    /// #2562: a named text is sent named only while every one named is
+    /// still in `tellable`; none, a file gone, or no known file: not.
+    #[test]
+    fn still_tellable_is_every_one_named_now_and_nothing_unverifiable() {
+        let dir = std::env::temp_dir().join(format!("lamp-msgs-tellable-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let ids = [person_id("Minh"), person_id("Lan")];
+        assert!(!still_tellable(Some(&known), &ids), "no file");
+        std::fs::write(tellable_of(&known), "Minh\nLan\n").unwrap();
+        assert!(still_tellable(Some(&known), &ids));
+        assert!(still_tellable(Some(&known), &ids[..1]));
+        assert!(!still_tellable(Some(&known), &[]), "nobody named");
+        assert!(!still_tellable(None, &ids), "no known file");
+        std::fs::write(tellable_of(&known), "Minh\n").unwrap();
+        assert!(!still_tellable(Some(&known), &ids), "one took it back");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     use super::*;
 
     #[test]
