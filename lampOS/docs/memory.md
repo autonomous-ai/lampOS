@@ -1070,12 +1070,14 @@ the unchanged legacy client, used unless the new Days client is selected.
   greeting has (the memory's common words, and "new", "good",
   "anything", "doing", "mới", "việc" and the like,
   `remember::GREETING_WORDS`) or a when word never counts, so the
-  question holds one of its other key words, or, for a thread of one key
-  word, that word: "Morning! Anything new?" and "Có gì mới không?" leave
+  question holds one of its other key words, and a thread with none, of
+  one key word or more ("Có việc", "Có việc mới"), is never marked but
+  offered up to its cap (El's and the reviewer-lead's P3s on #3048):
+  "Morning! Anything new?" and "Có gì mới không?" leave
   "Starting a new job" offered, "How's the new job going?" and "Công
   việc mới thế nào?" mark it; "Morning! Any plans for tomorrow?" leaves
-  "Exam tomorrow" offered, and "Có việc gì mới không?" leaves "Có việc
-  mới". The
+  "Exam tomorrow" offered, "Có việc gì không?" leaves "Có việc", and
+  "How did the exam go?" marks "Exam". The
   mark is apart from the journal: a remember or forget turn's reply,
   kept out of the journal, still marks it ("I'll remember that. How was
   your sister's wedding?"), but a reply in a request admitted held only

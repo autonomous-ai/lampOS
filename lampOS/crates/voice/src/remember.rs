@@ -2737,8 +2737,10 @@ fn plural_off(word: &str) -> &str {
 /// own ([`WHEN_WORDS`] excluded: a weekday, a month, a time word, or a word
 /// with a digit). For an undated thread (reviewer-two's P2 on #3000) a word
 /// a greeting has ([`GREETING_WORDS`]) or a [`WHEN_WORDS`] one never
-/// counts: the question holds one of its other key words, or, for a
-/// thread of one key word, that word. "Morning! Anything new?" does not
+/// counts, however many key words the thread has: the question holds one
+/// of its other key words, and a thread with none ("Có việc", "Life") is
+/// never marked, but offered up to its cap (El's and the reviewer-lead's
+/// P3s on #3048). "Morning! Anything new?" does not
 /// ask about "Starting a new job"; "How's the new job going?" does.
 /// "Morning! Any plans for tomorrow?" does not ask about "Exam tomorrow";
 /// "How did the exam go?" does. "How was your sister's wedding?" and "Did the wedding go
@@ -2773,7 +2775,6 @@ fn asks_about(said: &str, event: &[String], dated: bool) -> bool {
             shared
                 .iter()
                 .any(|word| !is_greeting_word(word) && !is_when_word(word))
-                || (event.len() == 1 && shared.len() == 1)
         };
         if asks {
             return true;
@@ -2824,13 +2825,8 @@ const GREETING_WORDS: &[&str] = &[
     "fine",
     "great",
     "nice",
-    "morning",
-    "afternoon",
-    "evening",
-    "night",
-    "day",
-    "week",
-    "weekend",
+    // "morning", "day", "weekend" and the like are WHEN_WORDS, which an
+    // undated thread leaves out too.
     "happening",
     "happened",
     "life",
@@ -7921,7 +7917,7 @@ mod tests {
     }
 
     /// reviewer-two's P2 on #3000: an undated thread is asked about only by
-    /// a key word of its own that is not a greeting's, or by all of them;
+    /// a key word of its own that is not a greeting's or a when word;
     /// a dated one keeps its rule, so "new" alone still asks about a
     /// "new car on Friday".
     #[test]
@@ -7951,12 +7947,22 @@ mod tests {
         ));
         assert!(asks_about("Công việc mới thế nào?", &viec, false));
         // Two greeting words are never asked by both (El's P3 on #3025:
-        // "việc" is both "job" and "thing"); one is asked by its word.
+        // "việc" is both "job" and "thing").
         let moi = content_words("Có việc mới");
         assert!(!asks_about("Có việc gì mới không?", &moi, false));
+        // Nor one, in a thread of one key word (El's P3 on #3048): a
+        // thread of greeting words only is never marked, as one of two or
+        // more is not (the reviewer-lead's P3 there), and runs to its cap.
+        let co_viec = content_words("Có việc");
+        assert_eq!(co_viec, ["việc"]);
+        assert!(!asks_about("Có việc gì không?", &co_viec, false));
         let life = content_words("Life");
         assert!(!asks_about("Anything good?", &life, false));
-        assert!(asks_about("How's life?", &life, false));
+        assert!(!asks_about("How's life?", &life, false));
+        // A thread of one real subject word is asked by it.
+        let exam_alone = content_words("Exam");
+        assert!(asks_about("How did the exam go?", &exam_alone, false));
+        assert!(!asks_about("Anything new?", &exam_alone, false));
         // A when word never asks either (El's P2 on #3025), nor a day
         // with events off, where the memory sends no "on".
         let exam = content_words("Exam tomorrow");
