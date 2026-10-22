@@ -566,6 +566,34 @@ reset is never done while seeing is not permitted (a mute or the switch
 closed): one that falls due then waits for the first failure after seeing is
 permitted again. Health counts the resets since the camera last opened.
 
+**The camera's helper** (#2892, `--camera-helper`, `camera_helper.rs`). On
+lamp-52e6 on 22 Oct (11:11, Sixth) a voice restart that dropped the camera's
+permit left every open refused (`DeadlineExceeded` at `StreamOn` or
+`Controls`) until the camera's USB device was **re-authorized** by hand, a
+step stronger than the reset, and lamps whose udev rule predates the line
+above (lamp-75c9's) can't reset it at all. So with `--camera-helper` (the
+product's, `/run/lampos-eyes-camera/camera.sock`), after three opens in a
+row that did not open (about 10 s at the 5 s retry) while seeing is
+permitted, the eyes ask the camera's helper, on a thread of their own so the
+loop never waits (at most 5 s for its answer), then at most once a minute
+while they go on failing (`camera_helper::ask_now`), and say its answer once
+("its helper asked to re-authorize its USB device: …"). The reset above runs
+as before.
+- **The helper** is `lamp-eyes reauthorize-camera --usb
+  VENDOR:PRODUCT@TOPOLOGY`, root's, started by `lamp-eyes-camera.socket`
+  (`deploy/product/`, root and the group `lampos` may connect) for each ask
+  as `lamp-eyes-camera@.service`, with the same camera and port as
+  lamp-eyes' own unit. It checks that the device at that port under
+  `/sys/bus/usb/devices` has that `idVendor` and `idProduct`, writes its
+  `authorized` 0, then 1 half a second later, as an unplug and a plug would,
+  and answers one line: `{"reauthorized":true}`, or `false` with why
+  (`too_soon` with `ago_s`, `no_device`, `not_the_camera`, `error`).
+- **Narrow:** it reads nothing from whoever connects, so it can't be pointed
+  at another device; a port that isn't digits, `-` and `.` makes no path; at
+  most once a minute by the time it keeps in `/run/lampos-eyes-camera/last`,
+  written before the device is touched; no capabilities, no network, nothing
+  else writable but that folder and sysfs.
+
 The size is at most 3264 by 2448, the camera runtime's bound
 ([camera-runtime.md](camera-runtime.md)); larger is refused at start. On
 lamp-52e6 on 2026-10-15 the first build asked for 1280 by 960 against the
