@@ -1,0 +1,573 @@
+{
+  "old_head": "6208a602bd7c409aa7a8396404518ac218cb17c1",
+  "old_base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe",
+  "new_head": "bd1d79a5ad1c4ce1fcd4f6674702265cc879b8b0",
+  "new_base": "fc800db6f839cf006098f73ee84942572acbccfa",
+  "branch": "second/music-push-20261021",
+  "status_porcelain": "",
+  "range_diff_sha256": "579ecb6e4e6456238530dc7e69f3af0e71f2cf19b6ba6f065f7a0e5b7a798fe3",
+  "music_changed_path_count": 89,
+  "upstream_changed_path_count": 69,
+  "overlapping_paths": [
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/crates/voice/src/tools.rs",
+    "lampOS/docs/switches.md"
+  ],
+  "conflict_resolution": {
+    "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+    "blocks": 1,
+    "choice": "Retain upstream speech_hold and speech_ready plus Music skipped; both speak-path branches and both test sets remain.",
+    "sha256": "3227b0054af6876e035a6913be4e398fa6ce71d7f6b5858b7c06ce4c68006e2f"
+  },
+  "upstream_files": [
+    {
+      "path": "lampOS/crates/cloud/src/lamp.rs",
+      "current_sha256": "55abc71e2c9f94a93f48c12d3c72194dca3117517c585a58c39bb60526f4b3ac",
+      "upstream_sha256": "55abc71e2c9f94a93f48c12d3c72194dca3117517c585a58c39bb60526f4b3ac",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/controls/src/main.rs",
+      "current_sha256": "d17ac1f8d136a857dc54318152e8254bbdfaa63576e79a7658199a351f68a75c",
+      "upstream_sha256": "d17ac1f8d136a857dc54318152e8254bbdfaa63576e79a7658199a351f68a75c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch_runtime.rs",
+      "current_sha256": "a1e6de80aea1853b5b07898113295310738495799340031be801dac0cdf2b7f6",
+      "upstream_sha256": "a1e6de80aea1853b5b07898113295310738495799340031be801dac0cdf2b7f6",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/controls/tests/it/touch_runtime.rs",
+      "current_sha256": "29e8e5bcfbde1cbd8705b043cf9c3e0e4d45d510e0861bfca4d3b810a91edfe2",
+      "upstream_sha256": "29e8e5bcfbde1cbd8705b043cf9c3e0e4d45d510e0861bfca4d3b810a91edfe2",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/Cargo.toml",
+      "current_sha256": "c288c7c1206384810712a4945165ea87266f4918b41e0598d55f06adc700eac1",
+      "upstream_sha256": "c288c7c1206384810712a4945165ea87266f4918b41e0598d55f06adc700eac1",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/examples/glance_replay.rs",
+      "current_sha256": "18d74ea34b9eacbc95e5d13d4f26f04371f3811f1fb97d3a0d16035b3861c9c0",
+      "upstream_sha256": "18d74ea34b9eacbc95e5d13d4f26f04371f3811f1fb97d3a0d16035b3861c9c0",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/change.rs",
+      "current_sha256": "5659eee84f893b19f4940dd259cc2e048dd3be1eec6094b5670bef7ebc63f94e",
+      "upstream_sha256": "5659eee84f893b19f4940dd259cc2e048dd3be1eec6094b5670bef7ebc63f94e",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/glance_log.rs",
+      "current_sha256": "3701b2ea40a40cd2d213373335c01acdc17639f11886cfd69400e5f99b675bf0",
+      "upstream_sha256": "3701b2ea40a40cd2d213373335c01acdc17639f11886cfd69400e5f99b675bf0",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/lib.rs",
+      "current_sha256": "b3bf60e8f3ff71d373515e72fee66ddf2a0bdfc592535f18bc910aa2b789591d",
+      "upstream_sha256": "b3bf60e8f3ff71d373515e72fee66ddf2a0bdfc592535f18bc910aa2b789591d",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "current_sha256": "dd210bdf35c9e6ff6ca86ffeecb702b977835081ae96b8bed95ed819aa47b312",
+      "upstream_sha256": "dd210bdf35c9e6ff6ca86ffeecb702b977835081ae96b8bed95ed819aa47b312",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/health.rs",
+      "current_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+      "upstream_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_people.rs",
+      "current_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+      "upstream_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/voice_link_used.rs",
+      "current_sha256": "172997d73b5332b7bdb24fbea99463b3eeec0deebef340eefca84e661173c217",
+      "upstream_sha256": "172997d73b5332b7bdb24fbea99463b3eeec0deebef340eefca84e661173c217",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/setup/fixtures/reset-plan-example.json",
+      "current_sha256": "7cb34291fcc1ebc26a238c9271930f6437ca7bd64ae34289476d68ec1f6e5b9a",
+      "upstream_sha256": "7cb34291fcc1ebc26a238c9271930f6437ca7bd64ae34289476d68ec1f6e5b9a",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/setup/fixtures/reset-plan-product.json",
+      "current_sha256": "7c24a8315ceb8fa6ff9d119370989f30cdad6d9390610ab67a607a99729cc5d8",
+      "upstream_sha256": "7c24a8315ceb8fa6ff9d119370989f30cdad6d9390610ab67a607a99729cc5d8",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/setup/tests/it/reset.rs",
+      "current_sha256": "7ba7e5b04ec1851f1a62500610d7aa1409cace98a38fccb35e34a5a6c14254f2",
+      "upstream_sha256": "7ba7e5b04ec1851f1a62500610d7aa1409cace98a38fccb35e34a5a6c14254f2",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/update/src/install.rs",
+      "current_sha256": "e787eb48d239e0dc12b1a9ac39da7d839015bf1e0002e25343453f95c5952009",
+      "upstream_sha256": "e787eb48d239e0dc12b1a9ac39da7d839015bf1e0002e25343453f95c5952009",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/answer_gaps.rs",
+      "current_sha256": "2ba43490baa6d9d2c45a48e319a8f6fc75a44c2052ee461a9f719bf9a21490f6",
+      "upstream_sha256": "2ba43490baa6d9d2c45a48e319a8f6fc75a44c2052ee461a9f719bf9a21490f6",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/lib.rs",
+      "current_sha256": "750058165d44965d5b68b911057537f83d80036e5f74e5f5a74d1db81376b560",
+      "upstream_sha256": "750058165d44965d5b68b911057537f83d80036e5f74e5f5a74d1db81376b560",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/main.rs",
+      "current_sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+      "upstream_sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/answer_gaps.rs",
+      "current_sha256": "d2fbf54b01f045500dad4c53888245d09840758ba9b659f93539e2c021fb1c20",
+      "upstream_sha256": "d2fbf54b01f045500dad4c53888245d09840758ba9b659f93539e2c021fb1c20",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/main.rs",
+      "current_sha256": "e6b90fc49f9a73ed9d62fd9e4a80d8a815874da8af5d20364949e44fe4decd95",
+      "upstream_sha256": "e6b90fc49f9a73ed9d62fd9e4a80d8a815874da8af5d20364949e44fe4decd95",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "current_sha256": "4809a08001eaf29ad69735ccaa44a2dc13d395931a81dc4da538996b78c35669",
+      "upstream_sha256": "c2aa12ba91e0a97c8c0cf31924fde47db0e163726db4afd0865af2da8657a1e8",
+      "music_overlap": true,
+      "exact_upstream": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/endpoint.rs",
+      "current_sha256": "596c488bd86e880714d45bd979dfd8cd4262dcc23c2b9e093ed2354bb8264246",
+      "upstream_sha256": "596c488bd86e880714d45bd979dfd8cd4262dcc23c2b9e093ed2354bb8264246",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+      "current_sha256": "56c0ac911e27725431579877caf4df125f52468dee45af0abe52e868f9dc652c",
+      "upstream_sha256": "56c0ac911e27725431579877caf4df125f52468dee45af0abe52e868f9dc652c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "current_sha256": "82308622a372687eb6ff724e272ada8bbd2a75b30ba3f9f7a69e2eda7b11624c",
+      "upstream_sha256": "82308622a372687eb6ff724e272ada8bbd2a75b30ba3f9f7a69e2eda7b11624c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "current_sha256": "f63e391fa96e8f82f6f25820c5ec1bb32950f402ded19e34e844969b8fc28522",
+      "upstream_sha256": "f63e391fa96e8f82f6f25820c5ec1bb32950f402ded19e34e844969b8fc28522",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "current_sha256": "3227b0054af6876e035a6913be4e398fa6ce71d7f6b5858b7c06ce4c68006e2f",
+      "upstream_sha256": "2abdc2a7ac8073d3689950777329509d395ccb1cf214cd8646886279a0231042",
+      "music_overlap": true,
+      "exact_upstream": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/tools.rs",
+      "current_sha256": "613d7075eb1f633fb80c4157c80bf37d7eb939d9c8c5019267e3c04b64e767be",
+      "upstream_sha256": "cee34ce909ef49e9f4bc5a30dc9f8b02f247b89ee26d28bbd72cb29dc753cc8a",
+      "music_overlap": true,
+      "exact_upstream": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/wire.rs",
+      "current_sha256": "cd56c6d7d5e6c464646d7ec29a957d6378a054c08716cbc32b7e9a67cb3b1442",
+      "upstream_sha256": "cd56c6d7d5e6c464646d7ec29a957d6378a054c08716cbc32b7e9a67cb3b1442",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/endpoint_confirmation.rs",
+      "current_sha256": "5a1c9dd17fb20c4f815f16e683b1f424ca75636c22d0a0d48d9c512591075d7d",
+      "upstream_sha256": "5a1c9dd17fb20c4f815f16e683b1f424ca75636c22d0a0d48d9c512591075d7d",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/deploy/lamp-4ace/lamp-controls.service",
+      "current_sha256": "3701a2d56de18f8d77826ac4f395f8c94846e46ac74686445ff96bcc93248ad1",
+      "upstream_sha256": "3701a2d56de18f8d77826ac4f395f8c94846e46ac74686445ff96bcc93248ad1",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-controls.service",
+      "current_sha256": "a3c18e745684e72fe9ea5e39a297e7e7815f62df26a7f2bdbcbb336e1b6c97f9",
+      "upstream_sha256": "a3c18e745684e72fe9ea5e39a297e7e7815f62df26a7f2bdbcbb336e1b6c97f9",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/controls.md",
+      "current_sha256": "2ddad784674438b8f3aad32f2b52b416457877ce10b29762bd59daa4342e8189",
+      "upstream_sha256": "2ddad784674438b8f3aad32f2b52b416457877ce10b29762bd59daa4342e8189",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/endpoint-pilot.md",
+      "current_sha256": "740c4e77c14c748c0598a6d5fa3c2d55c0070c0b24392f660325238cec2fe53c",
+      "upstream_sha256": "740c4e77c14c748c0598a6d5fa3c2d55c0070c0b24392f660325238cec2fe53c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "current_sha256": "41121ae2fd20cd34820ec02bc339a738bb0d0d3cb2eb4622a52986f8bea6fb71",
+      "upstream_sha256": "41121ae2fd20cd34820ec02bc339a738bb0d0d3cb2eb4622a52986f8bea6fb71",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/keeper.md",
+      "current_sha256": "48c04abc300b3598fcf786967b51cf7a017776dd26c3fa225f88b2dac6a4c093",
+      "upstream_sha256": "48c04abc300b3598fcf786967b51cf7a017776dd26c3fa225f88b2dac6a4c093",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/lamp-runs.md",
+      "current_sha256": "ff2e074cb58e296611eb6458c2bcd245234003b48178a4cb597ee63754fac577",
+      "upstream_sha256": "ff2e074cb58e296611eb6458c2bcd245234003b48178a4cb597ee63754fac577",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/memory-days.md",
+      "current_sha256": "34131c40a37493a494651efe2200c3613524bc7f9b0c38a1e967d5a17a9a4e54",
+      "upstream_sha256": "34131c40a37493a494651efe2200c3613524bc7f9b0c38a1e967d5a17a9a4e54",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/memory.md",
+      "current_sha256": "6bedd65b8b3c323007a77e4833babdc106fd60e5e3c784e317ec545a5b2ee0aa",
+      "upstream_sha256": "6bedd65b8b3c323007a77e4833babdc106fd60e5e3c784e317ec545a5b2ee0aa",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/privacy-switch.md",
+      "current_sha256": "98286f42cff323773dab744361eaad8b1bbe8294f082f8722fba01c342456799",
+      "upstream_sha256": "98286f42cff323773dab744361eaad8b1bbe8294f082f8722fba01c342456799",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/setup.md",
+      "current_sha256": "8d2b9aff6ac7f71acb6cb1630e90982ce21c278a5deb62fd82cdecd87945794b",
+      "upstream_sha256": "8d2b9aff6ac7f71acb6cb1630e90982ce21c278a5deb62fd82cdecd87945794b",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "current_sha256": "9edbeff38983c54a39be398f8557a4c4a6794a2350d17838655f0df169ac23d4",
+      "upstream_sha256": "c57df694d6ac58f676730bd1030bda1baed6c6e366240871c8c5abbcf27b7f4a",
+      "music_overlap": true,
+      "exact_upstream": false
+    },
+    {
+      "path": "lampOS/docs/verification/answer-gaps-20261021/README.md",
+      "current_sha256": "582eab79f6edb12066c2459203030131ebc3652d7029f894d3085210f0f12c2f",
+      "upstream_sha256": "582eab79f6edb12066c2459203030131ebc3652d7029f894d3085210f0f12c2f",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/answer-gaps-20261021/counts.json",
+      "current_sha256": "cdfb702d50b3c7d9f6b34c6b75985663e9e812d1315235523c934606ed25e124",
+      "upstream_sha256": "cdfb702d50b3c7d9f6b34c6b75985663e9e812d1315235523c934606ed25e124",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/answer-gaps-20261021/latency.json",
+      "current_sha256": "8f28106fb004adb1c4463b5019074fe9f9d2f07faa7952d1ff9253aca82fff4b",
+      "upstream_sha256": "8f28106fb004adb1c4463b5019074fe9f9d2f07faa7952d1ff9253aca82fff4b",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/README.md",
+      "current_sha256": "3818c947339af9b2f278a0c7dd0bcb7677e03333d6e9f7e0040b71fca0868120",
+      "upstream_sha256": "3818c947339af9b2f278a0c7dd0bcb7677e03333d6e9f7e0040b71fca0868120",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/after-host-timings.json",
+      "current_sha256": "313b1809647471ecf5ea4621cb8cc00d68bdbf8984820c188f2e2381f3b8099a",
+      "upstream_sha256": "313b1809647471ecf5ea4621cb8cc00d68bdbf8984820c188f2e2381f3b8099a",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/after.txt",
+      "current_sha256": "ff0946c117882a9d40e0f2cc43dce44b0a21f2f888ae9b42733d5d2c5f046754",
+      "upstream_sha256": "ff0946c117882a9d40e0f2cc43dce44b0a21f2f888ae9b42733d5d2c5f046754",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/arm64-before-5220.json",
+      "current_sha256": "75d67b25a89a9b555b749ca76df089d955c850e00944d7f7c1b366a869c78cf3",
+      "upstream_sha256": "75d67b25a89a9b555b749ca76df089d955c850e00944d7f7c1b366a869c78cf3",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/before-host-timings.json",
+      "current_sha256": "362aec6d5b410015e8d21f95bd298c9117118de9655a55956f0379bf6eeb59fd",
+      "upstream_sha256": "362aec6d5b410015e8d21f95bd298c9117118de9655a55956f0379bf6eeb59fd",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/before.txt",
+      "current_sha256": "4c5081a89bbde5fe23571962f9d2df0ff924d81cfc9ccb0dc9a45ac3bd782804",
+      "upstream_sha256": "4c5081a89bbde5fe23571962f9d2df0ff924d81cfc9ccb0dc9a45ac3bd782804",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/commands.json",
+      "current_sha256": "480c89c30f857cebb51892718d05a30e293fd8516fbe01e66b2255f0680fb4c9",
+      "upstream_sha256": "480c89c30f857cebb51892718d05a30e293fd8516fbe01e66b2255f0680fb4c9",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/control-expectation-note.txt",
+      "current_sha256": "f6b0423fe9be0c723de83fff2e33fee8633803309bab43f2f140cbf6c93f77cd",
+      "upstream_sha256": "f6b0423fe9be0c723de83fff2e33fee8633803309bab43f2f140cbf6c93f77cd",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/environment.json",
+      "current_sha256": "8944b1fe519ef2d19d6d3147e880a579c285e930ea2305367b03ecf058bc8dfe",
+      "upstream_sha256": "8944b1fe519ef2d19d6d3147e880a579c285e930ea2305367b03ecf058bc8dfe",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/local-gate.txt",
+      "current_sha256": "8c6d62dc52339b44ce4e8ee4aba9d2648aa6d436cc9f6330a764348101c50457",
+      "upstream_sha256": "8c6d62dc52339b44ce4e8ee4aba9d2648aa6d436cc9f6330a764348101c50457",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutant-early-release.patch",
+      "current_sha256": "e5930498032c8155fc50fea98e1686e754d8d1a1d129ce5d2b2781cd4164bc9b",
+      "upstream_sha256": "e5930498032c8155fc50fea98e1686e754d8d1a1d129ce5d2b2781cd4164bc9b",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutant-leaked-release.patch",
+      "current_sha256": "f29cfabebf0c1b6cacbe4f2d7bb84df056abf23b5fcd37b1c477d398f0099476",
+      "upstream_sha256": "f29cfabebf0c1b6cacbe4f2d7bb84df056abf23b5fcd37b1c477d398f0099476",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutant-no-set-aside.patch",
+      "current_sha256": "2043ebab3b47f9e35acd9cdcac36eb896a1121da062ad4a13f75b14ac04b3f6b",
+      "upstream_sha256": "2043ebab3b47f9e35acd9cdcac36eb896a1121da062ad4a13f75b14ac04b3f6b",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutant-unlinked-journal.patch",
+      "current_sha256": "b5fa0a1a3324b5021f561e699a05fc5f3bd203002991d49bd6b07bdc7dcfeaf3",
+      "upstream_sha256": "b5fa0a1a3324b5021f561e699a05fc5f3bd203002991d49bd6b07bdc7dcfeaf3",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutant-unwind-before-release.patch",
+      "current_sha256": "076db90c27013b89950436645b2d69f686f30c4ec834427de23e242bfd54447c",
+      "upstream_sha256": "076db90c27013b89950436645b2d69f686f30c4ec834427de23e242bfd54447c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/mutation-controls.txt",
+      "current_sha256": "321249ca3d6c653080bda2ea3580831cd4a7becd495bb2f009fbfd0212862d24",
+      "upstream_sha256": "321249ca3d6c653080bda2ea3580831cd4a7becd495bb2f009fbfd0212862d24",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/memory-completion-20261022/source-sha256.json",
+      "current_sha256": "0d1218a3bbcc119804e4e47f2f072fe74d774ca793ff988375e1edc26ec6bb5e",
+      "upstream_sha256": "0d1218a3bbcc119804e4e47f2f072fe74d774ca793ff988375e1edc26ec6bb5e",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/verification/slow-second-piece-20261021/README.md",
+      "current_sha256": "566e742e1c8beb2f7a9b543a15fb46f4795090f5204dde44bf631f252a871d7c",
+      "upstream_sha256": "566e742e1c8beb2f7a9b543a15fb46f4795090f5204dde44bf631f252a871d7c",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/docs/voice-eval.md",
+      "current_sha256": "fc997a6203a710668cbf3d1e157f390ed53ec0384587eb56d91c2341329acbe9",
+      "upstream_sha256": "fc997a6203a710668cbf3d1e157f390ed53ec0384587eb56d91c2341329acbe9",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/tools/played/README.md",
+      "current_sha256": "ee73b445d84140dbb9608dab21a6a264e4d0bc621b16278f60dffce492063405",
+      "upstream_sha256": "ee73b445d84140dbb9608dab21a6a264e4d0bc621b16278f60dffce492063405",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/tools/played/make-skill-test.sh",
+      "current_sha256": "c805628ab26c6cc3d48ccfc46dd942927cb6485f26ede7b89fcd4724947ffd8d",
+      "upstream_sha256": "c805628ab26c6cc3d48ccfc46dd942927cb6485f26ede7b89fcd4724947ffd8d",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/tools/played/make-skill.sh",
+      "current_sha256": "f9dce6ba63041fdc33c6aa64bb383c67a6f3fc1a6a2f790911640df22d15a28e",
+      "upstream_sha256": "f9dce6ba63041fdc33c6aa64bb383c67a6f3fc1a6a2f790911640df22d15a28e",
+      "music_overlap": false,
+      "exact_upstream": true
+    },
+    {
+      "path": "lampOS/tools/played/stand-in.sh",
+      "current_sha256": "a62b91e7f4f28201c9d7d8c08c9f6a668217d23b3a869d25365c0345ffa3cfc0",
+      "upstream_sha256": "a62b91e7f4f28201c9d7d8c08c9f6a668217d23b3a869d25365c0345ffa3cfc0",
+      "music_overlap": false,
+      "exact_upstream": true
+    }
+  ],
+  "unchanged_reviewed_shape_files": [
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "sha256": "354b8516acfc378d9b55f9e229336f07686ebef16a937bc13bad9b752ff9d3b8"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "sha256": "1aa28156dfd954dc28af288f0cca5480bbc4d5d00f1f63809e89a729124380c5"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "sha256": "8eb8ae09fef1b05eb9f9000eebf188283346f5c880028d842e63a195cac17ae4"
+    }
+  ],
+  "historical_proofs_unchanged": 34,
+  "validation": {
+    "scoped_rustfmt": "Rust1.96.0 --edition2024 --config skip_children=true --check second_provider/tests.rs: exit0",
+    "git_diff_check": "exit0",
+    "cargo": "not run",
+    "runtime": "not measured"
+  },
+  "retained_unchanged_crate_gates": {
+    "msgs": {
+      "old_tree": "5e5a9f8927aa5b157445e11d0f73d0341929c68f",
+      "new_tree": "5e5a9f8927aa5b157445e11d0f73d0341929c68f",
+      "unchanged": true,
+      "prior_passed": 167,
+      "prior_failed": 0,
+      "prior_ignored": 0,
+      "prior_filtered": 0
+    },
+    "actions": {
+      "old_tree": "8b535604d828a26b8b7e9fd9be2e31937118ff7b",
+      "new_tree": "8b535604d828a26b8b7e9fd9be2e31937118ff7b",
+      "unchanged": true,
+      "prior_passed": 120,
+      "prior_failed": 0,
+      "prior_ignored": 0,
+      "prior_filtered": 0
+    },
+    "skills": {
+      "old_tree": "8f065376ae87c4cf03316cf05f7b1870eec28477",
+      "new_tree": "8f065376ae87c4cf03316cf05f7b1870eec28477",
+      "unchanged": true,
+      "prior_passed": 452,
+      "prior_failed": 0,
+      "prior_ignored": 0,
+      "prior_filtered": 0
+    }
+  },
+  "current_gate_scope": {
+    "fmt": "workspace formatting",
+    "clippy": [
+      "lamp-msgs",
+      "lamp-actions",
+      "lamp-skills",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "tests": [
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "reason": "Only Voice and Voice-eval changed since the successful five-crate gate; Msgs, Actions and Skills trees remain byte-identical."
+  }
+}

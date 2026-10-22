@@ -1,3 +1,25 @@
+## Current checkpoint: 2026-10-22 07:55 +07, Music second rebase pushed
+
+**Music #1757:** `bd1d79a5ad1c4ce1fcd4f6674702265cc879b8b0` is pushed on
+`fc800db6f` with an exact lease over `6208a602b`. Fmt and strict Clippy for
+all five touched crates passed. Fresh Voice/Voice-eval tests are
+**4067 passed / 0 failed / 14 ignored / 0 filtered out**. The three other
+crate trees are byte-identical to the prior passing gate. [Full range-diff,
+source audit and gate](verification/requested-audio-rebase-fc800-20261022/README.md)
+are published. Ready for lamp-voice: **no**, fresh native gates pending.
+First merges once qualified.
+
+**#2764:** ready at `99d920738`; Reviewer-two's read is underway.
+**#2767:** `19d1a46d9` passed Linux Clippy **39701589363**, with ARM64
+**39701589308** running. Earlier complete counts and receipts remain below.
+The already authorized second-P8 follow-up applies cleanly to the current
+Music candidate; it advances only after #1757 merges, with fresh Skills
+gates and PR CI. No device action.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 07:49 +07, installer pushed as #2767; Music rebase in its gate
 
 **Exit-note installer #2767:** pushed `19d1a46d952d8301871a69caf48c04d5c21c0bfa`

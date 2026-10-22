@@ -1,0 +1,15 @@
+1:  6208a602b ! 1:  bd1d79a5a lampOS: add requested local music with bounded speaker authority
+    @@ lampOS/crates/voice/src/second_provider/tests.rs: struct Script {
+          /// A chat stream that, after its script, never ends.
+          hold_chat: bool,
+          /// A chat's first event waits this long (on the test's clock).
+    -     first_event_after: Option<Duration>,
+    -     /// Speech of this sentence starts late.
+    -     slow: Option<&'static str>,
+    +@@ lampOS/crates/voice/src/second_provider/tests.rs: struct Script {
+    +     speech_hold: Mutex<Option<(&'static str, tokio::sync::oneshot::Receiver<()>)>>,
+    +     /// Each sentence whose speech packet is ready, before it is yielded.
+    +     speech_ready: Option<mpsc::UnboundedSender<String>>,
+     +    /// An empty successful stream, as speech skipped after bounded retries.
+     +    skipped: Option<&'static str>,
+          /// Speech of this sentence never ends.
