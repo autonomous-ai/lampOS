@@ -1,0 +1,66 @@
+{
+  "head": "9694ec6333fc3e7461093a1a6723f0f2bd8b8960",
+  "source_files": 51,
+  "source_unchanged": true,
+  "python": "Python 3.14.7",
+  "commands": [
+    {
+      "command": [
+        "bash",
+        "-n",
+        "scripts/release/upload-lamp-os.sh"
+      ],
+      "started_at": "2026-10-22T18:10:20.362411+00:00",
+      "seconds": 0.006,
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_bytes": 0,
+      "summary": []
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "scripts.release.tests.test_lamp_os_package",
+        "scripts.release.tests.test_upload_lamp_os",
+        "-q"
+      ],
+      "started_at": "2026-10-22T18:10:20.368575+00:00",
+      "seconds": 10.957,
+      "exit": 0,
+      "log_sha256": "08f38e56e56a3c5ae5081c599d2d06b8c714cb8ad73c43584aa8a665951ff1ba",
+      "log_bytes": 193,
+      "summary": [
+        "Fetching notice provider-unavailable.en-US.wav",
+        "Fetching notice provider-unavailable.en-US.wav",
+        "----------------------------------------------------------------------",
+        "Ran 41 tests in 10.780s",
+        "",
+        "OK"
+      ]
+    }
+  ],
+  "notice_inventory": {
+    "lamp_voice_base": "28f796223aeabedb39756e5bdb7e76c3d223a8c9",
+    "names": [
+      "manifest.json",
+      "provider-unavailable.en-US.wav",
+      "back-online.en-US.wav",
+      "voice-service-unreachable.en-US.wav",
+      "wifi-lost.en-US.wav"
+    ],
+    "sizes": [
+      1674,
+      180294,
+      55086,
+      190290,
+      234804
+    ],
+    "count": 5,
+    "unit_directory": "/opt/lampOS/voice/notices",
+    "archive_directory": "runtime/voice/notices",
+    "pins_match": true
+  },
+  "limits": "Focused synthetic package/upload tests and source inventory read only; no network asset fetch, ARM64 build, publication, real key, install or played run."
+}

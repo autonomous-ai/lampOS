@@ -1,0 +1,362 @@
+{
+  "head": "9694ec6333fc3e7461093a1a6723f0f2bd8b8960",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "fc356f8b15b655c3d637425e2423691d422d3ba2",
+      "sha256": "5d9413a003aedb606556d344fba846f930804e5a9d5296fd472e8478bf496dfe",
+      "bytes": 18121,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "CLAUDE.md",
+      "git_blob": "9d24b2903bd7bd5c4187a81b64067a80ed84b4fe",
+      "sha256": "0d9ed0e1d48f9f4b04540427bd2be4c2ba708e92558afbf0062a1f5826211914",
+      "bytes": 18290,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/.dockerignore",
+      "git_blob": "7b829f89fc83aaea395299d247d90755e5348dcf",
+      "sha256": "e9679f3017e25bea2c876ee733927bf3f06d0cb3cc7a9b74c0be9a91e4e153ad",
+      "bytes": 31,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/build-aec-wheel.sh",
+      "git_blob": "298797a515ede858552260716831ba6a78feb76f",
+      "sha256": "74379e6609132b0e5849b53907b3072fa7a0780cf2eb85d79b155b2c59802b59",
+      "bytes": 2775,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/build-webrtcvad-wheel.sh",
+      "git_blob": "ec2a8d60d2444d680e4ad3a1bbad019e24e305f6",
+      "sha256": "d8a0e7e2cf8cc602be73035100575c9714cd16168cf1b24d385686bd761b23d4",
+      "bytes": 2774,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/fetch_lamp_os_assets.py",
+      "git_blob": "94987e4f545c639f6d2072d87a693b46e9c6a6e7",
+      "sha256": "3db03fbcf415bcb086f1bb4ce22b6bc7ebe5a3bce54960a139ea8fb6f81e8929",
+      "bytes": 2950,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-adapter/.gitignore",
+      "git_blob": "2f7896d1d1365eafb0da03d9fe456fac81408487",
+      "sha256": "b53ee26e6ff1da219b0563333a76d2c9ec19eec713d6ee54e11a1edacb0e9f3d",
+      "bytes": 8,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-adapter/Cargo.lock",
+      "git_blob": "44d92a156aeaad6a2f8344bdbe8351c52deb556a",
+      "sha256": "c64dae6c4f6d11edf1fe51c1066bdb4c70ad88b51bc24164f1699bb157026793",
+      "bytes": 2871,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-adapter/Cargo.toml",
+      "git_blob": "75f5dad8b05cc23e0a19a0cfbcf6b56495e861e7",
+      "sha256": "527ad727143cc91d9e3a2f539128f8fa5a77d4bac261711bd807a675d66c39ad",
+      "bytes": 165,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-adapter/src/main.rs",
+      "git_blob": "57d291bde92a3e6cc362053ad7140b566c50d544",
+      "sha256": "cf3f4712428be13a77cdd92b6ad1ba721e9f8cd7989a8fac7da47016e101362e",
+      "bytes": 40238,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-adapter/tests/prepare.rs",
+      "git_blob": "f535a6aed554c7df43b1da9933ce851b074f1250",
+      "sha256": "d33d4b66a0fa262c14a7a40f64300dac4882ac69d25b573c31fa4a5685d4e531",
+      "bytes": 3502,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-build-container.sh",
+      "git_blob": "31f545d49ad9d2e25004f676699a5db970af03d2",
+      "sha256": "9c7ab594d3e7c73ef633248d46e2c6fcf78424af9907d492f39d5ad6b44d7b12",
+      "bytes": 1347,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp-os-builder.Dockerfile",
+      "git_blob": "b08e6deea8173fb8c31cf02ce83916b3ce4f6287",
+      "sha256": "8b0ff2c821eef183b8f6b3ca8e85ad594284699f2df78c5df765e27d851fcfe6",
+      "bytes": 228,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/lamp_os_package.py",
+      "git_blob": "65b3b47dcc3548d0cdad0f7f94fbd5690cf33fa1",
+      "sha256": "eba4bb7a307cc336244d7c0684fb8f0ec3ed51086298d5277fe6cdae8fc48714",
+      "bytes": 26237,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/ota-config.sh",
+      "git_blob": "fbf389766fe378317fffe1dcca3f123b31a697a0",
+      "sha256": "80f2fc27b795df46d9059ec3f6dc68a9250575021d097bc47b9f54893cc955fd",
+      "bytes": 276,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/ota-metadata.sh",
+      "git_blob": "4f761144446de70642cf0c06118aad446a85dd4b",
+      "sha256": "c2ffa52338b335a3929b88fc50ec76566e73c9353d38c50eefe0909278423326",
+      "bytes": 4812,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/promote-ota.sh",
+      "git_blob": "085f50b6fb0555f91be6d2c45dd915b2c3cd5f25",
+      "sha256": "957870828ae9cc2252b6b5af335c264ce4a444ecf45748cdf4369625cec639e6",
+      "bytes": 5371,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tag-release.sh",
+      "git_blob": "393928809a249e02b300f99ee150e20969a82332",
+      "sha256": "8a77d8b434a65cc4999a2450676a34c442527574d739fe1f64b95fc22013851c",
+      "bytes": 1416,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_fetch_lamp_os_assets.py",
+      "git_blob": "49d56c4227a03a90fd468afc64d4f3481d347cf7",
+      "sha256": "08ecaec60605293205646d31eadc9351f6b64606a251e5a89352bb740b03d643",
+      "bytes": 1910,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_lamp_os_package.py",
+      "git_blob": "dd89b509594f6b93ee092a0e1d0b44e02ce90249",
+      "sha256": "3ff3413cc60a11de48469d093c3fbd8ed5939e1e36491d6a8e02d6cd068dd6b9",
+      "bytes": 27570,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/tests/test_promote_service.py",
+      "git_blob": "795cd7c5a0321cb27a442e9a115efe68ad7e1821",
+      "sha256": "347c334616693df1504a7975a8a7b3c8fbd5c6aebdb0700bff6cf7d342e194e0",
+      "bytes": 3384,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_service_metadata_trust.py",
+      "git_blob": "b83edfb38d2f0d62b08b83ab037e7cdf9c8969ec",
+      "sha256": "55701ce5cc6235d7806472e3f9e71a9fbfae198b37c3fda506a64c8ec32e1134",
+      "bytes": 8633,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_upload_autonomous_buddy.py",
+      "git_blob": "e142f45b2e7137814f923f5af6ed64af1f546543",
+      "sha256": "f51c85a59f4489d0e58c62dfa9a69d3b63598757a7184807037fd5b70de0f028",
+      "bytes": 13648,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_upload_hal_archive.py",
+      "git_blob": "ea2f0f5890a0cce44dca3e729684ce7ecde4d376",
+      "sha256": "8dba868d0dc0cc314ec892ef7e9c08494eec228110a8d48ec9b9a1fd639ba86c",
+      "bytes": 1436,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/tests/test_upload_lamp_os.py",
+      "git_blob": "971cfe48fdb710d4460dcd782b34fe1c1fe917ca",
+      "sha256": "5ee1b1c4418201c805d91d1491035c02bc84e0af4ed926efb9d20f40de6456f2",
+      "bytes": 7213,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/tests/test_upload_service.py",
+      "git_blob": "828d929e8543524dfcef0eeb2fe0a641b64e8cd3",
+      "sha256": "14cb7e0e55cee8af4c0623f148ccd7aefce4b3bb8c59986f903c853913b8b083",
+      "bytes": 5628,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-aec-wheel.sh",
+      "git_blob": "1c2cb6bcc612d1f55a9b4266cb3ee612780f7150",
+      "sha256": "48a11de0361524b4b26bc7be182d3b3160171be2c5746e32bacf45c41052c35a",
+      "bytes": 2478,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-autonomous-buddy.sh",
+      "git_blob": "58439d3df9d857e1f664ddfc9d5444687e1d5e4f",
+      "sha256": "2c938c73f1b347b586bb1d39e3e920e12b0653fd4e8357500643191777523229",
+      "bytes": 5962,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-autonomous-chat.sh",
+      "git_blob": "75ea6a2e4462635e605a99832197350104d53685",
+      "sha256": "749f38734aecde0c06cbe2e53108ad3e018356f3968ef7bb1c416109cce7382d",
+      "bytes": 2767,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-bootstrap.sh",
+      "git_blob": "3b4c38cb24cd946a74f4aafec783ae48dbf761a7",
+      "sha256": "eab5183ca3cabf634316e170ccb3c20c5ea369c2a9cacbe77f3c37c7d5bbb9f3",
+      "bytes": 2862,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-cad.sh",
+      "git_blob": "f92cff2dd6cad833c42add4ec8b1fc151a24add9",
+      "sha256": "d530079aad4d490f9e81ca52f109ee0abca974c8c8307e312477d8940e6108ad",
+      "bytes": 1485,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-claude-desktop-buddy.sh",
+      "git_blob": "e6ca8ab0fc2c8533a66ebf41ac941c92675ca5ea",
+      "sha256": "69d41288af463b0081468b34c3f7d640c463099f32320956c68fe69c5407e752",
+      "bytes": 2867,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-claudecode.sh",
+      "git_blob": "7c984923fcbf502bf1587d940d5216190204fe4d",
+      "sha256": "460c79ea2c79cf3c4cf52f905e1ac415932f859ed8faf3114744a31509378796",
+      "bytes": 1753,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-codex.sh",
+      "git_blob": "07d2c8da8492bc4b003b1a5141ae74bd1e192063",
+      "sha256": "da312d8e78aef595db92271a6a4619fe49a18c7ddeec18c3fdb9ce4a0020a79f",
+      "bytes": 1738,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-device.sh",
+      "git_blob": "287bc1d9412fabe4b41123517522de54e349e916",
+      "sha256": "eb81b1ee7dfd5eeafffe4d00bebfc9c22924453ee2ce783dea646162136ee582",
+      "bytes": 3976,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-hal.sh",
+      "git_blob": "461a7143bdfccc6c54904bc21fe8260aaaf6c2ee",
+      "sha256": "f9e06707b0a64e69351d76256dcdc04d8d117cd7ff0c98a1d02e725fb0fdf411",
+      "bytes": 2835,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-hermes.sh",
+      "git_blob": "91a7ba5e91626d3524f610def91de965723f792e",
+      "sha256": "4b78328fefb4ec2e6d6283358e3769514b698c942f2a8d658612e57dcb0e1afd",
+      "bytes": 2559,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-hooks.sh",
+      "git_blob": "bbed4ce2522f79b6a8d7072434fdfbc79a4b2c2b",
+      "sha256": "2cd174299683f74a1a13a726389f5aab96c124e5bfba313d48d7471d90a0211d",
+      "bytes": 909,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-lamp-os.sh",
+      "git_blob": "6425e57fb978f5e31a9f20b1d18678b2f1598082",
+      "sha256": "44bf84ba26e8e713de9e9bc9514ce3c97aa643061a486e416fae75b0762c05c4",
+      "bytes": 4046,
+      "source": "public GitHub blob API"
+    },
+    {
+      "path": "scripts/release/upload-openclaw.sh",
+      "git_blob": "d202ef9ef15d5932b1180f30934d49c7f6b43ca1",
+      "sha256": "baf0a7b4def04dff7faa592b360e0c547fbd35289d9a3a7e165ba993074f4a06",
+      "bytes": 1356,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-opencode.sh",
+      "git_blob": "f191ec796c359ad79d53cf7232eb52f92e73b22e",
+      "sha256": "72c3694b80a97b5b5a45089be6681943f4f784cd735264d5a9450e995e0e3147",
+      "bytes": 1721,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-os-server.sh",
+      "git_blob": "73ba9d4b30363d04b09b26566e9dbc07ee7f2e5c",
+      "sha256": "6914a9430e669f81425eef0d01fa7d2b08b09ce43d244f59c7354a6a7a858ded",
+      "bytes": 2803,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-picoclaw.sh",
+      "git_blob": "69adfb93a421351a2dc3da9255874617ca2c6996",
+      "sha256": "ccae42fc4773804da7bc0038133b1c7254c51b352997a7d80c98b932129ec1be",
+      "bytes": 1904,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-service.sh",
+      "git_blob": "19742429c76e1a5ff3e602474c41031031fec6fe",
+      "sha256": "6bc3e74adb5fc1d8b5c088f6ee216c19313f4f73fd7fe9348c550a5fa82f5d9c",
+      "bytes": 4792,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-setup-ap.sh",
+      "git_blob": "77f9388d6655a73817a49cb8537b6760e8cea623",
+      "sha256": "f31b4d0418d619307047f2d0052d3fe37ff6af2433d76f1ccebc6ee11dd21286",
+      "bytes": 545,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-setup-remote-hermes.sh",
+      "git_blob": "ea7e4b239f4e184b4159db96fd69ebb7c7979760",
+      "sha256": "50ed240e28c0cae0c12fa50750d4fafb216ceaf23e010e5c54febe2e324f21ed",
+      "bytes": 910,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-setup.sh",
+      "git_blob": "d236001eed9600e9521045d1e0f61c1603ca7040",
+      "sha256": "d5d61805c7f9dfa876a840b964ad5f4b2219ee08f9cbfa2fc87c8c40db097344",
+      "bytes": 2257,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-skills.sh",
+      "git_blob": "6c635b2941d38eea62b806a6b4df262d17e6ea35",
+      "sha256": "6b327600c7a7b4a61dd8e951e84981faba44df4ced6c762e9606ab321baf27ee",
+      "bytes": 4558,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-twitch-irc.sh",
+      "git_blob": "656244b899a09cd14b4fd4c18f38eab0ffdb2ce9",
+      "sha256": "fa2061c192882f7e19c03c780547ed881aecc5ec633483dad73581e5e50e19cb",
+      "bytes": 2684,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-web.sh",
+      "git_blob": "5556a80672663d554285dcbad08f31bee24daeb9",
+      "sha256": "b1c6aca3faad6c7d9ab774e6e43c1a36ed57661de0391b9ac8ef1e2fde85cd6e",
+      "bytes": 2777,
+      "source": "existing public-identified blob"
+    },
+    {
+      "path": "scripts/release/upload-webrtcvad-wheel.sh",
+      "git_blob": "a2c95bb08b9205881457a7bd31a8b7b9555b2bd4",
+      "sha256": "36cd012c65ec29dcb36fc4c9447107af1959cbce821ba739c55c17ccb7482b8a",
+      "bytes": 2464,
+      "source": "public GitHub blob API"
+    }
+  ]
+}

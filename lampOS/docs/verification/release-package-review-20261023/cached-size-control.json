@@ -1,0 +1,13 @@
+{
+  "head": "9694ec6333fc3e7461093a1a6723f0f2bd8b8960",
+  "control": "Existing synthetic PackageTest fixture; increment only manifest.json declared bytes, leave cached file and its expected digest unchanged. Run actual --fetch-notices CLI with a rejecting curl stand-in, then package the same fixture.",
+  "name": "manifest.json",
+  "cached_bytes": 20,
+  "declared_bytes": 21,
+  "fetch_exit": 0,
+  "fetch_stdout": "",
+  "fetch_stderr": "",
+  "curl_called": false,
+  "package_error": "notice checksum mismatch: manifest.json",
+  "severity": "P3 cache/preflight validation inconsistency; final packaging still refuses."
+}
