@@ -28,6 +28,8 @@ EOF
 # line's end, heard by the microphone as the lamp's own voice 0.1 s after that (a cut-in). FAKE_CASE=expired: the
 # yield's hearing expires 0.1 s in, and a separate yield at 8.5 s resumes at 9 s. FAKE_CASE=laterstop: the answer
 # finishes at 15 s with no block of its own voice heard; only the stop's answer, at 31.4 s, is heard, from 31.51 s.
+# FAKE_CASE=silent: the cut-in's turn 6 ends no_audio_answer at 9 s with no audio; task news, a written turn 7, is
+# admitted at 25 s, writes at 26 s, is heard from 26.11 s and finishes at 27 s.
 # FAKE_SCENE_FAIL: the scene exits 77; FAKE_NO_SCENE: it exits 0 and writes no scene.
 cat >"$T/scenario.py" <<'EOF'
 #!/usr/bin/env python3
@@ -58,6 +60,12 @@ if case == 'laterstop':
     ev[-2] = {"kind": "duplex_hearing", "at_us": 32_000_000, "first_frame_sequence": 5000, "heard": '3' * 50}
     ev += [{"kind": "turn_finished", "turn": 6, "at_us": 15_000_000, "outcome": "completed"},
            {"kind": "speaker_first_write", "at_us": 31_400_000, "owner": {"turn": 7}}]
+if case == 'silent':
+    ev[-2] = {"kind": "duplex_hearing", "at_us": 26_600_000, "first_frame_sequence": 3000, "heard": '3' * 50}
+    ev += [{"kind": "turn_finished", "turn": 6, "at_us": 9_000_000, "outcome": "no_audio_answer"},
+           {"kind": "input_admitted", "turn": 7, "at_us": 25_000_000, "admission_basis": "lamp_tells_news"},
+           {"kind": "speaker_first_write", "at_us": 26_000_000, "owner": {"turn": 7}},
+           {"kind": "turn_finished", "turn": 7, "at_us": 27_000_000, "outcome": "completed"}]
 if case == 'expired':
     ev += [{"kind": "duplex_yield_end", "started_at_us": yat, "at_us": yat + 100_000, "outcome": "hearing_expired",
             "last_frame_sequence": 1024, "service_sequence": 42},
@@ -72,7 +80,8 @@ elif '-cutin-' in name:
            {"kind": "stop_words", "stop": False, "words": 6, "at_us": yat + 400_000},
            {"kind": "turn_finished", "turn": 5, "at_us": yat + 120_000, "outcome": "user_interrupted"},
            {"kind": "transcript", "at_us": 8_500_000, "role": "input", "text": "Wait, what was the keeper's name?"},
-           {"kind": "speaker_first_write", "at_us": 9_400_000, "owner": {"turn": 6}}]
+           {"kind": "input_admitted", "turn": 6, "at_us": 8_300_000, "prefix_first_host_read_us": 7_000_000}]
+    if case != 'silent': ev.append({"kind": "speaker_first_write", "at_us": 9_400_000, "owner": {"turn": 6}})
 else:
     ev += [{"kind": "duplex_resume", "at_us": yat + 500_000, "frame_sequence": 1064},
            {"kind": "duplex_yield_end", "started_at_us": yat, "at_us": yat + 500_000, "outcome": "resumed",
@@ -152,6 +161,10 @@ FAKE_CASE=laterstop run laterstop 0 \
   'end of words->first answer audio: accepted PCM 1.40 s; acoustic (mic heard own voice) unmeasured' \
   'cutin 25 s: commit (onset->yield 150 ms, ->decision 100 ms, answer accepted 1400 / acoustic - ms)'
 grep -qF '23.51' <<<"$out" && { echo "FAIL laterstop: the stop's answer timed this answer"; fail=1; }
+# A cut-in answered with no audio is unmeasured, not timed by a later written turn's answer.
+FAKE_CASE=silent run silent 0 'answer: turn 6 ended no_audio_answer with no audio; unmeasured' \
+  'cutin 25 s: commit (onset->yield 150 ms, ->decision 100 ms, answer accepted - / acoustic - ms)'
+grep -qF '18.00' <<<"$out" && { echo "FAIL silent: the later task news timed this cut-in's answer"; fail=1; }
 
 # Not duplex: nothing changed. No LAMP_HOST: nothing at all.
 FAKE_TT=v1-baseline run baseline 3 "not on --turn-taking duplex"
