@@ -1236,7 +1236,7 @@ mod tests {
 
         // The caller has acknowledged the previous park. Only this thread
         // observes speaker state or checks the Ticket until it resumes work.
-        fn tick(&self, shared: &Shared, retained: &SpeakerState) {
+        fn resume_next(&self, shared: &Shared, retained: &SpeakerState) {
             let next = self.now() + u64::try_from(MONITOR_EVERY.as_micros()).unwrap();
             shared
                 .speaker
@@ -1246,6 +1246,10 @@ mod tests {
                 .observe(Some(retained.clone()), next);
             self.now_us.store(next, Ordering::Release);
             self.resume();
+        }
+
+        fn tick(&self, shared: &Shared, retained: &SpeakerState) {
+            self.resume_next(shared, retained);
             self.wait_parked();
         }
     }
@@ -1528,41 +1532,96 @@ mod tests {
     fn digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant() {
         for mismatch in [true, false] {
             let home = Home::new();
-            let peer = Peer::new(&home.0, None);
-            let (service, _publisher) = service(&home.0);
-            let mut offered = recording(&home.0);
+            let (steps, time) = WorkerSteps::new(1_000_000);
+            let peer_now = steps.now_us.clone();
+            let peer = Peer::with_clock(&home.0, None, move || peer_now.load(Ordering::Acquire));
+            let mut offered = recording_with_clock(&home.0, || steps.now());
             if mismatch {
                 offered.sha256 = "0".repeat(64);
             }
             peer.deny_renew.store(true, Ordering::Release);
-            let ticket = service.offer(offered).unwrap();
-            assert!(matches!(
+            let mut ticket = fixture(steps.now(), steps.now(), false);
+            Arc::get_mut(&mut ticket.shared).unwrap().offer = offered.clone();
+            let shared = ticket.shared.clone();
+            let busy = Arc::new(Capacity::default());
+            busy.active.store(true, Ordering::Release);
+            let (send, receive) = mpsc::sync_channel(1);
+            send.try_send(shared.clone()).unwrap();
+            drop(send);
+            let (done_send, done) = mpsc::sync_channel(1);
+            let worker = {
+                let socket = peer.path.clone();
+                let running = shared.running.clone();
+                let busy = busy.clone();
+                thread::spawn(move || {
+                    work(receive, &socket, &running, &busy, &time);
+                    done_send.try_send(()).unwrap();
+                })
+            };
+            assert_eq!(
                 peer.next(),
                 RequestedAudioOperation::AudioAuthorize {
+                    offer: offered.clone(),
                     phase: RequestedAudioPhase::Start,
-                    ..
-                }
-            ));
+                },
+                "digest mismatch {mismatch}: expected Start"
+            );
             if !mismatch {
-                assert!(ticket.wait_ready(Duration::from_secs(2)));
-                assert!(ticket.started(lamp_ipc::monotonic_us()));
-                assert!(matches!(
+                // A successful preparation must reach its park before this
+                // thread checks the ticket or refreshes the cache. The real
+                // monitor can legitimately cancel on contention or a missed
+                // deadline; neither is the revoked-renewal case tested here.
+                steps.wait_parked();
+                assert!(shared.ready.load(Ordering::Acquire));
+                assert!(ticket.started(steps.now()));
+                let first_lease = shared.lease_until_us.load(Ordering::Acquire);
+                assert_eq!(first_lease, offered.issued_us + REQUESTED_AUDIO_LEASE_US);
+                let retained = state(steps.now(), 1, 0);
+                let tick_us = u64::try_from(MONITOR_EVERY.as_micros()).unwrap();
+                assert_eq!(RENEW_US % tick_us, 0);
+                for _ in 1..RENEW_US / tick_us {
+                    steps.tick(&shared, &retained);
+                    assert!(ticket.may_play(steps.now()));
+                    assert_eq!(shared.lease_until_us.load(Ordering::Acquire), first_lease);
+                    assert_eq!(peer.operations.try_recv(), Err(mpsc::TryRecvError::Empty));
+                }
+                // A denied renewal exits the loop instead of parking again.
+                // Wait for its exact wire events, not another timer tick.
+                steps.resume_next(&shared, &retained);
+                assert_eq!(steps.now(), offered.issued_us + RENEW_US);
+                assert_eq!(
                     peer.next(),
                     RequestedAudioOperation::AudioAuthorize {
+                        offer: offered.clone(),
                         phase: RequestedAudioPhase::Renew,
-                        ..
-                    }
-                ));
+                    },
+                    "revoked renewal: expected Renew before cancellation"
+                );
             }
-            assert!(matches!(
+            assert_eq!(
                 peer.next(),
                 RequestedAudioOperation::AudioFinish {
+                    offer: offered.clone(),
                     outcome: RequestedAudioOutcome::Cancelled,
-                    ..
-                }
-            ));
-            assert!(!ticket.live(lamp_ipc::monotonic_us()));
-            assert!(ticket.take_ready(lamp_ipc::monotonic_us()).is_none());
+                },
+                "digest mismatch {mismatch}: expected Cancelled finish"
+            );
+            done.recv_timeout(Duration::from_secs(2)).unwrap();
+            worker.join().unwrap();
+            assert!(!busy.active.load(Ordering::Acquire));
+            assert_eq!(shared.terminal.load(Ordering::Acquire), CANCELLED);
+            assert_eq!(peer.operations.try_recv(), Err(mpsc::TryRecvError::Empty));
+            assert_eq!(
+                shared.lease_until_us.load(Ordering::Acquire),
+                offered.issued_us + REQUESTED_AUDIO_LEASE_US
+            );
+            assert!(steps.now() < shared.lease_until_us.load(Ordering::Acquire));
+            assert_eq!(shared.ready.load(Ordering::Acquire), !mismatch);
+            assert_eq!(shared.samples.lock().unwrap().is_some(), !mismatch);
+            assert!(!ticket.live(steps.now()));
+            assert!(!ticket.may_play(steps.now()));
+            assert!(ticket.take_ready(steps.now()).is_none());
+            assert!(!ticket.completed());
         }
     }
 }
