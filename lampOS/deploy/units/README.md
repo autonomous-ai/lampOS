@@ -102,3 +102,12 @@ development machine.
 
 Checked with `systemd-analyze verify` (systemd 252, Debian bookworm) with
 every `@NAME@` filled in: no complaint but the missing binaries.
+
+## A pin takes its unit's flags
+
+A unit that pins a binary by SHA-256 (`/opt/lampOS/<part>/<sha256>/`, in a
+lamp's own folder) must name only flags that binary accepts: one it refuses
+stops the part from starting. Before a pin or a unit's `ExecStart` changes,
+run the pinned binary's `--help` and grep it for every `--flag` in the
+`ExecStart`. A flag added in source waits, left out of the unit, until a
+binary built with it is pinned (lamp-4ace's `--sight-from-look`, #2748).
