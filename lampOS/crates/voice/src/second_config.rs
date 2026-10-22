@@ -175,6 +175,10 @@ impl Key {
     pub fn expose(&self) -> &str {
         &self.0
     }
+    #[cfg(test)]
+    pub(crate) fn for_test(key: &str) -> Self {
+        Self(key.to_owned())
+    }
 }
 impl fmt::Debug for Key {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -233,6 +237,18 @@ pub struct SecondConfig {
     /// `search_url` with `search_credential_file`; `None`: no web search.
     pub search: Option<SearchService>,
     pub hosted: Hosted,
+    /// Which services' addresses the voice unit's environment gave: the
+    /// relay's near addresses never go over them (`LAMP_RELAY_ROUTES`, #2882).
+    pub pinned: Pinned,
+}
+
+/// Which of [`DEEPSEEK_BASE_URL_ENV`], [`SPEECH_BASE_URL_ENV`] and
+/// [`LISTENING_BASE_URL_ENV`] were given ([`SecondConfig::with_environment`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Pinned {
+    pub chat: bool,
+    pub speech: bool,
+    pub listening: bool,
 }
 
 /// Google's Gemini API as `second.json` sets it, the defaults applied.
@@ -463,6 +479,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         tts_model: given(raw.tts_model).map(gemini_model).transpose()?,
         llm_extra,
         gemini,
+        pinned: Pinned::default(),
     };
     Ok((config, line))
 }
@@ -691,15 +708,18 @@ impl SecondConfig {
         if let Some(url) = given(DEEPSEEK_BASE_URL_ENV)? {
             self.hosted.deepseek_base_url =
                 Some(checked_url(url).map_err(named(DEEPSEEK_BASE_URL_ENV))?);
+            self.pinned.chat = true;
         }
         if let Some(url) = given(SPEECH_BASE_URL_ENV)? {
             self.tts_base_url = checked_url(url).map_err(named(SPEECH_BASE_URL_ENV))?;
+            self.pinned.speech = true;
         }
         if let Some(url) = given(LISTENING_BASE_URL_ENV)? {
             let url = checked_url(url).map_err(named(LISTENING_BASE_URL_ENV))?;
             if let Stt::Autonomous { base_url, .. } = &mut self.stt {
                 *base_url = url;
             }
+            self.pinned.listening = true;
         }
         // The chosen voice's model: Gemini's, or the configured voice's
         // (ElevenLabs, OpenAI); only the voice in use reads its own (#1712:
@@ -717,7 +737,9 @@ impl SecondConfig {
     }
 }
 
-fn checked_url(url: String) -> io::Result<String> {
+/// A service URL as the file's are taken: https, a host, no `?`, `#` or `@`,
+/// at most 2048 bytes; the relay's near addresses are checked the same (#2882).
+pub(crate) fn checked_url(url: String) -> io::Result<String> {
     let host = url
         .strip_prefix("https://")
         .map(|rest| rest.split('/').next().unwrap_or(""));
@@ -1048,6 +1070,47 @@ mod tests {
             .with_environment(|name| (name == LISTENING_BASE_URL_ENV).then(|| near.into()))
             .unwrap();
         assert!(matches!(kept.stt, Stt::Deepgram { .. }));
+    }
+
+    /// #2882: each address the unit's environment gives is pinned, so the
+    /// relay's near address never goes over it; unset or empty, none is.
+    #[test]
+    fn the_units_addresses_are_pinned_and_only_those() {
+        let (_, config) = written("pinned-env", "");
+        let route = || load_from_path(&config).unwrap();
+        assert_eq!(route().pinned, Pinned::default());
+        let empty = route().with_environment(|_| Some("".into())).unwrap();
+        assert_eq!(empty.pinned, Pinned::default());
+        for (name, pinned) in [
+            (
+                DEEPSEEK_BASE_URL_ENV,
+                Pinned {
+                    chat: true,
+                    ..Pinned::default()
+                },
+            ),
+            (
+                SPEECH_BASE_URL_ENV,
+                Pinned {
+                    speech: true,
+                    ..Pinned::default()
+                },
+            ),
+            (
+                LISTENING_BASE_URL_ENV,
+                Pinned {
+                    listening: true,
+                    ..Pinned::default()
+                },
+            ),
+        ] {
+            let set = route()
+                .with_environment(|asked| {
+                    (asked == name).then(|| "https://near.example.invalid/ai".into())
+                })
+                .unwrap();
+            assert_eq!(set.pinned, pinned, "{name}");
+        }
     }
 
     /// OpenRouter's pinned DeepSeek snapshot and DeepSeek's own Flash by
