@@ -3417,13 +3417,9 @@ fn perform(
     // keeps itself (#939); or to play the skill's own sound (#938), which
     // it plays at once or refuses at once, with why.
     let asking = calls.iter().find_map(|call| match call {
-        Call::Say(note) => Some((
-            "say",
-            json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
-        )),
-        // Its own words as written, or its note, at its priority and
-        // expiry (#1684): the text goes to the voice as it is in the file.
-        Call::Words(words) => Some(("say", words.ask())),
+        Call::Say(_) | Call::Words(_) => {
+            say_ask(call, sockets.may.permissions.who).map(|ask| ("say", ask))
+        }
         Call::SayFrom(source, _) => {
             // Share the item identity encoding with replay: task news names
             // its task; onboarding names its exact pending invitation.
@@ -4316,6 +4312,25 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
     })
 }
 
+/// The say service's ask for a skill's say: its note, or its own words as
+/// written at its priority and expiry (#1684). A note, never exact words,
+/// from a skill given `who` asks the voice to tell it who is at the lamp
+/// (#2825); any other say never is, so no other skill's words name anyone.
+fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
+    let (mut ask, note) = match call {
+        Call::Say(note) => (
+            json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
+            true,
+        ),
+        Call::Words(words) => (words.ask(), !words.exact),
+        _ => return None,
+    };
+    if who && note {
+        ask["who"] = json!(true);
+    }
+    Some(ask)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4908,6 +4923,38 @@ mod tests {
             pattern: None,
             keep: false,
             until_ends: false,
+        }
+    }
+
+    /// #2825: only a skill given `who` has its note told who is at the
+    /// lamp; another skill's note, and exact words, never are.
+    #[test]
+    fn only_a_skill_given_who_has_its_note_told_who_is_at_the_lamp() {
+        let note = Call::Say("Greet them.".into());
+        let words = |exact| {
+            Call::Words(lamp_skills::Words {
+                words: "Hello.".into(),
+                exact,
+                priority: 8,
+                expires_ms: 60_000,
+            })
+        };
+        assert_eq!(say_ask(&note, true).unwrap()["who"], true);
+        assert_eq!(say_ask(&words(false), true).unwrap()["who"], true);
+        for (call, who) in [(&note, false), (&words(false), false), (&words(true), true)] {
+            let ask = say_ask(call, who).unwrap();
+            assert!(ask.get("who").is_none(), "{ask}");
+        }
+        assert!(say_ask(&Call::Cue, true).is_none());
+        // The skills that must never name anyone are not given it.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        for (skill, given) in [
+            ("welcome-back", true),
+            ("guard-mode", false),
+            ("who-was-here", false),
+        ] {
+            let text = std::fs::read_to_string(root.join(skill).join("skill.toml")).unwrap();
+            assert_eq!(text.contains("\nwho = true"), given, "{skill}");
         }
     }
 

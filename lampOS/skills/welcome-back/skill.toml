@@ -11,6 +11,9 @@ topics = ["humans/faces/tracked", "voice/state"]
 speak = true
 light = true
 body = true
+# Its note is told who is at the lamp: a known face's name, one beat warmer
+# for someone who comes by often (#2825). No other skill has it.
+who = true
 
 [[trigger]]
 topic = "humans/faces/tracked"

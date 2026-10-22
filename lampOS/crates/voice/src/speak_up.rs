@@ -236,6 +236,7 @@ mod tests {
             "when = \"appears\"",
             "absent_for = \"5m\"",
             "cooldown = \"20m\"",
+            "who = true",
             "policy = \"hello\"",
             "say = ",
         ] {

@@ -56,7 +56,7 @@ All in `lamp-voice.service` in this folder unless said otherwise; install a chan
 | How loud counts as speech | `--faint-floor-db N` (-47 to -20) | -28 (was -40) |
 | Let that level follow the room | `Environment=LAMP_FAINT_FLOOR_MAX_DB=N`: the level then moves between `--faint-floor-db` and N with the talk that is not for the lamp. Without it the level is fixed, and the record's `room_floor` rows still say where the room alone would put it | off (watching) |
 | Web search | `"search": true` in `/etc/lampOS/voice/provider.json` (`~/lamp-voice-data/tools/set_provider.sh search false` turns it off) | on |
-| Say hello to someone who sits down | the Welcome back skill (`lamp-skills.service`); the voice's own hello and `LAMP_SPEAK_FIRST` were removed (#2825) | Welcome back since 16 Oct 10:15 (#967) |
+| Say hello to someone who sits down | the Welcome back skill (`lamp-skills.service`); the voice's own hello and `LAMP_SPEAK_FIRST` were removed (#2825). `lamp-policy.service` keeps `--hello --act hello`: nothing publishes `voice/arrival` any more, but `--gate`, which answers Welcome back's ask, needs both | Welcome back since 16 Oct 10:15 (#967) |
 | Take a look when asked ("Let me look") | `Environment=LAMP_EYES_LOOK_FILE=...` here, `--sight-file` in `lamp-eyes.service`, and the "You can see, when you look" line in the character (`lampOS/deploy/character/lamp.txt`) | on since 2026-10-15 |
 | Keep the conversation across a restart | `Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json` | on |
 | Tell each new Gemini session that nobody is talking to the lamp | `Environment=LAMP_SESSION_FACT=on` (the journal then says "told the new session" each time) | on since 17:29 on 2026-10-13; unmeasured |
