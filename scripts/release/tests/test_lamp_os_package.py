@@ -358,6 +358,93 @@ class PackageTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'ARM64'):
             self.build()
 
+    def write_notices(self, names=('manifest.json', 'provider-unavailable.en-US.wav')):
+        models = {'models': [{'path': '/opt/lampOS/voice/current/smart-turn-v3.2-gpu.onnx',
+                              'url': pkg.NOTICES_RELEASES + 'models/smart-turn.onnx', 'bytes': 1, 'sha256': '0' * 64}]}
+        (self.assets / 'notices').mkdir(exist_ok=True)
+        for name in names:
+            data = b'notice ' + name.encode()
+            (self.assets / 'notices' / name).write_bytes(data)
+            models['models'].append({'path': pkg.NOTICES_PATH + name, 'url': pkg.NOTICES_RELEASES + 'notices/' + name,
+                                     'bytes': len(data), 'sha256': pkg.digest(data)})
+        self.write_source(pkg.NOTICES_LIST, json.dumps(models).encode())
+        return models
+
+    def test_generic_carries_the_failure_notices_its_voice_unit_names(self):
+        # lampOS #2943: the generic voice unit names /opt/lampOS/voice/notices, so
+        # a moved lamp says why it can't answer rather than nothing.
+        self.write_generic_units()
+        self.write_source('deploy/units/lamp-voice.service',
+                          b'[Unit]\n[Service]\nExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve '
+                          b'--failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US\n')
+        with self.assertRaisesRegex(ValueError, 'missing packaged path: runtime/voice/notices'):
+            self.build_generic()
+        self.write_notices()
+        manifest = self.build_generic()
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertEqual(archive.read('runtime/voice/notices/manifest.json'), b'notice manifest.json')
+            self.assertEqual(archive.getinfo('runtime/voice/notices/provider-unavailable.en-US.wav').external_attr >> 16 & 0o777, 0o644)
+            self.assertIn('@RELEASE_ROOT@/runtime/voice/notices', archive.read('units/lamp-voice.service').decode())
+        self.assertIn('runtime/voice/notices/manifest.json', manifest['files'])
+        (self.assets / 'notices/manifest.json').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'notice checksum mismatch: manifest.json'):
+            self.build_generic()
+        (self.assets / 'notices/manifest.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'missing or unsafe file: notices/manifest.json'):
+            self.build_generic()
+
+    def test_a_source_from_before_the_notices_packages_none(self):
+        self.build()
+        with zipfile.ZipFile(self.output) as archive:
+            self.assertFalse([name for name in archive.namelist() if '/notices/' in name])
+
+    def test_failure_notice_list_is_checked(self):
+        for field, value in (('path', pkg.NOTICES_PATH + '../escape'), ('url', 'https://example.invalid/x.wav'),
+                             ('bytes', 0), ('sha256', 'not-a-sha')):
+            models = self.write_notices()
+            models['models'][1][field] = value
+            self.write_source(pkg.NOTICES_LIST, json.dumps(models).encode())
+            with self.assertRaisesRegex(ValueError, 'invalid failure notice'):
+                pkg.notices(self.source)
+        models = self.write_notices()
+        models['models'].append(models['models'][1])
+        self.write_source(pkg.NOTICES_LIST, json.dumps(models).encode())
+        with self.assertRaisesRegex(ValueError, 'duplicate failure notice'):
+            pkg.notices(self.source)
+
+    def test_fetch_notices_checks_each_download_and_keeps_a_good_one(self):
+        self.write_notices()
+        destination = self.root / 'fetched'
+        (destination / 'notices').mkdir(parents=True)
+        kept = b'notice manifest.json'
+        (destination / 'notices/manifest.json').write_bytes(kept)
+        fetched = []
+
+        def curl(command, check):
+            fetched.append(command[-1])
+            Path(command[command.index('--output') + 1]).write_bytes(b'notice provider-unavailable.en-US.wav')
+        with patch.object(pkg.subprocess, 'run', curl):
+            pkg.fetch_notices(self.source, destination)
+        self.assertEqual(fetched, [pkg.NOTICES_RELEASES + 'notices/provider-unavailable.en-US.wav'])
+        self.assertEqual((destination / 'notices/manifest.json').read_bytes(), kept)
+        (destination / 'notices/provider-unavailable.en-US.wav').unlink()
+
+        def wrong(command, check):
+            Path(command[command.index('--output') + 1]).write_bytes(b'tampered')
+        with patch.object(pkg.subprocess, 'run', wrong), \
+                self.assertRaisesRegex(ValueError, 'notice checksum mismatch: provider-unavailable'):
+            pkg.fetch_notices(self.source, destination)
+        self.assertFalse((destination / 'notices/provider-unavailable.en-US.wav').exists())
+        # A kept file is reused only when both its size and digest are the list's.
+        models = self.write_notices(names=('manifest.json',))
+        models['models'][1]['bytes'] += 1
+        self.write_source(pkg.NOTICES_LIST, json.dumps(models).encode())
+        fetched.clear()
+        with patch.object(pkg.subprocess, 'run', curl), \
+                self.assertRaisesRegex(ValueError, 'notice checksum mismatch: manifest.json'):
+            pkg.fetch_notices(self.source, destination)
+        self.assertEqual(fetched, [pkg.NOTICES_RELEASES + 'notices/manifest.json'])
+
     def test_unpinned_asset(self):
         (self.assets / 'melspectrogram.onnx').write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'checksum mismatch'):

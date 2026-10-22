@@ -7,6 +7,8 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import struct
+import subprocess
+import tempfile
 import zipfile
 
 CORE_BINARIES = ('lamp-keeper', 'lamp-voice', 'lamp-turn-end', 'lamp-body',
@@ -65,6 +67,15 @@ TOKEN = re.compile(r'@[A-Z][A-Z0-9_]*@')
 SECRET = re.compile(r'-----BEGIN .*PRIVATE KEY-----|AIza[0-9A-Za-z_-]{30,}|gh[pousr]_[A-Za-z0-9]{20,}')
 
 
+# The lines a lamp says when its voice service fails (lampOS docs/failure-notices.md,
+# #2943): the product's models.json names each, with its release URL, size and
+# SHA-256, and the voice units read them at /opt/lampOS/voice/notices.
+NOTICES_LIST = 'deploy/product/models.json'
+NOTICES_PATH = '/opt/lampOS/voice/notices/'
+NOTICES_RELEASES = 'https://github.com/autonomous-ai/lampOS/releases/download/'
+NOTICES_MAX_BYTES = 4 * 1024 * 1024
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -78,6 +89,52 @@ def read_file(root, relative):
     if candidate.is_symlink() or not candidate.is_file() or not candidate.resolve().is_relative_to(root):
         raise ValueError(f'missing or unsafe file: {relative}')
     return candidate.read_bytes()
+
+
+def notices(source):
+    """The failure notices the source's models.json names, as (name, url, bytes,
+    sha256); none for a source from before them."""
+    path = Path(source) / NOTICES_LIST
+    if not path.exists():
+        return []
+    listed = []
+    for item in json.loads(read_file(source, NOTICES_LIST)).get('models', []):
+        if not isinstance(item, dict) or not str(item.get('path', '')).startswith(NOTICES_PATH):
+            continue
+        name, url, size, sha = (item['path'][len(NOTICES_PATH):], item.get('url'), item.get('bytes'),
+                                item.get('sha256'))
+        if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', name) or not isinstance(url, str)
+                or not url.startswith(NOTICES_RELEASES) or any(c in url for c in '\n\r\x00 ')
+                or not isinstance(size, int) or not 0 < size <= NOTICES_MAX_BYTES
+                or not isinstance(sha, str) or not re.fullmatch(r'[0-9a-f]{64}', sha)):
+            raise ValueError(f'invalid failure notice in {NOTICES_LIST}: {item.get("path")}')
+        listed.append((name, url, size, sha))
+    if len({name for name, *_ in listed}) != len(listed):
+        raise ValueError(f'duplicate failure notice in {NOTICES_LIST}')
+    return listed
+
+
+def fetch_notices(source, destination):
+    """Fetch the source's failure notices into DESTINATION/notices, each checked by
+    size and SHA-256; one already there and right is kept."""
+    folder = Path(destination) / 'notices'
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, url, size, expected in notices(source):
+        path = folder / name
+        if path.is_file() and path.stat().st_size == size and digest(path.read_bytes()) == expected:
+            continue
+        print(f'Fetching notice {name}', flush=True)
+        with tempfile.TemporaryDirectory() as temporary:
+            downloaded = Path(temporary) / 'download'
+            subprocess.run(['curl', '--fail', '--location', '--retry', '2', '--connect-timeout', '30',
+                            '--max-time', '300', '--max-filesize', str(NOTICES_MAX_BYTES),
+                            '--output', str(downloaded), url], check=True)
+            data = downloaded.read_bytes()
+        if len(data) != size or digest(data) != expected:
+            raise ValueError(f'notice checksum mismatch: {name}')
+        partial = path.with_name(path.name + '.partial')
+        partial.write_bytes(data)
+        partial.replace(path)
 
 
 def check_elf(data, name):
@@ -282,6 +339,11 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         else:
             directory = 'runtime/name/models'
         add(f'{directory}/{name}', data)
+    for name, _, size, expected in notices(source):
+        data = read_file(assets, f'notices/{name}')
+        if len(data) != size or digest(data) != expected:
+            raise ValueError(f'notice checksum mismatch: {name}')
+        add(f'runtime/voice/notices/{name}', data)
     for relative, target in (
         ('models/name/name.onnx', 'runtime/name/models/name.onnx'),
         ('models/stop/stop.onnx', 'runtime/stop/models/stop.onnx'),
@@ -376,9 +438,23 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--profile')
-    for name in ('source', 'binaries', 'assets', 'version', 'output', 'adapter', 'libraries', 'source-commit'):
-        parser.add_argument('--' + name, required=True)
+    parser.add_argument('--fetch-notices', metavar='ASSETS',
+                        help="only fetch --source's failure notices into ASSETS/notices, then exit")
+    names = ('source', 'binaries', 'assets', 'version', 'output', 'adapter', 'libraries', 'source-commit')
+    for name in names:
+        parser.add_argument('--' + name)
     args = parser.parse_args()
+    if args.fetch_notices:
+        if not args.source:
+            parser.error('--fetch-notices needs --source')
+        try:
+            fetch_notices(args.source, args.fetch_notices)
+        except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+            parser.exit(1, f'lampOS package: {error}\n')
+        return
+    missing = [name for name in names if getattr(args, name.replace('-', '_')) is None]
+    if missing:
+        parser.error('the following arguments are required: ' + ', '.join('--' + name for name in missing))
     try:
         package(args.source, args.binaries, args.assets,
                 json.loads(Path(args.profile).read_text()) if args.profile else None, args.version, args.output, args.adapter, args.libraries, args.source_commit)

@@ -57,6 +57,8 @@ echo "Building complete lamp-os $version from lamp-voice @ $commit"
 docker build --platform linux/arm64 --build-arg "RUST_VERSION=$rust_version" \
   -t "$image" -f "$RELEASE_DIR/lamp-os-builder.Dockerfile" "$RELEASE_DIR"
 python3 "$RELEASE_DIR/fetch_lamp_os_assets.py" "$work/assets"
+# The failure notices the source names (lampOS #2943), beside the other assets.
+python3 "$RELEASE_DIR/lamp_os_package.py" --source "$source_dir" --fetch-notices "$work/assets"
 docker run --rm --platform linux/arm64 \
   -v "$source_dir:/source:ro" -v "$RELEASE_DIR/lamp-os-adapter:/adapter:ro" \
   -v "$work/assets:/assets:ro" -e CARGO_BUILD_JOBS=4 \

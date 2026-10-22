@@ -35,8 +35,15 @@ elif name == 'docker' and args[0] == 'run' and os.environ.get('BUILD_FAIL'):
     sys.exit(1)
 '''
 PACKAGER = '''import json, os, pathlib, sys, zipfile
-if os.environ.get('PACKAGE_FAIL'): sys.exit(1)
 args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+if '--fetch-notices' in args:
+    if os.environ.get('NOTICES_FAIL'): sys.exit(1)
+    # lampOS #2943: the source's failure notices are fetched into the assets first.
+    assert args['--source'].endswith('/source/lampOS') and args['--fetch-notices'].endswith('/assets')
+    pathlib.Path(os.environ['MOCK_ROOT'], 'notices-fetched').write_text(args['--fetch-notices'])
+    sys.exit(0)
+if os.environ.get('PACKAGE_FAIL'): sys.exit(1)
+assert pathlib.Path(os.environ['MOCK_ROOT'], 'notices-fetched').read_text() == args['--assets']
 assert args['--source-commit'] == 'a' * 40
 assert '--libraries' in args and '--adapter' in args
 with zipfile.ZipFile(args['--output'], 'w') as z:
@@ -124,12 +131,20 @@ class UploadLampOSTests(unittest.TestCase):
                 self.assertFalse(any(call[:2] == ['docker', 'build'] for call in calls))
 
     def test_fetch_build_package_and_version_errors_never_publish(self):
-        for flags in ({'FETCH_FAIL': '1'}, {'BUILD_FAIL': '1'}, {'PACKAGE_FAIL': '1'}, {'initial_version': 'bad'}):
+        for flags in ({'FETCH_FAIL': '1'}, {'BUILD_FAIL': '1'}, {'NOTICES_FAIL': '1'}, {'PACKAGE_FAIL': '1'},
+                      {'initial_version': 'bad'}):
             with self.subTest(flags=flags):
-                result, _, published, version = self.run_case(**flags)
+                result, calls, published, version = self.run_case(**flags)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIsNone(published)
                 self.assertEqual(version, flags.get('initial_version', '0.0.9'))
+                # The notices are fetched before the build, so their failure stops it;
+                # a failed final package is reached only after it.
+                ran = any(call[:2] == ['docker', 'run'] for call in calls)
+                if 'NOTICES_FAIL' in flags:
+                    self.assertFalse(ran)
+                if 'PACKAGE_FAIL' in flags:
+                    self.assertTrue(ran)
 
 
 if __name__ == '__main__':
