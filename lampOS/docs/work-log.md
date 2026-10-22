@@ -1,3 +1,42 @@
+## Current checkpoint: 2026-10-22 07:00 +07, Music rebase first; failed units and exit-note hooks next
+
+**Ready for lamp-voice: no (#1757, rebase validation in progress).**
+The owner requests a fresh rebase of the reviewed `0a878cd4d` onto
+`lamp-voice` `e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe`. Three conflicted files
+retain app-guard authorization, quoted-speech restrictions and both sets of
+tests while integrating Music's context. The five changed-crate Mac gate
+is running; the new head and range-diff will be posted after it passes,
+followed by fresh ARM64 and Linux Clippy. First merges the PR.
+
+**Merged: #2709**, `c3633d32e4260c33aae6bb759cbdde8ee25178e1`.
+The revised head `da054ab0905407ae71d257192edf087c387aa1dc` passed ARM64
+**39658263337**, **9794 passed (1 leaky), 0 failed, 63 skipped**, plus four
+doc tests, relay and twelve own-harness tests. Linux Clippy **39658263544**
+passed. [Exact native evidence](verification/update-self-recovery-revision-native-20261022/README.md)
+records the tested merge, source head and artifact metadata; the payload
+was not downloaded. The prior Mac gate remains **286/0/2/0**.
+#2694 is also merged as `46871dceb`; #2692 was already merged.
+
+**Next, assigned by First:** `second/report-failed-units`, then
+`second/install-exit-notes`, each based on public `e2b2f596d`.
+The first keeps a fixed allowlisted failed-unit list in health reports;
+the second installs the product exit-note hooks, including fixed template
+names without instance identifiers. Implementation and fixtures are being
+prepared; neither is qualified or pushed yet. Existing switches and
+consent-gated sending remain. Local exit notes are not consent-gated.
+
+**second-P9 is superseded by Fifth's merged #2749.** Its unpushed timer
+prototype stays local; no duplicate timer-report PR will be opened.
+The new failed-unit list retains #2749's `waits` implementation.
+Second-P8 remains pushed at `1bdecb484`, **425/0/0/0**, waiting for #1757's
+module to merge. The Music state regression requested after #1757's merge
+also remains a separate follow-up. #2462 is with its merger.
+No device action, full local workspace gate or local ARM64 build.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 02:04 +07, updater review revision pushed; report follow-up in progress
 
 **Ready for lamp-voice: no (#2709, revised native gates pending).**
