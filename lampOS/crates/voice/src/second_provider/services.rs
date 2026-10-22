@@ -44,6 +44,15 @@ pub trait Services: Send + Sync + 'static {
         let _ = without;
         self.chat(messages)
     }
+    /// A gap-held chat may retain only the pending-photo form of forget.
+    /// Services without schema overrides keep the stricter old withholding.
+    fn chat_held(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_without(messages, without)
+    }
     /// Whether a chat on `messages`, told without the functions named in
     /// `without`, declares the function `name` ([`Self::chat_without`]), for
     /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
@@ -516,6 +525,22 @@ impl Services for Net {
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
         stream::once(async move { chat.send_without(&messages, None, without).await })
+            .map_ok(|answer| {
+                stream::try_unfold(answer, |mut answer| async move {
+                    Ok(answer.next().await?.map(|event| (event, answer)))
+                })
+            })
+            .try_flatten()
+            .boxed()
+    }
+
+    fn chat_held(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        stream::once(async move { chat.send_held(&messages, without).await })
             .map_ok(|answer| {
                 stream::try_unfold(answer, |mut answer| async move {
                     Ok(answer.next().await?.map(|event| (event, answer)))

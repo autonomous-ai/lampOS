@@ -241,9 +241,15 @@ parts.
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
-Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
+The binary is off unless `LAMP_PHOTO_FACES=on`, with the photo folder
 (`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
-the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`). The product units now
+activate all three parts together (#2856): Voice and Cloud set
+`LAMP_PHOTO_FACES=on`; Cloud uses `/run/lampos-photos` and
+`/run/lampos-eyes/who.sock`, Eyes has `--photo-dir /run/lampos-photos`,
+and Voice uses that same who socket. Eyes keeps its existing recogniser
+and people file. Setup's completion conditions and Cloud's account/key
+conditions still hold.
 
 - **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
   by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
@@ -255,24 +261,9 @@ the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
   restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
   every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
   and Reviewer-lead on #2263, Mobile on lamp-0c89).
-- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
-  takes the three variables:
-
-      [Service]
-      Environment=LAMP_PHOTO_FACES=on
-      Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
-      Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-
-  The eyes' unit gives `--photo-dir` on its command line, so its drop-in
-  clears `ExecStart=` and repeats the product's line (`systemctl cat
-  lamp-eyes`) with `--photo-dir /run/lampos-photos` at its end:
-
-      [Service]
-      ExecStart=
-      ExecStart=/opt/lampOS/eyes/current/lamp-eyes ... --photo-dir /run/lampos-photos
-
-  The voice's asking at the lamp is its own switch (`LAMP_PHOTO_FACES` on
-  lamp-voice, `docs/switches.md`).
+- **Older or custom units** need the same three-part configuration;
+  changing Cloud alone does not enable the spoken confirmation or Eyes'
+  photo reader. Product units carry it directly, without per-lamp drop-ins.
 - **On a lamp whose tmpfiles aren't yet the update's**, the folder isn't
   there: the `-` lets lamp-cloud start anyway, the eyes start without photos
   (they answer `photos_off`, and their camera, presence and recognition run
@@ -292,17 +283,32 @@ to others, and make it at 0700 if it is missing (`photo::ready`).
   The eyes are asked `{"remember":NAME,"photo":FILE}` with a 2 s deadline,
   kept short because it's waited for on the runtime that keeps the broker's
   connection alive.
-- **Never kept:** the eyes read it once and remove it. lamp-cloud removes it
-  too afterwards, answered or not, so a photo the eyes never took doesn't
-  stay (`photos::add`).
+- **Transient file cleanup:** after reading, Eyes attempts to unlink the
+  file. Cloud also attempts unlink after its normal answer or timeout path,
+  including write failure (`photos::add`). Both ignore unlink errors;
+  cancellation, a process crash or a filesystem error can leave the file.
+  This activation adds no instant-cancellation cleanup guarantee.
 - **The answer** is the eyes': `added` (unconfirmed) or `remembered`.
   Otherwise their reason in the person's words: no face, more than one
   person, the face too small, not readable, known by another name, a name
   that can't be kept, no room, photos not taken. `the lamp's eyes did not
   answer` when they didn't.
 - **Then at the lamp** the voice asks the person once (`LAMP_PHOTO_FACES=on`
-  in the voice, `docs/eyes.md`, "A face from a photo"). No answer or no
-  deletes the face, and so do 30 days unconfirmed.
+  in the voice, `docs/eyes.md`, "A face from a photo"). Its answer reuses
+  `remember_my_face` or `forget_my_face` with explicit `photo_reply: true`,
+  not additional function names. The photo reply is only for Eyes' actual
+  pending, asked face, with no fallback to ordinary capture or broad
+  forgetting. No answer or no deletes the unconfirmed face at its meeting's
+  end; never-confirmed faces also expire after 30 days.
+
+The product unit contract test resolves the actual Cloud environment with
+`lamp_update::unit::environment` and `photos::Place::from`, then checks
+Voice/Eyes socket and folder agreement, recogniser prerequisites, setup
+conditions, writable photo path and shared `lampos:lampos` 0700 tmpfiles
+ownership. No service owns the photo folder as its runtime directory.
+Mobile's complete app/consent run on lamp-0c89 remains the device gate;
+unit activation alone does not establish that result. Moving this feature
+into its installable skill remains separate from #2856.
 
 Tests (`photos.rs`): the switch needs both absolute places; the name and
 the JPEG checked, too long, empty, not base64, not a JPEG and too large

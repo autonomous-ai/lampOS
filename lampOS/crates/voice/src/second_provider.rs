@@ -599,6 +599,8 @@ struct Shared {
     services: Arc<dyn Services>,
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
+    /// Whether face tools accept the explicit pending-photo reply form.
+    photo_faces: bool,
     requested_audio: Option<(String, RequestedAudioRunner)>,
     system: System,
     scoped_system: Option<ScopedSystem>,
@@ -1147,6 +1149,7 @@ impl Engine {
                 services,
                 tools,
                 scoped_tools: None,
+                photo_faces: false,
                 requested_audio: None,
                 system,
                 scoped_system: None,
@@ -1256,6 +1259,14 @@ impl Engine {
         {
             forget();
         }
+    }
+
+    /// Enable the pending-only photo refusal on a held line. Configured once.
+    pub fn replying_to_photos(mut self, on: bool) -> Self {
+        Arc::get_mut(&mut self.shared)
+            .expect("configured before admission")
+            .photo_faces = on;
+        self
     }
 
     /// Bind tools to the observation at admission, independent of later face changes.
@@ -4588,7 +4599,11 @@ fn chat_for(
     messages: Vec<Message>,
 ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
     if held_by_gap(scope) {
-        shared.services.chat_without(messages, MEMORY_CALLS)
+        if shared.photo_faces {
+            shared.services.chat_held(messages, MEMORY_CALLS)
+        } else {
+            shared.services.chat_without(messages, MEMORY_CALLS)
+        }
     } else {
         shared.services.chat(messages)
     }
@@ -4814,6 +4829,20 @@ fn asked_just_before(
     }
 }
 
+/// A photo no narrows only the pending record, never an ordinary forget.
+fn pending_photo_refusal(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> bool {
+    shared.photo_faces
+        && heard
+        && crate::photo_faces::is_refusal(&call.name, &call.args)
+        && scope.is_none_or(|lease| lease.is_current() && lease.key().request == request)
+}
+
 /// One call run by the route's runner: the admitted request's scoped one
 /// when there is one.
 async fn run_tool(
@@ -4825,7 +4854,14 @@ async fn run_tool(
 ) -> Value {
     // A memory call on a line held only by a gap runs for no one, however
     // it was asked: not declared to it, and refused if written anyway.
-    if held_by_gap(scope) && MEMORY_CALLS.contains(&call.name.as_str()) {
+    if shared.photo_faces
+        && crate::photo_faces::is_refusal(&call.name, &call.args)
+        && scope.is_some_and(|lease| !lease.is_current() || lease.key().request != request)
+    {
+        return crate::tools::unavailable();
+    }
+    let photo_refusal = pending_photo_refusal(shared, request, heard, call, scope);
+    if held_by_gap(scope) && MEMORY_CALLS.contains(&call.name.as_str()) && !photo_refusal {
         eprintln!(
             "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
         );
@@ -5467,7 +5503,13 @@ async fn answer(
                 }
                 // Or one their turn just before asked for by name.
                 let asked_just_before = heard && asked_before.contains(&call.name.as_str());
-                if crate::remember::is_forget(&call.name) && !forget_may_run && !asked_just_before {
+                let photo_refusal =
+                    pending_photo_refusal(shared, request, heard, call, scope.as_ref());
+                if crate::remember::is_forget(&call.name)
+                    && !photo_refusal
+                    && !forget_may_run
+                    && !asked_just_before
+                {
                     let holding = match forget_asker(scope.as_ref()) {
                         _ if held_forget_ran => None,
                         Some(asker) if heard => {

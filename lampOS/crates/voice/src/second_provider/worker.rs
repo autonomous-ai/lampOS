@@ -2052,6 +2052,7 @@ pub fn serve(
     let audio_runner = tools
         .requested_audio
         .then(|| requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed));
+    let photo_faces = tools.photo_faces;
     let runner = tool_runner(tools, search.clone(), early.clone(), policed);
     // The same calls with the admitted request's memory authority (#1794).
     let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed);
@@ -2064,6 +2065,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .replying_to_photos(photo_faces)
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
@@ -3271,7 +3273,11 @@ fn with_name_signal(
 fn with_held_forgets(
     declare: crate::second_provider::net::Declare,
 ) -> crate::second_provider::net::Declare {
-    Arc::new(move || crate::remember::held_forgets_described(declare()))
+    Arc::new(move || {
+        crate::photo_faces::scope_forget_description(crate::remember::held_forgets_described(
+            declare(),
+        ))
+    })
 }
 
 /// The model said it heard its name in `request`: answered, nothing done,

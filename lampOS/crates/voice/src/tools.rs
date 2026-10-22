@@ -672,10 +672,6 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
-        // A face added from a photo, asked about at the lamp (#1968).
-        if settings.photo_faces {
-            tools.extend(crate::photo_faces::tools());
-        }
     }
     if settings.mark.is_some() {
         tools.push(crate::marked::tool());
@@ -865,6 +861,7 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
     crate::known_faces::FaceSwitches {
         checked: settings.names_checked,
         visits: settings.who_visits && settings.memory.is_some(),
+        photos: settings.photo_faces,
     }
 }
 
@@ -889,6 +886,9 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
+    }
+    if crate::photo_faces::is_tool(name) && !settings.photo_faces {
+        return Route::Nobody;
     }
     if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
@@ -1450,12 +1450,22 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
-        Route::Faces(socket, _) if crate::photo_faces::is_tool(&call.name) => {
-            ("the eyes", crate::photo_faces::run(socket, call))
-        }
+        Route::Faces(socket, switches) if crate::photo_faces::is_tool(&call.name) => (
+            "the eyes",
+            if switches.photos {
+                crate::photo_faces::run_for(socket, call, request, lease)
+            } else {
+                (unavailable(), false)
+            },
+        ),
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
+        Route::Faces(socket, switches) if crate::photo_faces::requested(call) => (
+            "the eyes",
+            crate::photo_faces::dispatch(socket, call, switches.photos, request, lease)
+                .unwrap_or_else(|| (unavailable(), false)),
+        ),
         Route::Faces(socket, switches) => {
             let person = lease
                 .and_then(|lease| lease.scope())
@@ -1862,6 +1872,7 @@ mod tests {
         let on = FaceSwitches {
             checked: false,
             visits: true,
+            photos: false,
         };
         let route = Route::Faces(socket.clone(), on);
         let call = |name: &str| ToolCall {
@@ -4353,3 +4364,6 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
+
+#[cfg(test)]
+mod photo_replies;

@@ -32,7 +32,7 @@ Environment=LAMP_EYES_SPEAKING=on
 # person's kept yes in /var/lib/lampOS/consent/face-expressions.json (privacy-switch.md). The mesh
 # and the read run on their own thread, off the look, so the speaking read above stays on the
 # corners (eyes.md).
-ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx --photo-dir /run/lampos-photos
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

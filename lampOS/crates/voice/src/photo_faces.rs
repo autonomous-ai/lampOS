@@ -7,11 +7,17 @@
 //! (`{"photo_here":true}`), the voice tells them it is asking
 //! (`{"photo_asked":NAME}`) and asks once, as a written turn ([`note`]):
 //! "Someone added your face from a photo, as NAME. Shall I remember you?"
-//! Their spoken answer calls [`YES`] or [`NO`], which tell the eyes
-//! (`photo_yes`, `photo_no`). No answer in that meeting is the eyes' to let
+//! Their spoken answer uses `remember_my_face` or `forget_my_face` with
+//! `photo_reply: true`, which tell the eyes (`photo_yes`, `photo_no`).
+//! The legacy [`YES`]/[`NO`] names remain routable only with the flag on.
+//! No answer in that meeting is the eyes' to let
 //! go. Off unless set, and only with the eyes' request socket.
+mod replies;
 use crate::known_faces::DEADLINE;
 use lamp_gemini::{Tool, ToolCall};
+pub use replies::{
+    augment, dispatch, held_refusal, is_refusal, requested, scope_forget_description,
+};
 use serde_json::{Value, json};
 use std::{path::Path, sync::Mutex, time::Duration};
 
@@ -39,7 +45,8 @@ pub fn is_tool(name: &str) -> bool {
     matches!(name, YES | NO)
 }
 
-/// The two functions for the person's answer.
+/// Legacy declarations retained for compatibility tests; new sessions use
+/// the ordinary face names with an explicit photo reply instead.
 pub fn tools() -> Vec<Tool> {
     vec![
         Tool {
@@ -68,7 +75,8 @@ pub fn note(name: &str) -> String {
     format!(
         "Someone added the face of the person at the lamp from a photo, under the name {name}. \
          Ask them once, gently, in your own words: \"Someone added your face from a photo, as {name}. \
-         Shall I remember you?\" If they say yes, call {YES}. If they say no, call {NO}. \
+         Shall I remember you?\" If they say yes, call remember_my_face with photo_reply true and no name. \
+         If they say no, call forget_my_face with photo_reply true and no name. \
          Don't call them {name} unless they say yes, and don't ask again."
     )
 }
@@ -220,12 +228,34 @@ impl Drop for Watch {
 /// eyes take a yes only for that face, and only once it was asked
 /// (`not_here`, `not_asked`; the reviewer on #1977, 22:50).
 pub fn run(socket: &Path, call: &ToolCall) -> (Value, bool) {
+    run_for(socket, call, 0, None)
+}
+
+/// Compatibility calls resolve their pending face under the same request
+/// authority as shared replies. The lookup may block while a turn is revoked.
+pub fn run_for(
+    socket: &Path,
+    call: &ToolCall,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (Value, bool) {
     let Some(name) = here(socket) else {
         return (
             json!({"error": "Nobody added from a photo is at the lamp now, so there is nothing to answer."}),
             true,
         );
     };
+    if !authority_current(request, lease) {
+        return (crate::tools::unavailable(), false);
+    }
+    run_named(socket, call, &name)
+}
+
+fn authority_current(request: u64, lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    lease.is_none_or(|lease| lease.key().request == request && lease.is_current())
+}
+
+fn run_named(socket: &Path, call: &ToolCall, name: &str) -> (Value, bool) {
     let line = match call.name.as_str() {
         YES => json!({"photo_yes": name}),
         NO => json!({"photo_no": name}),
@@ -316,7 +346,10 @@ mod tests {
         assert!(
             note.contains("Someone added your face from a photo, as Lan. Shall I remember you?")
         );
-        assert!(note.contains(YES) && note.contains(NO));
+        assert!(
+            note.contains("remember_my_face with photo_reply true")
+                && note.contains("forget_my_face with photo_reply true")
+        );
         assert!(note.contains("Don't call them Lan unless they say yes"));
         let names: Vec<String> = tools().into_iter().map(|tool| tool.name).collect();
         assert_eq!(names, [YES, NO]);
@@ -575,18 +608,24 @@ mod tests {
             .into_iter()
             .map(|tool| tool.name)
             .collect();
-        assert!(names.iter().any(|n| n == YES) && names.iter().any(|n| n == NO));
+        assert!(
+            names.iter().any(|n| n == crate::known_faces::REMEMBER)
+                && names.iter().any(|n| n == crate::known_faces::FORGET)
+        );
+        assert!(names.iter().all(|n| !is_tool(n)));
         assert!(matches!(
             crate::tools::route(&settings, YES),
             crate::tools::Route::Faces(..)
         ));
         let (plain, _) = crate::tools::take(&flags[..2]).unwrap();
         assert!(!plain.photo_faces);
-        assert!(
-            crate::tools::declared(&plain)
-                .iter()
-                .all(|tool| !is_tool(&tool.name))
-        );
+        assert!(crate::tools::declared(&plain).iter().all(|tool| {
+            !is_tool(&tool.name)
+                && tool
+                    .parameters
+                    .as_ref()
+                    .is_none_or(|schema| schema["properties"].get("photo_reply").is_none())
+        }));
     }
 
     /// The eyes refuse a face that has gone: the model is told nothing

@@ -41,6 +41,8 @@ pub const VISITS_FLAG: &str = "--who-visits";
 pub struct FaceSwitches {
     pub checked: bool,
     pub visits: bool,
+    /// Photo answers share these two functions, with an explicit discriminator.
+    pub photos: bool,
 }
 /// The exchanges before the turn in hand that a name may have been said
 /// in, to be kept once the lamp has said it back and the person agreed
@@ -715,6 +717,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
     tools_for(FaceSwitches {
         checked,
         visits: false,
+        photos: false,
     })
 }
 
@@ -771,6 +774,9 @@ pub fn tools_for(switches: FaceSwitches) -> Vec<Tool> {
             silent: false,
         },
     ];
+    if switches.photos {
+        crate::photo_faces::augment(&mut tools);
+    }
     if switches.visits {
         tools.extend(visits_tools());
     }
@@ -824,6 +830,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
         FaceSwitches {
             checked,
             visits: false,
+            photos: false,
         },
         None,
     )
@@ -860,7 +867,16 @@ pub fn run_for(
 #[cfg(test)]
 fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Value, bool) {
     let visits = false;
-    run_switched(socket, call, FaceSwitches { checked, visits }, said)
+    run_switched(
+        socket,
+        call,
+        FaceSwitches {
+            checked,
+            visits,
+            photos: false,
+        },
+        said,
+    )
 }
 
 fn run_switched(
@@ -1511,6 +1527,7 @@ mod tests {
             tools_for(FaceSwitches {
                 checked: true,
                 visits,
+                photos: false,
             })
             .into_iter()
             .map(|tool| tool.name)

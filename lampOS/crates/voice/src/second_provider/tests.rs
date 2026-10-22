@@ -25,6 +25,7 @@ struct Script {
     /// The functions each chat was told without (`Services::chat_without`),
     /// none for a plain chat.
     withheld: Mutex<Vec<&'static [&'static str]>>,
+    photo_held: AtomicUsize,
     /// A deterministic barrier for tests waiting on a prepared round.
     chat_began: Option<Arc<tokio::sync::Notify>>,
     /// A chat stream that, after its script, never ends.
@@ -144,6 +145,15 @@ impl Services for Script {
         // `chat` records an empty withheld list for itself: drop it.
         self.withheld.lock().unwrap().pop();
         stream
+    }
+
+    fn chat_held(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.photo_held.fetch_add(1, Ordering::Relaxed);
+        self.chat_without(messages, without)
     }
 
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
@@ -6295,12 +6305,12 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         (
             "Someone added your face from a photo, as Lan. Shall I remember you?",
             "Yes.",
-            Some(crate::photo_faces::YES),
+            Some(crate::known_faces::REMEMBER),
         ),
         (
             "Someone added your face from a photo, as Lan. Shall I remember you?",
             "No.",
-            Some(crate::photo_faces::NO),
+            Some(crate::known_faces::FORGET),
         ),
         ("I'll keep that in mind.", "Yes.", None),
     ] {
@@ -6319,7 +6329,11 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         }
         let answer = match called {
             Some(name) => vec![
-                Ok(ChatEvent::ToolCalls(vec![call("c1", name, json!({}))])),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    name,
+                    json!({"photo_reply": true}),
+                )])),
                 Ok(ChatEvent::Done),
             ],
             None => vec![text("Okay."), Ok(ChatEvent::Done)],
@@ -6347,14 +6361,17 @@ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room(
         type Verdicts = Arc<Mutex<Vec<(u64, Option<&'static str>)>>>;
         let verdicts: Verdicts = Arc::default();
         let (judge, kept) = (heeding.clone(), verdicts.clone());
-        let mut engine = engine.heeding(Arc::new(move |request, said, heard, from| {
-            let verdict = judge
-                .lock()
-                .ok()
-                .and_then(|mut heeding| heeding.heed(request, said, heard, from));
-            kept.lock().unwrap().push((request, verdict));
-            verdict
-        }));
+        let mut engine =
+            engine
+                .replying_to_photos(true)
+                .heeding(Arc::new(move |request, said, heard, from| {
+                    let verdict = judge
+                        .lock()
+                        .ok()
+                        .and_then(|mut heeding| heeding.heed(request, said, heard, from));
+                    kept.lock().unwrap().push((request, verdict));
+                    verdict
+                }));
         // The lamp asks, as the coordinator has it say the photo's note.
         let drain = async |engine: &mut Engine| {
             while let Ok(event) = tokio::time::timeout(Duration::from_secs(3), engine.next()).await
@@ -6407,6 +6424,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
             crate::known_faces::FaceSwitches {
                 checked: true,
                 visits: true,
+                photos: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -11659,3 +11677,5 @@ async fn carried_music_after_unclear_handoff_cancels_pending_call_without_anothe
     assert_eq!(ordinary.load(Ordering::Relaxed), 1);
     assert!(legacy.lock().unwrap().is_empty());
 }
+
+mod photo_replies;

@@ -170,27 +170,119 @@ fn lamp_4aces_cloud_on_writes_the_units_whole_drop_in() {
     );
 }
 
-/// Reviewer-lead's P3 on #2273: the photo folder lamp-cloud's unit may
-/// write is the one the product's tmpfiles makes at boot, `lampos`'s at
-/// 0700 as the eyes require, and no unit's own runtime folder.
+/// #2856: resolve the product's actual environment through the same parser
+/// as updates, then use Cloud's real photo activation parser. The three
+/// units must agree on the private shared folder and Eyes' request socket.
 #[test]
 fn the_photo_folder_the_unit_may_write_is_the_one_made_at_boot() {
+    use lamp_cloud::photos::{self, Place};
+    use lamp_update::unit::environment;
+
+    const EYES: &str = include_str!("../../../../deploy/product/lamp-eyes.service");
+    const VOICE: &str = include_str!("../../../../deploy/product/lamp-voice.service");
+    let place = Place::from(|name| environment(UNIT, name))
+        .expect("the product Cloud unit activates its real photo configuration");
+    assert_eq!(place.dir, Path::new("/run/lampos-photos"));
+    assert_eq!(place.socket, Path::new("/run/lampos-eyes/who.sock"));
+    assert!(place.dir.is_absolute() && place.socket.is_absolute());
+    assert_eq!(
+        environment(VOICE, photos::ENVIRONMENT).as_deref(),
+        Some("on")
+    );
+    assert_eq!(
+        environment(VOICE, photos::SOCKET_ENVIRONMENT).as_deref(),
+        place.socket.to_str()
+    );
+
+    let field = |unit: &str, key: &str| {
+        let prefix = format!("{key}=");
+        let values: Vec<String> = unit
+            .lines()
+            .map(str::trim)
+            .filter_map(|line| line.strip_prefix(prefix.as_str()).map(str::to_owned))
+            .collect();
+        assert_eq!(values.len(), 1, "one {key} in unit: {values:?}");
+        values.into_iter().next().unwrap()
+    };
+    let command = field(EYES, "ExecStart");
+    let arguments: Vec<&str> = command.split_whitespace().collect();
+    let argument = |name| {
+        let values: Vec<&str> = arguments
+            .windows(2)
+            .filter(|pair| pair[0] == name)
+            .map(|pair| pair[1])
+            .collect();
+        assert_eq!(values.len(), 1, "one {name}: {values:?}");
+        values[0]
+    };
+    assert_eq!(Path::new(argument("--photo-dir")), place.dir);
+    assert_eq!(Path::new(argument("--who-socket")), place.socket);
+    for prerequisite in ["--recogniser", "--people"] {
+        assert!(Path::new(argument(prerequisite)).is_absolute());
+    }
+    assert_eq!(
+        argument("--recogniser"),
+        "/opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx"
+    );
+    assert_eq!(argument("--people"), "/var/lib/lampos-eyes/people.json");
+    assert_eq!(field(EYES, "RuntimeDirectory"), "lampos-eyes");
+    assert_eq!(place.socket.parent(), Some(Path::new("/run/lampos-eyes")));
+
     let writable: Vec<&str> = UNIT
         .lines()
         .filter_map(|line| line.strip_prefix("ReadWritePaths="))
         .flat_map(str::split_whitespace)
         .collect();
-    assert!(writable.contains(&"-/run/lampos-photos"), "{writable:?}");
+    assert!(
+        writable
+            .iter()
+            .any(|path| Path::new(path.trim_start_matches('-')) == place.dir),
+        "{writable:?}"
+    );
+    assert_eq!(field(UNIT, "ProtectSystem"), "strict");
+    for condition in [
+        "/etc/lampOS/setup/backend.json",
+        "/etc/lampOS/voice/credential",
+        "/var/lib/lampos-update/state.json",
+    ] {
+        assert!(
+            UNIT.lines()
+                .map(str::trim)
+                .any(|line| { line.strip_prefix("ConditionPathExists=") == Some(condition) })
+        );
+    }
+    for unit in [UNIT, EYES] {
+        assert_eq!(field(unit, "User"), "lampos");
+        assert_eq!(field(unit, "Group"), "lampos");
+    }
     let made: Vec<Vec<&str>> = TMPFILES
         .lines()
         .map(|line| line.split_whitespace().collect::<Vec<_>>())
-        .filter(|fields| fields.get(1) == Some(&"/run/lampos-photos"))
+        .filter(|fields| fields.get(1).copied() == place.dir.to_str())
         .collect();
     assert_eq!(
         made,
         [["d", "/run/lampos-photos", "0700", "lampos", "lampos", "-"]]
     );
-    assert!(!UNIT.contains("RuntimeDirectory=lampos-photos"));
+    for unit in [UNIT, EYES, VOICE] {
+        assert!(
+            unit.lines()
+                .map(str::trim)
+                .any(|line| { line == "ConditionPathExists=/var/lib/lampos-setup/done" })
+        );
+        for line in unit.lines().map(str::trim) {
+            if let Some(directories) = line
+                .strip_prefix("RuntimeDirectory=")
+                .or_else(|| line.strip_prefix("StateDirectory="))
+            {
+                assert!(
+                    !directories
+                        .split_whitespace()
+                        .any(|dir| dir == "lampos-photos")
+                );
+            }
+        }
+    }
 }
 
 /// #2562: lamp-cloud's unit may reach lamp-skills' call socket, for guard

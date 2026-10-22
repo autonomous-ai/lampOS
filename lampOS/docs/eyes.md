@@ -1192,7 +1192,10 @@ looking.
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
 Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
-recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
+recogniser (`--recogniser`, `--people`, `--who-socket`). The product unit
+now supplies `--photo-dir /run/lampos-photos` with those existing
+prerequisites (#2856); Voice and Cloud enable the photo route and share
+Eyes' `/run/lampos-eyes/who.sock`. On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
 (cloud.md, "A face from the app's photo"); the eyes make it at 0700 if they
@@ -1208,11 +1211,13 @@ photo there (`faces.add_photo`), then asks on the
 asking** (the first builder on #1968, 22:12). So a face from a photo is
 kept **unconfirmed**, until its person says yes at the lamp:
 
-- **Read once, then gone:** the file is read (a regular file, not a link,
-  checked to be the entry it opened; at most 8 MiB) and **removed whatever
-  follows**: a refusal, a bad name, a picture with no face. A link is
-  removed, not what it names. No picture is kept, only the print
-  (`photo::take`).
+- **Read once, then cleanup attempted:** the file is read (a regular file,
+  not a link, checked to be the entry it opened; at most 8 MiB). Once a
+  plain file name is admitted, `photo::take` attempts unlink after its read
+  validation, whether accepted or refused. A link's entry is targeted,
+  never its referent. Unlink
+  errors are ignored and a crash can interrupt cleanup. This is not an
+  instant-deletion guarantee on cancellation.
 - **Its one face:** decoded at the detector's size as a camera frame is,
   its faces found, and the largest taken. It must be at least `NEAR_ENOUGH`
   (0.10) of the picture's height, with no other face half its size or more
@@ -1277,25 +1282,31 @@ socket; `crates/voice/src/photo_faces.rs`):
   voice follows the eyes' own mark, which they save: a name the eyes say was
   not asked is a new face under it and is asked again, and a face they say
   was asked isn't asked again, even after the voice restarts. The
-  voice then says, once, as its own written turn (`photo_face_ask`): "Someone
-  added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
-- **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
-  run in the provider's worker, a process apart from the coordinator that
-  asked, so they take the face from the eyes, the unconfirmed one
-  `photo_here` names now, and tell the eyes `photo_yes` or `photo_no` for it.
-  The eyes take a yes only for that face once it was asked (`not_asked`
-  otherwise), so no name has to cross processes (the reviewer on #1977,
-  22:50). Like the other
-  face functions, these are taken only from words heard at the lamp, never
-  a written or typed request. A yes for a face that has gone is
-  `not_here`, and the model is told nothing changed.
+  voice then asks once, as its own written turn (`photo_face_ask`),
+  explicitly whether it may remember the face added from the photo. It
+  does not use the name as theirs unless they agree.
+- **Their spoken answer** uses the existing `remember_my_face` or
+  `forget_my_face` function with `photo_reply: true` (#2856). With the photo
+  switch on, their schema adds this explicit discriminator and allows the
+  photo reply to omit `name`; it adds no function names. The photo reply
+  carries no name, replacement or apart instruction: the worker reads the
+  actual pending face and saved asked mark from Eyes, then sends
+  `photo_yes` or `photo_no` for that face. A missing or no-longer-present
+  pending face refuses the reply; it never falls back to live capture or a
+  broader face forget. Eyes accepts a yes only after asking (`not_asked`
+  otherwise). These replies require words heard at the lamp, not a typed
+  request. A held-gap request can only refuse the pending photo; it cannot
+  grant consent or run an ordinary forget. With the photo switch off, the
+  existing two function schemas are unchanged. Without `photo_reply: true`,
+  the ordinary path still requires the name and preserves its existing
+  replacement/apart rules.
 - No answer is the eyes' to let go, at the meeting's end.
 
 **From the app:** lamp-cloud's `faces.add_photo` writes the app's photo into
 `--photo-dir` as a new 0600 file and sends the ask, only over the lamp's own
-account channel, and removes the file afterwards ([cloud.md](cloud.md), "A
-face from the app's photo"). The eyes make the folder theirs at 0700 when
+account channel, and attempts to unlink the file afterwards on normal
+completion or timeout ([cloud.md](cloud.md), "A face from the app's photo").
+The eyes make the folder theirs at 0700 when
 they start, and refuse one open to others (`photo::ready`).
 
 Tests (`photo.rs`):

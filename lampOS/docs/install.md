@@ -427,8 +427,18 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   lamp-ears (#1722 item 1). Both were found on lamp-06c1 on
   2026-10-16: with the locks 0775 the body never opened the servo port, and
   without the sessions folder the voice could not start.
-  It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
-  for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md).
+  It also makes `/run/lampos-photos` (`lampos:lampos`, 0700), shared by
+  Cloud and Eyes and owned by neither service's runtime directory. The
+  product activates the photo route (#2856): `LAMP_PHOTO_FACES=on` in
+  Voice and Cloud, Cloud's `LAMP_EYES_PHOTO_DIR=/run/lampos-photos` and
+  `LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock`, Eyes'
+  `--photo-dir /run/lampos-photos`, and Voice's matching who socket.
+  Existing recogniser/people arguments, setup conditions and photo consent
+  remain required. Photo replies reuse existing face function names; the
+  32-function cap and existing selection fallback are unchanged. Normal
+  cleanup attempts unlink; cancellation is not an
+  instant-deletion guarantee (cloud.md). Mobile's complete lamp-0c89 run
+  remains the device gate, and the installable-skill migration is separate.
 - **The body's unit id** is the host name (`--unit-id %H`), and no unit
   says `ConditionHost=`.
 - **The clock** (#811): a lamp has no battery clock, so after a boot its
