@@ -943,6 +943,61 @@ mod tests {
         });
     }
 
+    /// A voice session folder as earlier builds of the voice wrote it
+    /// (`docs/updates.md`, "Every part's saved data, one version ahead",
+    /// `tests/fixtures/stores/README.md`): kept and counted, never refused,
+    /// so a put-back lamp-records neither stops on a newer voice's sessions
+    /// nor leaves them unpruned. The sessions are in `/var/lib`, so a
+    /// restart in the same boot and one after a reboot see the same
+    /// folders: both are this inventory.
+    #[test]
+    fn each_kept_session_folder_is_taken_as_a_session() {
+        if store_cannot_run_here() {
+            return;
+        }
+        let kept = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/stores");
+        for day in ["2026-10-22"] {
+            let fixture = Fixture::new();
+            let sessions = kept.join(format!("session-{day}"));
+            let mut ids = Vec::new();
+            for session in stdfs::read_dir(&sessions).unwrap() {
+                let id = session.unwrap().file_name().into_string().unwrap();
+                // Git keeps no modes: made private as the voice makes them.
+                private_dir(&fixture.root.join(&id));
+                private_dir(&fixture.root.join(&id).join("metadata"));
+                for record in stdfs::read_dir(sessions.join(&id).join("metadata")).unwrap() {
+                    let name = record.unwrap().file_name();
+                    let mut file = OpenOptions::new()
+                        .create_new(true)
+                        .write(true)
+                        .mode(0o600)
+                        .open(fixture.record(&id, name.to_str().unwrap()))
+                        .unwrap();
+                    file.write_all(
+                        &stdfs::read(sessions.join(&id).join("metadata").join(&name)).unwrap(),
+                    )
+                    .unwrap();
+                }
+                ids.push(id);
+            }
+            let inventory = fixture.store().inventory().unwrap();
+            assert!(
+                inventory.refused.is_empty(),
+                "{day}: {:?}",
+                inventory.refused
+            );
+            assert_eq!(
+                inventory
+                    .sessions
+                    .iter()
+                    .map(|session| session.id.clone())
+                    .collect::<Vec<_>>(),
+                ids,
+                "{day}"
+            );
+        }
+    }
+
     #[test]
     fn inventory_is_read_only_and_uses_allocated_bytes_and_newest_mtime() {
         if store_cannot_run_here() {
