@@ -1411,27 +1411,39 @@ order is kept. A written turn is the same from the chat on.
   - **A read is not the memory's until a turn takes it**
     (`remember::NoteRead`; the reviewer-lead's and reviewer-two's P2s on
     #3016). The read opens its snapshots in the store under a new session
-    name and reads the rules and the follow-up, but the client's session,
-    its person, its sources, rules, carried links and offers are as they
-    were. Only an answered line's turn takes it (`NoteRead::adopt`, from
-    `Sessions::taken` once the turn waited for it): the session before is
-    closed then, the journal resumes then if it may, and the follow-up
-    joins the note then. A complete answer stands for its scope, however
-    late it came, until a turn takes it, for at most ten minutes
-    (`RETAINED_FOR`); an answered turn for another scope lets it go. A read
-    let go untold closes its own session in the store, and gives back the
-    kept mark it took as it began, so the next read covers that keep; a
-    worker stopping closes a read's session with the open one. With
-    `LAMP_MEMORY_THREADS`, the follow-up is read with the note: the memory
-    holds it until the lamp asks, so a read never told costs one of its
-    offers, never the thread.
-  - **A forget during the read** (El's and reviewer-two's P2s on #3016):
-    the Days client counts each forget or rule write sent, each stop of
-    journalling and each write whose answer was lost (`changes`). A read
-    stamps the count as it begins, and is taken only while the count is
-    the same: one the store may have changed under is let go and asked
-    again, whatever `LAMP_MEMORY_JOURNAL_RESUMES` or its backoff say. A
-    line held by a gap asks nothing and a revoked scope is told nothing.
+    name and reads the rules, but the client's session, its person, its
+    sources, rules, carried links and offers are as they were. Only an
+    answered line's turn takes it (`NoteRead::adopt`, from `Sessions::taken`
+    once the turn waited for it): the session before is closed then, the
+    journal resumes then if it may, and the follow-up joins the note then.
+    A complete answer stands for its scope, however late it came, until a
+    turn takes it, for at most ten minutes (`RETAINED_FOR`); an answered
+    turn for another scope lets it go. A read let go untold closes its own
+    session in the store, and gives back the kept mark it took as it
+    began, so the next read covers that keep; a read voided by a privacy
+    change is let go so as soon as it ends, before any note is chosen,
+    while it is read still the one reader. A worker stopping closes a
+    read's session with the open one.
+  - **The follow-up only for an answered turn** (`LAMP_MEMORY_THREADS`;
+    reviewer-two's P2 on #3016): the memory counts an offer as it gives
+    one, and the last of a thread's three offers records it as given, so
+    a read as a line begins asks none. The answered turn that takes the
+    read asks it as it waits for the note, off the loop, within 300 ms
+    more (`FOLLOW_UP_WITHIN`, `NoteRead::follow_up`), and a read begun as
+    the turn is told asks it with the note. A line never answered spends
+    no offer of anyone's. An answered turn whose read is then refused (a
+    forget in those few ms) has had its offer counted.
+  - **A forget during the read, or after it** (El's and reviewer-two's P2s
+    on #3016): the Days client counts each forget or rule write sent, each
+    stop of journalling and each write whose answer was lost (`changes`).
+    A read stamps the count as it begins, and is taken only while the
+    count is the same; the note it gave keeps that stamp
+    (`remember::NoteStamp`). A read the store may have changed under is
+    let go, and the cached note with it; a cached note whose stamp has
+    passed is dropped before any note is chosen. The next ask is then due,
+    whatever `LAMP_MEMORY_JOURNAL_RESUMES`, its backoff or the retry
+    pacing say, so a forgotten note is never told again. A line held by a
+    gap asks nothing and a revoked scope is told nothing.
   - **After a failed note read:** a refusal, timeout, or invalid snapshot
     leaves the note incomplete, and so does a note still not in by what is
     left of its 300 ms as the line ends (late). A room snapshot beside a
@@ -1459,15 +1471,20 @@ order is kept. A written turn is the same from the chat on.
     is told` for a read started at the end), `memory note late; retry on
     the next turn`, `memory note incomplete; retry on the next turn`,
     `memory note incomplete again; retry after 30000 ms`, `memory note
-    retry complete` and `memory note let go: the memory changed while it
-    was read; asked again`; they contain no note, name or person id. The
+    retry complete`, `memory note let go: the memory changed while it was
+    read; asked again` and `the memory changed since the note was read: it
+    is asked again`; they contain no note, name or person id. The
     host regressions are `worker::memory_note_retries` (among them the
     loop's longest gap with an answer 350 ms after the ask on a 1 s line,
     a late answer taken on the next turn, lines never answered asking
     nothing, and a voided read holding the next),
     `worker::kept_name_callback` (an abandoned refresh's keep reaching the
-    next turns, reviewer-two's reproduction, and its controls) and
-    `remember::tests::a_forget_during_a_note_read_keeps_it_from_being_told`;
+    next turns, voided before or after its read ends, and a resume read
+    rejected after a forget never bringing the forgotten note back:
+    reviewer-two's reproductions and their controls),
+    `remember::tests::a_forget_during_a_note_read_keeps_it_from_being_told`
+    and, against the real store, `lamp-memory`'s
+    `voice_note_ahead::a_note_read_ahead_spends_the_last_follow_up_offer_only_when_a_turn_takes_it`;
     the six-minute spoken name-retention check on #2540 is a separate lamp
     gate.
   - **Nothing is split by it** (the first builder's P2 on #2615): the ask

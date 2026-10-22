@@ -31,6 +31,7 @@ mod server;
 mod timing;
 mod voice;
 mod voice_name;
+mod voice_note_ahead;
 mod voice_people;
 mod voice_submit;
 mod voice_timing;
