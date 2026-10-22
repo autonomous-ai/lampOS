@@ -53,8 +53,10 @@ pub const STRIP_RUN: usize = 2;
 pub const HELD_LEAST: usize = 3;
 
 /// Words that make the lamp's answer an offer the person may take up, each
-/// matched as a run of [`super::word_key`] words anywhere in the answer (so
-/// "I can't" is not "I can"). A line answering one ("set a reminder for
+/// matched as a run of [`super::word_key`] words in the answer's last
+/// sentence only (so "I can't" is not "I can", and "I can hear you. It's
+/// five." is no offer): an offer is what the lamp ends on. A sign-off ("Let
+/// me know if you need anything") is not one. A line answering one ("set a reminder for
 /// six" after "I can set a reminder for six.") repeats the lamp's words
 /// because it accepts them, so it is the person's, "?" or not. Kept short
 /// and English on purpose: a missed offer only leaves the line judged as
@@ -67,7 +69,6 @@ pub const OFFERS: &[&str] = &[
     "want me to",
     "would you like",
     "do you want",
-    "let me know if",
     "if you want",
     "if you'd like",
     "if you like",
@@ -115,8 +116,15 @@ fn keys(words: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether `answer`'s keys hold an offer of [`OFFERS`].
-fn offers(answer: &[String]) -> bool {
+/// Whether the last sentence of the lamp's `answer` holds an offer of
+/// [`OFFERS`].
+fn offers(answer: &str) -> bool {
+    let last = answer
+        .split(['.', '!', '?'])
+        .map(str::trim)
+        .rfind(|sentence| !sentence.is_empty())
+        .unwrap_or_default();
+    let answer = keys(last);
     OFFERS.iter().any(|offer| {
         let offer = keys(offer);
         answer.windows(offer.len()).any(|window| window == offer)
@@ -195,7 +203,7 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it is a question of its own")
     } else if !line.over_the_lamps_voice && said.words.trim_end().ends_with('?') {
         Some("it began after the lamp's question")
-    } else if (!line.over_the_lamps_voice || m < n) && offers(&answer) {
+    } else if (!line.over_the_lamps_voice || m < n) && offers(said.words) {
         Some("it answers the lamp's offer")
     } else {
         None
@@ -378,8 +386,39 @@ mod tests {
             Echo::Held(_)
         ));
         // "I can't" is no offer.
-        assert!(!offers(&keys("I can't set a reminder.")));
-        assert!(offers(&keys("Would you like a reminder?")));
+        assert!(!offers("I can't set a reminder."));
+        assert!(offers("Would you like a reminder?"));
+    }
+
+    #[test]
+    fn an_offer_counts_only_in_the_answers_last_sentence() {
+        // The Reviewer-lead's P2 on #3034: "I can" or a sign-off early in an
+        // answer is no offer, so its echo in the tail is still held.
+        let answer = Said {
+            words: "I can hear you fine. The meeting starts at six today.",
+            ..said()
+        };
+        assert!(matches!(
+            judge(
+                &line("the meeting starts at six today", UNTIL_US + 300_000, false),
+                Some(&answer)
+            ),
+            Echo::Held(_)
+        ));
+        let signed_off = Said {
+            words: "The meeting starts at six. Let me know if you need anything.",
+            ..said()
+        };
+        assert!(matches!(
+            judge(
+                &line("the meeting starts at six", UNTIL_US + 300_000, false),
+                Some(&signed_off)
+            ),
+            Echo::Held(_)
+        ));
+        // An offer the lamp ends on is still one.
+        assert!(offers("It's five. I can set a reminder for six."));
+        assert!(!offers("I can hear you. It's five."));
     }
 
     #[test]
