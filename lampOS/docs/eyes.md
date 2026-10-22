@@ -1066,8 +1066,12 @@ the constructor receives an explicit enabled value and exact Eyes boot.
 One random ticket binds a store target and authenticated account generation
 for at most 120 seconds before commit handoff; polls never renew it. The
 first single candidate pins the exact `boot/fN`, with no retargeting. Trusted
-runtime privacy or account changes must call `invalidate(now)` immediately,
-without waiting for another frame or supplying the previous account/ticket.
+runtime privacy or account changes and forget entry must call
+`invalidate(now)` immediately, without waiting for another frame or supplying
+the previous account/ticket. For forget, this comes before potentially slow
+`People::forget` store I/O, even if storage later reports an error. The store's
+revision check prevents a stale repair write but cannot itself drop the
+controller's separate snapshot of the old person and staged prints.
 Before handoff this drops the pending target, consent and prints and records
 `Cancelled`; `observe` also rejects changed account or denied privacy on a
 frame delivery. A fresh observation of another candidate, disappearance or
@@ -1105,14 +1109,21 @@ capture path; the core performs no write. Once handed off, cancellation,
 runtime invalidation or expiry cannot promise rollback: `invalidate` returns
 `Committing`, and status remains `Committing` until the opaque
 completion returns `Committed`, `Refused`, `NotWritten` or `Indeterminate`.
+For a forget after handoff, the exclusive writer must order the store operations
+and reconcile their actual outcomes; invalidation cannot retract consumed work
+or claim the pending write was cancelled. This is a future adapter requirement,
+not runtime wiring added here.
 At most four terminal receipts remain in RAM. Eviction or restart makes a
 ticket unknown; after a write handoff, the file may hold the complete old
 or new record. Unknown never means unchanged: reload and reconcile the
 store, retaining the store's explicit post-rename uncertainty.
 
 The host target for bounded in-memory state/capture calls is under 1 ms,
-currently unmeasured. `start` additionally requests OS entropy. Eighteen
-controller fixtures pass on the development Mac; no model,
+currently unmeasured. `start` additionally requests OS entropy. Nineteen
+controller fixtures pass on the development Mac. The forget-entry fixture
+invalidates staged RAM
+before actual `People::forget`, checks the cancelled ticket cannot hand off or
+revive, and preserves the other person's complete record and stable ID. No model,
 hardware, power-loss or end-to-end approval flow is qualified here.
 
 ### One name for one face, and only a name they said (`LAMP_NAMES=checked`)

@@ -2,6 +2,8 @@
 //! socket, reads an environment variable, captures a frame or writes a store.
 //! Trusted ingress must separately prove account authority and the intended
 //! candidate's spoken consent. Neither an account start nor a name proves it.
+//! Future trusted runtime must invalidate at forget entry, before store I/O,
+//! so a pending target and captured prints do not wait for the disk or a frame.
 //!
 //! State/capture calls have a host target below 1 ms: bounded in-memory work,
 //! no filesystem/network calls or waits. Only `start` requests OS entropy.
@@ -303,8 +305,8 @@ impl Controller {
         if active.phase == Status::Committing {
             return Ok(Status::Committing);
         }
-        // Also reject revoked authority on frame delivery. Runtime privacy
-        // or account transitions must call `invalidate` without waiting for it.
+        // Also reject revoked authority on frame delivery. Runtime privacy,
+        // account and forget transitions must invalidate without waiting for it.
         if active.account != account || !allowed {
             self.finish(Status::Cancelled);
             return Err(Error::Cancelled);
@@ -495,10 +497,13 @@ impl Controller {
         Ok(status)
     }
 
-    /// Trusted runtime privacy/account invalidation, independent of a frame,
+    /// Trusted runtime privacy/account/forget invalidation, independent of a frame,
     /// ticket or the account that started the transaction. No app/model route
     /// may expose this entry point. Drops pending target, consent and prints;
     /// a consumed write handoff remains Committing until its real completion.
+    /// Call at trusted forget entry, before potentially slow store I/O. If work
+    /// was handed off, the exclusive writer must order forget and reconcile its
+    /// actual outcome; invalidation cannot retract that work or promise rollback.
     /// Disabled or absent active work returns Off or Unknown respectively;
     /// existing expiry/terminal receipts are retained, never rewritten.
     pub fn invalidate(&mut self, now: Instant) -> Result<Status, Error> {
@@ -1429,6 +1434,97 @@ mod tests {
                 original
             );
         }
+    }
+
+    #[test]
+    fn forget_entry_drops_staged_authority_before_store_io_and_cannot_revive_it() {
+        let mut fixture = Fixture::new();
+        let path = fixture.root.join("people.json");
+        fixture.people = People::open(path.clone()).unwrap().with_stable_ids(true);
+        fixture
+            .people
+            .remember("Fixture Other", vec![print(1)], 2)
+            .unwrap();
+        let other_id = fixture.people.id_of("Fixture Other").unwrap();
+        let before: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let other_record = before["people"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|person| person["name"] == "Fixture Other")
+            .unwrap()
+            .clone();
+        let at = Instant::now();
+        let (mut controller, ticket) = staged(&fixture, at);
+        let now = at + Duration::from_secs(1);
+        let active = controller.active.as_ref().unwrap();
+        assert!(active.target.is_some() && active.consent.is_some());
+        assert_eq!(active.prints.len(), MOST_PRINTS);
+        assert_eq!(
+            fixture.people.who(&print(2)),
+            None,
+            "staged replacement prints have not reached the store"
+        );
+
+        // Future trusted runtime forget entry must invalidate before store I/O,
+        // without another frame or waiting for a successful disk operation.
+        assert_eq!(controller.invalidate(now), Ok(Status::Cancelled));
+        assert!(
+            controller.active.is_none(),
+            "target, consent and prints dropped"
+        );
+        assert_eq!(
+            controller.status(account(1), ticket, now),
+            Some(Status::Cancelled)
+        );
+        assert_eq!(fixture.people.who(&print(0)).unwrap().0, "Fixture Target");
+        assert!(matches!(
+            controller.begin_commit(account(1), ticket, true, now),
+            Err(Error::Unknown)
+        ));
+
+        let forgotten = fixture.people.forget("Fixture Target").unwrap();
+        assert!(forgotten.forgot);
+        assert_eq!(forgotten.unsearched, 0);
+        assert_eq!(fixture.people.who(&print(0)), None);
+        assert_eq!(fixture.people.who(&print(2)), None);
+        assert_eq!(fixture.people.who(&print(1)).unwrap().0, "Fixture Other");
+        assert_eq!(fixture.people.id_of("Fixture Target"), None);
+        assert_eq!(fixture.people.id_of("Fixture Other"), Some(other_id));
+        let after: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(after["people"], serde_json::json!([other_record]));
+
+        for owner in [account(1), account(2)] {
+            assert!(matches!(
+                controller.begin_commit(owner, ticket, true, now),
+                Err(Error::Unknown)
+            ));
+            assert_eq!(
+                controller.accept_consent(owner, ticket, proof(ticket, face("f1"), now), now),
+                Err(Error::Unknown)
+            );
+            assert_eq!(
+                controller.push_print(owner, ticket, face("f1"), now, print(2), now),
+                Err(Error::Unknown)
+            );
+        }
+        assert_eq!(
+            controller.observe(
+                account(1),
+                FrameObservation::from_source(Some(face("f1")), 1, now),
+                true,
+                now
+            ),
+            Err(Error::Unknown)
+        );
+        assert!(controller.active.is_none());
+        assert_eq!(controller.receipts.len(), 1);
+        assert_eq!(
+            controller.status(account(1), ticket, at + TICKET_FOR),
+            Some(Status::Cancelled)
+        );
     }
 
     #[test]
