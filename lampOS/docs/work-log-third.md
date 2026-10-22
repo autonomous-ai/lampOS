@@ -5,6 +5,47 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 08:08 — Controls and strip CPU pacing pushed
+
+Ready for lamp-voice: no (#2677 awaits current-head native gates).
+
+- #2651 merged as `613986c596`; #2695 merged as `1f92c96ed` after both
+  requested fresh gates. #2677 now targets `lamp-voice`, with one commit
+  `4d94973f49293ee07b08699e8fb0ea0a95bcfe61` on `75bddc520`.
+- Folded First's #2677 ruling: ResetOnFork stays absent in both units,
+  preserving the strip at RR 30 above Voice's RR 20. The strip acquisition
+  and send use the same thread-CPU rest floor as the two main paths.
+  Terminal errors bypass sleep so the worker sends its fault immediately.
+  Recorder/relay inheritance is documented truthfully; recording is not
+  enabled in the product units.
+- The first/repeated production-loop fixture used three 5.000 ms CPU
+  reads, with end-of-read to next-start rests of 6.481, 6.130 and 6.797 ms.
+  The two real 30 ms sleeps measured 35.104/32.284 ms elapsed and requested
+  only 0.017/0.017 ms rest. These are host software timings, not lamp I2C
+  latency. The deterministic actual-monitor gap stays 30.2 ms versus 60 ms.
+- Mutating away strip pacing failed its regression; sleeping before a
+  terminal error failed the slow-fault regression. After restoring the
+  source, all 33 Controls unit tests passed. The follow-up local review
+  found no remaining issue after the fault path and docs were corrected.
+- Full local implementation gate on base `a503d70f0` passed: fmt,
+  workspace Clippy/all targets with warnings denied, workspace build,
+  and the 14 affected/dependent crates' tests: **6,858 passed, zero failed,
+  27 ignored**. The long updater/Voice cases completed normally. Exact
+  commands are in the PR; the interrupted old-base run is not a pass.
+- Final plain rebase to `75bddc520`: range-diff
+  `c3c272ff4^! → 4d94973f4^!` is `=`; no implementation/test change.
+  Post-rebase fmt/diff checks passed. Pushed with an explicit lease after
+  retargeting, posted #2602, and removed the task's temporary stash.
+- Native [ARM64 39703666978](https://github.com/autonomous-ai/lampOS/actions/runs/39703666978)
+  and [Linux Clippy 39703666785](https://github.com/autonomous-ai/lampOS/actions/runs/39703666785)
+  are running on the final head. Neither is claimed passed yet. No ARM64
+  link on the Mac. First owns merge and lamp-4ace measurements of strip
+  latency, scheduling, CPU-clock cost and loop health under Voice load.
+- #1362 is confirmed draft. The 750 ms design note is delivered; First
+  handed the policy call to Seventh. Fifth's #2487 wake-cue finding was
+  matched to the source path and left under First's assignment to Fifth;
+  no duplicate patch or policy change by Third.
+
 ## 2026-10-22 07:45 — privacy worker second rebase is green
 
 Ready for lamp-voice: yes (#2695; First owns merge).
