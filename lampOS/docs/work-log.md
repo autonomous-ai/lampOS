@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 10:25 +07, Cloud failure retained and routed
+
+[Failed #2764 native evidence](verification/report-failed-units-rebase-fab69-native-failure-20261022/README.md)
+records **7885 passed / 1 failed / 63 profile skips / 2132 selected tests
+unrun**, with all three added Cloud fixtures passing. The sole failing
+Voice forget/print fixture is unchanged from its base; a separate native
+base run and Music's run passed it. Source identity and those observations
+do not establish a root cause. Fourth and First were notified on #2764
+and #2602. This failed head is not qualified.
+
+The [successful intermediate local gate](verification/report-failed-units-rebase-2d1d3-20261022/README.md)
+passed fmt, strict Cloud Clippy and **177/0/1/0** on Music's actual merge.
+The pre-push guard withheld `d05d22ce4` after main advanced to `5c8b03a2e`.
+The next equal rebase is `beb1a4123` on that base; fresh gates are running.
+Its complete Cloud tree remains unchanged from the reviewed change.
+
+Music is merged; its follow-up metadata branch `db7db7a5f` passed fresh
+Skills **467/0/0/0** and is pushed for its PR. #2792's Voice gate follows.
+#2810's six recovery fixtures are written and await root validation;
+no behavioral result is claimed yet. #2767 remains with First.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:18 +07, Music merged
 
 First merged **#1757** as `2d1d353965b6b9f9bdc043ee4d19832630b3a6d8`.

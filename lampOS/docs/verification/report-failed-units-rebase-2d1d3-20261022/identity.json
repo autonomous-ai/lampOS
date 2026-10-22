@@ -1,0 +1,25 @@
+{
+  "old_head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+  "old_base": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+  "new_head": "d05d22ce43376078b58cd059261e1600dd25d827",
+  "new_base": "2d1d353965b6b9f9bdc043ee4d19832630b3a6d8",
+  "source_hashes_before": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b",
+    "lampOS/docs/verification/report-failed-units-20261022/README.md": "b23eca727b2d64e7cb8bc512113a22b5172ebca6a7713caeafae50fb9f677aec",
+    "lampOS/docs/verification/report-failed-units-20261022/control.json": "ae9bc885459747ccf4710241b8db3856b1af9760ff6253ee4e2092234efd2a9e",
+    "lampOS/docs/verification/report-failed-units-20261022/gate.json": "6bc77eda0a2dfdbdd65a6e595226501831f84dfbceed2207b02a9362694c5e8b"
+  },
+  "source_hashes_after": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b",
+    "lampOS/docs/verification/report-failed-units-20261022/README.md": "b23eca727b2d64e7cb8bc512113a22b5172ebca6a7713caeafae50fb9f677aec",
+    "lampOS/docs/verification/report-failed-units-20261022/control.json": "ae9bc885459747ccf4710241b8db3856b1af9760ff6253ee4e2092234efd2a9e",
+    "lampOS/docs/verification/report-failed-units-20261022/gate.json": "6bc77eda0a2dfdbdd65a6e595226501831f84dfbceed2207b02a9362694c5e8b"
+  },
+  "range_diff": "1:  93d93ecb1 = 1:  d05d22ce4 lampOS: report currently failed product units\n",
+  "music_merged_as": "2d1d353965b6b9f9bdc043ee4d19832630b3a6d8",
+  "cloud_tree": "1dd3e10a85ee130c788c245b789a6ae779c6434f"
+}
