@@ -60,6 +60,28 @@ class PackageTest(unittest.TestCase):
                        '--key-file ${CREDENTIALS_DIRECTORY}/jev.key --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus\n')
     PRODUCT_POLICY = ('[Service]\nUser=lampos\nExecStart=/opt/lampOS/policy/current/lamp-policy --key-file %d/jev.key '
                       '--endpoint https://relay.example/jev/decisions --log-dir /var/lib/lampos-policy\n')
+    PRODUCT_CLOUD = '''[Unit]
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/backend.json
+ConditionPathExists=/etc/lampOS/voice/credential
+ConditionPathExists=/var/lib/lampos-update/state.json
+After=network-online.target lamp-actions.service
+[Service]
+Environment=LAMP_CLOUD=on
+ExecStartPre=-+/usr/bin/systemctl stop os-server.service
+User=lampos
+Group=lampos
+StateDirectory=lampos-cloud
+StateDirectoryMode=0700
+LoadCredential=account:/etc/lampOS/setup/backend.json
+LoadCredential=key:/etc/lampOS/voice/credential
+LoadCredential=build:/var/lib/lampos-update/state.json
+ExecStart=/opt/lampOS/cloud/current/lamp-cloud --bus-root /run/lampos-bus
+Restart=on-failure
+ReadWritePaths=/run/lampos-bus /run/lampos-actions
+ProtectHome=yes
+'''
 
     PRODUCT_UNITS = {
         'lamp-voice.service': '[Service]\nEnvironment=LAMP_BUS=on\nEnvironment=LAMP_BUS_ROOT=/run/lampos-bus\nEnvironment=LAMP_BUS_AUDIO=on\n',
@@ -83,6 +105,8 @@ class PackageTest(unittest.TestCase):
             if unit.endswith('.service'):
                 self.write_source('deploy/product/' + unit, self.PRODUCT_UNITS.get(unit, '[Service]\n').encode())
         self.write_source('deploy/product/lamp-policy.service', self.PRODUCT_POLICY.encode())
+        self.write_source('deploy/product/lamp-cloud.service', self.PRODUCT_CLOUD.encode())
+        (self.binaries / 'lamp-cloud').write_bytes(self.adapter.read_bytes() + b'cloud')
         for name in pkg.PROVISION_SETTINGS:
             self.write_source('deploy/product/settings/' + name, b'{"fixture": true}\n')
         for name in pkg.PROVISIONING_BINARIES:
@@ -130,6 +154,47 @@ class PackageTest(unittest.TestCase):
         self.assertNotIn('LAMP_BUS', unit)
         self.assertNotIn('lamp-body-measure', manifest['binaries'])
         self.assertTrue({'SERVO_DEVICE', 'MOTOR_LOCK_DIR', 'LAMP_USER'} <= set(placeholders))
+
+    def test_generic_cloud_is_started_with_migrated_credentials_and_release_build(self):
+        self.write_generic_units()
+        manifest = self.build_generic()
+        with zipfile.ZipFile(self.output) as archive:
+            unit = archive.read('units/lamp-cloud.service').decode()
+            preflight = json.loads(archive.read('package-manifest.json'))
+            build = json.loads(archive.read('cloud-build.json'))
+            self.assertEqual(archive.read('bin/lamp-keeper'),
+                             (Path(__file__).parents[1] / 'lamp_cloud_prepare.py').read_bytes())
+            self.assertEqual(archive.read('bin/lamp-keeper-real'), (self.binaries / 'lamp-keeper').read_bytes())
+            self.assertEqual(archive.getinfo('bin/lamp-keeper').external_attr >> 16 & 0o777, 0o755)
+            self.assertEqual(archive.getinfo('bin/lamp-keeper-real').external_attr >> 16 & 0o777, 0o755)
+        self.assertIn('lamp-cloud.service', manifest['units'])
+        self.assertIn('Environment=LAMP_CLOUD=on\n', unit)
+        self.assertIn('User=@LAMP_USER@\nGroup=@LAMP_USER@\n', unit)
+        self.assertIn('BindPaths=@ACTIONS_DIR@:/run/lampos-actions\n', unit)
+        self.assertIn('ExecStartPre=-+/usr/bin/systemctl stop os-server.service\n', unit)
+        self.assertNotIn('Conflicts=', unit)
+        self.assertNotIn('ConditionPathExists=', unit)
+        self.assertIn(f'ExecStart=@RELEASE_ROOT@/runtime/cloud/{manifest["binaries"]["lamp-cloud"]}/lamp-cloud --bus-root /run/lampos-bus', unit)
+        self.assertIn('LoadCredential=build:@RELEASE_ROOT@/cloud-build.json\n', unit)
+        self.assertIn('/etc/lampOS/setup/backend.json', preflight['required_paths'])
+        self.assertIn('/etc/lampOS/setup/backend-key', preflight['required_paths'])
+        self.assertIn('/usr/bin/python3', preflight['required_paths'])
+        self.assertNotIn('/etc/lampOS/voice/credential', preflight['required_paths'])
+        self.assertNotIn('/var/lib/lampos-update/state.json', preflight['required_paths'])
+        self.assertEqual(build, {'installed': {'sequence': 0, 'commit': 'a' * 40}, 'package_version': '1.2.3'})
+
+    def test_generic_cloud_requires_binary_and_supported_product_contract(self):
+        self.write_generic_units()
+        (self.binaries / 'lamp-cloud').unlink()
+        with self.assertRaisesRegex(ValueError, 'generic migration requires lamp-cloud'):
+            self.build_generic()
+        self.write_generic_units()
+        self.write_source('deploy/product/lamp-cloud.service', self.PRODUCT_CLOUD.replace('LAMP_CLOUD=on', 'LAMP_CLOUD=off').encode())
+        with self.assertRaisesRegex(ValueError, 'cloud product contract changed'):
+            self.build_generic()
+        self.write_source('deploy/product/lamp-cloud.service', (self.PRODUCT_CLOUD + 'ConditionPathExists=/unknown\n').encode())
+        with self.assertRaisesRegex(ValueError, 'cloud product conditions changed'):
+            self.build_generic()
 
     def test_generic_runs_the_first_stand_when_the_source_has_it(self):
         # lampOS #2396: a seated lamp's first stand, confirmed at the lamp, runs

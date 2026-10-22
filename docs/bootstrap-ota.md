@@ -1487,16 +1487,24 @@ recovery, enables and starts it again, so V1 comes back with its whole site.
 A lamp whose nginx was not enabled is left as it is.
 
 The `lamp-os` ZIP built on main carries `SERVICE_PREFLIGHT=1` and
-`SERVICE_CLEANUP=1`. Its `bin/service prepare` execs the release's own
-`bin/lamp-keeper prepare` (the V2 contract from lamp-voice #1094) with
-`AUTONOMOUS_SERVICE_NAME` and `AUTONOMOUS_SERVICE_DATA` removed, as `serve`
-does for the keeper. Because it execs rather than spawns, the updater's
-120-second timeout, signals and exit status reach the keeper directly; no
-orphan keeps running after a timeout. The keeper writes the device key
-(`llm_api_key` of `/root/config/config.json`) to `/etc/lampOS/voice/credential`
-and `/etc/lampOS/policy/jev.key` where missing. It stops nothing and touches no
-hardware or unit. With no usable key it exits 0 and setup takes the key, so a
-successful prepare does **not** prove voice credentials or setup are complete.
+`SERVICE_CLEANUP=1`. Its `bin/service prepare` execs the release's packaged Python
+keeper wrapper with `AUTONOMOUS_SERVICE_NAME` and `AUTONOMOUS_SERVICE_DATA`
+removed. The wrapper prepares cloud credentials from V1, then execs the real
+`lamp-keeper prepare` (the V2 contract from lamp-voice #1094), retaining the PID.
+The updater's 120-second timeout, signals and exit status therefore reach the
+keeper directly. Preparation stops no service and touches no hardware.
+
+Cloud preparation reuses valid credentials for the same device, or converts V1
+configuration into the account and key consumed by the product cloud unit.
+The separate setup/backend-key mapping uses `BackendBase` and `BackendKey`,
+with each value's fallback resolved independently; it does not reuse the voice
+provider configuration as backend configuration. Missing or invalid required
+cloud credentials fail before V1 is stopped. This automatic package preflight
+does not require running the manual migration helper. It skips the product
+setup marker and standalone updater state: bootstrap remains the update owner.
+The real keeper still prepares `/etc/lampOS/voice/credential` and
+`/etc/lampOS/policy/jev.key` from V1's `llm_api_key` where missing; cloud
+preflight success does not prove voice readiness.
 Packaging fails when the built `lamp-keeper` lacks `prepare` (a source older
 than #1094), and an old keeper reached anyway exits nonzero. Prepare does not
 convert V1 calibration or settings; the device profile, poses and the other
@@ -1627,8 +1635,9 @@ non-group/world-writable `/etc/lampOS/package-profile.json` with `unit_id`, a
 `required_paths`. Values such as servo poses, device paths and service accounts
 must come from that Lamp. Private `/etc/lampOS/voice/provider.json` and controls
 configuration remain separately provisioned. Missing prerequisites or another
-host's identity fail preflight. This command does not implement automatic V1
-credential/calibration conversion. V2 runtime state placed outside the updater's
+host's identity fail preflight. Cloud credentials are converted by package
+preflight as described above; calibration and the remaining settings still need
+device preparation. V2 runtime state placed outside the updater's
 private data directory is not covered by its data snapshot; schema changes there
 need a separately qualified backward-compatible migration/rollback policy.
 Inspect the packaged manifest for exact
@@ -1657,12 +1666,26 @@ to replace other robot types or all Lamps.
 
 The release inventory also carries `lamp-selftest`, `lamp-settings` and
 `lamp-setup` when built upstream; adding their executables does not enable their
-services or run self-test/reset operations. `lamp-cloud` and `lamp-skills` are
-product services and their executables are carried (packaging fails if the
-source declares them and the build lacks them), but their units are not
-installed or started: `lamp-cloud` connects to the company broker, is opt-in and
-must not share V1 os-server's MQTT client ID, and `lamp-skills` also needs the
-product skills and settings that this ZIP does not carry yet.
+services or run self-test/reset operations. `lamp-cloud` is included with its
+adapted product unit and `LAMP_CLOUD=on`; `lamp-skills` remains executable-only
+because this ZIP does not carry its product skills and settings. Packaging fails
+if a declared product executable is missing.
+
+Cloud starts through `lampos.target` after the updater stops V1, avoiding two
+clients using the same MQTT identity. Its account and key are loaded as systemd
+credentials from the device. The unit binds the profile's `ACTIONS_DIR` to
+`/run/lampos-actions` inside its namespace. The adapter owns cloud like the other
+child services, reinstalls it after interrupted installation or reboot, and stops
+and removes its owned unit during cleanup/rollback; no manual cloud flag or
+service start is needed. These are package/lifecycle guarantees, not evidence
+that a particular device has connected to the broker.
+
+The release-local `cloud-build.json` records `installed.sequence: 0` and the
+actual source commit, plus the semantic package version as `package_version`.
+This source package has no CI build sequence: cloud reports `0+<commit12>`, not
+a fabricated CI build number. Rollback restores the previous release's build
+metadata along with its package. Local packaging and simulated lifecycle tests
+do not establish real-device online status or connection latency.
 `lamp-body-measure` is a factory/provisioning tool that writes one lamp's
 `BODY_POSES` at rest. The generic ZIP carries it as `tools/lamp-body-measure`,
 for the V1 migration script below, and poses are never shipped or copied from

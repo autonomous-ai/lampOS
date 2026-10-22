@@ -12,11 +12,11 @@ import zipfile
 CORE_BINARIES = ('lamp-keeper', 'lamp-voice', 'lamp-turn-end', 'lamp-body',
                  'lamp-body-worker', 'lamp-eyes', 'lamp-name', 'lamp-memory',
                  'lamp-actions', 'lamp-controls', 'lamp-expression', 'lamp-health', 'lamp-policy')
-# Optional executables are carried when built; carrying one never adds its unit.
-# lamp-cloud (company broker, opt-in, must not share V1 os-server's MQTT client ID)
-# and lamp-skills (needs the product skills and settings) stay out of DEFAULT_UNITS.
+# Optional executables are carried when built; units are selected explicitly.
+# Generic migrations include lamp-cloud's product unit, adapted below, after
+# preflight checks this lamp's migrated account. lamp-skills still needs its assets.
 # lamp-peek (read-only page, off unless LAMP_PEEK=on, never on a product lamp) is carried
-# without a unit, as lamp-cloud and lamp-skills are.
+# without a unit, as lamp-skills is.
 OPTIONAL_BINARIES = ('lamp-surround', 'lamp-update', 'lamp-ears', 'lamp-schedule',
                      'lamp-tasks', 'lamp-air', 'lamp-records', 'lamp-mood', 'lamp-bus',
                      'lamp-selftest', 'lamp-settings', 'lamp-setup', 'lamp-cloud', 'lamp-skills',
@@ -57,6 +57,7 @@ OPTIONAL_ASSETS = {
     'face_recognition_sface_2021dec.onnx': '0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79',
 }
 DEFAULT_UNITS = tuple('lamp-' + part + '.service' for part in ('voice', 'body', 'eyes', 'name', 'memory', 'actions', 'controls', 'expression', 'health', 'policy')) + ('lampos.target', 'lampos-voice.slice', 'lampos-parts.slice')
+CLOUD_UNIT = 'lamp-cloud.service'
 PROFILE_TOKENS = {'UNIT_ID', 'LAMP_USER', 'MEMORY_USER', 'SERVO_DEVICE', 'CAMERA_DEVICE',
     'CAMERA_USB', 'MOTOR_LOCK_DIR', 'CAMERA_LOCK_DIR', 'VOICE_OPTIONS', 'BODY_POSES',
     'FAST_CPUS', 'MEMORY_DIR', 'MEMORY_SOCKET', 'ACTIONS_DIR', 'MIXER_CARD',
@@ -106,6 +107,46 @@ def generic_policy(text, product):
         text = text.replace('StateDirectory=lampos-policy\n', 'StateDirectory=lampos-policy\nStateDirectoryMode=0700\n', 1)
     if '--endpoint' not in text:
         text = re.sub(r'^(ExecStart=\S*/lamp-policy) ', lambda m: f'{m[1]} --endpoint {endpoint[1]} ', text, count=1, flags=re.M)
+    return text
+
+
+def generic_cloud(product):
+    """Adapt the existing cloud contract to the service-OTA owner's paths.
+
+    The adapter starts this unit only after preflight and the V1 handover. There
+    is no product setup marker or standalone lamp-update state in this package.
+    Keep the upstream stop guard in ExecStartPre (never Conflicts, which stops
+    V1 even when systemd subsequently skips an unprovisioned cloud unit).
+    """
+    expected = (
+        'Environment=LAMP_CLOUD=on', 'User=lampos', 'Group=lampos',
+        'LoadCredential=account:/etc/lampOS/setup/backend.json',
+        'LoadCredential=key:/etc/lampOS/voice/credential',
+        'LoadCredential=build:/var/lib/lampos-update/state.json',
+        'ExecStart=/opt/lampOS/cloud/current/lamp-cloud --bus-root /run/lampos-bus',
+        'ExecStartPre=-+/usr/bin/systemctl stop os-server.service',
+    )
+    lines = product.splitlines()
+    if any(lines.count(line) != 1 for line in expected) or any(line.startswith('Conflicts=') for line in lines):
+        raise ValueError('lamp-cloud product contract changed; review the migration unit')
+    conditions = {
+        'ConditionPathExists=/var/lib/lampos-setup/done',
+        'ConditionPathExists=/etc/lampOS/setup/backend.json',
+        'ConditionPathExists=/etc/lampOS/voice/credential',
+        'ConditionPathExists=/var/lib/lampos-update/state.json',
+    }
+    if {line for line in lines if line.startswith('Condition')} != conditions:
+        raise ValueError('lamp-cloud product conditions changed; review the migration unit')
+    text = '\n'.join(line for line in lines if line not in conditions) + '\n'
+    text = text.replace('User=lampos\n', 'User=@LAMP_USER@\n').replace('Group=lampos\n', 'Group=@LAMP_USER@\n')
+    text = text.replace('/opt/lampOS/cloud/current/', '/opt/lampOS/cloud/@CLOUD_SHA256@/')
+    text = text.replace('LoadCredential=build:/var/lib/lampos-update/state.json',
+                        'LoadCredential=build:@RELEASE_ROOT@/cloud-build.json')
+    text = text.replace('LoadCredential=key:/etc/lampOS/voice/credential',
+                        'LoadCredential=key:/etc/lampOS/setup/backend-key')
+    # Cloud's socket path is fixed. Bind the existing generic actions directory
+    # into its namespace rather than move the persistent store or change V1.
+    text = text.replace('[Service]\n', '[Service]\nBindPaths=@ACTIONS_DIR@:/run/lampos-actions\n', 1)
     return text
 
 
@@ -177,8 +218,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
     generic = profile is None
     if generic:
         seated = [unit for unit in GENERIC_ONLY_UNITS if (Path(source) / 'deploy/units' / unit).exists()]
-        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated,
-                   'required_paths': ['/etc/lampOS/voice/provider.json',
+        profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated + [CLOUD_UNIT],
+                   'required_paths': ['/usr/bin/python3', '/etc/lampOS/voice/provider.json',
                        '/etc/lampOS/controls/controls.json', '/etc/lampOS/controls/controls-pins.json']}
     if set(profile) - {'substitutions', 'units', 'required_paths'}:
         raise ValueError('unknown profile fields')
@@ -243,7 +284,11 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
             if KEEPER_PREPARE not in data:
                 raise ValueError('lamp-keeper lacks the prepare command (source predates lamp-voice #1094); '
                                  'an initial migration package cannot be built from it')
-            add('bin/lamp-keeper', data, True)
+            if generic:
+                add('bin/lamp-keeper-real', data, True)
+                add('bin/lamp-keeper', read_file(Path(__file__).parent, 'lamp_cloud_prepare.py'), True)
+            else:
+                add('bin/lamp-keeper', data, True)
         elif name in ('lamp-voice', 'lamp-turn-end'):
             # The turn worker and model must live beside the voice executable.
             continue
@@ -252,10 +297,17 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         else:
             add(f'runtime/{part}/{digest(data)}/{name}', data, True)
     voice_dir = f'runtime/releases/{binary_hashes["lamp-voice"]}'
+    if generic and 'lamp-cloud' not in binary_hashes:
+        raise ValueError('generic migration requires lamp-cloud')
     for name in ('lamp-voice', 'lamp-turn-end'):
         add(f'{voice_dir}/{name}', read_file(binaries, name), True)
     add(f'runtime/body/{binary_hashes["lamp-body"]}/lamp-body-worker', read_file(binaries, 'lamp-body-worker'), True)
     if generic:
+        # This package is built from source, not a numbered lamp-update channel.
+        # Sequence zero explicitly denotes that; the commit is the actual source.
+        # Keep this release-local so rollback also restores the reported build.
+        add('cloud-build.json', (json.dumps({'installed': {'sequence': 0, 'commit': source_commit},
+                                           'package_version': version}) + '\n').encode())
         # What scripts/provision/lamp-v2-migrate reads from this package on a V1
         # lamp: the bench tool for its poses and V2's own setting templates.
         for name in sorted(provisioning_binaries):
@@ -306,7 +358,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
     for unit in sorted(units):
         if not isinstance(unit, str) or not re.fullmatch(r'[a-z][a-z0-9-]*\.(service|target|slice)', unit):
             raise ValueError(f'invalid unit name: {unit}')
-        text = read_file(source, f'deploy/units/{unit}').decode()
+        text = (generic_cloud(read_file(source, f'deploy/product/{unit}').decode())
+                if generic and unit == CLOUD_UNIT else read_file(source, f'deploy/units/{unit}').decode())
         # Template documentation uses @NAME@ as a metasyntactic example.
         text = '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#')) + '\n'
         if unit.endswith('.service'):
@@ -338,6 +391,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         for line in text.splitlines():
             if line.startswith('LoadCredential='):
                 credential = line.split('=', 1)[1].split(':', 1)
+                if len(credential) == 2 and credential[1] == '@RELEASE_ROOT@/cloud-build.json' and generic and unit == CLOUD_UNIT:
+                    continue
                 if len(credential) != 2 or not credential[1].startswith('/'):
                     raise ValueError(f'{unit}: unsupported credential source')
                 required_paths.append(credential[1])

@@ -978,6 +978,68 @@ mod tests {
         cleanup(&f.0, &fake).unwrap();
     }
     #[test]
+    fn packaged_cloud_is_started_owned_recovered_and_removed() {
+        let f = Fixture::new();
+        fs::write(
+            f.0.release.join("package-manifest.json"),
+            r#"{"format":1,"unit_id":"lamp-test","units":["lampos.target","lamp-voice.service","lamp-cloud.service"]}"#,
+        )
+        .unwrap();
+        fs::write(
+            f.0.release.join("units/lamp-cloud.service"),
+            "[Service]\nEnvironment=LAMP_CLOUD=on\nExecStart=@RELEASE_ROOT@/bin/lamp-cloud\n",
+        )
+        .unwrap();
+        let fake = Fake::default();
+        // A failed target start leaves the cloud unit journaled for recovery.
+        assert!(install(
+            &f.0,
+            "lamp-test",
+            &Fake {
+                fail_start: true,
+                ..Fake::default()
+            },
+        )
+        .is_err());
+        for reboot in [false, true] {
+            if reboot {
+                // /run disappears on reboot, but the ownership journal survives.
+                fs::remove_dir_all(&f.0.runtime).unwrap();
+            }
+            fake.calls.borrow_mut().clear();
+            let journal = install(&f.0, "lamp-test", &fake).unwrap();
+            assert!(journal.units.iter().any(|unit| unit == "lamp-cloud.service"));
+            assert!(read(&f.0.runtime.join("lamp-cloud.service"))
+                .unwrap()
+                .contains("Environment=LAMP_CLOUD=on"));
+            let owner =
+                read(&f.0.runtime.join("lamp-cloud.service.d/99-ota-owner.conf")).unwrap();
+            assert!(owner.contains("BindsTo=lamp-os.service"));
+            assert!(owner.contains("PartOf=lamp-os.service"));
+            assert_eq!(
+                read(&f.0.runtime.join("lampos.target.d/98-ota-parts.conf")).unwrap(),
+                "[Unit]\nWants=lamp-voice.service lamp-cloud.service\n",
+            );
+            assert!(fake
+                .calls
+                .borrow()
+                .iter()
+                .any(|call| call == "start lampos.target"));
+        }
+        fake.calls.borrow_mut().clear();
+        cleanup(&f.0, &fake).unwrap();
+        assert!(fake.calls.borrow().iter().any(|call| {
+            call.starts_with("stop ")
+                && call
+                    .split_whitespace()
+                    .any(|unit| unit == "lamp-cloud.service")
+        }));
+        assert!(!f.0.runtime.join("lamp-cloud.service").exists());
+        assert!(!f.0.runtime.join("lamp-cloud.service.d").exists());
+        assert!(!journal_path(&f.0).exists());
+        assert!(!f.0.persistent.exists());
+    }
+    #[test]
     fn unresolved_template_is_not_published() {
         let f = Fixture::new();
         fs::write(

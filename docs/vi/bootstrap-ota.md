@@ -1449,15 +1449,21 @@ nginx. `cleanup`, chạy khi rollback trước recovery, enable và start lại 
 V1 trở về với đủ site. Lamp có nginx không bật lúc boot thì giữ nguyên.
 
 ZIP `lamp-os` build trên main có `SERVICE_PREFLIGHT=1` và `SERVICE_CLEANUP=1`.
-`bin/service prepare` exec chính `bin/lamp-keeper prepare` của release (hợp đồng
-V2 từ lamp-voice #1094), bỏ `AUTONOMOUS_SERVICE_NAME` và `AUTONOMOUS_SERVICE_DATA`
-giống cách `serve` chạy keeper. Vì exec chứ không spawn, timeout 120 giây, tín hiệu
-và mã thoát của updater đi thẳng tới keeper; không còn tiến trình mồ côi chạy
-tiếp sau timeout. Keeper ghi key của device (`llm_api_key` trong
-`/root/config/config.json`) vào `/etc/lampOS/voice/credential` và
-`/etc/lampOS/policy/jev.key` nếu chưa có. Nó không dừng gì, không đụng hardware
-hay unit. Không có key dùng được thì nó vẫn thoát 0 và để setup nhận key, nên
-prepare thành công **không** chứng minh credentials voice hay setup đã đủ.
+`bin/service prepare` exec wrapper keeper bằng Python trong gói, bỏ
+`AUTONOMOUS_SERVICE_NAME` và `AUTONOMOUS_SERVICE_DATA`. Wrapper chuẩn bị cloud
+credentials từ V1, rồi exec `lamp-keeper prepare` thật (hợp đồng V2 từ
+lamp-voice #1094), giữ nguyên PID. Timeout 120 giây, tín hiệu và mã thoát của
+updater vì vậy đi thẳng tới keeper. Prepare không dừng service hay đụng hardware.
+
+Prepare cloud giữ lại credentials hợp lệ của đúng device, hoặc chuyển cấu hình
+V1 thành account và key cho unit cloud sản phẩm. Cấu hình setup/backend-key riêng
+lấy `BackendBase` và `BackendKey`, fallback độc lập cho từng giá trị; không lấy
+cấu hình voice provider làm cấu hình backend. Thiếu hoặc sai cloud credentials
+bắt buộc sẽ fail trước khi dừng V1. Preflight tự chạy trong gói, không cần chạy
+helper migrate bằng tay. Nó bỏ qua setup marker sản phẩm và state của updater
+độc lập: bootstrap vẫn quản lý update. Keeper thật vẫn tạo
+`/etc/lampOS/voice/credential` và `/etc/lampOS/policy/jev.key` từ `llm_api_key`
+của V1 nếu chưa có; cloud preflight thành công không chứng minh voice đã sẵn sàng.
 Packaging báo lỗi khi `lamp-keeper` được build không có `prepare` (source cũ hơn
 #1094); nếu keeper cũ vẫn được chạy thì nó thoát khác 0. Prepare không chuyển
 calibration hay settings V1; profile của device, pose và các required path bên dưới
@@ -1579,8 +1585,8 @@ không cho group/others ghi, có `unit_id`, map `substitutions` cho các placeho
 được manifest khai báo và `required_paths` tùy chọn. Pose servo, đường dẫn hardware
 và service account phải lấy đúng máy. Credentials riêng trong
 `/etc/lampOS/voice/provider.json` và config controls được cấp riêng. Thiếu điều kiện
-hoặc sai hostname sẽ fail preflight. Lệnh này chưa tự chuyển credentials/calibration
-V1. State V2 nằm ngoài thư mục dữ liệu riêng của updater không được snapshot bởi
+hoặc sai hostname sẽ fail preflight. Cloud credentials được chuyển trong preflight
+như trên; calibration và settings còn lại vẫn cần chuẩn bị riêng từng device. State V2 nằm ngoài thư mục dữ liệu riêng của updater không được snapshot bởi
 updater; đổi schema ở đó cần chính sách migration/rollback tương thích được kiểm
 chứng riêng. Xem manifest trong gói để biết điều kiện cụ thể trước khi chọn máy migrate.
 
@@ -1602,11 +1608,24 @@ Gói chung không có nghĩa được phép chuyển các robot khác hoặc to�
 
 Inventory còn mang `lamp-selftest`, `lamp-settings` và `lamp-setup` khi upstream
 build chúng; thêm executable không tự bật service hay chạy self-test/reset.
-`lamp-cloud` và `lamp-skills` là service sản phẩm nên executable được đưa vào gói
-(packaging báo lỗi nếu source khai báo mà build thiếu), nhưng unit của chúng không
-được cài hay bật: `lamp-cloud` kết nối broker công ty, là opt-in và không được dùng
-chung MQTT client ID với os-server V1; `lamp-skills` còn cần skills và settings sản
-phẩm mà ZIP này chưa mang. `lamp-body-measure` là công cụ nhà máy/provisioning ghi
+`lamp-cloud` được đóng gói cùng unit sản phẩm đã điều chỉnh và
+`LAMP_CLOUD=on`; `lamp-skills` vẫn chỉ mang executable vì gói chưa có skills và
+settings sản phẩm của nó. Packaging báo lỗi nếu thiếu executable đã khai báo.
+
+Cloud chạy qua `lampos.target` sau khi updater dừng V1, tránh hai client dùng
+chung MQTT identity. Account và key được nạp bằng systemd credentials từ device.
+Unit bind `ACTIONS_DIR` của profile vào `/run/lampos-actions` trong namespace của
+nó. Adapter sở hữu cloud như các service con khác, cài lại sau gián đoạn/reboot,
+và dừng rồi xoá unit do nó tạo khi cleanup/rollback; không cần bật flag hay start
+cloud bằng tay. Đây là bảo đảm của gói/lifecycle, không chứng minh một device cụ
+thể đã kết nối broker.
+
+`cloud-build.json` nằm trong release ghi `installed.sequence: 0` và source commit
+thật, cùng version ngữ nghĩa của gói ở `package_version`. Gói build từ source
+không có số thứ tự CI: cloud báo `0+<commit12>`, không bịa số build CI. Rollback
+khôi phục build metadata cùng release trước. Test đóng gói và lifecycle mô phỏng
+local không chứng minh device online thật hay độ trễ kết nối.
+`lamp-body-measure` là công cụ nhà máy/provisioning ghi
 `BODY_POSES` của từng lamp lúc đứng yên. ZIP chung mang nó ở
 `tools/lamp-body-measure` cho script migrate V1 bên dưới, và pose không bao giờ được
 ship hay chép từ lamp khác. Khi build từ source lampOS có
