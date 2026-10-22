@@ -712,6 +712,7 @@ const BUS_TOPICS: &[&str] = &[
     "mood/nudge",
     "mood/state",
     "name/heard",
+    "name/near",
     "name/rising",
     "output/caps",
     "policy/decisions",

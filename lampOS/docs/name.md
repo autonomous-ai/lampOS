@@ -37,6 +37,7 @@ of the lines addressed to a similar name.
 | `--rescue-sha256` | The rescue model's SHA-256, 64 lower-case hex digits; required with `--rescue-model` | — |
 | `--rescue-gate` | A score from 0.05 to 0.95 | 0.5 |
 | `--stop-least` | A score from 0.5 to 1: also run `stop.onnx` (beside the others, its SHA-256 checked) on the same embeddings, and publish `stop/heard` at the step its score first reaches this, then nothing new for 1 s ([stop-word.md](stop-word.md), #1555). In `check`, a `FILE stop SECONDS SCORE` line per hearing | off: `stop.onnx` is not loaded |
+| `--near` | A score from 0.05 to under `--least`: also say each hearing that reaches this lower bar on `name/near`, when it is over, with its highest score; `name/heard` and `name/rising` are as without it. `LAMP_NAME_NEAR=on` in its environment, with no `--near`, is `--near 0.5` (the voice's second route reads it beside a line's first word, [second-voice.md](second-voice.md)) | off |
 | `--bus-root` | The bus's directory | `LAMP_BUS_ROOT`, or `/run/lampos-bus` |
 
 It is its own process: with it gone the lamp talks on as before, and
@@ -49,6 +50,7 @@ end it with 1 before it listens to anything.
 | `mic2/audio` (or `mic1/audio`) | `lamp_msgs/Audio` | Reads: what the microphone hears, as the voice publishes it |
 | `name/rising` | `lamp_msgs/NameHeard` | Publishes: each hearing's first sign, as soon as the score reaches its bar, with the score so far (#782) |
 | `name/heard` | `lamp_msgs/NameHeard` | Publishes: a score and how long ago the name began, once for each hearing, when it is over |
+| `name/near` | `lamp_msgs/NameHeard` | Publishes, with `--near`: each hearing that reached the lower bar, when it is over, its highest score and how long before it reached that bar; its window is from then to the message's time. Never a call alone |
 | `diagnostics` | `lamp_msgs/Diagnostic` | Publishes: how it is, about once a second, as `name` |
 
 **Said twice (#782).** A hearing is said on `name/heard` when the score

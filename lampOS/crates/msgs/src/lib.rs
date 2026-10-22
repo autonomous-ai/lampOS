@@ -1052,6 +1052,17 @@ impl NameHeard {
     /// final word is still on [`Self::TOPIC`], with the highest score. A
     /// first sign with no final word was a near miss.
     pub const RISING_TOPIC: &str = "name/rising";
+    /// A hearing that reached a lower bar than the listener's own
+    /// (`lamp-name --near`, `LAMP_NAME_NEAR`): said when it is over, with
+    /// the highest score it reached and `ago_ms` from when it reached that
+    /// bar, so its window is from then to the message's time. One that
+    /// reached the listener's bar is said here too. Nothing reads it as
+    /// the name alone.
+    pub const NEAR_TOPIC: &str = "name/near";
+    /// The switch for those hearings, one name for both its halves: the
+    /// listener that says them, and the voice's second route that reads
+    /// them beside a line's first word (`on`, and nothing else).
+    pub const NEAR_ENVIRONMENT: &str = "LAMP_NAME_NEAR";
 
     /// Each hearing is over when it has been sent. None is promised.
     pub fn declaration() -> Declaration {
@@ -1531,7 +1542,10 @@ pub fn memory_topics() -> Vec<(&'static str, Declaration)> {
 /// The first sign of each hearing of the lamp's name (`name/rising`, #782),
 /// separate from the original seventeen, where its final word is.
 pub fn name_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(NameHeard::RISING_TOPIC, NameHeard::declaration())]
+    vec![
+        (NameHeard::RISING_TOPIC, NameHeard::declaration()),
+        (NameHeard::NEAR_TOPIC, NameHeard::declaration()),
+    ]
 }
 
 /// A stop word heard (`stop/heard`, #828), separate from the original
@@ -2283,11 +2297,16 @@ mod tests {
         assert_eq!((declared.kind, declared.period()), (Kind::Event, None));
         // Its first sign is the same message on a topic of its own, not one
         // of the original seventeen.
-        assert_eq!(declaration_of(NameHeard::RISING_TOPIC), Some(declared));
+        assert_eq!(
+            declaration_of(NameHeard::RISING_TOPIC),
+            Some(declared.clone())
+        );
+        assert_eq!(declaration_of(NameHeard::NEAR_TOPIC), Some(declared));
         assert!(
             first_topics()
                 .iter()
-                .all(|(topic, _)| *topic != NameHeard::RISING_TOPIC)
+                .all(|(topic, _)| *topic != NameHeard::RISING_TOPIC
+                    && *topic != NameHeard::NEAR_TOPIC)
         );
     }
 
