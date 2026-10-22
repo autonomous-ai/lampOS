@@ -1,0 +1,38 @@
+{
+  "buttons": [
+    {
+      "active_low": true,
+      "line": 99,
+      "name": "primary",
+      "pull": "up"
+    }
+  ],
+  "chip": "/dev/gpiochip0",
+  "every_ms": 5,
+  "head_pads": [
+    {
+      "active_low": false,
+      "line": 37,
+      "name": "head-1",
+      "pull": "down"
+    },
+    {
+      "active_low": false,
+      "line": 96,
+      "name": "head-2",
+      "pull": "down"
+    },
+    {
+      "active_low": false,
+      "line": 97,
+      "name": "head-3",
+      "pull": "down"
+    },
+    {
+      "active_low": false,
+      "line": 98,
+      "name": "head-4",
+      "pull": "down"
+    }
+  ]
+}

@@ -613,6 +613,19 @@ mod tests {
         true
     }
 
+    /// Writes the pins file prepare gives a lamp moved from V1, from this
+    /// build's product file, as a kept store for lamp-controls' tests
+    /// (`crates/controls/tests/fixtures/stores/README.md`), when
+    /// `LAMP_CONTROLS_MOVED_PINS_FIXTURE` names the file to write.
+    #[test]
+    #[ignore = "writes a fixture"]
+    fn write_a_moved_pins_fixture() {
+        let target = std::env::var_os("LAMP_CONTROLS_MOVED_PINS_FIXTURE")
+            .expect("LAMP_CONTROLS_MOVED_PINS_FIXTURE");
+        let product = include_str!("../../../deploy/product/settings/controls-pins.json");
+        std::fs::write(target, generic_pins(product).unwrap()).unwrap();
+    }
+
     /// #2529: the generic voice unit carries the ring's ceiling itself, and
     /// the voice refuses the flag given twice, so the profile's voice
     /// options never carry it.

@@ -8,6 +8,7 @@ mod head_discovery;
 mod head_rest;
 mod head_sleep;
 mod hold_clear;
+mod kept_stores;
 mod mpr121;
 mod mute;
 mod no_slide;
