@@ -523,8 +523,11 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `speak` | speaks, or plays a short sound | — | `speak` |
   | `light` | changes the light | — | `light` |
   | `body` | moves the lamp | — | `body` |
+  | `output_limits` | caps the light and the volume at set hours | — | `output_limits` |
+  | `messages` | sends a short message to your phone | — | `messages` |
   | `camera` | uses the camera when it runs | the privacy switch stops it | `look` |
   | `faces` | notices faces in front of it, with the camera | the privacy switch stops it | `humans/faces/tracked` |
+  | `known_faces` | knows whether a face is one it has met, never whose | the privacy switch stops it | `known_faces` |
   | `presence` | notices whether someone is at the desk, with the camera | the privacy switch stops it | `room/presence`, `room/activity` |
   | `hearing` | hears what is said to it | the privacy switch stops it | `voice/heard`, `name/heard` |
   | `room_sound` | hears how loud the room is | the privacy switch stops it | `ears/level`, `ears/sudden` |
