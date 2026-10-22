@@ -1,0 +1,777 @@
+{
+  "base": "ae80e1c5d2b7bfdec22da7eaa326c68007934954",
+  "host": "Darwin x86_64",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "source_audit": {
+    "base": "ae80e1c5d2b7bfdec22da7eaa326c68007934954",
+    "new_test_source_sha256": "d9b7f2caade98b18dac4f276a92f59a71e6692d4978f592ec94ac9ca704b8be1",
+    "unchanged_production_and_config": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": true,
+      "lampOS/crates/voice/src/remember.rs": true,
+      "lampOS/.config/nextest.toml": true
+    },
+    "existing_nine_regressions_byte_identical_prefix": true,
+    "production_and_config_sha256": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": "9b9ecd19262d949f754d2cd443c52ea0744db968326ad9e4b46fb06590498ad2",
+      "lampOS/crates/voice/src/remember.rs": "32a1655855664876ccd34ecceb04f6de0af4fc3a894216a3aa6ac97248a41224",
+      "lampOS/.config/nextest.toml": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+    }
+  },
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.126,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 83.14,
+      "log_sha256": "6d2fad2b9d5990d306b95b19174c45a38ace5b479c907b29e2ee4a72d7b36378"
+    },
+    {
+      "stage": "retry-worker",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "memory_note_retries",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 120.541,
+      "log_sha256": "94157a72e361b9e6976342fd023c657e60a98e692d603eacf06ba961bccfac4e",
+      "counts": {
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "retry-client",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "session_note_",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 1.121,
+      "log_sha256": "af38ed1d6cc89d5c628c089b23c70c1507eaa6c6bdda3e56e6550a011fcfe01d",
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "callback",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "kept_name_callback",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 0.503,
+      "log_sha256": "fcafe0a0043b350ef22e5030f7735bbd88357db99fcdd25e797e0f6432c78dec",
+      "counts": {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "fixture",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 0.72,
+      "log_sha256": "8006749531846d4c83affcb2360b9403b47b83d757f2ab04e1dc682bcd3c02f6",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "census",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "switch_census_tests",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 3.758,
+      "log_sha256": "3dd05871e415637091fd8ac46510fa517a5a93c1a4b4ac4a76ba72f661cba62a",
+      "counts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit": 0,
+      "seconds": 81.077,
+      "log_sha256": "df33e48f8f2e06456c8f8624168ca879daa5b24e4debe2f624f878997b583690"
+    }
+  ],
+  "focused_unique_counts": {
+    "passed": 27,
+    "failed": 0,
+    "ignored": 0
+  },
+  "counting": "12 worker (9 unchanged + 3 new), 6 client, 3 callback, 1 follows-face fixture, 5 census; one changed-case repeat is not added.",
+  "retry_io": {
+    "configured_us": 300000,
+    "observed_us": 301590,
+    "asserted_lower_us": 280000,
+    "asserted_upper_exclusive_us": 400000,
+    "scopes": 2,
+    "room_reply_held_ms": 200,
+    "start": "Immediately before eligible Sessions::frozen at virtualt+30s, before DaysClient I/O",
+    "end": "Sessions::frozen returns following DaysClient::session_note_within(explicit300ms)",
+    "production_fresh_session_note_FIRST_READ": "Source-checked only by this new test; existing client controls execute their production FIRST_READ constant.",
+    "acoustic_or_device_latency_claim": false
+  },
+  "new_controls": [
+    {
+      "test": "a_timed_out_note_retries_and_recovers_without_a_keep",
+      "asserted_snapshot_opens": 2,
+      "virtual_seconds": [
+        0,
+        29,
+        30,
+        60
+      ],
+      "keep": false
+    },
+    {
+      "test": "a_non_held_person_change_bypasses_the_failed_persons_backoff",
+      "asserted_snapshot_opens": 4,
+      "virtual_seconds": [
+        0,
+        1,
+        2
+      ],
+      "scope_path": "RequestScope/ScopeSnapshot::of -> told_while_scope_holds -> Sessions::told_for -> Sessions::frozen(changed)",
+      "scope_held": false,
+      "literal_forced_refresh": false
+    },
+    {
+      "test": "an_eligible_retry_shares_one_budget_between_room_and_person",
+      "asserted_snapshot_opens": 4,
+      "virtual_seconds": [
+        0,
+        30,
+        59
+      ]
+    }
+  ],
+  "fixture": "Synchronous controller; bounded poll/read/write/result channels; scoped client threads; held streams dropped only after client result; session_close jobs acknowledged separately with unconstrained ordering.",
+  "new_failures": [],
+  "native": "Pending exact published-head ARM64 and x86Clippy; no local result substitutes for native qualification.",
+  "limits": [
+    "Synthetic local socket replies, not a real Memory store",
+    "No full global memory_context initialization or provider worker execution",
+    "No real lamp, acoustic latency, face recognition or product-row acceptance",
+    "No production/API/config/nextest/env/census change"
+  ],
+  "loader_count_proof": {
+    "reason": "The synchronous controller only counts accepted requests; explicit loader counts also catch a cached response masking an unnecessary loader invocation.",
+    "change": "AtomicUsize local to the non-held test; assert 1 after A, 2 after B and still 2 after cached B.",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 12.13,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 66.127,
+        "log_sha256": "8f52a1bb74697a3991a4fb3e4fda92a11fd717d7afd380847ceda500489f2e40"
+      },
+      {
+        "stage": "non-held",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "a_non_held_person_change_bypasses_the_failed_persons_backoff",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 99.501,
+        "log_sha256": "4c66ae39fbbcc6e642ebd9554dcc8304e55baaa7ac14d498348d868c40c87618",
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    ],
+    "final_source_audit": {
+      "base": "ae80e1c5d2b7bfdec22da7eaa326c68007934954",
+      "test_source_sha256": "c062891e2b4d977b6a01c00a43c02736e2453b9af3b0395e54084a4e466655ac",
+      "existing_411_line_prefix_byte_identical": true,
+      "production_and_nextest_sha256": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": "9b9ecd19262d949f754d2cd443c52ea0744db968326ad9e4b46fb06590498ad2",
+        "lampOS/crates/voice/src/remember.rs": "32a1655855664876ccd34ecceb04f6de0af4fc3a894216a3aa6ac97248a41224",
+        "lampOS/.config/nextest.toml": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      }
+    },
+    "counting": "One repeated case, not an additional unique test. The initial 27-case gate and workspace build retain their earlier test-source hash; the other 26 test bodies and all production files are unchanged."
+  },
+  "qualified_head_before_rebase": {
+    "observed_utc": "2026-10-22T08:12:41.563580+00:00",
+    "pr_url": "https://github.com/autonomous-ai/lampOS/pull/2936",
+    "head": "3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290",
+    "ci_base": "a16545d928fe7262bc58eb5f4f51514abd944cf0",
+    "ci_checkout_merge": "616ece5713ddffd099b896abdca917ce5f7a92c0",
+    "runs": {
+      "arm64": {
+        "id": 39744314100,
+        "number": 5739,
+        "attempt": 1,
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39744314100",
+        "head": "3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290",
+        "status": "completed",
+        "conclusion": "success",
+        "watch_exit": 0,
+        "log_sha256": "99eeb7a94c8b2dbb2ca428df194b143d20cf346e6fc4aa2d9cfec62f59a43436",
+        "jobs": [
+          {
+            "id": 119708897733,
+            "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+            "conclusion": "success",
+            "started_at": "2026-10-22T07:58:43Z",
+            "completed_at": "2026-10-22T08:11:15Z"
+          },
+          {
+            "id": 119714075465,
+            "name": "report-full-run-failure",
+            "conclusion": "skipped",
+            "started_at": "2026-10-22T08:11:15Z",
+            "completed_at": "2026-10-22T08:11:15Z"
+          },
+          {
+            "id": 119714076472,
+            "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+            "conclusion": "skipped",
+            "started_at": "2026-10-22T08:11:16Z",
+            "completed_at": "2026-10-22T08:11:15Z"
+          }
+        ]
+      },
+      "clippy": {
+        "id": 39744313022,
+        "number": 1746,
+        "attempt": 1,
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39744313022",
+        "head": "3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290",
+        "status": "completed",
+        "conclusion": "success",
+        "watch_exit": 0,
+        "log_sha256": "fccaaa62289c8d158f5728fd911b1a5bca2dd480362ffd5f1f912f192dae6e66",
+        "jobs": [
+          {
+            "id": 119708894079,
+            "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+            "conclusion": "success",
+            "started_at": "2026-10-22T07:58:38Z",
+            "completed_at": "2026-10-22T08:01:48Z"
+          }
+        ]
+      }
+    },
+    "native_nextest": {
+      "run": 10334,
+      "passed": 10334,
+      "failed": 0,
+      "leaky_passed": 1,
+      "skipped": 67,
+      "unrun_selected": 0,
+      "seconds": 172.963,
+      "binaries_run": 162,
+      "binaries_skipped_by_filter": 2
+    },
+    "selection_lines": [],
+    "doc_tests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "turn_end_wire_process": {
+      "passed": 12,
+      "failed": 0
+    },
+    "ipc_relay_signals": "ok",
+    "callback_pass_lines": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7542174Z         PASS [   0.010s] ( 8886/10334) lamp-voice second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7598077Z         PASS [   0.009s] ( 8887/10334) lamp-voice second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7666737Z         PASS [   0.013s] ( 8889/10334) lamp-voice second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker"
+    ],
+    "follows_face_pass_lines": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:29.0764184Z         PASS [   0.306s] ( 8098/10334) lamp-voice remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+    ],
+    "leaky_pass_lines": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:32.4876010Z         LEAK [   0.243s] ( 8394/10334) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    ],
+    "artifact": {
+      "id": 12410858272,
+      "node_id": "MDg6QXJ0aWZhY3QxMjQxMDg1ODI3Mg==",
+      "name": "lampos-arm64-3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290",
+      "size_in_bytes": 113866287,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12410858272",
+      "archive_download_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12410858272/zip",
+      "expired": false,
+      "digest": "sha256:83c907ec12b04f7965e739cd49b097bc5505ed3f7d81cb38480f92640b6b7fbf",
+      "created_at": "2026-10-22T08:11:12Z",
+      "updated_at": "2026-10-22T08:11:12Z",
+      "expires_at": "2026-10-29T08:11:05Z",
+      "workflow_run": {
+        "id": 39744314100,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "fourth/memory-retry-boundaries",
+        "head_sha": "3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290"
+      }
+    },
+    "readiness_mutation": "none; root owns readiness and posting",
+    "reruns_by_this_agent": 0,
+    "retry_cases": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7650255Z         PASS [   0.005s] ( 8888/10334) lamp-voice second_provider::worker::memory_note_retries::a_held_person_change_cannot_leave_the_previous_persons_note_cached",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7715688Z         PASS [   0.006s] ( 8890/10334) lamp-voice second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7732260Z         PASS [   0.007s] ( 8891/10334) lamp-voice second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7783263Z         PASS [   0.005s] ( 8892/10334) lamp-voice second_provider::worker::memory_note_retries::a_valid_empty_note_is_cached_without_retries",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8294173Z         PASS [   0.006s] ( 8894/10334) lamp-voice second_provider::worker::memory_note_retries::an_explicit_refresh_does_not_wait_for_failed_read_backoff",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8351539Z         PASS [   0.006s] ( 8895/10334) lamp-voice second_provider::worker::memory_note_retries::an_incomplete_note_retries_at_thirty_seconds_and_then_stays_cached",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8410098Z         PASS [   0.006s] ( 8896/10334) lamp-voice second_provider::worker::memory_note_retries::authority_is_checked_after_waiting_for_an_older_context",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8466246Z         PASS [   0.006s] ( 8897/10334) lamp-voice second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8519338Z         PASS [   0.005s] ( 8898/10334) lamp-voice second_provider::worker::memory_note_retries::repeated_failures_get_one_attempt_per_interval",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.8572700Z         PASS [   0.005s] ( 8899/10334) lamp-voice second_provider::worker::memory_note_retries::unchanged_authority_keeps_the_note_and_unleased_behavior",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:36.0779306Z         PASS [   0.306s] ( 8933/10334) lamp-voice second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:36.0856429Z         PASS [   0.307s] ( 8936/10334) lamp-voice second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person"
+    ],
+    "client_cases": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.4362818Z         PASS [   0.006s] ( 8062/10334) lamp-voice remember::tests::session_note_a_keep_committed_during_its_read_marks_the_next_refresh",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.4418485Z         PASS [   0.006s] ( 8063/10334) lamp-voice remember::tests::session_note_empty_room_and_person_snapshots_are_complete",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.4475193Z         PASS [   0.006s] ( 8064/10334) lamp-voice remember::tests::session_note_failed_personal_reads_remain_incomplete_until_recovered",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.4529577Z         PASS [   0.005s] ( 8065/10334) lamp-voice remember::tests::session_note_refused_and_malformed_room_reads_can_recover",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.7367501Z         PASS [   0.306s] ( 8079/10334) lamp-voice remember::tests::session_note_a_room_timeout_is_incomplete_within_the_note_budget",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:28.7608292Z         PASS [   0.306s] ( 8084/10334) lamp-voice remember::tests::session_note_room_and_person_share_one_300ms_deadline"
+    ],
+    "callback_cases": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7542174Z         PASS [   0.010s] ( 8886/10334) lamp-voice second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7598077Z         PASS [   0.009s] ( 8887/10334) lamp-voice second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7666737Z         PASS [   0.013s] ( 8889/10334) lamp-voice second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker"
+    ],
+    "fixture_case": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:29.0764184Z         PASS [   0.306s] ( 8098/10334) lamp-voice remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+    ],
+    "census_cases": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:18.4146923Z         PASS [   0.005s] ( 7592/10334) lamp-voice process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:18.7241694Z         PASS [   0.247s] ( 7595/10334) lamp-voice process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:18.7285396Z         PASS [   0.253s] ( 7596/10334) lamp-voice process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:18.7339203Z         PASS [   0.010s] ( 7597/10334) lamp-voice process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:18.8937702Z         PASS [   0.478s] ( 7610/10334) lamp-voice process::switch_census_tests::a_helper_left_out_loses_its_switches"
+    ],
+    "timeout_recovery_case": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:36.0779306Z         PASS [   0.306s] ( 8933/10334) lamp-voice second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep"
+    ],
+    "normal_person_change_case": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:35.7732260Z         PASS [   0.007s] ( 8891/10334) lamp-voice second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff"
+    ],
+    "shared_retry_budget_case": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:10:36.0856429Z         PASS [   0.307s] ( 8936/10334) lamp-voice second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person"
+    ]
+  },
+  "latest_base_rebase": {
+    "audit": {
+      "old_head": "3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290",
+      "base": "8dd69028a2799e1f534835911a404a5bdaab3e54",
+      "source_head_before_evidence_amend": "7e31615fd6935decf7d1716e58b4cdd8163436af",
+      "range_diff": "1:  3bbbb6cbc = 1:  7e31615fd lampOS: test memory note retry boundaries",
+      "test_source_sha256": "c062891e2b4d977b6a01c00a43c02736e2453b9af3b0395e54084a4e466655ac",
+      "test_source_byte_identical_to_reviewed_head": true,
+      "parent_test_prefix_byte_identical": true,
+      "parent_test_lines": 411,
+      "upstream_parent_drift": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": false,
+        "lampOS/crates/voice/src/remember.rs": false,
+        "lampOS/.config/nextest.toml": false
+      },
+      "production_and_config_sha256": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": "9b9ecd19262d949f754d2cd443c52ea0744db968326ad9e4b46fb06590498ad2",
+        "lampOS/crates/voice/src/remember.rs": "32a1655855664876ccd34ecceb04f6de0af4fc3a894216a3aa6ac97248a41224",
+        "lampOS/.config/nextest.toml": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      }
+    },
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 11.809,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "retry-worker",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "memory_note_retries",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 115.521,
+        "log_sha256": "7f26931bd02a4151a2db6aac6df511a00e505d12b61742753e3d554d9acb915b",
+        "counts": {
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 77.97,
+        "log_sha256": "d561040d8e32b38882c46800e03d12c4844e42fe5be956a421c88cee2a6c3c01"
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "build",
+          "--workspace"
+        ],
+        "exit": 0,
+        "seconds": 60.578,
+        "log_sha256": "0a841da4c7ae43a19e5c05c74369266da9f41d94bdd540c86d3f2350b41f1fa8"
+      }
+    ],
+    "focused_counts": {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    "counts_attribution": "Twelve repeated retry cases on the new parent. Original 27-case local gate, one changed-case repeat, and 10334-test native gate retain their original source/head/base attribution; no repetitions added.",
+    "raw_checks": "/private/tmp/fourth-memory-retry-boundaries-checks-20261022/rebase-latest",
+    "native": "Fresh exact-head native ARM64 and x86 Clippy pending after root publication.",
+    "evidence_amendment": "Only README and validation JSON changed after the plain source replay.",
+    "retry_io": {
+      "configured_us": 300000,
+      "observed_us": 300779,
+      "asserted_lower_us": 280000,
+      "asserted_upper_exclusive_us": 400000,
+      "boundary": "Eligible Sessions::frozen through actual DaysClient::session_note_within with explicit 300ms argument; no acoustic or global callback claim."
+    }
+  },
+  "qualified_3c_head_before_final_rebase": {
+    "failed_first_attempt": {
+      "head": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+      "run": 39747538858,
+      "attempt": 1,
+      "conclusion": "failure",
+      "counts": {
+        "passed": 6025,
+        "failed": 1,
+        "skipped": 67,
+        "unrun": 4337
+      },
+      "failed_test": "lamp-tasks::runtime targets_from_machines_are_written_and_used_while_signed_in",
+      "assertion": "No signed-out cli_busy=false diagnostic within five seconds; last report signed_in=no, requests=6, cli_busy=true.",
+      "artifact": null,
+      "log_sha256": "939ed0ac361fe22b550dd34b1c9d7cbc3977253949eba98dc7ef40b418f289cb"
+    },
+    "rerun_authorization": "First issuecomment6336615705 authorized attempt2",
+    "successful_attempt2": {
+      "observed_utc": "2026-10-22T08:59:31.627856+00:00",
+      "pr_url": "https://github.com/autonomous-ai/lampOS/pull/2936",
+      "head": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+      "ci_base": "555117e757c38f752c142b4e29dbfa342e73121a",
+      "ci_checkout_merge": "3891e6925930ca2f290beac3b5c68117c63e8d8b",
+      "runs": {
+        "arm64": {
+          "id": 39747538858,
+          "number": 5759,
+          "attempt": 2,
+          "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39747538858",
+          "head": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+          "status": "completed",
+          "conclusion": "success",
+          "watch_exit": 0,
+          "log_sha256": "8a39ed69235e31a874c9766c5268f569dcca5b26742f6f92e2912e22888a6ade",
+          "jobs": [
+            {
+              "id": 119729400068,
+              "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+              "conclusion": "success",
+              "started_at": "2026-10-22T08:48:01Z",
+              "completed_at": "2026-10-22T08:57:25Z"
+            },
+            {
+              "id": 119733485228,
+              "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+              "conclusion": "skipped",
+              "started_at": "2026-10-22T08:57:25Z",
+              "completed_at": "2026-10-22T08:57:25Z"
+            },
+            {
+              "id": 119733486670,
+              "name": "report-full-run-failure",
+              "conclusion": "skipped",
+              "started_at": "2026-10-22T08:57:25Z",
+              "completed_at": "2026-10-22T08:57:25Z"
+            }
+          ]
+        },
+        "clippy": {
+          "id": 39747538905,
+          "number": 1766,
+          "attempt": 1,
+          "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39747538905",
+          "head": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+          "status": "completed",
+          "conclusion": "success",
+          "watch_exit": 0,
+          "log_sha256": "27dd743710b8e5507e9014ed9028ed0356ab190a41b1ed6de82c1fa26a8231ff",
+          "jobs": [
+            {
+              "id": 119719652071,
+              "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+              "conclusion": "success",
+              "started_at": "2026-10-22T08:24:54Z",
+              "completed_at": "2026-10-22T08:29:24Z"
+            }
+          ]
+        }
+      },
+      "native_nextest": {
+        "run": 10363,
+        "passed": 10363,
+        "failed": 0,
+        "leaky_passed": 1,
+        "skipped": 67,
+        "unrun_selected": 0,
+        "seconds": 176.378,
+        "binaries_run": 162,
+        "binaries_skipped_by_filter": 2
+      },
+      "selection_lines": [],
+      "doc_tests": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      },
+      "ipc_relay_signals": "ok",
+      "callback_pass_lines": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2098616Z         PASS [   0.012s] ( 8914/10363) lamp-voice second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2128756Z         PASS [   0.011s] ( 8915/10363) lamp-voice second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2248083Z         PASS [   0.015s] ( 8917/10363) lamp-voice second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker"
+      ],
+      "follows_face_pass_lines": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:38.4413755Z         PASS [   0.308s] ( 8126/10363) lamp-voice remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+      ],
+      "leaky_pass_lines": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:41.8501922Z         LEAK [   0.218s] ( 8422/10363) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ],
+      "artifact": {
+        "id": 12412589912,
+        "node_id": "MDg6QXJ0aWZhY3QxMjQxMjU4OTkxMg==",
+        "name": "lampos-arm64-3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+        "size_in_bytes": 114114801,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12412589912",
+        "archive_download_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12412589912/zip",
+        "expired": false,
+        "digest": "sha256:58be2a64faf1c01d2b590d83d1825162ed5462c862346d083ab1d6453bde5e7e",
+        "created_at": "2026-10-22T08:57:23Z",
+        "updated_at": "2026-10-22T08:57:23Z",
+        "expires_at": "2026-10-29T08:57:16Z",
+        "workflow_run": {
+          "id": 39747538858,
+          "repository_id": 1259624583,
+          "head_repository_id": 1259624583,
+          "head_branch": "fourth/memory-retry-boundaries",
+          "head_sha": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0"
+        }
+      },
+      "readiness_mutation": "none; root owns readiness and posting",
+      "reruns_by_this_agent": 1,
+      "retry_cases": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2183933Z         PASS [   0.006s] ( 8916/10363) lamp-voice second_provider::worker::memory_note_retries::a_held_person_change_cannot_leave_the_previous_persons_note_cached",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2256226Z         PASS [   0.007s] ( 8918/10363) lamp-voice second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2320408Z         PASS [   0.007s] ( 8919/10363) lamp-voice second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2378695Z         PASS [   0.006s] ( 8920/10363) lamp-voice second_provider::worker::memory_note_retries::a_valid_empty_note_is_cached_without_retries",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2790265Z         PASS [   0.006s] ( 8922/10363) lamp-voice second_provider::worker::memory_note_retries::an_explicit_refresh_does_not_wait_for_failed_read_backoff",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2846887Z         PASS [   0.006s] ( 8923/10363) lamp-voice second_provider::worker::memory_note_retries::an_incomplete_note_retries_at_thirty_seconds_and_then_stays_cached",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2906623Z         PASS [   0.006s] ( 8924/10363) lamp-voice second_provider::worker::memory_note_retries::authority_is_checked_after_waiting_for_an_older_context",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2967897Z         PASS [   0.006s] ( 8925/10363) lamp-voice second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.3024437Z         PASS [   0.006s] ( 8926/10363) lamp-voice second_provider::worker::memory_note_retries::repeated_failures_get_one_attempt_per_interval",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.3083249Z         PASS [   0.006s] ( 8927/10363) lamp-voice second_provider::worker::memory_note_retries::unchanged_authority_keeps_the_note_and_unleased_behavior",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.5327352Z         PASS [   0.307s] ( 8961/10363) lamp-voice second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.5449588Z         PASS [   0.307s] ( 8965/10363) lamp-voice second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person"
+      ],
+      "client_cases": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:37.7994896Z         PASS [   0.007s] ( 8090/10363) lamp-voice remember::tests::session_note_a_keep_committed_during_its_read_marks_the_next_refresh",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:37.8063604Z         PASS [   0.007s] ( 8091/10363) lamp-voice remember::tests::session_note_empty_room_and_person_snapshots_are_complete",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:37.8133722Z         PASS [   0.007s] ( 8092/10363) lamp-voice remember::tests::session_note_failed_personal_reads_remain_incomplete_until_recovered",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:37.8199609Z         PASS [   0.006s] ( 8093/10363) lamp-voice remember::tests::session_note_refused_and_malformed_room_reads_can_recover",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:38.0994496Z         PASS [   0.307s] ( 8107/10363) lamp-voice remember::tests::session_note_a_room_timeout_is_incomplete_within_the_note_budget",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:38.1269654Z         PASS [   0.307s] ( 8114/10363) lamp-voice remember::tests::session_note_room_and_person_share_one_300ms_deadline"
+      ],
+      "callback_cases": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2098616Z         PASS [   0.012s] ( 8914/10363) lamp-voice second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2128756Z         PASS [   0.011s] ( 8915/10363) lamp-voice second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2248083Z         PASS [   0.015s] ( 8917/10363) lamp-voice second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker"
+      ],
+      "fixture_case": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:38.4413755Z         PASS [   0.308s] ( 8126/10363) lamp-voice remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+      ],
+      "census_cases": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:27.7117506Z         PASS [   0.005s] ( 7620/10363) lamp-voice process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:28.0276738Z         PASS [   0.253s] ( 7623/10363) lamp-voice process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:28.0340977Z         PASS [   0.250s] ( 7624/10363) lamp-voice process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:28.0362379Z         PASS [   0.009s] ( 7625/10363) lamp-voice process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:28.1895993Z         PASS [   0.478s] ( 7634/10363) lamp-voice process::switch_census_tests::a_helper_left_out_loses_its_switches"
+      ],
+      "timeout_recovery_case": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.5327352Z         PASS [   0.307s] ( 8961/10363) lamp-voice second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep"
+      ],
+      "normal_person_change_case": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.2320408Z         PASS [   0.007s] ( 8919/10363) lamp-voice second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff"
+      ],
+      "shared_retry_budget_case": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T08:56:45.5449588Z         PASS [   0.307s] ( 8965/10363) lamp-voice second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person"
+      ],
+      "rerun_authority": "First6336615705",
+      "prior_attempt_failure_receipt": "/private/tmp/fourth-memory-retry-boundaries-ci-20261022/rebase-3c2d54877/failure-receipt.json"
+    },
+    "reviewer_full_voice": {
+      "head": "3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0",
+      "passed": 3562,
+      "failed": 0,
+      "ignored": 14,
+      "source": "Reviewer-two issuecomment6336623688",
+      "attribution": "Reviewer execution, not a new Fourth local run."
+    }
+  },
+  "final_rebase_after_tasks_fixture_fix": {
+    "audit": {
+      "base": "2202bf2f56237f5547b37bdd777f3a3d66eed93f",
+      "source_head_before_evidence_amend": "570d89afc1f02f3e2f75841e8a55329790104748",
+      "range_diff": "1:  3c2d54877 = 1:  570d89afc lampOS: test memory note retry boundaries",
+      "test_source_sha256": "c062891e2b4d977b6a01c00a43c02736e2453b9af3b0395e54084a4e466655ac",
+      "test_bytes_unchanged": true,
+      "original_411_lines_byte_identical_prefix": true,
+      "upstream_production_and_config_drift": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": false,
+        "lampOS/crates/voice/src/remember.rs": false,
+        "lampOS/.config/nextest.toml": false
+      },
+      "parent_tasks_test_sha256": "98b0e818b2ce4975f10f0b0f5eb3fcb1427e6e348434847757b8b3362a83265b",
+      "task_fix": "Merged #2954 at parent2202bf2f5; signed-out test waits for two further sign-in reads instead of an idle diagnostic."
+    },
+    "format_check": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs"
+      ],
+      "exit": 0
+    },
+    "local_gates": "No Cargo invocation: byte-identical reviewed test and unchanged relevant production/configuration. Historical local/native results retain their exact source/head/base attribution.",
+    "publication": "Root owns publication and fresh exact-head native qualification.",
+    "new_native": "Pending after final-head push."
+  }
+}

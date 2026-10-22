@@ -409,3 +409,350 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
         timings.into_inner().unwrap()
     );
 }
+
+/// A controller on the test thread, not a mock worker to stop or join.
+/// Real client writer closes may interleave with foreground snapshot opens.
+struct SocketScript {
+    socket: PathBuf,
+    listener: UnixListener,
+    requests: Vec<Value>,
+}
+impl SocketScript {
+    fn new(label: &str) -> Self {
+        let socket =
+            std::env::temp_dir().join(format!("note-boundary-{label}-{}.sock", std::process::id()));
+        let listener = UnixListener::bind(&socket).unwrap();
+        Self {
+            socket,
+            listener,
+            requests: Vec::new(),
+        }
+    }
+
+    fn next_open(&mut self) -> (UnixStream, Value) {
+        use rustix::event::{PollFd, PollFlags, Timespec, poll};
+        use std::io::Read;
+        // A faulty client must fail the fixture instead of blocking accept,
+        // reading forever, or producing an unbounded stream of close jobs.
+        for _ in 0..16 {
+            let mut ready = [PollFd::new(&self.listener, PollFlags::IN)];
+            let timeout = Timespec {
+                tv_sec: 2,
+                tv_nsec: 0,
+            };
+            assert_eq!(poll(&mut ready, Some(&timeout)).unwrap(), 1);
+            let (mut stream, _) = self.listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(stream.try_clone().unwrap())
+                .take(8_193)
+                .read_line(&mut line)
+                .unwrap();
+            assert!(line.len() <= 8_192 && line.ends_with('\n'));
+            let request: Value = serde_json::from_str(&line).unwrap();
+            self.requests.push(request.clone());
+            match request["op"].as_str() {
+                Some("session_open") => return (stream, request),
+                Some("session_close") => writeln!(stream, "{}", json!({"ok":true})).unwrap(),
+                other => panic!("unexpected operation: {other:?}"),
+            }
+        }
+        panic!("no snapshot open among sixteen bounded requests");
+    }
+
+    fn opens(&self) -> Vec<&Value> {
+        self.requests
+            .iter()
+            .filter(|request| request["op"] == "session_open")
+            .collect()
+    }
+
+    fn snapshot(request: &Value, id: u64, text: &str) -> Value {
+        let scope = if request["person"].is_string() {
+            "caller-supplied person; identity not verified"
+        } else {
+            "said in this room; speaker unknown"
+        };
+        json!({"ok":true,"snapshot":{
+            "session":request["session"],"opened_unix_ms":1,"generation":1,
+            "invalidated":false,"source_ids":[id],
+            "note":json!({"scope":scope,"untrusted":true,
+                "facts":[{"id":id,"kind":"preference","text":text}]}).to_string()
+        }})
+    }
+}
+impl Drop for SocketScript {
+    fn drop(&mut self) {
+        // The controller has no background accept/read or join. Production
+        // writer closes remain best effort, with their existing I/O bound.
+        let _ = std::fs::remove_file(&self.socket);
+    }
+}
+
+/// Start timing at the eligible Sessions ask, before real client I/O. Any
+/// held replies stay open until that ask returns, so EOF cannot fake timeout.
+fn socket_attempt(
+    memory: &mut SocketScript,
+    ask: impl FnOnce() -> String + Send,
+    script: impl FnOnce(
+        &mut SocketScript,
+        &std::sync::mpsc::Receiver<(String, Duration)>,
+    ) -> Vec<UnixStream>,
+) -> (String, Duration) {
+    std::thread::scope(|threads| {
+        let (finished, result) = std::sync::mpsc::sync_channel(1);
+        let asking = threads.spawn(move || {
+            let began = Instant::now();
+            let text = ask();
+            finished.send((text, began.elapsed())).unwrap();
+        });
+        let held = script(memory, &result);
+        let outcome = result.recv_timeout(Duration::from_secs(2));
+        drop(held);
+        asking.join().unwrap();
+        outcome.expect("the bounded client ask must return")
+    })
+}
+
+#[test]
+fn a_timed_out_note_retries_and_recovers_without_a_keep() {
+    let mut memory = SocketScript::new("timeout-recovery");
+    let client = DaysClient::new(memory.socket.clone()).unwrap();
+    let mut sessions = Sessions::default();
+    let start = Instant::now();
+    let ask = |session| {
+        client.session_note_within(session, None, false, Duration::from_millis(300), true)
+    };
+    let (failed, _) = socket_attempt(
+        &mut memory,
+        || sessions.frozen(false, start, ask),
+        |memory, _| {
+            let (held, request) = memory.next_open();
+            assert!(request["person"].is_null());
+            vec![held]
+        },
+    );
+    assert!(!failed.contains("recovered fact"));
+    assert_eq!(sessions.note_retry_at, Some(start + FRESH_RETRY));
+    assert_eq!(memory.opens().len(), 1);
+    assert_eq!(
+        sessions.frozen(false, start + FRESH_RETRY - Duration::from_secs(1), |_| {
+            panic!("timeout retried before eligibility")
+        }),
+        failed
+    );
+    let (recovered, _) = socket_attempt(
+        &mut memory,
+        || sessions.frozen(false, start + FRESH_RETRY, ask),
+        |memory, _| {
+            let (mut stream, request) = memory.next_open();
+            writeln!(
+                stream,
+                "{}",
+                SocketScript::snapshot(&request, 11, "recovered fact")
+            )
+            .unwrap();
+            vec![]
+        },
+    );
+    assert!(recovered.contains("recovered fact"));
+    assert!(sessions.note_retry_at.is_none());
+    assert_eq!(
+        sessions.frozen(false, start + FRESH_RETRY * 2, |_| {
+            panic!("healthy recovered note retried")
+        }),
+        recovered
+    );
+    let opens = memory.opens();
+    assert_eq!(opens.len(), 2);
+    assert!(opens[0]["session"].as_str().unwrap().ends_with("-1"));
+    assert!(opens[1]["session"].as_str().unwrap().ends_with("-2"));
+    assert_ne!(opens[0]["session"], opens[1]["session"]);
+    assert!(!client.kept_since_note(), "no keep triggered recovery");
+}
+
+#[test]
+fn a_non_held_person_change_bypasses_the_failed_persons_backoff() {
+    let mut memory = SocketScript::new("person-change");
+    let client = DaysClient::new(memory.socket.clone()).unwrap();
+    let sessions = Mutex::new(Sessions::default());
+    let start = Instant::now();
+    let make_scope = |request, name| {
+        RequestScope::new(
+            RequestKey {
+                worker: lamp_turn_owner::BootId::new([8; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            ScopeSnapshot::of(name),
+        )
+    };
+    let a = make_scope(1, "Scope A");
+    let b = make_scope(2, "Scope B");
+    let loads = AtomicUsize::new(0);
+    let context = |lease: &crate::memory_scope::ScopeLease, now| {
+        told_while_scope_holds(&sessions, Some(lease), |sessions, captured| {
+            let captured = captured.unwrap();
+            assert!(!captured.held(), "this is the normal identified path");
+            let person = captured.person().map(str::to_owned);
+            // The real scope-change result drives refresh, exactly as the
+            // worker's selection does. No forced-refresh literal is supplied.
+            let changed = sessions.told_for(&person);
+            Told::from(sessions.frozen(changed, now, |session| {
+                loads.fetch_add(1, Ordering::Relaxed);
+                client.session_note_within(
+                    session,
+                    person.as_deref(),
+                    false,
+                    Duration::from_millis(300),
+                    true,
+                )
+            }))
+        })
+        .text
+    };
+    let (partial, _) = socket_attempt(
+        &mut memory,
+        || context(&a.lease(), start),
+        |memory, _| {
+            let (mut room, request) = memory.next_open();
+            assert!(request["person"].is_null());
+            writeln!(
+                room,
+                "{}",
+                SocketScript::snapshot(&request, 11, "old partial room")
+            )
+            .unwrap();
+            let (mut personal, request) = memory.next_open();
+            assert_eq!(
+                request["person"],
+                a.lease().scope().unwrap().person().unwrap()
+            );
+            writeln!(personal, "{}", json!({"ok":false})).unwrap();
+            vec![]
+        },
+    );
+    assert!(partial.contains("old partial room"));
+    assert_eq!(loads.load(Ordering::Relaxed), 1);
+    assert_eq!(
+        sessions.lock().unwrap().note_retry_at,
+        Some(start + FRESH_RETRY)
+    );
+    a.revoke();
+    let (theirs, _) = socket_attempt(
+        &mut memory,
+        || context(&b.lease(), start + Duration::from_secs(1)),
+        |memory, _| {
+            let (mut room, request) = memory.next_open();
+            assert!(request["person"].is_null());
+            writeln!(room, "{}", SocketScript::snapshot(&request, 12, "new room")).unwrap();
+            let (mut personal, request) = memory.next_open();
+            assert_eq!(
+                request["person"],
+                b.lease().scope().unwrap().person().unwrap()
+            );
+            writeln!(
+                personal,
+                "{}",
+                SocketScript::snapshot(&request, 22, "B-only fact")
+            )
+            .unwrap();
+            vec![]
+        },
+    );
+    assert!(theirs.contains("B-only fact") && theirs.contains("new room"));
+    assert_eq!(loads.load(Ordering::Relaxed), 2);
+    assert!(!theirs.contains("old partial room"));
+    assert!(sessions.lock().unwrap().note_retry_at.is_none());
+    let opens_before_cached = memory.opens().len();
+    assert_eq!(context(&b.lease(), start + Duration::from_secs(2)), theirs);
+    assert_eq!(loads.load(Ordering::Relaxed), 2);
+    assert_eq!(memory.opens().len(), opens_before_cached);
+    let opens = memory.opens();
+    assert_eq!(opens.len(), 4);
+    assert_eq!(opens[0]["session"], opens[1]["session"]);
+    assert_eq!(opens[2]["session"], opens[3]["session"]);
+    assert!(opens[0]["session"].as_str().unwrap().ends_with("-1"));
+    assert!(opens[2]["session"].as_str().unwrap().ends_with("-2"));
+    assert_ne!(opens[0]["session"], opens[2]["session"]);
+}
+
+#[test]
+fn an_eligible_retry_shares_one_budget_between_room_and_person() {
+    let mut memory = SocketScript::new("retry-budget");
+    let client = DaysClient::new(memory.socket.clone()).unwrap();
+    let person = crate::remember::person_id("Scope A");
+    let mut sessions = Sessions::default();
+    let start = Instant::now();
+    // This measures Sessions -> the actual DaysClient API with its explicit
+    // 300 ms argument. fresh_session_note/FIRST_READ wiring is source-only
+    // here; the remember client tests assert that production constant too.
+    let ask = |session| {
+        client.session_note_within(
+            session,
+            Some(&person),
+            false,
+            Duration::from_millis(300),
+            true,
+        )
+    };
+    socket_attempt(
+        &mut memory,
+        || sessions.frozen(false, start, ask),
+        |memory, _| {
+            let (mut room, request) = memory.next_open();
+            writeln!(
+                room,
+                "{}",
+                SocketScript::snapshot(&request, 11, "room fact")
+            )
+            .unwrap();
+            let (mut personal, _) = memory.next_open();
+            writeln!(personal, "{}", json!({"ok":false})).unwrap();
+            vec![]
+        },
+    );
+    assert_eq!(sessions.note_retry_at, Some(start + FRESH_RETRY));
+    let (_, elapsed) = socket_attempt(
+        &mut memory,
+        || sessions.frozen(false, start + FRESH_RETRY, ask),
+        |memory, result| {
+            let (mut room, request) = memory.next_open();
+            assert!(matches!(
+                result.recv_timeout(Duration::from_millis(200)),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            ));
+            writeln!(
+                room,
+                "{}",
+                SocketScript::snapshot(&request, 11, "room fact")
+            )
+            .unwrap();
+            let (personal, request) = memory.next_open();
+            assert_eq!(request["person"], person);
+            vec![personal]
+        },
+    );
+    assert!(elapsed >= Duration::from_millis(280), "{elapsed:?}");
+    assert!(elapsed < Duration::from_millis(400), "{elapsed:?}");
+    assert_eq!(sessions.note_retry_at, Some(start + FRESH_RETRY * 2));
+    sessions.frozen(
+        false,
+        start + FRESH_RETRY * 2 - Duration::from_secs(1),
+        |_| panic!("timed-out retry attempted again before eligibility"),
+    );
+    let opens = memory.opens();
+    assert_eq!(opens.len(), 4);
+    assert_eq!(opens[0]["session"], opens[1]["session"]);
+    assert_eq!(opens[2]["session"], opens[3]["session"]);
+    assert_ne!(opens[0]["session"], opens[2]["session"]);
+    eprintln!(
+        "retry note I/O: configured_us=300000 observed_us={} scopes=2",
+        elapsed.as_micros()
+    );
+}
