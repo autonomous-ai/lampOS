@@ -549,11 +549,19 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     line goes on. The record says `own_line_waits` once for each sound
     that waits, then `input_let_go_own_line` with `why` (`sounded` or
     `deadline`), and the journal says it was let go.
-  - **A sound let go at its deadline stays that sound while it goes on**
-    (#2602, from El's run on lamp-06c1 at 22:21:49 on 21 Oct). There played
-    room talk was let go at +2.144 s. The hello's first audio came at
-    +2.291 s, and the same talk, still playing, rose again as a new sound
-    at +2.343 s and cut the hello as a cut-in.
+  - **A sound let go stays that sound while it goes on** (#2602), however
+    the wait ended while it was held: at its deadline (`deadline`), because
+    the line began to sound (`sounded`), or going on from one let go
+    (`goes_on`).
+    - **At its deadline**, from El's run on lamp-06c1 at 22:21:49 on 21 Oct:
+      played room talk was let go at +2.144 s. The hello's first audio came
+      at +2.291 s, and the same talk, still playing, rose again as a new
+      sound at +2.343 s and cut the hello as a cut-in.
+    - **As the line sounded**, from El's run on lamp-06c1 at 08:17–09:08 on
+      22 Oct (build 5378, with the deadline case): in two of three hellos
+      the waiting talk was let go as `sounded` at the first audio, and came
+      back as a new sound 56 ms and 67 ms after `provider_first_audio`,
+      cutting the hello.
     - **What counts as the same sound** (`LetGoSound`): from the last block
       heard as speech when it was let go, each block of speech carries it
       on. Quiet as long as the wait's own (`WAIT_QUIET_BLOCKS`, 300 ms) ends
@@ -567,9 +575,10 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
       a 300 ms gap, and speech that starts after the first audio with
       nothing let go before it.
     - **Its cost:** someone who starts speaking while the room's talk let go
-      goes on, with no gap, doesn't cut the hello in until there is one.
-    - **Only at the deadline:** a sound let go because the line sounded
-      (`sounded`) isn't kept this way.
+      goes on, with no gap, doesn't cut the hello in until there is one,
+      unless they say the lamp's name or are seen speaking turned to it.
+      The wait has no rule for a near or loud voice of its own, so a person
+      close by with neither is heard only after a 300 ms gap.
   - **A sound that begins once the line sounds** is a cut-in over the lamp's
     voice, judged by the duplex rules as for any of its speech. So words said
     over the hello still stop it.
@@ -589,6 +598,10 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   - `a_sound_let_go_at_its_deadline_stays_that_sound_past_the_own_lines_first_audio`,
     with the 22:21:49 timing, a gap, speech after the first audio, and the
     switch off;
+  - `a_sound_held_until_the_own_line_sounds_stays_that_sound_past_its_first_audio`,
+    with 22 Oct's 56 ms and 67 ms, each end of the wait (`deadline`,
+    `sounded`, `goes_on`), the name, a turned face, a gap, speech after the
+    first audio, and the switch off;
   - `with_words_a_stop_said_before_the_own_line_sounds_stops_it`: a stop and
     a put-off stop the line; a colleague's words wait;
   - `wait_words`' `a_put_off_is_only_what_puts_the_lamp_off`;
