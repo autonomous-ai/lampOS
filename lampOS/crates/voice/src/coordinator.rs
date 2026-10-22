@@ -9506,8 +9506,10 @@ fn conversation_with_gate(
             clock,
         );
         if let Some(bus) = bus_out.as_mut() {
-            bus.state(
-                crate::ring_wire::RingPhase::from_snapshot(snapshot).filter(|_| !sound_now),
+            tell_voice_of_turn(
+                bus,
+                snapshot,
+                reply.as_ref().map(|current| current.notice.origin()),
                 clock,
             );
             bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
@@ -11531,6 +11533,20 @@ fn tell_ring_of_turn(choreography: &mut RingChoreographer, origin: Option<Speech
     );
     choreography.set_listening(cue || origin == Some(SpeechOrigin::RequestedAudio));
     choreography.set_unshown(origin.is_some_and(SpeechOrigin::unshown) && !cue);
+}
+
+/// The room sees the owned turn, except for the lamp's short unshown sounds.
+fn tell_voice_of_turn(
+    bus: &mut crate::bus_out::BusOut,
+    snapshot: Snapshot,
+    origin: Option<SpeechOrigin>,
+    at_us: u64,
+) {
+    bus.state(
+        crate::ring_wire::RingPhase::from_snapshot(snapshot)
+            .filter(|_| !origin.is_some_and(SpeechOrigin::unshown)),
+        at_us,
+    );
 }
 
 /// A skill's sound asked for, if one waits: played now as a turn of the
