@@ -5,6 +5,40 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 00:39 — wake native gates pass; qualified for train 3
+
+Ready for lamp-voice: yes (#3087; First's current-base train carry and combined gate).
+
+- Exact source `b6d7377b5cc8e50abc7098c1a1b20ebd9e195ccb` passed
+  [ARM64 39821370239](https://github.com/autonomous-ai/lampOS/actions/runs/39821370239),
+  job `119973219359`, in 17 min 50 s. Checkout was merge `ed35e18` into
+  `b8a9148bd`. **6,891 nextest tests passed, zero failed, 31 skipped**,
+  including the new disabled-hum case in 0.018 s. One existing same-voice
+  journal test reported a leaky pass; no failure is hidden or retried.
+  Four doctests and twelve own-harness process checks passed separately.
+- [Linux Clippy 39821370289](https://github.com/autonomous-ai/lampOS/actions/runs/39821370289),
+  job `119973220085`, passed every crate and target with warnings denied
+  in 8 min 45 s. Both required jobs are terminal success, checked
+  individually; the bounded watcher exited zero. No job remains running.
+- Release build, publication rehearsals, checksums and artifact upload
+  passed. Artifact `lampos-arm64-b6d7377b5cc8e50abc7098c1a1b20ebd9e195ccb`,
+  ID `12445721839`, is present and unexpired. PR signing/publication
+  correctly skipped. No local ARM64 linking, install or device trial.
+- First's exact-head read at 00:29 found no P1, P2 or P3. The native
+  receipts are in #3087, its draft flag is lifted, and the qualified head
+  is posted as NEXT TRAIN for First's train 3. This does not qualify an
+  as-yet-unbuilt combined train; First retains that latest-base gate.
+- First also read #3083 `99395e226` clean at 00:32; it rides train 2.
+  #3088 `5b6409c77` needs the external documentation read and First's
+  merge lane. The two wake/documentation patches combine without Git
+  conflict; that virtual merge is not a combined build result.
+- The log branch is rebased onto `b8a9148bd`. All 108 prior history
+  patches compare equal in range-diff, preserving its historical
+  verification records. Only Third's own log branch was updated.
+- #2948 remains draft for First's coherent carry and Fifth/person's
+  attended hand trial. The remaining #1798 and #2136 acceptance steps
+  stay with their named people; no completed software gate replaces them.
+
 ## 2026-10-23 00:28 — hand-trial fault precondition corrected as #3088
 
 Ready for lamp-voice: yes (#3088; documentation review and First's merge lane).
