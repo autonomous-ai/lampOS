@@ -580,6 +580,11 @@ fn a_missing_journal_reports_once_across_ticks_and_reload_until_one_is_installed
     for at_us in [1, 250_000, 500_000] {
         assert!(engine.clock_tick(at_us).is_empty());
     }
+    // Each later chance is dropped by the fault, said once (#2602).
+    assert_eq!(
+        engine.take_dropped(),
+        ["daily-check not run: its daily journal is faulted"]
+    );
     assert!(engine.replace(vec![loaded]).is_empty());
     assert!(engine.clock_tick(500_001).is_empty());
     assert_eq!(
@@ -1367,4 +1372,92 @@ fn a_restart_before_the_morning_still_greets_with_it() {
     engine.rested(Some(TODAY - 1));
     let (greetings, said) = desk(&mut engine, (MORNING - 6, MORNING + 3), MORNING, resting);
     assert_eq!(greetings, vec!["bedtime-morning"], "{said:?}");
+}
+
+/// #2602: each due chance Welcome back drops says one journal line naming
+/// its gate: an absence under its 300 s (once through a face that flickers
+/// past its gap) and its cooldown. Its 60 s wait for the voice running out
+/// is #3007's `chance dropped` line, not one of these: said once.
+#[test]
+fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![welcome_back(root.path())], true);
+    let face = |second: u64| {
+        [
+            (0, 5),
+            (220, 225),
+            (230, 235),
+            (600, 605),
+            (1000, 1005),
+            (2400, 2470),
+        ]
+        .iter()
+        .any(|(from, to)| (*from..=*to).contains(&second))
+    };
+    let mut greeted = Vec::new();
+    for second in 0..=2470 {
+        let now = second * 1_000_000;
+        let voice: &[u8] = if second >= 2380 {
+            br#"{"state":"speaking"}"#
+        } else {
+            br#"{"state":"resting"}"#
+        };
+        engine.observe("voice/state", now, voice, None);
+        let runs = engine.observe(
+            Faces::TOPIC,
+            now,
+            if face(second) { FACE } else { EMPTY },
+            None,
+        );
+        if runs.iter().any(|run| !run.calls.is_empty()) {
+            greeted.push(second);
+        }
+    }
+    assert_eq!(greeted, [603]);
+    assert_eq!(
+        engine.take_dropped(),
+        [
+            "welcome-back not run: away 0 s, under its 300 s",
+            "welcome-back not run: away 215 s, under its 300 s",
+            "welcome-back not run: in its cooldown, 14 min left",
+        ]
+    );
+}
+
+/// #2602: a daily trigger's day already claimed, and a trigger spoken to
+/// since its window opened, each say why their chance was not run.
+#[test]
+fn a_claimed_day_and_a_spoken_window_say_why_not_run() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![skill(root.path(), "", morning())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    clock(&mut engine, 0, 0, 360);
+    assert_eq!(calls(engine.clock_tick(0)).len(), 1);
+    clock(&mut engine, 1, 0, 300);
+    engine.clock_tick(1);
+    clock(&mut engine, 2, 0, 361);
+    assert!(calls(engine.clock_tick(2)).is_empty());
+    assert_eq!(
+        engine.take_dropped(),
+        ["daily-check not run: its day already claimed"]
+    );
+    let root = private_root();
+    let heard = manifest(
+        root.path(),
+        "[permissions]\ntopics = [\"clock/local\", \"voice/heard\"]\nbody = true\n[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\nduring = { from = \"06:00\", to = \"10:00\" }\nunless_heard = true\n[ask]\npolicy = \"nudge\"\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    );
+    let mut engine = Engine::new(vec![heard], true);
+    clock(&mut engine, us(390, 0), 0, 390);
+    engine.observe(
+        "voice/heard",
+        us(390, 0),
+        br#"{"text":"fixture words","finished":true}"#,
+        None,
+    );
+    clock(&mut engine, us(400, 0), 0, 400);
+    assert!(calls(engine.clock_tick(us(400, 0))).is_empty());
+    assert_eq!(
+        engine.take_dropped(),
+        ["daily-check not run: spoken to since 06:00"]
+    );
 }

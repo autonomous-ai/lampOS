@@ -11738,3 +11738,183 @@ fn onboarding_data_is_required_and_checked_before_a_skill_loads() {
     assert!(load(&oversized).is_err());
     assert!(load(&skills_root().join("onboarding")).is_ok());
 }
+
+/// #2602: a nudge's due chance that a gate drops or holds back says one
+/// journal line naming the gate, once while its trigger holds: its
+/// cooldown, the quiet hours, its active hours, its day's most, its
+/// group's hour, a snooze, off, and a rearm line not yet passed.
+#[test]
+fn a_dropped_chance_says_its_gate_once() {
+    let dir = tempfile::tempdir().unwrap();
+    for (top, trigger, ran, line) in [
+        (
+            "",
+            "cooldown = \"20m\"",
+            [1, 0, 0],
+            "cooling not run: in its cooldown, 20 min left",
+        ),
+        (
+            "[quiet]\nfrom = \"22:00\"\nto = \"08:00\"",
+            "",
+            [0, 0, 0],
+            "quiet not run: quiet hours",
+        ),
+        (
+            "[active]\nfrom = \"10:00\"\nto = \"17:00\"",
+            "",
+            [0, 0, 0],
+            "active not run: outside its active hours",
+        ),
+        (
+            "most_a_day = 1",
+            "",
+            [1, 0, 0],
+            "most not run: its 1 a day already run",
+        ),
+    ] {
+        let name = line.split(' ').next().unwrap();
+        let mut engine = Engine::new(vec![nudge_skill(dir.path(), name, top, trigger)], true);
+        let runs: Vec<usize> = (0..3)
+            .map(|at| stuffy(&mut engine, at * 1_000).len())
+            .collect();
+        assert_eq!(runs, ran, "{name}");
+        assert_eq!(engine.take_dropped(), [line], "{name}");
+    }
+    // Its group's hour, spent by the first, which the hour then holds back
+    // too.
+    let budget = |name: &str| {
+        nudge_skill(
+            dir.path(),
+            name,
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+            "",
+        )
+    };
+    let mut engine = Engine::new(vec![budget("first"), budget("second")], true);
+    assert_eq!(stuffy(&mut engine, 0), ["first"]);
+    assert!(stuffy(&mut engine, 1_000).is_empty());
+    assert_eq!(
+        engine.take_dropped(),
+        [
+            "second not run: its nudges group's hour is spent",
+            "first not run: its nudges group's hour is spent"
+        ]
+    );
+    // A snooze, then off, in one spell: each said once.
+    let mut engine = Engine::new(
+        vec![load(&stoppable(&dir.path().join("stop"))).unwrap()],
+        true,
+    );
+    stop(&mut engine, "snooze", 0).unwrap();
+    assert!(!nudges(&mut engine, 1));
+    assert!(!nudges(&mut engine, 2));
+    stop(&mut engine, "off", 3).unwrap();
+    assert!(!nudges(&mut engine, 4));
+    assert!(!nudges(&mut engine, 5));
+    assert_eq!(
+        engine.take_dropped(),
+        ["sip not run: snoozed, 720 min left", "sip not run: off"]
+    );
+    // Back over the line too soon: not rearmed.
+    let mut engine = Engine::new(vec![nudge_skill(dir.path(), "air", "", ONCE)], true);
+    assert_eq!(stuffy(&mut engine, 0), ["air"]);
+    engine.observe("air/indoor", 1_000_000, br#"{"co2":900}"#, None);
+    assert!(stuffy(&mut engine, 2_000).is_empty());
+    assert!(stuffy(&mut engine, 3_000).is_empty());
+    assert_eq!(
+        engine.take_dropped(),
+        ["air not run: not rearmed: co2 below 1000 for 600 s first"]
+    );
+    // A list's item that comes while its while does not hold.
+    let news = skill_with(
+        dir.path(),
+        "news",
+        &BY_ITEM.replace(
+            "[ask]",
+            "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[ask]",
+        ),
+    );
+    let mut engine = Engine::new(vec![load(&news).unwrap()], true);
+    engine.observe("voice/state", 0, br#"{"state":"speaking"}"#, None);
+    for (at, list) in [
+        (1, [(1, "idle"), (2, "working")]),
+        (2, [(1, "idle"), (2, "idle")]),
+    ] {
+        let payload = tasks(&list);
+        assert!(
+            engine
+                .observe("tasks/status", at * 1_000_000, payload.as_bytes(), None)
+                .is_empty()
+        );
+    }
+    assert_eq!(
+        engine.take_dropped(),
+        ["news not run: an item came, but its while did not hold: voice/state state resting"]
+    );
+}
+
+/// #2602's P3s: a nudge resting after runs nobody noticed, a `[budget]`
+/// member another of its group waits ahead of (said though the same hold
+/// said its group's hour was spent: each reason is its own gate), and a
+/// `[[while]]` that holds a chance back with no `wait`, each say one line.
+#[test]
+fn resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run() {
+    let dir = tempfile::tempdir().unwrap();
+    // Two runs nobody noticed: the third chance finds it resting.
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 2)], true);
+    for (at, ran) in [(0, 1), (21, 1), (42, 0)] {
+        faces(&mut engine, at * 1_000, &seated(false));
+        assert_eq!(stuffy(&mut engine, at * 1_000).len(), ran, "at {at} s");
+        faces(
+            &mut engine,
+            (at + 5) * 1_000,
+            &desk_face(0.45, 0.3, 0.22, false),
+        );
+        faces(&mut engine, (at + 11) * 1_000, &seated(false));
+    }
+    assert!(
+        engine
+            .take_dropped()
+            .contains(&"sip not run: resting after runs nobody noticed, 720 min left".to_owned())
+    );
+    // The hour is first's at 0 s; second waits from 0 s, first from 1 s,
+    // so when the hour frees, first is behind second.
+    let budget = |name: &str| {
+        nudge_skill(
+            dir.path(),
+            name,
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+            "",
+        )
+    };
+    let mut engine = Engine::new(vec![budget("first"), budget("second")], true);
+    assert_eq!(stuffy(&mut engine, 0), ["first"]);
+    for at in (1..3_600).step_by(30) {
+        assert!(stuffy(&mut engine, at * 1_000).is_empty(), "at {at} s");
+    }
+    assert_eq!(stuffy(&mut engine, 3_601_000), ["second"]);
+    assert_eq!(
+        engine.take_dropped(),
+        [
+            "second not run: its nudges group's hour is spent",
+            "first not run: its nudges group's hour is spent",
+            "first not run: another nudges skill waits first",
+        ]
+    );
+    // A while with no `wait`: the chance is spent, and says why.
+    let mut engine = Engine::new(
+        vec![nudge_skill(
+            dir.path(),
+            "hush",
+            "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"",
+            "",
+        )],
+        true,
+    );
+    engine.observe("voice/state", 0, br#"{"state":"speaking"}"#, None);
+    assert!(stuffy(&mut engine, 1_000).is_empty());
+    assert_eq!(
+        engine.take_dropped(),
+        ["hush not run: its while did not hold: voice/state state resting"]
+    );
+}
