@@ -374,38 +374,113 @@ fn a_call_so_far(text: &str) -> bool {
         })
 }
 
-/// Whether a reply so far opens with the words "not for me", case,
-/// punctuation, quotes and dashes aside (`LAMP_NOT_FOR_ME_WORDS`): the
-/// model's refusal written as words. On lamp-4ace, r06, request 131, a line
-/// let out only as the conversation going on ("That lamp is cute, where did
-/// you get it?") got "Not for me — that's about me, not to me.", spoken.
-/// `Some(true)`: it does; `Some(false)`: it can't ("Nothing for me…",
-/// "Note for me", "Not formal"); `None`: not yet known, the text ending
-/// inside one of its first three words. `ended`: no more text comes, so a
-/// last word is whole. A typographic apostrophe is a word's own, as `'` is,
-/// so "me’s" is no "me".
+/// Whether a reply so far is the refusal "not for me" written as words
+/// (`LAMP_NOT_FOR_ME_WORDS`). On lamp-4ace, r06, request 131, a line let
+/// out only as the conversation going on ("That lamp is cute, where did you
+/// get it?") got "Not for me — that's about me, not to me.", spoken. It is
+/// the refusal when "not for me", case aside, is the whole reply, or is
+/// followed straight away by the refusal's own clause (`REFUSAL_CLAUSES`:
+/// "that's about me", "not to me", "to answer"…); punctuation, quotes,
+/// dashes and whitespace between or around the words are skipped, and so
+/// are speech tags before them (`[softly]`, `LAMP_SECOND_SPEECH_TAGS`).
+/// Anything else after it is an answer: `CONVERSATION_ALONE` tells the
+/// model a follow-up to the lamp is for it, so "Not for me, thanks, I'm
+/// more of a lo-fi lamp." and "Not for me to say, but…" are said.
+/// `Some(true)`: it is; `Some(false)`: it can't be ("Nothing for me…",
+/// "Note for me", "Not for me, thanks"); `None`: not yet known, the text
+/// ending inside its words, after "not for me" with nothing but
+/// punctuation since (only its end makes that the whole reply), partway
+/// through a clause, or inside a speech tag. `ended`: no more text comes,
+/// so a last word is whole. An apostrophe inside a word, `'` or `’`, is
+/// the word's own, so "me’s" is no "me"; single quotes enclosing the words
+/// ('Not for me', ‘Not for me’) are punctuation.
 pub fn opens_not_for_me(text: &str, ended: bool) -> Option<bool> {
     const WORDS: [&str; 3] = ["not", "for", "me"];
-    let in_word = |c: char| c.is_alphanumeric() || c == '\'' || c == '\u{2019}';
-    let open_end = !ended && text.ends_with(in_word);
-    let words: Vec<&str> = text
-        .split(|c| !in_word(c))
-        .filter(|w| !w.is_empty())
-        .collect();
-    for (at, want) in WORDS.iter().enumerate() {
-        let Some(word) = words.get(at) else {
-            return ended.then_some(false);
+    fn in_word(c: char) -> bool {
+        c.is_alphanumeric() || c == '\'' || c == '\u{2019}'
+    }
+    // The next word of `rest`, lower-cased with `’` as `'`, what follows
+    // it, and whether more of it may still come. A single quote enclosing
+    // it ('Not, me’) is no part of it; one inside it ("me’s") is.
+    fn next_word(rest: &str, ended: bool) -> (String, &str, bool) {
+        let rest = rest.trim_start_matches(|c| !in_word(c) || c == '\'');
+        let end = rest.find(|c| !in_word(c)).unwrap_or(rest.len());
+        let open = !ended && end == rest.len();
+        let word = rest[..end].trim_end_matches(['\'', '\u{2019}']);
+        (
+            word.to_lowercase().replace('\u{2019}', "'"),
+            &rest[end..],
+            open,
+        )
+    }
+    let mut rest = text;
+    loop {
+        rest = rest.trim_start_matches(|c| !in_word(c) && c != '[');
+        let Some(tag) = rest.strip_prefix('[') else {
+            break;
         };
-        let word = word.to_lowercase();
-        if open_end && at + 1 == words.len() {
+        rest = match tag.find(']') {
+            Some(close) => &tag[close + 1..],
+            // A tag still open waits, as the voice's own cut holds it; one
+            // too long to be a tag is none, and the reply is said.
+            None if !ended && tag.len() < crate::second_provider::speech_tags::HELD_MOST => {
+                return None;
+            }
+            None => return Some(false),
+        };
+    }
+    for want in WORDS {
+        let (word, after, open) = next_word(rest, ended);
+        if open {
             return (!want.starts_with(word.as_str())).then_some(false);
         }
-        if word != *want {
+        if word != want {
             return Some(false);
         }
+        rest = after;
     }
-    Some(true)
+    // After "not for me": nothing more, or one of the clauses.
+    let mut clauses = REFUSAL_CLAUSES.to_vec();
+    for at in 0.. {
+        let (word, after, open) = next_word(rest, ended);
+        if word.is_empty() {
+            // Nothing but punctuation since the last word.
+            return match (open, at) {
+                (true, _) => None,
+                (false, 0) => Some(true),
+                (false, _) => Some(false),
+            };
+        }
+        clauses.retain(|clause| {
+            clause.get(at).is_some_and(|want| match open {
+                true => want.starts_with(word.as_str()),
+                false => *want == word,
+            })
+        });
+        if clauses.is_empty() {
+            return Some(false);
+        }
+        if open {
+            return None;
+        }
+        if clauses.iter().any(|clause| clause.len() == at + 1) {
+            return Some(true);
+        }
+        rest = after;
+    }
+    unreachable!("the loop above returns")
 }
+
+/// The refusal's own words straight after "not for me" (r06's "Not for me —
+/// that's about me, not to me."), lower-case, `'` for any apostrophe.
+const REFUSAL_CLAUSES: [&[&str]; 6] = [
+    &["that's", "about", "me"],
+    &["that", "is", "about", "me"],
+    &["it's", "about", "me"],
+    &["not", "to", "me"],
+    &["to", "answer"],
+    &["to", "reply"],
+];
 
 /// What follows a function's name at the start of `text`.
 fn call_arguments(text: &str) -> Option<&str> {
@@ -809,22 +884,47 @@ pub fn unclear_in_conversation(
 mod tests {
     use super::*;
 
-    /// `LAMP_NOT_FOR_ME_WORDS`: a reply opening with "not for me", however
-    /// written, is a refusal; one that only begins like it is not, and one
-    /// whose opening is cut short is not known until more comes or it ends.
+    /// `LAMP_NOT_FOR_ME_WORDS`: "not for me", however written, as the whole
+    /// reply or followed by the refusal's own clause, is a refusal; followed
+    /// by anything else it is an answer, and one cut short is not known
+    /// until more comes or it ends.
     #[test]
     fn a_reply_opening_with_not_for_me_is_told_from_one_that_does_not() {
         for refusal in [
-            "Not for me — that's about me, not to me.",
+            // r06's own words.
+            "Not for me \u{2014} that's about me, not to me.",
+            "Not for me \u{2014} that\u{2019}s about me,",
+            "not for me, that is about me.",
+            "Not for me: it's about me!",
+            "Not for me, not to me.",
+            "Not for me to answer.",
+            "\u{201c}Not for me to reply\u{201d}",
+            "[softly] Not for me \u{2014} that's about me.",
+        ] {
+            assert_eq!(opens_not_for_me(refusal, false), Some(true), "{refusal}");
+        }
+        // The whole reply: known only at its end.
+        for whole in [
+            "Not for me",
             "not for me.",
+            "Not for me ",
+            "Not for me!",
             "  \"NOT FOR ME\"",
             "\u{2014} Not, for me.",
             "\u{201c}Not for me\u{201d}",
             "not_for_me{}",
+            // A speech tag first (`LAMP_SECOND_SPEECH_TAGS`) is not a word.
+            "[softly] Not for me.",
+            " [sighs][whispers] \"Not for me\"",
+            // Single quotes enclosing the words.
+            "'Not for me'",
+            "'Not for me.'",
+            "\u{2018}Not for me\u{2019}",
+            "\u{2018}Not for me\u{2019}.",
         ] {
-            assert_eq!(opens_not_for_me(refusal, false), Some(true), "{refusal}");
+            assert_eq!(opens_not_for_me(whole, false), None, "{whole:?}");
+            assert_eq!(opens_not_for_me(whole, true), Some(true), "{whole:?}");
         }
-        assert_eq!(opens_not_for_me("Not for me", true), Some(true));
         for reply in [
             "Nothing for me to add, but",
             "Note for me",
@@ -834,7 +934,18 @@ mod tests {
             "Sure",
             "It's not for me",
             "Not for me\u{2019}s",
+            "Not for me's",
+            // "Not." is decided by the next word that is not the refusal's.
+            "Not. For example, ",
             "Not for meat ",
+            // A follow-up to the lamp answered: an answer.
+            "Not for me, thanks, I'm more of a lo-fi lamp.",
+            "Not for me today",
+            "Not for me either.",
+            "Not for me to say, but it's lovely.",
+            "not for me to judge",
+            "Not for me, that's about you",
+            "[softly] Sure.",
         ] {
             assert_eq!(opens_not_for_me(reply, false), Some(false), "{reply}");
         }
@@ -848,10 +959,29 @@ mod tests {
             "Not f",
             "Not for",
             "Not for me",
+            "Not for me, ",
+            "Not for me t",
+            "Not for me th",
+            "Not for me to",
+            "Not for me to ",
+            "Not for me \u{2014} that's about ",
+            "Not for me\u{2019}",
+            "Not. ",
+            "Not. For ",
+            "[soft",
+            "[softly] ",
+            "[softly] Not for me ",
         ] {
             assert_eq!(opens_not_for_me(so_far, false), None, "{so_far:?}");
         }
-        for ended in ["", "No", "Not for"] {
+        for ended in [
+            "",
+            "No",
+            "Not for",
+            "Not for me to",
+            "Not for me, that's about",
+            "[soft",
+        ] {
             assert_eq!(opens_not_for_me(ended, true), Some(false), "{ended:?}");
         }
     }

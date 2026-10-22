@@ -32,7 +32,7 @@ pub fn read_by(model: &str, socket_model: Option<&str>) -> bool {
 
 /// The longest unclosed `[...]` held for its `]` in the next piece; a longer
 /// one is no tag, and its `[` is dropped.
-const HELD_MOST: usize = 24;
+pub(crate) const HELD_MOST: usize = 24;
 
 /// One reply's tags, piece by piece.
 #[derive(Debug, Default)]

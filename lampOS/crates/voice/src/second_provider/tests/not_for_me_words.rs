@@ -13,6 +13,16 @@ async fn answered(
     alone: bool,
     events: Vec<net::Result<ChatEvent>>,
 ) -> (Vec<String>, Vec<(u64, lamp_msgs::TurnVerdict)>) {
+    answered_tagged(on, alone, None, events).await
+}
+
+/// [`answered`], with speech tags (`LAMP_SECOND_SPEECH_TAGS`) as `tags`.
+async fn answered_tagged(
+    on: bool,
+    alone: bool,
+    tags: Option<bool>,
+    events: Vec<net::Result<ChatEvent>>,
+) -> (Vec<String>, Vec<(u64, lamp_msgs::TurnVerdict)>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(CUTE.to_owned())].into()),
         chats: Mutex::new([events].into()),
@@ -23,7 +33,8 @@ async fn answered(
         .noting_the_conversation_alone(Arc::new(move |_| {
             alone.then_some(worker::CONVERSATION_ALONE)
         }))
-        .declining_in_words(on);
+        .declining_in_words(on)
+        .speaking_tags(tags);
     let (mut engine, told) = telling(engine);
     engine.submit(start(1));
     engine.submit(audio(1, 1));
@@ -89,11 +100,49 @@ async fn not_for_me_written_as_words_alone_is_the_decline() {
         ],
         &["\u{201c}not for", " me.\u{201d}"],
         &["Not for me"],
+        &["Not for me", " "],
+        &["Not for me."],
+        &["Not for me", " to answer."],
+        &["Not for me, ", "not to ", "me."],
     ] {
         let (labels, told) = answered(true, true, pieces(cut)).await;
         assert_eq!(labels, called, "{cut:?}");
         assert_eq!(told, called_told, "{cut:?}");
     }
+    // A speech tag before the words (`LAMP_SECOND_SPEECH_TAGS`), whole or
+    // cut, is no opening of its own.
+    for cut in [
+        &["[softly] Not for me."][..],
+        &["[sof", "tly]", " Not for", " me."],
+    ] {
+        for tags in [Some(true), Some(false), None] {
+            let (labels, told) = answered_tagged(true, true, tags, pieces(cut)).await;
+            assert_eq!(labels, called, "{cut:?}, tags {tags:?}");
+            assert_eq!(told, called_told, "{cut:?}, tags {tags:?}");
+        }
+    }
+}
+
+/// "Not for me to say": the idiom opens a real answer, said on a line told
+/// it may be people's talk however it is cut, the "to" in a later piece
+/// included; and a speech tag before ordinary words leaves them said.
+#[tokio::test]
+async fn not_for_me_to_say_and_a_tag_before_words_are_said() {
+    const IDIOM: &str = "Not for me to say, but it's lovely.";
+    let words: Vec<&str> = IDIOM.split_inclusive(' ').collect();
+    for cut in [
+        &[IDIOM][..],
+        &words,
+        &["Not for me", " to say, but it's lovely."],
+    ] {
+        let (labels, told) = answered(true, true, pieces(cut)).await;
+        assert_eq!(spoken(&labels), IDIOM, "{cut:?}: {labels:?}");
+        assert!(told.is_empty(), "{cut:?}: {told:?}");
+    }
+    let (labels, told) =
+        answered_tagged(true, true, Some(false), pieces(&["[softly] Sure."])).await;
+    assert_eq!(spoken(&labels), "Sure.", "{labels:?}");
+    assert!(told.is_empty(), "{told:?}");
 }
 
 /// The same words on a line not told it may be people's talk (the name, a
@@ -120,6 +169,11 @@ async fn not_for_me_words_are_said_unless_alone_with_the_switch() {
         "Note for me: ask them.",
         "Not sure, maybe the shop downstairs.",
         "Not for",
+        // A follow-up to the lamp ("do you like jazz?") answered: said.
+        "Not for me, thanks, I'm more of a lo-fi lamp.",
+        "Not for me either.",
+        // "Not." waits past "For " for "example", which decides it.
+        "Not. For example, it was a gift.",
     ] {
         let cut: Vec<&str> = reply.split_inclusive(' ').collect();
         let (labels, told) = answered(true, true, pieces(&cut)).await;
@@ -155,12 +209,14 @@ async fn words_then_the_not_for_me_call_are_unchanged() {
 /// may be people's talk, streamed a piece (a word) every 40 ms and cut at
 /// the first clause or at four words (`LAMP_SECOND_FIRST_WORDS=4`, as
 /// lamp-4ace runs), each timed
-/// on the test's clock from the line's end to its first words said, with
-/// the switch off and on. The opening is known within the first word or
-/// three, before the first piece is cut, so nothing waits. Shown with
+/// on the test's clock from the line's end to its first audio (the
+/// announcement, before the words' own), with the switch off and on. A
+/// first word other than "not" decides the opening at once, so nothing
+/// waits; "Not sure, …" waits one piece, 40 ms, for "sure", and an answer
+/// opening "Not for me" waits for the word after it. Shown with
 /// `--nocapture`.
 #[tokio::test(start_paused = true)]
-async fn the_check_costs_a_typical_reply_no_time_to_its_first_sound() {
+async fn the_check_costs_the_first_audio_only_the_pieces_its_opening_waits_for() {
     const GAP: Duration = Duration::from_millis(40);
     async fn first_said(on: bool, first_words: Option<usize>, reply: &str) -> Duration {
         let cut: Vec<&str> = reply.split_inclusive(' ').collect();
@@ -183,11 +239,11 @@ async fn the_check_costs_a_typical_reply_no_time_to_its_first_sound() {
         let ended = tokio::time::Instant::now();
         loop {
             match engine.next().await {
-                ProviderOutput::Transcript {
-                    request: Some(_),
-                    text,
-                    ..
-                } if !text.is_empty() => return ended.elapsed(),
+                // The first sound itself: production emits a piece's
+                // words before its audio.
+                ProviderOutput::Audio { samples, .. } if !samples.is_empty() => {
+                    return ended.elapsed();
+                }
                 ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
                     panic!("{reply}: nothing said")
                 }
@@ -203,16 +259,27 @@ async fn the_check_costs_a_typical_reply_no_time_to_its_first_sound() {
         "Not sure, maybe ask the office.",
         "Nothing special, just a desk lamp.",
         "Haha, I'm glad you like it.",
+        // Answers that open with the words themselves.
+        "Not for me, thanks, I'm more of a lo-fi lamp.",
+        "Not for me to say, but it's lovely.",
+        "Not for me either.",
     ] {
+        // The pieces past the first that the opening waits for: up to the
+        // one that decides it.
+        let cut: Vec<&str> = reply.split_inclusive(' ').collect();
+        let deciding = (1..=cut.len())
+            .find(|&n| crate::not_speech::opens_not_for_me(&cut[..n].concat(), false).is_some())
+            .unwrap_or(cut.len());
+        let held = GAP * (deciding as u32 - 1);
         for first_words in [None, Some(4)] {
             let off = first_said(false, first_words, reply).await;
             let on = first_said(true, first_words, reply).await;
             eprintln!(
-                "LAMP_NOT_FOR_ME_WORDS first sound, first words {first_words:?}: off {} ms, on {} ms: {reply}",
+                "LAMP_NOT_FOR_ME_WORDS first audio, first words {first_words:?}: off {} ms, on {} ms: {reply}",
                 off.as_millis(),
                 on.as_millis()
             );
-            assert_eq!(on, off, "{first_words:?}: {reply}");
+            assert_eq!(on, off + held, "{first_words:?}: {reply}");
         }
     }
 }

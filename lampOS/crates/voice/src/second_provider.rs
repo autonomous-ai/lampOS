@@ -2244,10 +2244,11 @@ impl Engine {
     }
 
     /// `LAMP_NOT_FOR_ME_WORDS=on` ([`NOT_FOR_ME_WORDS_ENVIRONMENT`]): on a
-    /// line told `worker::CONVERSATION_ALONE`, a reply whose text opens with
-    /// "not for me" ([`crate::not_speech::opens_not_for_me`]) ends as the
-    /// `not_for_me` call does: nothing said, the line held back. Its first
-    /// piece, and the announcement, wait only until its opening is known. A
+    /// line told `worker::CONVERSATION_ALONE`, a reply that is "not for me",
+    /// whole or with the refusal's own clause after it
+    /// ([`crate::not_speech::opens_not_for_me`]), ends as the `not_for_me`
+    /// call does: nothing said, the line held back. Its first piece, and
+    /// the announcement, wait only until its opening is known. A
     /// line with the name, a call, a turned face or an answer to the lamp's
     /// own question is never told that note, and nothing of it waits.
     /// Before any turn only.
