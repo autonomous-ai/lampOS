@@ -558,9 +558,10 @@ impl<P: Printer> Voices<P> {
         self.caller_only
     }
 
-    /// [`Self::new`], its lines said to `journal` (#1444).
+    /// [`Self::new`], its lines said to `journal` (#1444); the second
+    /// route's tests read it too.
     #[cfg(test)]
-    fn journaled(printer: P, journal: Journal) -> Self {
+    pub(crate) fn journaled(printer: P, journal: Journal) -> Self {
         Self {
             journal,
             ..Self::new(printer)

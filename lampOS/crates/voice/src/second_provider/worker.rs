@@ -8862,6 +8862,128 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
+    /// Ten's trace on #3126 (05:0x), pinned for the owner's question 4 (the
+    /// first builder at 05:28): with `LAMP_SAME_VOICE_MODEL`,
+    /// `LAMP_SPOKEN_TO` and `LAMP_NAME_OR_FOLLOW_UP`, an answered ask, then
+    /// another line begun 4 s after the answer's words ended, inside
+    /// [`crate::name_or_follow_up::FOLLOW_UP_FOR`]. In another voice than
+    /// the asker's (a likeness under [`crate::same_voice::DIFFERENT_BELOW`])
+    /// it is held: a colleague's line, and as much a second person's real
+    /// follow-up. With no likeness at its verdict (its print not back) it
+    /// goes on, and the journal says it was judged without the voice check.
+    /// The asker's own voice goes on, judged.
+    #[test]
+    fn a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::{Did, Heard};
+        use std::sync::{Arc, Mutex};
+        /// Prints by a line's first sample: 1 is the asker's voice, -1
+        /// another's. Another's print comes back only with `back`.
+        struct Voice {
+            prints: std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>,
+            back: bool,
+        }
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                if samples[0] > 0 {
+                    self.prints.push_back((request, Ok(vec![1.0, 0.0])));
+                } else if self.back {
+                    self.prints.push_back((request, Ok(vec![0.0, 1.0])));
+                }
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.prints.pop_front()
+            }
+        }
+        let hear = |heeding: &mut Heeding, request: u64, voice: i16| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+        };
+        // Whether the second line, in `voice`, is held, and the journal's
+        // lines.
+        let judged = |voice: i16, back: Option<bool>| -> (bool, Vec<String>) {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+            }
+            let journal = Arc::new(Mutex::new(Vec::new()));
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.needing_name_or_follow_up();
+            let into = Arc::clone(&journal);
+            // No `back`: no voice check at all.
+            heeding.voices = back.map(|back| {
+                crate::same_voice::Voices::journaled(
+                    Box::new(Voice {
+                        prints: Default::default(),
+                        back,
+                    }) as Box<dyn crate::same_voice::Printer>,
+                    Arc::new(move |line: &str| into.lock().unwrap().push(line.to_owned())),
+                )
+            });
+            // The asker calls the lamp, and is answered: the answer began 6 s
+            // ago, and its words ended 4 s ago.
+            let now_us = monotonic_us();
+            hear(&mut heeding, 1, 1);
+            let call = "Lamp, what time is it?";
+            assert_eq!(
+                heeding.heed(1, (now_us - 9_000_000, now_us - 8_000_000), call, None),
+                None
+            );
+            {
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.person(call, true, Instant::now() - Duration::from_secs(8));
+                thread.lamp(
+                    1,
+                    "It's ten past six.",
+                    Instant::now() - Duration::from_secs(6),
+                );
+            }
+            heeding.lamp_did(Did::Said(1, now_us - 4_000_000));
+            // The next line, begun as the answer's words had ended 4 s ago.
+            hear(&mut heeding, 2, voice);
+            let line = "Did you send the slides?";
+            let held = heeding
+                .heed(2, (now_us, now_us + 1_500_000), line, None)
+                .is_some();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let lines = journal.lock().unwrap().clone();
+            (held, lines)
+        };
+        let without =
+            "request 2: judged without the voice check: its voice print was not back at its answer";
+        let said_without = |lines: &[String]| lines.iter().any(|line| line.contains(without));
+        // Another voice, its print back: under 0.30, held, judged.
+        let (held, lines) = judged(-1, Some(true));
+        assert!(held, "another voice 4 s after the answer is held");
+        assert!(!said_without(&lines), "{lines:?}");
+        // Another voice, its print not back at its verdict: it goes on, and
+        // the journal says so.
+        let (held, lines) = judged(-1, Some(false));
+        assert!(!held, "with no likeness it goes on");
+        assert!(said_without(&lines), "{lines:?}");
+        // The asker's own voice: it goes on, judged.
+        let (held, lines) = judged(1, Some(true));
+        assert!(!held, "the asker's own follow-up goes on");
+        assert!(!said_without(&lines), "{lines:?}");
+        // Without the voice check, the same line in another voice goes on:
+        // the hold is the check's.
+        let (held, lines) = judged(-1, None);
+        assert!(!held, "unchecked, another voice goes on");
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+
     /// The reviewer's P3 on #2428: with `LAMP_QUIET_GOING_ON_SAME_ONE` and no
     /// `LAMP_SPOKEN_TO`, a low print is read for `someone_else` alone; #829's
     /// conversation check, never run there, does not end the conversation
