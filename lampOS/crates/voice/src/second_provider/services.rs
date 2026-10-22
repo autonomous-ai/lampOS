@@ -106,6 +106,18 @@ pub trait Services: Send + Sync + 'static {
         };
         while_chat_permitted(chat, permitted)
     }
+    /// [`Self::chat_guarded`] asked once more on a connection of its own
+    /// (`LAMP_SECOND_CHAT_AGAIN`, #2602), with the same functions and the
+    /// same permission, checked before each send. Services that can't open
+    /// a fresh connection ask as [`Self::chat_guarded`] does.
+    fn chat_again(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_guarded(messages, functions, permitted)
+    }
     /// Whether a chat on `messages`, told without the functions named in
     /// `without`, declares the function `name` ([`Self::chat_without`]), for
     /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
@@ -377,6 +389,24 @@ pub struct RefusedTo {
     pub relay: Arc<Chat>,
     /// Told each refusal's status: the journal's line, the health warning.
     pub told: Arc<dyn Fn(u16) + Send + Sync>,
+}
+
+/// One send of a chat: on a connection of its own for an ask again
+/// (`LAMP_SECOND_CHAT_AGAIN`, #3107), else on the client's pool. Each is
+/// made only after the request's permission is checked, near, own and the
+/// relay alike (Fourth's #3064; reviewer-two's P2 on #3107).
+async fn send_on(
+    chat: &Chat,
+    messages: &[Message],
+    only: Option<&[&str]>,
+    without: &[&str],
+    fresh: bool,
+) -> net::Result<super::net::ChatStream> {
+    if fresh {
+        chat.send_fresh(messages, only, without).await
+    } else {
+        chat.send_without(messages, only, without).await
+    }
 }
 
 /// Whether a chat's failure is its key refused: the request goes to the
@@ -695,6 +725,18 @@ impl Net {
         functions: ChatFunctions,
         permitted: Option<ChatPermission>,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_sent(messages, functions, permitted, false)
+    }
+
+    /// [`Self::chat_selected`], each send on a connection of its own when
+    /// `fresh` (an ask again, `LAMP_SECOND_CHAT_AGAIN`), else on the pool.
+    fn chat_sent(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: Option<ChatPermission>,
+        fresh: bool,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
         let refused_to = self.refused_to.clone();
         let near = self.near_chat();
@@ -712,7 +754,7 @@ impl Net {
                 if !allowed() {
                     return Ok(None);
                 }
-                let answer = near_chat.send_without(&messages, only, without).await;
+                let answer = send_on(&near_chat, &messages, only, without, fresh).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
                     Some(why) => taken.fell(service, &why),
                     None => return answer.map(Some),
@@ -721,7 +763,7 @@ impl Net {
             if !allowed() {
                 return Ok(None);
             }
-            let answer = chat.send_without(&messages, only, without).await;
+            let answer = send_on(&chat, &messages, only, without, fresh).await;
             if key_fallback
                 && let (Err(error), Some(refused)) = (&answer, &refused_to)
                 && let Some(status) = key_refused(error)
@@ -731,9 +773,7 @@ impl Net {
                 if !allowed() {
                     return Ok(None);
                 }
-                return refused
-                    .relay
-                    .send_without(&messages, only, without)
+                return send_on(&refused.relay, &messages, only, without, fresh)
                     .await
                     .map(Some);
             }
@@ -973,6 +1013,15 @@ impl Services for Net {
         only: &'static [&'static str],
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         self.chat_told(messages, Some(only))
+    }
+
+    fn chat_again(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_sent(messages, functions, Some(permitted), true)
     }
 
     fn chat_without(
@@ -1613,6 +1662,138 @@ mod tests {
             .collect::<Vec<_>>()
             .await
             .concat()
+    }
+
+    /// #3107, El's P2 and Second's test (02:25): the ask again keeps the
+    /// own key's refusal fallback, as the first ask does: refused, it goes to
+    /// the relay, and the refusal is told.
+    #[tokio::test]
+    async fn an_ask_again_keeps_the_own_key_refusal_relay() {
+        let own = stub(
+            "k-second-refused",
+            vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))],
+        )
+        .await;
+        let relay = stub("k-second-refused", vec![(CHAT, answered("via relay"))]).await;
+        let told: Arc<Mutex<Vec<u16>>> = Arc::default();
+        let observed = told.clone();
+        let net = Net::new(
+            config_at(
+                "second-hedge-refusal",
+                "k-second-refused",
+                &own.url,
+                &own.url,
+            ),
+            Arc::new(Vec::new),
+        )
+        .unwrap()
+        .falling_back_to_the_relay(
+            &relay.url,
+            Arc::new(move |status| observed.lock().unwrap().push(status)),
+        )
+        .unwrap();
+        assert_eq!(
+            words(&net).await,
+            "via relay",
+            "the ordinary request keeps its configured fallback"
+        );
+        assert_eq!(*told.lock().unwrap(), vec![401]);
+        assert_eq!(relay.asked(CHAT), 1);
+        let mut hedged = net.chat_again(
+            vec![Message::user("hello")],
+            ChatFunctions::All,
+            Arc::new(|| true),
+        );
+        let next = tokio::time::timeout(std::time::Duration::from_secs(2), hedged.next())
+            .await
+            .unwrap();
+        assert!(
+            matches!(&next, Some(Ok(ChatEvent::Text(text))) if text == "via relay"),
+            "the fresh request must preserve the same configured fallback; got {next:?}"
+        );
+        assert_eq!(*told.lock().unwrap(), vec![401, 401]);
+        assert_eq!(relay.asked(CHAT), 2);
+    }
+
+    /// An ask again whose permission is gone before it goes sends nothing,
+    /// and a later yes does not revive it (#3064's guard, #3107).
+    #[tokio::test]
+    async fn an_ask_again_denied_before_it_goes_sends_nothing() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let key = "k-again-denied";
+        let own = stub(key, vec![(CHAT, answered("own"))]).await;
+        let net = Net::new(
+            config_at("again-denied", key, &own.url, &own.url),
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        let valid = Arc::new(AtomicBool::new(false));
+        let permission = valid.clone();
+        let mut again = net.chat_again(
+            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
+            ChatFunctions::All,
+            Arc::new(move || permission.load(Ordering::Acquire)),
+        );
+        assert!(again.next().await.is_none());
+        valid.store(true, Ordering::Release);
+        assert!(
+            again.next().await.is_none(),
+            "a denied ask again cannot revive"
+        );
+        assert_eq!(own.asked(CHAT), 0);
+    }
+
+    /// An ask again whose near address fails on the link, with permission
+    /// lost meanwhile, never goes on to its own address (#3107).
+    #[tokio::test]
+    async fn an_ask_again_never_falls_back_after_its_permission_is_lost() {
+        let key = "k-again-near-lost";
+        let near = stub(key, vec![(CHAT, Some((UNAVAILABLE, Vec::new())))]).await;
+        let own = stub(key, vec![(CHAT, answered("own"))]).await;
+        let net = routed(config_at("again-near-lost", key, &own.url, &own.url), THREE);
+        kept(&net).set(near_chat(&near));
+        net.turn_begins();
+        // Permission lasts until the near address has been asked.
+        let asked_near = near.seen.clone();
+        let mut again = net.chat_again(
+            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
+            ChatFunctions::All,
+            Arc::new(move || !asked_near.lock().unwrap().iter().any(|l| l.contains(CHAT))),
+        );
+        assert!(again.next().await.is_none());
+        assert_eq!(near.asked(CHAT), 1);
+        assert_eq!(own.asked(CHAT), 0);
+    }
+
+    /// The key-refusal notice cannot let an ask again on to the relay once
+    /// it has taken the permission away (#3064's guard, #3107).
+    #[tokio::test]
+    async fn an_ask_again_key_refusal_cannot_authorize_the_relay_send() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let key = "k-again-refused-lost";
+        let own = stub(key, vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
+        let relay = stub(key, vec![(CHAT, answered("relay"))]).await;
+        let valid = Arc::new(AtomicBool::new(true));
+        let expire = valid.clone();
+        let net = Net::new(
+            config_at("again-refused-lost", key, &own.url, &own.url),
+            Arc::new(Vec::new),
+        )
+        .unwrap()
+        .falling_back_to_the_relay(
+            &relay.url,
+            Arc::new(move |_| expire.store(false, Ordering::Release)),
+        )
+        .unwrap();
+        let permission = valid.clone();
+        let mut again = net.chat_again(
+            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
+            ChatFunctions::All,
+            Arc::new(move || permission.load(Ordering::Acquire)),
+        );
+        assert!(again.next().await.is_none());
+        assert_eq!(own.asked(CHAT), 1);
+        assert_eq!(relay.asked(CHAT), 0);
     }
 
     /// #2882 (b): the routes are read in the background, with the relay's
