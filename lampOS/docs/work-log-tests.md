@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 06:53 +0700 — Eyes failing-write fixture and Voice carry resumed
+
+Ready for lamp-voice: **no**.
+The assigned Eyes `seems_log::tests::a_failed_write_is_said_once` portability
+piece is claimed under [#1569](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6353886600),
+on `tests/1569-eyes-failed-write`, frozen base `ae4ab0022`. The current test
+opens Linux `/dev/full` on every host and fails before exercising its assertions
+on macOS. The planned fixture uses a deliberately read-only real file on every
+supported host while retaining a separate Linux full-device check. Product
+code and the first-error-only assertions will stay unchanged.
+
+[#3023](https://github.com/autonomous-ai/lampOS/pull/3023) is being carried onto
+the same frozen base, preserving upstream fixture corrections and every
+assertion. The proposed one-before/one-after full parallel library comparison
+and full serial consumer gate are posted on [Queue #3126](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6353886195)
+for coordination before they start, after the Eyes gate. Earlier failed
+commands remain recorded and unwaived. No test result is claimed yet.
+
 ## 2026-10-23 01:12 +0700 — Skills and TLS carries merged with combined Linux qualification
 
 Ready for lamp-voice: **merged** for [#2693](https://github.com/autonomous-ai/lampOS/pull/2693),
