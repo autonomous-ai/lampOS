@@ -5,6 +5,43 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 19:18 — wake hum fix pushed as #3021
+
+Ready for lamp-voice: no (current-head native gates pending).
+
+- Owner assigned the #2487 wake follow-up, not the pieces moved to Fifth,
+  Tests and El. Pushed one commit `4fb3a95a21e295ab0807703cfe743bc31c654b6b`
+  on latest `d7492ca74`; [draft #3021](https://github.com/autonomous-ai/lampOS/pull/3021).
+  Final memory-only rebase: `d178d1f06 = 4fb3a95a2`. Exact seven files,
+  one-line commit and no attribution; source tree clean.
+- Startup's `microphone_not_allowed` waits for permission/readiness only
+  within the original 1.5 s window. Expiry precedes readiness and is strict
+  at the boundary. Mute, renewed sleep, reply owed, speech first, marker
+  freshness and permission remain authoritative. No product switch enabled.
+- Full local gate on `e2232b836`: fmt, strict workspace Clippy, tests for
+  all 12 affected/dependent crates, and workspace build passed. **6,728
+  passed, zero failed, 29 ignored**. Long updater groups completed normally.
+- Rebased onto `c9df78414`, preserving the arrival/skill changes; normalized
+  production patch unchanged. Final test setup consumes an actual provider
+  Ready event before the cue, so no-provider assertions cover online state.
+  Review's coverage finding closed. Formatting, workspace Clippy/build and
+  **101 hand checks / 0 failed / 3 ignored**, **18 wake / 0 / 0** passed.
+  Counts are separate, not added to the full gate. Tests used local socket
+  access after the sandbox rejected socket binding; no external services.
+- Both mutations were caught: missing permission retry and inclusive expiry.
+  Source restored and all 18 wake-filtered tests passed. Synthetic scenario
+  permission/capture 60 ms, decision 62 ms, first speaker send 64 ms; no
+  device/acoustic latency claimed. Lamp target remains first write within
+  500 ms of wake acquisition, with the person's first words retained.
+- Native [ARM64 39776981243](https://github.com/autonomous-ai/lampOS/actions/runs/39776981243)
+  and [Clippy 39776972400](https://github.com/autonomous-ai/lampOS/actions/runs/39776972400)
+  are pending on the current head. No ARM64 link on the Mac.
+- Fifth owns #2857 and the #2948 hand try on lamp-52e6, on one coherent
+  build: tap, 3 s sleep/fold from standing, tap wake hm, quiet tap hm,
+  listening-process kill then one tap opens, and hands-away observation.
+  #2948 stays draft until the required hand try passes. Third has no lamp
+  and accessed none. Queue #2602 has the PR/head/range and handoff.
+
 ## 2026-10-22 17:59 — wake hm follow-up taken
 
 Ready for lamp-voice: no (new #2487 follow-up).
