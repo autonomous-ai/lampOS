@@ -1,3 +1,34 @@
+## Current checkpoint: 2026-10-22 23:04 +07, real CLI regression pushed; fresh native gate running
+
+Ready for lamp-voice: no — fresh official CI and review of CLI extension pending
+
+Kind: tests/docs only. #3012 replacement `baacc2746` is one commit on
+`17167b1ba`, confirmed latest immediately before push. Runtime updater code
+is unchanged. Its new real-CLI checker requires old/candidate exec identities,
+argv/environment, real pending state, one new-main confirmation and next
+round; the off control specifically rejects missing exec despite exit 0.
+[Evidence](verification/updater-cli-regression-20261022/README.md) retains
+all source bindings, commands and setup failures. Scoped source review: no P1/P2.
+
+Complete Mac changed-Update gate: **307 passed / 0 failed / 4 ignored**;
+fmt and strict all-target Clippy pass. The final carry preserves all36 bound
+Update/workspace inputs and passes fmt again. Targeted ARM64 Linux Clippy,
+checker and nextest pass, **1 named case** containing both paths; they do
+not replace official qualification. Fresh ARM64 **39810342673** and Clippy
+**39810342675** are watched through terminal required-job results. No prior
+head's green is transferred. The earlier pre-read did not cover the new CLI
+code, and Reviewer-lead has the fresh read/final carry request on #3012.
+
+The owned containers and VM are stopped. Same-implementation ELF variants
+and mocked readiness prove no actual timer/service restart, cross-release,
+quiet timing, cold boot or flash durability. First owns the still-unexecuted
+[attended worksheet](verification/updater-attended-exec-cut-20261022.md),
+lamp/person/window and actual-device observer qualification. #1812 follows
+its acceptance and needs signing/publication inputs. No SSH, install, real-key
+access, release publication or physical cut occurred.
+
+---
+
 ## Current checkpoint: 2026-10-22 22:40 +07, seventh native gate green; CLI regression in progress
 
 Ready for lamp-voice: no — integration advanced; new CLI regression not yet qualified
