@@ -1,0 +1,42 @@
+# The base image's orangepi-ramlog settings, with the journal kept out of
+# its copies (#2602). Read by /usr/lib/orangepi/orangepi-ramlog (sourced, so
+# the arrays are bash), orangepi-zram-config (ENABLED and SIZE, by awk),
+# orangepi-truncate-logs and lamp-ramlog-postrotate.
+#
+# At boot ramlog copies /var/log.hdd (the eMMC) into the new /var/log RAM
+# disk, journald starts after it, and its flush writes the boot's first
+# seconds there. The copy brought back earlier boots' journal files, some
+# still marked open ("Failed to read journal file ... Device or resource
+# busy", lamp-06c1, 22 Oct) and filled the disk past the 75% at which
+# orangepi-truncate-logs (every 15 min) runs `journalctl --vacuum-size=5M`.
+# At 19:00 that vacuum dropped this boot's oldest file, and the journal had
+# nothing before +11 s, though dmesg had lines from 3.8 s.
+#
+# So the journal lives in the RAM disk only, one boot at a time, and is
+# never written to the eMMC: the boot's copy leaves /var/log.hdd/journal's
+# files out (its folder still comes, so journald keeps using /var/log), and
+# each copy to the eMMC (`write`: at 00:00, at shutdown and from
+# orangepi-truncate-logs) hides the RAM disk's journal, so --delete
+# removes the old copy on the eMMC once. The night's copy-back then finds
+# no journal to write over the open one. The last two boots are kept apart
+# from these copies, at a clean shutdown or reboot only, in
+# /var/lib/lamp-journal (/usr/local/libexec/lamp-journal-keep), so
+# `journalctl -b -1` still works after a reboot.
+#
+# enable the orangepi-ram-logging service?
+ENABLED=true
+#
+# size of the tmpfs mount -- please keep in mind to adjust /etc/default/orangepi-zram-config too when increasing
+SIZE=50M
+#
+# use rsync instead of cp -r
+# requires rsync installed, may provide better performance
+# due to copying only new and changed files
+USE_RSYNC=true
+
+# Extra rsync options for the copy to the eMMC (XTRA_RSYNC_TO) and the copy
+# back to the RAM disk at boot (XTRA_RSYNC_FROM), as bash arrays. The
+# patterns are anchored at /var/log. "hide" is an exclude on the sending
+# side only, so the eMMC's journal files aren't protected from --delete.
+XTRA_RSYNC_TO=(--filter='hide /journal/*')
+XTRA_RSYNC_FROM=(--exclude='/journal/*')

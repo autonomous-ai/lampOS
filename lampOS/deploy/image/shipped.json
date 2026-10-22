@@ -9,16 +9,25 @@
         "55eef0b732a4c0b6227e22360df3414cf9326fb661e8b4ee3c9fec134b6d9245",
         "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50"
       ],
+      "/etc/default/orangepi-ramlog": [
+        "4d0083afadd00ad3437fb74e60065be7c140385ff3dc3c9d31cd1b87e3cd3e06",
+        "65cd044e9401c4664b79d3e77065ed45d845eed3af473f48bd7eda6eae0492d2"
+      ],
       "/etc/systemd/system/lamp-cmedia-speaker.service": [
         "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
         "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
         "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706"
       ],
       "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
-        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405",
+        "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
+      ],
+      "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
-        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b",
+        "f08ad965d0ab02ad038820a9db7bd493ef135c8798b2eed140e80817da8e1208"
       ],
       "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
         "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
@@ -30,6 +39,9 @@
         "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
         "8a2bd89d501e8e05734e429e1bfda69e9c87066fde51fce0d91097accc81540f",
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-journal-keep": [
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -46,6 +58,10 @@
         "b6afa2fd8cf0a8c205790bf21a481b5d2416aea9e36cefaa6eb7762835013fee",
         "e919207b350881bc754ab0169d960b191a6fe53588d3f0a680d0bcf1a64f49e9"
       ],
+      "/etc/default/orangepi-ramlog": [
+        "4d0083afadd00ad3437fb74e60065be7c140385ff3dc3c9d31cd1b87e3cd3e06",
+        "65cd044e9401c4664b79d3e77065ed45d845eed3af473f48bd7eda6eae0492d2"
+      ],
       "/etc/systemd/system/lamp-cmedia-speaker.service": [
         "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
         "3c06065938be8960aec164745b59a98f8d4c3cd2c0068a4628b5a55f32e97359",
@@ -54,10 +70,15 @@
         "d76a02f2072a74efc2cbf122a4dc27c27b835d4c84f640dde4da6f4cefec3075"
       ],
       "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
-        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405",
+        "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
+      ],
+      "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
-        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b",
+        "f08ad965d0ab02ad038820a9db7bd493ef135c8798b2eed140e80817da8e1208"
       ],
       "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
         "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
@@ -71,6 +92,9 @@
         "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
         "8a2bd89d501e8e05734e429e1bfda69e9c87066fde51fce0d91097accc81540f",
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-journal-keep": [
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -86,6 +110,10 @@
         "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50",
         "e919207b350881bc754ab0169d960b191a6fe53588d3f0a680d0bcf1a64f49e9"
       ],
+      "/etc/default/orangepi-ramlog": [
+        "4d0083afadd00ad3437fb74e60065be7c140385ff3dc3c9d31cd1b87e3cd3e06",
+        "65cd044e9401c4664b79d3e77065ed45d845eed3af473f48bd7eda6eae0492d2"
+      ],
       "/etc/systemd/system/lamp-cmedia-speaker.service": [
         "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
         "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
@@ -95,10 +123,15 @@
         "8f86970535d8c80140597afdfd021b6e70180215a49ceb43f965ebb90033d348"
       ],
       "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
-        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405",
+        "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
+      ],
+      "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
-        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b",
+        "f08ad965d0ab02ad038820a9db7bd493ef135c8798b2eed140e80817da8e1208"
       ],
       "/etc/udev/rules.d/90-respeaker-lite.rules": [
         "4a977f828b7576b1ddf346dbeaf352f31cda3e67ad351010c7b88ec77a8f73f9"
@@ -115,6 +148,9 @@
         "8a2bd89d501e8e05734e429e1bfda69e9c87066fde51fce0d91097accc81540f",
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
+      "/usr/local/libexec/lamp-journal-keep": [
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
+      ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
       ]
@@ -128,16 +164,25 @@
         "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50",
         "9eabba477dfb775fe0d3313faa25a991175eaf07c9c4035cf94a892e094f8008"
       ],
+      "/etc/default/orangepi-ramlog": [
+        "4d0083afadd00ad3437fb74e60065be7c140385ff3dc3c9d31cd1b87e3cd3e06",
+        "65cd044e9401c4664b79d3e77065ed45d845eed3af473f48bd7eda6eae0492d2"
+      ],
       "/etc/systemd/system/lamp-cmedia-speaker.service": [
         "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
         "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
         "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706"
       ],
       "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
-        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405",
+        "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
+      ],
+      "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
-        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b",
+        "f08ad965d0ab02ad038820a9db7bd493ef135c8798b2eed140e80817da8e1208"
       ],
       "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
         "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
@@ -149,6 +194,9 @@
         "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
         "8a2bd89d501e8e05734e429e1bfda69e9c87066fde51fce0d91097accc81540f",
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-journal-keep": [
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"

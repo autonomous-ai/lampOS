@@ -1,0 +1,78 @@
+# The last two boots' journal, kept on the eMMC (#2602; the drop-in
+# orangepi-ramlog.service.d/zz-lamp-journal-keep.conf runs it). Run with bash.
+#
+# The journal lives on the /var/log RAM disk, one boot at a time, and
+# ramlog's copies to the eMMC leave it out (/etc/default/orangepi-ramlog):
+# bringing earlier boots' files back into the RAM disk is what filled it
+# past orangepi-truncate-logs' 75% and had its vacuum drop this boot's first
+# seconds. So the kept boots never go back to the RAM disk, nor to
+# /var/log.hdd (whose copy has --delete), nor anywhere a vacuum reaches:
+#
+# `keep`, from ramlog's stop at a clean shutdown or reboot only (systemd
+#   says "stopping"; never at a `systemctl stop`, and a crash runs nothing,
+#   so a crashed boot is lost, as accepted on #2602): journald rotates, so
+#   every file is closed, then this boot's closed files are copied, newest
+#   first, to $keep/last, up to 5 MB, stopping at the first that doesn't fit
+#   so what is kept is the boot's end without a gap. The boot before moves
+#   to $keep/previous, and the one before that is removed: at most 2 boots
+#   and 10 MB, written once per shutdown. A boot with nothing to copy
+#   leaves the kept ones as they are.
+# `link`, from ramlog's start at boot: each kept file is linked into
+#   /run/log/journal, a tmpfs journalctl reads besides /var/log/journal.
+#   Journald's own vacuum is of its machine's folder only, and a vacuum
+#   (orangepi-truncate-logs' `journalctl --vacuum-size`) never removes a
+#   file whose name isn't an archived one's, which a link's ("lamp-kept-…",
+#   no "@") isn't. Nothing is written to the RAM disk.
+#
+# The paths, and the state, may be given for tests only; with them given,
+# journald isn't asked to rotate.
+keep=${LAMP_JOURNAL_KEEP:-/var/lib/lamp-journal}
+run=${LAMP_JOURNAL_RUN:-/run/log/journal}
+budget=5000000
+
+case "$1" in
+keep)
+    state=${LAMP_JOURNAL_STATE:-$(systemctl is-system-running 2>/dev/null)}
+    [ "$state" = stopping ] || exit 0
+    if [ -n "${LAMP_JOURNAL_FROM:-}" ]; then
+        from=$LAMP_JOURNAL_FROM
+    else
+        from=/var/log/journal/$(cat /etc/machine-id 2>/dev/null)
+        timeout 15 journalctl --rotate >/dev/null 2>&1
+    fi
+    [ -d "$from" ] || exit 0
+    mkdir -p "$keep" || exit 0
+    new=$keep/.new
+    rm -rf "$new"
+    mkdir "$new" || exit 0
+    total=0
+    # Closed files only: an archived name has "@"; the open ones journald
+    # starts after the rotation hold the shutdown's last lines only.
+    for file in $(ls -1t "$from"/*@*.journal 2>/dev/null); do
+        size=$(wc -c <"$file")
+        [ $((total + size)) -le $budget ] || break
+        cp -p "$file" "$new/" || break
+        total=$((total + size))
+    done
+    if [ -z "$(ls -A "$new")" ]; then
+        rm -rf "$new"
+        exit 0
+    fi
+    rm -rf "$keep/previous"
+    [ -d "$keep/last" ] && mv "$keep/last" "$keep/previous"
+    mv "$new" "$keep/last"
+    sync
+    ;;
+link)
+    mkdir -p "$run" || exit 0
+    rm -f "$run"/lamp-kept-*.journal
+    for slot in previous last; do
+        for file in "$keep/$slot"/*.journal; do
+            [ -f "$file" ] || continue
+            name=${file##*/}
+            ln -s "$file" "$run/lamp-kept-$slot-${name//@/.}"
+        done
+    done
+    ;;
+esac
+exit 0
