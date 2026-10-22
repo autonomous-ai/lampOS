@@ -7305,6 +7305,57 @@ Ready for lamp-voice: yes (#3121); no (#3064, #3014, #2988)
   qualified final Common source. No lamp/model call, physical acceptance,
   memory score increase or corrected-source gate success is claimed.
 
+## 2026-10-23, 04:45: common folded and pushed; writer carried by train 12
+
+Ready for lamp-voice: no (#3064, #3014, #2988); writer delivered by train 12
+
+- Common #3064 is one commit `8a8d46d76` on main `b62f30ea5`, pushed
+  with the explicit old-head `77bdd4c95` lease. Its exact tree is
+  `887a7a0f8bfeb9b1e006d8897e5ecc6d73b58e35`, all 23 feature paths.
+  Fresh Mac fmt, strict workspace/all-target clippy and workspace build
+  passed. Full package-only Voice is 3,862/0/14 ignored: library 3,581
+  in 607.70 s, binary 1, integration 270/4/6, docs 0. All 1,555 source
+  hashes remained unchanged. Native ARM64 39859004929 runs; Linux clippy
+  39859004837 passed. El is First's assigned final source reader.
+- Focused overlapping controls passed: callbacks 24, private Engine 25,
+  retries 19, scope 25, Services 24, name carry 15, near 4, upstream
+  short-answer 5 and kept-chat 1. Held gaps 2, credited IPC 1, speaking
+  source 12 and Eyes binary 10 passed too. The new actual private Engine
+  short-answer test covers positive, proof lost at tool return and proof
+  lost at the empty second round; allowed chat counts 2/1/2 and TTS 1/0/0.
+  Warm synthetic name-helper first/repeat was 236/55 us, not cold or lamp
+  latency. Receipts: final-b62-note-permission under the existing checks dir.
+- Actual memory subrequests carry the same permission, and observed private
+  loss cannot revive within the request. A waiting new request uses the
+  denied old reader's explicit done receipt, with one reader and the
+  original absolute wait. The exact waiting-reader RED then GREEN result
+  and both original boundary REDs remain recorded. The gate's callback
+  21/3 fixture failures are retained: completion lookup after tidy and
+  expected cancellation causing fake-server BrokenPipe. Their setup was
+  fixed without changing any of the 179 callback/48 privacy assertion
+  macros. The later 23/1 failed only its parent diagnostic count: safe
+  cancellation restores keep and produces two refresh markers, expected
+  count updated 1 to 2. No full failed run is relabelled or erased.
+- First carried inactive writer #3121 into train 12 #3124, merged as
+  `4f4379770`, and closed the original PR. Its source reads remain clean;
+  activation/shutdown/crash/panic and isolated Rename-forget control
+  requirements are retained for the next adapter. No live caller exists.
+  A source-only current-main/Common merge preview is conflict-free and
+  preserves the critical guard bodies; it is not merged native execution.
+- GitHub disabled new comments on Queue #2602 at 2,500 comments. First
+  designated #3126; its full body/comments and all own PR replies have
+  been read through 04:39. Coordination now uses #3126, with reviews on PRs.
+  Root is clean on main `4f4379770`; its AGENTS matches upstream.
+- Name has a provisional exact five-path preview; all runtime files equal
+  Common, with stale inherited/off-camera claims corrected in the proposal.
+  Photo has a provisional 31-path preview with Common guards retained and
+  a guarded single-endpoint held-chat route. Three new real-Net HTTP tests
+  cover ten positive/denial/Room/no-fallback modes. An isolated own candidate
+  is compiling; tests are not yet run, existing product branches unchanged.
+  Actual acceptance/final gates still require qualified public Common.
+- No lamp, model call, physical consent/privacy acceptance or memory score
+  increase. First owns the latest-base train and 10:00 person checks.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
