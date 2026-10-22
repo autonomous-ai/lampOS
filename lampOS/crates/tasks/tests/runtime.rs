@@ -94,8 +94,10 @@ struct Counts {
     theirs: AtomicBool,
     /// Each `close`, with the machine and agent it named (#1390).
     closes: Mutex<Vec<(String, String)>>,
-    /// Harness is signed out while set (#1676).
+    /// Harness is signed out while set (#1676), and how often whether it is
+    /// signed in was asked.
     signed_out: AtomicBool,
+    sign_in_reads: AtomicUsize,
     /// What `harness machines` lists, and how often it was asked (#1676).
     machines: Mutex<Vec<AccountMachine>>,
     machine_reads: AtomicUsize,
@@ -245,6 +247,7 @@ impl Adapter for Script {
         }))
     }
     fn signed_in(&self) -> Result<SignIn, String> {
+        self.counts.sign_in_reads.fetch_add(1, Ordering::SeqCst);
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
             SignIn::Out
         } else {
@@ -1471,16 +1474,20 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     let requests: u64 = said(&report, "requests").unwrap().parse().unwrap();
     let answer = s.ask(json!({"op":"targets"}));
     assert_eq!(answer["ok"], true, "{answer}");
-    // The owner reports this request only after scheduling jobs. An idle,
-    // signed-out report after it means that pass finished with no machines
-    // read pending, rather than just that the request was answered.
+    // The owner reports this request only after scheduling jobs. Two more
+    // sign-in reads after it mean whole passes ran past it while signed out,
+    // each choosing the machines or not, rather than just that the request
+    // was answered. Not an idle report: the sign-in is asked every 20 ms
+    // here, so on a slow runner the worker is busy at nearly every report
+    // (lamp-voice's ARM64 at 07:58 and #2936's at 15:44, 22 Oct).
+    let reads = s.counts.sign_in_reads.load(Ordering::SeqCst);
     tasks_diagnostic_until(&s, |d| {
         unchanged();
         said(d, "requests")
             .and_then(|count| count.parse::<u64>().ok())
             .is_some_and(|count| count > requests)
             && said(d, "signed_in").as_deref() == Some("no")
-            && said(d, "cli_busy").as_deref() == Some("false")
+            && s.counts.sign_in_reads.load(Ordering::SeqCst) >= reads + 2
     });
     assert_eq!(
         s.counts.machine_reads.load(Ordering::SeqCst),
