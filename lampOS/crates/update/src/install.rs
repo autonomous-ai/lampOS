@@ -140,6 +140,17 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-skills-manage@.service",
         include_str!("../../../deploy/product/lamp-skills-manage@.service"),
     ),
+    // The eyes' camera helper (#2892): root's, started by its socket for
+    // each ask, so the socket is enabled and the template never is.
+    // lamp-eyes asks it after a camera stops opening.
+    (
+        "lamp-eyes-camera.socket",
+        include_str!("../../../deploy/product/lamp-eyes-camera.socket"),
+    ),
+    (
+        "lamp-eyes-camera@.service",
+        include_str!("../../../deploy/product/lamp-eyes-camera@.service"),
+    ),
     (
         "lamp-records.service",
         include_str!("../../../deploy/product/lamp-records.service"),
@@ -237,6 +248,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-controls.service",
     "lamp-ears.service",
     "lamp-expression.service",
+    "lamp-eyes-camera@.service",
     "lamp-eyes.service",
     "lamp-health.service",
     "lamp-keeper-restart@.service",
@@ -802,6 +814,7 @@ fn enabled() -> Vec<String> {
             "lamp-skills-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
+            "lamp-eyes-camera.socket",
         ])
         .map(str::to_owned)
         .collect()
@@ -2588,10 +2601,11 @@ mod tests {
         }
         // Setup, its reset, the waking face and setup's three helpers (the
         // names', the Wi-Fi's and its boot restore) share one binary, and so
-        // do the air and its bus clock, and the skills and their manage
-        // helper; every other service is a part.
+        // do the air and its bus clock, the skills and their manage helper,
+        // and the eyes and their camera helper (#2892); every other service
+        // is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 7, "every product service is a part");
+        assert_eq!(parts.len(), services - 8, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
@@ -2680,6 +2694,43 @@ mod tests {
                 "{socket} is not enabled"
             );
         }
+    }
+
+    /// #2892: the eyes' camera helper is installed, its socket enabled and
+    /// its template never, and it names the same camera and port as the
+    /// eyes, which ask it.
+    #[test]
+    fn the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera() {
+        let unit = |name: &str| {
+            PRODUCT
+                .iter()
+                .find(|(unit, _)| *unit == name)
+                .map(|(_, text)| *text)
+                .unwrap()
+        };
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lamp-eyes-camera.socket")
+        );
+        assert!(!enabled().iter().any(|name| name.contains('@')));
+        let usb = |text: &str| {
+            let at = text.find("--usb ").unwrap() + "--usb ".len();
+            text[at..].split_whitespace().next().unwrap().to_owned()
+        };
+        assert_eq!(
+            usb(unit("lamp-eyes-camera@.service")),
+            usb(unit("lamp-eyes.service"))
+        );
+        assert!(
+            unit("lamp-eyes.service")
+                .contains("--camera-helper /run/lampos-eyes-camera/camera.sock")
+        );
+        assert!(
+            unit("lamp-eyes-camera.socket")
+                .contains("ListenStream=/run/lampos-eyes-camera/camera.sock")
+        );
+        assert!(unit("lamp-eyes-camera@.service").contains("lamp-eyes reauthorize-camera --usb"));
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from

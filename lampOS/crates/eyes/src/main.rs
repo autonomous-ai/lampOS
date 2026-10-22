@@ -5,9 +5,12 @@
 //! that one only, in a private file for the voice service, and with
 //! `--full-look-file` one still the voice service asked for, in another.
 
-use std::{ffi::OsString, path::PathBuf};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
-const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--change-persist on|off] [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --change-persist on (with --look-on-change on), a cell
+const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--change-persist on|off] [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off] [--camera-helper ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --change-persist on (with --look-on-change on), a cell
 counts as changed only if it changed in this glance and the one compared before it, so a
 one-glance flicker is not a change and a person costs at most one glance more (off unless
 given). With --glance-log /var/lib/lampos-eyes/glance.log (with --look-on-change on;
@@ -16,7 +19,7 @@ file, made new each start (0600, in a folder of the owner's only), as one JSON l
 numbers: the rule's verdict, the cells past the bar and, per cell, its change over its
 noise and its change in greys after its row's median change; no grey, pixel or picture,
 and it stops after 20 minutes or 50 MB. A test flag: no unit lampOS deploys passes it
-(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the person's yes is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). The mesh and this read then run on their own thread\nwith the newest near face's crop, and no look waits on them; the mouth's per-look pass\ndoesn't run, so the speaking read judges from the corners. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\n";
+(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the person's yes is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). The mesh and this read then run on their own thread\nwith the newest near face's crop, and no look waits on them; the mouth's per-look pass\ndoesn't run, so the speaking read judges from the corners. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\nWith --camera-helper (the camera's helper's socket, #2892), after three opens in a row that did\nnot open, while seeing is permitted, the helper is asked, on a thread of its own, to re-authorize\nthe camera's USB device, then at most once a minute while they go on failing, and its answer\nis said in the journal (off unless given).\n\nlamp-eyes reauthorize-camera --usb VENDOR:PRODUCT@TOPOLOGY is that helper, run as root by its\nsocket for each connection: it checks the device at that port is that camera, writes its\nauthorized 0 then 1, as an unplug and a plug would, at most once a minute, answers one line,\nand reads nothing from whoever connected.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -88,6 +91,9 @@ struct Arguments {
     seems_log: Option<PathBuf>,
     /// Numeric explanations of the speaking judge, never another inference.
     mouth_diagnostics: bool,
+    /// The camera's helper's socket (#2892): asked to re-authorize the
+    /// camera's USB device after opens that did not open. Nothing without it.
+    camera_helper: Option<PathBuf>,
 }
 
 /// `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits each, or
@@ -179,6 +185,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut seems, mut seems_blendshapes, mut seems_log) = (None, None, None);
     let mut photo_dir = None;
     let mut mouth_diagnostics = None;
+    let mut camera_helper = None;
     while let Some(key) = args.next() {
         if key == "--help" {
             let alone = device.is_none()
@@ -315,6 +322,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 glance_log = Some(PathBuf::from(value));
             }
             Some("--photo-dir") if photo_dir.is_none() => photo_dir = Some(PathBuf::from(value)),
+            Some("--camera-helper") if camera_helper.is_none() => {
+                camera_helper = Some(PathBuf::from(value));
+            }
             Some("--mouth-on-heard") if mouth_on_heard.is_none() => {
                 mouth_on_heard = Some(match value.to_str() {
                     Some("on") => true,
@@ -369,6 +379,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         seems_log,
         photo_dir,
         mouth_diagnostics: mouth_diagnostics.unwrap_or(false),
+        camera_helper,
     };
     match (&result.device, result.usb.topology.is_empty()) {
         (None, false) => return Err("--device is required with --usb VENDOR:PRODUCT@TOPOLOGY"),
@@ -453,6 +464,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     .chain(&result.seems_log)
     .chain(&result.glance_log)
     .chain(&result.photo_dir)
+    .chain(&result.camera_helper)
     {
         if !path.is_absolute()
             || path.as_os_str().len() > 200
@@ -478,6 +490,11 @@ fn main() -> std::process::ExitCode {
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();
+    // The camera's helper (#2892): root's, started by its socket, the one
+    // thing it does.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new(REAUTHORIZE)) {
+        return reauthorize_camera(std::env::args_os().skip(2));
+    }
     let arguments = match parse(std::env::args_os().skip(1)) {
         Ok(None) => {
             print!("{USAGE}");
@@ -504,6 +521,86 @@ fn main() -> std::process::ExitCode {
             std::process::ExitCode::FAILURE
         }
     }
+}
+
+/// The helper's command: `lamp-eyes reauthorize-camera --usb
+/// VENDOR:PRODUCT@TOPOLOGY` (#2892).
+const REAUTHORIZE: &str = "reauthorize-camera";
+/// Where the helper keeps when it last re-authorized: its socket's folder,
+/// root's.
+const REAUTHORIZED_AT: &str = "/run/lampos-eyes-camera/last";
+
+/// The camera's helper: one answer line on its standard output (the
+/// connection), what it did said once in the journal, never anything read
+/// from whoever connected.
+fn reauthorize_camera(
+    mut args: impl Iterator<Item = std::ffi::OsString>,
+) -> std::process::ExitCode {
+    let usb = match (args.next(), args.next(), args.next()) {
+        (Some(key), Some(value), None) if key == "--usb" => value.to_str().and_then(usb_of),
+        _ => None,
+    };
+    let Some(usb) = usb.filter(|usb| !usb.topology.is_empty()) else {
+        eprintln!("lamp-eyes {REAUTHORIZE}: --usb VENDOR:PRODUCT@TOPOLOGY, its port named");
+        return std::process::ExitCode::from(2);
+    };
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    let outcome = lamp_eyes::camera_helper::reauthorize_at(
+        Path::new("/sys/bus/usb/devices"),
+        &usb.topology,
+        usb.vendor,
+        usb.product,
+        Path::new(REAUTHORIZED_AT),
+        now_s,
+    );
+    match outcome {
+        Ok(outcome) => {
+            eprintln!(
+                "lamp-eyes {REAUTHORIZE}: camera {:04x}:{:04x} at {}: {}",
+                usb.vendor,
+                usb.product,
+                usb.topology,
+                outcome.line()
+            );
+            println!("{}", outcome.line());
+            if outcome == lamp_eyes::camera_helper::Outcome::Reauthorized {
+                std::process::ExitCode::SUCCESS
+            } else {
+                std::process::ExitCode::FAILURE
+            }
+        }
+        Err(error) => {
+            eprintln!("lamp-eyes {REAUTHORIZE}: not re-authorized: {error}");
+            println!(r#"{{"reauthorized":false,"why":"error"}}"#);
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+/// After an open that did not open, the `failed`th in a row: the camera's
+/// helper asked, if there is one and it's time (`asked`, the last ask, in
+/// seconds of the monotonic clock), on a thread of its own so the loop
+/// never waits for it; its answer said once (#2892).
+fn ask_helper(helper: Option<&Path>, failed: u32, asked: &mut Option<u64>) {
+    let Some(helper) = helper else {
+        return;
+    };
+    let now_s = lamp_ipc::monotonic_us() / 1_000_000;
+    if !lamp_eyes::camera_helper::ask_now(failed, *asked, now_s) {
+        return;
+    }
+    *asked = Some(now_s);
+    let helper = helper.to_path_buf();
+    std::thread::spawn(move || match lamp_eyes::camera_helper::ask(&helper) {
+        Ok(answer) => eprintln!(
+            "lamp-eyes: camera did not open {failed} times in a row: its helper asked to re-authorize its USB device: {answer}"
+        ),
+        Err(error) => eprintln!(
+            "lamp-eyes: camera did not open {failed} times in a row: its helper could not be asked: {error}"
+        ),
+    });
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -907,6 +1004,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // camera (#2126); apart from `failures`, which the full size's turns
     // also set.
     let mut reopen = lamp_eyes::reopen::Reopen::default();
+    let mut helper_asked = None;
     // With `--usb VENDOR:PRODUCT` alone: why no one camera was found, said
     // once while it stays so, and the port it was last found on.
     let (mut not_found, mut found_on): (Option<String>, Option<String>) = (None, None);
@@ -1554,6 +1652,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             if failed.reset {
                                 reset_camera(&arguments.usb, at, &mut reopen);
                             }
+                            if permit.holds() {
+                                ask_helper(
+                                    arguments.camera_helper.as_deref(),
+                                    failed.failed,
+                                    &mut helper_asked,
+                                );
+                            }
                             retry_at = Instant::now() + failed.retry_after;
                         }
                         continue;
@@ -1662,6 +1767,15 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     if failed.reset {
                         // Closed above; nothing of ours holds the device.
                         reset_camera(&arguments.usb, &usb_port, &mut reopen);
+                    }
+                    // Only while seeing is permitted, as the reset (the
+                    // reviewer's P3 on #2129).
+                    if permit.holds() {
+                        ask_helper(
+                            arguments.camera_helper.as_deref(),
+                            failed.failed,
+                            &mut helper_asked,
+                        );
                     }
                     retry_at = Instant::now() + failed.retry_after;
                     continue;
@@ -2558,6 +2672,29 @@ mod tests {
             ),
         }
         assert!(parse(args(&[&FULL[..], &["--photo-dir", "photos"]].concat())).is_err());
+        // The camera's helper (#2892): off unless given, an absolute path, once.
+        assert!(value.camera_helper.is_none());
+        let helper = [
+            &FULL[..],
+            &["--camera-helper", "/run/lampos-eyes-camera/camera.sock"],
+        ]
+        .concat();
+        assert_eq!(
+            parse(args(&helper))
+                .unwrap()
+                .unwrap()
+                .camera_helper
+                .as_deref(),
+            Some(Path::new("/run/lampos-eyes-camera/camera.sock"))
+        );
+        assert!(
+            parse(args(
+                &[&FULL[..], &["--camera-helper", "camera.sock"]].concat()
+            ))
+            .is_err()
+        );
+        let twice = [&helper[..], &["--camera-helper", "/run/x.sock"]].concat();
+        assert!(parse(args(&twice)).is_err());
         // Every glance is detected unless looking on change is asked for.
         assert!(!value.look_on_change);
         let on = [&FULL[..], &["--look-on-change", "on"]].concat();
