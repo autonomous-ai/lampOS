@@ -161,10 +161,25 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
 - **The side talk** (mark `C`) after each ask: a clip of a real meeting
   from the AMI Meeting Corpus, CC BY 4.0,
   https://groups.inf.ed.ac.uk/ami/corpus/, listed in
-  `$DESK_KIT_AMI/clips.tsv` (default `~/lamp-played/ami`; columns `file
-  meeting start_s end_s speakers overlap text`, `file` relative to that
-  folder). Without that file, two `say` voices talk about work. AMI audio
-  stays on your Mac, outside the repo: never commit it.
+  `$DESK_KIT_AMI/clips.tsv` (columns `file meeting start_s end_s speakers
+  overlap text`, `file` relative to that folder). Without that file, two
+  `say` voices talk about work. AMI audio stays on your Mac, outside the
+  repo: never commit it.
+- **The kit's audio** is one versioned tar, `desk-kit-1.tar`, fetched once
+  into `$PLAYED_OUT` from
+  `gs://s3-autonomous-upgrade-3/os/test-kits/desk-kit-1.tar` and refused
+  unless its sha256 is `DESK_KIT_SHA256` (`e9f826f6…`), so every Mac plays
+  the same audio. It holds 52 AMI clips (meetings EN2002a, EN2002b,
+  EN2002d and ES2004b, individual headsets, from the corpus owners' copy at
+  https://huggingface.co/datasets/edinburghcstr/ami, whose card gives the
+  licence as `cc-by-4.0`), cut, summed for overlap, resampled to 48 kHz and
+  levelled, with the credit "AMI Meeting Corpus, the AMI Consortium,
+  https://groups.inf.ed.ac.uk/ami/corpus/, CC BY 4.0,
+  https://creativecommons.org/licenses/by/4.0/" in its README. It also
+  holds the asks, pre-made with macOS `say` (voice `Daniel` asks, `Samantha`
+  the colleague with no clips, rate 185, 16-bit 16 kHz), so they are the
+  same on every Mac. `DESK_KIT_TAR=none` uses `DESK_KIT_AMI` and this
+  Mac's `say` instead.
 - **Each arm** is `NAME:ENV=v,ENV=v`, put on lamp-voice with `BASE` through
   a `/run` drop-in (`zz-desk-kit.conf`), the voice restarted and its
   environment checked before anything is played; `VOICE_BIN` runs another
