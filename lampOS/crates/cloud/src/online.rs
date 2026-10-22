@@ -56,7 +56,10 @@ const _: () = assert!(SESSION_EXPIRY_S > WILL_DELAY_S);
 /// reply channel `fd_channel`, at QoS 1, not retained, after
 /// [`WILL_DELAY_S`]. The backend takes an `offline` with the lamp's `id` on
 /// its own channel as the lamp gone, and its next ping or `info` as back.
-/// The will's `time` is when the connection was made.
+/// The will's `time`, `timezone` and `local_ip` are those of when the client
+/// was made (start, or a relink after a Wi-Fi join): a reconnect inside the
+/// event loop keeps them. The backend reads only `type`, `id` and `device` of
+/// an `offline`, and takes messages on a channel in the order they come.
 pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttOptions> {
     let mut options = options(account)?;
     let properties = LastWillProperties {
