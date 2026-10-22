@@ -1,0 +1,19 @@
+{
+  "authored_head": "f913461d92b7928e5361c51de357ca7aef4b1a8d",
+  "train_head": "75dfd7cb1da943e10608308c8875afd6f5e73fde",
+  "train_base": "001a3d714db50aaac36c68a524ec0844c17c2090",
+  "landed_head": "43bc29f9b3163e03165148813c27af9e073e615c",
+  "landed_commit": "43bc29f9b3163e03165148813c27af9e073e615c",
+  "integration_head_observed": "43bc29f9b3163e03165148813c27af9e073e615c",
+  "range_diff": "1:  f913461d9 = 1:  43bc29f9b lampOS: step the requested audio renewal refusal fixture",
+  "train_tree": "99325f6f5d8f18023750fd4bd4f02f295ef65c19",
+  "landed_tree": "99325f6f5d8f18023750fd4bd4f02f295ef65c19",
+  "trees_match": true,
+  "checked_merge": "7c3ebdd43e65f1611e71eff2dbb735742f85b277",
+  "checked_tree": "99325f6f5d8f18023750fd4bd4f02f295ef65c19",
+  "checked_parents": [
+    "001a3d714db50aaac36c68a524ec0844c17c2090",
+    "75dfd7cb1da943e10608308c8875afd6f5e73fde"
+  ],
+  "checked_train_landed_trees_match": true
+}
