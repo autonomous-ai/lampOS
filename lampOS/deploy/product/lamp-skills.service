@@ -4,7 +4,7 @@
 # inert while LAMP_SKILL_ROUTINES is off); Bedtime and Morning
 # stays off until its lamp comparison, and install::PRODUCT_SKILLS_OFF's eight are installed off
 # until their lamp checks. A skill speaks only through the voice's say service
-# (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice's own hello is off there, so only
+# (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice has no hello of its own (#2825), so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
 # LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
 # without it every skill is asked about and refused, and nothing is done.

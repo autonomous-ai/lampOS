@@ -133,8 +133,6 @@ Environment=LAMP_TASKS_WHO=on
 Environment=LAMP_TASKS_TARGET=office-claude
 # Work asked of the staff is handed over every time; a name not made out is asked about (#854, #859). Tried from 2026-10-15 21:30.
 Environment=LAMP_TASKS_ASKED=on
-# The hello waits up to 2 s for the Policy's say_now or wait (#856, #883); watching only while lamp-policy has no --act hello.
-Environment=LAMP_HELLO_ASKS_POLICY=on
 # A bare call ("Hey Lamp," and a pause) waits up to 2 s for the rest, on lamp-name's early name/rising, and the name
 # carries across a cut (#782, #853; lamp-4ace 2026-10-16 00:27: busy room 3 of 3, from 0 of 3). With --call-wait-ms 2000 above.
 Environment=LAMP_CUT_KEEPS_NAME=on
@@ -197,14 +195,12 @@ Environment=LAMP_ROOM_FACTS=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 # And tell the eyes (lamp-eyes.service) they may look, while the microphone is permitted.
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
-# Know when someone comes to sit in front of the lamp (lampOS/docs/speaking-first.md). With only
-# this line the moments a hello would be due are recorded and nothing is said; add
-# Environment=LAMP_SPEAK_FIRST=on for the lamp to say it.
+# Know when someone is sitting in front of the lamp (lampOS/docs/speaking-first.md): a reminder or news
+# waits for them, and a skill's note is told who they are. The hello is Welcome back's alone (#2825).
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
-# Remembering a face when asked, a hello by name, and the name told with what a known person says
+# Remembering a face when asked, and the name told with what a known person says and with a skill's note
 # (lampOS/docs/eyes.md, "Who is there"); the eyes' known file is beside this socket.
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-#Environment=LAMP_SPEAK_FIRST=on (off since 16 Oct 10:15: Welcome back, a skill, greets instead, #967)
 # Let the lamp take a look when it says "Let me look" (lampOS/docs/speaking-first.md): the eyes'
 # newest frame goes to the model with that one request and with no other.
 Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg

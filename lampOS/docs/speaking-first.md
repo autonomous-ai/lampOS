@@ -1,120 +1,92 @@
 # Speaking first
 
-`crates/voice/src/speak_up.rs`, with `lamp-eyes --presence-file` and a written
-request in `lamp-gemini`. Status on 2026-10-13: built, host tests, and the
-provider's part tried on lamp-4ace without a sound being played. The lamp
-has not yet said hello to anyone, nor taken a look on being asked. On
-lamp-4ace the hello runs in its watching mode: the moments it would have
-spoken are recorded and nothing is said.
+What the lamp says unasked, through the voice (`crates/voice/src/speak_up.rs`,
+with `lamp-eyes --presence-file` and a written request in `lamp-gemini`): a
+look it said it would take, an ask again, a note given it by another part
+(the say service, below). **The hello to someone who comes back to the desk
+is the Welcome back skill's alone** ([skills.md](skills.md),
+`lampOS/skills/welcome-back`).
 
-## What it is for
+## One hello, from the skill (#2825)
 
-Everything else the lamp says is an answer. A person at the next desk also
-looks up and says a word when a colleague comes back. This is that, and
-only that: one short hello to someone who comes and sits down. It is not an
-announcement, it is not for people walking past, and it never goes into a
-conversation.
+The read of every behaviour on 21 October found the hello built twice: as
+the Welcome back skill, and as the voice's own (`speak_up::Arrival`, switched
+by `LAMP_SPEAK_FIRST`, with `LAMP_HELLO_ASKS_POLICY` to ask the Policy).
+The row asks for no one-off code, and two paths for one hello can both
+fire, so the voice's own was removed. `LAMP_SPEAK_FIRST` and
+`LAMP_HELLO_ASKS_POLICY` are no longer read; no `lamp_speaks_first` turn,
+`hello_due` or `hello_policy` record is written, and nothing publishes
+`voice/arrival`. A test fails if the voice's sources hold a hello of their
+own again, or the skill stops greeting
+(`speak_up::tests::only_welcome_back_says_hello_on_an_arrival`).
 
-## When
+What the voice's hello did, and where it went:
+
+| The voice's hello | Now |
+|---|---|
+| a face at least 0.14 of the picture's height, there 3 s, after 5 minutes with nobody | Welcome back's trigger: `near = 0.14`, `for = "3s"`, `absent_for = "5m"` |
+| at most one hello in 20 minutes | Welcome back's `cooldown = "20m"` |
+| nothing said to the lamp or by it for 30 s | Welcome back's two `voice/state` conditions: resting for 5 s, and the lamp not speaking for 30 s (#1140, [skills.md](skills.md)) |
+| the keeper's pause | the say service's gates (below) |
+| the Policy asked first (`LAMP_HELLO_ASKS_POLICY`, `voice/arrival`) | Welcome back's `[ask] policy = "hello"`, through `lamp-skills`' ask (`LAMP_SKILLS_ASK=policy`) |
+| by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "by name if you know it" |
+| by a known face's name | told with every skill's note while someone is at the lamp: "(The person at the lamp now is NAME: you know their face.)" (`person::at_the_lamp`, `known_faces::note`) |
+| one beat warmer for someone Mood calls `regular` or `close` (#1670) | told with every skill's note while someone is at the lamp: "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)" (`person::OFTEN`) |
+| for someone `close`, no hello within the hour | **dropped**: `lamp-skills` has no cooldown by how familiar someone is, and Mood carries no identity, so the hour counted any hello, not one to this person; the 20 minutes hold for everyone |
+| a glance away under 20 s is the same arrival | Welcome back's `gap = "3s"` keeps a look down; a longer one ends the hold, and the absence counts from the last near face, which comes to the same for an arrival after five minutes |
+| `lamp_speaks_first` turn, `hello_due` and `hello_policy` records | the say service's `skill_says` record, naming `welcome-back`, and `lamp-skills`' journal |
+
+## Someone at the lamp
 
 The eyes keep one line fresh while a face is near (`--presence-file`: the
 face's height as a share of the picture's, no picture, nothing else; a file
-not written for a second and a half means nobody). From that the voice
-service decides (`Arrival`). A hello is due when all of these hold:
+not written for a second and a half means nobody). `LAMP_EYES_PRESENCE_FILE`
+in the voice service's environment names it; without it nobody is known to
+be at the lamp from the eyes. From it the voice keeps one thing
+(`speak_up::Presence`): someone has been there, a face at least 0.14 of the
+picture's height, for three seconds without a break. A reminder due long ago
+and the news wait for that, or for a person heard a moment ago.
 
-| | |
-|---|---|
-| someone is there | a face at least 0.14 of the picture's height, for three seconds without a break |
-| they were away | nobody for five minutes or more before that. A face lost for under twenty seconds is someone who looked away |
-| the lamp is at rest | nothing said to it or by it for half a minute, nothing being heard, a provider ready |
-| it has not just done this | no hello in the last twenty minutes; for someone `close` (#1670, below), no hello in the hour before they arrived, so an arrival that began within the hour is not greeted at all |
-| it is not paused | the keeper has not said `{"paused": true}` on `lamp/pause` ([keeper.md](keeper.md), "Named states and the pause") |
+While someone is there, a skill's note (`note` on the say service, never
+exact `text`, an add-on's quoted line or what the voice keeps) is told who
+it is, after the note: a known face's name ([eyes.md](eyes.md)), and for a
+remembered person Mood calls `regular` or `close` (`familiar` in
+`mood/state`, from the eyes' `lamp-eyes --visits on`, [mood.md](mood.md)),
+the sentence above. The level is read with the presence file, four times a
+second, from source `mood` only and within its 2.5 s
+(`speak_up::familiar_in`); if the eyes have not recognised them yet, nothing
+is added. Tests: `person::tests::a_skills_note_is_told_who_is_at_the_lamp`,
+`speak_up::tests::the_familiar_level_is_read_from_moods_fresh_state_only`.
+The one line in `coordinator.rs` that adds it to a skill's turn has no test
+of its own.
 
-What ends that quiet is talk: the lamp's own words playing, any voice the
-detector calls speech (words or none: a line in a language the route takes
-no words from is still someone talking), a person's words heard (a
-transcript of what was heard with a word in it), or a Stop. The rest of a
-request does not: its end's silence and the wait for an answer that never
-comes aloud (`no_audio_answer`, `not_speech`) leave the quiet counting from
-its last speech, though the lamp still waits for the request to end before
-it begins anything. On lamp-52e6 on 21 October, with the person seated
-quietly, the lamp's own fan opened 11 wordless requests in two minutes, each
-had held the quiet until it ended, and the onboarding walk's 3 s never
-came. A fan the detector calls speech still holds it while it does. Every
-quiet the lamp waits out "since the last turn" is this one (`last_turn_us`):
-the hello's, a reminder's and a skill's say's, the news', a face added from
-a photo's, and each onboarding step's
+What ends the quiet every unasked turn waits for is talk: the lamp's own
+words playing, any voice the detector calls speech (words or none: a line in
+a language the route takes no words from is still someone talking), a
+person's words heard (a transcript of what was heard with a word in it), or
+a Stop. The rest of a request does not: its end's silence and the wait for
+an answer that never comes aloud (`no_audio_answer`, `not_speech`) leave the
+quiet counting from its last speech, though the lamp still waits for the
+request to end before it begins anything. On lamp-52e6 on 21 October, with
+the person seated quietly, the lamp's own fan opened 11 wordless requests in
+two minutes, each had held the quiet until it ended, and the onboarding
+walk's 3 s never came. A fan the detector calls speech still holds it while
+it does. Every quiet the lamp waits out "since the last turn" is this one
+(`last_turn_us`): a reminder's and a skill's say's, the news', a face added
+from a photo's, and each onboarding step's
 (`coordinator::tests::second_route::speech_holds_the_quiet_with_or_without_words_and_a_wordless_requests_tail_does_not`).
-
-Someone already there when the service starts was never away and gets none.
-A hello that is due but cannot be begun (the lamp is in a turn, or paused)
-stays due until it can be. The pause holds every turn the lamp begins
-itself the same way: the look it said it would take, the second look, a
-reminder and news.
-
-`LAMP_EYES_PRESENCE_FILE` in the voice service's environment names the
-eyes' file; without it none of this runs. `LAMP_SPEAK_FIRST=on` lets the
-lamp say the hello. Without that the moment is recorded (`hello_due` in the
-session record, a line in the journal) and nothing is said.
-
-On lamp-4ace it was only recorded from 2026-10-13 to 15, and in 680 voice
-sessions it was never once due. Fifteen hours of what the eyes published
-(a bus recording from 2026-10-14 18:23 to 10-15 08:46) say why: no face
-reached the 0.14 of the picture's height that counts as someone at the
-lamp (the largest were 0.11 to 0.14). At rest lamp-4ace's camera looks
-across the side of the desk, and the people at the computer were at the
-very edge of its view. Turning the lamp to face the seat is the fix; the first five minutes
-([onboarding.md](onboarding.md)) has the lamp ask its person to do that. A
-false "face" that the eyes report all night in one spot is #763. It is on since 2026-10-15, 07:34. Its voice side was tried at 07:59
-the same day by writing a near face's size into the presence file by hand
-for eight seconds, 21 minutes after the last person was seen: the lamp
-said, unasked, "Oh, hey! Back again. It's good to have some company." The
-eyes writing the file for a real person sitting down is still to be seen.
+The keeper's pause holds every turn the lamp begins itself: the look it said
+it would take, the second look, a reminder, a skill's say and news.
 
 ## How it is said
 
-The lamp cannot be handed words to speak: its voice is the model's. So the
-turn is a request like any other, with a written note in place of speech
-(`ProviderInput::Written`, `InputSender::try_written`): one `clientContent`
-message, complete, outside any activity, and whatever the model answers is
-played like any answer. The note is:
+The lamp cannot be handed words to speak: its voice is the model's. So an
+unasked turn is a request like any other, with a written note in place of
+speech (`ProviderInput::Written`, `InputSender::try_written`): one
+`clientContent` message, complete, outside any activity, and whatever the
+model answers is played like any answer.
 
-```text
-(Nobody has spoken. Someone has just come and sat down in front of you
-after being away for a while. Say hello the way a friend at the next desk
-would: a few warm words and no question they have to answer.)
-```
-
-By name when the lamp has one: the known face's at the lamp now
-(`known_faces::hello`, [eyes.md](eyes.md)), else the name typed at setup
-(`LAMP_PERSON_NAME`, `person::hello`: "… most likely “Example Name”, whose
-lamp you are. Say hello … by name …", #806; quoted, so it reads as a name).
-A known face's name wins, since it is the one at the lamp now; with neither,
-the note above, with no name.
-
-**Someone who comes by often** (#1670). Where Mood says how familiar the
-remembered person at the lamp is (`familiar` in `mood/state`, from the eyes'
-`lamp-eyes --visits on`, [mood.md](mood.md), [eyes.md](eyes.md)), the voice reads
-it with the eyes' presence file, four times a second, from source `mood` only
-and within its 2.5 s (`speak_up::familiar_in`). For `regular` and `close`, the
-hello's note gains one sentence, the same hello one beat warmer:
-"They come by often: greet them as you would someone you see most days,
-warmly and without fuss." (`person::OFTEN`). For `close`, an arrival that
-began within an hour of the last hello gets none: a friend wouldn't greet you
-twice (the first builder on #1670, 12:19). It is judged from when they
-arrived, so someone close is never greeted late while they sit there; a
-glance away under twenty seconds is the same arrival (Tests on #1775).
-Without a fresh level, or for `new`, the hello is as before. The level is
-read when the hello comes due, three seconds after they arrive: if the eyes
-have not recognised them by then, they are greeted as anyone. The hour counts
-any hello by the lamp, not one to this person, since Mood carries no identity:
-someone close who comes half an hour after a regular was greeted gets none. Tests: the
-level read from Mood only; `close` greeted at 0 and 78 minutes, not at 26 or
-52, where anyone else is greeted at each; someone close who glances away
-once the hour is up is not greeted mid-sitting (Tests' test); and the warmer sentence only for
-`regular` and `close`. The one line in `coordinator.rs` that passes the
-level into the hello's words has no test of its own: nothing tests the
-coordinator's hello. The typed name is also told to the model after
+The name typed at setup is told to the model after
 its character, by the provider and second workers that build it (the voice
 passes them `LAMP_PERSON_NAME`), only as the name the person gave, never as
 who is at the lamp: "… gave their name as “Example Name”. Whoever is at the
@@ -123,7 +95,7 @@ know it" (Welcome back) can use it. It is one line of at most 64 characters,
 setup's own limit, with no control character, line separator or direction
 mark; anything else, or no file (before setup, after a reset), is no name,
 and the voice says why without saying the name. Each time it is read (when a
-worker builds the instruction, and at each hello), the journal says so
+worker builds the instruction), the journal says so
 without the name: `the person's name from /etc/lampOS/person/name is used
 (12 characters)`. The first five minutes (#841) run in the same session, so
 their notes come after the same instruction.
@@ -350,8 +322,8 @@ is left alone with or without it.
 
 Off unless `LAMP_SAY=on`. Another part of the lamp, `lamp-skills` first
 ([skills.md](skills.md)), asks the voice to say something unprompted, and
-is told what became of it (`crates/voice/src/say.rs`). The hello, task
-news and reminders are to move onto it.
+is told what became of it (`crates/voice/src/say.rs`). The hello is on it
+(Welcome back); task news and reminders are to move onto it.
 
 **The socket** is `LAMP_SAY_SOCKET`, `/run/lampos-say/say.sock` if unset,
 in a directory of its own: the voice runs as root and its own runtime
@@ -364,8 +336,8 @@ is not. One JSON line in:
     {"skill": "reminders", "note": "Remind them, in one short line, to call the bank.", "priority": 8, "expires_in_ms": 120000}
 
 - `skill`: 1 to 64 of `a-z`, `0-9`, `-` and `_`. Logged and traced only.
-- Exactly one of `note`, an instruction the model phrases (as the hello's
-  and the news'), `text`, words to say as they are (the model is told
+- Exactly one of `note`, an instruction the model phrases (as Welcome back's
+  hello and the news'), `text`, words to say as they are (the model is told
   "Say exactly these words, in your own voice, and nothing else:" before
   them), at most 900 bytes with no control characters, `from`, words
   the voice keeps itself (below), `sound`, a skill's own short sound
@@ -444,8 +416,7 @@ request or extra actuator writer. It is an alternative to every other
 content field; other cue values are refused. Its acoustic result remains
 part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).
 
-**When it is said.** After a due reminder and before the hello and the
-news, through a reminder's gates: no reply owed or queued, the speaker
+**When it is said.** After a due reminder and before the news, through a reminder's gates: no reply owed or queued, the speaker
 free, nobody's utterance pending, the microphone's capture fresh and a
 second since the last speech, the playback mask free, a ready session and
 the keeper's pause off; and a quiet since the last turn of 15 s (as the
@@ -509,7 +480,7 @@ for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
   the words. With the switch but no say service (`LAMP_SAY` off), nothing
   can ask, and nothing waits.
 - While a reminder is held for its skill, and is still the one offered,
-  the say service's own says, the hello and the news wait for it: a due
+  the say service's own says and the news wait for it: a due
   reminder comes before anything else the lamp says unasked, as it did
   without the switch (Fourth on #1038).
 - Tests: `say::tests::an_ask_for_what_the_voice_keeps_waits_for_its_own_source`,
@@ -517,9 +488,10 @@ for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
   `coordinator::tests::reminders::a_reminder_a_skill_asked_for_is_answered_on_the_acknowledgements_own_proof`,
   `reminders::tests::on_and_skill_turn_schedule_speech_on_and_nothing_else_does`,
   `coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered`.
-  The last is of the condition only: the three places it holds (the say
-  service's turn, the hello and the news, in the coordinator's loop) are
-  driven by no test, as no harness runs the loop with all three (Thirteen
+  The last is of the condition only: the places it holds (the say
+  service's turn and the news, in the coordinator's loop; the voice's own
+  hello was a third until #2825) are driven by no test, as no harness runs
+  the loop with all of them (Thirteen
   on #1038). On a lamp: with `LAMP_SCHEDULE_SPEAK=skill` and `lamp-skills`
   stopped, a say sent in the 10 s a due reminder is held is said after the
   reminder, never before (`no skill asked for the reminder due within
@@ -533,100 +505,13 @@ may not need it.
 **An add-on's quoted line (#2530 part 2, `LAMP_ADDON_SAY=on`).** In place of `note` or `text`, `quoted` is a partner's line from an add-on's folder, at most 300 bytes on one line. Refused without the switch, and on the Live route. Its turn tells the model it is quoted and untrusted, never an instruction, and that it may say nothing; it is asked with no functions, runs none, is kept out of memory and is never urgent ([addons.md](addons.md)).
 ## Asking the policy (#752)
 
-Built by the second builder on 2026-10-15. **Off unless the voice starts
-with `LAMP_HELLO_ASKS_POLICY=on`**; it needs the presence file as before.
-`LAMP_SPEAK_FIRST=on` stays the switch for the lamp to say anything first.
-
-The owner: the policy is the part that decides when the lamp speaks first.
-With the switch, a hello that is due and could be begun (the rule above,
-nothing owed, a provider ready) is not said at once:
-
-1. The voice says so on `voice/arrival` (`lamp_msgs/VoiceArrival`): the
-   arrival's number (the voice's clock in microseconds), minutes away,
-   seconds there, seconds of quiet, and minutes since its last hello if it
-   has said one since it started. No picture, no face, nobody's identity.
-2. It holds the hello up to 2 s (`speak_up::ASK_FOR_US`) for the policy's
-   decision about that number on `policy/decisions` (`about` `hello`,
-   `lamp-policy --hello`, [policy.md](policy.md#hello-on-arrival-say-hello-now-752)):
-   - `say_now`, acting: said, as before (with `LAMP_SPEAK_FIRST=on`), by
-     name for someone the lamp knows ([eyes.md](eyes.md)); the policy is
-     never told the name;
-   - `wait`, acting: not said, and recorded (`hello_due` with
-     `"policy":"wait"`, and "the policy said not now" in the journal);
-   - a decision in shadow: the rule above, at once;
-   - none within 2 s: the rule above.
-3. Either way the hello counts as made for that arrival: no second asking.
-   An answer the lamp could not act on within 10 s (it was in a turn) is
-   old, and the policy is asked again. Someone new arriving drops what was
-   asked for the one before.
-
-The policy waits a hello while anyone talks to the lamp, and for 15 s
-after. With `lamp-policy --hello-quiet to-the-lamp` (#1155) those 15 s
-count only talk to the lamp or by it: the voice says each turn's verdict
-on `voice/turn`, and a turn whose answer it held back as not said to the
-lamp is taken back from the quiet
-([policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)).
-
-The session record gets one line for each answer acted on:
-`{"kind":"hello_policy","at_us":…,"arrival":…,"answer":"say_now|wait|shadow|none","waited_ms":…}`,
-and the journal "a hello is due; asking the policy (arrival N)" and "the
-policy's answer to the hello: say_now after N ms". What the policy decided
-and why is in its own log.
-
-**Without the switch** nothing here touches the bus (no `voice/arrival`
-publisher, no subscription), the hello is the rule's on the very tick it
-is due and ready, and the session record and journal are as they were:
-`without_the_switch_the_hello_is_as_it_was_and_nothing_is_said_on_the_bus`
-and `speak_up::tests::without_asking_a_ready_hello_is_the_rules_at_once`.
-
-**How long a hello now waits**, measured on the development Mac (Apple M2
-Max, macOS 26.6.2, release build), with `cargo run --release -p lamp-voice
---example hello_wait -- --samples 30`: from the first call that says the
-arrival to the call that takes the policy's `say_now`, the voice calling
-every 2 ms as its loop does, through a bus in `/tmp`, the policy's own loop
-and a stand-in judge that answers at once: **31.6 ms in the middle, 38.0 ms
-at most** (33.2 ms the first) in one run of 30, and 22.4 ms in the middle,
-36.3 ms at most in a second. Without the switch it waits nothing (0.0 ms,
-the same call). On the lamp Jev's own time comes on top: 0.5 to 1 s as
-measured from lamp-4ace for the attention question, and never more than
-1.5 s, since the hello question's asking is cut there and the policy's
-rule answers in its place; past 2 s the voice's rule does. So a hello comes
-about 0.5 to 1 s later than before. These are the Mac's numbers, not the
-lamp's ([verification](verification/hello-asks-host-20261015/README.md)).
-
-**On the lamp** (the first builder; the smallest step first):
-
-1. Install the ARM64 run's `lamp-voice` and `lamp-policy` with the switches
-   as they are, and see the minute out.
-2. Shadow first: add `--hello` to `lamp-policy`'s `ExecStart` and
-   `Environment=LAMP_HELLO_ASKS_POLICY=on` to `lamp-voice.service`,
-   `sudo systemctl daemon-reload`, restart both. `journalctl -u lamp-policy
-   -n 5` says `hello=true`; `lamp-bus info voice/arrival` lists the voice as
-   publisher and `policy.` as subscriber.
-3. Make one hello due, as at 07:59 on 2026-10-15: with nobody seen for
-   five minutes and no hello for twenty, write a near face into the
-   presence file for eight seconds:
-
-   ```sh
-   for i in $(seq 16); do echo 0.30 | sudo -u orangepi tee /run/lampos-eyes/present >/dev/null; sleep 0.5; done
-   journalctl -u lamp-voice --since -1min | grep -E 'hello|policy'
-   journalctl -u lamp-policy --since -1min | grep 'hello decision'
-   ```
-
-   Expected: "asking the policy", "the policy's answer to the hello: shadow
-   after N ms" (N about Jev's time), the lamp's hello as before, and one
-   `hello decision` line.
-4. Then act: add `--act hello` beside `--hello`, restart the policy, and
-   repeat step 3 after twenty minutes. "say_now after N ms" and the hello,
-   or "wait" and none; a second try within twenty minutes is a `wait` with
-   `guard=greeted_recently`.
-5. Hand back N for each, the lamp's words, and the policy's decision lines.
-
-**Most likely wrong on the lamp.** That the half second to a second of
-Jev's time reads as the lamp hesitating, not as it noticing; that `wait`
-from Jev, asked a question it was not built for, keeps a hello a person
-would have liked; and the eyes: no real person has yet made a hello due on
-lamp-4ace ([why](#when)), so this has been tried only by the written file.
+Removed with the voice's own hello (#2825). It held a due hello up to 2 s
+for the Policy's decision on `voice/arrival` (`LAMP_HELLO_ASKS_POLICY=on`).
+Welcome back asks the Policy itself (`[ask] policy = "hello"`), put to the
+same question as an arrival (`lamp-policy --gate`,
+[policy.md](policy.md#hello-on-arrival-say-hello-now-752)). The measures of
+how long the voice's hello waited are kept with the run
+([verification](verification/hello-asks-host-20261015/README.md)).
 
 ## Tests
 
@@ -651,20 +536,11 @@ person `dropped` as `user_interrupted`; one the model left silent `dropped`
 as `no_audio_answer`. The gates in the voice's loop are a reminder's, with
 no test of their own here: they are to be seen on lamp-4ace.
 
-`speak_up::tests`: one hello to someone back after five minutes and none
-while they stay an hour, looking away now and then; none for someone there
-at the start, away two minutes, walking past, or arriving into a room in
-conversation until it has been quiet for half a minute; none again within
-twenty minutes; a hello that could not be begun stays due; the eyes'
-file counts only fresh and only for a near face; only the lamp saying
-it will look asks for a look; and, asking the policy, a ready hello is the
-rule's at once without the switch, is held for its own arrival's answer
-(another arrival's is not taken), takes `say_now`, `wait` or a decision in
-shadow as above, keeps an answer that comes while the lamp is busy, and is
-the rule's after 2 s without one. `tests/hello_asks.rs` runs the policy's
-own loop with a stand-in judge: an arrival, a `say_now`, one hello, and a
-`wait` for the next within twenty minutes; a `wait` kept; someone talking,
-a `wait`; a policy in shadow or silent, the rule. `session::tests` in
+`speak_up::tests`: no hello of the voice's own in its sources, and Welcome
+back's trigger, ask and say in its folder (#2825); someone present after
+three seconds and gone at once; the eyes' file counts only fresh and only for
+a near face; Mood's level read from its own fresh state only; only the lamp
+saying it will look asks for a look. `session::tests` in
 `lamp-gemini`: a written request is one message with no activity opened,
 what comes back is its own, an ordinary request follows it, and a look
 is the same one message with the picture before the note; a fact is one
@@ -674,7 +550,5 @@ no quiet. The eyes' line has a test beside the kept frame's. The worker
 telling a new session has no host test: it is seen in the service's
 journal ("told the new session").
 
-Not shown: the lamp saying it. What a hello sounds like in a room, whether
-five minutes and twenty are the right numbers, and whether a face of 0.14
-is a person at the desk and not one walking behind it, are to be seen with
-people; the watching mode is there to count the last of these first.
+Owed on a lamp (#2825): with a face shown from the Mac's screen, three
+arrivals after an absence each give exactly one hello, Welcome back's.
