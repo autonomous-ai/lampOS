@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-22 23:11 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 00:12 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 90.1% over 72 rows. Quality 62.2% over 16 rows.**
 
@@ -63,7 +63,7 @@ Written by the first builder from the team's review page at 2026-10-22 23:11 (+0
 | “Look for my keys”, an installable skill | 0.85 | #1685 #1738 #2444 #2466 #2835 #2904 | first | 22 Oct 17:5x, up from 0.8: a push on the lamp ends its search at once, a real push and a test input each ending it on lamp-c0a4 (Thirteen, #2983 carried as #2990, fe49ed3c4). |
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
-| Forgets on request: that, everything, my face, and everything it came from | 0.90 | #1586 #1693 #2849 #2850 | fourth, twelve | 22 Oct 15:1x, up from 0.85: “forget everything” passed on lamp-c0a4 with two known faces (Twelve, #2849, closed): one thing forgotten alone, all of A’s gone across a restart, B’s and the room’s untouched. |
+| Forgets on request: that, everything, my face, and everything it came from | 0.92 | #1586 #1693 #2849 #2850 | fourth, twelve | 23 Oct 00:1x, up from 0.9: a room’s forget goes through only when the named person’s own face was seen saying the line (#3063 merged, Twelve; |
 | Remembers what matters without being asked (“how was the wedding?”) | 0.70 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 22 Oct 17:3x, up from 0.65: a dated event’s follow-up is worded in memory’s note and marked when the lamp asks it (LAMP_MEMORY_EVENTS, Twelve’s #2894, carried as #2980, a8564b52e). |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud’s unit (#2696), and install puts their units on every product lamp (Sixth’s #2926, carried as #2955). |
