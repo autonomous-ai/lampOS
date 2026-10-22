@@ -90,6 +90,12 @@ tokio = { version = "=1.53.1", features = ["test-util"] }
 name = "render_line_second"
 test = true
 
+# Test people's lines in other voices for played tests: its checks run
+# with `cargo test`; it renders only when named.
+[[example]]
+name = "render_people_lines"
+test = true
+
 # The speech-to-text stop path scored on recorded bundles (#828, the Stop
 # words row): its checks run with `cargo test`; it hears only when named.
 [[example]]
