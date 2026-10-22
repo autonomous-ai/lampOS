@@ -68,6 +68,104 @@ fn least_speech_ms(value: Option<&str>, least: u16) -> Option<u16> {
         .filter(|ms| (LEAST_SPEECH_LEAST_MS..=least.saturating_mul(10)).contains(ms))
 }
 
+/// The switch under whose probability a verdict holds the line to the
+/// unfinished window (`ConfirmPolicy::incomplete_probability`, held to
+/// `incomplete_blocks`, 1.5 s): a probability from
+/// [`UNFINISHED_BELOW_RANGE`]; unset or `off`, 0.01 as before. A verdict
+/// exactly at it is not under it. For the first builder's night A/B on
+/// lamp-4ace (22 Oct): of 110 Ends there, 36 were uncertain verdicts ended
+/// at the 600 ms window, 17 of them at p 0.2 or under, and 1 held as
+/// unfinished, while made people's lines split into 2 to 4 pieces at
+/// natural pauses of 0.6 to 1.4 s: a leading "Lamp," split off alone,
+/// misheard and held as a short sound, then the rest held for want of the
+/// name.
+pub const UNFINISHED_BELOW_SWITCH: &str = "LAMP_ENDPOINT_UNFINISHED_BELOW";
+
+/// The probabilities [`UNFINISHED_BELOW_SWITCH`] takes.
+pub const UNFINISHED_BELOW_RANGE: std::ops::RangeInclusive<f32> = 0.01..=0.6;
+
+/// The switch for the silence an uncertain verdict waits before the line
+/// ends (`ConfirmPolicy::uncertain_blocks`): whole ms from
+/// [`UNSURE_RANGE_MS`] in 10 ms steps; unset or `off`, the silence window
+/// (600 ms on lamp-4ace) as before. The same night A/B.
+pub const UNSURE_MS_SWITCH: &str = "LAMP_ENDPOINT_UNSURE_MS";
+
+/// The waits [`UNSURE_MS_SWITCH`] takes, in ms: from the lamp's window to
+/// the unfinished window.
+pub const UNSURE_RANGE_MS: std::ops::RangeInclusive<u16> = 600..=1500;
+
+/// A switch's value that asks for something: unset, empty and `off` are
+/// today's, with nothing said.
+fn asked_for(value: Option<&str>) -> Option<&str> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != "off")
+}
+
+/// The probability [`UNFINISHED_BELOW_SWITCH`]'s `value` asks for, if it
+/// is one in [`UNFINISHED_BELOW_RANGE`].
+fn unfinished_below(value: &str) -> Option<f32> {
+    value
+        .parse::<f32>()
+        .ok()
+        .filter(|probability| UNFINISHED_BELOW_RANGE.contains(probability))
+}
+
+/// The wait in ms [`UNSURE_MS_SWITCH`]'s `value` asks for, if it is a
+/// whole number in [`UNSURE_RANGE_MS`] and a multiple of 10.
+fn unsure_ms(value: &str) -> Option<u16> {
+    value
+        .parse::<u16>()
+        .ok()
+        .filter(|ms| UNSURE_RANGE_MS.contains(ms) && ms % 10 == 0)
+}
+
+/// `policy` with the night's two endpoint switches' values (`unfinished`
+/// for [`UNFINISHED_BELOW_SWITCH`], `unsure` for [`UNSURE_MS_SWITCH`]):
+/// each unset or `off` keeps today's; one out of its range is left as
+/// today's too. With the journal's lines for them, said once, as the
+/// policy is built.
+fn with_night_switches(
+    mut policy: ConfirmPolicy,
+    unfinished: Option<&str>,
+    unsure: Option<&str>,
+) -> (ConfirmPolicy, Vec<String>) {
+    let mut said = Vec::new();
+    if let Some(value) = asked_for(unfinished) {
+        match unfinished_below(value) {
+            Some(probability) => {
+                policy.incomplete_probability = probability;
+                said.push(format!(
+                    "lamp-voice: a verdict under {probability} holds the line to the {} ms unfinished window ({UNFINISHED_BELOW_SWITCH})",
+                    u64::from(policy.incomplete_blocks) * 10
+                ));
+            }
+            None => said.push(format!(
+                "lamp-voice: {UNFINISHED_BELOW_SWITCH} is not a probability from {} to {}; a verdict under {} is unfinished, as before",
+                UNFINISHED_BELOW_RANGE.start(),
+                UNFINISHED_BELOW_RANGE.end(),
+                policy.incomplete_probability
+            )),
+        }
+    }
+    if let Some(value) = asked_for(unsure) {
+        match unsure_ms(value) {
+            Some(ms) => {
+                policy.uncertain_blocks = ms / 10;
+                said.push(format!(
+                    "lamp-voice: an uncertain verdict ends the line after {ms} ms of silence, or the silence window if longer ({UNSURE_MS_SWITCH})"
+                ));
+            }
+            None => said.push(format!(
+                "lamp-voice: {UNSURE_MS_SWITCH} is not a whole number of ms from {} to {} in steps of 10; an uncertain verdict ends on the silence window, as before",
+                UNSURE_RANGE_MS.start(),
+                UNSURE_RANGE_MS.end()
+            )),
+        }
+    }
+    (policy, said)
+}
+
 /// The switch that starts the fast worker with ONNX Runtime's threads not
 /// spinning while they wait for work (#1608): off unless `on`. The worker
 /// runs at the voice's real-time priority, where a spinning thread holds its
@@ -227,6 +325,17 @@ impl EndpointRig {
                 u64::from(policy.least_speech_blocks) * 10,
                 u64::from(policy.incomplete_blocks) * 10
             );
+        }
+        // The night's A/B on lamp-4ace (22 Oct): an unfinished verdict's
+        // bar and an uncertain verdict's wait, each today's unless set.
+        let said;
+        (policy, said) = with_night_switches(
+            policy,
+            std::env::var(UNFINISHED_BELOW_SWITCH).ok().as_deref(),
+            std::env::var(UNSURE_MS_SWITCH).ok().as_deref(),
+        );
+        for line in said {
+            eprintln!("{line}");
         }
         detector = detector
             .with_confirmation(classifier, policy)
@@ -409,6 +518,79 @@ mod tests {
                 short_verdict_blocks(Some("on"), policy.least_speech_blocks);
             assert!(policy.validate().is_ok(), "{ms}");
         }
+    }
+
+    /// The night's A/B on lamp-4ace (22 Oct): `LAMP_ENDPOINT_UNFINISHED_BELOW`
+    /// takes a probability from 0.01 to 0.6 and `LAMP_ENDPOINT_UNSURE_MS`
+    /// whole ms from 600 to 1500 in 10 ms steps. Unset, empty or `off`,
+    /// today's, with nothing said; any other value keeps today's and is
+    /// said. What they set passes the policy's check.
+    #[test]
+    fn the_nights_endpoint_switches_take_only_their_ranges_and_keep_todays_otherwise() {
+        let today = ConfirmPolicy {
+            fallback_blocks: 60,
+            ..ConfirmPolicy::responsive()
+        };
+        for (unfinished, unsure) in [
+            (None, None),
+            (Some(""), Some("")),
+            (Some("off"), Some(" off ")),
+        ] {
+            assert_eq!(
+                with_night_switches(today, unfinished, unsure),
+                (today, Vec::new()),
+                "{unfinished:?} {unsure:?}"
+            );
+        }
+        for bad in [
+            "on", "0", "0.009", "0.61", "1", "-0.2", "NaN", "inf", "0.2p", "20%",
+        ] {
+            let (policy, said) = with_night_switches(today, Some(bad), None);
+            assert_eq!(policy, today, "{bad}");
+            assert_eq!(said.len(), 1, "{bad}");
+            assert!(said[0].contains(UNFINISHED_BELOW_SWITCH), "{bad}");
+        }
+        for bad in [
+            "on", "599", "590", "1510", "605", "1001", "1.2", "1000ms", "-600",
+        ] {
+            let (policy, said) = with_night_switches(today, None, Some(bad));
+            assert_eq!(policy, today, "{bad}");
+            assert_eq!(said.len(), 1, "{bad}");
+            assert!(said[0].contains(UNSURE_MS_SWITCH), "{bad}");
+        }
+        for (value, taken) in [("0.01", 0.01), ("0.3", 0.3), (" 0.25 ", 0.25), ("0.6", 0.6)] {
+            let (policy, said) = with_night_switches(today, Some(value), None);
+            assert_eq!(
+                policy,
+                ConfirmPolicy {
+                    incomplete_probability: taken,
+                    ..today
+                },
+                "{value}"
+            );
+            assert_eq!(said.len(), 1);
+            assert!(policy.validate().is_ok(), "{value}");
+        }
+        for (value, blocks) in [("600", 60), ("1000", 100), (" 1210 ", 121), ("1500", 150)] {
+            let (policy, _) = with_night_switches(today, None, Some(value));
+            assert_eq!(
+                policy,
+                ConfirmPolicy {
+                    uncertain_blocks: blocks,
+                    ..today
+                },
+                "{value}"
+            );
+            assert!(policy.validate().is_ok(), "{value}");
+        }
+        // Both, and the policy's record says them; off, the record is as
+        // before.
+        let (both, said) = with_night_switches(today, Some("0.3"), Some("1000"));
+        assert_eq!(said.len(), 2);
+        let record = json!(both);
+        assert_eq!(record["incomplete_probability"], json!(0.3_f32));
+        assert_eq!(record["uncertain_blocks"], json!(100));
+        assert!(json!(today).get("uncertain_blocks").is_none());
     }
 
     /// #1608: `--no-spin` only with the switch, and only for the fast worker.

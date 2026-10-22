@@ -871,6 +871,15 @@ pub struct ConfirmPolicy {
     /// policy's record when off, so that record is as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub count_start: bool,
+    /// An uncertain verdict ends the line at this pause, when it is longer
+    /// than the silence window (`fallback_blocks`), in place of the window
+    /// (`LAMP_ENDPOINT_UNSURE_MS`, the first builder's night A/B on
+    /// lamp-4ace, 22 Oct: of 110 Ends, 36 were uncertain verdicts ended at
+    /// the 600 ms window, 17 of them at p 0.2 or under, while people's lines
+    /// split at natural pauses of 0.6 to 1.4 s). 0: at the window, as before.
+    /// Absent from the policy's record when 0, so that record is as before.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub uncertain_blocks: u16,
 }
 
 impl Default for ConfirmPolicy {
@@ -887,6 +896,7 @@ impl Default for ConfirmPolicy {
             short_verdict_blocks: 0,
             recheck_uncertain: false,
             count_start: false,
+            uncertain_blocks: 0,
         }
     }
 }
@@ -919,6 +929,13 @@ impl ConfirmPolicy {
         }
     }
 
+    /// The silence an uncertain verdict waits before the line ends:
+    /// [`Self::uncertain_blocks`] when longer than the window, else the
+    /// window, as before.
+    pub fn uncertain_wait_blocks(&self) -> u16 {
+        self.uncertain_blocks.max(self.fallback_blocks)
+    }
+
     pub fn validate(&self) -> Result<(), &'static str> {
         let valid = self.check_blocks > 0
             && self.check_blocks <= self.commit_blocks
@@ -929,7 +946,8 @@ impl ConfirmPolicy {
             && self.complete_probability < 1.0
             && self.incomplete_probability >= 0.0
             && self.incomplete_probability <= self.complete_probability
-            && self.short_verdict_blocks <= self.least_speech_blocks;
+            && self.short_verdict_blocks <= self.least_speech_blocks
+            && self.uncertain_blocks <= self.incomplete_blocks;
         if valid {
             Ok(())
         } else {
@@ -1313,10 +1331,12 @@ impl Confirmation {
             {
                 Some(decide("model_incomplete", Some(heard), None))
             }
+            // Uncertain: the silence window, or the longer wait asked for an
+            // uncertain verdict (`ConfirmPolicy::uncertain_blocks`).
             Pause::Heard(heard)
                 if heard.probability >= policy.incomplete_probability
                     && heard.probability < policy.complete_probability
-                    && pause >= policy.fallback_blocks =>
+                    && pause >= policy.uncertain_wait_blocks() =>
             {
                 Some(decide("model_uncertain", Some(heard), None))
             }
@@ -1331,10 +1351,10 @@ impl Confirmation {
                 Some(decide("silence_fallback", None, Some("short")))
             }
             // A second verdict still out at the window: the first's, as without it.
-            Pause::Waiting { .. } if pause >= policy.fallback_blocks && first.is_some() => {
+            Pause::Waiting { .. } if pause >= policy.uncertain_wait_blocks() && first.is_some() => {
                 Some(decide("model_uncertain", first, None))
             }
-            Pause::Waiting { .. } if pause >= policy.fallback_blocks => {
+            Pause::Waiting { .. } if pause >= policy.fallback_blocks && first.is_none() => {
                 Some(decide("silence_fallback", None, Some("timeout")))
             }
             _ => None,
