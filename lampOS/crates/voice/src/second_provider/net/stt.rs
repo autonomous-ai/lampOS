@@ -1478,6 +1478,74 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
+    /// #2602 (the first builder at 19:49): the stop stream, opened from the
+    /// coordinator's own read of `second.json`, asks with the unit's key
+    /// terms (`LAMP_SECOND_KEY_TERMS`) after the lamp's name, and with
+    /// `LAMP_STOP_WORDS_KEYTERM=on` after the stop words. The relay counted
+    /// 1-term sessions beside the worker's 10-term ones.
+    #[test]
+    fn the_stop_stream_asks_with_the_units_key_terms() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-stop-key-terms-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let key = directory.join("llm.key");
+        std::fs::write(&key, "secret\n").unwrap();
+        let config = directory.join("second.json");
+        std::fs::write(
+            &config,
+            format!(
+                r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_base_url":"https://stt.example.invalid"}}"#,
+                key.display()
+            ),
+        )
+        .unwrap();
+        for file in [&key, &config] {
+            std::fs::set_permissions(file, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+                .unwrap();
+        }
+        let own = [
+            "Hanoi",
+            "Da Nang",
+            "Hue",
+            "desk lamp",
+            "Saigon",
+            "Hai Phong",
+            "Nha Trang",
+            "Can Tho",
+            "Vung Tau",
+            "Ha Long",
+        ];
+        let loaded = crate::second_config::from_setting(Some(config.into()), |name| {
+            (name == crate::second_config::KEY_TERMS_ENV).then(|| own.join(",").into())
+        })
+        .unwrap()
+        .unwrap();
+        for (keyterm, before) in [(false, &[][..]), (true, crate::stop_words::KEY_TERMS)] {
+            let stop = crate::stop_words::with_key_terms(loaded.clone(), keyterm);
+            let Stt::Autonomous { base_url, .. } = &stop.stt else {
+                panic!("the proxy's speech to text");
+            };
+            let asked = url(
+                Some(base_url),
+                stop.stt_language.as_deref(),
+                &super::super::key_terms::listening(&stop.stt_key_terms),
+            )
+            .unwrap();
+            let terms: Vec<String> = asked
+                .query_pairs()
+                .filter(|(name, _)| name == "keyterm")
+                .map(|(_, value)| value.into_owned())
+                .collect();
+            let expected: Vec<&str> = ["Lamp"]
+                .into_iter()
+                .chain(before.iter().copied())
+                .chain(own)
+                .collect();
+            assert_eq!(terms, expected, "keyterm {keyterm}: {asked}");
+        }
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[test]
     fn a_service_that_is_not_a_websocket_is_refused() {
         assert_eq!(
