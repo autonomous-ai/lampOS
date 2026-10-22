@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
@@ -37,10 +37,13 @@ const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs
                 name.onnx reached --rescue-gate (0.5) in the last second, a step's score
                 is the higher of the two. Refused unless its SHA-256 is --rescue-sha256.
                 Off unless set
+  --near        also say each hearing that reaches this lower bar, 0.05 to under --least,
+                on name/near when it is over, with its highest score; nothing else changes.
+                LAMP_NAME_NEAR=on is --near 0.5. Off unless set
   --bus-root    the bus's directory (LAMP_BUS_ROOT, or /run/lampos-bus)
 
 It listens to MICROPHONE/audio and publishes name/rising as each hearing begins,
-name/heard when it is over, and how it is on diagnostics.
+name/heard when it is over, name/near with --near, and how it is on diagnostics.
 It keeps no sound and writes none down.
 
 lamp-name check MODELS_DIR FILE... runs the same models over files of sound (16 kHz, one
@@ -52,6 +55,11 @@ rests as the program would, and says how many steps rested. It touches no bus.";
 /// The name it publishes under, and reports as.
 const NAME: &str = "name";
 const DEFAULT_LEAST: f32 = 0.9;
+/// `--near` when `LAMP_NAME_NEAR=on` gives none: a call misheard at a
+/// line's start scored 0.97 to 0.99 in its clean file and was not heard
+/// on lamp-4ace at 0.9 (22 Oct); a line with no name scored 0.5 or more
+/// in 1 of 24.
+const DEFAULT_NEAR: f32 = 0.5;
 /// Sound that stops coming for this long is a gap: what the models held
 /// is forgotten, and a hearing that was going on is said.
 const GAP: Duration = Duration::from_millis(500);
@@ -72,6 +80,8 @@ struct Arguments {
     rescue: Option<RescueModel>,
     /// Pass over a hearing that began while the lamp spoke (#705).
     not_while_speaking: bool,
+    /// `--near`: the lower bar of the hearings said on `name/near`.
+    near: Option<f32>,
     bus: Option<PathBuf>,
 }
 
@@ -150,6 +160,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     let mut wake = None;
     let mut rescue = RescueGiven::default();
     let mut not_while_speaking = None;
+    let mut near = None;
     while let Some(option) = arguments.next() {
         if option == "--help" || option == "-h" {
             return Ok(None);
@@ -187,6 +198,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             "--stop-least" => stop_least.replace(stop_bar(&value)?).is_some(),
             "--step-ms" => step_ms.replace(step_of(&value)?).is_some(),
             "--wake" => wake.replace(wake_of(&value)?).is_some(),
+            "--near" => near.replace(near_of(&value)?).is_some(),
             "--not-while-speaking" => not_while_speaking
                 .replace(match value.as_str() {
                     "on" => true,
@@ -209,18 +221,39 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     }
     let step_ms = step_ms.unwrap_or(80);
     woken_step(wake, step_ms)?;
+    let least = least.unwrap_or(DEFAULT_LEAST);
+    if near.is_some_and(|near| near >= least) {
+        return Err("--near is under --least".into());
+    }
     Ok(Some(Arguments {
         models: models.ok_or("--models is required")?,
         microphone: microphone.unwrap_or_else(|| "mic2".to_owned()),
-        least: least.unwrap_or(DEFAULT_LEAST),
+        least,
         quiet_below,
         step_ms,
         wake,
         stop_least,
         rescue: rescue.done()?,
         not_while_speaking: not_while_speaking.unwrap_or(false),
+        near,
         bus,
     }))
+}
+
+/// `--near`'s score: from 0.05 to under 1 (and under `--least`, checked
+/// once both are read).
+fn near_of(value: &str) -> Result<f32, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|score| (0.05..1.0).contains(score))
+        .ok_or_else(|| "--near is a score from 0.05 to under --least".to_owned())
+}
+
+/// The near bar: `--near` as given, else [`DEFAULT_NEAR`] when the switch
+/// (`LAMP_NAME_NEAR`, `switch`) is `on` and under `least`, else none.
+fn near_from(given: Option<f32>, switch: Option<&str>, least: f32) -> Option<f32> {
+    given.or_else(|| (switch == Some("on") && DEFAULT_NEAR < least).then_some(DEFAULT_NEAR))
 }
 
 /// `--step-ms`'s step: one of `hear::STEPS_MS`.
@@ -443,6 +476,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         bus.publisher_declared(NameHeard::RISING_TOPIC, &NameHeard::declaration(), NAME)?;
     let mut health: Publisher =
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), NAME)?;
+    // Hearings that reach the lower bar (`--near`), on a topic of their own.
+    let mut nears = arguments.near.map(Hearings::new);
+    let mut near_heard: Option<Publisher> = match arguments.near {
+        Some(_) => {
+            Some(bus.publisher_declared(NameHeard::NEAR_TOPIC, &NameHeard::declaration(), NAME)?)
+        }
+        None => None,
+    };
     let mut stop_heard: Option<Publisher> = match arguments.stop_least {
         Some(_) => {
             Some(bus.publisher_declared(StopHeard::TOPIC, &StopHeard::declaration(), NAME)?)
@@ -456,10 +497,13 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         .transpose()?;
     let mut speaking = Speaking::default();
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} least={} near={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
         arguments.least,
+        arguments
+            .near
+            .map_or("off".to_owned(), |score| score.to_string()),
         arguments
             .quiet_below
             .map_or("off".to_owned(), |db| format!("{db}dBFS")),
@@ -532,6 +576,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             }
         }
         let mut name_said = None;
+        let mut near_said = None;
         if let Some(message) = message
             && failed.is_none()
         {
@@ -558,6 +603,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                             rescue.forget();
                         }
                         name_said = hearings.cut(now);
+                        near_said = nears.as_mut().and_then(|nears| nears.cut(now));
                     }
                     last_sound = Some(now);
                     let block: Vec<i16> = samples
@@ -590,6 +636,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                 }
                                 let judged = judged(&mut rescue, step, &score);
                                 name_said = name_said.or(hearings.score(judged, now));
+                                if let Some(nears) = nears.as_mut() {
+                                    near_said = near_said.or(nears.score(judged, now));
+                                }
                                 // A step only the rescue brought to the bar,
                                 // in a hearing (not one passed over after one).
                                 if judged >= arguments.least
@@ -610,6 +659,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                             // hearing still open is over (as `check` does).
                             if rested {
                                 name_said = name_said.or(hearings.cut(now));
+                                if let Some(nears) = nears.as_mut() {
+                                    near_said = near_said.or(nears.cut(now));
+                                }
                             }
                         }
                         Err(why) => {
@@ -623,6 +675,19 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             }
         }
         let name_said = name_said.or_else(|| hearings.tick(now));
+        // A hearing that reached the lower bar, said as it is over: never
+        // one begun while the lamp spoke, as for the name.
+        if let (Some(near), Some(publisher)) = (
+            near_said.or_else(|| nears.as_mut().and_then(|nears| nears.tick(now))),
+            near_heard.as_mut(),
+        ) && lets_through(&near)
+        {
+            let _ = publisher.publish_json(at_us(now), &near);
+            log(&format!(
+                "near its name: score={:.3} began_ms_ago={}",
+                near.score, near.ago_ms
+            ));
+        }
         if let Some(name) = name_said
             && !lets_through(&name)
         {
@@ -670,6 +735,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             );
             renew(&mut heard, &mut rising);
             if let Some(publisher) = stop_heard.as_mut() {
+                let _ = publisher.alive();
+            }
+            if let Some(publisher) = near_heard.as_mut() {
                 let _ = publisher.alive();
             }
         }
@@ -910,7 +978,14 @@ fn main() -> ExitCode {
         };
     }
     let arguments = match parse(given.into_iter()) {
-        Ok(Some(arguments)) => arguments,
+        Ok(Some(arguments)) => Arguments {
+            near: near_from(
+                arguments.near,
+                std::env::var(NameHeard::NEAR_ENVIRONMENT).ok().as_deref(),
+                arguments.least,
+            ),
+            ..arguments
+        },
         Ok(None) => {
             println!("{USAGE}\n\n{HELP}");
             return ExitCode::SUCCESS;
@@ -981,6 +1056,51 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// `--near` (`LAMP_NAME_NEAR`): a lower bar under `--least`, from the
+    /// flag or, with the switch `on` and no flag, 0.5; off otherwise. A run
+    /// of scores that reaches it and not the bar is a near hearing only:
+    /// `name/heard` and `name/rising` are as without it.
+    #[test]
+    fn a_near_bar_says_hearings_under_the_bar_and_changes_nothing_else() {
+        let near = |text: &str| of(text).map(|read| read.unwrap().near);
+        assert_eq!(near("--models /m"), Ok(None));
+        assert_eq!(near("--models /m --near 0.5"), Ok(Some(0.5)));
+        assert_eq!(near("--models /m --least 0.95 --near 0.9"), Ok(Some(0.9)));
+        for refused in [
+            "--models /m --near 0.9",
+            "--models /m --near 0.95",
+            "--models /m --near 0.01",
+            "--models /m --near x",
+            "--models /m --near 0.5 --near 0.6",
+        ] {
+            assert!(of(refused).is_err(), "{refused}");
+        }
+        assert_eq!(near_from(None, Some("on"), 0.9), Some(DEFAULT_NEAR));
+        assert_eq!(near_from(Some(0.6), Some("on"), 0.9), Some(0.6));
+        assert_eq!(near_from(Some(0.6), None, 0.9), Some(0.6));
+        for off in [None, Some("off"), Some("ON"), Some("1")] {
+            assert_eq!(near_from(None, off, 0.9), None, "{off:?}");
+        }
+        assert_eq!(near_from(None, Some("on"), 0.5), None, "never at the bar");
+        // One run of scores up to 0.62: near, and not the name.
+        let start = Instant::now();
+        let (mut name, mut nears) = (Hearings::new(0.9), Hearings::new(DEFAULT_NEAR));
+        let (mut heard, mut near) = (Vec::new(), Vec::new());
+        for (step, score) in [0.1, 0.55, 0.62, 0.58, 0.2, 0.1].into_iter().enumerate() {
+            let at = start + Duration::from_millis(80 * step as u64);
+            heard.extend(name.score(score, at));
+            near.extend(nears.score(score, at));
+        }
+        assert!(heard.is_empty());
+        assert_eq!(
+            near,
+            [NameHeard {
+                score: 0.62,
+                ago_ms: 240
+            }]
+        );
+    }
+
     #[test]
     fn the_options_are_read_and_the_rest_have_their_defaults() {
         assert_eq!(
@@ -995,6 +1115,7 @@ mod tests {
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
+                near: None,
                 bus: None,
             }
         );
@@ -1012,6 +1133,7 @@ mod tests {
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
+                near: None,
                 bus: Some("/run/lampos-bus".into()),
             }
         );

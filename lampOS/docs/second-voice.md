@@ -1106,6 +1106,39 @@ order is kept. A written turn is the same from the chat on.
     "Lamp,", heard right and misheard, lone calls, and a colleague's line
     within 2.5 s of a call, in a quiet and a busy room: no request lost,
     lone calls answered, nothing carried to another person.
+- **With `LAMP_NAME_NEAR=on`, a first word like the name, heard near, is
+  the name** (off unless set; branch `first/name-carries`, 22 Oct). In
+  that night's played rounds on lamp-4ace, 24 of 132 lines that began with
+  the name had it written as another word (Louvre 7, Month 4, Length 2,
+  Life, Light, Lane, Lynn and others; Swedish and British voices most), and
+  lamp-name said nothing at its bar of 0.9 for lines whose clean files
+  scored 0.97 to 1.00. With the switch, in both halves:
+  - **lamp-name says its near hearings** (`--near`, 0.5 with the switch)
+    on `name/near`, when each is over, with its highest score; nothing it
+    says elsewhere changes ([name.md](name.md)).
+  - **The second route takes a first word as the name only with both
+    signs** (`named_near`): it is set off (past a greeting at most, then a
+    comma or a stop, or it is the whole piece, `first_word_set_off`) and
+    sounds like the name (`sounds_like_the_name`: one syllable from an L
+    to an M, P or N, or one of the words written for "Lamp" on lamp-4ace,
+    `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
+    (`NAME_NEAR_LEAST`) from 0.3 s before the line's first sound to 1.3 s
+    after (`Heeding::near_name`). Then "Lamp" takes the word's place, so
+    the rule and the model read the call, and a lone one waits for the line
+    after it as a name does (`LAMP_SECOND_NAME_CARRIES`). Either sign
+    alone changes nothing: "Thanks," with a near hearing, or "Right, …"
+    with none.
+  - **The journal** says which signs held and the near score, never the
+    words.
+  - **What it costs:** offline, the played lines with no name reached 0.5
+    in 1 of 24 (mid-line); on AMI the bare-name model is heard at 0.5 43
+    times an hour against 10 at 0.9 ([bare-name.md](bare-name.md)), before
+    the word's sign. To be counted on lamp-4ace against d01–d12 and the
+    AMI side talk before the voice's half is turned on.
+  - **Tests:** `second_provider::tests::name_near`,
+    `worker::tests::a_near_hearing_counts_only_around_the_lines_start`,
+    and lamp-name's
+    `a_near_bar_says_hearings_under_the_bar_and_changes_nothing_else`.
 - **With `LAMP_SECOND_QUIET_HELD=on` the quiet after a pause isn't sent**
   (off unless set; needs `LAMP_SECOND_EARLY_FINALIZE=on`; the backend on
   #2135 and the first builder on #1722, 21 Oct 13:1x). Deepgram bills each
