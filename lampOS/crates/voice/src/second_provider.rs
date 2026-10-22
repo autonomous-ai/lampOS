@@ -1939,11 +1939,14 @@ impl Engine {
         self.memory.as_ref().map(|(worker, cache)| {
             // A heard line with the camera allowed, its turn told and kept
             // by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`): admitted as
-            // the room's while the face cache is cold (after a restart, a
-            // privacy change, a face remembered or a known-file change, for
-            // up to `COLD_FOR` with no face named), its keeper is
-            // decided at its end (#2807, `ScopeLease::face_at_end`); a warm
-            // cache that named nobody arms nothing (El's P2 on #3108).
+            // the room's, its keeper is decided at its end (#2807,
+            // `ScopeLease::face_at_end`), armed only if the face cache was
+            // cold at its start or went cold before its end plus
+            // `KEEPER_WAIT` (after a restart, a privacy change, a face
+            // remembered or a known-file change, for up to `COLD_FOR` with
+            // no face named), and if only during the line, only for a face
+            // the eyes saw in view as it began; a warm cache with no change
+            // through the line arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
@@ -4204,17 +4207,33 @@ async fn spoken(
     }
     let finishing = Instant::now();
     let times = Times::new(finishing);
-    // A line admitted as the room's only because no known face was cached
-    // yet (#2807): the known face the cache names as of its end is looked
-    // for from the end itself, not once the words are back, which on a lamp
-    // is often past the end plus `KEEPER_WAIT` (reviewer-three's P2 on
-    // #3108). Who was seen speaking it is checked once the words are in.
+    // A line admitted as the room's with the camera allowed (#2807): the
+    // known face the cache names as of its end is looked for from the end
+    // itself, not once the words are back, which on a lamp is often past the
+    // end plus `KEEPER_WAIT` (reviewer-three's P2 on #3108). Whether it is
+    // armed (the cache cold at its start, or gone cold by the end plus
+    // `KEEPER_WAIT`: on lamp-c0a4 the eyes' known file changed mid-line) is
+    // decided there too; armed only mid-line, it keeps only for a face the
+    // eyes saw in view as the line began (their passing id beside the known
+    // file, `LAMP_EYES_SPEAKING=on`): the known file also changes when a
+    // known person walks in (El's P2 on #3108). Without the eyes' view, a
+    // line armed mid-line keeps for nobody. Who was seen speaking it is
+    // checked once the words are in.
     let late_face = scope
         .as_ref()
-        .filter(|scope| scope.looks_later())
+        .filter(|scope| scope.may_look_later())
         .map(|lease| {
             let ends = lease.clone();
-            tokio::task::spawn_blocking(move || ends.face_at_end(finishing))
+            let sight = shared.forget_sight.clone();
+            tokio::task::spawn_blocking(move || match &sight {
+                Some((eyes, known)) => ends.face_at_end_seen(
+                    finishing,
+                    Some(&|person: &str, since: Instant| {
+                        eyes.known_in_view_since(known, person, since)
+                    }),
+                ),
+                None => ends.face_at_end(finishing),
+            })
         });
     let finish = listener.finish(request);
     tokio::pin!(finish);

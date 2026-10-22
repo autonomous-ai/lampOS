@@ -2171,9 +2171,12 @@ restart, or just after a face is remembered, a known person's first line can
 start before the cache has their face, so it is admitted as the room's. On
 lamp-c0a4 on 23 October such a first line ("my sister's wedding is this
 Saturday") was kept as `everyone`'s, where the room's other people could be
-told it. With this switch, a line has a late look only when all of these
-hold as it starts: the camera is allowed, it is admitted as the room's, and
-the face cache is cold (`FaceCache::is_cold`, `RequestScope::looking_later`).
+told it. With this switch, a line may have a late look when, as it starts,
+the camera is allowed and it is admitted as the room's
+(`RequestScope::looking_later`); the look is armed only if the face cache
+was cold as the line started, or went cold at any time from its start to
+its end plus 300 ms (`FaceCache::is_cold`; decided at the end,
+`ScopeLease::face_at_end`).
 The cache goes cold when the voice starts, at each privacy change (the
 camera allowed again or its generation moved), when a face is remembered
 through the voice's own remember-face call (`FaceCache::face_remembered`),
@@ -2192,12 +2195,31 @@ about 1 s after a voice restart said its first line 1 to 2 s later, which
 at `39a68c91b` (cold only until the first refresh) fell past the window and
 was kept as `everyone`'s; and the known file names a face for 3 s after the
 eyes write it. Past those 5 s with nobody named, the cache is warm: nobody
-known is in view, so its room's lines have no late look, and a known face
-first cached during a line said by someone off camera never takes its keep
-(El's P2 on #3108). A known face who arrives mid-line on a warm cache is
-that case too: the change is read after the line started, which only a
-line starting later can use. The journal says `the eyes' known file
-changed: the face cache is cold`, with no name. A line with a late look has its keeper decided at the
+known is in view, so a room's line that starts warm and sees no cold event
+before its end plus 300 ms has no late look, and a known face first cached
+during it never takes its keep (El's P2 on #3108). A cold event mid-line
+arms it: on lamp-c0a4 at 05:13 on 23 October the eyes remembered a face
+about 0.3 to 0.7 s before its line began, the cache was still warm as it
+began, and the refresh read the changed known file only about 1.9 s into
+the line; the keep went to `everyone`. That person's face was in view, not
+yet known, before the line began. A change in the known file's words is
+also a cold event when a known person walks into view, so a line armed
+only by a cold event during it, not cold as it started, has a keeper only
+if the eyes saw that person's face in view as the line started: the
+passing id the eyes write beside the known file (`known-face`) must be in
+a look of `humans/faces/tracked` from 1.2 s before the line was admitted to
+that moment, under the same eyes' boot
+(`speaking_faces::IN_VIEW_BEFORE`,
+`SpeakingFaces::known_in_view_since`, `ScopeLease::face_at_end_seen`). A
+known person who walks in mid-line while someone off camera speaks never
+takes the keep (El's P2 on #3108). A keeper armed mid-line needs
+`LAMP_EYES_SPEAKING=on` and `LAMP_BUS=on` (the eyes write `known-face` only
+with both, [eyes.md](eyes.md), and the voice reads the tracked faces only
+with `LAMP_EYES_SPEAKING=on`, the bus and the known file). Without them, a
+cold event mid-line gives no keeper, and only a line whose cache was cold
+as it started can take a late keeper: the lamp-c0a4 case at 05:13 is not
+covered. The journal says `the eyes' known file changed: the face cache
+is cold`, with no name. An armed line has its keeper decided at the
 line's end, when its audio ends:
 the known face the cache names by then, waiting at most 300 ms past the end
 (`memory_scope::KEEPER_WAIT`, about one refresh; `ScopeLease::face_at_end`).
@@ -2235,6 +2257,8 @@ it: its keep stays the room's`, with no words. Tests:
 `memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face`,
 `memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper`,
 `memory_scope::tests::a_late_look_is_armed_only_while_the_cache_is_cold`,
+`memory_scope::tests::a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end`,
+`speaking_faces::tests::a_known_face_was_in_view_at_a_lines_start_only_if_its_id_was_tracked_then`,
 `memory_scope::tests::a_change_in_the_eyes_known_file_makes_the_cache_cold`
 and
 `memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet`.

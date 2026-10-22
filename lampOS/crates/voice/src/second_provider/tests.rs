@@ -13547,6 +13547,13 @@ async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later()
 ///   named mid-line is the keeper. And a warm cache whose eyes' known set is
 ///   rewritten by another writer (a face remembered through the eyes' own
 ///   socket) just before the line: cold again, A is the keeper.
+/// - The #2807 run on lamp-c0a4 at 05:13 on 23 October: warm as the line
+///   began; the eyes' known file changed mid-line (cold, naming nobody), then
+///   A was named, before the line's end plus `KEEPER_WAIT`: A is the keeper,
+///   A's face (`f1`) in view since before the line and named beside the
+///   known file (`LAMP_EYES_SPEAKING`). El's walk-in: the same, A's face
+///   first in view as the known set changes: the keep stays the room's. And
+///   with the eyes' speaking off, a mid-line change keeps for nobody.
 #[tokio::test]
 async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
     use crate::memory_scope::{FaceCache, KEEPER_WAIT, ScopeLease};
@@ -13610,8 +13617,35 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             None,
             Some(a.clone()),
         ),
+        (
+            "warm, the known set changes mid-line, A named after",
+            "",
+            true,
+            None,
+            Some(a.clone()),
+        ),
+        (
+            "warm, the known set changes mid-line, A walks in",
+            "",
+            true,
+            None,
+            None,
+        ),
+        (
+            "warm, the known set changes mid-line, the eyes' speaking off",
+            "",
+            true,
+            None,
+            None,
+        ),
     ] {
         let warm = what.starts_with("warm");
+        let mid_line = what.starts_with("warm, the known set");
+        // Seen first as the known set changes, not before the line.
+        let walks_in = what.ends_with("A walks in");
+        // `LAMP_EYES_SPEAKING` off: no passing id beside the known file.
+        let sight = mid_line && !what.ends_with("speaking off");
+        let a_in_view = Arc::new(AtomicBool::new(!walks_in));
         let lamp = what.starts_with("restart") || what.starts_with("known");
         // Fresh for this case: the known file names A for 3 s from now.
         std::fs::write(&path, "A").unwrap();
@@ -13675,6 +13709,9 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             )
             .seeing_who_speaks(eyes.clone(), path.clone())
             .announcing(false);
+        if sight {
+            engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
+        }
         engine.memory_camera(true, 1);
         let long_ago = Instant::now()
             .checked_sub(crate::memory_scope::COLD_FOR + Duration::from_secs(1))
@@ -13728,6 +13765,14 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             std::fs::remove_file(&path).unwrap();
             assert!(refresh(), "{what}: A no longer named");
         }
+        if mid_line {
+            // Warm and nobody named as the line begins: the first read sets
+            // the mark.
+            let _ = std::fs::remove_file(&path);
+            std::fs::write(&names, "A\n").unwrap();
+            assert!(!refresh(), "{what}: the first read sets the mark");
+            assert!(!cache.is_cold(Instant::now()), "{what}: warm");
+        }
         if lamp {
             assert!(cache.is_cold(Instant::now()), "{what}: cold");
             // A named during the line, from the known file.
@@ -13735,12 +13780,16 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
         }
         let done = Arc::new(AtomicBool::new(false));
         let feeder = {
-            let (eyes, done) = (eyes.clone(), done.clone());
+            let (eyes, done, a_in_view) = (eyes.clone(), done.clone(), a_in_view.clone());
             std::thread::spawn(move || {
                 let mut frame = 0u64;
                 while !done.load(Ordering::Acquire) {
+                    // A's face (`f1`) in view only once it is.
+                    let in_view = a_in_view.load(Ordering::Acquire);
                     let faces = lamp_msgs::Faces {
                         faces: ["f1", "f2"]
+                            .into_iter()
+                            .filter(|id| in_view || *id != "f1")
                             .map(|id| lamp_msgs::Face {
                                 id: id.to_owned(),
                                 xmin: 0.1,
@@ -13760,7 +13809,7 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
                                     from: None,
                                 }),
                             })
-                            .into(),
+                            .collect(),
                     };
                     frame += 1;
                     eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
@@ -13768,6 +13817,10 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
                 }
             })
         };
+        if mid_line {
+            // The eyes' looks before the line begins: what was in view then.
+            tokio::time::sleep(Duration::from_millis(30)).await;
+        }
         engine.submit(start(1));
         let lease = engine
             .turn
@@ -13778,8 +13831,32 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             .unwrap()
             .lease();
         assert_eq!(lease.scope().unwrap().person(), None, "{what}: the room's");
+        assert!(lease.may_look_later(), "{what}");
         assert_eq!(lease.looks_later(), !warm, "{what}");
-        if during {
+        if mid_line {
+            // Mid-line the eyes remember A through their own socket: the
+            // next refresh reads the changed known set, naming nobody yet
+            // (cold), and the one after names A, their passing id `f1`
+            // written beside it by these eyes. Walking in, A's face comes
+            // into view only now (El's P2 on #3108).
+            if walks_in {
+                a_in_view.store(true, Ordering::Release);
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            std::fs::write(known_face_of(&path), "f1\n").unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&names)
+                .unwrap()
+                .set_modified(std::time::SystemTime::now() + Duration::from_secs(5))
+                .unwrap();
+            assert!(refresh(), "{what}: the known set changed mid-line");
+            assert!(cache.is_cold(Instant::now()), "{what}: cold mid-line");
+            assert!(lease.looks_later(), "{what}: armed mid-line");
+            std::fs::write(&path, "A").unwrap();
+            refresh();
+            assert!(!cache.is_cold(Instant::now()), "{what}: A named");
+        } else if during {
             // The eyes name A while the line is said.
             cache.replace(
                 cache.begin_refresh(),
