@@ -7551,15 +7551,30 @@ mod tests {
     /// [`follows_jobs_timed`]: on its way `coming` after the writer first
     /// asks for it, then filled with `late`, if any; the writer waiting at
     /// most `print_wait` for it. With `hold`, the last job (the
-    /// conversation's end) is sent that long after the others, with a
-    /// forget said halfway through it when `forget_held`.
+    /// conversation's end) is sent that long after the others, a forget
+    /// said in that hold as `forget` orders it.
     #[derive(Clone, Copy)]
     struct Timing {
         coming: Duration,
         late: Option<[f32; 2]>,
         print_wait: Duration,
         hold: Option<Duration>,
-        forget_held: bool,
+        forget: Held,
+    }
+
+    /// A forget said while the end is held, ordered against the saving
+    /// line's print by signals, not sleeps: the print comes only when the
+    /// fixture lets it, `coming` then unused.
+    #[derive(Clone, Copy, PartialEq)]
+    enum Held {
+        /// No forget; the print comes `coming` after it was first asked.
+        No,
+        /// Once the writer waits for the print, the forget; the print comes
+        /// only after it.
+        BeforePrint,
+        /// The print comes once the writer waits for it; the forget only
+        /// once the move is done.
+        AfterMove,
     }
 
     impl Default for Timing {
@@ -7569,7 +7584,7 @@ mod tests {
                 late: None,
                 print_wait: crate::follows_face::PRINT_WAIT,
                 hold: None,
-                forget_held: false,
+                forget: Held::No,
             }
         }
     }
@@ -7656,11 +7671,20 @@ mod tests {
         let known = known.map(|(person, face)| (person.to_owned(), face.to_owned()));
         let known_now = move || known.clone();
         let asked = OnceLock::new();
+        let (asked_send, asked_receive) = sync_channel(1);
+        let released = AtomicBool::new(false);
         let fill = |request: u64| {
             if request != 3 {
                 return false;
             }
-            if asked.get_or_init(Instant::now).elapsed() < timing.coming {
+            if asked.set(Instant::now()).is_ok() {
+                let _ = asked_send.try_send(());
+            }
+            let coming = match timing.forget {
+                Held::No => asked.get().is_some_and(|at| at.elapsed() < timing.coming),
+                _ => !released.load(Ordering::Acquire),
+            };
+            if coming {
                 return true;
             }
             if let Some(print) = timing.late {
@@ -7674,12 +7698,28 @@ mod tests {
                     drop(send);
                     return false;
                 };
-                if timing.forget_held {
-                    std::thread::sleep(hold / 2);
-                    crate::follows_face::forgot_in(&heard, &forgets);
-                    std::thread::sleep(hold / 2);
-                } else {
-                    std::thread::sleep(hold);
+                let asked_receive = asked_receive;
+                let waiting = || asked_receive.recv_timeout(Duration::from_secs(5)).unwrap();
+                match timing.forget {
+                    Held::No => std::thread::sleep(hold),
+                    Held::BeforePrint => {
+                        waiting();
+                        crate::follows_face::forgot_in(&heard, &forgets);
+                        released.store(true, Ordering::Release);
+                        // The writer polls again and is offered the print.
+                        std::thread::sleep(hold);
+                    }
+                    Held::AfterMove => {
+                        waiting();
+                        released.store(true, Ordering::Release);
+                        // The move done drops the lines it moved.
+                        let by = Instant::now() + Duration::from_secs(5);
+                        while !heard.lock().unwrap().is_empty() {
+                            assert!(Instant::now() < by, "never moved");
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        crate::follows_face::forgot_in(&heard, &forgets);
+                    }
                 }
                 let gone = heard.lock().unwrap().is_empty();
                 send.send(end).unwrap();
@@ -7819,7 +7859,7 @@ mod tests {
                 late: Some(BRAMBLE_AGAIN),
                 print_wait: Duration::from_secs(5),
                 hold: Some(Duration::from_millis(1500)),
-                forget_held: false,
+                forget: Held::No,
             },
         );
         assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
@@ -7873,7 +7913,9 @@ mod tests {
     }
 
     /// A forget while the move waits for the saving line's print: nothing
-    /// moves, though the print would have come.
+    /// moves, though the print comes after it. The forget is said once the
+    /// writer waits, and the print let in only after it: no race between
+    /// the two (the flake on #2673's follow-up).
     #[test]
     fn with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing() {
         let (read, _) = follows_conversation_timed(
@@ -7886,11 +7928,11 @@ mod tests {
             ],
             false,
             Timing {
-                coming: Duration::from_millis(400),
+                coming: Duration::ZERO,
                 late: Some(BRAMBLE_AGAIN),
                 print_wait: Duration::from_secs(5),
-                hold: Some(Duration::from_millis(800)),
-                forget_held: true,
+                hold: Some(Duration::from_millis(300)),
+                forget: Held::BeforePrint,
             },
         );
         assert_eq!(adopted(&read), None, "{read:?}");
@@ -7903,6 +7945,43 @@ mod tests {
                 "session_close room"
             ]
         );
+    }
+
+    /// The reverse order: the print in while the move waits, the move done,
+    /// and only then a forget. The move stands, and the forget is a forget
+    /// of what is Bramble's now.
+    #[test]
+    fn with_follows_face_a_forget_after_the_print_moved_the_lines_is_a_plain_forget() {
+        let (read, gone_before_end) = follows_conversation_timed(
+            "follows-forget-after",
+            5,
+            [
+                heard_line(Some(BRAMBLE), &[]),
+                heard_line(None, &[]),
+                heard_line(None, &["e/f1"]),
+            ],
+            false,
+            Timing {
+                coming: Duration::ZERO,
+                late: Some(BRAMBLE_AGAIN),
+                print_wait: Duration::from_secs(5),
+                hold: Some(Duration::from_millis(300)),
+                forget: Held::AfterMove,
+            },
+        );
+        assert_eq!(adopted(&read), Some(json!([1, 7, 3])), "{read:?}");
+        assert!(gone_before_end, "the forget after the move");
+        assert_eq!(
+            ops(&read),
+            [
+                "append_linked room",
+                "append_linked room",
+                "adopt room",
+                "conversation_end p-b",
+                "session_close room"
+            ]
+        );
+        assert_eq!(read[3]["source_ids"], json!([101, 103]));
     }
 
     /// The wait is bounded: the print still not in at `print_wait`, the
@@ -7924,7 +8003,7 @@ mod tests {
                 late: Some(BRAMBLE_AGAIN),
                 print_wait: Duration::from_millis(200),
                 hold: Some(Duration::from_millis(1500)),
-                forget_held: false,
+                forget: Held::No,
             },
         );
         assert_eq!(adopted(&read), Some(json!([3])), "{read:?}");
