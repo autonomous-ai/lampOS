@@ -1,0 +1,77 @@
+{
+  "head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+  "integration_base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "tested_merge_short": "a4e570c",
+  "tested_merge_base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "arm64_run": 39795365169,
+  "clippy_run": 39795365207,
+  "conclusion": "success",
+  "required_jobs": [
+    {
+      "id": 119881247110,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39795365169/job/119881247110",
+      "started_at": "2026-10-22T14:24:23Z",
+      "completed_at": "2026-10-22T14:37:40Z",
+      "active_step": [],
+      "run_id": 39795365169,
+      "head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    },
+    {
+      "id": 119881247161,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39795365207/job/119881247161",
+      "started_at": "2026-10-22T14:24:19Z",
+      "completed_at": "2026-10-22T14:37:52Z",
+      "active_step": [],
+      "run_id": 39795365207,
+      "head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+      "workflow_status": "in_progress",
+      "workflow_conclusion": null
+    }
+  ],
+  "nextest": {
+    "passed": 10491,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passes": 1,
+    "elapsed_seconds": 184.082
+  },
+  "checker": {
+    "name": "persisted_self_switches_survive_sigkill",
+    "internal_cuts": 7,
+    "passed": true,
+    "elapsed_seconds": 3.967
+  },
+  "separate_harnesses": {
+    "doc_passed": 4,
+    "process_passed": 12,
+    "process_failed": 0,
+    "relay": "ok"
+  },
+  "leak_rows": [
+    "2026-10-22T14:36:57.7459418Z         LEAK [   0.218s] ( 8495/10491) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "raw_log_sha256": "530f1632ca5d9b3739fa3aa3bbd853c6ed1c57ac79ea4cf0c9fe171f0cb745c2",
+  "artifact": {
+    "head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+    "artifact_id": 12432514917,
+    "archive_sha256": "f7e8f85fcefeb44e4c8afd5514cbddde0eaa9ceebd48fd7ee6c4290d72bfed14",
+    "archive_bytes": 114384027,
+    "zip_members": 50,
+    "verified_payloads": 49,
+    "updater_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+    "updater_bytes": 4592768,
+    "updater_ELF": "ELF64 little-endian AArch64",
+    "all_payload_hashes_match": true,
+    "first_download": "Network read timed out; partial archive was not executed or qualified. Range retry independently checked the final API digest.",
+    "scope": "Verified PR merge artifact; not a signed production release."
+  },
+  "limits": "Exact historical qualified head; later replacement needs its own native checks. No real key, publication, device or physical power loss."
+}

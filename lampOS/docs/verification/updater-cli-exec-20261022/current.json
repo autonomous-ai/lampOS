@@ -1,0 +1,583 @@
+{
+  "status": "passed",
+  "scope": "actual CLI self-switch/exec/new-main confirmation in disposable roots",
+  "platform": {
+    "machine": "aarch64",
+    "python": "3.11.2",
+    "system": "Linux"
+  },
+  "artifact_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+  "artifact_bytes": 4592768,
+  "original_ELF_segments_within_original_bytes": true,
+  "source_hashes": {
+    "common.py": "38724dec56296ecd74e014df875b73d61eb2f2a35d1ff003121335c4d29c4024",
+    "fixture_systemctl.py": "67485c6f55d77caf993792eef5103e3cf2b4d75417ba65ad58529f88764dbb30",
+    "observer.gdb": "d6e1d2593cb3ac18aa0c5ba229e61e2b5316515a7318c5acab869925808ea3c6",
+    "observer.py": "69b18c228edb833107f4a6585447a45f7c1109fcb62c005ff69144c709e3f58d",
+    "rehearse.py": "4be0e1f012356d7416282650fd09b4899af3cb0c1c6068bcca0fade0741c0610"
+  },
+  "watchdog_seconds": 90,
+  "not_run": [],
+  "elapsed_seconds": 3.651,
+  "limits": [
+    "Derived old/new ELFs run the same implementation, not distinct software versions.",
+    "Systemctl readiness is simulated; no real timer/service/quiet switch/body is exercised.",
+    "No physical power loss, storage durability, deadline rollback, or attended device proof.",
+    "No back command is invoked: its CLI uses fixed / paths and needs a separate disposable-container case.",
+    "The only keys are disposable fixture keys; no network/publication/real signing key."
+  ],
+  "artifact_source_head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+  "raw_receipt_sha256": "ef98416966b6ba4f9ae36b40dc2085ce44d44ec30c9645fb81e44ac5871b3231",
+  "fixture_manifest_commit": "0000000000000000000000000000000000000002",
+  "fixture_channel": "self-rehearsal",
+  "fixture_sequence": 2,
+  "cases": [
+    {
+      "case": "detach",
+      "status": "passed",
+      "elapsed_seconds": 3.335,
+      "variants": {
+        "new": {
+          "bytes": 4592824,
+          "original_prefix_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+          "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "synthetic_same_implementation": true,
+          "trailer_sha256": "286354ea565113bd1045bb0cd20285a873b99e519cd938fc3bde3a568b296f2b"
+        },
+        "old": {
+          "bytes": 4592824,
+          "original_prefix_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+          "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+          "synthetic_same_implementation": true,
+          "trailer_sha256": "3d3c4646cc932df15b53f70007d94357f3422be89e6dc6fab58706e780410544"
+        }
+      },
+      "initial_records_absent": true,
+      "ready": {
+        "actual_updater_prefix": {
+          "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "files": {
+            "fixed_fallback": {
+              "bytes": 4592768,
+              "mode": "0o755",
+              "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+            },
+            "new": {
+              "bytes": 4592824,
+              "mode": "0o755",
+              "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+            },
+            "old": {
+              "bytes": 4592824,
+              "mode": "0o755",
+              "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+            }
+          },
+          "installed": {
+            "commit": "0000000000000000000000000000000000000002",
+            "sequence": 2
+          },
+          "log_sha256": "30f9e7e0908b77364961dd1e57da6ab7a4bb3255c64899bac9d6c1f4fe31efd6",
+          "made": [
+            "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+          ],
+          "pending": {
+            "at_unix_ms": 1792680824739,
+            "new": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+            "old": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+            "version": 1
+          },
+          "pending_sha256": "3b30fdc086752728b3744847c6e458ecd7f0bd1496fce9eb125b487de22f329d",
+          "self_confirmed_count": 0,
+          "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+        },
+        "events": [
+          {
+            "argv_sha256": "35b3bde3e04717d46ad2cb9aa57806ea1ebb4419bc25b8863c730a16e0ea3cf5",
+            "checks": {
+              "canonical_executable": true,
+              "exec_catchpoint": true,
+              "executable_sha256": true,
+              "expected_argv": true,
+              "same_pid": true,
+              "same_starttime": true,
+              "stopped": true
+            },
+            "executable_sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+            "phase": "trampoline_to_old",
+            "starttime": 113648
+          },
+          {
+            "argv_sha256": "d9bbb74c7301c104471cb60c8184e9be62755f449579e8da95b5fa0dbb27c77c",
+            "checks": {
+              "canonical_executable": true,
+              "exec_catchpoint": true,
+              "executable_sha256": true,
+              "expected_argv": true,
+              "same_pid": true,
+              "same_starttime": true,
+              "stopped": true
+            },
+            "executable_sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+            "phase": "actual_cli_to_candidate",
+            "starttime": 113648
+          }
+        ],
+        "hold_seconds": 3,
+        "new_main_not_started": true,
+        "pid": 7,
+        "ready_monotonic": 1136.640508721,
+        "starttime": 113648
+      },
+      "outer_verified_prefix": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "30f9e7e0908b77364961dd1e57da6ab7a4bb3255c64899bac9d6c1f4fe31efd6",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": {
+          "at_unix_ms": 1792680824739,
+          "new": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "old": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+          "version": 1
+        },
+        "pending_sha256": "3b30fdc086752728b3744847c6e458ecd7f0bd1496fce9eb125b487de22f329d",
+        "self_confirmed_count": 0,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "observer_final": {
+        "detached": true,
+        "events_seen": 2,
+        "phase": "hold_ready",
+        "ready": true,
+        "reason": "normal_detach"
+      },
+      "target_exit_code": 0,
+      "observer_exit_code": 0,
+      "resumed_without_SIGCONT": true,
+      "after_confirmation": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "18e1262ee39d08f6a68fb19d287353ded4682ea0a73f56e894b7d307b0aa0b27",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": null,
+        "pending_sha256": null,
+        "self_confirmed_count": 1,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "after_next_round": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "7ff1b483b3a9ff8fb7ba341134452e7ecf5b4a667e83ccbf105066cd05f7b6cc",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": null,
+        "pending_sha256": null,
+        "self_confirmed_count": 1,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "systemctl_calls": [
+        {
+          "accepted": true,
+          "argv": [
+            "show",
+            "--no-pager",
+            "--property=Id,LoadState,UnitFileState,ActiveState,SubState,Unit",
+            "--",
+            "lamp-update-back.service",
+            "lamp-update-back.timer"
+          ]
+        }
+      ],
+      "logs": [
+        {
+          "bytes": 0,
+          "file": "key-generation.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 6404,
+          "file": "new-help.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        },
+        {
+          "bytes": 153,
+          "file": "next-round.log",
+          "sha256": "338d0297e5cb4ce9a12a90e71757fd569bfda98839b9ccf44843717ccdd4e569"
+        },
+        {
+          "bytes": 627,
+          "file": "observer.log",
+          "sha256": "59d3f4078c51723655d572eb8abfb31a792db7cd2dfefce8edf112736fc9180f"
+        },
+        {
+          "bytes": 6404,
+          "file": "old-help.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        },
+        {
+          "bytes": 45,
+          "file": "public-key.log",
+          "sha256": "1337dc1ec30050e36830f7e848cab84b82328d6c35ada9ca2d64561341c41772"
+        },
+        {
+          "bytes": 33,
+          "file": "sign.log",
+          "sha256": "2047e684c9a65e519844e65ff3ea01d2cde487e4280a1e7dcd27b55f58b01766"
+        },
+        {
+          "bytes": 758,
+          "file": "target.log",
+          "sha256": "c2167166a510cbb42398ea0e95433ce32b868d7b435e154828824c5382c4315c"
+        }
+      ],
+      "private_key_files_removed": true,
+      "no_back_command": true,
+      "next_round": {
+        "exit_code": 0,
+        "elapsed_seconds": 0.033,
+        "log_sha256": "338d0297e5cb4ce9a12a90e71757fd569bfda98839b9ccf44843717ccdd4e569",
+        "log_bytes": 153
+      },
+      "subscription_warning_count": 0,
+      "subscription_warnings": [],
+      "owned_children_reaped": true,
+      "cleanup_kill": false
+    },
+    {
+      "case": "observer_kill",
+      "status": "passed",
+      "elapsed_seconds": 0.302,
+      "variants": {
+        "new": {
+          "bytes": 4592824,
+          "original_prefix_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+          "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "synthetic_same_implementation": true,
+          "trailer_sha256": "286354ea565113bd1045bb0cd20285a873b99e519cd938fc3bde3a568b296f2b"
+        },
+        "old": {
+          "bytes": 4592824,
+          "original_prefix_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+          "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+          "synthetic_same_implementation": true,
+          "trailer_sha256": "3d3c4646cc932df15b53f70007d94357f3422be89e6dc6fab58706e780410544"
+        }
+      },
+      "initial_records_absent": true,
+      "ready": {
+        "actual_updater_prefix": {
+          "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "files": {
+            "fixed_fallback": {
+              "bytes": 4592768,
+              "mode": "0o755",
+              "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+            },
+            "new": {
+              "bytes": 4592824,
+              "mode": "0o755",
+              "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+            },
+            "old": {
+              "bytes": 4592824,
+              "mode": "0o755",
+              "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+            }
+          },
+          "installed": {
+            "commit": "0000000000000000000000000000000000000002",
+            "sequence": 2
+          },
+          "log_sha256": "e6aad390980b8eb2fddd037f25a1f9c10b8fb407c8d8741fa6d07c09aa174dd0",
+          "made": [
+            "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+          ],
+          "pending": {
+            "at_unix_ms": 1792680828083,
+            "new": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+            "old": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+            "version": 1
+          },
+          "pending_sha256": "49f4281a0e9bd5b741ecb6359b628f32734c2720a15dc20725438c87436f367f",
+          "self_confirmed_count": 0,
+          "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+        },
+        "events": [
+          {
+            "argv_sha256": "410c848653fc3e98b76a27fa85b855ae9bbf988c771d190a7c8420d1b78eb9fc",
+            "checks": {
+              "canonical_executable": true,
+              "exec_catchpoint": true,
+              "executable_sha256": true,
+              "expected_argv": true,
+              "same_pid": true,
+              "same_starttime": true,
+              "stopped": true
+            },
+            "executable_sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+            "phase": "trampoline_to_old",
+            "starttime": 113983
+          },
+          {
+            "argv_sha256": "2ff662789285bd5b8cca03a62857956f2683dd612a0427aef7bf9fa7dbd40942",
+            "checks": {
+              "canonical_executable": true,
+              "exec_catchpoint": true,
+              "executable_sha256": true,
+              "expected_argv": true,
+              "same_pid": true,
+              "same_starttime": true,
+              "stopped": true
+            },
+            "executable_sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+            "phase": "actual_cli_to_candidate",
+            "starttime": 113983
+          }
+        ],
+        "hold_seconds": 3,
+        "new_main_not_started": true,
+        "pid": 26,
+        "ready_monotonic": 1139.986401432,
+        "starttime": 113983
+      },
+      "outer_verified_prefix": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "e6aad390980b8eb2fddd037f25a1f9c10b8fb407c8d8741fa6d07c09aa174dd0",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": {
+          "at_unix_ms": 1792680828083,
+          "new": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+          "old": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd",
+          "version": 1
+        },
+        "pending_sha256": "49f4281a0e9bd5b741ecb6359b628f32734c2720a15dc20725438c87436f367f",
+        "self_confirmed_count": 0,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "observer_final": null,
+      "target_exit_code": 0,
+      "observer_exit_code": -9,
+      "resumed_without_SIGCONT": true,
+      "after_confirmation": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "873290a244238e4efcaae43e1249a73f135cdf1f9ebc35253fd8f0ee728bf977",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": null,
+        "pending_sha256": null,
+        "self_confirmed_count": 1,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "after_next_round": {
+        "current": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1",
+        "files": {
+          "fixed_fallback": {
+            "bytes": 4592768,
+            "mode": "0o755",
+            "sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd"
+          },
+          "new": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1"
+          },
+          "old": {
+            "bytes": 4592824,
+            "mode": "0o755",
+            "sha256": "06dd726df34767189f5942510e727a3879e7e1b50c7ce7fc2fdcfe3b3606f7fd"
+          }
+        },
+        "installed": {
+          "commit": "0000000000000000000000000000000000000002",
+          "sequence": 2
+        },
+        "log_sha256": "1c379f91c981d3b413f17390e1e5fda90e1aa5029bd55d6c7e993821a2bd95e0",
+        "made": [
+          "/opt/lampOS/update/4f59d408faa48b28118240cbc047cf9fcdd5c51bcfe98d6201aba0a43edbbed1/"
+        ],
+        "pending": null,
+        "pending_sha256": null,
+        "self_confirmed_count": 1,
+        "state_sha256": "ff9df29922afaf800c7b6c27483ec8939f775dda88711935d703e0785ce8c04d"
+      },
+      "systemctl_calls": [
+        {
+          "accepted": true,
+          "argv": [
+            "show",
+            "--no-pager",
+            "--property=Id,LoadState,UnitFileState,ActiveState,SubState,Unit",
+            "--",
+            "lamp-update-back.service",
+            "lamp-update-back.timer"
+          ]
+        }
+      ],
+      "logs": [
+        {
+          "bytes": 0,
+          "file": "key-generation.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 6404,
+          "file": "new-help.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        },
+        {
+          "bytes": 160,
+          "file": "next-round.log",
+          "sha256": "6f9c77611d5cefc5eb10f11f7e6ce1216f3f726a5405f764a22a37f710e0597e"
+        },
+        {
+          "bytes": 190,
+          "file": "observer.log",
+          "sha256": "5ab8fefa0c420656fb2ef3df35ec5fced25526c750e83dea4d9176f02717b88f"
+        },
+        {
+          "bytes": 6404,
+          "file": "old-help.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        },
+        {
+          "bytes": 45,
+          "file": "public-key.log",
+          "sha256": "a917bcea01b446f98c8a825f5d0d36918af9af4bfa8d8a00220c5388e2ce664c"
+        },
+        {
+          "bytes": 33,
+          "file": "sign.log",
+          "sha256": "ed1f88ce9f92df61d796a36c301b40e14ece74776ecff093f5a0dde73cbeab8d"
+        },
+        {
+          "bytes": 772,
+          "file": "target.log",
+          "sha256": "f6f29827bbc43677cbd56c54379e54706e524c127b9736e270b4d9f28cc848f1"
+        }
+      ],
+      "private_key_files_removed": true,
+      "no_back_command": true,
+      "next_round": {
+        "exit_code": 0,
+        "elapsed_seconds": 0.016,
+        "log_sha256": "6f9c77611d5cefc5eb10f11f7e6ce1216f3f726a5405f764a22a37f710e0597e",
+        "log_bytes": 160
+      },
+      "subscription_warning_count": 0,
+      "subscription_warnings": [],
+      "owned_children_reaped": true,
+      "cleanup_kill": false
+    }
+  ],
+  "subscription_warning_count": 0
+}

@@ -1,0 +1,14 @@
+{
+  "head": "d4d5e5a66c2bcaa4e138884edbbd305cd6b3a615",
+  "artifact_id": 12432514917,
+  "archive_sha256": "f7e8f85fcefeb44e4c8afd5514cbddde0eaa9ceebd48fd7ee6c4290d72bfed14",
+  "archive_bytes": 114384027,
+  "zip_members": 50,
+  "verified_payloads": 49,
+  "updater_sha256": "8191ea0429655ec1fa62c2cf18b9f79cd29e73ce0a96d7372b17700ff9293ecd",
+  "updater_bytes": 4592768,
+  "updater_ELF": "ELF64 little-endian AArch64",
+  "all_payload_hashes_match": true,
+  "first_download": "Network read timed out; partial archive was not executed or qualified. Range retry independently checked the final API digest.",
+  "scope": "Verified PR merge artifact; not a signed production release."
+}

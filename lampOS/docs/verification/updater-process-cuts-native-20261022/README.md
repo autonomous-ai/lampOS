@@ -138,3 +138,20 @@ After #3044 merged, the equal-range final rebase became `d4d5e5a66` on
 that final head. That own branch is pushed. Its new ARM64 run39795365169 and
 Clippy run39795365207 are pending, so no earlier native green qualifies it.
 The PR remains draft pending its replacement checks and latest-base guard.
+
+## Sixth native qualification, 21:45 +07
+
+[rebase-d4.json](rebase-d4.json) records head `d4d5e5a66`, merge `a4e570c`,
+base `c6d50559a`: ARM64 39795365169 and Clippy39795365207 both passed.
+Nextest: **10,491 passed / 0 failed / 67 skipped**, one leaky Voice pass,
+checker PASS **3.967 s**, plus four doctests, twelve process tests and relay.
+The artifact is now fully verified, including all49 payloads and its API
+archive digest, not merely metadata. Its updater hash differs from authored33a.
+The [actual CLI proof](../updater-cli-exec-20261022/README.md) therefore tests
+both artifact identities separately and retains their fixture limitations.
+
+Integration advanced to `b722fd212`, including an Update installer change.
+The next equal-range local head is `97ca7b322`; fresh Update local gates are
+running because that source changed. No old green qualifies that replacement.
+A coordinated merge window was requested from First/Reviewer-lead so the
+latest-base guard can pass once the replacement checks complete.
