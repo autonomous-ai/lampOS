@@ -6620,6 +6620,52 @@ Ready for lamp-voice: no
   authorised0c89 fullupdate/selfie/onequestion/yes remains open. No lamp
   actions, backendretention proof or row-score increase. Installableskill separate.
 
+## 2026-10-22 18:24 ICT: corrected photo native gate and Mobile install
+
+Ready for lamp-voice: no
+
+- Integratedfeatureheadb78fc2e858f3d7aa92c14f86c4b092449384b051 pushed
+  fast-forward tofourth/photo-product-activation-review/#2988; actualCI
+  started after conflictresolution. Integrationtargete9b0a46f, scopedsourceb3aef2b2f:
+  44/0/0,fmt,strictworkspaceClippy,workspacebuild pass;22source/unit hashes
+  preserved across evidence amendment. Featurecommitd52 plus targetintegration,
+  both single-line/noattribution; no further force-push.
+- ARM39766788308 passed10,460/0/67,all44scoped,4docs/12process/relay,
+  oneunchangedsamevoiceleaky; no rerun. Clippy39766788280passed.
+  ActualCImergee252be27bfa288f612dd90ad1bab21056b1ad146,
+  basefe49ed3c498abfdc0a95fae19618d6a8be912a31.
+  Artifact12421282166 SHA-256
+  `d71237ed4a8e7e2ad5d0a979d79200e443cf885002b96353cece92b458201ac6`.
+  API/currenthead/logdigest matched. Raw review-corrections/qualification.json
+  underfourth-photo-product-activation-ci-20261022. Issue6339440977,
+  Queue6339442134,PR6339443450; latesttargethandoff remainsFirst's.
+- FullhostVoice lib3340/1/14 failedunchanged TaskNews made-by-text test,
+  no news at5s. Exactone diagnosticpasses1/0 in0.61stest time. SourceSHA
+  f1892465e06fc2133f7897dc59298b3b72d004f633290af08c5522422f33b583
+  matchesold8ee/target/current. NewVoicedisjointbins1/0/0,it266/0/0,
+  docs0/0/0pass. FullCloud196/1/2 failedunchanged recovery-report contract
+  (nullwaits vs unarmedtimer map); exactone diagnosticpasses1/0 in1.62s,
+  sourceSHAe8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68.
+  BothcasesPASS natively(0.088/0.027s). No failedfullgate erased orrerun;
+  First/Tests dispositionrequested6339374953,diagnostics6339512717.
+- TaskNewsread-onlyaudit:5sfixture vs1.5sRPC/20spack/10sretryallows
+  deadlinefragility; no directphoto-test statepathfound. This is not a
+  reproduced rootcause orprovenknownflake. No fixture/productionfix assumed.
+- RemainingCloud docs0/0/0pass; Memory/Keeper/Skills/Setup/Eval/Update
+  completepackages running separately inexclusive rootCargo33427. Raw
+  host-integrated,host-integrated-remaining,host-consumers preserve boundaries.
+- Mobile6339488227 installedb78 artifact as0c89 build5870: allunitsup,
+  productphotoenvironmentpresent, noPhotodrop-ins; Cloudstartupscan0/removed0.
+  Person'syes/no/revocationgate waits untiltheirreturn. No Fourthdeviceaction,
+  words/photos/persondata, backendretention proof orscoreincrease claimed.
+- MainmovedafterCIbegan. Read-onlylatestbf38audit findsoneworker factory
+  conflict: retainweather/audio/scopedwrappers; capturetools.photo_faces before
+  answering_weather movestools, retainreplying_to_photos. Correctfeaturebase
+  ise9..b78(secondparent),23/28featurefiles exact,5upstreammixed; actual
+  Cloud/photohelpers+3units explicitmatchinghashes. Earlier16/7auditcount used
+  wrongfirstparent and is superseded. Proposal is not a testednewhead;
+  branch/artifact remainfrozenb78 forMobile's exactheadgate.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
