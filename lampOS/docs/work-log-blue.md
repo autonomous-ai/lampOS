@@ -447,3 +447,6 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - the voice's quoted turn was not reached.
   Put back and released to Nine at 10:01. Results are on #2602 (6331607814).
 - **09:48, reviewer-two:** asked for a merge window at the current base for #2768 and #2764. I agreed to keep `fe174b748` until its ARM64 finishes.
+- **10:0x, the backlog:** Blue has #2811, #2813, #2825 and #2842. Took #2813, then #2811.
+- **10:1x, the first builder on #2813:** (b), keep it spoken-only. The lead's ruling on #1711 binds a made skill to a yes said out loud at the lamp, so #2813 becomes "typed in the app, put on by a spoken yes at the lamp". They also asked for the window check in lamp-skills' helper on its own: opened as #2874.
+- **#2811:** `make-skill.sh` needs `sudo -n` on the lamp, which lamp-75c9 doesn't have. I asked whether it should run on lamp-4ace.
