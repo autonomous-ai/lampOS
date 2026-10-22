@@ -148,6 +148,10 @@ fn running_binaries(root: &Path) -> Vec<(String, String)> {
     let mut found = Vec::new();
     for entry in fs::read_dir(root.join("etc/systemd/system")).unwrap() {
         let entry = entry.unwrap();
+        // Product installation also places per-unit drop-in directories.
+        if entry.file_type().unwrap().is_dir() {
+            continue;
+        }
         let text = fs::read_to_string(entry.path()).unwrap();
         if let Some(program) = unit::program(&text).or_else(|| unit::linked_program(&text, root)) {
             let path = root

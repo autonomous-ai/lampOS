@@ -1,0 +1,57 @@
+{
+  "initial_gate_counts": {
+    "passed": 448,
+    "failed": 23,
+    "ignored": 3,
+    "filtered_out": 0
+  },
+  "initial_log_sha256": "0cf6de0b24c41ff6edee2c059b6a5781deeb1ecb240f87b1309f6235ad819d51",
+  "directory_assumption": {
+    "count": 22,
+    "source": "crates/update/tests/round.rs:151",
+    "error": "Os { code: 21, kind: IsADirectory, message: \"Is a directory\" }",
+    "tests": [
+      "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+      "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+      "a_new_updater_that_confirms_keeps_its_switch",
+      "a_new_updater_that_exits_at_once_is_put_back",
+      "a_new_updater_that_refuses_every_manifest_is_put_back",
+      "a_round_after_install_keeps_lamp_updates_own_folder",
+      "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+      "a_round_by_hand_keeps_the_folder_it_runs_from",
+      "a_self_json_from_a_later_version_still_reads",
+      "an_old_updater_climbs_one_updater_a_round",
+      "an_unreadable_self_json_with_both_builds_known_is_put_back",
+      "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+      "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+      "install_writes_the_fallback_and_no_round_touches_it",
+      "lamp_update_back_puts_back_an_unreadable_self_json",
+      "no_second_round_begins_while_lamp_updates_own_switch_waits",
+      "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+      "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+      "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+      "the_fallback_reads_a_self_json_written_by_a_later_updater",
+      "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+      "with_the_switch_off_lamp_update_never_switches_itself"
+    ],
+    "fix": "The existing running_binaries fixture skips directory entries before reading unit files."
+  },
+  "existing_timing_failure": {
+    "test": "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+    "source": "crates/cloud/src/online.rs:1645",
+    "observed": "at once: [591.783458ms, 591.81675ms, 693.133208ms, 895.079208ms, 951.205708ms]",
+    "required_first_after_join_ms": 300,
+    "baseline_passed_once": true,
+    "baseline": "515e43d3abc37db719338883d0aa7e9465ca94ac",
+    "source_identical_to_baseline": true,
+    "cause": "not established; no change to the test or its runtime source"
+  },
+  "second_attempt": {
+    "result": "compile failure before tests",
+    "errors": "six E0425 errors for EXIT_NOTE / EXIT_NOTE_UNITS despite both constants present in candidate source",
+    "source_unchanged": true,
+    "action": "cargo +1.96.0 clean --offline -p lamp-update -p lamp-cloud; only the task target cache was cleaned",
+    "removed_files": 381,
+    "removed_mib": 618.1
+  }
+}

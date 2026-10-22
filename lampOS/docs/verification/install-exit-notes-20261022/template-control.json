@@ -1,0 +1,57 @@
+{
+  "mode": "template-control",
+  "started_at": "2026-10-22T07:17:50.582637+07:00",
+  "base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe",
+  "sources_before": {
+    "crates/update/src/install.rs": "cec23c8d87c1cacb6b0f1262a45e7d896c1bdcb7566218d9094d6250b44837fd",
+    "crates/update/tests/install.rs": "ea52b37281aa8da30f5588ddf2b3b6af9697745ce64de7febd0a0b3ed2ab12f2",
+    "crates/cloud/src/reports.rs": "75e1b28f8d28a437f659daf5f60f213ddb86f07d8432c9a46b4133dadcc38fec",
+    "deploy/product/exit-note.conf": "bd4bd677a345a5d742666c8214d1b3d0e70e7c146ba0b671abf963e2a101f46c",
+    "docs/cloud.md": "6a57ee5d880de4a3d039bb3c0805f9fb007426c02307f76a8c8bc3f2a26f0a29",
+    "docs/install.md": "c7b6da8d42da8d1009c6122d58ce376abf9600e60485b57c5e79691efc8e8c95"
+  },
+  "stages": [
+    {
+      "name": "template-control",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-cloud",
+        "--lib",
+        "reports::tests::template_exit_notes_keep_only_the_fixed_name_in_files_and_reports",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "timed_out": false,
+      "elapsed_seconds": 20.44,
+      "log_name": "template-control.log",
+      "log_sha256": "df54b5e085638c570f14cb7d82e9c723e064b64facd01da3637fc34647449fa5",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 151 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "filtered out": 151
+      }
+    }
+  ],
+  "status": "expected-failure-observed",
+  "sources_after": {
+    "crates/update/src/install.rs": "cec23c8d87c1cacb6b0f1262a45e7d896c1bdcb7566218d9094d6250b44837fd",
+    "crates/update/tests/install.rs": "ea52b37281aa8da30f5588ddf2b3b6af9697745ce64de7febd0a0b3ed2ab12f2",
+    "crates/cloud/src/reports.rs": "75e1b28f8d28a437f659daf5f60f213ddb86f07d8432c9a46b4133dadcc38fec",
+    "deploy/product/exit-note.conf": "bd4bd677a345a5d742666c8214d1b3d0e70e7c146ba0b671abf963e2a101f46c",
+    "docs/cloud.md": "6a57ee5d880de4a3d039bb3c0805f9fb007426c02307f76a8c8bc3f2a26f0a29",
+    "docs/install.md": "c7b6da8d42da8d1009c6122d58ce376abf9600e60485b57c5e79691efc8e8c95"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T07:18:11.045290+07:00"
+}

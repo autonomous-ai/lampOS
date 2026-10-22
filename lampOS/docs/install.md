@@ -659,8 +659,18 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `/usr/local/lib/lampos/lamp-update-back` (0755) if that file isn't already
    the same: lamp-update's fallback, which only install writes and no round
    can (updates.md, "lamp-update switching itself", #1680).
-5. Writes each product unit and `lampos.conf`, each only if it is not
-   already exactly that. A unit, `lampos.conf` or setting found already
+5. Writes each product unit, its reserved exit-note drop-in and
+   `lampos.conf`, each only if it is not already exactly that. The drop-ins are
+   `/etc/systemd/system/UNIT.d/exit-note.conf`, for exactly Cloud's fixed
+   service list (including templates), using the existing root recorder.
+   Other drop-ins are left alone. They record only bounded local stop notes;
+   install grants no reporting consent, changes no reporting switch or
+   service write permissions, and runs no recorder. Cloud's existing gates
+   still control transmission ([cloud.md](cloud.md#crashes-the-exit-note)).
+   Systemd waits for `ExecStopPost` before restarting the service. A failed
+   stop adds a recorder process and its `systemctl show` query, capped at
+   2 seconds; total restart overhead has not been measured on a lamp.
+   A unit, drop-in, `lampos.conf` or setting found already
    holding install's exact bytes is given install's mode (0644; the voice's
    provider, its key and the Policy's key 0600, so a key is only ever
    narrowed), read and changed through one open of the file, never through
@@ -740,8 +750,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    setup writes later, is kept as the lamp's own. No `state.json` with a
    `state.json.corrupt-*` beside it (a run that could not save the mark) is
    taken as set aside too (Third and the reviewer on #1263). That systemd is owed
-   (`systemd_owed`) is recorded earlier still, before the first unit or
-   `lampos.conf` is written (step 5), and after anything else changed.
+   (`systemd_owed`) is recorded earlier still, before the first unit,
+   exit-note drop-in or `lampos.conf` is written (step 5), and after anything
+   else changed.
 8. If systemd is owed: `systemd-tmpfiles --create`, `systemctl
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
    `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer` and

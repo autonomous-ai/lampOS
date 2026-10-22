@@ -1,0 +1,141 @@
+{
+  "mode": "gate",
+  "started_at": "2026-10-22T07:40:09.374070+07:00",
+  "base": "8f798e749a7a2ad3ee56fe2f1048e558381f701b",
+  "sources_before": {
+    "crates/update/src/install.rs": "03e15c1e732efc8b7963a2e92a74bdbba77eef9128de35dff3c16e7c67906249",
+    "crates/update/tests/install.rs": "ea52b37281aa8da30f5588ddf2b3b6af9697745ce64de7febd0a0b3ed2ab12f2",
+    "crates/update/tests/round.rs": "964e9bc839b76ef0e50f459142e51fb765ac3d85b5e36f9014c0e3d5f0059de4",
+    "crates/cloud/src/reports.rs": "75e1b28f8d28a437f659daf5f60f213ddb86f07d8432c9a46b4133dadcc38fec",
+    "deploy/product/exit-note.conf": "bd4bd677a345a5d742666c8214d1b3d0e70e7c146ba0b671abf963e2a101f46c",
+    "docs/cloud.md": "6a57ee5d880de4a3d039bb3c0805f9fb007426c02307f76a8c8bc3f2a26f0a29",
+    "docs/install.md": "c7b6da8d42da8d1009c6122d58ce376abf9600e60485b57c5e79691efc8e8c95"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 5.307,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 15.39,
+      "log_name": "clippy.log",
+      "log_sha256": "4e0f62d789d85cbad14ceab5ce6f91de5e7a78e074d5172ee6295574f1f4d4e7",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "install-tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 140.88,
+      "log_name": "install-tests.log",
+      "log_sha256": "a80b27cc0f5e3a71217b081febb7ccc5b98f849a950498f9185925c86e02a77f",
+      "summaries": [
+        "test result: ok. 76 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 120.22s"
+      ],
+      "counts": {
+        "passed": 76,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "cloud-tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-cloud",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 65.953,
+      "log_name": "cloud-tests.log",
+      "log_sha256": "aca7aa2197f34d00cca1caa8f0604225a5385c7be49179400ee78d995f0cb649",
+      "summaries": [
+        "test result: ok. 151 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 39.84s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.09s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 177,
+        "failed": 0,
+        "ignored": 1,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "passed",
+  "sources_after": {
+    "crates/update/src/install.rs": "03e15c1e732efc8b7963a2e92a74bdbba77eef9128de35dff3c16e7c67906249",
+    "crates/update/tests/install.rs": "ea52b37281aa8da30f5588ddf2b3b6af9697745ce64de7febd0a0b3ed2ab12f2",
+    "crates/update/tests/round.rs": "964e9bc839b76ef0e50f459142e51fb765ac3d85b5e36f9014c0e3d5f0059de4",
+    "crates/cloud/src/reports.rs": "75e1b28f8d28a437f659daf5f60f213ddb86f07d8432c9a46b4133dadcc38fec",
+    "deploy/product/exit-note.conf": "bd4bd677a345a5d742666c8214d1b3d0e70e7c146ba0b671abf963e2a101f46c",
+    "docs/cloud.md": "6a57ee5d880de4a3d039bb3c0805f9fb007426c02307f76a8c8bc3f2a26f0a29",
+    "docs/install.md": "c7b6da8d42da8d1009c6122d58ce376abf9600e60485b57c5e79691efc8e8c95"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T07:43:56.926062+07:00"
+}
