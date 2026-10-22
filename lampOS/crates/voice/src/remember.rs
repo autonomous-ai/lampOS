@@ -686,9 +686,11 @@ pub const ROOM_AFTER_FORGET_ENVIRONMENT: &str = "LAMP_MEMORY_ROOM_AFTER_FORGET";
 const FORGOT_MOST: usize = 64;
 
 /// The words that make a line about a person for
-/// [`ROOM_AFTER_FORGET_ENVIRONMENT`]: the first person and the third.
-/// "we" and "our" are left out: they are the household's.
-const PERSON_WORDS: [&str; 22] = [
+/// [`ROOM_AFTER_FORGET_ENVIRONMENT`]: the first person, the second's own
+/// ("your favourite colour is green", Fourteen's P3 on #3142) and the
+/// third. "we" and "our" are left out: they are the household's; so is a
+/// bare "you", which most of the lamp's own lines hold.
+const PERSON_WORDS: [&str; 25] = [
     "i",
     "i'm",
     "i've",
@@ -698,6 +700,9 @@ const PERSON_WORDS: [&str; 22] = [
     "my",
     "mine",
     "myself",
+    "your",
+    "yours",
+    "yourself",
     "he",
     "she",
     "him",
@@ -8192,6 +8197,8 @@ mod tests {
             "she likes tea",
             "the user likes jazz",
             "Call him at noon",
+            "Your favourite colour is green",
+            "That jacket is yours",
         ] {
             assert!(about_someone(about), "{about}");
         }

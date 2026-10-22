@@ -731,7 +731,8 @@ the unchanged legacy client, used unless the new Days client is selected.
       own. About a person (`remember::about_someone`) is a whole word,
       lower-cased with a curly apostrophe read as a straight one: first
       person `i`, `i'm`, `i've`, `i'd`, `i'll`, `me`, `my`, `mine`,
-      `myself`; third person `he`, `she`, `him`, `his`, `her`, `hers`,
+      `myself`; the second person's own `your`, `yours`, `yourself` (not a
+      bare `you`, which most of the lamp's own lines hold); third person `he`, `she`, `him`, `his`, `her`, `hers`,
       `herself`, `himself`, `their`, `theirs`, `them`, `themselves`;
       `user` ("the user"); or a word ending in `'s` other than `it's`,
       `that's`, `what's`, `there's`, `here's`, `let's`, `where's`,
