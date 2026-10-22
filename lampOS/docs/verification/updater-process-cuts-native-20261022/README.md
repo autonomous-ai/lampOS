@@ -155,3 +155,16 @@ The next equal-range local head is `97ca7b322`; fresh Update local gates are
 running because that source changed. No old green qualifies that replacement.
 A coordinated merge window was requested from First/Reviewer-lead so the
 latest-base guard can pass once the replacement checks complete.
+
+## Seventh pushed head, 22:03 +07
+
+Fresh local gate on `97ca7b322`, integration `b722fd212`, is recorded in
+[mac-b722.json](mac-b722.json): fmt passed, strict all-target Update Clippy
+passed (**13.812 s**), and Update tests passed (**237.181 s**): **307 passed /
+0 failed / 3 ignored / 0 filtered**. This rerun was necessary because upstream
+changed Update install.rs; the prior source-bound gate was not reused for it.
+
+The public latest-base guard still matched b722 when that head was pushed.
+Its new ARM64 39800605261 and Clippy39800605346 are pending, watched to their
+required-job completion. The [actual fixed fallback proof](../updater-cli-exec-20261022/README.md)
+uses the earlier qualified d4 artifact, not an unverified seventh-head binary.
