@@ -1685,6 +1685,13 @@ pub const NOT_SET_UP: &str =
 /// wouldn't go through just now … want me to try again?".
 pub const NO_HARNESS: &str = "I can't hand work on to another computer yet: that isn't set up on this lamp. It can be set up later.";
 
+/// What the model is told when the tasks part refuses a hand-over because
+/// its task targets were written for a newer build, or name what this one
+/// doesn't know (`targets_newer`, #1505): hand-overs stay off until the
+/// lamp's software or the targets match, so a retry can't work either
+/// (Eighth's P3 on #3131).
+pub const TARGETS_NEWER: &str = "I can't hand work on to another computer right now: its settings on this lamp need newer software. It will work again once the lamp is updated.";
+
 /// What the model is told when the tasks part did not answer: not set up
 /// only while the file it needs is missing, as its unit's condition decides
 /// (the reviewer on #1063: a crashed part's socket is gone too, since systemd
@@ -1903,13 +1910,14 @@ fn run_for(
                         started.elapsed().as_millis()
                     );
                     // No Harness to hand over with (`lamp-tasks
-                    // --set-up-later`, #2842): not a failure of the moment,
-                    // so no "just now" for the model to offer a retry on.
-                    let told = if answer.get("error").and_then(Value::as_str) == Some("no_harness")
-                    {
-                        NO_HARNESS
-                    } else {
-                        "The work could not be prepared just now."
+                    // --set-up-later`, #2842), or task targets this build
+                    // can't follow (Eighth's P3 on #3131): not failures of
+                    // the moment, so no "just now" for the model to offer a
+                    // retry on.
+                    let told = match answer.get("error").and_then(Value::as_str) {
+                        Some("no_harness") => NO_HARNESS,
+                        Some("targets_newer") => TARGETS_NEWER,
+                        _ => "The work could not be prepared just now.",
                     };
                     (json!({"error": told}), true)
                 }
@@ -3020,8 +3028,9 @@ pub(crate) mod tests {
     /// there once. The one target of the engine asked for is prepared
     /// instead. With none of that engine, or two to choose between, the
     /// model is told plainly that it isn't set up, never "can't reach it".
-    /// `no_harness` is told it can be set up later (#2842); any other
-    /// refusal is answered as before, with nothing read.
+    /// `no_harness` is told it can be set up later (#2842), `targets_newer`
+    /// that it works again once the lamp is updated; any other refusal is
+    /// answered as before, with nothing read.
     #[test]
     fn a_target_the_tasks_part_lacks_is_answered_from_who_is_there() {
         let _one = ONE_AT_A_TIME
@@ -3160,13 +3169,28 @@ pub(crate) mod tests {
         let seen = tasks_part(
             &directory,
             vec![
-                ("request.sock", status),
+                ("request.sock", status.clone()),
                 ("request.sock", refused("no_harness")),
             ],
         );
         let (told, _) = run(&place, &call, 3, true, PEER_WAIT);
         assert_eq!(told, json!({"error": NO_HARNESS}));
         assert!(NO_HARNESS.contains("set up later") && !NO_HARNESS.contains("just now"));
+        assert_eq!(seen.try_iter().count(), 2);
+        // Targets for a newer build (Eighth's P3 on #3131): lasting too,
+        // so told when it works again, with no "just now".
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                ("request.sock", refused("targets_newer")),
+            ],
+        );
+        let (told, _) = run(&place, &call, 3, true, PEER_WAIT);
+        assert_eq!(told, json!({"error": TARGETS_NEWER}));
+        assert!(TARGETS_NEWER.contains("updated") && !TARGETS_NEWER.contains("just now"));
         assert_eq!(seen.try_iter().count(), 2);
         if let Ok(mut pending) = PENDING.lock() {
             *pending = None;
