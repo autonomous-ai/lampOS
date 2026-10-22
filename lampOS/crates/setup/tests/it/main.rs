@@ -8,6 +8,7 @@ mod bus_names;
 mod change;
 mod keys;
 mod light;
+mod recover;
 mod reset;
 mod serve;
 mod wifi;

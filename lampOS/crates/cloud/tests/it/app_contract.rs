@@ -104,6 +104,7 @@ fn lamp(root: &PathBuf) -> Places {
         proc: root.join("proc"),
         sys: root.join("sys"),
         etc: root.join("etc"),
+        run: root.join("run"),
     }
 }
 

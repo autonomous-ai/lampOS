@@ -58,6 +58,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
             proc: root.join("proc"),
             sys: root.join("sys"),
             etc: root.join("etc"),
+            run: root.join("run"),
         },
         bus: Some(Bus::new(&bus_root).unwrap()),
         device_id: "d-42".into(),

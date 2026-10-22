@@ -769,6 +769,61 @@ above, not yet run on a lamp). Setup pressed to `connected` and the marker:
 and #811 (the two settings files, `provider.json`, the voice's sessions
 folder, the lock folders' modes).
 
+## When the saved network is gone (#3020)
+
+With `LAMP_WIFI_RECOVERY=on` (off unless set, a drop-in on
+`lamp-setup-recover.service`, which the product installs), a set-up lamp
+whose saved network is gone (a new router, a changed password, a move)
+opens setup's own hotspot after 90 s, as V1 did (`system/network/recovery.go`
+in the parent repository), so the app's setup flow sets the new network
+without a 5 s reset. A lamp moved from V1 whose line 100 is a head pad has no
+reset (above), so this is its only way back.
+
+- **Watched** by `lamp-setup recover`, one look every 5 s: a station address
+  on the Wi-Fi (online), `wpa_state` (joined to a known network's radio,
+  waiting for an address: only slow), `lamp-setup.service` and a Wi-Fi
+  change from the app (busy), and while the hotspot is open the phones on it
+  (`iw dev wlan0 station dump`; one that can't be counted counts as some).
+- **The policy** (`crates/setup/src/recover.rs`, pure, tested in
+  `tests/it/recover.rs`): 90 s off every known network, not joining one and
+  not busy, opens the hotspot. Only slow or busy, the 90 s start again. The
+  saved network in reach but never joining (a changed password) is gone. From
+  the hotspot the saved network is tried every 2 min, 45 s each, never during
+  a setup run, and from under a phone only once it has held the retry 10 min
+  (a phone that remembers the open hotspot may join it by itself while the
+  router reboots); not sooner when it shows in a scan, since with a changed
+  password it always would. A try that joins the radio and waits for an
+  address, or that a Wi-Fi change takes, is never cut back to the hotspot:
+  it counts as lost afresh, the 90 s again once that clears (reviewer-two
+  on #3024). Online at any time ends recovery, and a 5 s reset
+  (the marker gone) ends the watcher, setup's own then serving.
+- **The hotspot** is setup's own (`device-ap-mode`), with its page and API,
+  the marker and the person's data kept, and no setup light (the ring is the
+  voice's). Its status says `runtime_phase: "recovering"`, which tells the
+  app it is recovery and not a first setup. A setup request there joins its
+  network and **saves nothing else** (`serve::NetworkOnly`, El on #3024):
+  the key, the name, the zone, the backend's link, the reports answer and own
+  keys in it are not kept, so the app's one full request works and nobody on
+  the open hotspot can change the settings the owner kept. They are still
+  checked as at first setup, so a malformed one refuses the request before
+  any join. The status's `share_reports` is the answer the last setup
+  kept, read as lamp-cloud reads that record, never the request's. **The
+  network is the one thing such a request sets.** Joined, recovery ends.
+  **What it cannot stop** (the Reviewer-lead on #3024): the hotspot is
+  open, as at first setup, so someone in radio range while it is up can
+  set **their own** network; the key, the backend link and the
+  person's data stay, but the lamp's traffic then crosses their network.
+  The first builder signs off before `LAMP_WIFI_RECOVERY` goes on anywhere
+  (the sticker's password on a recovery request is the proposed guard).
+- **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
+  each retry, and when recovery ends; lamp-cloud's `system.info` says
+  `"recovery": true` while it runs with its switch on, so the app names the
+  hotspot only to a lamp that will open one (Fourteen's ecm-sds-mobile#50).
+
+Not shown on a lamp: the check is a lamp with its person, the router's SSID
+changed, the hotspot open within 2 minutes, the app setting the new network,
+and the voice back.
+
 ## After a setup from the Autonomous app
 
 A checklist to run on the lamp once its setup from the app has finished (the

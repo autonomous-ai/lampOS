@@ -233,6 +233,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-waking.service",
         include_str!("../../../deploy/product/lamp-waking.service"),
     ),
+    // Setup's hotspot again when a set-up lamp's saved network is gone
+    // (#3020); off unless `LAMP_WIFI_RECOVERY=on`.
+    (
+        "lamp-setup-recover.service",
+        include_str!("../../../deploy/product/lamp-setup-recover.service"),
+    ),
 ];
 
 /// The fixed services whose stops Cloud may report. The install fixture
@@ -261,6 +267,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-selftest.service",
     "lamp-setup-change@.service",
     "lamp-setup-keys@.service",
+    "lamp-setup-recover.service",
     "lamp-setup-reset.service",
     "lamp-setup-wifi-restore.service",
     "lamp-setup-wifi@.service",
@@ -2599,13 +2606,13 @@ mod tests {
         for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
-        // Setup, its reset, the waking face and setup's three helpers (the
-        // names', the Wi-Fi's and its boot restore) share one binary, and so
-        // do the air and its bus clock, the skills and their manage helper,
-        // and the eyes and their camera helper (#2892); every other service
-        // is a part.
+        // Setup, its reset, the waking face, its recovery (#3020) and
+        // setup's three helpers (the names', the Wi-Fi's and its boot
+        // restore) share one binary, and so do the air and its bus clock,
+        // the skills and their manage helper, and the eyes and their camera
+        // helper (#2892); every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 8, "every product service is a part");
+        assert_eq!(parts.len(), services - 9, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");

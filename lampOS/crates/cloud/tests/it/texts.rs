@@ -23,6 +23,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
             proc: root.join("proc"),
             sys: root.join("sys"),
             etc: root.join("etc"),
+            run: root.join("run"),
         },
         bus: Some(Bus::new(&bus_root).unwrap()),
         device_id: "d-42".into(),

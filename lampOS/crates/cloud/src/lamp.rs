@@ -31,6 +31,10 @@ pub const PREVIEW_PRIORITY: Priority = Priority::Conversation;
 pub const SHOWN_WITHIN: Duration = Duration::from_secs(1);
 const NO_RING: &str = "the lamp's light is not running";
 
+/// Kept while `lamp-setup recover` runs with its switch on (#3020): the
+/// same path as `lamp_setup::recover::ON_FILE`, which a test holds equal.
+pub const RECOVERY_ON: &str = "/run/lampos-setup-recover/on";
+
 /// Where each part is read.
 #[derive(Clone, Debug)]
 pub struct Places {
@@ -40,6 +44,8 @@ pub struct Places {
     pub proc: PathBuf,
     pub sys: PathBuf,
     pub etc: PathBuf,
+    /// `/run`, as the host has it; a test's own.
+    pub run: PathBuf,
 }
 
 impl Default for Places {
@@ -49,6 +55,7 @@ impl Default for Places {
             proc: "/proc".into(),
             sys: "/sys".into(),
             etc: "/etc".into(),
+            run: "/run".into(),
         }
     }
 }
@@ -570,6 +577,13 @@ impl Lamp for Real {
         }))
     }
 
+    fn recovery(&self) -> bool {
+        self.places
+            .run
+            .join(RECOVERY_ON.trim_start_matches("/run/"))
+            .exists()
+    }
+
     fn texting(&self) -> bool {
         self.texts.on && self.bus.is_some()
     }
@@ -790,9 +804,43 @@ mod tests {
                 proc: root.join("proc"),
                 sys: root.join("sys"),
                 etc: root.join("etc"),
+                run: root.join("run"),
             },
             root,
         )
+    }
+
+    /// #3020: `recovery` while `lamp-setup recover` runs with its switch on,
+    /// which keeps its file in its runtime folder; not otherwise.
+    #[test]
+    fn recovery_is_read_from_setups_file() {
+        let (places, root) = places("recovery");
+        let lamp = Real {
+            places: places.clone(),
+            bus: None,
+            device_id: "d-42".into(),
+            build: "812+460a1a1aa2b3".into(),
+            wifi: Wifi::default(),
+            ring: Ring::default(),
+            texts: Texts::default(),
+            reports: None,
+            skills: None,
+            changes: None,
+            photos: None,
+            faces: None,
+            schedule: None,
+            update_page: false,
+            restart: None,
+            guard: None,
+            make_skill: None,
+        };
+        assert!(!lamp.recovery());
+        let on = places.run.join("lampos-setup-recover/on");
+        std::fs::create_dir_all(on.parent().unwrap()).unwrap();
+        std::fs::write(&on, "").unwrap();
+        assert!(lamp.recovery());
+        let _ = std::fs::remove_dir_all(root);
+        assert_eq!(RECOVERY_ON, lamp_setup::recover::ON_FILE);
     }
 
     /// The volume goes through `lamp-actions`' socket, in its own line

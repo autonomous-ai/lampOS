@@ -790,6 +790,11 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             // before the marker the ring is the setup light's (#1681).
             assert!(unit.contains(&condition.as_str()), "{name}");
             assert!(section(text, "Install").contains(&"WantedBy=sysinit.target"));
+        } else if *name == "lamp-setup-recover.service" {
+            // Recovery is for a set-up lamp only (#3020): before the
+            // marker, setup itself serves.
+            assert!(unit.contains(&condition.as_str()), "{name}");
+            assert!(section(text, "Install").contains(&"WantedBy=multi-user.target"));
         } else if *name == "lampos-setup-done.path" {
             // And this starts the lamp once it is there.
             let path = section(text, "Path");

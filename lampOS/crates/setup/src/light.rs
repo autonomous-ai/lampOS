@@ -393,6 +393,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn own_key(&mut self, given: &crate::keys::Given) -> crate::keys::Verdict {
         self.save.own_key(given)
     }
+    fn keeps_settings(&self) -> bool {
+        self.save.keeps_settings()
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();

@@ -3,6 +3,7 @@ pub mod change;
 pub mod http;
 pub mod keys;
 pub mod light;
+pub mod recover;
 pub mod reset;
 pub mod scan;
 pub mod serve;
