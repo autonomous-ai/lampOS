@@ -8874,7 +8874,10 @@ mod tests {
     /// it is held: a colleague's line, and as much a second person's real
     /// follow-up. With no likeness at its verdict (its print not back) it
     /// goes on, and the journal says it was judged without the voice check.
-    /// The asker's own voice goes on, judged.
+    /// The asker's own voice goes on, judged. In a room already busy, with
+    /// the call and the answer's start past the 8 s, so that only the end
+    /// of the lamp's words lets a line go on; 9 s after it, past the 8 s,
+    /// every line is held (reviewer-two's P3 on #3139).
     #[test]
     fn a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
@@ -8910,14 +8913,19 @@ mod tests {
             heeding.hear(request, Heard::Samples(&[voice; 48_000]));
             heeding.hear(request, Heard::Ended);
         };
-        // Whether the second line, in `voice`, is held, and the journal's
-        // lines.
-        let judged = |voice: i16, back: Option<bool>| -> (bool, Vec<String>) {
+        // Whether the second line, in `voice`, begun `ended_s` after the
+        // answer's words ended, is held, and the journal's lines. The room
+        // is already busy, so only `FOLLOW_UP_FOR` from the end of the
+        // lamp's words or the call lets a line go on, and the call is
+        // backdated past it: the reply's end alone decides (reviewer-two's
+        // P3 on #3139).
+        let judged = |voice: i16, back: Option<bool>, ended_s: u64| -> (bool, Vec<String>) {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
                 *room = crate::room_told::RoomTold::new();
                 room.count_only_talk(true);
+                room.count_held_talk(true);
             }
             let journal = Arc::new(Mutex::new(Vec::new()));
             let mut heeding = Heeding::new(true, true, None, None);
@@ -8934,26 +8942,27 @@ mod tests {
                     Arc::new(move |line: &str| into.lock().unwrap().push(line.to_owned())),
                 )
             });
-            // The asker calls the lamp, and is answered: the answer began 6 s
-            // ago, and its words ended 4 s ago.
+            // The asker calls the lamp, and is answered for 6 s: the call
+            // ended `ended_s` + 8 s ago, the answer began `ended_s` + 6 s ago,
+            // past the 8 s from its start, and its words ended `ended_s` ago.
             let now_us = monotonic_us();
+            let ago_us = |s: u64| now_us - s * 1_000_000;
+            let ago = |s: u64| Instant::now() - Duration::from_secs(s);
             hear(&mut heeding, 1, 1);
             let call = "Lamp, what time is it?";
             assert_eq!(
-                heeding.heed(1, (now_us - 9_000_000, now_us - 8_000_000), call, None),
+                heeding.heed(1, (ago_us(ended_s + 9), ago_us(ended_s + 8)), call, None),
                 None
             );
+            heeding.called_at = Some(ago(ended_s + 8));
             {
                 let mut thread = crate::thread::THREAD.lock().unwrap();
-                thread.person(call, true, Instant::now() - Duration::from_secs(8));
-                thread.lamp(
-                    1,
-                    "It's ten past six.",
-                    Instant::now() - Duration::from_secs(6),
-                );
+                thread.person(call, true, ago(ended_s + 8));
+                thread.lamp(1, "It's ten past six.", ago(ended_s + 6));
             }
-            heeding.lamp_did(Did::Said(1, now_us - 4_000_000));
-            // The next line, begun as the answer's words had ended 4 s ago.
+            heeding.lamp_did(Did::Said(1, ago_us(ended_s)));
+            // Two people talking at the desk: the room is busy.
+            assert!(crate::room_told::room().lock().unwrap().two_people(now_us));
             hear(&mut heeding, 2, voice);
             let line = "Did you send the slides?";
             let held = heeding
@@ -8968,23 +8977,32 @@ mod tests {
             "request 2: judged without the voice check: its voice print was not back at its answer";
         let said_without = |lines: &[String]| lines.iter().any(|line| line.contains(without));
         // Another voice, its print back: under 0.30, held, judged.
-        let (held, lines) = judged(-1, Some(true));
+        let (held, lines) = judged(-1, Some(true), 4);
         assert!(held, "another voice 4 s after the answer is held");
         assert!(!said_without(&lines), "{lines:?}");
         // Another voice, its print not back at its verdict: it goes on, and
         // the journal says so.
-        let (held, lines) = judged(-1, Some(false));
+        let (held, lines) = judged(-1, Some(false), 4);
         assert!(!held, "with no likeness it goes on");
         assert!(said_without(&lines), "{lines:?}");
         // The asker's own voice: it goes on, judged.
-        let (held, lines) = judged(1, Some(true));
+        let (held, lines) = judged(1, Some(true), 4);
         assert!(!held, "the asker's own follow-up goes on");
         assert!(!said_without(&lines), "{lines:?}");
         // Without the voice check, the same line in another voice goes on:
         // the hold is the check's.
-        let (held, lines) = judged(-1, None);
+        let (held, lines) = judged(-1, None, 4);
         assert!(!held, "unchecked, another voice goes on");
         assert!(lines.is_empty(), "{lines:?}");
+        // Just past the 8 s: no conversation goes on in the busy room, so
+        // even the asker's own line is held, and nothing is judged without
+        // the check.
+        let (held, lines) = judged(1, Some(true), 9);
+        assert!(held, "9 s after the answer, past FOLLOW_UP_FOR, it is held");
+        assert!(!said_without(&lines), "{lines:?}");
+        let (held, lines) = judged(-1, Some(false), 9);
+        assert!(held, "past FOLLOW_UP_FOR, a line with no print is held too");
+        assert!(!said_without(&lines), "{lines:?}");
     }
 
     /// The reviewer's P3 on #2428: with `LAMP_QUIET_GOING_ON_SAME_ONE` and no
