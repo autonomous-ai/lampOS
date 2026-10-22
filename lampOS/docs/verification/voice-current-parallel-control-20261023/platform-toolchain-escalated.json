@@ -1,0 +1,95 @@
+{
+  "observed_utc": "2026-10-22T17:20:56.792863+00:00",
+  "metadata_only": true,
+  "additional_test_executions": 0,
+  "execution_context": "require_escalated, matching the original test runner tool launch context; prior sandbox-limited reads remain in platform-toolchain.json",
+  "observations": [
+    {
+      "argv": [
+        "/Users/autonomous/.cargo/bin/rustc",
+        "-vV"
+      ],
+      "exit": 0,
+      "stdout": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/uname",
+        "-s"
+      ],
+      "exit": 0,
+      "stdout": "Darwin\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/uname",
+        "-r"
+      ],
+      "exit": 0,
+      "stdout": "25.6.0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/uname",
+        "-m"
+      ],
+      "exit": 0,
+      "stdout": "x86_64\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/sysctl",
+        "-n",
+        "hw.model"
+      ],
+      "exit": 0,
+      "stdout": "iMac20,1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/sysctl",
+        "-n",
+        "hw.machine"
+      ],
+      "exit": 0,
+      "stdout": "x86_64\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/sysctl",
+        "-n",
+        "hw.optional.arm64"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "sysctl: unknown oid 'hw.optional.arm64'\n"
+    },
+    {
+      "argv": [
+        "/usr/sbin/sysctl",
+        "-n",
+        "sysctl.proc_translated"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "sysctl: unknown oid 'sysctl.proc_translated'\n"
+    },
+    {
+      "argv": [
+        "/usr/sbin/sysctl",
+        "-n",
+        "machdep.cpu.brand_string"
+      ],
+      "exit": 0,
+      "stdout": "Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz\n",
+      "stderr": ""
+    }
+  ],
+  "qualification": "Toolchain host and binary architecture are separate from hardware and translation state; no native-ISA assumption."
+}

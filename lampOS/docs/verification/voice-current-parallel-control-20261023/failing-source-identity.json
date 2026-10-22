@@ -1,0 +1,94 @@
+{
+  "refs": {
+    "ec_baseline": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+    "candidate": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "current": "bad1144960da9dcdbbcc29072e86a767bcbd0437"
+  },
+  "paths": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs",
+      "versions": {
+        "ec_baseline": {
+          "git_blob": "09cfdd756b8de242bba5ecdd5ebb5d2aee9e8b5f",
+          "sha256": "d0ff88f74bd75a8483ec08cb475bb2a9247f5453a178fdf0f340bb32099c968c",
+          "bytes": 61976
+        },
+        "candidate": {
+          "git_blob": "09cfdd756b8de242bba5ecdd5ebb5d2aee9e8b5f",
+          "sha256": "d0ff88f74bd75a8483ec08cb475bb2a9247f5453a178fdf0f340bb32099c968c",
+          "bytes": 61976
+        },
+        "current": {
+          "git_blob": "09cfdd756b8de242bba5ecdd5ebb5d2aee9e8b5f",
+          "sha256": "d0ff88f74bd75a8483ec08cb475bb2a9247f5453a178fdf0f340bb32099c968c",
+          "bytes": 61976
+        }
+      },
+      "identical_across_ec_candidate_current": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs",
+      "versions": {
+        "ec_baseline": {
+          "git_blob": "e254c2b21831ebc0cf14ff7851a7aa9bd6954a1a",
+          "sha256": "fef73758e950bd43ef791e20d339cb9b3f03ff417c157e2b37ec9bb2c885ac35",
+          "bytes": 40807
+        },
+        "candidate": {
+          "git_blob": "e254c2b21831ebc0cf14ff7851a7aa9bd6954a1a",
+          "sha256": "fef73758e950bd43ef791e20d339cb9b3f03ff417c157e2b37ec9bb2c885ac35",
+          "bytes": 40807
+        },
+        "current": {
+          "git_blob": "e254c2b21831ebc0cf14ff7851a7aa9bd6954a1a",
+          "sha256": "fef73758e950bd43ef791e20d339cb9b3f03ff417c157e2b37ec9bb2c885ac35",
+          "bytes": 40807
+        }
+      },
+      "identical_across_ec_candidate_current": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/reminders.rs",
+      "versions": {
+        "ec_baseline": {
+          "git_blob": "dd5b04d2eca7ffd3ef1e6bbf37d71a9d59310de3",
+          "sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+          "bytes": 54354
+        },
+        "candidate": {
+          "git_blob": "dd5b04d2eca7ffd3ef1e6bbf37d71a9d59310de3",
+          "sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+          "bytes": 54354
+        },
+        "current": {
+          "git_blob": "dd5b04d2eca7ffd3ef1e6bbf37d71a9d59310de3",
+          "sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+          "bytes": 54354
+        }
+      },
+      "identical_across_ec_candidate_current": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/reminders/consumer/roundtrip_tests.rs",
+      "versions": {
+        "ec_baseline": {
+          "git_blob": "d4800f5b1534945aa18071e1fcf0fe9090ed9797",
+          "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+          "bytes": 15609
+        },
+        "candidate": {
+          "git_blob": "d4800f5b1534945aa18071e1fcf0fe9090ed9797",
+          "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+          "bytes": 15609
+        },
+        "current": {
+          "git_blob": "d4800f5b1534945aa18071e1fcf0fe9090ed9797",
+          "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+          "bytes": 15609
+        }
+      },
+      "identical_across_ec_candidate_current": true
+    }
+  ],
+  "scope": "Every test-definition file and panic-site file for the seven current failures. File identity does not establish equal whole-program state, test inventory, schedule or execution context."
+}

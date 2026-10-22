@@ -1,0 +1,122 @@
+{
+  "recovery": "Each block is an exact contiguous byte slice of the preserved original stdout stream; offsets are bytes, not characters.",
+  "blocks": [
+    {
+      "name": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+      "source_stream": "full-library.stdout",
+      "byte_start": 337953,
+      "byte_end_exclusive": 338529,
+      "bytes": 576,
+      "sha256": "761413e48e2e15160251724c92b273b91439616ac4d072eeaae6cf3cd99b6af7",
+      "text_lines": [
+        "---- coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean stdout ----\n",
+        "lamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n",
+        "\n",
+        "thread 'coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean' (699693613) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:881:5:\n",
+        "restart tick took 81.160744ms\n",
+        "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+      "source_stream": "full-library.stdout",
+      "byte_start": 338529,
+      "byte_end_exclusive": 339234,
+      "bytes": 705,
+      "sha256": "b8b06c3a81bd0de1d4b0e20a949970561d9c0bfa5e19e3dd42bba7d7b848e04d",
+      "text_lines": [
+        "---- coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure stdout ----\n",
+        "\n",
+        "thread 'coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure' (699692785) panicked at crates/voice/src/coordinator/motor/tests.rs:883:9:\n",
+        "owned child timed out: adapter=Some(\"motor worker ended independently\"); connected=true; ready=false; reaped=true; supervisor=Some(\"motor inhibited: ControlLost\"); largest_poll_gap_us=3118; output=\n",
+        "running 1 test\n",
+        "motor_fixture_phase=child_entry at_us=3217037095903\n",
+        "motor_fixture_phase=channels_bound at_us=3217037333312\n",
+        "motor_fixture_phase=channels_connected at_us=3217037402602\n",
+        "motor_fixture_event=Inhibited { at_us: 3217037473447, motion\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from",
+      "source_stream": "full-library.stdout",
+      "byte_start": 339234,
+      "byte_end_exclusive": 339647,
+      "bytes": 413,
+      "sha256": "7b0ddc7415d0d0435dc88599ba30a7427b8bc7da6209a374e62ff21bba4f0835",
+      "text_lines": [
+        "---- coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from stdout ----\n",
+        "lamp-voice schedule-consumer: reminder id 1 delivery 1: withdrawn: its due notice aged while the ledger was written\n",
+        "\n",
+        "thread 'coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from' (699715481) panicked at crates/voice/src/reminders/consumer/roundtrip_tests.rs:371:13:\n",
+        "fresh durable offer\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said",
+      "source_stream": "full-library.stdout",
+      "byte_start": 339647,
+      "byte_end_exclusive": 340054,
+      "bytes": 407,
+      "sha256": "5754a0e8689f8460e0a31523dc39fbfb7559929e04d9eb309ca49522a6ee84a8",
+      "text_lines": [
+        "---- coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said stdout ----\n",
+        "lamp-voice schedule-consumer: reminder id 1 delivery 1: withdrawn: its due notice aged while the ledger was written\n",
+        "\n",
+        "thread 'coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said' (699715634) panicked at crates/voice/src/reminders/consumer/roundtrip_tests.rs:371:13:\n",
+        "fresh durable offer\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered",
+      "source_stream": "full-library.stdout",
+      "byte_start": 340054,
+      "byte_end_exclusive": 340537,
+      "bytes": 483,
+      "sha256": "2dbec7b0d44e81461db0e7ec3e5d08607f92fcb9a34c1e108a9ac57bb8381bac",
+      "text_lines": [
+        "---- coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered stdout ----\n",
+        "lamp-voice schedule-consumer: reminder id 1 delivery 1: withdrawn: its due notice aged while the ledger was written\n",
+        "\n",
+        "thread 'coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered' (699715847) panicked at crates/voice/src/reminders/consumer/roundtrip_tests.rs:371:13:\n",
+        "fresh durable offer\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute",
+      "source_stream": "full-library.stdout",
+      "byte_start": 340537,
+      "byte_end_exclusive": 340948,
+      "bytes": 411,
+      "sha256": "b6be9530c36cb5848b7f4ef8df4fc404e98310c3c747648ecd128a5d5c3e8d7f",
+      "text_lines": [
+        "---- coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute stdout ----\n",
+        "lamp-voice schedule-consumer: reminder id 1 delivery 1: withdrawn: its due notice aged while the ledger was written\n",
+        "\n",
+        "thread 'coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute' (699715932) panicked at crates/voice/src/reminders/consumer/roundtrip_tests.rs:371:13:\n",
+        "fresh durable offer\n",
+        "\n"
+      ]
+    },
+    {
+      "name": "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+      "source_stream": "full-library.stdout",
+      "byte_start": 340948,
+      "byte_end_exclusive": 341416,
+      "bytes": 468,
+      "sha256": "3ee8221dbb5299287643c6923028e7a56e39ceecbf6c85075ba47339cfc0ade8",
+      "text_lines": [
+        "---- coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire stdout ----\n",
+        "lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1)\n",
+        "\n",
+        "thread 'coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire' (699716508) panicked at crates/voice/src/coordinator/tests/reminders.rs:287:56:\n",
+        "called `Result::unwrap()` on an `Err` value: StaleOwner\n",
+        "\n"
+      ]
+    }
+  ]
+}

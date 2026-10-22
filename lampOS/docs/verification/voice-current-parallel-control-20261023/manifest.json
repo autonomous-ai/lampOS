@@ -1,0 +1,97 @@
+{
+  "scope": "All receipt files except manifest.json itself; work-log entry is outside this folder.",
+  "files": {
+    "README.md": {
+      "bytes": 10103,
+      "sha256": "b1b732f746d0128ab5385ac26ae88ed0ca7ec25faec20bc87833cefe0aab1a32"
+    },
+    "binary-architecture.json": {
+      "bytes": 1306,
+      "sha256": "c18883888ef8cb1757f9d74e8b27bad4418f3deaf244a21e9af9f85041089146"
+    },
+    "candidate-18-failures.json": {
+      "bytes": 2050,
+      "sha256": "b211942072976ac22544ae262dbe41f119f1fd80775532978e471a1dc13ce652"
+    },
+    "candidate-delta-absence.json": {
+      "bytes": 2368,
+      "sha256": "f4958289cbf2c786baf38d9f3a98de27683e2b2d89d717b54237066abb316dea"
+    },
+    "commands.json": {
+      "bytes": 2283,
+      "sha256": "23715dd220d4f69738dd0c4ab0e5d094d391108bd2f6c9a0b19a4c5458ae3397"
+    },
+    "failing-source-identity.json": {
+      "bytes": 3642,
+      "sha256": "8d70cf828d152f9c09c03542065ea335072d89103e5918e8addc50f04c5630f8"
+    },
+    "failure-diagnostics.json": {
+      "bytes": 6793,
+      "sha256": "ccfae20a259c6144cc83dcd616c45131b3c1154051d4aa29506c1ab5c25b897f"
+    },
+    "inventory-comparison.json": {
+      "bytes": 324521,
+      "sha256": "06e81d1fe11b54547f57f875714e3a8a2fa521be72765c151ef04f43e53d2027"
+    },
+    "plan.json": {
+      "bytes": 2849,
+      "sha256": "8399b79ed62b046f20889bee66be0201e485100f9bb5c62da1361311599bbfd0"
+    },
+    "platform-toolchain-escalated.json": {
+      "bytes": 2179,
+      "sha256": "9de299c96849d599b153d33fda46a8819f84e3d2fedb9df43ac08dcb8fea5195"
+    },
+    "platform-toolchain.json": {
+      "bytes": 2284,
+      "sha256": "5c82c6ed247de0bd7e451e01df917fe71b87f1cf324252b5ac90628fa09b9212"
+    },
+    "provenance.json": {
+      "bytes": 4757,
+      "sha256": "0cdcdcd7b82ccd394cf89cd5315552ef263c114af83cdcde83cd1942736cea26"
+    },
+    "raw/compiled-inventory-stderr.json": {
+      "bytes": 334,
+      "sha256": "1bb0c4e0238463921ff5d90d411cdea14b7d251d2cf1712136a4abd8a11e8108"
+    },
+    "raw/compiled-inventory-stdout.json": {
+      "bytes": 347524,
+      "sha256": "8e866da8b5e92872197005f255a4107763c435ae2c00bebaded770bb406aeb68"
+    },
+    "raw/full-library-stderr.json": {
+      "bytes": 3849,
+      "sha256": "cf8d8971ed7e49c1c322c93a0760ccd0413167f67671fffdcb7e939f8e855d14"
+    },
+    "raw/full-library-stdout.json": {
+      "bytes": 373793,
+      "sha256": "c90746248e09ae3811f56c055aa18ec3ed89a4dd7d9f43d1e6dccb5778fb46cf"
+    },
+    "raw/index.json": {
+      "bytes": 911,
+      "sha256": "e4120409845d574df20ea4d54a36133a98cd20d5faa641f7226fa938b94ded67"
+    },
+    "restoration.json": {
+      "bytes": 389,
+      "sha256": "ba4fb851468ae4576d7c3cbd64c4fbb26502103f23dac64d94da4b788675caaa"
+    },
+    "results.json": {
+      "bytes": 17805,
+      "sha256": "f0ae4de59dc52ca2497be8d6e0bd0ab57ac8887dc6bddfc98d9551c1779e770f"
+    },
+    "source-freshness.json": {
+      "bytes": 304,
+      "sha256": "44b2f8e5df900060a9e4349c21194f8e9892ad93385529c90dcb01ece7bb20b1"
+    },
+    "source-manifest.json": {
+      "bytes": 924845,
+      "sha256": "a0eeb2e6bc52edd00f5484c4e3fde3db9637ededeff4b77114acc4f6067080b2"
+    },
+    "started.json": {
+      "bytes": 236,
+      "sha256": "5e62168f31ee27b9fa4e196a77c630fc7e460b02b7a616918fdd29f9595ca9f3"
+    },
+    "validation.json": {
+      "bytes": 1095,
+      "sha256": "54ce0536aab60189ce64aff7eec2b7b4563f61dedaef71119d94877298531223"
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "full-library": {
+    "label": "full-library",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS",
+    "timeout_seconds": 1800,
+    "started_utc": "2026-10-22T17:17:53.291264+00:00",
+    "started_epoch_ns": 1792689473291279000,
+    "load_average_before": [
+      5.564453125,
+      7.65185546875,
+      9.44287109375
+    ],
+    "stdout": "full-library.stdout",
+    "stderr": "full-library.stderr",
+    "pid": 21149,
+    "exit": 101,
+    "timed_out": false,
+    "cleanup": {
+      "initial_members": [],
+      "signals": [],
+      "final_members": [],
+      "no_live_owned_children": true
+    },
+    "wall_seconds": 473.237265,
+    "load_average_after": [
+      12.6611328125,
+      9.99951171875,
+      9.78271484375
+    ],
+    "stdout_sha256": "e19706bea02dba0d776ac18ebcec2e31267bd78a82c22709e28d10713db39624",
+    "stdout_bytes": 342206,
+    "stderr_sha256": "5e75808082213d5362df46022e437e939f3d794d737d23fe4a51ee572d1e9928",
+    "stderr_bytes": 3264
+  },
+  "compiled-inventory": {
+    "label": "compiled-inventory",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS",
+    "timeout_seconds": 60,
+    "started_utc": "2026-10-22T17:25:47.145255+00:00",
+    "started_epoch_ns": 1792689947145323000,
+    "load_average_before": [
+      12.04736328125,
+      9.91650390625,
+      9.75439453125
+    ],
+    "stdout": "compiled-inventory.stdout",
+    "stderr": "compiled-inventory.stderr",
+    "pid": 63313,
+    "exit": 0,
+    "timed_out": false,
+    "cleanup": {
+      "initial_members": [],
+      "signals": [],
+      "final_members": [],
+      "no_live_owned_children": true
+    },
+    "wall_seconds": 0.213458,
+    "load_average_after": [
+      12.04736328125,
+      9.91650390625,
+      9.75439453125
+    ],
+    "stdout_sha256": "e047b0d4b0b7f21d1513be2da77a67cb6d722545a95b169a684a1c430190feb8",
+    "stdout_bytes": 316511,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  }
+}

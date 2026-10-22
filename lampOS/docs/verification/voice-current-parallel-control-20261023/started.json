@@ -1,0 +1,13 @@
+{
+  "started_utc": "2026-10-22T17:17:53.253239+00:00",
+  "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline"
+  ],
+  "execution_count": 1
+}

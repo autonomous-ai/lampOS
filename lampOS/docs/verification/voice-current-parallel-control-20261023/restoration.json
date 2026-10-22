@@ -1,0 +1,10 @@
+{
+  "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "tracked_files": 6426,
+  "before_aggregate": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+  "after_aggregate": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+  "all_bytes_unchanged": true,
+  "git_status_porcelain": "",
+  "source_mutations": 0,
+  "shared_runner_sha256_unchanged": true
+}

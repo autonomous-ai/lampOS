@@ -1,5 +1,29 @@
 # Tests work log
 
+## 2026-10-23 00:39 +0700 — unchanged current-head Voice control retains seven failures
+
+Ready for lamp-voice: **no, [#3023](https://github.com/autonomous-ai/lampOS/pull/3023)**.
+The single unchanged `bad114496` default-parallel `cargo test -p lamp-voice
+--lib --offline` exits **101**: **3,387 passed / 7 failed / 14 ignored**,
+342.98 s test time. The fresh x86_64 Mach-O library lists **3,408** tests,
+**11 added / 1 removed** from the earlier EC/735 inventories. Every actual
+result row was checked. All seven assigned cases and kept-start are `ok`;
+light-call integration was outside this command.
+
+The motor privacy/discard-or-close failure and faulted-ring restart tick
+also failed in the candidate's 18-failure run. Five separate reminder cases
+failed only in this current observation. All eight candidate fixture deltas
+are absent here, and every current failing definition/panic-site file is
+byte-identical across EC, 735 and this head. This changed-base control shows
+only that the two overlapping failures occur without our patch; it does not
+clear any of the 18 candidate failures or the full Update consumer gate.
+
+[Complete receipt](verification/voice-current-parallel-control-20261023/)
+retains all raw streams, seven diagnostics, assigned-case rows, exact inventory
+deltas, source and architecture evidence. All 6,426 tracked lampOS files stayed
+byte-identical and the worktree clean. No test retry, source mutation, ARM64
+build or device execution occurred; no load-cause or speedup claim is made.
+
 ## 2026-10-23 00:20 +0700 — Skills fixtures admitted to First's train
 
 Ready for lamp-voice: **yes, train-only** for [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)

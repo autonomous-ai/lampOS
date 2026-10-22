@@ -1,0 +1,60 @@
+{
+  "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "branch": "tests/1569-voice-current-parallel-control-20261023",
+  "tree": "9b2e4076ab69938ef9eae06f8ac95bc6c7910d16",
+  "worktree": "/private/tmp/tests-codex-voice-current-parallel-control-20261023",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline"
+  ],
+  "test_execution_count": 1,
+  "inventory_execution": "Compiled binary --list --format terse, after the single full test; metadata only",
+  "target": "/private/tmp/tests-codex-1569-target",
+  "claim": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6346630405",
+  "target_release": "Root explicitly released MAIN exclusively after the Queue claim; no other Cargo or source mutations during this control",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "machine": "x86_64",
+  "cpu_count": 16,
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "unset_environment": [
+    "RUST_TEST_THREADS",
+    "CARGO_BUILD_TARGET"
+  ],
+  "other_compiler_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "hash_scope": "Every Git-tracked lampOS file, including docs, Rust/Cargo/toolchain/config and fixture inputs; every prepared file verified against the committed blob. Excludes ignored/untracked files and paths outside lampOS.",
+  "file_count": 6426,
+  "prepared_aggregate_sha256": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+  "aggregate_algorithm": "SHA256(json.dumps(sorted path-to-file-SHA256 map, sort_keys=True).encode())",
+  "freshness": "Refresh mtimes of every file in that exact tracked scope; compare all bytes before/after refresh and after execution",
+  "timeout_seconds": 1800,
+  "cleanup": "Each command owns a new process session. Inspect only that session, including child process groups, and terminate leftovers with bounded TERM/KILL. Never signal unrelated sessions.",
+  "runner_sha256": {
+    "bytes": 9842,
+    "sha256": "8a39b5921dc8252903795e6d27d43465d7867989db84b2d221a201c390f356fd"
+  },
+  "shared_runner": {
+    "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/verify_parallel.py",
+    "bytes": 20931,
+    "sha256": "e13aaeca13288d0f1997082272791625f560fe77a3950d114f00c612c1a4c35d"
+  },
+  "causal_limit": "Current-head control on changed upstream, NOT a matched causal pair with EC/735. A pass does not clear or waive the failed candidate. No mutations, stress or retry."
+}

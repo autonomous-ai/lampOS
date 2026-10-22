@@ -1,0 +1,35 @@
+{
+  "observed_utc": "2026-10-22T17:26:37.243167+00:00",
+  "binary": {
+    "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "bytes": 107034176,
+    "sha256": "893b4b82d791966c858fc411834c4c1804ae64b62d1e8378d4f928a41f0e4156",
+    "mtime_ns": 1792689600157636906,
+    "fresh_compile_line": "   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS/crates/voice)"
+  },
+  "observations": [
+    {
+      "argv": [
+        "/usr/bin/file",
+        "-b",
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274"
+      ],
+      "exit": 0,
+      "stdout": "Mach-O 64-bit executable x86_64\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/lipo",
+        "-archs",
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274"
+      ],
+      "exit": 0,
+      "stdout": "x86_64\n",
+      "stderr": ""
+    }
+  ],
+  "artifact_bytes_unchanged": true,
+  "additional_test_executions": 0,
+  "qualification": "The executed Voice test artifact is x86_64 Mach-O, matching rustc host x86_64-apple-darwin. OS-reported hardware and unavailable translation-key observations remain separate in platform-toolchain-escalated.json. No ARM64 build or execution occurred."
+}

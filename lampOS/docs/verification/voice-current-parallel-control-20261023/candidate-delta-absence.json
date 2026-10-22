@@ -1,0 +1,58 @@
+[
+  {
+    "path": "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs",
+    "ec_baseline": "b8a241b63ee509d0d5ce3227ec168b26f4dd6b2a",
+    "candidate": "fad5f96dc750ae6d6cecc97179fda3f0bce2184d",
+    "current": "b8a241b63ee509d0d5ce3227ec168b26f4dd6b2a",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/provider_worker.rs",
+    "ec_baseline": "d517f926eb227d05e3a023e607f5fc8f6243aea5",
+    "candidate": "d0d6b8d2c92cfdc17767b2a567896b4776c1dbbb",
+    "current": "d517f926eb227d05e3a023e607f5fc8f6243aea5",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs",
+    "ec_baseline": "e40691b3557f4555b512d6819651c52ce2649ad7",
+    "candidate": "541e7f5f0569feac6bb7a00cea1b0bf0f9187ca9",
+    "current": "e40691b3557f4555b512d6819651c52ce2649ad7",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/provider_worker/tests/reminders.rs",
+    "ec_baseline": "6b2108bd7e6c9edc8b18b943c011550120290f74",
+    "candidate": "5efc471f24ac4f51f4eace04578f94a99bd6e38d",
+    "current": "6b2108bd7e6c9edc8b18b943c011550120290f74",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+    "ec_baseline": "5f418fc11295ab277127f490001803ee47c7c9fd",
+    "candidate": "d649f2a6a7f5d099e40005695584a875e6b609ca",
+    "current": "5f418fc11295ab277127f490001803ee47c7c9fd",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/remember.rs",
+    "ec_baseline": "80fa16527878d0f56df00bab4dca70b1e731846d",
+    "candidate": "d23af8b00ed92865e485854a53ce189d95b9d4cd",
+    "current": "80fa16527878d0f56df00bab4dca70b1e731846d",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/requested_audio/runtime.rs",
+    "ec_baseline": "f5c4fd4bab74507d13bdc9b28bf0818f1883efbd",
+    "candidate": "5eb6bea381c53ed6ba18fe3bb63eb9b577e40a55",
+    "current": "f5c4fd4bab74507d13bdc9b28bf0818f1883efbd",
+    "candidate_delta_absent": true
+  },
+  {
+    "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+    "ec_baseline": "35a82bd2bce391ec1a5eff333887ab787dc6b42f",
+    "candidate": "a183bc44dbadec5ad46ae0a3639d3b7cd18014b8",
+    "current": "35a82bd2bce391ec1a5eff333887ab787dc6b42f",
+    "candidate_delta_absent": true
+  }
+]

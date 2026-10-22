@@ -1,0 +1,368 @@
+{
+  "status": "single unchanged current-head observation complete",
+  "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "causal_limit": "Current-head control on changed upstream, NOT a matched causal pair with EC/735. A pass does not clear or waive the failed candidate. No mutations, stress or retry.",
+  "full_library": {
+    "label": "full-library",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS",
+    "timeout_seconds": 1800,
+    "started_utc": "2026-10-22T17:17:53.291264+00:00",
+    "started_epoch_ns": 1792689473291279000,
+    "load_average_before": [
+      5.564453125,
+      7.65185546875,
+      9.44287109375
+    ],
+    "stdout": "full-library.stdout",
+    "stderr": "full-library.stderr",
+    "pid": 21149,
+    "exit": 101,
+    "timed_out": false,
+    "cleanup": {
+      "initial_members": [],
+      "signals": [],
+      "final_members": [],
+      "no_live_owned_children": true
+    },
+    "wall_seconds": 473.237265,
+    "load_average_after": [
+      12.6611328125,
+      9.99951171875,
+      9.78271484375
+    ],
+    "stdout_sha256": "e19706bea02dba0d776ac18ebcec2e31267bd78a82c22709e28d10713db39624",
+    "stdout_bytes": 342206,
+    "stderr_sha256": "5e75808082213d5362df46022e437e939f3d794d737d23fe4a51ee572d1e9928",
+    "stderr_bytes": 3264
+  },
+  "summary_lines": [
+    "test result: FAILED. 3387 passed; 7 failed; 14 ignored; 0 measured; 0 filtered out; finished in 342.98s"
+  ],
+  "failures": [
+    "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+    "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+    "coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from",
+    "coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said",
+    "coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered",
+    "coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute",
+    "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire"
+  ],
+  "candidate_18_failed_here": [
+    "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+    "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean"
+  ],
+  "failures_outside_candidate_18": [
+    "coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from",
+    "coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said",
+    "coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered",
+    "coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute",
+    "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire"
+  ],
+  "candidate_18_current_status": {
+    "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found": "ok",
+    "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn": "ok",
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup": "ok",
+    "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants": "ok",
+    "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches": "ok",
+    "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only": "ok",
+    "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal": "ok",
+    "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests": "ok",
+    "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant": "ok",
+    "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority": "ok",
+    "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate": "ok",
+    "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released": "ok",
+    "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write": "ok",
+    "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure": "FAILED",
+    "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean": "FAILED",
+    "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean": "ok",
+    "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back": "ok",
+    "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics": "ok"
+  },
+  "binary": {
+    "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "bytes": 107034176,
+    "sha256": "893b4b82d791966c858fc411834c4c1804ae64b62d1e8378d4f928a41f0e4156",
+    "mtime_ns": 1792689600157636906,
+    "fresh_compile_line": "   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS/crates/voice)"
+  },
+  "compiled_inventory_command": {
+    "label": "compiled-inventory",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-current-parallel-control-20261023/lampOS",
+    "timeout_seconds": 60,
+    "started_utc": "2026-10-22T17:25:47.145255+00:00",
+    "started_epoch_ns": 1792689947145323000,
+    "load_average_before": [
+      12.04736328125,
+      9.91650390625,
+      9.75439453125
+    ],
+    "stdout": "compiled-inventory.stdout",
+    "stderr": "compiled-inventory.stderr",
+    "pid": 63313,
+    "exit": 0,
+    "timed_out": false,
+    "cleanup": {
+      "initial_members": [],
+      "signals": [],
+      "final_members": [],
+      "no_live_owned_children": true
+    },
+    "wall_seconds": 0.213458,
+    "load_average_after": [
+      12.04736328125,
+      9.91650390625,
+      9.75439453125
+    ],
+    "stdout_sha256": "e047b0d4b0b7f21d1513be2da77a67cb6d722545a95b169a684a1c430190feb8",
+    "stdout_bytes": 316511,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "prior_observations": {
+    "before": {
+      "command": {
+        "label": "full-library",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--offline"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS",
+        "timeout_seconds": 1800,
+        "started_utc": "2026-10-22T16:40:17.190939+00:00",
+        "started_epoch_ns": 1792687217190962000,
+        "load_average_before": [
+          6.544921875,
+          8.33544921875,
+          9.95556640625
+        ],
+        "stdout": "full-library.stdout",
+        "stderr": "full-library.stderr",
+        "pid": 32866,
+        "exit": 0,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 376.357434,
+        "load_average_after": [
+          32.197265625,
+          17.94384765625,
+          13.16357421875
+        ],
+        "stdout_sha256": "b5e8ff1281067aeabcaaaa8289455fd7ce2ffe096f35d3584b9ad4809a694502",
+        "stdout_bytes": 336976,
+        "stderr_sha256": "340f74d6a591090778912d77038a4d6310c911906175fe00d568b7ba80c10367",
+        "stderr_bytes": 3083
+      },
+      "summary_lines": [
+        "test result: ok. 3384 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 276.28s"
+      ]
+    },
+    "after": {
+      "command": {
+        "label": "full-library",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--offline"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-events-20261022/lampOS",
+        "timeout_seconds": 1800,
+        "started_utc": "2026-10-22T16:48:54.103799+00:00",
+        "started_epoch_ns": 1792687734103826000,
+        "load_average_before": [
+          28.552734375,
+          20.16943359375,
+          14.67041015625
+        ],
+        "stdout": "full-library.stdout",
+        "stderr": "full-library.stderr",
+        "pid": 80759,
+        "exit": 101,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 511.770055,
+        "load_average_after": [
+          11.54833984375,
+          12.56494140625,
+          13.00634765625
+        ],
+        "stdout_sha256": "1a70b8496a075e86075287e86369fdf051b251fe8a3bc2d34c2fbc3a86209a7f",
+        "stdout_bytes": 346695,
+        "stderr_sha256": "44a8250f1819c201566da7cd18187c0bf9eb19f81ed58eba66cc54de1b09623b",
+        "stderr_bytes": 3975
+      },
+      "summary_lines": [
+        "test result: FAILED. 3366 passed; 18 failed; 14 ignored; 0 measured; 0 filtered out; finished in 360.55s"
+      ]
+    }
+  },
+  "restoration": {
+    "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+    "tracked_files": 6426,
+    "before_aggregate": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+    "after_aggregate": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+    "all_bytes_unchanged": true,
+    "git_status_porcelain": "",
+    "source_mutations": 0,
+    "shared_runner_sha256_unchanged": true
+  },
+  "inventory_receipt": "inventory-comparison.json",
+  "actual_rows_audit": {
+    "regex": "^test (\\S+)(?: - should panic)? \\.\\.\\. (ok|FAILED|ignored).*$",
+    "unique_actual_rows": 3408,
+    "counts": {
+      "ok": 3387,
+      "FAILED": 7,
+      "ignored": 14
+    },
+    "exact_names_equal_compiled_inventory": true,
+    "expected_panic_annotation_rows": 3,
+    "scope": "Every terminal libtest row, including ignored and expected-panic rows; no status inferred from aggregate counts."
+  },
+  "assigned_seven_and_kept_start_actual_rows": {
+    "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": {
+      "status": "ok",
+      "raw_row": "test provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply ... ok"
+    },
+    "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet": {
+      "status": "ok",
+      "raw_row": "test provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet ... ok"
+    },
+    "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by": {
+      "status": "ok",
+      "raw_row": "test provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by ... ok"
+    },
+    "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked": {
+      "status": "ok",
+      "raw_row": "test remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked ... ok"
+    },
+    "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply": {
+      "status": "ok",
+      "raw_row": "test second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply ... ok"
+    },
+    "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going": {
+      "status": "ok",
+      "raw_row": "test second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going ... ok"
+    },
+    "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news": {
+      "status": "ok",
+      "raw_row": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... ok"
+    },
+    "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end": {
+      "status": "ok",
+      "raw_row": "test provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end ... ok"
+    }
+  },
+  "candidate_18_actual_rows": {
+    "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found": {
+      "status": "ok",
+      "raw_row": "test body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found ... ok"
+    },
+    "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn ... ok"
+    },
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant ... ok"
+    },
+    "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority ... ok"
+    },
+    "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate ... ok"
+    },
+    "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released ... ok"
+    },
+    "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write": {
+      "status": "ok",
+      "raw_row": "test coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write ... ok"
+    },
+    "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure": {
+      "status": "FAILED",
+      "raw_row": "test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... FAILED"
+    },
+    "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean": {
+      "status": "FAILED",
+      "raw_row": "test coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean ... FAILED"
+    },
+    "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean": {
+      "status": "ok",
+      "raw_row": "test coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean ... ok"
+    },
+    "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back": {
+      "status": "ok",
+      "raw_row": "test coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back ... ok"
+    },
+    "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics": {
+      "status": "ok",
+      "raw_row": "test coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics ... ok"
+    }
+  },
+  "light_call": "Integration test; outside this --lib command, not run here.",
+  "readiness": {
+    "pr": 3023,
+    "ready": false,
+    "candidate_parallel_18_failures_waived": false,
+    "update_consumer_failure_waived": false,
+    "current_head_overlap_proves": "These two named failures also occur without the eight candidate fixture deltas. Changed upstream prevents matched-pair attribution and does not clear the candidate."
+  }
+}

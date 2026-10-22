@@ -1,0 +1,112 @@
+{
+  "external_evidence_directory": "/private/tmp/tests-codex-voice-current-parallel-evidence-20261023",
+  "published_from_log_head": "fb175b1c6c8de028bc963b392722fc55bb89d6e8",
+  "source_head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "external_files": {
+    "plan.json": {
+      "bytes": 2849,
+      "sha256": "8399b79ed62b046f20889bee66be0201e485100f9bb5c62da1361311599bbfd0"
+    },
+    "run.py": {
+      "bytes": 9842,
+      "sha256": "8a39b5921dc8252903795e6d27d43465d7867989db84b2d221a201c390f356fd"
+    },
+    "started.json": {
+      "bytes": 235,
+      "sha256": "96fa6a6c3b106c4b722437b3e7d2104274b56c8578da37f35177747dd5eaed5c"
+    },
+    "prepared-source.json": {
+      "bytes": 924845,
+      "sha256": "a0eeb2e6bc52edd00f5484c4e3fde3db9637ededeff4b77114acc4f6067080b2"
+    },
+    "final-source.json": {
+      "bytes": 924845,
+      "sha256": "a0eeb2e6bc52edd00f5484c4e3fde3db9637ededeff4b77114acc4f6067080b2"
+    },
+    "source-freshness.json": {
+      "bytes": 304,
+      "sha256": "44b2f8e5df900060a9e4349c21194f8e9892ad93385529c90dcb01ece7bb20b1"
+    },
+    "restoration.json": {
+      "bytes": 389,
+      "sha256": "ba4fb851468ae4576d7c3cbd64c4fbb26502103f23dac64d94da4b788675caaa"
+    },
+    "results.json": {
+      "bytes": 341402,
+      "sha256": "3a10dcf5c5403fc9a5b1f2c54df71c0fe12902dfed6d8cb776ee31f73e82894a"
+    },
+    "inventory-comparison.json": {
+      "bytes": 324521,
+      "sha256": "06e81d1fe11b54547f57f875714e3a8a2fa521be72765c151ef04f43e53d2027"
+    },
+    "candidate-delta-absence.json": {
+      "bytes": 2368,
+      "sha256": "f4958289cbf2c786baf38d9f3a98de27683e2b2d89d717b54237066abb316dea"
+    },
+    "failing-source-identity.json": {
+      "bytes": 3642,
+      "sha256": "8d70cf828d152f9c09c03542065ea335072d89103e5918e8addc50f04c5630f8"
+    },
+    "candidate-18-failures.json": {
+      "bytes": 2050,
+      "sha256": "b211942072976ac22544ae262dbe41f119f1fd80775532978e471a1dc13ce652"
+    },
+    "full-library.json": {
+      "bytes": 1012,
+      "sha256": "69d1419935b8a0fd9b8a49e9532f45764b8f42735d18456d7228ec103ed83bd4"
+    },
+    "compiled-inventory.json": {
+      "bytes": 1068,
+      "sha256": "b461c5439a24d4da9fcdd5e70f7c50557ceb246b2d85aa50825c986ab9e482cd"
+    },
+    "platform-toolchain.json": {
+      "bytes": 2284,
+      "sha256": "5c82c6ed247de0bd7e451e01df917fe71b87f1cf324252b5ac90628fa09b9212"
+    },
+    "platform-toolchain-escalated.json": {
+      "bytes": 2179,
+      "sha256": "9de299c96849d599b153d33fda46a8819f84e3d2fedb9df43ac08dcb8fea5195"
+    },
+    "binary-architecture.json": {
+      "bytes": 1306,
+      "sha256": "c18883888ef8cb1757f9d74e8b27bad4418f3deaf244a21e9af9f85041089146"
+    }
+  },
+  "raw_streams": [
+    {
+      "original_filename": "full-library.stdout",
+      "wrapper": "raw/full-library-stdout.json",
+      "bytes": 342206,
+      "sha256": "e19706bea02dba0d776ac18ebcec2e31267bd78a82c22709e28d10713db39624"
+    },
+    {
+      "original_filename": "full-library.stderr",
+      "wrapper": "raw/full-library-stderr.json",
+      "bytes": 3264,
+      "sha256": "5e75808082213d5362df46022e437e939f3d794d737d23fe4a51ee572d1e9928"
+    },
+    {
+      "original_filename": "compiled-inventory.stdout",
+      "wrapper": "raw/compiled-inventory-stdout.json",
+      "bytes": 316511,
+      "sha256": "e047b0d4b0b7f21d1513be2da77a67cb6d722545a95b169a684a1c430190feb8"
+    },
+    {
+      "original_filename": "compiled-inventory.stderr",
+      "wrapper": "raw/compiled-inventory-stderr.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "shared_runner": {
+    "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/verify_parallel.py",
+    "bytes": 20931,
+    "sha256": "e13aaeca13288d0f1997082272791625f560fe77a3950d114f00c612c1a4c35d"
+  },
+  "script_availability": "Runner source and imported helper stay external; commands, environment, cleanup policy and hashes are published. No Python script, executable, source export or Cargo machine-JSON is included.",
+  "artifact_availability": "The compiled artifact was hashed and its architecture read before the target was released. Its binary is not published; the reused target may later be overwritten. A digest is identity evidence, not an artifact-retention guarantee.",
+  "prior_pair_receipt": "../voice-ec-parallel-20261022/",
+  "prior_update_receipt": "../voice-latest-refresh-20261022/",
+  "new_test_executions_during_publication": 0,
+  "child_output_availability": "The motor timeout assertion embeds child_output(), which reads at most 2,048 bytes available from its child-output file. This captured excerpt ends mid-event at motion. No separate complete child-output file is retained; the published raw Cargo stdout itself is complete."
+}

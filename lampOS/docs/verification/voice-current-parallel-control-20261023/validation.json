@@ -1,0 +1,27 @@
+{
+  "published_source_head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "new_test_executions": 0,
+  "raw_streams_exact_roundtrip": 4,
+  "failure_blocks_exact_byte_slices": 7,
+  "all_terminal_rows_unique_and_inventory_equal": 3408,
+  "actual_status_counts": {
+    "ok": 3387,
+    "FAILED": 7,
+    "ignored": 14
+  },
+  "assigned_seven_and_kept_start_exact_passing_rows": 8,
+  "candidate_18_statuses_checked_individually": 18,
+  "candidate_failures_reproduced_here": 2,
+  "additional_current_head_reminder_failures": 5,
+  "inventory_delta_added": 11,
+  "inventory_delta_removed": 1,
+  "source_map_count": 6426,
+  "prepared_and_final_source_maps_identical": true,
+  "source_map_aggregate_sha256": "76acb1087287e1f515baf6297bf3e1cf7f6b0f243a88c4c195679cb7f5af2e0e",
+  "all_eight_candidate_fixture_deltas_absent": true,
+  "four_failing_definition_and_panic_paths_checked_against_git_objects": true,
+  "old_work_log_preserved_byte_for_byte_after_new_entry": true,
+  "all_json_parsed": true,
+  "all_new_files_checked_individually_for_git_whitespace_errors": true,
+  "work_log_git_diff_check": true
+}

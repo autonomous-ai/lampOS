@@ -1,0 +1,28 @@
+{
+  "streams": [
+    {
+      "original_filename": "full-library.stdout",
+      "wrapper": "raw/full-library-stdout.json",
+      "bytes": 342206,
+      "sha256": "e19706bea02dba0d776ac18ebcec2e31267bd78a82c22709e28d10713db39624"
+    },
+    {
+      "original_filename": "full-library.stderr",
+      "wrapper": "raw/full-library-stderr.json",
+      "bytes": 3264,
+      "sha256": "5e75808082213d5362df46022e437e939f3d794d737d23fe4a51ee572d1e9928"
+    },
+    {
+      "original_filename": "compiled-inventory.stdout",
+      "wrapper": "raw/compiled-inventory-stdout.json",
+      "bytes": 316511,
+      "sha256": "e047b0d4b0b7f21d1513be2da77a67cb6d722545a95b169a684a1c430190feb8"
+    },
+    {
+      "original_filename": "compiled-inventory.stderr",
+      "wrapper": "raw/compiled-inventory-stderr.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

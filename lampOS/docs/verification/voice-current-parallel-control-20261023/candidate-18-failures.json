@@ -1,0 +1,27 @@
+{
+  "source_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "names": [
+    "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+    "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+    "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+    "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+    "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+    "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+    "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+    "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+    "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+    "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+    "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+    "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+    "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+    "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+    "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back",
+    "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics"
+  ],
+  "raw_stdout": {
+    "bytes": 346695,
+    "sha256": "1a70b8496a075e86075287e86369fdf051b251fe8a3bc2d34c2fbc3a86209a7f"
+  }
+}
