@@ -1319,6 +1319,10 @@ fn marked(mut answer: Value) -> Value {
     answer
 }
 
+/// What the model is told for a `remember` the store answers `existing`
+/// (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): that it knew already, to say so.
+pub const ALREADY_KEPT: &str = "Already kept before this session. Tell them you already knew it.";
+
 /// `remember`'s kept answer as the model is told it: with `replaces`
 /// ([`REPLACES_ENVIRONMENT`], #2510), also the kept thing's `id` (the new
 /// one, or the one kept already), so a correction in a later turn of the
@@ -1343,8 +1347,11 @@ pub(crate) fn answer_for(
         return Some(match name {
             REMEMBER => {
                 answer.get("id")?;
+                // #2176: `existing` comes only with `LAMP_MEMORY_REMEMBER_ONCE`'s
+                // `once`. Told plainly, the reply says it knew already in a
+                // new session too (the relay's DeepSeek, 20/20 against 1/20).
                 if answer["existing"] == true {
-                    json!({"remembered": true, "note": "That was already kept."})
+                    json!({"remembered": true, "note": ALREADY_KEPT})
                 } else if let Some(old) = answer.get("replaced").and_then(Value::as_u64) {
                     // #2510: no note, so a kept heard line still says its own.
                     json!({"remembered": true, "replaced": old})
@@ -9237,7 +9244,7 @@ mod tests {
         assert_eq!(
             remember(),
             (
-                json!({"remembered": true, "note": "That was already kept."}),
+                json!({"remembered": true, "note": "Already kept before this session. Tell them you already knew it."}),
                 true
             )
         );
@@ -11416,7 +11423,7 @@ mod tests {
         assert_eq!(
             run(json!({"text":"Her favourite colour is violet."})),
             (
-                json!({"remembered":true,"note":"That was already kept.","id":8}),
+                json!({"remembered":true,"note":"Already kept before this session. Tell them you already knew it.","id":8}),
                 true
             )
         );
@@ -11455,7 +11462,7 @@ mod tests {
         assert_eq!(
             run(),
             (
-                json!({"remembered": true, "note": "That was already kept."}),
+                json!({"remembered": true, "note": "Already kept before this session. Tell them you already knew it."}),
                 true
             )
         );
