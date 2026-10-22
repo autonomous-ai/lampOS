@@ -1431,6 +1431,7 @@ fn second_route_worker_environment(
         crate::second_provider::net::QUIET_HELD_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
+        crate::second_provider::net::CHAT_KEPT_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
@@ -2050,6 +2051,7 @@ mod tests {
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::net::CHAT_KEPT_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
                     || name == crate::second_provider::RELAY_ROUTES_ENVIRONMENT
@@ -2187,6 +2189,7 @@ mod tests {
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
+                    "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
