@@ -129,6 +129,20 @@ Retained implementation references: [GPIO builder/value contract](https://docs.r
 establish electrical cutoff, acoustic silence, optical appearance or lamp
 timing; the PR's native ARM64 run and First's lamp measurements remain separate.
 
+## A wake cue waits for privacy readiness (#2487 follow-up, 2026-10-22)
+
+Re-read V1 `hal/drivers/button_actions.py::announce_listening_cue`: it
+respects the hardware mute and disables the spoken cue because it could
+make VAD lose the person's first words. Keep the Rust wake's existing local
+hum through its owned speaker/reference path, with microphone permission,
+quiet and listening readiness still required. Reuse privacy's 60 ms stable
+reopening rather than bypassing it for a cue. Change only the pending wake's
+refusal handling: wait for startup permission inside its original 1.5 s
+window, with a strict expiry before accepting readiness. The 500 ms
+wake-input-to-first-write target and real-hand qualification remain with
+Fifth on lamp-52e6; a host fixture cannot establish either acoustics or the
+person's first words being retained.
+
 ## Touch strip and head, Task 33 (2026-10-14)
 
 Third read V1 `hal/drivers/mpr121.py`, its initialization/configuration/spatial
