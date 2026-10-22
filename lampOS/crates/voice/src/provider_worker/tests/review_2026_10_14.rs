@@ -617,11 +617,17 @@ struct DeclineMusic {
     asked: std::sync::mpsc::Receiver<serde_json::Value>,
     stop: std::sync::Arc<AtomicBool>,
     worker: Option<std::thread::JoinHandle<()>>,
+    /// The rigs' one-at-a-time lock, held from before the peer's 3 s accept
+    /// deadline starts until the peer is joined: under a full parallel run
+    /// another test's rig held it past that deadline, so the call found no
+    /// peer (#1569). The rig takes it again on this same thread.
+    _one: super::OneThread,
 }
 
 impl DeclineMusic {
     fn new() -> Self {
         use std::io::{BufRead, Read, Write};
+        let one = super::one_thread();
         let home = crate::process::SessionDirectory::create().unwrap();
         std::fs::write(
             home.path.join(crate::tools::CATALOG_FILE),
@@ -685,6 +691,7 @@ impl DeclineMusic {
             asked,
             stop,
             worker: Some(worker),
+            _one: one,
         }
     }
 
