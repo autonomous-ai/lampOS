@@ -665,6 +665,10 @@ struct Shared {
     /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
     /// is told once that request's answer begins to be heard.
     air: Option<(TaskNote, AirHeard)>,
+    /// With `LAMP_SECOND_SEEMS=on`: how a known person in view seems from
+    /// their face, when it is due, and what is told once that request's
+    /// answer begins to be heard.
+    seems: Option<(TaskNote, AirHeard)>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -1147,6 +1151,7 @@ impl Engine {
                 name_sounded: None,
                 task_waiting: None,
                 air: None,
+                seems: None,
                 did: None,
                 hold: None,
                 policy: None,
@@ -1904,6 +1909,18 @@ impl Engine {
     pub fn noting_the_air(mut self, note: TaskNote, heard: AirHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.air = Some((note, heard));
+        }
+        self
+    }
+
+    /// A spoken request from a known person in view, not one held only by
+    /// a gap, is told how they seem from their face, when `note` says so
+    /// (`LAMP_SECOND_SEEMS=on`, `crate::seems_told`), and `heard` is told
+    /// the request once its answer's first audio goes, as for the air
+    /// ([`Engine::noting_the_air`]). Before any turn only.
+    pub fn noting_how_they_seem(mut self, note: TaskNote, heard: AirHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.seems = Some((note, heard));
         }
         self
     }
@@ -3403,6 +3420,18 @@ async fn spoken(
     });
     // A stuffy room, told beside what a person says (#1712's map, item 6).
     let air = shared.air.as_ref().and_then(|(note, _)| note(request));
+    // How a known person in view seems, never the room's or a gap's (#1671):
+    // the scope is the room's when the camera may not be used.
+    let seems = shared
+        .seems
+        .as_ref()
+        .filter(|_| {
+            scope
+                .as_ref()
+                .and_then(crate::memory_scope::ScopeLease::scope)
+                .is_some_and(|scope| scope.person().is_some() && !scope.held())
+        })
+        .and_then(|(note, _)| note(request));
     // Let out only as the conversation going on: it may be people's talk.
     let alone = shared
         .conversation_alone
@@ -3434,6 +3463,7 @@ async fn spoken(
         .chain(follows_on)
         .chain(called)
         .chain(air)
+        .chain(seems)
         .collect();
     if let Some(carried) = carried {
         eprintln!(
@@ -5493,6 +5523,9 @@ async fn answer(
                         // The air's note, if this request was given it, is
                         // spent now its answer is heard.
                         if let Some((_, heard)) = &shared.air {
+                            heard(request);
+                        }
+                        if let Some((_, heard)) = &shared.seems {
                             heard(request);
                         }
                         // Some of its answer heard: no longer to be carried.

@@ -2525,6 +2525,27 @@ after a take-over, but now for every turn:
   lamp's own, never is. The journal, at that first audio: `request N is told the air is stuffy`. Its room
   is the one this route keeps (`room/state`); the room's quiet or busy is
   in each turn's system message with `LAMP_ROOM_FACTS`, as before.
+- **How a known person seems (`LAMP_SECOND_SEEMS=on`, #1671):** off, and
+  stays off until the reads' measure passes (#2733's labelled session).
+  With `LAMP_BUS=on`, `humans/seems` is read every second
+  (`worker::seems_task`, `crate::seems_told`), a read fresh within the
+  message's 5 s. Two `positive` reads in a row by Blendshape V2, the
+  product's reader (distinct messages by their bus time, 0.6 or over,
+  `SURE_FROM`), as Mood's own run (#2716); an `unsure`, a `negative`, a
+  FER+ read or none breaks the run. Then a spoken request whose scope is a
+  known person in view, not the room's and not one held only by a gap (so
+  never while the camera is closed to memory), is told, beside its words,
+  that they seem in good spirits from their face just now, with the rule
+  never to mention it, their face or their mood, only to let it shape the
+  tone, and to ignore it if it doesn't fit their words
+  (`Engine::noting_how_they_seem`, `worker::seems_noting`). Not in a busy
+  room, never a written turn. Spent as the air's note is, once an answer
+  given it begins to be heard, then not again for ten minutes. `negative`
+  is left out: brows drawn down while concentrating read as low
+  (`LAMP_SEEMS_BROW_LOW`); it waits for the labelled session's at-the-desk
+  count (#2733). Nothing of the read is kept past the note: no person, no
+  picture. The journal, at that first audio: `request N is told how the
+  person seems`.
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
   start. As a standby it stays Ready: an outage shows only as failed turns.
   As the only voice it goes down and back with the network (below, "The

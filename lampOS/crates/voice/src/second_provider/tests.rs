@@ -4871,6 +4871,87 @@ async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
     );
 }
 
+/// #1671 (`LAMP_SECOND_SEEMS`): a spoken request from a known person in view
+/// is told how they seem; the same words with no known face in view, or a
+/// written turn, are not, and are never asked of the note.
+#[tokio::test]
+async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!("seems-known-{}", std::process::id()));
+    std::fs::write(&path, "Maya").unwrap();
+    let cache = Arc::new(FaceCache::holding_gaps(None));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("How was my day?".to_owned()), Ok("And now?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Sounds full."), Ok(ChatEvent::Done)],
+                vec![text("Hello."), Ok(ChatEvent::Done)],
+                vec![text("Still here."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let asked_for = Arc::new(Mutex::new(Vec::new()));
+    let noted = asked_for.clone();
+    let heard_for = Arc::new(Mutex::new(Vec::new()));
+    let heard = heard_for.clone();
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        )
+        .noting_how_they_seem(
+            Arc::new(move |request| {
+                noted.lock().unwrap().push(request);
+                Some("SEEMS NOTE".to_owned())
+            }),
+            Arc::new(move |request| heard.lock().unwrap().push(request)),
+        );
+    engine.memory_camera(true, 1);
+    let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+    cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    engine.submit(written(2, "Say hello."));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    // Nobody known in view now: the room's scope.
+    cache.replace_seen(cache.begin_refresh(), None, Some(0));
+    engine.submit(start(3));
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    std::fs::remove_file(&path).unwrap();
+    let told = |messages: &Vec<Message>| {
+        messages.iter().any(|message| {
+            message.role == "system"
+                && message
+                    .content
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    .is_some_and(|note| note == "SEEMS NOTE")
+        })
+    };
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 3);
+    assert!(told(&asked[0]), "{:?}", asked[0]);
+    assert!(!told(&asked[1]), "{:?}", asked[1]);
+    assert!(!told(&asked[2]), "{:?}", asked[2]);
+    assert_eq!(
+        *asked_for.lock().unwrap(),
+        [1],
+        "asked of the known person's spoken one only"
+    );
+    assert!(heard_for.lock().unwrap().contains(&1));
+}
+
 /// #1712: what the lamp did is told to the rule, as the Live worker tells its
 /// own: a task, timer or reminder asked of its parts is its work, and its
 /// own written turn heard is news someone may reply to. A lookup is
