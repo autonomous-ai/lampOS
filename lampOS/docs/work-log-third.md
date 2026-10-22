@@ -5,6 +5,30 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 20:56 — wake review corrections taken
+
+Ready for lamp-voice: no (#3021 held and returned to draft).
+
+- Read merged #3047 and origin/lamp-voice's current AGENTS.md protocol;
+  Queue and PRs replace the old harness-send route. Read all 84 Queue
+  comments since Third's 19:38 post, plus discussion, inline comments and
+  reviews on the two open Third-labelled PRs, #3021 and carried draft #2948.
+  The actionable new read is El's #3021 P3s; answered on the PR and claimed
+  the corrections on Queue #2602 before proceeding.
+- Clean task branch rebased onto `2297f0f3d`, as `42148f8e3`; local
+  AGENTS.md matches origin. New work records one refused pending wake when
+  its conversation ends, covers unavailable permission through expiry, and
+  corrects the conversation-start versus input-acquisition wording. The
+  existing 2 s marker age, 1.5 s window, privacy guards and 500 ms lamp target
+  stay unchanged. No device access or acoustic result.
+- Workspace Clippy is running on the Mac. Formatting currently fails only
+  at the upstream own_echo.rs test line assigned to #3044; no unowned file
+  was changed. New tests, full local gate and replacement native checks
+  remain pending. The previous head's green receipts remain historical.
+- Reviewer-lead owns review/merge after the hold is lifted; First carries
+  the accepted fix into #2948; Fifth/person owns the real-hand 52e6 try.
+  #2948 remains draft. Next is completing and qualifying these P3 fixes.
+
 ## 2026-10-22 19:36 — wake native gates green; hand try with Fifth
 
 Ready for lamp-voice: yes (#3021; Reviewer-lead's read/merge lane).
