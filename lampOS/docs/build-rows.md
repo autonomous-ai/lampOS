@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 03:19 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 06:55 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.2% over 72 rows. Quality 62.5% over 16 rows.**
+**Build 90.3% over 72 rows. Quality 62.5% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -54,7 +54,7 @@ Written by the first builder from the team's review page at 2026-10-23 03:19 (+0
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
 | Bedtime and Morning as a skill, with night caps on light and volume | 0.65 | #1672 #1732 #2803 #2804 | jarvis, second | 22 Oct, up from 0.5: evening, the glow, bedtime twice and a night sound’s end passed on lamp-06c1 (Jarvis, 21–22 Oct). |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
-| Seeing someone speak (is the face it looks at talking?) | 0.85 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 21 Oct 14:08, up from 0.75: passed on lamp-52e6 with stand-ins (Sixth, #2407): a speaking stranger’s lines are the room’s and are told nothing of the known person’s; |
+| Seeing someone speak (is the face it looks at talking?) | 0.90 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 06:5x, up from 0.85: the mouth reads a talking face at desk distance (Fifth, lamp-52e6, 06:21: a muted talking video at 1 m’s size, speaking read yes in 228 of 234 looks, a still mouth no in 101 of 105; |
 | The eye: looks toward you, blinks, a face for each state | 1.00 | #712 | first | Built (ring eye, asleep face) |
 | Its light by voice and in the app, kept across a restart | 1.00 | #1472 #1484 #1464 #1468 | — | Built |
 | Volume by voice and in the app | 1.00 | #1458 #1465 | — | Built |
