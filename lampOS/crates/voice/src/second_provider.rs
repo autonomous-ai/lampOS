@@ -339,6 +339,17 @@ impl Told {
         messages.extend(self.after.map(Message::system));
         messages
     }
+
+    /// Without `section` wherever its system text holds it (a dated
+    /// follow-up's, reviewer-two's P2 on #3059); the exchanges as they are.
+    pub fn without(mut self, section: &str) -> Self {
+        if section.is_empty() {
+            return self;
+        }
+        self.text = self.text.replace(section, "");
+        self.after = self.after.map(|after| after.replace(section, ""));
+        self
+    }
 }
 
 /// Where the worker reads whether a spoken turn's system message keeps only
@@ -561,6 +572,9 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// The note's section for a dated follow-up withheld now, to be cut from
+/// what a chat is told ([`Engine::asking_after_events`]).
+pub type EventWithheld = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 /// Told, by request, that the request's answer began to be heard.
 pub type AirHeard = Arc<dyn Fn(u64) + Send + Sync>;
 /// What the lamp did, for the rule for whom it answers
@@ -698,6 +712,9 @@ struct Shared {
     /// greeting alone, is given for a dated follow-up
     /// ([`Engine::asking_after_events`], #2805, #2602 22 Oct 22:17).
     event_turn: Option<Remembered>,
+    /// The note's section to cut for a withheld dated follow-up
+    /// ([`Engine::asking_after_events`]).
+    event_withheld: Option<EventWithheld>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -1218,6 +1235,7 @@ impl Engine {
                 staff: None,
                 remembered: None,
                 event_turn: None,
+                event_withheld: None,
                 name_note: None,
                 conversation_alone: None,
                 named_ask: None,
@@ -1817,10 +1835,14 @@ impl Engine {
     /// own instructions, after the session's note is read ([`event_line`]):
     /// `crate::remember::event_turn_note` gives it on the person's first
     /// line of a session they were offered a dated follow-up in, when that
-    /// line only greets. Before any turn only.
-    pub fn asking_after_events(mut self, note: Remembered) -> Self {
+    /// line only greets. Every chat is told without the note's section for
+    /// it that `withheld` gives (`crate::remember::event_withheld`): before
+    /// that line, and for the rest of a session whose first line asked
+    /// something (reviewer-two's P2 on #3059). Before any turn only.
+    pub fn asking_after_events(mut self, note: Remembered, withheld: EventWithheld) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.event_turn = Some(note);
+            shared.event_withheld = Some(withheld);
         }
         self
     }
@@ -4231,12 +4253,34 @@ async fn next_early(early: &mut Option<mpsc::UnboundedReceiver<net::Early>>) -> 
     }
 }
 
-/// What a turn's chat is told: for its admitted scope when this route
-/// scopes context ([`Engine::with_memory_scope`]), as before otherwise.
+/// What a turn's chat is told ([`told_whole`]), with a dated follow-up's
+/// section cut when it is withheld ([`cut_event`]).
 fn told(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Told {
+    cut_event(shared, told_whole(shared, scope))
+}
+
+/// What a turn's chat is told, as the system gives it: for its admitted
+/// scope when this route scopes context ([`Engine::with_memory_scope`]),
+/// as before otherwise.
+fn told_whole(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Told {
     match (&shared.scoped_system, scope) {
         (Some(system), Some(lease)) => system(lease),
         _ => (shared.system)(),
+    }
+}
+
+/// `told` without the note's section for a dated follow-up that is
+/// withheld now ([`Engine::asking_after_events`], `remember::event_withheld`):
+/// before the person's first line decided it, and after a first line that
+/// asked something (reviewer-two's P2 on #3059).
+fn cut_event(shared: &Shared, told: Told) -> Told {
+    match shared
+        .event_withheld
+        .as_ref()
+        .and_then(|withheld| withheld())
+    {
+        Some(section) => told.without(&section),
+        None => told,
     }
 }
 
@@ -5319,21 +5363,23 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let told = told(shared, scope.as_ref());
+        let told = told_whole(shared, scope.as_ref());
         // Building it can wait on the memory service: a request revoked
         // meanwhile is not asked with what was read for it.
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let mut messages = told.messages();
         // A dated follow-up's line, last among the notes: asked only now,
         // once the session's note is read, as a session's first line is
-        // the one that opens it and the offer is made as it opens.
+        // the one that opens it and the offer is made as it opens. Then
+        // the note's section for it is cut unless that line only greeted
+        // (reviewer-two's P2 on #3059).
         let mut notes = notes;
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
         {
             notes.push(line);
         }
+        let mut messages = cut_event(shared, told).messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {

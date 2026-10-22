@@ -6194,10 +6194,13 @@ async fn a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes() {
     let words = asked_with.clone();
     let mut engine = engine
         .remembering(Arc::new(|_, _, _| Some("MEMORY NOTE".to_owned())))
-        .asking_after_events(Arc::new(move |request, heard: &str, _| {
-            words.lock().unwrap().push((request, heard.to_owned()));
-            crate::remember::greets(heard).then(|| "ASK FIRST".to_owned())
-        }));
+        .asking_after_events(
+            Arc::new(move |request, heard: &str, _| {
+                words.lock().unwrap().push((request, heard.to_owned()));
+                crate::remember::greets(heard).then(|| "ASK FIRST".to_owned())
+            }),
+            Arc::new(|| None),
+        );
     for request in [1, 2] {
         engine.submit(start(request));
         engine.submit(audio(request, 1));
@@ -6226,28 +6229,24 @@ async fn a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes() {
     assert_eq!(greeting[at + 1], Message::user("Good evening!".to_owned()));
 }
 
-/// Reviewer-two's P2 on #3059: a cold session's first greeting, with no
-/// chat begun early, gets the dated follow-up's line, though the offer is
-/// made only as that same turn reads the session's note: the line is asked
-/// for after the note, through the Days client itself.
-#[tokio::test]
-async fn a_cold_first_greeting_gets_the_dated_follow_up_s_line() {
+/// A cold session for "p-be9688998f085098", offered their sister's wedding
+/// (dated) as its first turn reads the note through a real Days client, no
+/// chat begun early: what each of `lines` was asked with, in turn.
+async fn a_cold_session_asked(name: &str, lines: &[&str]) -> Vec<Vec<Message>> {
     const MINH: &str = "p-be9688998f085098";
     let script = Arc::new(Script {
-        heard: Mutex::new([Ok("Good evening!".to_owned())].into()),
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
         chats: Mutex::new(
-            [vec![
-                text("Evening! How was the wedding?"),
-                Ok(ChatEvent::Done),
-            ]]
-            .into(),
+            lines
+                .iter()
+                .map(|_| vec![text("Evening."), Ok(ChatEvent::Done)])
+                .collect(),
         ),
         ..Script::default()
     });
-    let (days, socket, served) =
-        crate::remember::tests::event_memory("event-turn-engine", true, true);
+    let (days, socket, served) = crate::remember::event_memory(name, true, true, true);
     let days = Arc::new(days);
-    let (opening, asking) = (days.clone(), days.clone());
+    let (opening, asking, withholding) = (days.clone(), days.clone(), days.clone());
     // The session's note, read once, as the worker's context reads it.
     let note = Arc::new(std::sync::OnceLock::new());
     let system: System = Arc::new(move || {
@@ -6260,17 +6259,37 @@ async fn a_cold_first_greeting_gets_the_dated_follow_up_s_line() {
     let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
     let mut engine = Engine::with_clock(script.clone(), system, tools, Arc::new(Instant::now))
         .remembering(Arc::new(|_, _, _| Some("MEMORY NOTE".to_owned())))
-        .asking_after_events(Arc::new(move |_, heard: &str, _| {
-            asking.event_turn(Some(MINH), heard)
-        }));
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
-    engine.submit(end(1));
-    turn(&mut engine).await;
+        .asking_after_events(
+            Arc::new(move |_, heard: &str, _| asking.event_turn(Some(MINH), heard)),
+            Arc::new(move || withholding.event_withheld()),
+        );
+    for request in 1..=lines.len() as u64 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(&mut engine).await;
+    }
     served.join().unwrap();
     std::fs::remove_file(&socket).unwrap();
-    let asked = script.asked.lock().unwrap();
-    assert_eq!(asked.len(), 1);
+    script.asked.lock().unwrap().clone()
+}
+
+/// Whether any of `messages` holds the dated follow-up's heading or words.
+fn tells_the_event(messages: &[Message]) -> bool {
+    let all = format!("{messages:?}");
+    all.contains(crate::remember::EVENT_HEADING) || all.contains("wedding")
+}
+
+/// Reviewer-two's P2 on #3059: a cold session's first greeting, with no
+/// chat begun early, gets the dated follow-up's line, though the offer is
+/// made only as that same turn reads the session's note: the line is asked
+/// for after the note, through the Days client itself. The note's section
+/// stays for it and the next turn.
+#[tokio::test]
+async fn a_cold_first_greeting_gets_the_dated_follow_up_s_line() {
+    let asked =
+        a_cold_session_asked("event-turn-engine", &["Good evening!", "What time is it?"]).await;
+    assert_eq!(asked.len(), 2);
     let messages = &asked[0];
     let last = messages.len() - 1;
     assert_eq!(messages[last], Message::user("Good evening!".to_owned()));
@@ -6285,6 +6304,29 @@ async fn a_cold_first_greeting_gets_the_dated_follow_up_s_line() {
         messages[last - 2],
         Message::system("MEMORY NOTE".to_owned())
     );
+    assert!(tells_the_event(&messages[..last - 1]), "the heading stays");
+    assert!(tells_the_event(&asked[1]), "and on the next turn");
+}
+
+/// Reviewer-two's P2 on #3059 (the first builder on #2602, 22 Oct 22:17): a
+/// cold session whose first line asks something tells the model nothing of
+/// the dated follow-up, neither the line nor the note's heading nor its
+/// words, on that turn or a later greeting of the session.
+#[tokio::test]
+async fn a_cold_first_request_tells_the_model_nothing_of_the_event() {
+    let asked = a_cold_session_asked(
+        "event-turn-engine-request",
+        &["Hi, what time is it?", "Good evening!"],
+    )
+    .await;
+    assert_eq!(asked.len(), 2);
+    for messages in &asked {
+        assert!(!tells_the_event(messages), "{messages:?}");
+        assert!(
+            !format!("{messages:?}").contains("They only said hello"),
+            "{messages:?}"
+        );
+    }
 }
 
 /// The first builder on #2805, 22 Oct 20:28: a greeting held only by a
@@ -6313,10 +6355,13 @@ async fn a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line() {
     let lines = Arc::new(AtomicUsize::new(0));
     let counting = lines.clone();
     let mut engine = engine
-        .asking_after_events(Arc::new(move |_, _, _| {
-            counting.fetch_add(1, Ordering::Relaxed);
-            Some("ASK FIRST".to_owned())
-        }))
+        .asking_after_events(
+            Arc::new(move |_, _, _| {
+                counting.fetch_add(1, Ordering::Relaxed);
+                Some("ASK FIRST".to_owned())
+            }),
+            Arc::new(|| None),
+        )
         .with_memory_scope(
             lamp_turn_owner::BootId::new([9; 16]).unwrap(),
             cache.clone(),
