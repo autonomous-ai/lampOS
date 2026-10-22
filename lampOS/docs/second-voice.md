@@ -1011,9 +1011,13 @@ order is kept. A written turn is the same from the chat on.
     (`name_alone`); or they are short and begin with it (`name_first`):
     the name first, set off as a call (`attention::begins_with_the_name`,
     so not "Lamp is broken."), at most 3 words after it
-    (`NAME_FIRST_MORE`), and no question their end shows ("Lamp. So",
-    "Lamp, can", "Hey Lamp, what's"; "Hey Lamp, what's the time?" is
-    answered at once). In r01 such pieces were the ones held: "Lamp. So So
+    (`NAME_FIRST_MORE`) ("Lamp. So", "Lamp, can", "Hey Lamp, what's").
+    Never a line whole as it is (`whole_already`, El's P2: "Lamp, stop."
+    waited 2.5 s): a stop or "never mind" (`says_stop`, the stop words'
+    list), a question past the name ("Hey Lamp, what's the time?"), or two
+    words or more past the name ending a sentence ("Lamp, lights off.");
+    this route has no turn-end verdict for its lines and no verb list, so
+    that is the bound that keeps "Lamp. So" and "Lamp. So." waiting. In r01 such pieces were the ones held: "Lamp. So So
     I have a meeting…" was held as a short sound, then the rest for no
     name. Or the coordinator ended it as only the name
     (`ProviderInput::Called`), whatever its words. Such a line is never
@@ -1036,7 +1040,9 @@ order is kept. A written turn is the same from the chat on.
     at each. Otherwise there's no carry: the line is judged as its own,
     with its own words and window, and held as it would be without the
     name; the name's words wait where words cut short do, answered in its
-    place if it is held. With no rule (`Engine::telling_one_speaker`
+    place if it is held, and never joined to it (`name_refused`, El's P3:
+    the join's own no sign of a second person takes one face in view at
+    each in a busy room). With no rule (`Engine::telling_one_speaker`
     unset), nothing carries. Carried, the line is never held as a short
     sound, and the rule is given its words with the name line's words before them when
     those begin with the name ("Lamp. So I have a meeting at three…"), or
@@ -1076,8 +1082,8 @@ order is kept. A written turn is the same from the chat on.
     came after its name: answered as a call` (`as it is`); a call kept for
     its words, and a start that may not carry the name, say so.
   - **What it costs:** a lone call, or a short line begun with the name
-    and whole ("Lamp, stop.", "Lamp, lights off."), is answered up to 2.5 s
-    later than before; every other line is as it was.
+    that isn't whole ("Lamp, can"), is answered up to 2.5 s later than
+    before; every other line is as it was.
   - **What it doesn't do:** the coordinator isn't told of the wait, so its
     answer wait (`LAMP_WAIT_KEEPS_ANSWER`) and the body's motors judge a
     sound begun in it as they judge any sound while an answer is awaited:
@@ -1089,7 +1095,9 @@ order is kept. A written turn is the same from the chat on.
     and the rest 1.0 s later, asked as one line; "So I" held as before; a
     lone call; a short sound that is no name; a line 3 s later; another
     session and a stop; two faces, two voices or no rule; a call's words
-    back 0.6 s and 3 s after its end; the switch off) and
+    back 0.6 s and 3 s after its end; "Lamp, stop." and "Lamp, lights
+    off." at once; a refused name's words never joined; the switch off)
+    and
     `worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker`
     (a busy room, two faces, no eyes in a quiet and an unknown room, a
     print under 0.30) and
