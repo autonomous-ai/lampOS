@@ -2965,10 +2965,19 @@ pub fn serve(
                 eprintln!(
                     "lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)"
                 );
+                // Whose face is turned is read from the eyes' speaking faces
+                // when they read speaking (`LAMP_EYES_SPEAKING`).
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.opening_the_eyes(files.bus_root.as_deref());
+                    heeding.turned_near_speaking(crate::speaking_faces::eyes_from_environment());
+                }
                 let near = heeding.clone();
-                engine = engine.hearing_the_name_near(Arc::new(move |began_us| {
+                engine = engine.hearing_the_name_near(Arc::new(move |window: (u64, u64)| {
                     near.lock().map_or((None, false), |mut heeding| {
-                        (heeding.near_name(began_us), heeding.turned_to_the_lamp())
+                        (
+                            heeding.near_name(window.0),
+                            heeding.turned_to_the_lamp(window),
+                        )
                     })
                 }));
             } else {
@@ -3915,6 +3924,9 @@ pub(crate) struct Heeding {
     /// bar by this process's clock and its score, the last
     /// [`NEAR_KEPT_US`].
     near: Option<(lamp_bus::Subscriber, std::collections::VecDeque<(u64, f32)>)>,
+    /// With it and `LAMP_EYES_SPEAKING`: the face turned to the lamp for a
+    /// first word must be seen speaking the line ([`Self::turned_to_the_lamp`]).
+    turned_near_speaks: bool,
     /// With `LAMP_JOIN_CUT_WORDS` ([`Self::keeping_line_rooms`]): how the
     /// room was as each of the last lines was judged, newest last, at most
     /// [`SPOKE_KEPT`]; none without it.
@@ -4468,6 +4480,7 @@ impl Heeding {
             name_or_follow_up: false,
             spoke: std::collections::VecDeque::new(),
             near: None,
+            turned_near_speaks: false,
             rooms: None,
             in_view: None,
             another_person: None,
@@ -4797,10 +4810,26 @@ impl Heeding {
         }
     }
 
-    /// Whether the eyes' newest look has a face turned to the lamp
-    /// (`crate::bus_out::someone_turned_to_lamp`), for a first word of the
-    /// lamp's name's shape (`LAMP_NAME_NEAR`): nothing fresh is no.
-    pub(crate) fn turned_to_the_lamp(&self) -> bool {
+    /// `LAMP_NAME_NEAR` with the eyes reading speaking (`LAMP_EYES_SPEAKING`):
+    /// a face turned to the lamp counts for a first word only when it was
+    /// seen speaking the line ([`Self::turned_to_the_lamp`]).
+    pub(crate) fn turned_near_speaking(&mut self, on: bool) {
+        self.turned_near_speaks = on;
+    }
+
+    /// Whether a face turned to the lamp said the line in `began_us..=ended_us`,
+    /// for a first word of the lamp's name's shape (`LAMP_NAME_NEAR`). With
+    /// speaking faces read ([`Self::turned_near_speaking`]): a face turned
+    /// to it and seen speaking the line, as `LAMP_TURNED_SPEAKING` reads
+    /// one ([`speakers_between`]), so the listener's face never carries a
+    /// colleague's "Leon, can you…" (reviewer-three's P3 on 1600b0a69).
+    /// Without them, the eyes' newest look with a face turned to the lamp
+    /// (`crate::bus_out::someone_turned_to_lamp`); nothing fresh is no.
+    pub(crate) fn turned_to_the_lamp(&self, (began_us, ended_us): (u64, u64)) -> bool {
+        if self.turned_near_speaks {
+            let (_, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+            return !turned_speakers.is_empty();
+        }
         self.bus
             .as_ref()
             .is_some_and(|(bus, _)| crate::bus_out::someone_turned_to_lamp(bus) == Some(true))
@@ -13476,6 +13505,61 @@ mod tests {
             asked_after_pieces(&pieces, soon, rule("f2", &[], "x"), |_, _| {}).await,
             Message::user("I want the um, and weather in Saigon this weekend?"),
             "X then nobody then X"
+        );
+    }
+
+    /// `LAMP_NAME_NEAR` with speaking faces read (reviewer-three's P3 on
+    /// 1600b0a69): the face that counts for a first word of the name's shape
+    /// is one turned to the lamp and seen speaking the line. The listener
+    /// turned to it while a colleague, turned away, speaks is no one; the
+    /// speaker turned to it and speaking is. Without speaking faces read,
+    /// the newest look as before.
+    #[test]
+    fn a_turned_face_counts_for_a_first_word_only_when_it_speaks_the_line() {
+        use lamp_msgs::{Face, Faces, Speaking, SpeakingState};
+        let turned_said = |speaker_turned: bool| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            let face = |id: &str, facing: bool, state: SpeakingState| Face {
+                id: id.into(),
+                xmin: 0.4,
+                ymin: 0.3,
+                xmax: 0.5,
+                ymax: 0.45,
+                confidence: 1.0,
+                yaw: Some(0.1),
+                facing: Some(facing),
+                speaking: Some(Speaking {
+                    state,
+                    score: 0.0,
+                    from: None,
+                }),
+            };
+            for look in 0..5u64 {
+                let faces = Faces {
+                    faces: vec![
+                        // The listener, turned to the lamp, quiet.
+                        face("f1", true, SpeakingState::No),
+                        // The one speaking.
+                        face("f2", speaker_turned, SpeakingState::Yes),
+                    ],
+                };
+                eyes.look(
+                    now + Duration::from_millis(200 + look * 400),
+                    Some((("b", look), &faces)),
+                );
+            }
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.turned_near_speaking(true);
+            heeding.turned_to_the_lamp((now_us, now_us + 2_200_000))
+        };
+        assert!(!turned_said(false), "only the listener is turned");
+        assert!(turned_said(true), "the speaker turned to it, speaking");
+        let unread = super::Heeding::new(true, false, None, None);
+        assert!(
+            !unread.turned_to_the_lamp((0, 1)),
+            "no speaking faces read and no bus: no face"
         );
     }
 
