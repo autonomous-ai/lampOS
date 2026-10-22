@@ -15,6 +15,7 @@ use std::fmt;
 #[cfg(test)]
 extern crate self as lamp_body;
 
+pub mod ask;
 #[cfg(any(target_os = "linux", test))]
 pub mod body;
 #[cfg(any(target_os = "linux", test))]
