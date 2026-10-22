@@ -1,0 +1,10 @@
+{
+  "reviewed_head": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe",
+  "qualified_head": "6208a602bd7c409aa7a8396404518ac218cb17c1",
+  "gated_source_hashes_match_final_head": true,
+  "range_diff_sha256": "4933ad4aaff3d9e978b0a61d57fb208e4c5a768e24f8fcbbd560d5cc467c5719",
+  "arm64_run": 39698425178,
+  "clippy_run": 39698425278,
+  "native_status_at_recording": "in_progress"
+}

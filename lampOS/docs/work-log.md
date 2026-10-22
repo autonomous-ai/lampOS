@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-22 07:15 +07, Music rebased and pushed; failed-unit gate running
+
+**Ready for lamp-voice: no (#1757, fresh native gates running).**
+Reviewed `0a878cd4d` is rebased onto `e2b2f596d` and pushed as
+`6208a602bd7c409aa7a8396404518ac218cb17c1`. Mac fmt and strict Clippy pass;
+**4780 passed / 0 failed / 14 ignored / 0 filtered out**. The complete
+[range-diff and gate](verification/requested-audio-rebase-20261022/README.md)
+are recorded and [posted on #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329472009).
+The PR remains non-draft and mergeable. ARM64 **39698425178** and Linux
+Clippy **39698425278** are running. First merges.
+
+**Next work is active:** `second/report-failed-units` completed read review
+without P1/P2; its compiled control and Cloud gate are running. The
+`second/install-exit-notes` implementation also passed read review and
+follows it. Its docs include the existing stop-command ordering limit.
+Both preserve existing report sending gates; no device action.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 07:00 +07, Music rebase first; failed units and exit-note hooks next
 
 **Ready for lamp-voice: no (#1757, rebase validation in progress).**
