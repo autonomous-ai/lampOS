@@ -216,10 +216,12 @@ fn own_line_keeps_from_environment() -> bool {
 /// ([`OwnLineWait::theirs`]): their mouth reading comes after the sound.
 const OWN_LINE_EYES_LAG_US: u64 = 300_000;
 
-/// A sound let go at its deadline while the lamp's own line waited, kept
-/// while it goes on (#2602, El on lamp-06c1 at 22:21:49 on 21 Oct): room
-/// talk let go at +2.144 s rose again as a new sound 52 ms after the hello's
-/// first audio and cut it. Its continuation is that sound, never a cut-in.
+/// A sound let go while the lamp's own line waited, at its deadline or as
+/// the line began to sound, kept while it goes on (#2602, El on lamp-06c1
+/// at 22:21:49 on 21 Oct, and at 08:17–09:08 on 22 Oct): room talk let go
+/// rose again as a new sound 52 ms (deadline), and 56 and 67 ms (sounded),
+/// after the hello's first audio and cut it. Its continuation is that
+/// sound, never a cut-in.
 /// It has ended once it has been quiet as long as the wait's own quiet
 /// ([`WAIT_QUIET_BLOCKS`], 300 ms), and a sound that begins after that is a
 /// new one.
@@ -238,6 +240,20 @@ impl LetGoSound {
         Self {
             turn,
             last_speech_us,
+        }
+    }
+
+    /// The sound kept after `own` under `turn`, its last speech at
+    /// `last_speech_us`: however the wait ends while a sound is held, at its
+    /// deadline (`deadline`), because the line began to sound (`sounded`,
+    /// El on lamp-06c1 on 22 Oct: room talk let go at the hello's first
+    /// audio came back 56 and 67 ms after it and cut it), or going on from
+    /// one let go (`goes_on`), the held sound stays that sound while it goes
+    /// on. No other outcome keeps one.
+    fn let_go(own: WhileOwnLineWaits, turn: u64, last_speech_us: u64) -> Option<Self> {
+        match own {
+            WhileOwnLineWaits::LetGo(_) => Some(Self::new(turn, last_speech_us)),
+            _ => None,
         }
     }
 
@@ -280,7 +296,7 @@ enum WhileOwnLineWaits {
     /// Not yet: it stays pending.
     Wait,
     /// The line began to sound, or the sound's own deadline came, or it is
-    /// a sound let go at its deadline going on ([`LetGoSound`]): let go as
+    /// a sound let go before going on ([`LetGoSound`]): let go as
     /// the room's, and the line goes on.
     LetGo(&'static str),
     /// With `LAMP_WAIT_KEEPS_ANSWER=words`, its words only told the lamp to
@@ -320,8 +336,8 @@ struct OwnLineWait {
     /// their looks since the sound's first read
     /// ([`crate::speaking_faces::SpeakingFaces::turned_speakers`]).
     theirs: bool,
-    /// The candidate is a sound let go at its deadline while this line
-    /// waited, going on ([`LetGoSound::goes_on`]).
+    /// The candidate is a sound let go while this line waited, going on
+    /// ([`LetGoSound::goes_on`]).
     let_go_goes_on: bool,
 }
 
@@ -340,8 +356,8 @@ fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) 
 /// to `CALL_BEFORE_US` before its trigger) or the eyes saw a face speaking
 /// through it turned to the lamp: that is the person the line is for, and
 /// their "not now" is no room's talk. One that waited is let go once the
-/// line sounds, or 100 ms before its own decision deadline. One let go at
-/// its deadline that goes on past the line's first audio is still that
+/// line sounds, or 100 ms before its own decision deadline. One let go
+/// either way that goes on past the line's first audio is still that
 /// sound and let go again (#2602), unless the lamp's name or its person is
 /// heard in it. A sound that begins once the line sounds, or after a gap,
 /// is a cut-in over the lamp's voice, judged as before, so words said over
@@ -5088,8 +5104,8 @@ fn conversation_with_gate(
     // recorded for.
     let own_line_keeps = own_line_keeps_from_environment();
     let mut own_kept_for: Option<crate::admission::CandidateId> = None;
-    // The sound last let go at its deadline while the own line waited, while
-    // it goes on (#2602).
+    // The sound last let go while the own line waited, at its deadline or as
+    // it sounded, while it goes on (#2602).
     let mut own_let_go: Option<LetGoSound> = None;
     // The newest turn the lamp began itself with no ticket or news on it:
     // its hello to someone arriving, or a line of the setup walk.
@@ -8006,12 +8022,13 @@ fn conversation_with_gate(
                             }
                             detector.clear_prospective();
                             own_kept_for = None;
-                            // Let go at its deadline, or going on from one
-                            // that was: kept while it goes on (#2602).
-                            if why == "deadline" || why == "goes_on" {
-                                own_let_go = reply.as_ref().map(|current| {
-                                    LetGoSound::new(current.owner.turn(), last_speech_us)
-                                });
+                            // Let go at its deadline, as the line sounded, or
+                            // going on from one that was: kept while it goes
+                            // on (#2602).
+                            if let Some(current) = reply.as_ref() {
+                                own_let_go =
+                                    LetGoSound::let_go(own, current.owner.turn(), last_speech_us)
+                                        .or(own_let_go);
                             }
                             eprintln!(
                                 "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
@@ -8021,7 +8038,7 @@ fn conversation_with_gate(
                                 json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
                                 "candidate":candidate.id,"why":why,"at_us":at_us,
                                 "boundary":if why == "goes_on" {
-                                    "a sound let go at its deadline while a line the lamp started on its own waited, going on past its first audio: the room's"
+                                    "a sound let go while a line the lamp started on its own waited, going on past its first audio: the room's"
                                 } else {
                                     "a sound while a line the lamp started on its own had not sounded: the room's"
                                 }}),
