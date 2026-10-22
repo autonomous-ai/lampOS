@@ -1,5 +1,42 @@
 # Tests work log
 
+## 2026-10-22 19:28 +0700 — Voice fixture event PR published
+
+Ready for lamp-voice: no; draft [#3023](https://github.com/autonomous-ai/lampOS/pull/3023).
+
+Part of #1569, branch `tests/1569-voice-full-run-events`, head
+`ebbb25cb1f836b5db9529116655e13c2d50359a4`, rebased onto `d7492ca743`.
+The range-diff is unchanged from the measured e223 patch (`4aab7c749 = ebbb25cb1`).
+All seven assigned cases use fixture events/clocks or the existing conversation
+guard. All 142 original coordinator assertions and product timing bounds stay.
+No production behavior changes or ARM64 build on the Mac.
+
+At the pinned e223 comparison base the unchanged x86 full library passed
+3,355/0/14. The first candidate full library was 3,352/3/14, all seven assigned
+cases passing; its three child/scenario watchdog failures are retained and not
+called inherited. An unchanged comparison passed those cases. The required
+package run later passed the complete library 3,355/0/14 and binary unit 1/0,
+then failed integration 265/1: light-call maximum 136.91273 ms beyond its
+unchanged 100 ms assertion. Doc tests did not run after that failure.
+Fmt, strict Voice Clippy and native workspace build pass at that base.
+The branch contains the full failed observations and compact raw controls.
+
+Unchanged ARM64 full [#5895](https://github.com/autonomous-ai/lampOS/actions/runs/39770980758)
+passed 10,456/0 across four shards, 67 of 10,523 listed not run; one passing
+leaky. Controlled stalls fail before/pass after; conversation overlap is
+3/3 failures before, 3/3 passes after. Whole-child ~304 ms requested-audio
+pauses likewise fail 3/3 before/pass 3/3 after across all five reasons;
+forced fixture-watchdog failure now exits101 instead of aborting. Wrong
+memory content and late reply still fail their original checks.
+
+Final-head native gates are running. Required PR ARM64
+[#5943](https://github.com/autonomous-ai/lampOS/actions/runs/39778143352),
+full ARM64 after [#5944](https://github.com/autonomous-ai/lampOS/actions/runs/39778150685)
+and Clippy [#1947](https://github.com/autonomous-ai/lampOS/actions/runs/39778143468)
+are pending. Historical counts are not relabeled as final-head qualification;
+six upstream merges changed the Voice inventory. Queue has the PR, counts,
+retained failures and range-diff status. No readiness or merge is claimed.
+
 ## 2026-10-22 17:58 +0700 — full-library Voice flakes claimed
 
 Ready for lamp-voice: no
