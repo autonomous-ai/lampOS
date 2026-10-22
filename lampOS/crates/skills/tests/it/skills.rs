@@ -11671,6 +11671,7 @@ fn onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging() {
             "only after a clear yes call remember_my_face",
         ),
         ("room_sounds", "done only after a clear yes"),
+        ("face_expressions", "done only after a clear yes"),
     ] {
         for mode in ["first", "reoffer"] {
             for replacement in ["", "a yes is not needed"] {

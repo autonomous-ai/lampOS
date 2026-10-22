@@ -31,6 +31,7 @@ ready, not paused) and a face is in front of it.
 | 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | an invitation begun, a fresh physical close (even while it is said), the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; with eyes that give receipts on the bus, also their receipt that the camera closed for this close (#1802) | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | the core onboarding skill requests a short invitation: take its head gently, move it a little, let go (#1800, below) | in the minute after the invitation's playback, the body says a hand pushed it, a head joint moved more than the body's `HAND_MOVED` (15 counts) from where it was asked to be with its goal held there, and then the hand let go: done; two invitations without that: failed; no body, or the keeper's pause while it is led: `not_available` | the outcome only |
 | 6½ | `room_sounds` | only on a lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`, exactly): asks once whether it may notice music and laughter, with the line "the lamp notices music and laughter, nothing is recorded" (see "Room sounds" below); elsewhere `not_available`, unspoken | the model calls `setup_step`: `done` only after a clear yes, `skipped` for a no; never reported, `failed` after 90 s as any step | a yes alone, as `/var/lib/lampOS/consent/room-sounds.json` |
+| 6¾ | `face_expressions` | only with `LAMP_FACE_EXPRESSIONS_ASK=on` (a lamp whose eyes read how a face seems): asks once whether it may notice from their face how they seem, to answer more warmly, with the line "you never say it aloud, and nothing of their face is kept" (see "Face expressions" below); elsewhere `not_available`, unspoken | as `room_sounds`: `done` only after a clear yes, `skipped` for a no, `failed` after 90 s | a yes alone, as `/var/lib/lampOS/consent/face-expressions.json` |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | both answers heard: the quiet hours (a time, a part of the day, "after"/"before", or any no word, "no idea" included, which counts as "none") and the hello (a line with "hello", or a yes or a no once the quiet hours are in); the walk ends the step itself (`onboarding_heard`). Or the model calls `setup_step` as soon as it has heard the second answer, before it says anything else (row 10 on lamp-52e6: asked and answered, never reported) | the rules, in memory |
 
 A placeholder is the step of a part another builder owns. It is recorded as
@@ -74,7 +75,7 @@ run. Existing `setup_step` and `redo_setup` provider tools still follow
 `LAMP_ONBOARDING` and its file setting; they are not removed by this failure.
 Repair the file and restart Voice to recover the automatic walk.
 
-`order` names each of the eight stable step IDs exactly once; `steps` provides
+`order` names each of the nine stable step IDs exactly once; `steps` provides
 `first` and `reoffer` notes for every ID. `reoffer_after_s` is 1 to 31,536,000
 (the shipped value is 86,400). Only `who_you_are` and `preferences` may have a
 `nudge`, with `words` and `after_answers` from 1 to 8. Every note is 1 to 900
@@ -83,7 +84,7 @@ bytes with no control characters. Only the privacy step's notes have one
 notes have no slots. Consent remains a code-checked mechanism: both `first`
 and `reoffer` for `who_you_are` must retain the exact clause
 `only after a clear yes call remember_my_face`; both notes for `room_sounds`
-must retain `done only after a clear yes`. Voice's installed-file loader and
+and for `face_expressions` must retain `done only after a clear yes`. Voice's installed-file loader and
 Skills loading/packaging reject a missing or altered clause. Surrounding
 words remain editable. The shipped notes are unchanged. The privacy notes
 fit a 1,024-byte written turn with the
@@ -152,6 +153,27 @@ emptied, the file removed on that write), by a forget of everything
 goes with their memory, with a journal line naming the file only), and by
 the factory reset (the reset plan wipes the file). There is no separate
 "stop noticing music" yet.
+
+## Face expressions (#2872)
+
+lamp-eyes reads how the near face seems (`humans/seems`) only with the
+person's kept yes ([privacy-switch.md](privacy-switch.md), "Face reads stay
+off without a yes"), on every lamp, slide or not. With
+`LAMP_FACE_EXPRESSIONS_ASK=on` (read once when the walk is made, behind
+`LAMP_ONBOARDING`) the walk asks for it once, after room sounds; without it
+the step is `not_available` and unspoken. Its words and its place in
+the order are the onboarding skill's (`[onboarding.steps.face_expressions]`
+in `skills/onboarding/skill.toml`), with the same code-checked
+`done only after a clear yes` clause as room sounds; the switch is code.
+
+Everything else is the room sounds step's, above: asked once, any kept
+outcome ends it, only a yes writes a record, and `redo_setup`, a forget of
+everything and the factory reset remove it. The record is
+`/var/lib/lampOS/consent/face-expressions.json` (`FACE_EXPRESSIONS_PATH`,
+beside `room-sounds.json`, written the same way and with the same mode and
+group), shaped `{"version":1,"face_expressions":"yes","at_unix_s":<when>}`,
+and read by lamp-eyes' `seems::face_expressions_yes` with the same rule:
+yes only when `face_expressions` is exactly `"yes"`.
 
 ## Movement during onboarding
 

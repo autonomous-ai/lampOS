@@ -297,6 +297,11 @@ mod tests {
         assert!(read(
             r#"{"version":1,"face_expressions":"yes","at_unix_s":1792500000}"#
         ));
+        // Byte for byte what the voice's onboarding writes (lamp-voice's
+        // storage test asserts the same bytes).
+        assert!(read(
+            r#"{"at_unix_s":7,"face_expressions":"yes","version":1}"#
+        ));
         assert_eq!(due(None, &file), Due::Now);
         let long_ago = std::time::Instant::now().checked_sub(READ_EVERY);
         assert_eq!(due(long_ago, &file), Due::Now);

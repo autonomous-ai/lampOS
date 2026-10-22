@@ -108,12 +108,13 @@ pub enum Step {
     Privacy,
     GivingWay,
     RoomSounds,
+    FaceExpressions,
     Preferences,
 }
 
 impl Step {
     /// Stable mechanism IDs for validation and the tool schema, not walk order.
-    pub const IDS: [&'static str; 8] = [
+    pub const IDS: [&'static str; 9] = [
         "where_you_sit",
         "who_you_are",
         "how_you_sound",
@@ -121,6 +122,7 @@ impl Step {
         "privacy",
         "giving_way",
         "room_sounds",
+        "face_expressions",
         "preferences",
     ];
 
@@ -133,6 +135,7 @@ impl Step {
             Step::Privacy => "privacy",
             Step::GivingWay => "giving_way",
             Step::RoomSounds => ROOM_SOUNDS,
+            Step::FaceExpressions => FACE_EXPRESSIONS,
             Step::Preferences => "preferences",
         }
     }
@@ -146,6 +149,7 @@ impl Step {
             "privacy" => Some(Self::Privacy),
             "giving_way" => Some(Self::GivingWay),
             "room_sounds" => Some(Self::RoomSounds),
+            "face_expressions" => Some(Self::FaceExpressions),
             "preferences" => Some(Self::Preferences),
             _ => None,
         }
@@ -199,6 +203,22 @@ pub const ROOM_SOUNDS_PATH: &str = "/var/lib/lampOS/consent/room-sounds.json";
 pub const ROOM_SOUNDS_GROUP: &str = "lampos";
 /// The only value of `LAMP_PRIVACY_CONTROLS` that offers the step.
 pub const NO_SLIDE: &str = "no-slide";
+/// The face expressions step (#2872): asked only with
+/// [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`] on, a lamp whose eyes read how a face
+/// seems, and only with the person's yes. Kept as the room sounds yes is: a
+/// yes (`done`) as [`FACE_EXPRESSIONS_PATH`] for lamp-eyes, beside
+/// [`ROOM_SOUNDS_PATH`] and readable by the same group; no or silence keeps
+/// only the step's outcome, so it is asked once and stays off.
+pub const FACE_EXPRESSIONS: &str = "face_expressions";
+/// The file lamp-eyes reads (`lamp_eyes::seems::FACE_EXPRESSIONS_FILE`).
+pub const FACE_EXPRESSIONS_PATH: &str = "/var/lib/lampOS/consent/face-expressions.json";
+/// [`FACE_EXPRESSIONS_PATH`] for a voice whose room sounds yes is at
+/// `room_sounds`: its sibling, so a test's folder keeps both.
+pub fn face_expressions_beside(room_sounds: &Path) -> PathBuf {
+    room_sounds.with_file_name("face-expressions.json")
+}
+/// `on` offers the face expressions step; anything else passes it over.
+pub const FACE_EXPRESSIONS_ASK_ENVIRONMENT: &str = "LAMP_FACE_EXPRESSIONS_ASK";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -509,6 +529,9 @@ pub struct Onboarding {
     /// A lamp with no privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`):
     /// only then is the room sounds step offered.
     no_slide: bool,
+    /// [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`] on: only then is the face
+    /// expressions step offered.
+    face_ask: bool,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -596,6 +619,7 @@ impl Onboarding {
                 .ok()
                 .as_deref(),
         );
+        walk.face_ask = std::env::var(FACE_EXPRESSIONS_ASK_ENVIRONMENT).as_deref() == Ok("on");
         Some(walk)
     }
 
@@ -642,6 +666,7 @@ impl Onboarding {
             giving: giving_way::GivingWayFlow::default(),
             unix_clock: unix_ms,
             no_slide: false,
+            face_ask: false,
             looked: None,
             felt: None,
             goals: None,
@@ -964,6 +989,7 @@ impl Onboarding {
             Step::Privacy => self.privacy_available(),
             Step::HowYouSound => self.near_available(),
             Step::RoomSounds => self.no_slide,
+            Step::FaceExpressions => self.face_ask,
             Step::GivingWay => self.giving_way_available(),
             Step::Touch => (self.available)(step) && self.touches.is_some(),
             _ => (self.available)(step),
@@ -2444,7 +2470,7 @@ pub fn tools() -> Vec<Tool> {
                           where_you_sit, how_you_sound, touch, privacy and giving_way can only be \
                           skipped; the runner requires physical evidence: seeing them, hearing their \
                           call, feeling their touch, the switch's receipt, the body giving way. \
-                          room_sounds is done only after a clear yes."
+                          room_sounds and face_expressions are done only after a clear yes."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -2796,7 +2822,7 @@ mod tests {
         }
         report(&room.walk, "preferences", "done");
         assert_eq!(room.wait(120 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 8);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         // Kept across a restart: nothing is asked again.
         let mut again = Room {
@@ -2821,7 +2847,7 @@ mod tests {
         assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
         report(&room.walk, "preferences", "skipped");
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
-        assert_eq!(room.walk.kept().steps.len(), 8);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
         // "Lamp, let's redo the setup."
         let redo = ToolCall {
             id: "c".into(),
@@ -2967,7 +2993,7 @@ mod tests {
     #[test]
     fn completed_setup_steps_do_not_move_the_body() {
         let mut room = walked("gesture");
-        assert_eq!(room.walk.kept().steps.len(), 8);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
         assert_eq!(room.walk.take_gesture(), None);
     }
 
@@ -3812,6 +3838,99 @@ mod tests {
         again.walk.no_slide = true;
         assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
         assert!(!room_sounds_file(&again).exists());
+    }
+
+    fn face_expressions_file(room: &Room) -> PathBuf {
+        face_expressions_beside(&room_sounds_file(room))
+    }
+
+    /// A walk on a lamp whose eyes read faces, up to the face question.
+    fn asked_face_expressions(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.face_ask = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [FACE_EXPRESSIONS_NOTE]);
+        room
+    }
+
+    #[test]
+    fn face_expressions_is_offered_only_with_its_switch_and_kept_where_the_eyes_read() {
+        assert_eq!(
+            face_expressions_beside(Path::new(ROOM_SOUNDS_PATH)),
+            Path::new(FACE_EXPRESSIONS_PATH)
+        );
+        let room = walked("face-expressions-off");
+        assert_eq!(
+            room.outcome(Step::FaceExpressions),
+            Some(Outcome::NotAvailable)
+        );
+        assert!(!face_expressions_file(&room).exists());
+        assert!(
+            FACE_EXPRESSIONS_NOTE
+                .contains("you never say it aloud, and nothing of their face is kept")
+        );
+    }
+
+    #[test]
+    fn a_yes_to_face_expressions_is_kept_once_and_redo_wipes_it() {
+        let mut room = asked_face_expressions("face-expressions-yes");
+        report(&room.walk, "face_expressions", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        let path = face_expressions_file(&room);
+        let at = room.walk.kept().steps["face_expressions"].at_unix_s;
+        // Exactly what lamp-eyes' `face_expressions_yes` reads as a yes.
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+        );
+        assert!(!room_sounds_file(&room).exists());
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.face_ask = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(path.exists());
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({}),
+        };
+        assert!(run(&again.walk.file, &redo).1);
+        assert_eq!(again.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn no_or_silence_to_face_expressions_leaves_it_off_and_is_not_asked_again() {
+        let mut room = asked_face_expressions("face-expressions-no");
+        report(&room.walk, "face_expressions", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Skipped));
+        assert!(!face_expressions_file(&room).exists());
+        let mut room = asked_face_expressions("face-expressions-silence");
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Failed));
+        assert!(!face_expressions_file(&room).exists());
+        report(&room.walk, "preferences", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        let mut again = Room {
+            walk: Onboarding::at(room.walk.file.clone()),
+            at: 0,
+            said: 0,
+            still: true,
+            body_on_bus: false,
+        };
+        again.walk.face_ask = true;
+        assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!face_expressions_file(&again).exists());
     }
 
     #[test]

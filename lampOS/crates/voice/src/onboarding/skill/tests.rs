@@ -45,6 +45,11 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         (Step::Privacy, PRIVACY_INVITATION, PRIVACY_INVITATION),
         (Step::GivingWay, GIVE_ASK, GIVE_ASK),
         (Step::RoomSounds, ROOM_SOUNDS_NOTE, ROOM_SOUNDS_NOTE),
+        (
+            Step::FaceExpressions,
+            FACE_EXPRESSIONS_NOTE,
+            FACE_EXPRESSIONS_NOTE,
+        ),
         (Step::Preferences, PREFERENCES_NOTE, PREFERENCES_NOTE),
     ];
     assert_eq!(definition.order, expected.map(|(step, _, _)| step));
@@ -219,6 +224,7 @@ fn both_consent_clauses_hold_for_first_and_reoffer_in_the_installed_file() {
             "only after a clear yes call remember_my_face",
         ),
         ("room_sounds", "done only after a clear yes"),
+        ("face_expressions", "done only after a clear yes"),
     ] {
         for mode in ["first", "reoffer"] {
             for replacement in ["", "a yes is not needed"] {
@@ -242,14 +248,7 @@ fn both_consent_clauses_hold_for_first_and_reoffer_in_the_installed_file() {
             let loaded = read_installed(&folder.0).unwrap();
             assert!(
                 loaded
-                    .note(
-                        if step == "who_you_are" {
-                            Step::WhoYouAre
-                        } else {
-                            Step::RoomSounds
-                        },
-                        mode == "reoffer"
-                    )
+                    .note(Step::named(step).unwrap(), mode == "reoffer")
                     .contains("Speak briefly. ")
             );
         }
