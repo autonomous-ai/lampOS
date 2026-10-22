@@ -1,4 +1,4 @@
-# A person's own keys (#2094, built, off unless set)
+# A person's own keys (#2094, on in the product units, #2846)
 
 Product lamps answer through the Autonomous relay and hold no provider key of
 the company's (the lead on #1711, 20 Oct 07:34). A person may bring their
@@ -7,16 +7,22 @@ and a **Deepgram** key for speech to text. Each is optional. With none, the
 lamp uses the relay, as before. The design was agreed on #2094 (El 09:42,
 the first builder 09:44, Third's privacy read 09:50).
 
-**Off unless `LAMP_OWN_KEYS=on`**, on three units: `lamp-setup` and
-`lamp-cloud` (`Environment=LAMP_OWN_KEYS=on` in a drop-in), and the voice,
-through `deploy/product/own-keys-voice.conf` placed as
-`/etc/systemd/system/lamp-voice.service.d/own-keys.conf`. `lamp-cloud` also
-needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`. The helper's units
-(`lamp-setup-keys.socket`, `lamp-setup-keys@.service`) are enabled by hand
-with the switch, as they aren't in `install`'s list yet. The helper itself
-doesn't read the switch (its unit passes `--enable`): with the switch off it
-is closed because its units aren't installed, `lamp-cloud` answers "not on
-this lamp" and only `lamp-cloud` may ask. Off, nothing changes:
+**`LAMP_OWN_KEYS=on`**, on three units, all set in the product's own
+units since #2846: `lamp-setup`, `lamp-cloud`, and `lamp-voice`, whose unit
+also loads the keys' folder (`LoadCredential=own:/etc/lampOS/voice/own`,
+with `ConfigurationDirectory=lampOS/voice/own`). Before #2846 the voice's
+half was a drop-in, `own-keys-voice.conf`, placed as
+`/etc/systemd/system/lamp-voice.service.d/own-keys.conf`. On a lamp that
+still has it, `lamp-update install` deletes it (`RETIRED_DROP_INS`, with
+systemd told), and the folder too only when nothing else is in it. `lamp-cloud`
+also needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`, and the product
+leaves `LAMP_SETTINGS_CHANGE` off until its own lamp check: until then the
+app's `keys.*` are "not on this lamp", and a key comes only through setup.
+The helper's units (`lamp-setup-keys.socket`, `lamp-setup-keys@.service`)
+are in `install`'s list, the socket enabled and the template never. The
+helper itself doesn't read the switch (its unit passes `--enable`): only
+`lamp-cloud` may ask, and `lamp-cloud` asks only with its switches on.
+Off (a unit's drop-in setting `LAMP_OWN_KEYS=off`), nothing changes:
 setup checks and keeps nothing and says nothing new, the app's kinds are
 "not on this lamp", and the voice reads no person's key even if one is
 there.
@@ -203,6 +209,14 @@ written said as `not_kept`, the old one gone and the voice restarted;
 its header alone, no redirect followed; only `lamp-cloud`'s cgroup, at the system's place for it, asks; a
 planted `sk-…` key in no reply, error, status or journal line; the reset
 wiping the folder; a later 401 answered through the relay with the warning;
-the switch off changing nothing. Not yet run on a lamp: systemd 252's
-folder credential names (`own_<file>`), the cgroup check under the real
-socket, and the checks against DeepSeek's and Deepgram's own services.
+the switch off changing nothing. `-p lamp-update` holds the product units:
+the switch on all three, the voice's folder credential, the helper installed
+and the reset's path.
+
+**On a lamp:** lamp-06c1 on 22 Oct (#2845, #2861), with the lines as
+drop-ins: the 5 s reset, then a new setup from the app with the person's
+own DeepSeek and Deepgram keys, both checked "works", the voice answering
+through them, and the keys root's 0600 with no journal line holding them.
+Still owed (#2846): a fresh install with no key keeps the lamp's own (the
+relay), and a key given in the app still used after a full update. Not yet
+run on a lamp: the cgroup check under the real socket from the app.
