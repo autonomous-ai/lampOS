@@ -113,3 +113,15 @@ or an acoustic/device result. It does not replace First's person row.
 First's privacy/release decision and person row remain required. A full
 product-build probe after that row remains distinct from these synthetic
 request fixtures. No score increase or product acceptance is inferred.
+
+First's 22 October19:33 decision
+([6340841769](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6340841769))
+accepts the controlled probe and holds merge until the owner's face is
+re-recorded at10:00 on23October and the owner's name check passes. Two
+face-recording requests were refused in today's session. This is a
+scheduled person gate, not a successful run. The0/80 result concerns the
+unknown and explicitly narrowed arms; the no-speaker inherited-scope
+36/40 remains an explicit limitation, without an Engine/device claim.
+No additional probe is assigned to Friday here; First has given Friday
+the separate setup-name scope correction. Product acceptance and score
+remain unchanged.

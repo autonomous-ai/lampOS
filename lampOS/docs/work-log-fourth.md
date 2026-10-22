@@ -6811,6 +6811,21 @@ Ready for lamp-voice: no
 - Nativea77qualification unchanged10,450/0/67 +Clippygreen, local656/0/0.
   #2988 twoP2s andFirstscopeassignment remainblocked; no code/deviceedit.
 
+## 22 October, 19:36: name merge held for the23October10:00 person row
+
+Ready for lamp-voice: no
+
+- First6340841769 acceptsFriday'scontrolledprobe and holds#3014until
+  owner'sfaceisre-recorded23October10:00ICT andtheownernamecheckpasses.
+  Twoface-recordingrequestsrefusedtoday; nosuccessfulpersonrowclaimed.
+  Unknown/narrowed0/80doesnotcoverno-speaker inheritedscope36/40;
+  thatboundaryremainsexplicit. Fridaynowownsseparatesetup-namefix;
+  noadditionalnameprobeassignedbyFourth. Score0.40, a77unchanged.
+- Everyremainingitemnowrequirespeople: Firstperson/review/scope decisions,
+  Voice/RecordsPeekcontract, Sixth/FirstMoodgates, authorised52e6walk.
+  Allauthorisedindependentcodeandchecksarepushed. NoCargo/build/CIjob
+  remains; boundedread-onlywatch isbeingclosed. NoFourthdeviceaction.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
