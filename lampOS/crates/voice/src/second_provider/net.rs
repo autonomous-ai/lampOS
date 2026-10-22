@@ -39,19 +39,19 @@ pub(crate) const CONNECT: Duration = Duration::from_secs(10);
 pub(crate) const STALL: Duration = Duration::from_secs(30);
 
 /// `LAMP_SECOND_CHAT_KEPT=on` (#2602, the first builder's 02:14 on 23 Oct):
-/// the chat client keeps an idle connection at most [`CHAT_POOL_IDLE`], not
-/// reqwest's 90 s, and sends TCP keepalive every [`CHAT_KEEPALIVE`]. On
+/// the chat client keeps an idle connection in its pool at most
+/// [`CHAT_POOL_IDLE`], not reqwest's 90 s. TCP keepalive is reqwest's own
+/// either way (15 s, then 3 probes 15 s apart, and a 30 s TCP user timeout on
+/// Linux), so this changes only how long a connection is reused. On
 /// lamp-4ace on 22 Oct three chat requests never reached the relay (Backend's
 /// 02:09), which fits a request written onto a pooled connection the path had
 /// already dropped (a home router or the relay's front may drop an idle one
 /// sooner than 90 s); that cause isn't shown yet.
 /// `on`, and nothing else; the other clients are unchanged.
 pub const CHAT_KEPT_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_KEPT";
-/// How long an idle chat connection is kept with [`CHAT_KEPT_ENVIRONMENT`].
+/// How long an idle chat connection is kept with [`CHAT_KEPT_ENVIRONMENT`],
+/// counted from when it went back to the pool.
 pub const CHAT_POOL_IDLE: Duration = Duration::from_secs(25);
-/// TCP keepalive's idle time on a chat connection with
-/// [`CHAT_KEPT_ENVIRONMENT`], which keeps a router's mapping alive.
-pub const CHAT_KEEPALIVE: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -114,26 +114,31 @@ fn http_client() -> Result<reqwest::Client> {
 }
 
 /// The chat's client: [`http_client`], or with [`CHAT_KEPT_ENVIRONMENT`] on,
-/// idle connections kept at most [`CHAT_POOL_IDLE`] and TCP keepalive; and
-/// whether it is kept so.
+/// idle connections kept at most [`CHAT_POOL_IDLE`]; and whether it is kept
+/// so.
 fn chat_client() -> Result<(reqwest::Client, bool)> {
-    let kept = std::env::var(CHAT_KEPT_ENVIRONMENT).ok().as_deref() == Some("on");
-    Ok((
-        client_kept(kept.then_some((CHAT_POOL_IDLE, CHAT_KEEPALIVE)))?,
-        kept,
-    ))
+    let kept = chat_kept(std::env::var(CHAT_KEPT_ENVIRONMENT).ok().as_deref());
+    Ok((client_kept(kept.then_some(CHAT_POOL_IDLE))?, kept))
 }
 
-/// [`http_client`], with `kept`'s idle limit and keepalive when given.
-fn client_kept(kept: Option<(Duration, Duration)>) -> Result<reqwest::Client> {
+/// Whether [`CHAT_KEPT_ENVIRONMENT`]'s value keeps the chat's connections
+/// briefly: `on`, and nothing else.
+fn chat_kept(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// [`http_client`], with `idle` as its pool's idle limit when given, and then
+/// at most one idle connection per host, so a warm still running when a chat
+/// goes can't leave two pooled (El's P3 on #3115).
+fn client_kept(idle: Option<Duration>) -> Result<reqwest::Client> {
     let builder = reqwest::Client::builder()
         .tls_backend_preconfigured(tls()?)
         .https_only(!cfg!(test))
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(CONNECT)
         .read_timeout(STALL);
-    match kept {
-        Some((idle, keepalive)) => builder.pool_idle_timeout(idle).tcp_keepalive(keepalive),
+    match idle {
+        Some(idle) => builder.pool_idle_timeout(idle).pool_max_idle_per_host(1),
         None => builder,
     }
     .build()
