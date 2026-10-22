@@ -262,8 +262,10 @@ pub struct Interruption {
     forced: bool,
     /// The yield in force, or the last one, began so.
     forced_yield: bool,
-    /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): see [`Self::hold_backchannels`].
+    /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): see [`Self::hold_backchannels`],
+    /// with the still blocks after which a yield's words are asked for.
     holds_backchannels: bool,
+    words_asked_after_still: u8,
     /// Whether the words of the yield in force, or the last one, were a
     /// backchannel; `None` until they came.
     backchannel: Option<bool>,
@@ -272,8 +274,13 @@ pub struct Interruption {
     held: u16,
 }
 
-/// The longest a yield's commit is held for its words (#2939): 500 ms.
-pub const BACKCHANNEL_HOLD_BLOCKS: u16 = 50;
+/// How long a yield's commit is held for its words once they have been
+/// asked for (#2939): 500 ms, for the speech-to-text's answer, about
+/// 250-350 ms through the relay. The hold is tied to the ask, which comes
+/// only once the person has been still for a while, not to when the commit
+/// fell due: a 300 ms "Yeah." on the speech rule is due 60 ms into it, and
+/// its words come some 0.7 s later.
+pub const BACKCHANNEL_WORDS_WAIT_BLOCKS: u8 = 50;
 /// Speech in the clear in a yield that commits it even when its words are
 /// a backchannel, and that no hold waits past: 400 ms, a sentence.
 pub const BACKCHANNEL_SPEECH_BLOCKS: u8 = 40;
@@ -292,21 +299,24 @@ impl Interruption {
             forced: false,
             forced_yield: false,
             holds_backchannels: false,
+            words_asked_after_still: 0,
             backchannel: None,
             held: 0,
         }
     }
 
     /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): while a yield's words are
-    /// awaited ([`Self::await_words`]), its commit is held for them, up to
-    /// [`BACKCHANNEL_HOLD_BLOCKS`], never past the yield's deadline, and
-    /// only while its speech in the clear is
-    /// under [`BACKCHANNEL_SPEECH_BLOCKS`]. Words that are a backchannel
+    /// awaited ([`Self::await_words`]), its commit is held for them: until
+    /// [`BACKCHANNEL_WORDS_WAIT_BLOCKS`] after they are asked for, at
+    /// `words_asked_after_still` still blocks, never past the yield's
+    /// deadline, and only while its speech in the clear is under
+    /// [`BACKCHANNEL_SPEECH_BLOCKS`]. Words that are a backchannel
     /// let stillness resume it, unless that speech reaches a sentence; any
     /// other words end the hold, and a due commit commits. A stop word and
     /// a forced yield are never held.
-    pub fn hold_backchannels(&mut self) {
+    pub fn hold_backchannels(&mut self, words_asked_after_still: u8) {
         self.holds_backchannels = true;
+        self.words_asked_after_still = words_asked_after_still;
     }
 
     /// Whether backchannels are held ([`Self::hold_backchannels`]).
@@ -478,7 +488,9 @@ impl Interruption {
                     && !self.stop_heard
                     && !self.forced_yield
                     && !sentence
-                    && self.held < BACKCHANNEL_HOLD_BLOCKS;
+                    && u16::from(*still)
+                        < u16::from(self.words_asked_after_still)
+                            + u16::from(BACKCHANNEL_WORDS_WAIT_BLOCKS);
                 if held {
                     self.held += 1;
                     Step::Carry
