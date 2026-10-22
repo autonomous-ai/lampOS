@@ -343,6 +343,29 @@ impl Record {
     }
 }
 
+/// One ask of the voice's say service at `socket` (`lamp_voice::say`):
+/// `text` said as written, under `skill`. The connection is returned open,
+/// for the service's answer lines (`begun`, then the outcome). The write
+/// waits at most [`SAY_WRITE_WAIT`]; a socket nobody listens on fails at once.
+pub fn say_text(
+    socket: &Path,
+    skill: &str,
+    text: &str,
+    priority: u8,
+    expires_in_ms: u64,
+) -> io::Result<std::os::unix::net::UnixStream> {
+    use std::io::Write;
+    let mut stream = std::os::unix::net::UnixStream::connect(socket)?;
+    stream.set_write_timeout(Some(SAY_WRITE_WAIT))?;
+    let line = serde_json::json!({"skill": skill, "text": text, "priority": priority,
+        "expires_in_ms": expires_in_ms});
+    stream.write_all(format!("{line}\n").as_bytes())?;
+    Ok(stream)
+}
+
+/// The longest [`say_text`] waits for the say service to take its line.
+pub const SAY_WRITE_WAIT: Duration = Duration::from_secs(1);
+
 /// Where the run finds and puts things.
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -371,7 +394,6 @@ mod run {
         os::unix::{
             fs::{DirBuilderExt, OpenOptionsExt},
             net::UnixDatagram,
-            net::UnixStream,
         },
         process::{Command, Stdio},
         sync::mpsc,
@@ -453,10 +475,7 @@ mod run {
     }
 
     fn ask(options: &Options) -> io::Result<mpsc::Receiver<Said>> {
-        let mut stream = UnixStream::connect(&options.say_socket)?;
-        let line = serde_json::json!({"skill": SKILL, "text": ASK, "priority": 5,
-            "expires_in_ms": SAY_EXPIRES_MS});
-        stream.write_all(format!("{line}\n").as_bytes())?;
+        let stream = say_text(&options.say_socket, SKILL, ASK, 5, SAY_EXPIRES_MS)?;
         let (tell, told) = mpsc::channel();
         thread::spawn(move || {
             for line in BufReader::new(stream).lines() {
