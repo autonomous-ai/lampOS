@@ -1024,7 +1024,9 @@ the unchanged legacy client, used unless the new Days client is selected.
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
   with the Days client only; off unless set; both voice routes since
   twelve-P2). A session opened for someone
-  known asks the memory `follow_up` within the note's 300 ms. The memory
+  known asks the memory `follow_up` within the note's 300 ms (on the second
+  route, within its read's 2 s, and joining the note only when an answered
+  turn takes the read). The memory
   gives at most one open `thread` or `promise` observation of theirs, at
   least 6 hours old (not the same conversation) and at most 14 days old,
   newest first, never one given before, and none if one was given to them
@@ -1208,15 +1210,25 @@ the unchanged legacy client, used unless the new Days client is selected.
   no turn ends the run of turns, and the next turn asks the note again, a
   new session, told a due thread as above. The memory still gives a thread
   at most once a day, so a later quiet asks again but tells nothing new.
-  It costs that turn what a person change costs: one note within 300 ms
-  ([second-voice.md](second-voice.md), "Each turn is one person's").
+  It is asked as the person's next line begins, off the worker's loop, and
+  that turn waits for it no longer than what is left of 300 ms from the ask
+  ([second-voice.md](second-voice.md), "Each turn is one person's" and
+  "Asked as the line begins").
 - **Recovering a failed note in the same conversation** (second route,
   Days memory, no new switch). A successful `remember` refreshes the next
   turn's note (#2627/#2540). If that read fails, or only its room snapshot
-  succeeds while the requested personal snapshot fails, Voice retains a
-  typed incomplete result and retries on the first context built at least
-  30 s after the attempt. Each retry opens a new session within the same
-  total 300 ms budget; nothing polls between turns. Valid empty snapshots
+  succeeds while the requested personal snapshot fails, or it is not in by
+  what is left of 300 ms from its ask as the line ends, Voice retains a
+  typed incomplete result. A late read that then completes is the next
+  turn's; otherwise the next turn asks again, as its line begins, with a
+  new session, and a second failure in a row waits 30 s from that attempt
+  before the next. The read runs off the worker's loop and may take 2 s; a
+  turn waits for it no longer than what is left of the 300 ms from the ask
+  ([second-voice.md](second-voice.md), "Asked as the line begins"). A read
+  becomes the memory's context (its session, sources, rules and follow-up)
+  only when an answered turn takes it; one taken after a forget, a rule
+  forgotten, a stop or a lost write began during it is let go. Nothing
+  polls between turns. Valid empty snapshots
   are complete and stay cached. Keeps and person changes still force a
   fresh read immediately. Confirmed forgets retain the existing
   `LAMP_MEMORY_JOURNAL_RESUMES` policy and its backoff; when it requests a
