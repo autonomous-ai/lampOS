@@ -6794,6 +6794,23 @@ Ready for lamp-voice: no
   No Fourthlamp/deviceaction. Original2665/2638/2684/2691 delivered/merged;
   2540six-minute Daysrun accepted/closed. Memory rowremains0.40.
 
+## 22 October, 19:33: Friday's name probe delivered, product/person boundary remains
+
+Ready for lamp-voice: no
+
+- Friday6340799154 delivered a source-a77 controlled model probe:20per
+  language/arm, fivearms, relay,13functions,freshsyntheticknownfile and
+  memorysnapshots. Correctknownname38/40ON vs0/40OFF; unknown/explicitly
+  narrowed other-speaker knownname0/80. No-speaker inheritedscope gives
+  visibleperson'sname36/40: documentedopenboundary remains reproduced
+  atrequest/model level,notactualEngine/audio/device reproduction.
+- This corrects the preceding waiting-on-Friday wording: its controlled
+  model measurement is delivered. First'spersonrow/privacyreview and
+  the exactproductbuild/tool/memory-path probe remain separate. No raw
+  modelwords or realpersonnames copied; scorestays0.40.
+- Nativea77qualification unchanged10,450/0/67 +Clippygreen, local656/0/0.
+  #2988 twoP2s andFirstscopeassignment remainblocked; no code/deviceedit.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

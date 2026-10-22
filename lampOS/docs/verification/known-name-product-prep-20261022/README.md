@@ -92,3 +92,24 @@ First's review and the authorised lamp-4ace person row remain open;
 Friday owns the following 20-run EN/VI product probe. Existing off-camera
 and just-forgotten-name limits above remain explicit. No product
 acceptance or memory-row score increase follows from these checks.
+
+## Controlled model probe, 19:33
+
+[Friday's source-bound probe](https://github.com/autonomous-ai/lampOS/pull/3014#issuecomment-6340799154)
+uses a local request fixture at a77, a freshly written known file,
+synthetic memory snapshots, the relay, and 13 functions. Each arm has
+20 English and 20 Vietnamese requests. It is a model/context measurement,
+not an installed product request/tool census, actual face/speaker capture,
+or an acoustic/device result. It does not replace First's person row.
+
+- Known person's correct name: switch on38/40, off0/40.
+- Unknown face and explicitly narrowed other speaker: known name0/80.
+- No speaking-face evidence, scope retained for the visible known person:
+  known name36/40. This is the documented open wrong-person boundary,
+  demonstrated in the request fixture, not an Engine/device reproduction.
+- The setup-name placeholder also reaches unknown/narrowed turns; that
+  comes from the existing character wording, unchanged by this switch.
+
+First's privacy/release decision and person row remain required. A full
+product-build probe after that row remains distinct from these synthetic
+request fixtures. No score increase or product acceptance is inferred.
