@@ -224,10 +224,12 @@ lamp-station complete --records PLACE --matrix production/matrix-v1.toml [--devi
 asks the pilot's question (#2795): is every lamp's record complete against
 that matrix version? It takes each lamp's folder in the place, or only the
 lamps named with `--device`, and judges each lamp's latest routine or retest
-record as `records --matrix` does. The latest is the one with the latest
-`started`, then `ended`, then run id: the record's own start by the station's
-clock, never a file's modified time, which a copy to a share or a restore
-changes. A qualification run is passed over. It prints one line per lamp:
+record against the matrix, judged as `records --matrix` judges one. Which
+run it takes can differ from `records`, which counts every run and takes the
+last file by name: here the latest is the one with the latest `started`,
+then `ended`, then run id, the record's own start by the station's clock,
+never a file's name or modified time, which a copy to a share or a restore
+changes, and a qualification run is passed over. It prints one line per lamp:
 `<lamp> complete: run <run id> <verdict>`, or `<lamp> not complete: run
 <run id> <verdict>; gaps:` and each gap's kind and check only (as `missing
 privacy_switch`), the verdict being the one the run's checks give. A lamp
