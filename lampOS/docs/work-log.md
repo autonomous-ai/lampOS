@@ -1,3 +1,20 @@
+## Current checkpoint: 2026-10-23 00:23 +07, signed-release preparation delta checked
+
+#1812's nine scoped publisher/workflow/runtime files are byte-identical
+from `17167b1ba` to `b8a9148bd`; source read found no new host preflight to
+build. [Current preparation and metadata](proposals/second-internet-release-20261021.md)
+retain the observed zero repository variables and inaccessible environment
+metadata without claiming effective enablement or key absence. No suites
+were rerun, secrets read, settings changed or release published. First's
+isolated bad-release route and monotonic restoration plan remain explicit
+because the current publisher only targets `lamp-voice`.
+
+#3085's official Linux checks continue; #3012's automated slice is merged.
+The next no-lamp code request is on Queue #2602, while the attended #2810
+and subsequent #1812 execution remain with First and the person at the lamp.
+
+---
+
 ## Current checkpoint: 2026-10-23 00:20 +07, updater process-death and CLI checkers merged
 
 #3012 was carried unchanged as `3d1de9ba0` through First's train #3078,
