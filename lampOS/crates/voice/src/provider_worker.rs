@@ -10380,6 +10380,7 @@ pub(crate) mod tests {
                 staff_note: noted,
                 make_skill: false,
                 named_only: false,
+                correct: false,
                 sign_in: false,
             }),
             ..Default::default()
@@ -10527,6 +10528,7 @@ pub(crate) mod tests {
                 staff_note: true,
                 make_skill: false,
                 named_only: false,
+                correct: false,
                 sign_in: false,
             }),
             ..Default::default()
