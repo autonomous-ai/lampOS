@@ -2869,12 +2869,22 @@ Vietnam: Tomorrow, Friday, 24 to 30°C, light rain, 60% chance of
 rain."}`; for now and for today the temperature, the sky, the feeling and
 the humidity now come first ("In Hanoi, Vietnam now: 31°C, partly cloudy,
 feels like 36°C, humidity 70%."). Today and tomorrow carry their weekday
-too, worked out from the forecast's own dates (#2185). A place not found
+too, worked out from the forecast's own dates (#2185). Which row is today
+is worked out at each call from the place's own date now: the lamp's
+clock moved by the forecast's `utc_offset_seconds`, never the lamp's own
+date; tomorrow is the row dated the day after, a weekday the next row on
+it from today, and rows before today are never said
+(`net::weather::place_day`, `days_from`). The reviewers on #2969: today
+taken as the first row made a forecast kept from 23:59 at the place say
+yesterday's as today's after its midnight. A forecast whose rows lack the
+place's today is no answer. A place not found
 answers `{"error": "I couldn't find that place"}`, and a failed lookup or
 fetch says the weather couldn't be reached: never another place's
 weather, nor any older than it is kept. Each place's forecast is kept 10
-minutes, so a follow-up ("and Saturday?") is answered at once, with at
-most 16 places kept, the oldest out (`net::weather::Weather`). Nothing
+minutes, and never past that place's midnight, so a follow-up ("and
+Saturday?") is answered at once and the first call of the place's new day
+fetches again, with at most 16 places kept, the oldest out
+(`net::weather::Weather`). Nothing
 is fetched ahead, no task runs, and the model's notes carry no weather.
 Before, the forecast of the lamp's own place was fetched every 15
 minutes and told in every request, so "what's the weather in Hanoi

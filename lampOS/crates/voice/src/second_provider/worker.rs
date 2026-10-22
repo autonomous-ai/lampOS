@@ -1438,15 +1438,17 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
 /// The weather the model may ask for, with `switch` (`LAMP_SECOND_WEATHER`)
 /// exactly `on` (the owner on 22 Oct): looked up with `fetch` only when a
 /// call asks, for the place and the day asked, the lamp's own place
-/// (`here`) for a call that names none. Nothing is fetched here and no
-/// task is started; with the switch off there is no weather at all.
+/// (`here`) for a call that names none, its days told from that place's
+/// own date by `clock`. Nothing is fetched here and no task is started;
+/// with the switch off there is no weather at all.
 fn weather_asked(
     switch: Option<&str>,
     here: Option<String>,
     fetch: crate::second_provider::net::weather::Fetch,
+    clock: crate::second_provider::net::weather::Clock,
 ) -> Option<Arc<crate::second_provider::net::weather::Weather>> {
     use crate::second_provider::net::weather;
-    weather::on(switch).then(|| Arc::new(weather::Weather::new(here, fetch)))
+    weather::on(switch).then(|| Arc::new(weather::Weather::new(here, fetch, clock)))
 }
 
 /// The search's functions, then the weather's when it is on: what a spoken
@@ -1839,6 +1841,7 @@ pub fn serve(
             .as_deref(),
         crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
         crate::second_provider::net::weather::open_meteo(),
+        crate::second_provider::net::weather::wall_clock(),
     );
     if let Some(weather) = &weather {
         eprintln!(
@@ -13203,6 +13206,7 @@ mod tests {
                                                     "latitude": 21.0245, "longitude": 105.84117}]})
                 } else {
                     serde_json::json!({
+                        "utc_offset_seconds": 25_200,
                         "current": {"temperature_2m": 24.0, "weather_code": 61},
                         "daily": {"time": ["2026-10-22", "2026-10-23"],
                                   "weather_code": [61, 3],
@@ -13216,6 +13220,13 @@ mod tests {
         (fetched, fetch)
     }
 
+    /// A clock set at 10:00 on Thursday 22 Oct 2026 in Hanoi, seven hours
+    /// ahead of UTC: [`counted_weather_fetch`]'s today.
+    fn thursday_in_hanoi() -> crate::second_provider::net::weather::Clock {
+        // 03:00 UTC on 22 Oct 2026, 20,748 days after 1 January 1970.
+        Arc::new(|| 20_748 * 86_400 + 3 * 3_600)
+    }
+
     /// The owner on 22 Oct: no weather is fetched every 15 minutes any
     /// more. With the switch on nothing is fetched at start or as time
     /// passes, only when a call asks, and the call is answered by the
@@ -13224,8 +13235,13 @@ mod tests {
     async fn the_weather_is_fetched_only_when_a_call_asks() {
         use std::sync::atomic::Ordering;
         let (fetched, fetch) = counted_weather_fetch();
-        let weather =
-            super::weather_asked(Some("on"), Some("Hanoi, Vietnam".into()), fetch).expect("on");
+        let weather = super::weather_asked(
+            Some("on"),
+            Some("Hanoi, Vietnam".into()),
+            fetch,
+            thursday_in_hanoi(),
+        )
+        .expect("on");
         tokio::time::advance(Duration::from_secs(60 * 60)).await;
         assert_eq!(fetched.load(Ordering::Relaxed), 0, "nothing ahead");
         let settings = crate::tools::Settings::default();
@@ -13280,7 +13296,10 @@ mod tests {
         use std::sync::atomic::Ordering;
         let (fetched, fetch) = counted_weather_fetch();
         for switch in [None, Some(""), Some("yes"), Some("ON")] {
-            assert!(super::weather_asked(switch, Some("Hanoi".into()), fetch.clone()).is_none());
+            let clock = thursday_in_hanoi();
+            assert!(
+                super::weather_asked(switch, Some("Hanoi".into()), fetch.clone(), clock).is_none()
+            );
         }
         let settings = crate::tools::Settings::default();
         let named = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
@@ -13318,8 +13337,8 @@ mod tests {
         assert!(super::given_at_once("weather"));
     }
 
-    /// The weather is cut at the bound with the search's group: after the
-    /// skills' that aren't a core skill's, before `web_search`.
+    /// The weather is cut at this route's bound with the search's group:
+    /// after the skills' that aren't a core skill's, before `web_search`.
     #[test]
     fn the_weather_is_cut_after_the_skills_and_before_the_search() {
         let cut = super::chat_cut(vec!["installed".into()]);
@@ -13339,13 +13358,13 @@ mod tests {
                 .collect()
         };
         let kept = |lamp: usize| -> Vec<String> {
-            crate::tools::within_bound(told(lamp), &cut)
+            crate::tools::within(told(lamp), &cut, crate::second_provider::MAX_TOOLS)
                 .unwrap()
                 .into_iter()
                 .map(|tool| tool.name)
                 .collect()
         };
-        let one_over = kept(lamp_gemini::MAX_TOOLS - 3);
+        let one_over = kept(crate::second_provider::MAX_TOOLS - 3);
         assert!(
             !one_over.iter().any(|name| name == "installed"),
             "{one_over:?}"
@@ -13354,7 +13373,7 @@ mod tests {
             one_over.iter().any(|name| name == "weather"),
             "{one_over:?}"
         );
-        let two_over = kept(lamp_gemini::MAX_TOOLS - 2);
+        let two_over = kept(crate::second_provider::MAX_TOOLS - 2);
         assert!(
             !two_over.iter().any(|name| name == "weather"),
             "{two_over:?}"
