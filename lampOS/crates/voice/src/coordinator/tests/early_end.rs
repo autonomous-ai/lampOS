@@ -808,6 +808,7 @@ impl Setup {
             early_end_blocks: self.early_ms.map(|ms| ms / 10),
             early_finalize: false,
             open_name: false,
+            unfinished_wait: false,
             faint_level: None,
             provider,
             capture,

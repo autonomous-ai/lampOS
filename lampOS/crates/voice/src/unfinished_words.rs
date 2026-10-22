@@ -13,12 +13,15 @@
 //! the words come back from speech to text, whether the words so far end
 //! on one of [`UNFINISHED_WORDS`] (`ProviderOutput::WordsEnd`, only when
 //! that changes). While they do, an end the detector decides is held for
-//! [`WAIT_BLOCKS`] more of quiet: speech in that time goes on with the same
-//! line, and a person who truly stopped after "um" is answered when it runs
-//! out. Each held end is told in the journal, counts only: the trailing
-//! word's class, how long it waited, and whether more speech came.
+//! [`WAIT_BLOCKS`] more of quiet at most, in all, a line: speech in that
+//! time goes on with the same line, and a person who truly stopped after
+//! "um" is answered when it runs out. An end the end-of-turn model already
+//! held as incomplete (`model_incomplete`) is not held again. Each held end
+//! is told in the journal, counts only: the trailing word's class, how long
+//! it waited, and whether more speech came.
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
+use unicode_normalization::UnicodeNormalization;
 
 /// Only the exact value `on`.
 pub const ENVIRONMENT: &str = "LAMP_SECOND_UNFINISHED_WAIT";
@@ -33,7 +36,9 @@ pub fn on() -> bool {
 /// in the detector's 10 ms blocks. The first builder's guess for a real
 /// mid-sentence pause is 1.2 to 1.5 s (#3026); a pause longer than this
 /// still ends the line, so a person who stopped after "um" is answered at
-/// most this much later than before. To be set from lamp-4ace's journal.
+/// most this much later than before. It is the line's, not a pause's: holds
+/// on one line add up to no more, and no line's quiet passes the silence
+/// window plus this. To be set from lamp-4ace's journal.
 pub const WAIT_BLOCKS: u16 = 130;
 
 /// What kind of word the words so far end on.
@@ -45,8 +50,6 @@ pub enum Trailing {
     Joining,
     /// A filler: "um", "uh".
     Filler,
-    /// A question word with nothing after it: "what", "where".
-    Question,
 }
 
 impl Trailing {
@@ -55,13 +58,15 @@ impl Trailing {
         match self {
             Self::Joining => "joining",
             Self::Filler => "filler",
-            Self::Question => "question",
         }
     }
 }
 
 /// Words that can't end a whole request, lower case, with their class:
 /// English, and Vietnamese for a route whose speech to text is set to it.
+/// No question words: interim results rarely carry the "?", and "tell me
+/// why", "show me how" or "you know what" are whole requests (El on #3045).
+/// A rule by the words before one would be one more guess; none is simpler.
 pub const UNFINISHED_WORDS: &[(&str, Trailing)] = &[
     ("about", Trailing::Joining),
     ("the", Trailing::Joining),
@@ -78,13 +83,6 @@ pub const UNFINISHED_WORDS: &[(&str, Trailing)] = &[
     ("my", Trailing::Joining),
     ("um", Trailing::Filler),
     ("uh", Trailing::Filler),
-    ("what", Trailing::Question),
-    ("where", Trailing::Question),
-    ("when", Trailing::Question),
-    ("how", Trailing::Question),
-    ("why", Trailing::Question),
-    ("who", Trailing::Question),
-    ("which", Trailing::Question),
     ("và", Trailing::Joining),
     ("của", Trailing::Joining),
     ("là", Trailing::Joining),
@@ -96,18 +94,21 @@ pub const UNFINISHED_WORDS: &[(&str, Trailing)] = &[
 /// The class of the last word of `words`, if it is one of
 /// [`UNFINISHED_WORDS`]. A word with a question or exclamation mark after
 /// it was said as an end ("What?"); commas and dots are only the service's
-/// formatting and are ignored.
+/// formatting and are ignored. Both sides are compared composed (NFC), so a
+/// service's decomposed "và" (a, then the grave accent) is "và".
 pub fn trailing(words: &str) -> Option<Trailing> {
     let last = words.split_whitespace().last()?;
     if last.ends_with(['?', '!']) {
         return None;
     }
+    // Composed before the trim: a decomposed accent is not alphanumeric.
+    let last: String = last.nfc().collect();
     let word = last
         .trim_matches(|c: char| !c.is_alphanumeric())
         .to_lowercase();
     UNFINISHED_WORDS
         .iter()
-        .find(|(unfinished, _)| *unfinished == word)
+        .find(|(unfinished, _)| unfinished.nfc().eq(word.chars()))
         .map(|(_, class)| *class)
 }
 
@@ -149,11 +150,24 @@ mod tests {
             Some(Trailing::Joining)
         );
         assert_eq!(trailing("Can you tell me, um,"), Some(Trailing::Filler));
-        assert_eq!(trailing("Lamp, what"), Some(Trailing::Question));
         assert_eq!(
             trailing("Cho tôi biết thời tiết của"),
             Some(Trailing::Joining)
         );
+    }
+
+    #[test]
+    fn a_decomposed_word_is_its_composed_one() {
+        // "và" as "a" and U+0300, the combining grave accent.
+        assert_eq!(trailing("Bật đèn va\u{300}"), Some(Trailing::Joining));
+        assert_eq!(trailing("Bật đèn v\u{e0}"), Some(Trailing::Joining));
+    }
+
+    #[test]
+    fn a_question_word_last_is_a_whole_request() {
+        assert_eq!(trailing("tell me why"), None);
+        assert_eq!(trailing("show me how"), None);
+        assert_eq!(trailing("you know what"), None);
     }
 
     #[test]
