@@ -5999,6 +5999,30 @@ Ready for lamp-voice: no (#2870 and #2782 await native gates; #2774 waits for th
   narrow Records grant support, own-account unit, authorized lamp proof.
   No account, group, ACL, product default or device was changed.
 
+## 2026-10-22 10:32 ICT: callback rebase includes the updated tool dispatcher
+
+Ready for lamp-voice: no (#2782 and #2870 await their current native gates; #2774 still waits for #2780).
+
+- #2782's first rebased head `a8abee38d` passed ARM64 39714810652:
+  10,025 passed, zero failed, 63 skipped, plus four doctests, 12 process
+  checks and relay signals. Strict Clippy 39714810633 passed. Actual
+  checkout merge `6fbb93c8a` used base `f71a62f55`; artifact 12398972267
+  retains the exact-head receipt. The same-voice journal test was a leaky
+  pass. These results are historical, not reused for the next head.
+- The local-music merge `2d1d35396` changed the scoped tool dispatcher and
+  run_call exercised by the callback regression. A clean source rebase
+  onto `5c8b03a2e` preserved memory selection byte-for-byte and prompt
+  composition modulo indentation. Local formatting, strict workspace
+  Clippy and three callback checks pass with zero failures or ignored.
+- Pushed `892fef9f226106784fe622190228290336c4d9af` to the same own branch
+  with an explicit lease. Source-only range-diff is unchanged
+  (`a8abee38d = 526ce54ac`); the final amendment records evidence only.
+  PR stays draft for ARM64 39717312576 and Clippy 39717312647; raw checks are in
+  `/private/tmp/fourth-kept-name-callback-checks/rebase-after-music-20261022/`.
+- #2870's strict Clippy passed; ARM64 remains running. #2789's later
+  permission contract still needs the requested Voice and bus/keeper
+  owner decisions. No account, group, unit or device change was made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
