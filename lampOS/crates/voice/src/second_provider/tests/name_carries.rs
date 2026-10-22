@@ -693,3 +693,188 @@ async fn a_refused_names_words_are_never_joined_to_the_line() {
         );
     }
 }
+
+/// With `LAMP_JOIN_CUT_WORDS` too: a chain goes on across a carried name.
+/// "Lamp." alone, then "I've been tired lately." said by it, then "Like,
+/// every afternoon," and "why?", each begun while the one before was still
+/// being answered, are asked as one named line, the name's words first.
+#[tokio::test(start_paused = true)]
+async fn a_request_in_pieces_after_the_name_is_asked_as_one_named_line() {
+    let pieces = [
+        "Lamp.",
+        "I've been tired lately.",
+        "Like, every afternoon,",
+        "why?",
+    ];
+    let searching_chat = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c",
+                "web_search",
+                json!({"query": "tired"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let played = Arc::new(Script {
+        heard: Mutex::new(pieces.iter().map(|line| Ok((*line).to_owned())).collect()),
+        chats: Mutex::new(
+            [
+                searching_chat(),
+                searching_chat(),
+                vec![text("Maybe your sleep."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    // A search under way for each piece but the last: none of its answer
+    // is heard before the next piece begins.
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            std::future::pending::<()>().await;
+            json!({})
+        })
+    });
+    let now = Arc::new(Mutex::new(Instant::now()));
+    let clock = now.clone();
+    let mut engine = Engine::with_clock(
+        played.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(move || *clock.lock().unwrap()),
+    )
+    .checking_sounds(true)
+    .carrying_the_name(true)
+    .telling_one_speaker(Arc::new(|_, _| ONE_FACE), Arc::new(|_, _| {}))
+    .joining_cut_words(Arc::new(|_, _| ONE_FACE))
+    .heeding(Arc::new(|_, _, _, _| None));
+    say_the_name(&mut engine, false, true);
+    say_after(&mut engine, &now, Duration::from_millis(1_200)).await;
+    for request in 3..=4 {
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while searched.try_recv().is_err() {
+            assert!(
+                std::time::Instant::now() < until,
+                "no search before {request}"
+            );
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+        *now.lock().unwrap() += Duration::from_millis(1_500);
+        engine.submit(start(request));
+        engine.retire_through(request - 1);
+        engine.submit(audio_at(request, NAME_READ_US + request * 1_500_000));
+        engine.submit(ended(request, false));
+    }
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the last piece's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: 4, .. }) {
+            break;
+        }
+    }
+    let asked = asked(&played);
+    assert_eq!(asked.len(), 3, "the name got no answer of its own");
+    assert_eq!(
+        last_words(&asked[0]),
+        Some(&Message::user("Lamp. I've been tired lately."))
+    );
+    assert_eq!(
+        last_words(&asked[2]),
+        Some(&Message::user(
+            "Lamp. I've been tired lately. Like, every afternoon, why?"
+        ))
+    );
+}
+
+/// Reviewer-three's P2 (23 Oct): a line said by the name goes on only from
+/// the name, never from a line before it, often the end of other talk.
+/// "yeah, I'll send it after lunch", still being answered, then "Lamp."
+/// and "what's on my calendar?", one face seen speaking each: the named
+/// line is asked without the talk before the name.
+#[tokio::test(start_paused = true)]
+async fn a_line_said_by_the_name_never_goes_on_from_talk_before_the_name() {
+    let played = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("yeah, I'll send it after lunch".to_owned()),
+                Ok("Lamp.".to_owned()),
+                Ok("what's on my calendar?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c",
+                        "web_search",
+                        json!({"query": "lunch"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A meeting at three."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            std::future::pending::<()>().await;
+            json!({})
+        })
+    });
+    let now = Arc::new(Mutex::new(Instant::now()));
+    let clock = now.clone();
+    let mut engine = Engine::with_clock(
+        played.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(move || *clock.lock().unwrap()),
+    )
+    .checking_sounds(true)
+    .carrying_the_name(true)
+    .telling_one_speaker(Arc::new(|_, _| ONE_FACE), Arc::new(|_, _| {}))
+    .joining_cut_words(Arc::new(|_, _| ONE_FACE))
+    .heeding(Arc::new(|_, _, _, _| None));
+    engine.submit(start(1));
+    engine.submit(audio_at(1, NAME_READ_US / 5));
+    engine.submit(ended(1, false));
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while searched.try_recv().is_err() {
+        assert!(std::time::Instant::now() < until, "no search for the talk");
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    *now.lock().unwrap() += Duration::from_millis(1_000);
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio_at(2, NAME_READ_US));
+    engine.submit(ended(2, true));
+    tokio::time::sleep(Duration::from_millis(1_200)).await;
+    *now.lock().unwrap() += Duration::from_millis(1_200);
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio_at(3, NAME_READ_US + 1_200_000));
+    engine.submit(ended(3, false));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+            .await
+            .expect("the named line's turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { request: 3, .. }) {
+            break;
+        }
+    }
+    let asked = asked(&played);
+    assert_eq!(
+        last_words(asked.last().unwrap()),
+        Some(&Message::user("Lamp. what's on my calendar?"))
+    );
+}
