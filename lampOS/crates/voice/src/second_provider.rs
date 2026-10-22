@@ -409,6 +409,18 @@ pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 /// voice may read ([`speech_tags`], [`Engine::speaking_tags`]): `on`, and
 /// nothing else (#2901; the lead's proposal on #1711, 22 Oct 12:4x).
 pub const SPEECH_TAGS_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_TAGS";
+/// Where the worker reads whether a turn whose every call is a light or
+/// volume change lamp-actions answered short is answered with the calls'
+/// own line, with no further chat round ([`Engine::answering_short`]):
+/// `on`, and nothing else. The same switch as lamp-actions' short answer
+/// (`lamp_actions::SHORT_ENVIRONMENT`, #1520): on the second route the
+/// model still spoke about ten words after it, a median of 10 off and 10 on
+/// (Fifth's row 24 on lamp-52e6, #2877).
+pub const SHORT_DONE_ENVIRONMENT: &str = "LAMP_SHORT_DONE";
+
+/// What a turn of short answers is said when its calls' own lines differ
+/// ("Brighter." with "Quieter."): one line, never two (#2877).
+pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
 
 /// Where the worker reads whether the lamp's name heard only in the room's
 /// sound needs a second sign to count: a face turned to the lamp, said close
@@ -505,6 +517,32 @@ pub(crate) fn said_once_note(said: &str) -> String {
         "(For you to know, not to answer: before these calls you already said aloud \"{}\", and the person heard it. Do not say it again in other words or confirm twice. Say only what the results add that you have not said, such as the time it is set for or that it failed, in a few words, or nothing if they add nothing.)",
         said.trim()
     )
+}
+
+/// The line a round's calls are answered with when every one of them was
+/// answered short (`LAMP_SHORT_DONE`, #2877): `told` holds what each call
+/// was told, one for each. lamp-actions marks a light or volume change it
+/// made with `"next"` and gives its own words in `"say"` ("Brighter.");
+/// a call refused, failed, held, unchanged ("already") or anyone else's
+/// carries no `"say"`, and then there is no line and the turn goes on as
+/// without the switch. One line for the round: the calls' own when they
+/// agree, [`SHORT_DONE_TOGETHER`] when they differ.
+pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
+    let mut says = told.iter().map(|told| {
+        told["next"]
+            .is_string()
+            .then(|| told["say"].as_str())
+            .flatten()
+            .filter(|say| say.chars().any(char::is_alphanumeric))
+    });
+    let first = says.next()??;
+    let mut line = first;
+    for say in says {
+        if say? != first {
+            line = SHORT_DONE_TOGETHER;
+        }
+    }
+    Some(line)
 }
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
@@ -734,6 +772,8 @@ struct Shared {
     /// the voice is given and the lamp's words; `Some(true)` when the voice
     /// reads tags.
     speech_tags: Option<bool>,
+    /// [`Engine::answering_short`] (#2877).
+    short_done: bool,
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
@@ -1684,6 +1724,7 @@ impl Engine {
                 said_once: false,
                 declines_in_words: false,
                 speech_tags: None,
+                short_done: false,
                 written_wait: false,
                 resend: None,
                 hearing: None,
@@ -2267,6 +2308,19 @@ impl Engine {
     pub fn speaking_tags(mut self, voiced: Option<bool>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.speech_tags = voiced;
+        }
+        self
+    }
+
+    /// `LAMP_SHORT_DONE=on` ([`SHORT_DONE_ENVIRONMENT`], #2877): a turn
+    /// whose every call is the light's or the volume's, each done and
+    /// answered short by lamp-actions (its `"say"`), with no words of the
+    /// model's before them, is answered with the calls' own line
+    /// ([`short_done_line`]) and asks the chat no further round. Before any
+    /// turn only.
+    pub fn answering_short(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.short_done = on;
         }
         self
     }
@@ -6885,6 +6939,10 @@ async fn answer(
         let mut resent = false;
         // A `not_for_me` not taken, once (#2191).
         let mut named_asked_again = false;
+        // Whether an earlier round of the turn called anything: a turn
+        // answered with its calls' own line is one whose first calls are
+        // all short (`LAMP_SHORT_DONE`, #2877).
+        let mut called_earlier = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -7132,6 +7190,8 @@ async fn answer(
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
             }
+            let first_calls = !called_earlier;
+            called_earlier |= !calls.is_empty();
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
@@ -7208,6 +7268,17 @@ async fn answer(
                 && text.chars().any(char::is_alphanumeric)
                 && !crate::not_speech::names_a_function(&text))
             .then(|| said_once_note(&text));
+            // A turn that may be answered with its calls' own line
+            // (`LAMP_SHORT_DONE`, #2877): these are its first calls, no held
+            // forget ran before them, and the model said no words beside
+            // them. Any word is beyond the ask (a call written as words
+            // too), and the turn goes on as without the switch.
+            let may_answer_short = shared.short_done
+                && first_calls
+                && !held_forget_ran
+                && !text.chars().any(char::is_alphanumeric);
+            // What each call was told, while every one may be answered short.
+            let mut short_told: Vec<Value> = Vec::new();
             messages.push(Message::assistant_calls_with(
                 Some(text),
                 &calls,
@@ -7408,6 +7479,9 @@ async fn answer(
                         picture_note(&answer.told),
                     ));
                 }
+                if may_answer_short {
+                    short_told.push(answer.told.clone());
+                }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
                     if !shared
@@ -7452,6 +7526,20 @@ async fn answer(
                 if !queue.started {
                     queue.push(LOOKING.to_owned()).await?;
                 }
+                return Ok(());
+            }
+            // Every call a light or volume change answered short: the calls'
+            // own line is the answer, and the chat is asked no further round
+            // (`LAMP_SHORT_DONE`, #2877). A call held, refused or run by
+            // anyone else told nothing short, so the count falls short.
+            if may_answer_short
+                && short_told.len() == calls.len()
+                && let Some(line) = short_done_line(&short_told)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: every call answered short; said \"{line}\", no further round (LAMP_SHORT_DONE)"
+                );
+                queue.push(line.to_owned()).await?;
                 return Ok(());
             }
             if let Some(note) = said_once {

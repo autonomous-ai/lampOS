@@ -124,7 +124,7 @@ impl Arm {
                     args: json!({}),
                     extra: None,
                 };
-                let result = done_line(before.done);
+                let result = done_line(name, before.done);
                 messages.push(Message::assistant_calls(None, std::slice::from_ref(&call)));
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
@@ -140,10 +140,25 @@ impl Arm {
 /// test holds the two the same).
 pub const SHORT_NEXT: &str = "It is done. About this change, say only a word or two, in your own words and not the same each time. Answer anything else they asked as you would.";
 
-/// The actions part's answer to a light or volume call it did, short, as
-/// `lamp_actions::Outcome::Done(..).line_for(name, true)` makes it.
-pub fn done_line(done: &str) -> serde_json::Value {
-    json!({"ok": true, "result": {"result": done, "next": SHORT_NEXT}})
+/// The actions part's answer to a light or volume call `name` it did,
+/// short, as `lamp_actions::Outcome::Done(..).line_for(name, true)` makes
+/// it, its own words (`"say"`, #2877) included.
+pub fn done_line(name: &str, done: &str) -> serde_json::Value {
+    json!({"ok": true, "result": {"result": done, "next": SHORT_NEXT, "say": short_say(name)}})
+}
+
+/// `lamp_actions::short_say`: a call's own words after a change answered
+/// short (#2877; a test holds the two the same).
+pub fn short_say(name: &str) -> &'static str {
+    match name {
+        "light_brighter" => "Brighter.",
+        "light_dimmer" => "Dimmer.",
+        "light_warmer" => "Warmer.",
+        "light_cooler" => "Cooler.",
+        "volume_up" => "Louder.",
+        "volume_down" => "Quieter.",
+        _ => "Done.",
+    }
 }
 
 /// Every function a spoken turn declares: the voice's own, and the actions
@@ -1355,10 +1370,18 @@ mod tests {
     fn the_actions_short_answer_is_theirs() {
         assert_eq!(SHORT_NEXT, lamp_actions::SHORT_NEXT);
         assert_eq!(
-            done_line("My light is a step dimmer."),
+            done_line("light_dimmer", "My light is a step dimmer."),
             lamp_actions::Outcome::Done("My light is a step dimmer.".into())
                 .line_for("light_dimmer", true)
         );
+        for function in lamp_actions::catalog(true, true) {
+            assert_eq!(
+                short_say(function.name),
+                lamp_actions::short_say(function.name),
+                "{}",
+                function.name
+            );
+        }
     }
 
     #[test]
