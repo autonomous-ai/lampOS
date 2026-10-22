@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 21:24 +07, corrected-base replacement pushed
+
+Ready for lamp-voice: no — exact replacement native checks pending
+
+Kind: tests/docs only. #3012 public head `d4d5e5a66` contains latest pre-push
+integration `c6d50559a`, including #3044's upstream formatting fix. The patch
+range is equal to authored33a. The local tree is clean and its AGENTS.md matches
+integration's current Queue/PR protocol; all new addressed replies were read.
+
+[Mac replacement evidence](verification/updater-process-cuts-native-20261022/mac-2297.json)
+retains the original upstream fmt failure and the corrected final fmt pass.
+Strict Update Clippy passed, and Update tests gave **306 passed / 0 failed /
+3 ignored / 0 filtered**. All 35 bound inputs remain identical after the final
+rebase. Fresh ARM64 39795365169 and Clippy39795365207 are now watched by their
+required job results; stale workflow aggregation will not hide their completion.
+No old native result is transferred to this replacement.
+
+The real #2810 unplug and #1812 run remain unexecuted. First still owns the
+lamp/person/persistent trial setup; owner provisioning is needed for real
+signing/publication. While CI runs, the actual-CLI exec rehearsal requirements
+and signed-release preflight are being checked without device or key access.
+The older #694 name work is in Nine's lane, not a new claim by Second.
+
+---
+
 ## Current checkpoint: 2026-10-22 20:44 +07, fifth required gate green; corrected-base merge slot next
 
 Ready for lamp-voice: no — latest-base guard awaits the preceding merge slots
