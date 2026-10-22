@@ -6981,6 +6981,33 @@ Ready for lamp-voice: no
   `b7aacc716`; code trees and running checks were unaffected. No lamp, model
   call, physical memory-row acceptance or score increase is claimed.
 
+## 2026-10-23, 00:58: store ready for train and carried proof correction
+
+Ready for lamp-voice: #3072 only, at `f6affe231`
+
+- Correcting the previous reader status: El read the corrected head at 00:31
+  and reviewer-two at 00:38, both with no P1/P2 finding. The 00:39 status
+  missed those replies; the Queue correction links the two completed reads.
+- #3072 ARM64 39822682481 and Linux clippy 39822682504 passed. Native totals
+  are 10,600 passed, zero failed, 67 skipped, including one leaky pass,
+  plus 12 doctests. Mac total remains 541/0/4 ignored with fmt, strict
+  workspace clippy and build passing. The PR is out of draft and posted as
+  NEXT TRAIN; First owns current-base combined qualification and merging.
+- Its nonblocking actual-forget P3 is authored in the inactive controller
+  follow-up: exact unfinished copies are removed before RAM/file mutation,
+  and cleanup errors refuse completion. Three controls check before reopening.
+  The core's 17 tests and these controls enter fresh checks on current main
+  `28f796223`; no runtime adapter, RPC or effective switch is enabled.
+- Common proof self-audit found a carried-speech P2: earlier visible speech
+  could qualify a new unseen piece. The correction requires matching positive
+  current-piece evidence as well as the combined window. Eight actual Engine
+  controls are authored, not qualified. The previous full Voice run was
+  deliberately canceled (exit 143), not passed. Prior focused passes do not
+  qualify this new source. #3064 and both product carries remain draft.
+- The clean root checkout now fast-forwards to `28f796223` and its local
+  AGENTS.md matches the Queue/PR protocol. No lamp, deployment, model call,
+  physical memory-row acceptance or score increase is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
