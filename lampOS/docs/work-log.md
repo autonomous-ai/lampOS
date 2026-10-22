@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-22 10:56 +07, metadata diagnostics native green
+
+#2871 head `db7db7a5f5c029dd442aa2120f357b5af9149643` is CI-qualified for
+review: ARM64 39716702065 and Linux Clippy 39716702114 passed.
+[Native evidence](verification/requested-audio-metadata-native-20261022/README.md)
+records **10,189 passed, 0 failed, 63 skipped**, including one leaky pass,
+plus 4 doc tests, 12 custom-harness tests and relay. All six diagnostic
+regressions and both unchanged content controls passed. The actual tested
+merge is `4e0abb5416ee8005f010326275b548e7287604a9`, base `4f2df6bf6`.
+The Mac 467/0/0 gate remains separate. Reviewer decides merge; no device
+or original-refusal-cause claim is made.
+
+#2879 has green Clippy; its positive ARM64 and separate unshown-music
+negative-control ARM64 continue. #2810's initial Update gate passed
+297/0/2, its twelve fault controls failed as intended, and its six restored
+fixtures passed. Its current-base gate is running before push.
+#2780 is now merged as `fc082681a`; #2764's rebase/gate/push is next when
+the local Cargo cache is free. #2767 awaits First's default-install read.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:41 +07, voice-state regression opened
 
 #2879 is open at `4e060a224cb3d04bcd4404355aa5fc0bac187705`, on the actual
