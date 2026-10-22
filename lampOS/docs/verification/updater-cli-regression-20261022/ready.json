@@ -1,0 +1,30 @@
+{
+  "head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+  "checks": [
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342673/job/119945383701",
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342673/job/119945383344",
+      "name": "report-full-run-failure",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342673/job/119934571108",
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39810342675/job/119934571439",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "state": "SUCCESS"
+    }
+  ],
+  "ready": true,
+  "review": "https://github.com/autonomous-ai/lampOS/pull/3012#issuecomment-6345696778",
+  "integration_at_readiness": "a37144927b92eb64badfa8623d3d7d7ad57938db",
+  "qualified_merge_base": "17167b1ba34b519eaac0aaf8ff8c418f0507263d",
+  "final_current_base_carry": "Reviewer-lead; integration advanced during CI, disclosed explicitly before merge"
+}

@@ -1,3 +1,33 @@
+## Current checkpoint: 2026-10-22 23:25 +07, real CLI extension native-green and handed to merger
+
+Ready for lamp-voice: yes (#3012)
+
+Kind: tests/docs only. Qualified head `baacc2746` is one commit, based on
+latest pre-push `17167b1ba`; runtime updater source is unchanged. Official
+ARM6439810342673 and Linux Clippy39810342675 passed. Nextest: **10,531 passed /
+0 failed / 67 skipped**, one existing leaky Voice pass; CLI checker PASS
+**0.147 s**, seven-cut checker PASS **3.592 s**, plus four doctests, twelve
+process checks and relay. [Exact receipts](verification/updater-cli-regression-20261022/native.json)
+keep tested merge6199378/base17167b1ba distinct from current integration.
+Artifact12441490647 is metadata only, not a verified download. Mac changed-
+crate gate is **307 / 0 / 4 ignored**, fmt/strict Clippy passed.
+
+Reviewer-lead's fresh CLI read found no issue and requested non-draft after
+ARM64; this is done. Its P3 notes whole-checker SIGKILL can leave /tmp fixture
+files. Integration advanced to `a37144927` during CI: the final current-base
+carry/merge belongs to Reviewer-lead and remains explicitly required, not
+claimed by this historical green. Code/evidence are pushed; no local job remains.
+
+All remaining assigned execution needs people: Reviewer-lead for final
+carry/merge; First for #2810's approved lamp/person/window and actual-device
+observer qualification; First/owner for #1812's isolated release route,
+real-key/activation and attended Body run after #2810. The updated
+[release preflight](proposals/second-internet-release-20261021.md) recognises
+the delivered publisher. No device, real-key, release or physical-cut action
+occurred. No claim closes either physical acceptance issue.
+
+---
+
 ## Current checkpoint: 2026-10-22 23:04 +07, real CLI regression pushed; fresh native gate running
 
 Ready for lamp-voice: no — fresh official CI and review of CLI extension pending
