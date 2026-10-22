@@ -10494,26 +10494,25 @@ fn conversation_with_gate(
                     "lamp-voice: saying what the skill {} asked (priority {priority})",
                     ticket.skill()
                 );
-                record(
-                    trace,
-                    json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session}),
-                )?;
                 // A note whose skill asked (`who`, Welcome back alone) is
                 // told who is at the lamp: a known face by name, someone who
                 // comes by often one beat warmer (#2825). No other's is.
-                let turn = crate::person::told_who(
-                    turn,
-                    ticket.told_who(),
-                    presence
-                        .as_ref()
-                        .filter(|presence| presence.present(clock))
-                        .map(|presence| {
-                            (
-                                crate::known_faces::known_from_environment(),
-                                presence.familiar(),
-                            )
-                        }),
-                );
+                let here = presence
+                    .as_ref()
+                    .filter(|presence| presence.present(clock))
+                    .map(|presence| {
+                        (
+                            crate::known_faces::known_from_environment(),
+                            presence.familiar(),
+                        )
+                    });
+                let (told_who, familiar) =
+                    crate::person::told_record(ticket.told_who(), here.as_ref());
+                record(
+                    trace,
+                    json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session,"told_who":told_who,"familiar":familiar}),
+                )?;
+                let turn = crate::person::told_who(turn, ticket.told_who(), here);
                 snapshot = commit_written_turn(
                     owner,
                     reply,

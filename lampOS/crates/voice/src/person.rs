@@ -166,9 +166,46 @@ pub fn told_who(
     }
 }
 
+/// What a say's `skill_says` record keeps of [`told_who`] (#2831): whether
+/// its note was told who is at the lamp, and Mood's level it was told with
+/// (`new`, `regular`, `close`, or null when not told or not known). Never the
+/// name or the words.
+pub fn told_record(
+    who: bool,
+    here: Option<&(Option<String>, Option<lamp_msgs::FamiliarLevel>)>,
+) -> (bool, Option<lamp_msgs::FamiliarLevel>) {
+    match here {
+        Some((_, familiar)) if who => (true, *familiar),
+        _ => (false, None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #2831: the record says a who-skill's note was told, with Mood's
+    /// level; any other say, or nobody at the lamp, false and null. The
+    /// name is never in it.
+    #[test]
+    fn a_says_record_keeps_the_level_its_note_was_told_and_no_name() {
+        use lamp_msgs::FamiliarLevel;
+        let here = Some((Some("Minh".to_owned()), Some(FamiliarLevel::Regular)));
+        let fields = |(told, familiar): (bool, Option<FamiliarLevel>)| serde_json::json!({"told_who": told, "familiar": familiar});
+        let told = fields(told_record(true, here.as_ref()));
+        assert_eq!(
+            told,
+            serde_json::json!({"told_who": true, "familiar": "regular"})
+        );
+        assert!(!told.to_string().contains("Minh"));
+        let not_asked = serde_json::json!({"told_who": false, "familiar": null});
+        assert_eq!(fields(told_record(false, here.as_ref())), not_asked);
+        assert_eq!(fields(told_record(true, None)), not_asked);
+        assert_eq!(
+            fields(told_record(true, Some(&(None, None)))),
+            serde_json::json!({"told_who": true, "familiar": null})
+        );
+    }
 
     /// #1670, #2825: a skill's note is told a known face's name, and one
     /// beat warmer for someone who comes by often; nobody known, nothing.
