@@ -5,6 +5,49 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 22:18 — wake native gates and peer read passed
+
+Ready for lamp-voice: yes (#3021 qualified source; final current-base carry/merge remains Reviewer-lead's).
+
+- Exact source head `c579d1a4f6bc4eca58c342531ff06dead1b8004a` passed
+  [ARM64 39799976091](https://github.com/autonomous-ai/lampOS/actions/runs/39799976091),
+  job `119897576874`, in 17 min 35 s. Tested merge `653d7ea` into
+  `b722fd212`: **6,825 nextest tests passed (one leaky), zero failed,
+  31 skipped**. New permission-expiry and worker-fault cases both ran and
+  passed. Four doctests, relay signals and all 12 own-harness process
+  checks passed. Release/package/publication rehearsals, checksums and
+  artifact export/upload passed. The leaky pass is the existing
+  same-voice journal test. Signing/publication jobs were skipped for PR.
+- [Linux Clippy 39799976038](https://github.com/autonomous-ai/lampOS/actions/runs/39799976038)
+  passed all workspace crates and targets with warnings denied on the
+  exact head, job `119897577247`, in 3 min 41 s. Both required jobs are
+  completed/success, not inferred from a workflow aggregate. Native
+  watcher exited zero; no local Cargo or CI watcher job remains.
+- Artifact `lampos-arm64-c579d1a4f6bc4eca58c342531ff06dead1b8004a`,
+  ID `12436855446`, is present and unexpired. This does not replace the
+  later coherent #2948 build or its real-hand gate.
+- El's [exact-head re-read](https://github.com/autonomous-ai/lampOS/pull/3021#issuecomment-6343871958)
+  confirms all three earlier points fixed and no P1/P2. All new Queue,
+  discussion, inline and formal-review comments on #3021/#2948 were read;
+  no additional request for Third remains unanswered. PR body has the
+  exact receipts, draft CI hold lifted, and the qualified source is handed
+  to Reviewer-lead for its read/final current-base rebase and serial merge.
+- Final fetched integration `16b1a2a15` adds Eyes helper, skill-creator
+  docs and task corrections; none of the seven task files drifted from
+  the qualified base. That is not clearance for an old-base merge:
+  Reviewer-lead must take the latest base and the current c579 source,
+  reading every later source comment before any carry. No other branch
+  was pushed by Third. Source tree clean, single-line commit verified.
+- First carries the accepted fix into #2948; Fifth/person owns the
+  [52e6 hand try](https://github.com/autonomous-ai/lampOS/pull/2948#issuecomment-6343888972).
+  #2948 stays draft. No device access, install, ARM64 linking on the Mac,
+  played round, acoustic latency or first-word-retention result is claimed.
+  All remaining assigned steps require Reviewer-lead/First/Fifth/person.
+- Found outside this task: ARM64 workflow comments still say the PR
+  profile skips real-clock tests, but `.config/nextest.toml`'s actual
+  `profile.pr` includes them. The actual config and job results governed
+  this qualification; no test was waived. Flagged to First on the Queue.
+
 ## 2026-10-22 21:56 — wake review fixes pushed
 
 Ready for lamp-voice: no (#3021; replacement native checks pending).
