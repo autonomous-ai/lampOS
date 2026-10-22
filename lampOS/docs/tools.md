@@ -434,13 +434,16 @@ neither is `reports_stop` nor any of the actions part's (the first
 builder, on #2644): the cut takes the second route's fetch, then its time
 elsewhere, then `reports_state` (reading reports' state is rare), then the
 skills' functions that are not a core skill's, the last first, then the
-search. On the product's chat route the fetch, the time elsewhere and
-`reports_state` are left out; in a Live session `reports_state` alone, and
-`dance` stays in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
+search. A Live session's bound is 32 (`lamp_gemini::MAX_TOOLS`); the second
+route's chat requests have their own, 48 (`second_provider::MAX_TOOLS`,
+22 Oct: Live's bound had left out the time, the light scenes and the search
+on lamp-4ace). On the product's chat route nothing is left out; in a Live
+session `reports_state` alone, and `dance` stays in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
 core skill, so it is a core name and never the one cut. Whatever is cut is
-said once, at start, on a plain journal line (`past the bound of 32, left
-out: …`); only the lamp's own and core skills' functions alone past 32 are
-an error line (`alone are past the bound of 32; left out: …`). Tests:
+said once, at start, on a plain journal line naming the bound (`past the
+bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
+and core skills' functions alone past it are an error line (`alone are past
+the bound of 32; left out: …`). Tests:
 `with_reports_on_dance_stays_at_the_bound`
 (`crates/update/tests/functions.rs`),
 `reports_add_two_functions_and_the_last_skills_are_cut_past_32` and

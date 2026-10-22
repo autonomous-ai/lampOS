@@ -579,7 +579,8 @@ other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
 on, its own hello off, and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
-A skill with a tool costs one of the 32 functions a session takes, after
+A skill with a tool costs one of the 32 functions a Live session takes (48
+on the second route's chat requests, `second_provider::MAX_TOOLS`), after
 the voice's own and the actions part's: a product lamp's are 31
 (`crates/update/tests/functions.rs`). Past 32 a core skill's function is
 never the one cut (the owner's rule, on #2614): the tools file names core
@@ -1342,7 +1343,8 @@ for it.
       The skills here give the model 1 function (check_my_work). A session takes 32, …
 
 - **A session's 32 functions.** `install` and `list` end with the functions
-  the skills give the model, because a session takes 32, the voice's own
+  the skills give the model, because a Live session takes 32 (the second
+  route's chat requests 48), the voice's own
   and the actions part's first (30 on a product lamp), and past 32 the last
   skills' are dropped unless the voice runs with `LAMP_USE_SKILL=on` (#1696),
   which gives every skill through one function, `use_skill`
