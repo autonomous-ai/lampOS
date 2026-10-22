@@ -12,6 +12,8 @@
 //!   another.
 //! - [`complete`]: whether a record kept is complete against a matrix
 //!   version, for the pilot (#2795): every check judged, none missing.
+//! - [`fleet`]: each lamp's latest record in the records' place judged
+//!   that way, one line per lamp.
 //!
 //! Nothing here opens a device or a socket; the station tool reads files and
 //! writes one.
@@ -24,6 +26,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
 pub mod complete;
+pub mod fleet;
 pub mod inputs;
 pub mod matrix;
 pub mod record;

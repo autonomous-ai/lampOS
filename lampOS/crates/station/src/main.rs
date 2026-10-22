@@ -2,10 +2,11 @@
 //! self-test report, the station's answers and the coverage matrix, keeps
 //! it in `--out` (and with `--records`, in the records' place under the
 //! lamp's name), and prints the run's verdict; `lamp-station records` reads
-//! one lamp's records back (docs/production-testing.md).
+//! one lamp's records back; `lamp-station complete` says whether every
+//! lamp's latest record is complete against a matrix (docs/production-testing.md).
 use jiff::Timestamp;
 use lamp_station::{
-    Refused, Utc, complete,
+    Refused, Utc, complete, fleet,
     inputs::{self, Answers},
     matrix::Matrix,
     record::{self, Device, Given, Occasion, Record, RunVerdict},
@@ -18,7 +19,8 @@ const USAGE: &str = "usage: lamp-station --matrix PATH --answers PATH [--selftes
   --suite VERSION+COMMIT --station station-ID --operator op-DIGITS
   --occasion routine|retest|qualification [--retest-of RECORD] --out DIR
   [--records PLACE]
-       lamp-station records --records PLACE --device ID [--matrix PATH]";
+       lamp-station records --records PLACE --device ID [--matrix PATH]
+       lamp-station complete --records PLACE --matrix PATH [--device ID]...";
 const HELP: &str = "Makes the record of one production test run: every check's verdict and
 measurement, the failures against their limits, and the run's verdict. The
 record is written whole into --out as <run id>.json; one already there is
@@ -38,7 +40,15 @@ check missing, skipped, interrupted or not checked), 2 no record was made
 in --out or in --records). `records`: 0 the lamp's latest run passed (and is
 complete, with --matrix) and every file in its folder is its record, 1 not,
 3 the lamp has none, 2 the arguments were refused or the place could not be
-read.";
+read.
+
+`lamp-station complete` takes each lamp's folder in the place, or each lamp
+named with --device, and judges its latest routine or retest record (by the
+record's own start time) against --matrix: one line per lamp, `complete` or
+`not complete` with each gap's kind and check, and the run's verdict as its
+checks give it; a lamp with none is `no record`. It changes nothing. Exit
+status: 0 every lamp is complete, 1 one is not, 3 there is no lamp, 2 the
+arguments were refused or the place or the matrix could not be read.";
 
 #[derive(Debug)]
 struct Arguments {
@@ -246,6 +256,91 @@ fn lookup(given: &[String]) -> ExitCode {
     }
 }
 
+/// What `lamp-station complete` is given.
+#[derive(Debug, PartialEq)]
+struct Pilot {
+    place: PathBuf,
+    matrix: PathBuf,
+    /// The lamps named; every lamp's folder in the place when none.
+    lamps: Vec<String>,
+}
+
+/// `None` for `--help`.
+fn parse_complete(given: &[String]) -> Result<Option<Pilot>, String> {
+    let (mut place, mut matrix, mut lamps) = (None, None, Vec::new());
+    let mut given = given.iter();
+    while let Some(flag) = given.next() {
+        if matches!(flag.as_str(), "-h" | "--help") {
+            return Ok(None);
+        }
+        let mut value = || given.next().ok_or_else(|| format!("{flag} needs a value"));
+        let slot = match flag.as_str() {
+            "--records" => &mut place,
+            "--matrix" => &mut matrix,
+            "--device" => {
+                let lamp = value()?.clone();
+                if lamps.contains(&lamp) {
+                    return Err(format!("--device {lamp} is given twice"));
+                }
+                lamps.push(lamp);
+                continue;
+            }
+            other => return Err(format!("unknown argument {other:?}")),
+        };
+        if slot.replace(value()?.clone()).is_some() {
+            return Err(format!("{flag} is given twice"));
+        }
+    }
+    Ok(Some(Pilot {
+        place: place.ok_or("--records is needed")?.into(),
+        matrix: matrix.ok_or("--matrix is needed")?.into(),
+        lamps,
+    }))
+}
+
+/// Says, one line per lamp, whether each lamp's latest record is complete
+/// against the matrix. Reads only.
+fn pilot(given: &[String]) -> ExitCode {
+    let refused = |why: String| {
+        eprintln!("lamp-station complete: {why}");
+        ExitCode::from(2)
+    };
+    let pilot = match parse_complete(given) {
+        Ok(Some(pilot)) => pilot,
+        Ok(None) => {
+            println!("{USAGE}\n\n{HELP}");
+            return ExitCode::SUCCESS;
+        }
+        Err(why) => return refused(format!("{why}\n{USAGE}")),
+    };
+    let matrix = match Matrix::read(&pilot.matrix) {
+        Ok(matrix) => matrix,
+        Err(why) => return refused(why.to_string()),
+    };
+    let (names, others) = if pilot.lamps.is_empty() {
+        match fleet::lamps_in(&pilot.place) {
+            Ok(found) => found,
+            Err(error) => {
+                return refused(format!("{}: {error}", pilot.place.display()));
+            }
+        }
+    } else {
+        (pilot.lamps, Vec::new())
+    };
+    let mut lamps = Vec::new();
+    for name in &names {
+        match fleet::judge(&pilot.place, name, &matrix) {
+            Ok(lamp) => lamps.push(lamp),
+            Err(error) => return refused(format!("{name}: {error}")),
+        }
+    }
+    let (lines, status) = fleet::summary(&matrix, &lamps, &others);
+    for line in lines {
+        println!("{line}");
+    }
+    ExitCode::from(status)
+}
+
 fn verdict(verdict: RunVerdict) -> &'static str {
     match verdict {
         RunVerdict::Pass => "pass",
@@ -317,6 +412,9 @@ fn main() -> ExitCode {
     let given: Vec<String> = std::env::args().skip(1).collect();
     if given.first().is_some_and(|first| first == "records") {
         return lookup(&given[1..]);
+    }
+    if given.first().is_some_and(|first| first == "complete") {
+        return pilot(&given[1..]);
     }
     let arguments = match parse(&given) {
         Ok(Some(arguments)) => arguments,
@@ -483,6 +581,55 @@ mod tests {
         assert!(lookup(&["--records", "place", "--device", "a", "--device", "b"]).is_err());
         assert!(lookup(&["--records", "place", "--device", "a", "--out", "x"]).is_err());
         assert!(lookup(&["--records"]).is_err());
+    }
+
+    #[test]
+    fn complete_needs_its_place_and_a_matrix_and_takes_lamps() {
+        let pilot = |given: &[&str]| {
+            parse_complete(&given.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+        };
+        assert_eq!(
+            pilot(&["--records", "place", "--matrix", "m.toml"])
+                .unwrap()
+                .unwrap(),
+            Pilot {
+                place: "place".into(),
+                matrix: "m.toml".into(),
+                lamps: Vec::new()
+            }
+        );
+        let named = pilot(&[
+            "--device",
+            "lamp-4ace",
+            "--records",
+            "place",
+            "--device",
+            "lamp-52e6",
+            "--matrix",
+            "m.toml",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(named.lamps, ["lamp-4ace", "lamp-52e6"]);
+        assert!(pilot(&["--help"]).unwrap().is_none());
+        assert!(pilot(&["--records", "place"]).is_err());
+        assert!(pilot(&["--matrix", "m.toml"]).is_err());
+        assert!(
+            pilot(&[
+                "--records",
+                "p",
+                "--matrix",
+                "m",
+                "--device",
+                "a",
+                "--device",
+                "a"
+            ])
+            .is_err()
+        );
+        assert!(pilot(&["--records", "p", "--records", "q", "--matrix", "m"]).is_err());
+        assert!(pilot(&["--records", "p", "--matrix", "m", "--out", "x"]).is_err());
+        assert!(pilot(&["--records", "p", "--matrix", "m", "--device"]).is_err());
     }
 
     /// The Reviewer-lead on #3054: a lamp stands by its latest run. A
