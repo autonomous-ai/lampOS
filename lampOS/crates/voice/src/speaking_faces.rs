@@ -33,6 +33,9 @@ pub const FEWEST_LOOKS: usize = 3;
 /// nothing fresh from them, one empty look is counted this often, as one of
 /// theirs would be.
 pub const EYES_EVERY: Duration = Duration::from_millis(500);
+/// How far before a moment a look still says a face was in view then
+/// ([`SpeakingFaces::in_view_at`]): two of the eyes' frames at their slowest.
+pub const IN_VIEW_BEFORE: Duration = Duration::from_millis(1200);
 
 /// Where the voice reads that the eyes judge whether a face is speaking at
 /// this lamp (`LAMP_EYES_SPEAKING=on`, the eyes' own switch, set in the
@@ -111,6 +114,9 @@ struct Look {
     boot: String,
     /// The passing ids that read speaking in this look.
     speaking: Vec<String>,
+    /// Every passing id in this look, speaking or not
+    /// ([`SpeakingFaces::in_view_at`]).
+    tracked: Vec<String>,
     /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
     /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
     turned: Vec<String>,
@@ -189,6 +195,9 @@ impl SpeakingFaces {
             })
             .unwrap_or_default();
         let speaking = speaking_faces.iter().map(|face| face.id.clone()).collect();
+        let tracked = frame
+            .map(|(_, faces)| faces.faces.iter().map(|face| face.id.clone()).collect())
+            .unwrap_or_default();
         let turned = speaking_faces
             .iter()
             .filter(|face| face.facing == Some(true))
@@ -237,6 +246,7 @@ impl SpeakingFaces {
             at,
             boot,
             speaking,
+            tracked,
             turned,
             turned_silent,
             turned_unread,
@@ -304,6 +314,37 @@ impl SpeakingFaces {
             .filter(|(_, first)| *first < written)
             .max_by_key(|(_, first)| *first)?;
         Some((name, format!("{boot}/{face}")))
+    }
+
+    /// Whether the face `face` (`boot/f3`, as [`Self::known_with_boot`]
+    /// gives it) was in view at `at`: in some look from [`IN_VIEW_BEFORE`]
+    /// before `at` to `at` itself. A passing id is nobody's once its face
+    /// has gone, so the same id seen later means the same face stayed in
+    /// view since. No look then is not in view.
+    pub fn in_view_at(&self, face: &str, at: Instant) -> bool {
+        let from = at.checked_sub(IN_VIEW_BEFORE).unwrap_or(at);
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= from && look.at <= at && !look.boot.is_empty())
+                .any(|look| {
+                    look.tracked
+                        .iter()
+                        .any(|id| format!("{}/{id}", look.boot) == face)
+                })
+        })
+    }
+
+    /// Whether the person the eyes know at the lamp now (`known`, its face
+    /// beside it, [`Self::known_with_boot`]) is `person`, and their face was
+    /// in view at `since` ([`Self::in_view_at`]): a known face named after a
+    /// line began was at the lamp, unknown yet, as it began, not walking in
+    /// during it (#2807, El's P2 on #3108). Blocking: reads the files.
+    pub fn known_in_view_since(&self, known: &Path, person: &str, since: Instant) -> bool {
+        self.known_with_boot(known).is_some_and(|(name, face)| {
+            crate::known_faces::memory_person(&name) == person && self.in_view_at(&face, since)
+        })
     }
 
     /// The faces that read speaking and turned to the lamp in at least half
@@ -844,6 +885,63 @@ mod tests {
         let bound = at(first + ms(1));
         assert_eq!(bound, Some(("Lan".to_owned(), "b/f1".to_owned())));
         assert!(seen_saying(&said, &lan, bound));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2807 on lamp-c0a4: a line armed only by the eyes' known file
+    /// changing mid-line keeps for the known face only if that face's
+    /// passing id was in view as the line began. Lan's `f1` tracked (not
+    /// speaking, unknown yet) from before the line: in view. El's walk-in on
+    /// #3108: `f2` first tracked mid-line is not; nor is a face of another
+    /// boot, another name in the known file, or a moment with no look within
+    /// [`IN_VIEW_BEFORE`] before it. An empty look (nothing fresh) shows
+    /// nobody.
+    #[test]
+    fn a_known_face_was_in_view_at_a_lines_start_only_if_its_id_was_tracked_then() {
+        let dir = std::env::temp_dir().join(format!("speaking-faces-view-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let now = Instant::now();
+        let ago = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        let eyes = SpeakingFaces::default();
+        let mut frame = 0u64;
+        // `f1` from 3 s ago; `f2` joins 0.8 s ago.
+        for step in 0..15u32 {
+            let at = ago(3.0) + Duration::from_millis(200) * step;
+            let mut seen = vec![("f1", No)];
+            if at >= ago(0.8) {
+                seen.push(("f2", No));
+            }
+            frame += 1;
+            eyes.look(at, Some((("b", frame), &faces(&seen))));
+        }
+        let begun = ago(1.5);
+        let lan = crate::known_faces::memory_person("Lan");
+        let named = |name: &str, face: &str| {
+            std::fs::write(&known, format!("{name}\n")).unwrap();
+            std::fs::write(known_face_of(&known), format!("{face}\n")).unwrap();
+        };
+        named("Lan", "f1");
+        assert!(eyes.in_view_at("b/f1", begun));
+        assert!(
+            eyes.known_in_view_since(&known, &lan, begun),
+            "the lamp's case"
+        );
+        named("Lan", "f2");
+        assert!(!eyes.in_view_at("b/f2", begun));
+        assert!(!eyes.known_in_view_since(&known, &lan, begun), "walked in");
+        assert!(eyes.known_in_view_since(&known, &lan, ago(0.1)));
+        named("Ann", "f1");
+        assert!(
+            !eyes.known_in_view_since(&known, &lan, begun),
+            "another name"
+        );
+        assert!(!eyes.in_view_at("a/f1", begun), "another boot");
+        assert!(!eyes.in_view_at("b/f1", ago(4.5)), "no look then");
+        let quiet = now + IN_VIEW_BEFORE + EYES_EVERY;
+        eyes.look(quiet, None);
+        assert!(!eyes.in_view_at("b/f1", quiet), "an empty look");
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
