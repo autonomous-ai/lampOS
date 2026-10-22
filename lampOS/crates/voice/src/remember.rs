@@ -1654,6 +1654,15 @@ fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExch
 }
 
 fn hand_on_days(done: Vec<FinishedExchange>, wall: u64, client: &DaysClient) {
+    // #1693 (reviewer-two's P2 on #2894): a finished reply that asks about
+    // the dated follow-up marks it whether or not its exchange is
+    // journalled: "I'll remember that. How was your sister's wedding?" in a
+    // remember turn is kept out of the journal, never out of the mark. Only
+    // the exchanges the thread hands on as finished, the same the journal
+    // is given before its keep-out: nothing the thread holds back is here.
+    for exchange in &done {
+        client.mark_if_asked(&exchange.said, exchange.whose.as_deref());
+    }
     for exchange in journalable(done) {
         client.finished_exchange_of(
             exchange.request,
@@ -2552,20 +2561,85 @@ fn content_words(text: &str) -> Vec<String> {
 
 /// Whether the lamp's own reply `said` asks about a dated follow-up whose
 /// key words ([`content_words`]) are `event` (#1693, the first builder on
-/// #2602, 22 Oct 09:4x): it shares at least two of them ("how was your
-/// sister's wedding" for "Sister's wedding is on Saturday"), or one and
-/// has a question mark ("how was Saturday?"). Deterministic, on the reply
-/// alone. Its limits: a paraphrase with none of the event's words ("how
-/// did the big day go?") is not seen, and the memory offers it again on a
-/// later day, at most its cap; a reply that names the event without asking
-/// ("your sister's wedding sounds lovely") counts, as it was brought up;
-/// a reply in another language than the event's words is not seen.
+/// #2602, 22 Oct 09:4x; reviewer-two's P2 on #2894): one sentence of it is
+/// itself a question, ending in `?` or `？`, and that sentence holds two of
+/// the event's key words, or one that is the event's own ([`WHEN_WORDS`]
+/// excluded: a weekday, a month, a time word, or a word with a digit).
+/// "How was your sister's wedding?" and "Did the wedding go well?" ask;
+/// "Saturday should be sunny. Anything else I can help with?" does not,
+/// as its question and the event's day are in different sentences.
+/// Deterministic, on the reply alone. Its limits: a paraphrase with none
+/// of the event's own words ("how did the big day go?") or a question by
+/// its day alone ("how was Saturday?") is not seen, and the memory offers
+/// it again on a later day, at most its cap; a question about something
+/// else that names one of its own words ("is your sister well?")
+/// counts; a statement without a question mark ("your
+/// sister's wedding sounds lovely") does not; a reply in another language
+/// than the event's words is not seen.
 fn asks_about(said: &str, event: &[String]) -> bool {
-    let shared = content_words(said)
-        .iter()
-        .filter(|word| event.contains(word))
-        .count();
-    shared >= 2 || (shared == 1 && (said.contains('?') || said.contains('\u{ff1f}')))
+    let mut start = 0;
+    for (at, mark) in said.char_indices() {
+        if !matches!(mark, '.' | '!' | '?' | '\u{ff1f}' | '\u{3002}' | '\n') {
+            continue;
+        }
+        let sentence = &said[start..at];
+        start = at + mark.len_utf8();
+        if !matches!(mark, '?' | '\u{ff1f}') {
+            continue;
+        }
+        let shared: Vec<String> = content_words(sentence)
+            .into_iter()
+            .filter(|word| event.contains(word))
+            .collect();
+        if shared.len() >= 2 || shared.iter().any(|word| !is_when_word(word)) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Words that say when, not what: a key word of the event that is one of
+/// these, or has a digit, never alone makes a question about it
+/// ([`asks_about`]). As [`content_words`] gives them: lower-cased, a
+/// plural's `s` off.
+const WHEN_WORDS: &[&str] = &[
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+    "tomorrow",
+    "tonight",
+    "yesterday",
+    "weekend",
+    "week",
+    "month",
+    "year",
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "day",
+    "next",
+    "last",
+];
+
+fn is_when_word(word: &str) -> bool {
+    WHEN_WORDS.contains(&word) || word.chars().any(|c| c.is_ascii_digit())
 }
 
 /// [`hits_note`]'s words for a kept list's answer and what was heard: the
@@ -3941,6 +4015,25 @@ impl DaysClient {
         }
     }
 
+    /// #1693: the lamp's finished reply `said` to `person` asked about the
+    /// dated follow-up it was offered ([`asks_about`]): the memory is told,
+    /// once (`follow_up_asked`), so it is never offered again. Apart from
+    /// the journal ([`hand_on_days`]): a remember or forget turn's reply is
+    /// kept out of the journal but still marks it (reviewer-two's P2 on
+    /// #2894).
+    fn mark_if_asked(&self, said: &str, person: Option<&str>) {
+        let Ok(mut context) = self.context.lock() else {
+            return;
+        };
+        let asked = context
+            .asking
+            .take_if(|(whose, _, words)| Some(whose.as_str()) == person && asks_about(said, words));
+        drop(context);
+        if let Some((whose, id, _)) = asked {
+            let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
+        }
+    }
+
     fn queue_exchange(
         &self,
         at_unix_ms: u64,
@@ -3953,15 +4046,6 @@ impl DaysClient {
             self.lost.fetch_add(1, Ordering::Relaxed);
             return false;
         };
-        // #1693: the lamp asked about the dated follow-up it was offered
-        // ([`asks_about`]): the memory is told, once, so it is never offered
-        // again. Whether or not this exchange is journalled: it was said.
-        if let Some((whose, id, _)) = context
-            .asking
-            .take_if(|(whose, _, words)| Some(whose.as_str()) == person && asks_about(said, words))
-        {
-            let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
-        }
         if context.journal_inhibited || context.uncertain_writes != 0 {
             self.lost.fetch_add(1, Ordering::Relaxed);
             context.held_back = context.held_back.saturating_add(1);
@@ -7026,25 +7110,32 @@ mod tests {
         assert!(!off.contains("it was on"));
     }
 
-    /// #1693 (the first builder on #2602, 22 Oct 09:4x): the lamp's own
-    /// reply asks about a dated follow-up when it shares two of its key
-    /// words, or one with a question mark; an unrelated reply, or one word
-    /// without a question, does not.
+    /// #1693 (the first builder on #2602, 22 Oct 09:4x; reviewer-two's P2
+    /// on #2894): the lamp's own reply asks about a dated follow-up when one
+    /// sentence of it is a question holding two of its key words, or one of
+    /// its own (not a day); the event's day in one sentence and a question
+    /// mark in another, a statement, or a question by its day alone, do not.
     #[test]
     fn a_reply_asks_about_an_event_by_its_words() {
         let event = content_words("Sister's wedding is on Saturday");
         for asks in [
             "How was your sister's wedding?",
-            "Your sister's wedding was on Saturday, wasn't it",
-            "How was Saturday?",
+            "Did the wedding go well?",
             "Did the wedding go well？",
+            "I'll remember that. How was your sister's wedding?",
+            "Oh! Was Saturday's wedding fun? Tell me.",
         ] {
             assert!(asks_about(asks, &event), "{asks}");
         }
         for not in [
+            "Saturday should be sunny. Anything else I can help with?",
             "Not much new here. The rain stopped, at least.",
             "Anything new with you?",
             "I spoke to my sister about the weather.",
+            "Your sister's wedding sounds lovely.",
+            "Your sister's wedding sounds lovely. Anything else I can help with?",
+            "How was Saturday?",
+            "How was your sister's wedding",
             "",
         ] {
             assert!(!asks_about(not, &event), "{not}");
@@ -7104,26 +7195,95 @@ mod tests {
             }
             marks
         };
-        assert!(client.finished_exchange_for(
+        // Requests no other test names.
+        let done = |request: u64, said: &str, whose: &str| {
+            vec![FinishedExchange {
+                request,
+                age: Duration::from_secs(1),
+                heard: "anything new with you?".to_owned(),
+                said: said.to_owned(),
+                whose: Some(whose.to_owned()),
+            }]
+        };
+        hand_on_days(
+            done(
+                u64::MAX - 70,
+                "Not much new here. The rain stopped, at least.",
+                MINH,
+            ),
             NOW,
-            "anything new with you?",
-            "Not much new here. The rain stopped, at least.",
-            Some(MINH)
-        ));
+            &client,
+        );
+        assert!(asked(&work).is_empty());
+        // The reviewer's case: the day in one sentence, a question in another.
+        hand_on_days(
+            done(
+                u64::MAX - 71,
+                "Saturday should be sunny. Anything else I can help with?",
+                MINH,
+            ),
+            NOW,
+            &client,
+        );
         assert!(asked(&work).is_empty());
         // Someone else's exchange that asks is not theirs.
-        client.finished_exchange_for(NOW, "hi", "How was the wedding on Saturday?", Some("p-mai"));
-        assert!(asked(&work).is_empty());
-        client.finished_exchange_for(
+        hand_on_days(
+            done(u64::MAX - 72, "How was the wedding on Saturday?", "p-mai"),
             NOW,
-            "I'm fine",
-            "Good. How was your sister's wedding?",
-            Some(MINH),
+            &client,
+        );
+        assert!(asked(&work).is_empty());
+        hand_on_days(
+            done(u64::MAX - 73, "Good. How was your sister's wedding?", MINH),
+            NOW,
+            &client,
         );
         assert_eq!(asked(&work), vec![(MINH.to_owned(), 12)]);
-        client.finished_exchange_for(NOW, "Lovely", "Tell me more about the wedding?", Some(MINH));
+        hand_on_days(
+            done(u64::MAX - 74, "Tell me more, how was the wedding?", MINH),
+            NOW,
+            &client,
+        );
         assert!(asked(&work).is_empty(), "once");
         assert!(client.context.lock().unwrap().asking.is_none());
+    }
+
+    /// Reviewer-two's P2 on #2894: a remember turn's reply is kept out of
+    /// the journal, but a question in it about the dated follow-up still
+    /// marks it: one `Asked`, no journal exchange.
+    #[test]
+    fn a_question_in_a_remember_turn_marks_the_follow_up_but_is_not_journalled() {
+        const MINH: &str = "p-be9688998f085098";
+        let (client, work) = asking_client();
+        client.context.lock().unwrap().asking = Some((
+            MINH.to_owned(),
+            12,
+            content_words("Sister's wedding is on Saturday"),
+        ));
+        // A request no other test names, kept out as a remember's is.
+        let request = u64::MAX - 75;
+        keep_out(request);
+        hand_on_days(
+            vec![FinishedExchange {
+                request,
+                age: Duration::from_secs(1),
+                heard: "remember I like tea".to_owned(),
+                said: "I'll remember that. How was your sister's wedding?".to_owned(),
+                whose: Some(MINH.to_owned()),
+            }],
+            NOW,
+            &client,
+        );
+        let (mut marks, mut exchanges) = (vec![], 0);
+        while let Ok(job) = work.try_recv() {
+            match job {
+                DaysJob::Asked { person, id } => marks.push((person, id)),
+                DaysJob::Exchange { .. } => exchanges += 1,
+                _ => {}
+            }
+        }
+        assert_eq!(marks, vec![(MINH.to_owned(), 12)]);
+        assert_eq!(exchanges, 0, "kept out of the journal");
     }
 
     /// The session's note with events: a dated one the memory gives
