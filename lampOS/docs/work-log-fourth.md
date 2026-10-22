@@ -6194,6 +6194,41 @@ Ready for lamp-voice: yes (#2899 code at f6431ebcb, before its necessary new-bas
   #2797 real tone session. Neither dependency was bypassed or claimed.
 - Fourth still has no lamp. No device, account or unit actions were made.
 
+## 2026-10-22 13:31 ICT: callback integration cleared and onboarding conflict removed
+
+Ready for lamp-voice: no (both PRs require their replacement-head native gates).
+
+- #2782 head4451c0334 passed ARM64 39730903538: 10,247/0/65,
+  all24 focused cases,2doctests,12process checks and relay; unchanged
+  same-voice leaky pass. Clippy39730903401 passed. CI mergeaa9547274
+  used532c98545; artifact12405638280 SHA-256
+  `71a65172d30fc415382fefea16fa203f04f55bffada0d1f8509883029d19ccc8`.
+  Reviewer-two independently reconstructed the parent and cleared the
+  retry-aware extraction and exact508-line fixture rename: P1/P2none
+  (issuecomment-6334329645). It is unconditional active-path production
+  extraction, so merge authority stays Reviewer/First. The required final
+  current-base rebase and local gates are now active; no old receipt will
+  be relabelled onto its replacement.
+- #2899 was replayed to468d655f9 on4f82e1f1b. Fresh formatting, strict
+  workspaceClippy, build and610focused/0failed/1ignored passed:
+  onboarding128,Skills477,census5; the inherited Skills fixture writer
+  remained ignored. Raw rebase-latest-20261022 under its check directory.
+  That head got no CI run because newer main conflicted in the same
+  documentation table; it was not rerun or manually dispatched.
+- Replacement #2899 head `a3f13a013c1ad850d6abf51704a039b0c6a8c0d3`
+  is on `fb5d82a8782ac46df9b5ac7df5e1834582c0d9d0`, singlecommitclean.
+  The current News/reminder rows were preserved exactly and onboarding
+  information moved into its own subsection outside the changing table.
+  All14 authored source/manifest changes remain equivalent. Fresh formatting
+  and4Skills onboarding+1guard checks pass,0failed/ignored. The610case and
+  strict/build results above keep4f82 attribution. ARM6439734146637 and
+  Clippy39734146677 are now running; PR remains draft. Raw
+  `/private/tmp/fourth-onboarding-skill-checks-20261022/rebase-fb5d82a87-20261022/`.
+- First's #2899 source read and52e6 same-steps acceptance remain pending.
+  No device action. Dependency/scope question for #2856 posted once on
+  Queue issuecomment-6334168716: product-unit activation does not itself
+  migrate photo-face's Rust words into an installable skill.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
