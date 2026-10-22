@@ -1,5 +1,28 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Atomic face repair store (2026-10-22)
+
+The evidence here is the existing Rust `crates/eyes/src/who.rs`, not a V1
+audit or a lamp comparison. Keep `Person`/`Kept`, the private 0600 file,
+print bounds and recognition threshold. `People::remember` delegates to
+`remember_as`, which rebuilds the record and resets its added time and
+familiarity. `remember_one` owns ordinary recognition/name policy;
+`keep_prints` preserves named-visit consent during its recognized-face update.
+Leave those behaviors intact. None is the repair operation: repair must keep
+the old name reserved, retain the existing ID and metadata, and clear consent
+when replacing the biometric prints.
+
+Reuse the store's file-sync and rename pattern without delete/re-add or a
+new ID. Add an opaque, consumed snapshot bound to the live writer and its
+save revision, compare the whole record, and check every other record for a
+matching print. Only this new operation adds parent-directory sync and an
+explicit `Indeterminate` outcome after rename; ordinary save durability is
+unchanged. The narrow fault hook covers write/sync/rename boundaries without
+a general I/O abstraction. This is an [inactive store component](eyes.md#atomic-face-repair-store-inactive):
+account approval, fresh capture, proved lamp consent, expiry and cancellation
+remain caller work. No runtime, V1 parity, biometric proof or device result is
+claimed.
+
 ## Bedtime and Morning as a core skill (#1672, 2026-10-19)
 
 V1's `hal/app_state.py::_wake_sleepy_peripherals` restores only sleep-owned
