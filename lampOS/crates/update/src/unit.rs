@@ -225,6 +225,74 @@ mod tests {
         assert_eq!(ceiling(&generic), ceiling(&product), "{generic}");
     }
 
+    /// The product's "who it answers" switches, and the bus they read the
+    /// name and the faces from: the generic voice unit carries each, so a
+    /// lamp moved from V1 answers only when spoken to (Migrate on #2602,
+    /// 22 Oct). Not `LAMP_NAMES`: it needs the eyes' who socket, which the
+    /// generic eyes unit does not serve.
+    const WHO_IT_ANSWERS: [&str; 12] = [
+        "LAMP_BUS",
+        "LAMP_BUS_AUDIO",
+        "LAMP_ATTENTION",
+        "LAMP_ROOM_FACTS",
+        "LAMP_SPOKEN_TO",
+        "LAMP_NAME_IN_PASSING",
+        "LAMP_NAME_NOTE",
+        "LAMP_NAME_NOTE_BUSY",
+        "LAMP_CUT_KEEPS_NAME",
+        "LAMP_SHORT_SOUNDS",
+        "LAMP_FAINT_HOLD_MS",
+        "LAMP_WAIT_KEEPS_ANSWER",
+    ];
+
+    #[test]
+    fn the_generic_voice_answers_whom_the_product_does() {
+        let product = include_str!("../../../deploy/product/lamp-voice.service");
+        let generic = include_str!("../../../deploy/units/lamp-voice.service");
+        for name in WHO_IT_ANSWERS {
+            let value = environment(product, name);
+            assert!(value.is_some(), "the product voice unit sets no {name}");
+            assert_eq!(environment(generic, name), value, "{name}");
+        }
+        // Every switch attention.md names that the product voice sets is in the group above, or
+        // here, left out of a moved lamp's voice on purpose: a new attention switch can't be
+        // forgotten (the Reviewer-lead's P3 on #2883).
+        const NOT_THE_GROUP: [&str; 7] = [
+            "LAMP_CLOCK",
+            "LAMP_FIRST_OUTPUT",
+            "LAMP_KERNEL_CLOCK",
+            "LAMP_PROVIDER_PATIENCE",
+            "LAMP_SECOND_LOOK",
+            "LAMP_THREAD_FILE",
+            "LAMP_VOICE_ROUTE",
+        ];
+        let attention = include_str!("../../../docs/attention.md");
+        for line in product.lines() {
+            let Some(name) = line
+                .strip_prefix("Environment=")
+                .and_then(|rest| rest.split('=').next())
+            else {
+                continue;
+            };
+            let named = attention.match_indices(name).any(|(at, _)| {
+                !attention[at + name.len()..]
+                    .starts_with(|c: char| c == '_' || c.is_ascii_alphanumeric())
+                    && !attention[..at].ends_with(|c: char| c == '_' || c.is_ascii_alphanumeric())
+            });
+            if named {
+                assert!(
+                    WHO_IT_ANSWERS.contains(&name) || NOT_THE_GROUP.contains(&name),
+                    "{name} is named in attention.md and set in the product voice: add it to the group or leave it out on purpose"
+                );
+            }
+        }
+        // The faces the name note and the spoken-to rule read reach the bus only when the eyes publish.
+        let product_eyes = include_str!("../../../deploy/product/lamp-eyes.service");
+        let generic_eyes = include_str!("../../../deploy/units/lamp-eyes.service");
+        assert_eq!(environment(product_eyes, "LAMP_BUS").as_deref(), Some("on"));
+        assert_eq!(environment(generic_eyes, "LAMP_BUS").as_deref(), Some("on"));
+    }
+
     #[test]
     fn lamp_4aces_own_units_are_read() {
         // As they are in the repository: what the lamp runs.

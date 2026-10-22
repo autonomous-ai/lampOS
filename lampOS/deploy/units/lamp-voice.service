@@ -50,7 +50,43 @@ Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
 # The say service (docs/speaking-first.md): how the first stand asks (lamp-first-stand.service).
 # Root only: no group is given the socket.
 Environment=LAMP_SAY=on
+# The lamp's bus (docs/bus.md): the name lamp-name hears, the faces lamp-eyes sees, the room's state.
+Environment=LAMP_BUS=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
+# The voice's microphone on the bus (mic2/audio, lamp-name's default): the only sound lamp-name hears
+# the name in (name.md).
+Environment=LAMP_BUS_AUDIO=on
+# Who it answers: the product unit's group, each at the product's value (crates/update/src/unit.rs
+# checks it), so a lamp moved from V1 answers only when spoken to (Migrate on #2602, 22 Oct:
+# lamp-a63e answered office talk 13 times in 15 minutes without it).
+# The busy-room rule (docs/attention.md). Its close-to-the-lamp half reads lamp-ears' room level,
+# which this package does not run: until it does, a busy room is judged as `busy` judges it.
+Environment=LAMP_ATTENTION=busy-near
+# The room's state goes to the model inside a request, and a quiet room turns busy at two unanswered things
+# in a minute, not three (docs/attention.md, room_told.rs).
+Environment=LAMP_ROOM_FACTS=on
+# An answer plays only when the lamp was spoken to, and the reply to its own news (outside a busy room), a question
+# about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
+# starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
+Environment=LAMP_SPOKEN_TO=on
+# "The lamp" said about it, not to it, is no call in a busy room (#829, #864).
+Environment=LAMP_NAME_IN_PASSING=ignored
+# The model is told its name was heard as a request began, and in a busy room only with a face
+# turned to the lamp (docs/attention.md).
+Environment=LAMP_NAME_NOTE=on
+Environment=LAMP_NAME_NOTE_BUSY=face
+# A request that goes on after the early end cut it keeps the first part's name and call (#782).
+Environment=LAMP_CUT_KEEPS_NAME=on
+# A short word in a quiet room goes to the model, its answer held unless it was said to the lamp (#800).
+Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
+# Speech trailing under the faint floor (the voice options' --faint-floor-db) is heard 400 ms more.
+Environment=LAMP_FAINT_HOLD_MS=400
+# A short sound before the awaited answer has sounded does not cut it off (#1123).
+Environment=LAMP_WAIT_KEEPS_ANSWER=on
+# Not here: LAMP_NAMES=checked, which needs the eyes' who socket (LAMP_EYES_WHO_SOCKET, lamp-eyes
+# --who-socket with its recogniser); this package's eyes run without them, so it would do nothing.
+# Nor the second route (LAMP_VOICE_ROUTE=second): nothing in this package writes
+# /etc/lampOS/voice/second.json, and without it that voice does not start.
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_MEMORY_SOCKET=@MEMORY_SOCKET@
