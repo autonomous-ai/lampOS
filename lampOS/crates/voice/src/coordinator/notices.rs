@@ -193,7 +193,12 @@ impl SpeechOrigin {
     pub(super) fn unshown(self) -> bool {
         matches!(
             self,
-            Self::HeadCue | Self::UnclearHum | Self::SleepBreath | Self::WakeHum | Self::SkillSound
+            Self::HeadCue
+                | Self::UnclearHum
+                | Self::SleepBreath
+                | Self::WakeHum
+                | Self::SkillSound
+                | Self::RequestedAudio
         )
     }
     /// The trace's name for what plays.
