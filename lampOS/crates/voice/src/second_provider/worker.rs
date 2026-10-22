@@ -2662,6 +2662,19 @@ pub fn serve(
         );
     }
     engine = engine.saying_once(said_once);
+    // "Not for me" written as words on a line let out only as the
+    // conversation going on is the decline itself
+    // (`LAMP_NOT_FOR_ME_WORDS=on`; lamp-4ace, r06, request 131).
+    let declines_in_words = std::env::var(crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if declines_in_words {
+        eprintln!(
+            "lamp-voice second: a reply opening with \"not for me\" to a line let out only as the conversation going on is taken as not_for_me, its first piece held until its opening is known (LAMP_NOT_FOR_ME_WORDS)"
+        );
+    }
+    engine = engine.declining_in_words(declines_in_words);
     if let Some(voiced) = speech_tags {
         eprintln!(
             "lamp-voice second: the chat is told a few speech tags; the voice is given {} (LAMP_SECOND_SPEECH_TAGS)",

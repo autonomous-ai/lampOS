@@ -9,6 +9,7 @@ mod music_scope;
 mod music_warm_name;
 mod name_carries;
 mod name_near;
+mod not_for_me_words;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
@@ -33,6 +34,9 @@ struct Script {
     hold_chat: bool,
     /// A chat's first event waits this long (on the test's clock).
     first_event_after: Option<Duration>,
+    /// Each of a chat's events waits this long (on the test's clock), as a
+    /// streamed reply's pieces come apart.
+    piece_gap: Option<Duration>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
     /// This sentence's first audio waits for the test to release it.
@@ -174,13 +178,19 @@ impl Services for Script {
         let events = self.chats.lock().unwrap().pop_front().unwrap();
         let token = self.token.clone();
         let delay = self.first_event_after;
+        let gap = self.piece_gap;
         let scripted = stream::once(async move {
             if let Some(delay) = delay {
                 tokio::time::sleep(delay).await;
             }
         })
         .filter_map(|()| async { None })
-        .chain(stream::iter(events));
+        .chain(stream::iter(events).then(move |event| async move {
+            if let Some(gap) = gap {
+                tokio::time::sleep(gap).await;
+            }
+            event
+        }));
         if self.hold_chat {
             scripted
                 .chain(stream::pending().map(move |never: ()| {
