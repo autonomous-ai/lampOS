@@ -879,8 +879,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             told_at: Instant::now(),
         })
         .collect();
-    // Whether the person's yes to face reads was there at the last ask, for
-    // the journal's one line each time it changes.
+    // Whether the lamp's yes to face reads, for everyone it sees, was there
+    // at the last ask, for the journal's one line each time it changes.
     let mut face_yes_told: Option<bool> = None;
     // With --seems-log, each read's time, kind, confidence and reader, for
     // the measure (#1671, step 0): nothing of whose face.
@@ -2152,7 +2152,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                         // How the near face seems, at most every 2 s and
-                        // only with the person's kept yes (privacy-switch.md):
+                        // only with the lamp's kept yes, for everyone it sees
+                        // (privacy-switch.md):
                         // a kind and a confidence on the bus, nothing kept.
                         // One reader a look, so two readers' times never
                         // add up in one look's delay (the reviewer on
