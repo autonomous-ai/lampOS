@@ -147,6 +147,80 @@ pub trait Lamp {
     fn restart(&mut self) -> Result<Value, String> {
         Err(not_here("system.reboot"))
     }
+
+    /// Whether `system.reboot` is answered (`LAMP_APP_RESTART=on`), asked
+    /// of nobody.
+    fn restarts(&self) -> bool {
+        false
+    }
+}
+
+/// Whether a kind is answered on `lamp` now: its switch, read without
+/// asking any of the lamp's parts.
+type Switch = fn(&dyn Lamp) -> bool;
+
+const ALWAYS: Switch = |_| true;
+
+/// Every kind the app may ask that this lamp can answer, with its switch,
+/// in the order `system.info`'s `can` lists them (#2864).
+pub const KINDS: [(&str, Switch); 33] = [
+    ("system.info", ALWAYS),
+    ("system.version", ALWAYS),
+    ("system.network", ALWAYS),
+    ("volume.get", ALWAYS),
+    ("volume.set", ALWAYS),
+    ("mic.get", ALWAYS),
+    ("lamp.health", ALWAYS),
+    ("led.resting.get", ALWAYS),
+    ("led.resting.set", ALWAYS),
+    ("led.resting.preview", ALWAYS),
+    ("chat.send", |lamp| lamp.texting()),
+    ("reports.get", |lamp| lamp.reports().is_some()),
+    ("reports.set", |lamp| lamp.reports().is_some()),
+    ("skills.list", |lamp| lamp.skills().is_some()),
+    ("skills.remove", |lamp| lamp.skills().is_some()),
+    ("skills.install", |lamp| {
+        lamp.skills().is_some_and(|places| places.store)
+    }),
+    (crate::settings::WIFI_KIND, WIFI),
+    (crate::settings::WIFI_CONFIRM_KIND, WIFI),
+    (crate::settings::KEYS_KINDS[0], KEYS),
+    (crate::settings::KEYS_KINDS[1], KEYS),
+    (crate::settings::KEYS_KINDS[2], KEYS),
+    (crate::settings::KINDS[0], SETTINGS),
+    (crate::settings::KINDS[1], SETTINGS),
+    (crate::settings::KINDS[2], SETTINGS),
+    ("faces.add_photo", |lamp| lamp.photos().is_some()),
+    ("face.list", |lamp| lamp.faces().is_some()),
+    ("face.remove", |lamp| lamp.faces().is_some()),
+    ("schedule.list", |lamp| lamp.schedule().is_some()),
+    ("schedule.cancel", |lamp| lamp.schedule().is_some()),
+    ("guard.on", |lamp| lamp.guard().is_some()),
+    ("guard.off", |lamp| lamp.guard().is_some()),
+    ("update.status", |lamp| lamp.update_page()),
+    ("system.reboot", |lamp| lamp.restarts()),
+];
+
+const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
+const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
+const SETTINGS: Switch = |lamp| lamp.changes().is_some();
+
+/// Whether this lamp answers `kind` now, by its row in [`KINDS`]: the one
+/// rule [`answer`] and `system.info`'s `can` both read (#2864), so the app
+/// is never shown a row the lamp refuses.
+pub fn on(lamp: &impl Lamp, kind: &str) -> bool {
+    KINDS
+        .iter()
+        .any(|(name, switch)| *name == kind && switch(lamp))
+}
+
+/// `system.info`'s `can`: the kinds [`on`] now, read only.
+pub fn can(lamp: &impl Lamp) -> Vec<&'static str> {
+    KINDS
+        .iter()
+        .filter(|(_, switch)| switch(lamp))
+        .map(|(name, _)| *name)
+        .collect()
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -165,11 +239,17 @@ pub const MIC_SET_REFUSED: &str =
 pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<Value>, String> {
     let some = |value: Value| Ok(Some(value));
     match kind {
-        "system.info" => some(json!({
-            "versions": lamp.versions(),
-            "network": lamp.network(),
-            "host": lamp.host(),
-        })),
+        // `can`: the kinds the app may ask now (#2864); a lamp without it
+        // is read as before.
+        "system.info" => {
+            let can = can(lamp);
+            some(json!({
+                "versions": lamp.versions(),
+                "network": lamp.network(),
+                "host": lamp.host(),
+                "can": can,
+            }))
+        }
         "system.version" => some(lamp.versions()),
         "system.network" => some(lamp.network()),
         "volume.get" => lamp.volume().map(|volume| Some(json!(volume))),
@@ -201,7 +281,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // A text from the app (#1673): acked with its run, and put on the
         // bus for the voice; the answer goes back as `chat.event`.
-        "chat.send" if lamp.texting() => {
+        "chat.send" if on(lamp, kind) => {
             let now_ms = crate::chat::now_ms();
             let run = lamp.new_run(now_ms);
             let text = crate::chat::text_in(data, run)?;
@@ -211,7 +291,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // Health and crash reports (#1683): whether the person's yes stands,
         // since when and how many wait; and the person's own choice, from
         // their account, the only way to turn them on after setup.
-        "reports.get" | "reports.set" if lamp.reports().is_some() => {
+        "reports.get" | "reports.set" if on(lamp, kind) => {
             let shared = lamp.reports().ok_or_else(|| not_here(kind))?;
             if kind == "reports.set" {
                 let share = data
@@ -229,14 +309,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The app's skills page (#1722): every skill on the lamp, its group,
         // whether it can be removed or turned off and what it may use. Read
         // only.
-        "skills.list" if lamp.skills().is_some() => {
+        "skills.list" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::list(&places).map(Some)
         }
         // Names and the time zone after setup (#1959): handed to root's
         // helper, answered `starting` now and its result later.
         // The Wi-Fi (#1959's second piece), with its own switch too.
-        crate::settings::WIFI_KIND if lamp.changes().is_some_and(|c| c.wifi_on()) => {
+        crate::settings::WIFI_KIND if on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             changes.start_wifi(data)?;
             Ok(None)
@@ -244,21 +324,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The app reached the lamp over its new network (#1959's P1): kept
         // only with this, within the helper's window, which starts when the
         // broker acks `wifi.joined` (#2617's P2-1 and P2-2).
-        crate::settings::WIFI_CONFIRM_KIND if lamp.changes().is_some_and(|c| c.wifi_on()) => {
+        crate::settings::WIFI_CONFIRM_KIND if on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             changes.confirm_wifi(data)?;
             Ok(None)
         }
         // A person's own keys (#2094), with LAMP_OWN_KEYS=on too: to root's
         // keys helper, which checks each once before it keeps it.
-        kind if crate::settings::KEYS_KINDS.contains(&kind)
-            && lamp.changes().is_some_and(|c| c.keys_on()) =>
-        {
+        kind if crate::settings::KEYS_KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             changes.start_keys(kind, data)?;
             Ok(None)
         }
-        kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
+        kind if crate::settings::KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
             changes.start(kind, line);
@@ -267,24 +345,24 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // A face from a photo the app sends (#1968): handed to the eyes,
         // which keep it unconfirmed until its person says yes at the lamp.
         // It comes over the lamp's own account channel only.
-        "faces.add_photo" if lamp.photos().is_some() => {
+        "faces.add_photo" if on(lamp, kind) => {
             let place = lamp.photos().ok_or_else(|| not_here(kind))?;
             let (name, photo) = crate::photos::asked(data)?;
             crate::photos::add(&place, &name, &photo, crate::chat::now_ms()).map(Some)
         }
         // The faces the lamp knows, and removing one (#2192): names only,
         // and the eyes' own forget. Over the lamp's own account channel only.
-        "face.list" if lamp.faces().is_some() => {
+        "face.list" if on(lamp, kind) => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
             crate::faces::list(&eyes).map(Some)
         }
-        "face.remove" if lamp.faces().is_some() => {
+        "face.remove" if on(lamp, kind) => {
             let eyes = lamp.faces().ok_or_else(|| not_here(kind))?;
             crate::faces::remove(&eyes, data).map(Some)
         }
         // The lamp's timers and reminders, for the app's Lamp 2 page
         // (#2195): only with `LAMP_APP_SCHEDULE=on`.
-        "schedule.list" | "schedule.cancel" if lamp.schedule().is_some() => {
+        "schedule.list" | "schedule.cancel" if on(lamp, kind) => {
             let adapter = lamp.schedule().ok_or_else(|| not_here(kind))?;
             if kind == "schedule.list" {
                 crate::schedule::list(adapter, data)
@@ -294,30 +372,30 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // An installed or made-here skill taken off on the person's tap
         // (#1722), never a core one: the page as it now is.
-        "skills.remove" if lamp.skills().is_some() => {
+        "skills.remove" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::remove(&places, data).map(Some)
         }
         // Guard mode on or off from the owner's app (#2562), as
         // `skills.remove` goes: handed to lamp-skills' call socket, which
         // holds it to the watch's own rules, its mark among them.
-        "guard.on" | "guard.off" if lamp.guard().is_some() => {
+        "guard.on" | "guard.off" if on(lamp, kind) => {
             let socket = lamp.guard().ok_or_else(|| not_here(kind))?;
             crate::guard::turn(&socket, kind)
         }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
         // installs it only signed with the update channel's key.
-        "skills.install" if lamp.skills().is_some_and(|places| places.store) => {
+        "skills.install" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::install(&places, data).map(Some)
         }
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
-        "update.status" if lamp.update_page() => crate::update::status(lamp.update_status()),
+        "update.status" if on(lamp, kind) => crate::update::status(lamp.update_status()),
         // A restart from the app (#2193): asked of the keeper, never done
         // here; the keeper answers first and refuses under an update.
-        "system.reboot" => lamp.restart().map(Some),
+        "system.reboot" if on(lamp, kind) => lamp.restart().map(Some),
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -355,6 +433,13 @@ pub mod tests {
         pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
         /// A will left with the broker (`LAMP_CLOUD_OFFLINE_WILL`).
         pub will: bool,
+        /// The other switches `can` reads (#2864).
+        pub photos: Option<crate::photos::Place>,
+        pub faces: Option<crate::faces::Eyes>,
+        pub schedule: Option<lamp_actions::schedule::Adapter>,
+        pub guard: Option<std::path::PathBuf>,
+        pub update_page: bool,
+        pub restart: bool,
     }
 
     impl Lamp for Fake {
@@ -417,6 +502,24 @@ pub mod tests {
         }
         fn offline_will(&self) -> bool {
             self.will
+        }
+        fn photos(&self) -> Option<crate::photos::Place> {
+            self.photos.clone()
+        }
+        fn faces(&self) -> Option<crate::faces::Eyes> {
+            self.faces.clone()
+        }
+        fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
+            self.schedule.as_ref()
+        }
+        fn guard(&self) -> Option<std::path::PathBuf> {
+            self.guard.clone()
+        }
+        fn update_page(&self) -> bool {
+            self.update_page
+        }
+        fn restarts(&self) -> bool {
+            self.restart
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
@@ -711,5 +814,165 @@ pub mod tests {
             );
         }
         assert!(answer(&mut lamp, "", &Value::Null).is_err());
+    }
+
+    /// #2864: `system.info`'s `can` holds each switch's kinds only while it
+    /// is on, as [`answer`] takes them; the always-answered kinds are in it
+    /// with every switch off.
+    #[test]
+    fn system_info_says_each_switchs_kinds_only_while_it_is_on() {
+        let switches: Vec<Switch> = vec![
+            ("texting", |f| f.texting = true, &["chat.send"]),
+            (
+                "reports",
+                |f| {
+                    let places = crate::reports::tests::places("can");
+                    f.reports = Some(crate::reports::Shared::new(crate::reports::Reports::open(
+                        places,
+                    )));
+                },
+                &["reports.get", "reports.set"],
+            ),
+            (
+                "skills page",
+                |f| f.skills = Some(places_of(false)),
+                &["skills.list", "skills.remove"],
+            ),
+            (
+                "skills store",
+                |f| f.skills = Some(places_of(true)),
+                &["skills.list", "skills.remove", "skills.install"],
+            ),
+            (
+                "settings",
+                |f| f.changes = changes_of(false, false),
+                &crate::settings::KINDS,
+            ),
+            (
+                "wifi",
+                |f| f.changes = changes_of(true, false),
+                &[
+                    "timezone.set",
+                    "person.name.set",
+                    "device.rename",
+                    "wifi.set",
+                    "wifi.confirm",
+                ],
+            ),
+            (
+                "keys",
+                |f| f.changes = changes_of(false, true),
+                &[
+                    "timezone.set",
+                    "person.name.set",
+                    "device.rename",
+                    "keys.set",
+                    "keys.remove",
+                    "keys.get",
+                ],
+            ),
+            (
+                "photos",
+                |f| {
+                    f.photos = Some(crate::photos::Place {
+                        dir: std::path::PathBuf::from("/nowhere/photos"),
+                        socket: std::path::PathBuf::from("/nowhere/eyes.sock"),
+                    })
+                },
+                &["faces.add_photo"],
+            ),
+            (
+                "faces page",
+                |f| {
+                    f.faces = Some(crate::faces::Eyes {
+                        socket: std::path::PathBuf::from("/nowhere/eyes.sock"),
+                        memory: None,
+                    })
+                },
+                &["face.list", "face.remove"],
+            ),
+            (
+                "schedule",
+                |f| {
+                    f.schedule = Some(
+                        lamp_actions::schedule::Adapter::new(std::path::PathBuf::from(
+                            "/run/lampos-schedule/call.sock",
+                        ))
+                        .unwrap(),
+                    )
+                },
+                &["schedule.list", "schedule.cancel"],
+            ),
+            (
+                "guard",
+                |f| f.guard = Some(std::path::PathBuf::from("/nowhere/call.sock")),
+                &["guard.on", "guard.off"],
+            ),
+            ("update page", |f| f.update_page = true, &["update.status"]),
+            ("restart", |f| f.restart = true, &["system.reboot"]),
+        ];
+        let always = [
+            "system.info",
+            "system.version",
+            "system.network",
+            "volume.get",
+            "volume.set",
+            "mic.get",
+            "lamp.health",
+            "led.resting.get",
+            "led.resting.set",
+            "led.resting.preview",
+        ];
+        let said = |lamp: &mut Fake| -> Vec<String> {
+            let info = answer(lamp, "system.info", &Value::Null).unwrap().unwrap();
+            serde_json::from_value(info["can"].clone()).unwrap()
+        };
+        let mut off = lamp();
+        assert_eq!(said(&mut off), always, "every switch off");
+        for (name, turn_on, kinds) in switches {
+            let mut lamp = lamp();
+            for kind in kinds {
+                assert!(!on(&lamp, kind), "{name} off: {kind}");
+                assert_eq!(
+                    answer(&mut lamp, kind, &Value::Null),
+                    Err(not_here(kind)),
+                    "{name} off"
+                );
+            }
+            turn_on(&mut lamp);
+            let mut wanted: Vec<&str> = always.to_vec();
+            wanted.extend(
+                KINDS
+                    .iter()
+                    .map(|(kind, _)| *kind)
+                    .filter(|kind| kinds.contains(kind)),
+            );
+            assert_eq!(said(&mut lamp), wanted, "{name} on");
+            // Read only: asking again says the same.
+            assert_eq!(said(&mut lamp), wanted, "{name} read again");
+        }
+    }
+
+    /// A switch's name, how it is turned on, and the kinds it brings.
+    type Switch = (&'static str, fn(&mut Fake), &'static [&'static str]);
+
+    fn places_of(store: bool) -> crate::skills::Places {
+        crate::skills::Places {
+            folder: std::path::PathBuf::from("/nowhere/skills"),
+            off: std::path::PathBuf::from("/nowhere/off"),
+            manage: std::path::PathBuf::from("/nowhere/manage.sock"),
+            store,
+            addons: false,
+        }
+    }
+
+    fn changes_of(wifi: bool, keys: bool) -> Option<std::sync::Arc<crate::settings::Changes>> {
+        let wait = std::time::Duration::from_secs(1);
+        Some(crate::settings::Changes::with_helpers(
+            "/nowhere/settings.sock",
+            wait,
+            wifi.then(|| (std::path::PathBuf::from("/nowhere/wifi.sock"), wait)),
+            keys.then(|| (std::path::PathBuf::from("/nowhere/keys.sock"), wait)),
+        ))
     }
 }
