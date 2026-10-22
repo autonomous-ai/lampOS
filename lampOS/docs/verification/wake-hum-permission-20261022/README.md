@@ -194,9 +194,19 @@ Fifth owns lamp-52e6 and the hand try, using one coherent build and #2948's
 product units on the second voice route. Verify the running flags before the
 try. With the body standing and someone at the arm: tap; a 3 s hold
 with the breath, sleep and fold; tap to wake with the hm; a quiet tap's hm;
-kill while listening, then one tap opens it; and 20 s with hands away. Keep
-the original quiet-tap rarity rule when spacing the gestures. Record the
+a fault-recovery tap as below; and 20 s with hands away. Keep the original
+quiet-tap rarity rule when spacing the gestures. Record the
 actual build/flags, acquisition/decision/first-write times, perceived sleep
 and wake, and whether the first spoken words are retained. Observe cleanup
 and the lamp lease; Third accesses no device. #2948 stays draft until that
 required hand try passes. No lamp result is claimed here.
+
+For the fault-recovery case, verify `LAMP_RESTORED_MUTE=on` and
+`LAMP_HEAD_TOUCH=on`, with the lamp unmuted and its physical slide open.
+Cause an unhandled process crash (SIGKILL) after capture has delivered
+frames. An ordinary SIGTERM or service restart takes the clean-stop path
+and does not exercise the fault-restored mute. After the voice restarts,
+require its `mute_restored_after_fault` record before testing that one
+fresh head tap opens the microphones. A restart that is already unmuted
+does not establish this case. Record the crash, restored-mute evidence,
+tap and resumed capture times with the build and flags.
