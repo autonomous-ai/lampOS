@@ -1003,7 +1003,7 @@ pub fn services(
             "lamp-voice second: the chat's connection is opened as a line begins (LAMP_SECOND_CHAT_WARM)"
         );
     }
-    // The chat's idle connections kept briefly, with TCP keepalive
+    // The chat's idle connections kept briefly
     // (`LAMP_SECOND_CHAT_KEPT=on`; the first builder's 02:14 on #2602).
     if std::env::var(super::net::CHAT_KEPT_ENVIRONMENT)
         .ok()
@@ -1011,9 +1011,8 @@ pub fn services(
         == Some("on")
     {
         eprintln!(
-            "lamp-voice second: the chat keeps an idle connection {} s at most, with TCP keepalive every {} s (LAMP_SECOND_CHAT_KEPT)",
-            super::net::CHAT_POOL_IDLE.as_secs(),
-            super::net::CHAT_KEEPALIVE.as_secs()
+            "lamp-voice second: the chat keeps an idle connection {} s at most (LAMP_SECOND_CHAT_KEPT)",
+            super::net::CHAT_POOL_IDLE.as_secs()
         );
     }
     // The configured voice's connection opened as a line begins (#1712).
