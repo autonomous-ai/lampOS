@@ -9,7 +9,9 @@ reviewer's, in [reviewer.md](reviewer.md): the same checklist, the same gate
 and the same merge rights apply here, and nothing below loosens them.
 
 - **Name:** `reviewer-two`
-- **Who runs it:** Thirteen, between its own tasks, in its own session
+- **Who runs it:** since 22 Oct 07:0x, a session of its own that the owner
+  started (the first builder on #2602). Thirteen ran it from 19 Oct, between
+  its own tasks, and went back to building
 - **Lamp(s):** none for this lane
 - **Branches it may push:** none for this lane (a fix it is asked to make goes
   to the PR's builder)
@@ -22,6 +24,8 @@ Every ready pull request into `lamp-voice` (not a draft) that is one of:
   request (`lampOS/docs/**/*.md` but the six docs code reads, and
   `lampOS/builders/**`). It merges on the read alone (reviewer.md);
 - **off unless set and needing no lamp:** reviewer.md's merge list, all of it.
+- **tests only** (since 22 Oct 06:5x, the first builder on #2602): it changes
+  only tests, fixtures or test tools, and no product code or unit.
 
 Everything else stays the reviewer's, and the first builder's where
 reviewer.md says so.
@@ -32,6 +36,6 @@ reviewer.md says so.
   `reviewer-two: reading` on it, and skip any PR that already has a
   `Reviewer` or `reviewer-two` reading comment from the last 30 minutes.
 - **Neither reviews or merges its own pull requests.** Thirteen's PRs go to
-  the reviewer.
+  the reviewer, never to reviewer-two.
 - A PR that turns out to be outside the lane is handed back in one line:
   `reviewer-two: outside my lane (why), for the reviewer.`
