@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-22 16:14 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-22 16:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 89.2% over 72 rows. Quality 62.8% over 16 rows.**
+**Build 89.3% over 72 rows. Quality 62.8% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -70,7 +70,7 @@ Written by the first builder from the team's review page at 2026-10-22 16:14 (+0
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.80 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 22 Oct 09:10, up from 0.75: a task’s finish is told after the agent’s question, on lamp-75c9 (Eighth, #2543). |
 | Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.55 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 22 Oct 12:4x, up from 0.5: three more parts’ kept files are read by every later build’s tests: controls (#2784), lamp-cloud’s rotated login (#2786) and records (#2787) (Migrate). |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
-| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.65 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 22 Oct 15:1x, up from 0.6: the head lines come from a test input, so the factory steps run whole with no person (Fifth, #2818, 5b9bed794). |
+| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.70 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 22 Oct 16:3x, up from 0.65: the factory steps start the body before the stand, so a whole run needs no person between steps (Fifth, #2869, ef1eb0cf2). |
 | Reads your mood from your face or voice *(not a ship gate)* | 0.35 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 22 Oct 16:1x, up from 0.3: the eyes read a face’s expression only on the person’s kept yes, and the face mesh runs on its own worker (Sixth’s #2872, carried as #2953); |
 | Notices your activity and posture | 1.00 | — | — | Built and tried on lamp-4ace 20 Oct 01:23: with LAMP_ACTIVITY on the eyes say what the person at the desk is doing on room/activity (away in an empty room); |
 | Habits and wellbeing nudges beyond Stretch break, as skills | 1.00 | — | — | 20 Oct 11:46, built: all four tried on lamp-52e6 with the lead (row 12: rest your eyes, a sip of water, stand up, wind down), each passed with its skill done. |
