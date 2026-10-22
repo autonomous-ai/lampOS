@@ -576,7 +576,9 @@ now reads the state of the release after it:
   later target field may narrow what a task may do, so it's never passed
   over. But `lamp-tasks` no longer stops on them, since a stopped part says
   nothing: it runs with **hand-overs off**. Every `prepare` is refused,
-  code `targets_newer`, and nothing reaches Harness. The `tasks` warning
+  code `targets_newer`, and nothing reaches Harness. The voice tells the
+  model `agent_tasks::TARGETS_NEWER`, that hand-overs work again once the
+  lamp is updated, not "just now" (Eighth's P3 on #3131). The `tasks` warning
   says "The task targets were written for a newer build (version N);
   hand-overs are off until they match this build", every second, with
   `targets_newer`. A version-1 file with a field or an engine this build
