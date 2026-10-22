@@ -34,6 +34,21 @@ yet seen on a lamp.
   can say ("I keep an eye on things only when someone asks me out loud, at
   the lamp."). It never turns itself on: a watch has no trigger, and a load,
   a reload or a restart of `lamp-skills` leaves it off.
+- **Off when you're back, in any words** (#2827, with
+  `LAMP_GUARD_WORDS_V2=on` in `lamp-skills`). The model reads `keep_watch`
+  in `lamp-skills`' `tools.json` (`/run/lampos-skills/tools.json`), which
+  the voice declares as it is: the skill's `SKILL.md` description and its
+  `[choice]` `about`. Those put on first and name "keep an eye" for it, and
+  on lamp-06c1 (22 Oct 09:14) "I'm back. You can stop keeping an eye on
+  things." was called `{"turn":"on"}`. With the switch, the tool's
+  description and its choice put off first: off when you say you're back or
+  here now, thank it for watching, or say it can stop or there's no need,
+  even in "keep an eye" or "watch" words ("I'm back, you can stop keeping
+  an eye on things", "thanks, I'm here now", "no need to keep watch"); on
+  only when you ask it to start (`watch::WORDS_V2_DESCRIPTION`,
+  `watch::WORDS_V2_TURN`). Without it, both are as the skill says, byte for
+  byte. Only the words change: `[watch] if_heard` still gates on. Not yet
+  measured on the real model.
 - **It says so, and shows it.** The model says in one short line that it's
   on. While it's on, the ring keeps a faint mark, blue at level 1, asked of
   the ring at skill priority on `light/request` and renewed every 10 s, so
@@ -240,6 +255,12 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   `the_privacy_switch_closed_ends_it_with_one_text`,
   `once_the_switch_has_ended_it_nothing_about_the_desk_is_taken`, and
   "I'm off guard" in `the_face_of_the_person_who_asked_ends_it`.
+- `crates/skills/tests/it/skills.rs`,
+  `guard_modes_new_words_come_only_with_their_switch` (#2827): with
+  `LAMP_GUARD_WORDS_V2` on, `keep_watch`'s description and `turn` choice in
+  the tools file are the new words, off first, inside the provider's 1024
+  and 256 bytes; off, they are `SKILL.md`'s and `skill.toml`'s byte for
+  byte; other skills' tools unchanged either way.
 - `skills/guard-mode/tests/`: eleven written cases replayed through the
   watch, arrivals by sound taken as with `LAMP_GUARD_SOUNDS=on` ([tests/README.md](../skills/guard-mode/tests/README.md)). A
   replay looks at no time between messages, so one `light/reached` holds
