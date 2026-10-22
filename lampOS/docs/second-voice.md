@@ -2539,7 +2539,9 @@ after a take-over, but now for every turn:
     `request N: cut short after its words came back, before it was asked;
     they wait for request M's verdict, a chain of K lines`); a held line's
     never, nor one that says stop or "never mind", which lets the chain
-    before it go. Every older piece is judged against the line joining it
+    before it go in any room, busy or not (reviewer-three's P2, 23 Oct:
+    else a held line after it answered the stopped request again). Every
+    older piece is judged against the line joining it
     too, not only its neighbour, each pair once and all within the join's
     one wait for a print (`JOIN_WAIT`). While no pair says two people, the
     whole chain is asked. Once one does (a link no verdict judged, or a

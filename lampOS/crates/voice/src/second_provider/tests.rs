@@ -7661,6 +7661,114 @@ async fn a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy(
     );
 }
 
+/// Reviewer-three's P2 (23 Oct): a stop always clears the chain, in a busy
+/// room too, where a piece cut before its verdict is not chained.
+/// "Lamp, play some jazz" let out and searching, then "never mind" waiting
+/// on the Policy and cut, then "sorry, go on" held: the jazz is asked
+/// once, never again in the held line's place.
+#[tokio::test]
+async fn a_stop_cut_while_its_verdict_waits_clears_the_chain_in_any_room() {
+    for busy in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Lamp, play some jazz".to_owned()),
+                    Ok("never mind".to_owned()),
+                    Ok("sorry, go on".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            "web_search",
+                            json!({"query": "jazz"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Playing jazz."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (searching, searched) = std::sync::mpsc::channel();
+        let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+            let searching = searching.clone();
+            Box::pin(async move {
+                let _ = searching.send(());
+                std::future::pending::<()>().await;
+                json!({})
+            })
+        });
+        let now = Arc::new(Mutex::new(Instant::now()));
+        let clock = now.clone();
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(move || *clock.lock().unwrap()),
+        )
+        .announcing(false)
+        .heeding(Arc::new(|request, _, _, _| match request {
+            2 => Some(WAITS_FOR_POLICY),
+            3 => Some("not said to the lamp"),
+            _ => None,
+        }))
+        .asking_the_policy(Arc::new(|_| Some(None)))
+        .judging_busy(Arc::new(move |_| busy))
+        .joining_cut_words(Arc::new(|_, _| {
+            Joined::NoSecond("no sign of a second person".to_owned())
+        }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let until = std::time::Instant::now() + Duration::from_secs(5);
+        while searched.try_recv().is_err() {
+            assert!(std::time::Instant::now() < until, "no search for the jazz");
+            let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+        }
+        *now.lock().unwrap() += Duration::from_millis(1_000);
+        engine.submit(start(2));
+        engine.retire_through(1);
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the stop's words");
+            if matches!(&event, ProviderOutput::Transcript { text, finished: true, .. } if text == "never mind")
+            {
+                break;
+            }
+        }
+        *now.lock().unwrap() += Duration::from_millis(1_000);
+        engine.submit(start(3));
+        engine.retire_through(2);
+        engine.submit(audio(3, 1));
+        engine.submit(end(3));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(3), engine.next())
+                .await
+                .expect("the held line's turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { request: 3, .. }) {
+                break;
+            }
+        }
+        let asked = script.asked.lock().unwrap();
+        let jazz = asked
+            .iter()
+            .filter(|chat| {
+                chat.last()
+                    .is_some_and(|said| *said == Message::user("Lamp, play some jazz"))
+            })
+            .count();
+        assert_eq!(jazz, 1, "busy {busy}: the jazz asked once");
+    }
+}
+
 /// A piece cut short before its words came back, the next begun within
 /// `CARRY_AFTER_END` of its end, goes on in that line's sound: the chain
 /// goes on across it, from the line before it, so the line asked holds all
