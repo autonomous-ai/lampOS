@@ -60,6 +60,9 @@ struct Lamp {
     /// One servo lifts (toward fewer counts) no faster than this many
     /// counts a second, as a head rising slowly against its weight.
     climb: Option<(usize, f32)>,
+    /// One servo lifts only in bursts: for this long, then still for this
+    /// long, over and over, as lamp-52e6's head creeps back up.
+    creep: Option<(usize, Duration, Duration)>,
     silent_from: Option<Duration>,
     silent_until: Option<Duration>,
     event: Option<(Duration, usize, Event)>,
@@ -158,6 +161,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             short: None,
             heavy: None,
             climb: None,
+            creep: None,
             silent_from: None,
             silent_until: None,
             event: None,
@@ -283,6 +287,15 @@ impl Lamp {
             let rising = match self.climb {
                 Some((slow, most)) if slow == index => most.min(fastest),
                 _ => fastest,
+            };
+            let rising = match self.creep {
+                Some((slow, moving, still))
+                    if slow == index
+                        && now.as_micros() % (moving + still).as_micros() >= moving.as_micros() =>
+                {
+                    0.0
+                }
+                _ => rising,
             };
             let moved = (wanted - servo.position).clamp(-rising * step, fastest * step);
             servo.position += moved;
@@ -3357,8 +3370,8 @@ fn a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand() {
         .filter(|step| (held.0..held.1).contains(&step.0) && lead_of(step) > GLANCE_LIFT_LEAD)
         .count();
     assert!(
-        led <= tracking_steps + 1,
-        "led {led} steps into a hand, bound {tracking_steps}"
+        led <= usize::from(GLANCE_LEAD_STILL_STEPS) + 1,
+        "led {led} steps into a hand"
     );
 }
 
@@ -3384,6 +3397,38 @@ fn a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives() {
     // And back within the self-test's 12 counts within its 3 s.
     let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
     let before = at(GLANCE_FROM);
+    let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// A head that creeps back up from 40 counts down, 2 counts a step for
+/// 100 ms and then still for 400 ms, over and over, as lamp-52e6's did on
+/// #2818: its pauses are not a hand, so it keeps its lead through them and
+/// is back within the self-test's 12 counts within its 3 s.
+#[test]
+fn a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead() {
+    let (report, seen) = rest_glance(|lamp, _| {
+        lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+        lamp.climb = Some((PITCH, 100.0));
+        lamp.creep = Some((
+            PITCH,
+            Duration::from_millis(100),
+            Duration::from_millis(400),
+        ));
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(GLANCE_FROM);
+    let lowest = seen
+        .iter()
+        .filter(|step| step.0 >= GLANCE_FROM && step.0 < GLANCE_UNTIL)
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 36, "dipped from {before} to {lowest}");
     let after = at(GLANCE_UNTIL + Duration::from_secs(3));
     assert!(
         after.abs_diff(before) <= 12,
