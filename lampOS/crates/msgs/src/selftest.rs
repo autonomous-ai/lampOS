@@ -114,6 +114,15 @@ pub struct SelfTest {
     /// from runs before it, and from a program run outside an install.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<String>,
+    /// The lamp that ran it: its host name as the kernel has it
+    /// (`/proc/sys/kernel/hostname`), `lamp-` and the last four of its serial
+    /// or Ethernet address, given by the image's hotspot script at the first
+    /// boot, and the name `lamp-cloud`'s `info` answers as `hostname`. A test
+    /// station matches it to the lamp it identified (`lamp-station`,
+    /// docs/production-testing.md). Absent from runs before it, and where the
+    /// name cannot be read or is not one lamp's own ([`SelfTest::is_own_name`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lamp: Option<String>,
 }
 
 impl SelfTest {
@@ -125,6 +134,30 @@ impl SelfTest {
     /// holds until the next, so the topic promises no period.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+
+    /// Whether `name` can be a lamp's name in a report: 1 to 64 bytes of
+    /// ASCII letters, digits, `-`, `.` and `_`, as a host name is.
+    pub fn is_lamp_name(name: &str) -> bool {
+        !name.is_empty()
+            && name.len() <= 64
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_'))
+    }
+
+    /// Whether `name` is one lamp's own: a host name ending in `-` and a
+    /// suffix, as the image's first boot names a lamp, `<device type>-` and
+    /// the last four of its serial or Ethernet address. A name with no `-`,
+    /// such as the image's `autonomous` or a stock board's `orangepi`, and
+    /// one with nothing after its last `-` (`lamp-`, when no serial could be
+    /// read), are shared by every lamp that has them, so they name none
+    /// (El on #3073).
+    pub fn is_own_name(name: &str) -> bool {
+        Self::is_lamp_name(name)
+            && name
+                .rsplit_once('-')
+                .is_some_and(|(kind, suffix)| !kind.is_empty() && !suffix.is_empty())
     }
 
     /// The verdict a run of these parts has.
@@ -167,6 +200,11 @@ impl SelfTest {
                 "build is not a plain name of 1 to 128 bytes".into(),
             ));
         }
+        if let Some(lamp) = &self.lamp
+            && !Self::is_lamp_name(lamp)
+        {
+            return Err(Invalid("lamp is not a host name of 1 to 64 bytes".into()));
+        }
         Ok(())
     }
 }
@@ -183,6 +221,7 @@ mod tests {
             verdict: SelfTest::verdict_of(&parts),
             parts,
             build: None,
+            lamp: None,
         }
     }
 
@@ -253,6 +292,47 @@ mod tests {
         for refused in [String::new(), "a".repeat(129), "bad\nname".to_owned()] {
             test.build = Some(refused.clone());
             assert!(test.check().is_err(), "{refused:?}");
+        }
+    }
+
+    /// A run names its lamp by its host name. A run written before it did
+    /// still reads, with no lamp; a name that is not a host name is refused.
+    #[test]
+    fn a_run_names_its_lamp_or_is_from_before_it_did() {
+        let mut test = run(vec![PartResult::new("ring", Verdict::Pass, "")]);
+        let older = serde_json::to_string(&test).unwrap();
+        assert!(!older.contains("\"lamp\""), "{older}");
+        assert_eq!(serde_json::from_str::<SelfTest>(&older).unwrap().lamp, None);
+        test.lamp = Some("lamp-4ace".into());
+        assert_eq!(test.check(), Ok(()));
+        let text = serde_json::to_string(&test).unwrap();
+        assert!(text.contains("\"lamp\":\"lamp-4ace\""), "{text}");
+        assert_eq!(serde_json::from_str::<SelfTest>(&text).unwrap(), test);
+        let long = "a".repeat(65);
+        for refused in ["", "lamp 4ace", "lamp-4ace\n", "lämp", long.as_str()] {
+            test.lamp = Some(refused.to_owned());
+            assert!(test.check().is_err(), "{refused:?}");
+            assert!(!SelfTest::is_lamp_name(refused), "{refused:?}");
+        }
+        assert!(SelfTest::is_lamp_name(&"a".repeat(64)));
+    }
+
+    /// A shared host name is no lamp's own (El on #3073).
+    #[test]
+    fn only_a_name_with_its_suffix_is_one_lamps_own() {
+        for own in ["lamp-4ace", "lamp-75c9", "reachy-mini-a1b2"] {
+            assert!(SelfTest::is_own_name(own), "{own}");
+        }
+        for shared in [
+            "autonomous",
+            "orangepi",
+            "localhost",
+            "lamp-",
+            "-4ace",
+            "lamp 4ace",
+            "",
+        ] {
+            assert!(!SelfTest::is_own_name(shared), "{shared:?}");
         }
     }
 }

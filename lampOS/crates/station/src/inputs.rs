@@ -24,6 +24,9 @@ struct StrictSelfTest {
     parts: Vec<StrictPart>,
     #[serde(default)]
     build: Option<String>,
+    /// Absent from a report made before reports named their lamp.
+    #[serde(default)]
+    lamp: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +76,7 @@ pub fn selftest(text: &str) -> Result<SelfTest, Refused> {
             })
             .collect(),
         build: strict.build,
+        lamp: strict.lamp,
     };
     test.check()
         .map_err(|why| Refused(format!("the self-test report: {why}")))?;
@@ -184,7 +188,15 @@ pub(crate) mod tests {
             let test = selftest(text).unwrap();
             assert_eq!(test.verdict, Verdict::NotChecked);
             assert!(test.parts.iter().any(|part| part.part == "storage"));
+            // Made before reports named their lamp.
+            assert_eq!(test.lamp, None);
         }
+        let mut value: serde_json::Value = serde_json::from_str(LAMP_75C9).unwrap();
+        value["lamp"] = "lamp-75c9".into();
+        let test = selftest(&value.to_string()).unwrap();
+        assert_eq!(test.lamp.as_deref(), Some("lamp-75c9"));
+        value["lamp"] = "lamp 75c9".into();
+        assert!(selftest(&value.to_string()).is_err());
     }
 
     #[test]

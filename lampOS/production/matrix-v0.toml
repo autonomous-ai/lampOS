@@ -30,6 +30,13 @@
 version = "0"
 approved = false
 
+# A self-test report names the lamp that ran it (`lamp`, its host name); one
+# from a build before reports did cannot be matched to the station's --device.
+# Such a run is "incomplete" (the default) or "refused" (no record made): the
+# hardware lead's choice. A report naming another lamp is always refused.
+[rules]
+selftest_without_lamp = "incomplete"
+
 # Placeholder names: the hardware lead names the revisions.
 [[revision]]
 id = "draft-a"
