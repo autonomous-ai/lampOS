@@ -2514,7 +2514,7 @@ pub fn serve(
         == Some("on")
     {
         eprintln!(
-            "lamp-voice second: a line begun over the lamp's answer or within 1.5 s after it, mostly of its own words, is held as its echo; its own words at a line's start or end are taken out (LAMP_SECOND_OWN_ECHO)"
+            "lamp-voice second: a line begun over the lamp's answer or within 1.5 s after it, nothing but its own words in their order, is held as its echo; its own words at a line's start or end are taken out (LAMP_SECOND_OWN_ECHO)"
         );
         engine = engine.holding_own_echo(true);
     }

@@ -728,29 +728,47 @@ order is kept. A written turn is the same from the chat on.
   the switch, a line begun while the lamp's answer could be heard (`Start`'s
   `over_the_lamps_voice`), or within 1.5 s (`TAIL_US`) after its words sent
   would have played to their end (the end the conversation goes on from,
-  `Did::Said`), is judged against that answer with the same word matching,
-  before the attention rule:
-  - **mostly its own words** (K ≥ W/2, and at least 3 of them, `HELD_LEAST`): its answer is held back, and the
-    journal says `request N: its answer is held back: the lamp's own echo:
-    of its W words, K in the lamp's answer to request A, begun over the
-    lamp's voice` (or `within 1.5 s of the lamp's words`). Its verdict is
-    held back; it gets no hum or ask-again, and words it cut short are
-    answered in its place, as for any held line.
-  - **fewer, all one run at the line's start or end, at least 2 words**
-    (`STRIP_RUN`): that run is taken out of what the model is sent, and the
+  `Did::Said`), is judged against that answer, before the attention rule.
+  A heard word is the lamp's own only inside a run of at least 2 heard
+  words (`STRIP_RUN`) that the answer says one after another in the same
+  order (the same `word_key` matching). The same words out of order are
+  not its own, so this count K can be lower than the journal's count above,
+  which matches words as a set.
+  - **nothing but its own words, at least 3** (`HELD_LEAST`): its answer
+    is held back, and the journal says `request N: its answer is held back:
+    the lamp's own echo: of its W words, K in the lamp's answer to request
+    A, begun over the lamp's voice` (or `within 1.5 s of the lamp's
+    words`). Its verdict is held back; it gets no hum or ask-again, and
+    words it cut short are answered in its place, as for any held line.
+  - **one run of its own words at the line's start or end, the rest new
+    words**: that run is taken out of what the model is sent, and the
     journal says `request N: K of its W words, the lamp's own answer to
     request A at its start` (or `end`) `, are taken out of what the model
-    is sent`. Its own words anywhere else, or one alone ("so", "no"), leave
-    the line as heard. The heard line is still told as heard.
-  - **A person repeating the lamp is never held, nor cut:** a line begun
-    later than the 1.5 s, one with the lamp's name
-    (`attention::called_by_name_on`, or only the name called), a question
-    of its own (`remarks::questions`, a `?` or a question word first, with
-    at least one word not the lamp's: "Did you say five o'clock?"), or one
-    begun after the lamp's words when they ended on a question ("Yes, start
-    it." after "Shall I start it?") is the person's and sent as heard. When
-    such a line is mostly the lamp's words, the journal says `…, but it has
-    the lamp's name: answered as the person's` (or the guard that kept it).
+    is sent`. Its own words anywhere else, at both ends, or one alone
+    ("so", "no"), leave the line as heard. The heard line is still told as
+    heard.
+  - **A line that adds a word the lamp did not say is never held.** At
+    most its own run at its start or end is taken out, as above.
+  - **The person's line is sent as heard, never held nor cut,** when it
+    begins later than the 1.5 s, has the lamp's name
+    (`attention::called_by_name_on`, or only the name called), is a
+    question of its own (`remarks::questions`, a `?` or a question word
+    first, with at least one word not the lamp's: "Did you say five
+    o'clock?"), begins after the lamp's words when they ended on a question
+    ("Yes, start it." after "Shall I start it?"), or answers an offer in the
+    answer (`OFFERS`: "I can", "I could", "shall I", "should I", "want me
+    to", "would you like", "do you want", "let me know if", "if you want",
+    "if you'd like", "if you like"; "I can't" is none). An offer covers a
+    line begun after the lamp's words, and one over its voice that adds a
+    word: "set a reminder for six" after "I can set a reminder for six." is
+    answered. When such a line would have been held or cut, the journal
+    says `…, but it answers the lamp's offer: answered as the person's` (or
+    the guard that kept it).
+  - **Still held:** a line over the lamp's voice that is nothing but its
+    words, even an offer's or a question's ("shall I start the timer" over
+    "Shall I start the timer?"), and a line of its words within the tail
+    after an answer with no offer and no question. A person who repeats
+    such an answer word for word within 1.5 s is held as its echo.
   Counts only, never words. Without the switch nothing of this runs.
 - **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
   (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
