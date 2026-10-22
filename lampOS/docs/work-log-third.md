@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 17:59 — wake hm follow-up taken
+
+Ready for lamp-voice: no (new #2487 follow-up).
+
+- Taken by Third, session `third-wake-20261022`, no lamp, on the owner's
+  explicit assignment. Claim posted on Queue #2602 before code. Base
+  `fe49ed3c4`; branch `third/wake-hum-permission`.
+- Fifth's #2857 run at `172f9c94c` confirmed the wake is refused as
+  `microphone_not_allowed`. The code consumes it during normal 60 ms
+  privacy stabilization. Retry only within the original 1.5 s window;
+  enforce expiry before any successful cue, retain readiness and all
+  existing mute/sleep cancellation. Add real-loop startup and cancellation
+  regressions plus exact deadline cases; use a fresh capture generation.
+- Latency target: wake tap acquisition to `head_wake_cue_first_write`
+  within 500 ms on the lamp. Host dispatch tests cannot qualify that.
+  Fifth owns the 52e6 test; Third accesses no device.
+- #1362 is carried by First as draft #2948; keep it draft for Fifth's
+  real-hand tap, 3 s sleep, wake tap, quiet hm and kill/listening recovery.
+  Other prior assignments stay with Fifth, Tests and El.
+
 ## 2026-10-22 08:25 — Controls native gates passed; waiting on First
 
 Ready for lamp-voice: yes (#2677; First owns merge and lamp-4ace checks).
