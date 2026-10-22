@@ -1255,6 +1255,11 @@ fn read_once_with(
                 // The computer has no such folder: lamp-tasks says so only
                 // with `serve --folder-missing` (#2840).
                 let folder = item["dispatch"]["code"] == "folder_missing";
+                // An app's ask that surely never reached the agent is
+                // settled; one that may have stays `making` (#2813).
+                if !failed && let Some(keeping) = made {
+                    crate::app_make::not_kept(&keeping.directory, &key, crate::app_make::NOT_SENT);
+                }
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
@@ -1281,6 +1286,18 @@ fn read_once_with(
                 continue;
             };
             let key = format!("{store}:{id}:{observation_id}");
+            // An app's ask whose agent failed or stopped makes nothing:
+            // settled by this task's own store and id on every read, by the
+            // task's own states, whether or not its news was told, so a
+            // task that failed before its ask knew it is settled too
+            // (#2813, reviewer-two's P2 on #2887).
+            if let Some(keeping) = made
+                && crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default())
+                && settled_state(&task, observation_id)
+                    .is_some_and(|state| matches!(state, "failed" | "stopped"))
+            {
+                crate::app_make::not_kept(&keeping.directory, &key, crate::app_make::STOPPED);
+            }
             if told.contains(&key) || offered.contains(&key) || age_ms > OLDEST_MS {
                 continue;
             }
@@ -1370,6 +1387,15 @@ fn went_on<'a>(earlier: &str, answer: &'a str) -> Option<&'a str> {
 /// The task's newest observation in which its agent had finished, stopped,
 /// or stopped to ask, and how long ago it was seen: only one seen in this
 /// boot can be dated.
+/// The state of `task`'s observation `observation_id`, as the task says it.
+fn settled_state(task: &Value, observation_id: u64) -> Option<&str> {
+    task["observations"]
+        .as_array()?
+        .iter()
+        .find(|observation| observation["id"].as_u64() == Some(observation_id))?["state"]
+        .as_str()
+}
+
 fn newest_settled(task: &Value, now: &BootClock) -> Option<(u64, u64)> {
     task["observations"]
         .as_array()?
@@ -1471,7 +1497,11 @@ fn made_note(
                 made.version, made.sha256
             );
         }
-        Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
+        Err(why) => {
+            eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0);
+            // An app's ask is told why (#2813), in the maker's plain words.
+            crate::app_make::not_kept(&keeping.directory, key, &why.0);
+        }
     }
     let when = if age_ms <= JUST_MS {
         &words.just
@@ -3152,6 +3182,118 @@ mod tests {
         assert_eq!(keys, ["s1:2:2"]);
         drop(texts);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// An app's ask (#2813) settled by the reader itself, by its task's
+    /// store and id (reviewer-two's P2 on #2887): work the tasks part
+    /// confirmed but never sent is `not_kept`; work it may have sent stays
+    /// `making`; an agent that failed is `not_kept`.
+    #[test]
+    fn an_apps_ask_is_settled_when_its_work_never_reached_or_failed() {
+        let root = std::env::temp_dir().join(format!("task-app-make-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let keeping = crate::made_skill::Keeping {
+            directory: root.join("made"),
+            program: root.join("no-pack"),
+        };
+        let brief = crate::made_skill::brief("make me a skill that dims the light").unwrap();
+        // A stand-in tasks part answering one list, one task and one result.
+        let serve = |name: &str, list: Value, task: Value, data: Value| {
+            let socket = root.join(format!("{name}.sock"));
+            let listener = UnixListener::bind(&socket).unwrap();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let mut stream = stream.unwrap();
+                    let mut line = String::new();
+                    BufReader::new(&stream).read_line(&mut line).unwrap();
+                    let asked: Value = serde_json::from_str(&line).unwrap();
+                    let reply = match asked["op"].as_str().unwrap() {
+                        "list" => list.clone(),
+                        "get_task" => task.clone(),
+                        "get_observation" => json!({"ok": true, "data": data.clone()}),
+                        _ => json!({"ok": false}),
+                    };
+                    writeln!(stream, "{reply}").unwrap();
+                }
+            });
+            socket
+        };
+        let dispatched = |id: u64, state: &str| {
+            json!({"ok":true,"store_id":"s1","items":[{"id":id,"observations":0,"dispatch":{"state":state,
+                "confirmed":{"boot_id":"boot-a"},"finished":{"boot_id":"boot-a","monotonic_ms":NOW - 5_000}}}]})
+        };
+        let task = json!({"ok":true,"text":brief,"target":{"engine":"claude"},
+            "observations":[seen(1, "failed", "boot-a", NOW - 1_000)]});
+        let none = BTreeSet::new();
+        let at = crate::app_make::now_unix_ms();
+        let state = |id: &str| crate::app_make::status(&keeping.directory, Some(id), at);
+        // Confirmed, then never sent.
+        crate::app_make::begin(
+            &keeping.directory,
+            "make me a skill that dims the light",
+            "r1",
+            at,
+        )
+        .unwrap();
+        crate::app_make::handed(&keeping.directory, "r1", Ok(("s1".into(), 3)));
+        let socket = serve(
+            "not-sent",
+            dispatched(3, "not_sent"),
+            task.clone(),
+            json!({}),
+        );
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let told = state("r1");
+        assert_eq!(
+            (told["state"].as_str(), told["why"].as_str()),
+            (Some("not_kept"), Some(crate::app_make::NOT_SENT))
+        );
+        // May have been sent: still making, honestly.
+        crate::app_make::begin(&keeping.directory, "make me a skill that glows", "r2", at).unwrap();
+        crate::app_make::handed(&keeping.directory, "r2", Ok(("s1".into(), 4)));
+        let socket = serve(
+            "unsure",
+            dispatched(4, "uncertain"),
+            task.clone(),
+            json!({}),
+        );
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(state("r2")["state"], "making");
+        // Its agent failed: settled.
+        let list = json!({"ok":true,"store_id":"s1","items":[{"id":4,"observations":1}]});
+        let socket = serve("failed", list, task, json!({"state": "failed"}));
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let told = state("r2");
+        assert_eq!(
+            (told["state"].as_str(), told["why"].as_str()),
+            (Some("not_kept"), Some(crate::app_make::STOPPED))
+        );
+        assert_eq!(
+            state("r1")["why"],
+            crate::app_make::NOT_SENT,
+            "r1 kept as it was"
+        );
+        // reviewer-two's staged order: the task fails before the hand-over's
+        // thread has kept its store and id, its news is told, and then the
+        // ask learns its task. The next read settles it all the same.
+        crate::app_make::begin(&keeping.directory, "make me a skill that hums", "r3", at).unwrap();
+        let list = json!({"ok":true,"store_id":"s1","items":[{"id":5,"observations":1}]});
+        let failed = json!({"ok":true,"text":brief,"target":{"engine":"claude"},
+            "observations":[seen(1, "failed", "boot-a", NOW - 1_000)]});
+        let socket = serve("early", list, failed, json!({"state": "failed"}));
+        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        assert_eq!(news[0].key, "s1:5:1");
+        assert_eq!(state("r3")["state"], "making", "not yet its task");
+        crate::app_make::handed(&keeping.directory, "r3", Ok(("s1".into(), 5)));
+        let told: BTreeSet<String> = ["s1:5:1".to_owned()].into();
+        read_once_with(&socket, &now(), &told, &none, Some(&keeping));
+        let told = state("r3");
+        assert_eq!(
+            (told["state"].as_str(), told["why"].as_str()),
+            (Some("not_kept"), Some(crate::app_make::STOPPED))
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

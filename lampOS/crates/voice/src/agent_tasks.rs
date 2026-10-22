@@ -2059,6 +2059,134 @@ fn next(
     .to_owned()
 }
 
+/// Hand `text` over to the agent at `target` in the tasks part at
+/// `directory`, prepared and confirmed at once, within `deadline`: for work
+/// the person asked for where the asking is itself the yes (an app's
+/// typed skill, `crate::app_make`, #2813), never for the model's calls,
+/// which wait for the person's yes ([`CONFIRM`]). `tag` names the asker in
+/// the tasks part's request ids. With `discover` (the target is the
+/// default, not one set), a target the tasks part hasn't is replaced by its
+/// one Claude target, as the voice's own hand-over does
+/// ([`missing_target`], #1390); none or several is refused, never guessed
+/// (reviewer-two's and El's P2 on #2887). The task's store and id, or, in
+/// plain words, why it wasn't handed over. A confirm whose answer is lost
+/// is taken as handed: the task's own news settles it either way. Nothing
+/// of `text` is logged.
+pub fn hand_over(
+    directory: &Path,
+    target: &str,
+    discover: bool,
+    text: &str,
+    tag: &str,
+    deadline: Duration,
+) -> Result<(String, u64), &'static str> {
+    const NOT_REACHED: &str = "the computer couldn't be reached";
+    if text.len() > MOST_TASK_BYTES || text.starts_with("--") {
+        return Err("it was too long to hand over");
+    }
+    let started = Instant::now();
+    let left = || deadline.saturating_sub(started.elapsed());
+    let request = directory.join("request.sock");
+    let status = ask(&request, &json!({"op":"status"}), left()).ok_or(NOT_REACHED)?;
+    let guard = self::guard(&status, format!("{tag}-prepare-{}", nonce())).ok_or(NOT_REACHED)?;
+    let mut prepared = ask_until_sure(
+        &request,
+        &json!({"op":"prepare","guard":guard,"text":text,"target":target}),
+        left,
+    )
+    .ok_or(NOT_REACHED)?;
+    if discover && prepared.get("error") == Some(&json!("target")) {
+        let place = Place {
+            directory: directory.to_path_buf(),
+            target: target.to_owned(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            make_skill: true,
+            named_only: false,
+            sign_in: false,
+        };
+        match missing_target(&place, 0, target, "claude", left()) {
+            Missing::Use(other) => {
+                let again = self::guard(&status, format!("{tag}-prepare-{}", nonce()))
+                    .ok_or(NOT_REACHED)?;
+                prepared = ask_until_sure(
+                    &request,
+                    &json!({"op":"prepare","guard":again,"text":text,"target":other}),
+                    left,
+                )
+                .ok_or(NOT_REACHED)?;
+            }
+            Missing::NotSetUp => return Err(crate::app_make::NOT_SET_UP),
+            Missing::Unread => {}
+        }
+    }
+    let (Some(id), Some(digest)) = (
+        prepared.get("id").and_then(Value::as_u64),
+        prepared.get("prepared_digest").and_then(Value::as_str),
+    ) else {
+        // The tasks part's code only, never the task's words.
+        eprintln!(
+            "lamp-voice: {tag}: the tasks part did not prepare the work ({})",
+            prepared
+                .get("error")
+                .and_then(Value::as_str)
+                .filter(|code| alias(code))
+                .unwrap_or("no code")
+        );
+        return Err(crate::app_make::NOT_SENT);
+    };
+    let status = ask(&request, &json!({"op":"status"}), left()).ok_or(NOT_REACHED)?;
+    let (Some(guard), Some(session), Some(store)) = (
+        self::guard(&status, format!("{tag}-confirm-{}", nonce())),
+        status
+            .get("summary")
+            .and_then(|summary| summary.get("session_id"))
+            .and_then(Value::as_str),
+        status.get("store_id").and_then(Value::as_str),
+    ) else {
+        return Err(NOT_REACHED);
+    };
+    // Asked again while the tasks part isn't sure, as `ask_until_sure`, but
+    // remembering whether any answer was `uncertain`: that one may have
+    // committed, whatever a later `busy` or `timeout` says of the next try
+    // (reviewer-two's P2 on #2887). Only a definite refusal is not sent.
+    let line =
+        json!({"op":"confirm","guard":guard,"id":id,"prepared_digest":digest,"session_id":session});
+    let voice = directory.join("voice.sock");
+    let mut unsure = false;
+    let refused = loop {
+        let Some(answer) = ask(&voice, &line, left()) else {
+            // Its answer lost: it may have been taken (El's P3).
+            unsure = true;
+            break false;
+        };
+        if answer.get("ok") == Some(&json!(true)) {
+            break false;
+        }
+        let code = answer
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        unsure |= code == "uncertain";
+        if !ASK_AGAIN.contains(&code) || left() <= AGAIN_AFTER {
+            break true;
+        }
+        std::thread::sleep(AGAIN_AFTER);
+    };
+    if refused && !unsure {
+        return Err(crate::app_make::NOT_SENT);
+    }
+    if unsure {
+        eprintln!("lamp-voice: {tag}: the confirm may have been taken; kept as handed");
+    }
+    Ok((store.to_owned(), id))
+}
+
 /// The tasks part's guard for a mutation: its store, its revision now, and
 /// a request id of our own.
 fn guard(status: &Value, request_id: String) -> Option<Value> {
@@ -2932,6 +3060,317 @@ pub(crate) mod tests {
         );
         assert_eq!(listed(&[]), "none");
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// An app's typed skill (#2813): prepared and confirmed at once, as
+    /// the voice's own two steps, with no yes asked; the tasks part's
+    /// refusal or silence told in plain words.
+    #[test]
+    fn a_hand_over_prepares_and_confirms_at_once() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-hand-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let handed = hand_over(
+            &directory,
+            "office",
+            false,
+            "Make a skill.",
+            "app-make",
+            PEER_WAIT,
+        );
+        assert_eq!(handed, Ok(("s1".to_owned(), 7)));
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        let prepare = seen.recv().unwrap();
+        assert_eq!(
+            (
+                prepare["op"].as_str(),
+                prepare["text"].as_str(),
+                prepare["target"].as_str()
+            ),
+            (Some("prepare"), Some("Make a skill."), Some("office"))
+        );
+        assert_eq!(seen.recv().unwrap()["op"], "status");
+        let confirm = seen.recv().unwrap();
+        assert_eq!(
+            (
+                confirm["op"].as_str(),
+                confirm["id"].as_u64(),
+                confirm["prepared_digest"].as_str()
+            ),
+            (Some("confirm"), Some(7), Some("abc"))
+        );
+        // The tasks part refuses to prepare it: said so, and not started.
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+            ],
+        );
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                false,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Err("the computer didn't take the work")
+        );
+        // No tasks part at all.
+        let gone = directory.join("gone");
+        assert_eq!(
+            hand_over(
+                &gone,
+                "office",
+                false,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Err("the computer couldn't be reached")
+        );
+    }
+
+    /// reviewer-two's and El's P2 on #2887: with the default target, one
+    /// the tasks part hasn't is replaced by its one Claude target, as the
+    /// voice's own hand-over does; a target set is kept as set, and two
+    /// Claude targets are refused, never guessed. El's P3: a confirm
+    /// refused is not sent; one whose answer is lost is kept as handed.
+    #[test]
+    fn a_hand_over_finds_the_one_claude_target_and_never_guesses() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let no_target = json!({"ok":false,"error":"target"});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let fresh = |name: &str| {
+            let directory = std::env::temp_dir()
+                .join(format!("agent-tasks-find-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            directory
+        };
+        // One Claude target, named otherwise: found, and the work goes there.
+        let directory = fresh("one");
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", no_target.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"targets":[{"alias":"office-claude","engine":"claude"},{"alias":"laptop","engine":"codex"}]}),
+                ),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status(1)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                true,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Ok(("s1".to_owned(), 7))
+        );
+        let asked: Vec<Value> = seen.try_iter().collect();
+        let targets: Vec<&str> = asked
+            .iter()
+            .filter(|line| line["op"] == "prepare")
+            .filter_map(|line| line["target"].as_str())
+            .collect();
+        assert_eq!(targets, ["office", "office-claude"], "{asked:?}");
+        // A target set is kept as set: nothing looked up.
+        let directory = fresh("set");
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", no_target.clone()),
+            ],
+        );
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                false,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Err(crate::app_make::NOT_SENT)
+        );
+        assert!(seen.try_iter().all(|line| line["op"] != "targets"));
+        // Two Claude targets: refused, never guessed.
+        let directory = fresh("two");
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", no_target),
+                (
+                    "request.sock",
+                    json!({"ok":true,"targets":[{"alias":"desk","engine":"claude"},{"alias":"den","engine":"claude"}]}),
+                ),
+            ],
+        );
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                true,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Err(crate::app_make::NOT_SET_UP)
+        );
+        // A confirm refused: not sent.
+        let directory = fresh("refused");
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", prepared.clone()),
+                ("request.sock", status(1)),
+                ("voice.sock", json!({"ok":false,"error":"conflict"})),
+            ],
+        );
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                true,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Err(crate::app_make::NOT_SENT)
+        );
+        // reviewer-two's control: the confirm taken, then the socket closed
+        // with no answer. Kept as handed, with its store and id, for its
+        // news to settle; never `not_kept` while the work may run.
+        let directory = fresh("lost");
+        let requests = UnixListener::bind(directory.join("request.sock")).unwrap();
+        let confirms = UnixListener::bind(directory.join("voice.sock")).unwrap();
+        let answers = vec![status(0), prepared, status(1)];
+        std::thread::spawn(move || {
+            for (stream, answer) in requests.incoming().zip(answers) {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let (taken, confirm) = mpsc::channel();
+        std::thread::spawn(move || {
+            let (stream, _) = confirms.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            taken.send(line).unwrap();
+            drop(stream);
+        });
+        assert_eq!(
+            hand_over(
+                &directory,
+                "office",
+                true,
+                "Make a skill.",
+                "app-make",
+                PEER_WAIT
+            ),
+            Ok(("s1".to_owned(), 7))
+        );
+        let line: Value = serde_json::from_str(&confirm.recv().unwrap()).unwrap();
+        assert_eq!(
+            (line["op"].as_str(), line["id"].as_u64()),
+            (Some("confirm"), Some(7))
+        );
+        // reviewer-two's two controls: the confirm answered `uncertain` to
+        // the end of the wait, and `uncertain` then `busy`/`timeout`. Each
+        // may have committed: kept as handed, never not sent. Busy alone
+        // says only that the change never began: not sent.
+        let tasks = |codes: Vec<&'static str>| {
+            let mut answers = vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+                ("request.sock", status(1)),
+            ];
+            answers.extend(
+                codes
+                    .into_iter()
+                    .map(|code| ("voice.sock", json!({"ok":false,"error":code}))),
+            );
+            answers
+        };
+        for (name, codes, told) in [
+            ("unsure", vec!["uncertain"; 12], Ok(("s1".to_owned(), 7))),
+            (
+                "unsure-then-busy",
+                vec![
+                    "uncertain",
+                    "busy",
+                    "busy",
+                    "timeout",
+                    "busy",
+                    "busy",
+                    "busy",
+                    "busy",
+                ],
+                Ok(("s1".to_owned(), 7)),
+            ),
+            ("busy", vec!["busy"; 12], Err(crate::app_make::NOT_SENT)),
+        ] {
+            let directory = fresh(name);
+            let _seen = tasks_part(&directory, tasks(codes));
+            assert_eq!(
+                hand_over(
+                    &directory,
+                    "office",
+                    true,
+                    "Make a skill.",
+                    "app-make",
+                    Duration::from_millis(700)
+                ),
+                told,
+                "{name}"
+            );
+        }
     }
 
     #[test]
