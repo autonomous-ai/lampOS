@@ -1836,6 +1836,24 @@ impl Test {
             Self::Number(field) => format!("{field} no longer a number"),
         }
     }
+
+    /// What it wants, for the journal: `state resting`, `a face`.
+    fn shows(&self) -> String {
+        fn shown(value: &Value) -> String {
+            value
+                .as_str()
+                .map_or_else(|| value.to_string(), str::to_owned)
+        }
+        match self {
+            Self::NoFaces => "no face".into(),
+            Self::Faces(_) => "a face".into(),
+            Self::Equals(field, wanted) => format!("{field} {}", shown(wanted)),
+            Self::NotEquals(field, unwanted) => format!("{field} not {}", shown(unwanted)),
+            Self::Above(field, line) => format!("{field} above {line}"),
+            Self::Below(field, line) => format!("{field} below {line}"),
+            Self::Number(field) => format!("{field} a number"),
+        }
+    }
 }
 
 /// A once-a-day trigger's watch reset after it had begun holding, said once
@@ -4261,6 +4279,47 @@ struct Watch {
     readings: Readings,
     /// With `yields_to`: when this time it holds first waited, and said so.
     yielded_us: Option<u64>,
+    /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
+    /// hold it was said in and when. A run clears them.
+    said: HashMap<&'static str, (Option<u64>, u64)>,
+}
+
+/// A gate's line is not said again for the same trigger within this long,
+/// even in a new hold: a face that flickers past its `gap` says it once.
+const DROPPED_LINE_US: u64 = 60_000_000;
+/// The most lines kept for a host that never takes them.
+const DROPPED_LINES_KEPT: usize = 256;
+
+/// A due chance a gate dropped or held back (#2602), for the journal:
+/// `<skill> not run: <why>`, once a hold for each gate and not again for
+/// that gate within [`DROPPED_LINE_US`]. Taken with [`Engine::take_dropped`].
+fn dropped(
+    lines: &mut Vec<String>,
+    watch: &mut Watch,
+    skill: &str,
+    gate: &'static str,
+    now_us: u64,
+    why: impl FnOnce() -> String,
+) {
+    let hold = watch.since_us;
+    if watch.said.get(gate).is_some_and(|(on, at)| {
+        (hold.is_some() && *on == hold) || now_us.saturating_sub(*at) < DROPPED_LINE_US
+    }) {
+        return;
+    }
+    watch.said.insert(gate, (hold, now_us));
+    if lines.len() < DROPPED_LINES_KEPT {
+        lines.push(format!("{skill} not run: {}", why()));
+    }
+}
+
+/// How long is left of `us`, for the journal: `7 min`, or `40 s` under one.
+fn left(us: u64) -> String {
+    if us >= 60_000_000 {
+        format!("{} min", us.div_ceil(60_000_000))
+    } else {
+        format!("{} s", us.div_ceil(1_000_000))
+    }
 }
 
 /// Where a `yields_to` trigger's chance stands against the daily trigger it
@@ -4366,6 +4425,8 @@ pub struct Engine {
     /// occurrence day, and when it took its chance (none: dropped or let
     /// go). In memory: the journal says a day was claimed, not when.
     judged: HashMap<(String, String), (i64, Option<u64>)>,
+    /// The journal's lines of due chances dropped ([`dropped`]), not yet taken.
+    dropped: Vec<String>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -4554,7 +4615,14 @@ impl Engine {
             daily_faulted: false,
             rested_day: None,
             judged: HashMap::new(),
+            dropped: Vec::new(),
         }
+    }
+
+    /// The lines of due chances dropped since the last take, each
+    /// `<skill> not run: <why>` (#2602): the program says each in its journal.
+    pub fn take_dropped(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.dropped)
     }
 
     /// The local day the last night the lamp rested began (the routine
@@ -5363,6 +5431,38 @@ impl Engine {
         })
     }
 
+    /// The first `[[while]]` condition of `skill` that does not hold, for
+    /// the journal: `voice/state state resting for 5 s`.
+    fn unmet(
+        latest: &HashMap<String, (Value, u64, Option<u64>)>,
+        holding: &HashMap<(String, usize), u64>,
+        skill: &Skill,
+        now_us: u64,
+    ) -> String {
+        if skill.is_routine() && !Self::routine_voice_fresh(latest, now_us) {
+            return format!("{} state resting, said within 3 s", VoiceState::TOPIC);
+        }
+        skill
+            .conditions
+            .iter()
+            .enumerate()
+            .find(|(index, condition)| {
+                !Self::condition_holds(
+                    latest,
+                    condition,
+                    holding.get(&(skill.name.clone(), *index)),
+                    now_us,
+                )
+            })
+            .map_or_else(String::new, |(_, condition)| {
+                let mut wanted = format!("{} {}", condition.topic, condition.test.shows());
+                if condition.for_us > 0 {
+                    wanted += &format!(" for {} s", condition.for_us / 1_000_000);
+                }
+                wanted
+            })
+    }
+
     /// A run asked of the Policy, when its answer comes: its calls made
     /// again at `now_us` (a look at where the face is now), if one of its
     /// triggers still holds on its topic's newest value that lasts and its
@@ -5597,6 +5697,15 @@ impl Engine {
                     watch.items = Some(items);
                     for name in came {
                         if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
+                            let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                            dropped(
+                                &mut self.dropped,
+                                watch,
+                                &skill.name,
+                                "while",
+                                now_us,
+                                || format!("an item came, but its while did not hold: {unmet}"),
+                            );
                             continue;
                         }
                         let held = format!("{key} {name} of {list} on {topic} came to hold");
@@ -5718,7 +5827,26 @@ impl Engine {
                 // Once each time it holds: a chance held back now waits for
                 // the next time.
                 let once = trigger.when == When::Appears || trigger.rearm;
-                if (once && watch.spent) || watch.disarmed {
+                if once && watch.spent {
+                    continue;
+                }
+                if watch.disarmed {
+                    if let Some(line) = &trigger.rearm_line {
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "rearm",
+                            now_us,
+                            || {
+                                format!(
+                                    "not rearmed: {} for {} s first",
+                                    line.test.shows(),
+                                    line.for_us / 1_000_000
+                                )
+                            },
+                        );
+                    }
                     continue;
                 }
                 watch.spent = once;
@@ -5726,11 +5854,37 @@ impl Engine {
                     watch.disarmed = true;
                     watch.past_line_us = None;
                 }
-                if (trigger.when == When::Appears && watch.away_us < trigger.absent_for_us)
-                    || watch
-                        .ran_us
-                        .is_some_and(|ran| now_us - ran < trigger.cooldown_us)
+                if trigger.when == When::Appears && watch.away_us < trigger.absent_for_us {
+                    let (away, absent) = (watch.away_us, trigger.absent_for_us);
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "away",
+                        now_us,
+                        || {
+                            format!(
+                                "away {} s, under its {} s",
+                                away / 1_000_000,
+                                absent / 1_000_000
+                            )
+                        },
+                    );
+                    continue;
+                }
+                if let Some(ran) = watch
+                    .ran_us
+                    .filter(|ran| now_us - ran < trigger.cooldown_us)
                 {
+                    let rest = trigger.cooldown_us - (now_us - ran);
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "cooldown",
+                        now_us,
+                        || format!("in its cooldown, {} left", left(rest)),
+                    );
                     continue;
                 }
                 if skill
@@ -5749,16 +5903,38 @@ impl Engine {
                         watch.disarmed = false;
                         watch.waiting_us = None;
                     }
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "quiet",
+                        now_us,
+                        || "quiet hours".into(),
+                    );
                     continue;
                 }
                 // Snoozed or turned off by a person (#1685): the chance is
                 // spent, so nothing waits to come when it ends.
-                if self.off.contains(&skill.name)
-                    || self
-                        .snoozed
-                        .get(&skill.name)
-                        .is_some_and(|until| now_us < *until)
+                if self.off.contains(&skill.name) {
+                    dropped(&mut self.dropped, watch, &skill.name, "off", now_us, || {
+                        "off".into()
+                    });
+                    continue;
+                }
+                if let Some(until) = self
+                    .snoozed
+                    .get(&skill.name)
+                    .filter(|until| now_us < **until)
                 {
+                    let rest = until - now_us;
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "snooze",
+                        now_us,
+                        || format!("snoozed, {} left", left(rest)),
+                    );
                     continue;
                 }
                 // The nudges' limits (#1685). Past the day's most, or resting
@@ -5768,15 +5944,35 @@ impl Engine {
                 // in the quiet hours: taken at the trigger's first message
                 // once they allow it, while it still holds.
                 let day = day_of(self.clock, now_us);
-                if skill.most_a_day.is_some_and(|most| {
+                if let Some(most) = skill.most_a_day.filter(|most| {
                     self.day_runs
                         .get(&skill.name)
-                        .is_some_and(|(on, count)| *on == day && *count >= most)
-                }) || self
+                        .is_some_and(|(on, count)| *on == day && count >= most)
+                }) {
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "most",
+                        now_us,
+                        || format!("its {most} a day already run"),
+                    );
+                    continue;
+                }
+                if let Some(nudge) = self
                     .nudges
                     .get(&skill.name)
-                    .is_some_and(|nudge| now_us < nudge.resting_until_us)
+                    .filter(|nudge| now_us < nudge.resting_until_us)
                 {
+                    let rest = nudge.resting_until_us - now_us;
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "resting",
+                        now_us,
+                        || format!("resting after runs nobody noticed, {} left", left(rest)),
+                    );
                     continue;
                 }
                 // After a night the lamp rested, the other skill's daily
@@ -5884,6 +6080,20 @@ impl Engine {
                         watch.disarmed = false;
                         watch.waiting_us = None;
                     }
+                    let group = skill
+                        .budget
+                        .as_ref()
+                        .map_or("", |(group, _)| group.as_str());
+                    // Each budget reason is its own gate, so a different
+                    // one within 60 s is still said.
+                    let (gate, why) = if outside {
+                        ("active", "outside its active hours".to_owned())
+                    } else if hour_spent {
+                        ("budget-hour", format!("its {group} group's hour is spent"))
+                    } else {
+                        ("budget-first", format!("another {group} skill waits first"))
+                    };
+                    dropped(&mut self.dropped, watch, &skill.name, gate, now_us, || why);
                     continue;
                 }
                 if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
@@ -5944,6 +6154,22 @@ impl Engine {
                             from: None,
                         });
                     }
+                    // Without a `wait`, a chance a condition holds back is
+                    // spent here and says so (#2602). One let go past a
+                    // `wait` is said by the `chance dropped` line above,
+                    // which #3007 gives every trigger with a `wait`, not
+                    // here: it must not be said twice.
+                    if trigger.wait_us == 0 && !(once && trigger.once_per_day) {
+                        let unmet = Self::unmet(&self.latest, &self.holding, skill, now_us);
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "while",
+                            now_us,
+                            || format!("its while did not hold: {unmet}"),
+                        );
+                    }
                     continue;
                 }
                 watch.waiting_us = None;
@@ -5967,10 +6193,30 @@ impl Engine {
                                 .is_some_and(|at| now_us.saturating_sub(at) < opened_us)
                         });
                 if spoken && !(trigger.once_per_day && acts) {
+                    let opens = trigger
+                        .during
+                        .as_ref()
+                        .map_or_else(String::new, daily::Window::opens);
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "spoken",
+                        now_us,
+                        || format!("spoken to since {opens}"),
+                    );
                     continue;
                 }
                 if trigger.once_per_day && acts {
                     if self.daily_faulted {
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "daily",
+                            now_us,
+                            || "its daily journal is faulted".into(),
+                        );
                         continue;
                     }
                     let day = moment.as_ref().and_then(|moment| {
@@ -6021,7 +6267,17 @@ impl Engine {
                             continue;
                         }
                         Ok(true) => {}
-                        Ok(false) => continue,
+                        Ok(false) => {
+                            dropped(
+                                &mut self.dropped,
+                                watch,
+                                &skill.name,
+                                "daily",
+                                now_us,
+                                || "its day already claimed".into(),
+                            );
+                            continue;
+                        }
                         Err(error) => {
                             self.daily_faulted = true;
                             runs.push(Run {
@@ -6091,6 +6347,7 @@ impl Engine {
                 }
                 if acts {
                     watch.ran_us = Some(now_us);
+                    watch.said.clear();
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
                     if skill.most_a_day.is_some() {
