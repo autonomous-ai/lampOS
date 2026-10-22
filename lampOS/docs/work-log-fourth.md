@@ -6464,6 +6464,50 @@ Ready for lamp-voice: no, activation implementation begins; retry replacement na
   face tools. Host functional/timing evidence remains distinct from Mobile's
   authorised end-to-end lamp acceptance. No device action is authorised.
 
+## 2026-10-22 16:00 ICT: authorised retry rerun passes; photo final host gate underway
+
+Ready for lamp-voice: no, retry latest-base handoff and activation full/native gates remain.
+
+- #2936 head3c2d54877 native39747538858 attempt1 failed the unchanged
+  Tasks signed-out idle-report barrier:6025/1/67,4337selectedunrun,
+  no artifact, new retry cases not reached. Full raw terminal record retained.
+  Test source0a7c9b5124c4b459431ee24e088c970ff466db1de268841df426cee9f68562a1
+  exact across old3bb,oldnativebasea165,newparent8dd,failedCIbase555.
+  It waited for increasedrequests/signed_in=no/cli_busy=false; lastreport
+  requests6/signed_in=no/cli_busy=true. Not a target-content failure.
+  Routed6336624674 on #2637 and6336627482 on #2936; no Tasks edit by Fourth.
+- First6336615705 recognised the known flake, took correction #2954 and
+  explicitly requested one rerun. Same-head attempt2 passed10,363/0/67,
+  all27focused,4doctests,12process,relay;1samevoiceleaky. Clippy39747538905
+  green. Artifact12412589912 SHA-256
+  `58be2a64faf1c01d2b590d83d1825162ed5462c862346d083ab1d6453bde5e7e`.
+  CImerge3891e6925930ca2f290beac3b5c68117c63e8d8b on555117e75.
+  Attempt1 evidence is not overwritten; rerun authority in separate receipt
+  `/private/tmp/fourth-memory-retry-boundaries-ci-20261022/rebase-3c2d54877/attempt2/`.
+  Exact-head receipt6336886965; final latest-base refresh remains required.
+- Reviewer-two6336623688 independently passed exact3c full serialVoice:
+  3562/0/14,fmt/strictClippy;6393sourcehashes unchanged, P1/P2none.
+  This is reviewer evidence, not a Fourth rerun. First's #2954 correction
+  remains open; current integration head64b4c2417 at15:59. Photo work
+  continues while preparing the final ancestry handoff.
+- #2856 final source frozen: explicit sharedphoto_reply, pending/asked
+  authority, no fallback, held-only narrowNo and ordinaryforget guards,
+  three product units/real cross-unit0700contract/exact31-32census.
+  New Engine control caught ordinaryforget-confirmation interference;
+  fixed exactheardphotoNo only. Six first-run socket denials and two
+  Mac accepted-stream WouldBlock fixture failures retained. All accepted
+  streams now blocking with boundedread/write, accepts bounded3s.
+- Final fmt and strictworkspaceClippy pass. Final9photo controls pass,
+  including no-mutation pending timeout300427us. Controlledlegacy RPCs:
+  yes2359/2374us,no2622/2633us;sharedyes2646/2565us,no2491/2335us,
+  cold/repeated in one process. Target<50ms met on synthetic host only;
+  same twoRPCboundary, existing300mslookup+6smutation bounds, no added
+  steadyturnIO. No provider/audio/device latency claimed.
+- Full affected-consumer host gate running; Cloud187/0/2 passed. Focused
+  repetitions will not be added to full package unique totals. Raw
+  `/private/tmp/fourth-photo-product-activation-checks-20261022/host/`.
+  Final checks precede code publication; Mobile0c89 acceptance stays open.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
