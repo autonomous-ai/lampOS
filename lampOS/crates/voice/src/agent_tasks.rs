@@ -1678,6 +1678,13 @@ pub fn run(
 pub const NOT_SET_UP: &str =
     "I can't hand work on to another computer yet: that isn't set up on this lamp.";
 
+/// What the model is told when the tasks part refuses a hand-over for want
+/// of a Harness program (`lamp-tasks --set-up-later`, #1676): what
+/// [`NOT_SET_UP`] says, and that it can be set up later (#2842's done-when).
+/// On lamp-75c9, 23 Oct, "could not be prepared just now" was said as "it
+/// wouldn't go through just now … want me to try again?".
+pub const NO_HARNESS: &str = "I can't hand work on to another computer yet: that isn't set up on this lamp. It can be set up later.";
+
 /// What the model is told when the tasks part did not answer: not set up
 /// only while the file it needs is missing, as its unit's condition decides
 /// (the reviewer on #1063: a crashed part's socket is gone too, since systemd
@@ -1895,10 +1902,16 @@ fn run_for(
                             .unwrap_or("no code"),
                         started.elapsed().as_millis()
                     );
-                    (
-                        json!({"error": "The work could not be prepared just now."}),
-                        true,
-                    )
+                    // No Harness to hand over with (`lamp-tasks
+                    // --set-up-later`, #2842): not a failure of the moment,
+                    // so no "just now" for the model to offer a retry on.
+                    let told = if answer.get("error").and_then(Value::as_str) == Some("no_harness")
+                    {
+                        NO_HARNESS
+                    } else {
+                        "The work could not be prepared just now."
+                    };
+                    (json!({"error": told}), true)
                 }
                 None => {
                     eprintln!(
@@ -3007,7 +3020,8 @@ pub(crate) mod tests {
     /// there once. The one target of the engine asked for is prepared
     /// instead. With none of that engine, or two to choose between, the
     /// model is told plainly that it isn't set up, never "can't reach it".
-    /// Any other refusal is answered as before, with nothing read.
+    /// `no_harness` is told it can be set up later (#2842); any other
+    /// refusal is answered as before, with nothing read.
     #[test]
     fn a_target_the_tasks_part_lacks_is_answered_from_who_is_there() {
         let _one = ONE_AT_A_TIME
@@ -3129,7 +3143,7 @@ pub(crate) mod tests {
         let seen = tasks_part(
             &directory,
             vec![
-                ("request.sock", status),
+                ("request.sock", status.clone()),
                 ("request.sock", refused("bad_text")),
             ],
         );
@@ -3138,6 +3152,21 @@ pub(crate) mod tests {
             told,
             json!({"error": "The work could not be prepared just now."})
         );
+        assert_eq!(seen.try_iter().count(), 2);
+        // No Harness (#2842): told it can be set up later, with no "just
+        // now" to retry on, and who is there is not read.
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                ("request.sock", refused("no_harness")),
+            ],
+        );
+        let (told, _) = run(&place, &call, 3, true, PEER_WAIT);
+        assert_eq!(told, json!({"error": NO_HARNESS}));
+        assert!(NO_HARNESS.contains("set up later") && !NO_HARNESS.contains("just now"));
         assert_eq!(seen.try_iter().count(), 2);
         if let Ok(mut pending) = PENDING.lock() {
             *pending = None;
