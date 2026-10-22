@@ -386,7 +386,10 @@ fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) 
 /// is a cut-in over the lamp's voice, judged as before, so words said over
 /// the lamp still stop it, unless the room was `busy` as the line began
 /// (`LAMP_OWN_LINE_OVER_TALK`): then talk with no name, no stop word and no
-/// face turned to the lamp in it is let go as the room's (`busy_room`).
+/// face turned to the lamp in it is let go as the room's (`busy_room`), once
+/// the line has reached the speaker (its playback started, or samples were
+/// handed to it, so a line paused for a yield still counts): provider audio
+/// still queued short of a speaker block is no sounding line yet.
 fn while_own_line_waits(
     wait: OwnLineWait,
     reply: Option<&Reply>,
@@ -422,7 +425,12 @@ fn while_own_line_waits(
             WhileOwnLineWaits::LetGo("sounded")
         } else if on && let_go_goes_on && !named && !theirs {
             WhileOwnLineWaits::LetGo("goes_on")
-        } else if busy && !named && !theirs && !in_it(stop_began_us) {
+        } else if busy
+            && (current.handed > 0 || current.playback.is_some())
+            && !named
+            && !theirs
+            && !in_it(stop_began_us)
+        {
             WhileOwnLineWaits::LetGo("busy_room")
         } else {
             WhileOwnLineWaits::AsBefore

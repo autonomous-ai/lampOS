@@ -2174,6 +2174,8 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
         reply.input_sequence = 0;
         reply.say = Some(ticket);
         reply.had_audio = true;
+        // One block handed to the speaker: the line has sounded.
+        reply.handed = 240;
     }
     let busy = OwnLineWait {
         heard: true,
@@ -2248,6 +2250,28 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
             "{case}"
         );
     }
+    // Provider audio queued short of a speaker block (an unfinished
+    // 240-frame tail: no playback, nothing handed) is no sounding line yet:
+    // talk over it is admitted as before (reviewer-two's P2 on #2920).
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.handed = 0;
+        reply.generation_done = false;
+        reply.pcm = vec![1_i16; 120].into();
+        assert!(!reply.has_speaker_chunk());
+        assert!(reply.playback.is_none());
+    }
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+    // A line that sounded and then paused (for a yield: playback ended,
+    // its rest queued) is still sounding for the room.
+    h.reply.as_mut().unwrap().handed = 480;
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::LetGo("busy_room")
+    );
     // Not yet sounding: only `LAMP_OWN_LINE_KEEPS` waits, as before.
     h.reply.as_mut().unwrap().had_audio = false;
     assert_eq!(
