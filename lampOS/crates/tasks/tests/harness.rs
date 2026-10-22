@@ -101,6 +101,7 @@ impl Rig {
             ]),
             cancel: None,
             as_person: false,
+            folder_missing: false,
         };
         let rig = Self {
             root,
@@ -818,6 +819,52 @@ fn machine_change_and_existing_name_heuristic_remain_uncertain() {
         assert_eq!(rig.cli().launch(&launch()), uncertain(code));
         assert_eq!(rig.calls().len(), 2);
     }
+}
+
+/// A folder that isn't on the computer is refused before anything is made
+/// (Harness 0.4.41, lamp-75c9, 22 Oct), so with `--folder-missing` the task
+/// surely did not start (#2840). Any other words, or the switch off, keep
+/// the failure uncertain.
+#[test]
+fn a_missing_folder_after_new_is_not_sent_with_the_switch_and_never_retried() {
+    for (error, outcome) in [
+        ("CWD_NOT_FOUND", not_sent("folder_missing")),
+        (
+            "CWD_NOT_FOUND (The saved project folder is no longer available.)",
+            not_sent("folder_missing"),
+        ),
+        (
+            "That folder does not exist on the machine.",
+            not_sent("folder_missing"),
+        ),
+        ("CWD_NOT_FOUNDX", uncertain("new_failed")),
+        ("SPAWN_FAILED", uncertain("new_failed")),
+    ] {
+        for switch in [true, false] {
+            let mut rig = Rig::new();
+            rig.config.folder_missing = switch;
+            let reply = json!({"ok": false, "error": error}).to_string();
+            rig.new_step(json!({"exit": 1, "stdout": format!("{reply}\n")}));
+            let expected = if switch {
+                outcome.clone()
+            } else {
+                uncertain("new_failed")
+            };
+            assert_eq!(rig.cli().launch(&launch()), expected, "{error} {switch}");
+            assert_eq!(
+                rig.calls()
+                    .iter()
+                    .filter(|call| call["args"][0] == "new")
+                    .count(),
+                1
+            );
+        }
+    }
+    // Said with success is not a refusal Harness gives.
+    let mut rig = Rig::new();
+    rig.config.folder_missing = true;
+    rig.new_step(json!({"stdout":"{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n"}));
+    assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
 }
 
 #[test]

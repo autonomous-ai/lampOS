@@ -188,7 +188,8 @@ pub struct SetUpLater {
 /// this many looks: every five minutes on a lamp.
 pub const MACHINES_EVERY_LOOKS: u32 = 5;
 /// The folder each written target names on the person's computer: today's
-/// on lamp-4ace (`docs/tasks.md`). Harness makes it the first time.
+/// on lamp-4ace (`docs/tasks.md`). Harness never makes it: a computer
+/// without it refuses the hand-over (`serve --folder-missing`, #2840).
 pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
@@ -2006,6 +2007,7 @@ pub fn serve<C: Clock>(
     clock: C,
     executable: PathBuf,
     as_person: bool,
+    folder_missing: bool,
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
@@ -2027,6 +2029,7 @@ pub fn serve<C: Clock>(
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
         cli.as_person = as_person;
+        cli.folder_missing = folder_missing;
         Cli::new(cli, session.into()).map(Production::Cli)
     })
 }
