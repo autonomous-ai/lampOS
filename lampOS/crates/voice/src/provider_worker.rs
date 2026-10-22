@@ -178,6 +178,31 @@ fn two_faces_make_it_busy(eyes: Option<&lamp_bus::Bus>, request: u64) {
     }
 }
 
+/// Whether the line in hand, begun at `began_us`, is in a conversation going
+/// on in `room`, the worker's reading of it being `going_on`
+/// ([`attention_now`]): with [`name_or_follow_up`], in a busy room, it is
+/// when it began while the lamp's words played or within
+/// [`crate::name_or_follow_up::FOLLOW_UP_FOR`] of their end
+/// ([`follows_up_from`]), however long it then went on, with words of the
+/// lamp's in the thread and nobody talking past the lamp since it spoke. The
+/// thread's 45 s, read as the line is judged, doesn't decide there: on
+/// lamp-52e6 on 22 Oct follow-ups begun as the answers played went
+/// unanswered. Elsewhere, and without the switch, `going_on` stands.
+fn going_on_in(room: crate::room_told::Room, going_on: bool, began_us: Option<u64>) -> bool {
+    if room != crate::room_told::Room::Busy
+        || !name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
+    {
+        return going_on;
+    }
+    follows_up_from(began_us)
+        && !crate::room_told::room()
+            .lock()
+            .is_ok_and(|room| room.talked_past_the_lamp())
+        && crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| thread.said_last_ago(Instant::now()).is_some())
+}
+
 /// [`follows_up_from`]'s reading of words played until `until_us` (zero:
 /// none), for a line begun at `began_us`.
 fn follows_up_at(until_us: u64, began_us: u64) -> bool {
@@ -2654,11 +2679,12 @@ async fn serve_with_visual<C: Connect>(
                     } else {
                         // `LAMP_NAME_OR_FOLLOW_UP`: two faces make the room
                         // busy, and there a line goes on by when it began.
+                        // Read only while its verdict is awaited: this
+                        // branch's own condition.
                         two_faces_make_it_busy(eyes.as_ref(), request);
                         let (room, going_on) = now();
-                        let going_on = going_on
-                            && (room != crate::room_told::Room::Busy
-                                || follows_up_from(attention.window().map(|(began, _)| began)));
+                        let going_on =
+                            going_on_in(room, going_on, attention.window().map(|(began, _)| began));
                         let turned = eyes.as_ref().and_then(crate::bus_out::someone_turned_to_lamp);
                         // Whether it answers the lamp's own question, read as
                         // the judging reads it below: such a line never waits.
@@ -2807,12 +2833,14 @@ async fn serve_with_visual<C: Connect>(
                             // `LAMP_NAME_OR_FOLLOW_UP`: two faces make the
                             // room busy, and there a follow-up is one begun
                             // soon after the lamp's words, however long it
-                            // goes on before its answer.
-                            two_faces_make_it_busy(eyes.as_ref(), lineage.request.get());
+                            // goes on before its answer. The eyes are read
+                            // once, for the verdict, not on every packet.
+                            if attention.awaits_verdict(lineage.request.get()) {
+                                two_faces_make_it_busy(eyes.as_ref(), lineage.request.get());
+                            }
                             let (room, going_on) = now();
-                            let going_on = going_on
-                                && (room != crate::room_told::Room::Busy
-                                    || follows_up_from(attention.window().map(|(began, _)| began)));
+                            let going_on =
+                                going_on_in(room, going_on, attention.window().map(|(began, _)| began));
                             let request = lineage.request.get();
                             let turned = (attention_busy && room == crate::room_told::Room::Busy
                                 || attention.sound_in_hand()
