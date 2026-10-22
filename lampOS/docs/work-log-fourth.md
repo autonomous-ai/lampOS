@@ -6990,7 +6990,7 @@ Ready for lamp-voice: #3072 only, at `f6affe231`
   missed those replies; the Queue correction links the two completed reads.
 - #3072 ARM64 39822682481 and Linux clippy 39822682504 passed. Native totals
   are 10,600 passed, zero failed, 67 skipped, including one leaky pass,
-  plus 12 doctests. Mac total remains 541/0/4 ignored with fmt, strict
+  plus 4 doctests and 12 own-harness process checks. Mac total remains 541/0/4 ignored with fmt, strict
   workspace clippy and build passing. The PR is out of draft and posted as
   NEXT TRAIN; First owns current-base combined qualification and merging.
 - Its nonblocking actual-forget P3 is authored in the inactive controller
@@ -7015,7 +7015,7 @@ Ready for lamp-voice: no new head; First owns the trains
 - #3097 is pushed at `a6c42ae92`: inactive controller core and actual-forget
   cleanup P3. Mac formatting, strict workspace/all-target clippy and build
   pass. Core 18/0/0, store 51/0/1, Eyes binary 8/0/0, Setup 178/0/1,
-  VoiceEval 623/0/0 (238 doctests included), Update plan 4/0/0: total
+  VoiceEval 623/0/0 (238 playback integration tests included), Update plan 4/0/0: total
   882 passed, zero failed, two existing ignores. Head contains `28f796223`;
   main advanced during qualification. Linux clippy 39829201608 passed;
   ARM64 39829201544 is still running. Source reads requested on the PR.
@@ -7037,6 +7037,46 @@ Ready for lamp-voice: no new head; First owns the trains
   its await. Fresh qualification follows the urgent store rebase gate.
 - #3064, #3014 and #2988 remain draft; no lamp, model call, physical
   acceptance or memory score increase is claimed.
+
+## 2026-10-23, 01:45: rebased store reviewed; forget entry checked
+
+Ready for lamp-voice: no new head until its native gate; First owns merging
+
+- #3072 is force-with-lease pushed at `69d0e6815` on `c7003f01d` for the
+  next train. The two authored ranges preserve all store/P2 logic and tests;
+  only absorbed upstream Linux cfg and combined reset census/hash differ.
+  Reviewer-two read the resolution at 01:32 with no P1/P2. Mac fmt, strict
+  workspace clippy/build and 238/0/2 ignored pass. Fresh Linux clippy
+  39831178067 passed; ARM64 39831178139 is running. The PR remains draft
+  until its fresh native result; the previous green native head is historical.
+- #3097 correction `d5cb90240` requires trusted forget invalidation before
+  slow store I/O. New actual-forget control proves pending target, consent and
+  prints are dropped before disk work and cannot hand off or revive later;
+  the other complete record and stable ID survive. All 19 core tests,
+  formatting, strict Eyes/all-target clippy and Eyes build pass. The initial
+  test-only owned-path compiler diagnostic is retained. Production logic and
+  all 18 earlier controls are unchanged. El and reviewer-two have the P3
+  correction for re-read. Fresh ARM64 39832338419 and clippy 39832338441
+  are running. No runtime repair is enabled.
+- The original controller head `a6c42ae92` completed ARM64 39829201544 at
+  10,662/0/67 skipped with one leaky pass, four doctests, twelve own-harness
+  process checks and relay. Its Linux clippy passed. That result does not
+  qualify the later correction.
+- Evidence classification correction: the 238 VoiceEval playback tests are
+  integration tests, not doctests; 623 and the Mac aggregate 882 stay unchanged.
+  The earlier store native head's twelve extra checks are own-harness process
+  checks; its actual Rust doctests number four. Raw section boundaries were
+  recounted; prior body/log wording is corrected and old receipts retained.
+- The common speaker gate is active on `c7003f01d`, with 23 authored Engine
+  controls. Its first strict-clippy attempt found a wrong test API name;
+  the fixture now uses the actual speaking-observation API, with the compile
+  log retained. No post-correction full Voice success is claimed yet.
+- Name is clean at local merge `7255b3a8c`, Photo at `9f3af93f7`, each
+  incorporating pinned main `23132abf9` and preserving its product deltas.
+  No new product head is pushed or qualified. Final integration will merge
+  the exact qualified common commit and preserve newer upstream tests, never
+  overwrite whole source files. Name activation hold and Photo isolation stay.
+- No lamp, model call, physical acceptance or memory score increase is claimed.
 
 ## Not shown
 
