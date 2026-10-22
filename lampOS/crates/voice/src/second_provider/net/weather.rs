@@ -31,6 +31,13 @@ pub const WITHIN: Duration = super::search::WITHIN;
 pub const KEPT_FOR: Duration = Duration::from_secs(10 * 60);
 /// The most places kept at once; a new one puts out the oldest.
 pub const MOST_PLACES: usize = 16;
+/// Where a place's name was found is kept this long: a place doesn't move,
+/// so a second look for it, or the first after its midnight, asks only its
+/// forecast (one request, about half of a look's 2.3–2.4 s on lamp-4ace on
+/// 22 Oct, the owner's try).
+pub const PLACE_KEPT_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+/// At most this many places' names are kept with where they are.
+const MOST_FOUND: usize = 32;
 /// The most names one kept place is found by ("Hanoi", "Ha Noi").
 const MOST_NAMES: usize = 8;
 /// The longest place name looked up, in characters.
@@ -456,6 +463,8 @@ pub struct Weather {
     fetch: Fetch,
     clock: Clock,
     kept: Mutex<Vec<Kept>>,
+    /// The places names were found as, by name, kept [`PLACE_KEPT_FOR`].
+    found: Mutex<Vec<(String, Place, Instant)>>,
 }
 
 impl Weather {
@@ -467,6 +476,7 @@ impl Weather {
             fetch,
             clock,
             kept: Mutex::new(Vec::new()),
+            found: Mutex::new(Vec::new()),
         }
     }
 
@@ -522,20 +532,28 @@ impl Weather {
                 "from what was kept".into(),
             );
         }
-        let Some(url) = geocoding_url(&query) else {
-            return (json!({"error": NOT_FOUND}), "no such place".into());
-        };
-        let place = match (self.fetch)(url).await {
-            Ok(answer) => found(&answer),
-            Err(error) => {
-                return (
-                    json!({"error": UNREACHED}),
-                    format!("the place was not looked up: {error}"),
-                );
+        let known = self.found_before(&key);
+        let place = match known.clone() {
+            Some(place) => place,
+            None => {
+                let Some(url) = geocoding_url(&query) else {
+                    return (json!({"error": NOT_FOUND}), "no such place".into());
+                };
+                let place = match (self.fetch)(url).await {
+                    Ok(answer) => found(&answer),
+                    Err(error) => {
+                        return (
+                            json!({"error": UNREACHED}),
+                            format!("the place was not looked up: {error}"),
+                        );
+                    }
+                };
+                let Some(place) = place else {
+                    return (json!({"error": NOT_FOUND}), "no such place".into());
+                };
+                self.remember_place(key.clone(), place.clone());
+                place
             }
-        };
-        let Some(place) = place else {
-            return (json!({"error": NOT_FOUND}), "no such place".into());
         };
         if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
@@ -567,7 +585,38 @@ impl Weather {
         };
         let answered = answer_for(&place, &forecast, day, today);
         self.keep(key, place, forecast, (today, now));
-        (answered, "fetched".into())
+        let how = if known.is_some() {
+            "fetched, its place known"
+        } else {
+            "fetched"
+        };
+        (answered, how.into())
+    }
+
+    /// Where `name` was found before, while under [`PLACE_KEPT_FOR`] old.
+    fn found_before(&self, name: &str) -> Option<Place> {
+        let mut found = self
+            .found
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        found.retain(|(_, _, at)| at.elapsed() < PLACE_KEPT_FOR);
+        found
+            .iter()
+            .find(|(kept, _, _)| kept == name)
+            .map(|(_, place, _)| place.clone())
+    }
+
+    /// Keep where `name` was found, the oldest put out past [`MOST_FOUND`].
+    fn remember_place(&self, name: String, place: Place) {
+        let mut found = self
+            .found
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        found.retain(|(kept, _, _)| *kept != name);
+        while found.len() >= MOST_FOUND {
+            found.remove(0);
+        }
+        found.push((name, place, Instant::now()));
     }
 
     /// The kept places still fresh at `now`: under [`KEPT_FOR`] old, and
@@ -998,7 +1047,12 @@ mod tests {
             .store(false, std::sync::atomic::Ordering::Relaxed);
         let answered = weather.answer(&json!({"place": "Hanoi"})).await;
         assert_eq!(answered.told["place"], "Hanoi, Vietnam");
-        assert_eq!(canned.count(), 4);
+        assert_eq!(answered.how, "fetched, its place known");
+        assert_eq!(
+            canned.count(),
+            3,
+            "where Hanoi is was kept: its forecast alone again"
+        );
     }
 
     /// A fetch that never answers is cut at the call's bound, the search's
@@ -1035,8 +1089,8 @@ mod tests {
         assert_eq!(canned.count(), 2, "no fetch for either");
         wall.pass(60).await;
         let later = weather.answer(&json!({"place": "Hanoi"})).await;
-        assert_eq!(later.how, "fetched");
-        assert_eq!(canned.count(), 4, "the place and its forecast again");
+        assert_eq!(later.how, "fetched, its place known");
+        assert_eq!(canned.count(), 3, "its forecast again, not where it is");
     }
 
     /// At most 16 places are kept: a seventeenth puts out the oldest.
@@ -1052,7 +1106,10 @@ mod tests {
         let second = weather.answer(&json!({"place": "Town 2"})).await;
         assert_eq!(second.how, "from what was kept");
         let first = weather.answer(&json!({"place": "Town 1"})).await;
-        assert_eq!(first.how, "fetched", "the oldest was put out");
+        assert_eq!(
+            first.how, "fetched, its place known",
+            "the oldest forecast was put out, but where it is is still kept"
+        );
         assert_eq!(weather.fresh(tuesday_noon()()).len(), MOST_PLACES);
     }
 
@@ -1146,12 +1203,15 @@ mod tests {
         assert_eq!(fetched.load(Ordering::Relaxed), 2);
         wall.pass(2 * 60).await;
         let tomorrow = weather.answer(&asked("tomorrow")).await;
-        assert_eq!(tomorrow.how, "fetched", "the place's midnight passed");
+        assert_eq!(
+            tomorrow.how, "fetched, its place known",
+            "the place's midnight passed: its forecast again, not where it is"
+        );
         assert_eq!(
             said(tomorrow),
             "In Honolulu, United States: Tomorrow, Saturday, 20 to 24°C, partly cloudy, 20% chance of rain."
         );
-        assert_eq!(fetched.load(Ordering::Relaxed), 4);
+        assert_eq!(fetched.load(Ordering::Relaxed), 3);
         let today = weather.answer(&asked("today")).await;
         assert_eq!(today.how, "from what was kept");
         let today = said(today);
@@ -1180,7 +1240,7 @@ mod tests {
         );
         assert_eq!(
             fetched.load(Ordering::Relaxed),
-            4,
+            3,
             "the new day's forecast kept"
         );
     }
@@ -1214,6 +1274,10 @@ mod tests {
             "the forecast came with nothing for today there"
         );
         weather.answer(&json!({"place": "Honolulu"})).await;
-        assert_eq!(fetched.load(std::sync::atomic::Ordering::Relaxed), 4);
+        assert_eq!(
+            fetched.load(std::sync::atomic::Ordering::Relaxed),
+            3,
+            "the second call asks its forecast again, not where it is"
+        );
     }
 }
