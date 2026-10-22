@@ -242,6 +242,10 @@ struct Script {
     /// finished, then what its answer says, before the answer's audio.
     live_hears: &'static [&'static str],
     live_says: Option<&'static str>,
+    /// Each capture frame carries the echo canceller's evidence, as a
+    /// duplex lamp's do: the person speaking over the lamp while speech,
+    /// else the lamp's own voice.
+    echo_evidence: bool,
 }
 
 impl Script {
@@ -296,6 +300,7 @@ impl Script {
             live_says: None,
             near_name_ms: None,
             speech_frames: 60,
+            echo_evidence: false,
         }
     }
 }
@@ -841,7 +846,16 @@ impl Peers {
                 frame_sequence: frame,
                 read_completed_at_us: at,
                 probability: if speech { 0.99 } else { 0.0 },
-                echo: None,
+                echo: self.script.echo_evidence.then(|| {
+                    super::duplex::evidence(
+                        0,
+                        if speech {
+                            super::duplex::OVER
+                        } else {
+                            super::duplex::OWN
+                        },
+                    )
+                }),
                 reference: Default::default(),
                 samples: if speech && self.script.voiced {
                     (0..160u64)
@@ -4283,6 +4297,73 @@ fn talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch() {
             );
         }
     }
+}
+
+/// #3051's review: the same say under the duplex policy, through the loop.
+/// The mask plays on through the talk while it waits for the name
+/// (`ForName`): no yield. Talk with no name is let go only once
+/// `OWN_LINE_NAME_LAG_US` after its trigger is past, never taken, and the
+/// say is `spoken`.
+#[test]
+fn talk_over_a_say_in_a_busy_room_waits_for_the_name_then_is_let_go_under_duplex() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (says, answered) = crate::say::Says::note_for_test(
+        "stretch",
+        "Remind the person to stretch.",
+        crate::say::URGENT_FROM,
+    );
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    TEST_OWN_LINE_OVER_TALK.with(|over| over.set(true));
+    TEST_ROOM_BUSY.with(|room| room.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        written: Written::Said(30),
+        speak_again: Some(When::Accepted(78)),
+        turn_taking: TurnTaking::Duplex,
+        echo_evidence: true,
+        mute_at_frame: Some(1_200),
+        limit: Duration::from_secs(20),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_ROOM_BUSY.with(|room| room.set(false));
+    TEST_OWN_LINE_OVER_TALK.with(|over| over.set(false));
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    let answered: Vec<_> = answered.try_iter().collect();
+    run.assert_clean();
+    assert!(run.events("duplex_yield").is_empty(), "{}", run.summary());
+    let triggers: std::collections::HashMap<String, u64> = run
+        .events("input_candidate")
+        .into_iter()
+        .map(|event| {
+            (
+                event["candidate"]["id"].to_string(),
+                event["candidate"]["trigger_read_at_us"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    let let_go: Vec<_> = run
+        .events("input_let_go_own_line")
+        .into_iter()
+        .filter(|event| event["why"] == "busy_room")
+        .collect();
+    assert!(!let_go.is_empty(), "{}", run.summary());
+    for event in &let_go {
+        let trigger = triggers[&event["candidate"].to_string()];
+        assert!(
+            event["at_us"].as_u64().unwrap() >= trigger + OWN_LINE_NAME_LAG_US,
+            "let go before the name could be said: {event}"
+        );
+    }
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}: {}",
+        run.summary()
+    );
 }
 
 /// The holding answers on the second route (the first builder's 22:54 on
