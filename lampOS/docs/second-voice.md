@@ -2216,10 +2216,11 @@ after a take-over, but now for every turn:
     out, the new line is asked with the words it cut short before its own,
     as one line, when one person said both: `request M goes on from
     request N's words, cut short D ms before it began: WHY; both are asked
-    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 2.5 s
+    as one line (LAMP_JOIN_CUT_WORDS)`. Only when it began within 3 s
     (`JOIN_WITHIN`, longer than the sound's 1.5 s since a join needs one
     person's sign too: on lamp-4ace on 21 Oct a 1.2 s pause began the
-    second half 1635 ms after the first's end) of that line's end, in the
+    second half 1635 ms after the first's end; 2.5 s until 22 Oct, below)
+    of that line's end, in the
     same session, neither that line's sound nor its words began it
     already, and the words were that line's own: words answered in a held
     line's place are never joined with the line after it. A held new line
@@ -2278,11 +2279,12 @@ after a take-over, but now for every turn:
     silence that ended the line (0.6 s by default), plus that hold. The owner's lost
     lines, from the journal's times (it has no clock, so each is a bound):
     24 to 25 began 1.45-2.45 s after the first's end, 37 to 38
-    1.59-2.13 s, 42 to 43 1.66-1.96 s, inside `JOIN_WITHIN`; 35 to 36 at
-    least 2.14 s, near 2.6 s by the wait sound it began over (1.79 s after
-    35's end, cut 0.81 s into it), just past it. Risk: a second person off
-    camera, in a quiet room or beside one face in view, saying a line let
-    out within 2.5 s, is joined to the first person's words.
+    1.59-2.13 s, 42 to 43 1.66-1.96 s; 35 to 36 at least 2.14 s, near
+    2.6 s by the wait sound it began over (1.79 s after 35's end, cut
+    0.81 s into it), just past the 2.5 s `JOIN_WITHIN` was, so it is 3 s
+    now. Risk: a second person off camera, in a quiet room or beside one
+    face in view, saying a line let out within 3 s, is joined to the first
+    person's words.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
