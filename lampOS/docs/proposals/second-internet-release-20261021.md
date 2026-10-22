@@ -1,3 +1,33 @@
+# Current preparation audit, 23 October 2026 00:21 +07
+
+The publisher/workflow, three publication test suites and three updater
+entry points are byte-identical between `17167b1ba` and current integration
+`b8a9148bd` (nine files). The delivered preparation below remains current;
+no additional publisher or missing host preflight implementation was found.
+This was a source audit, not a rerun of those suites or a real release.
+#3012's process/CLI checks have now merged through train #3078; they still
+provide no attended physical-cut, real-systemd or quiet/Body acceptance.
+
+[Fresh configuration metadata](../verification/release-preflight-20261023/metadata.json)
+was read at 00:21 +07. The repository-variable API returned zero variables.
+The publication environment and its secret-name listing returned HTTP 404:
+absence cannot be distinguished from inaccessible configuration. No signing
+key value was read. Organization/environment variable inheritance and the
+effective enablement value remain unestablished. No setting was changed.
+
+The existing publisher fixes its channel to `lamp-voice`; it has no trial
+channel option. First must approve an isolated route and monotonic
+restoration plan for the deliberately bad release, rather than assuming the
+normal publisher is a rehearsal switch. Before execution, First/owner still
+supplies the attended #2810 result, lamp/person/Body window, trusted real
+key/public-key fingerprint, protected environment and activation/bootstrap
+decision, selected successful push artifact, installed/published/good/bad/
+restoration sequences, persistent trial configuration and evidence steps.
+There is no source-only substitute for those inputs. No publication, SSH or
+physical acceptance was performed in this audit.
+
+---
+
 **Current delivery, 22 October 2026, source `17167b1ba`:** the workflow and
 publisher described below now exist. The original proposal is retained as
 historical design, not a request to implement another publisher. Current

@@ -1,0 +1,36 @@
+{
+  "checked_at_utc": "2026-10-22T17:21:43.097766+00:00",
+  "repository": "autonomous-ai/lampOS",
+  "key_values_read": false,
+  "configuration_changed": false,
+  "repository_variables": {
+    "accessible": true,
+    "total_count": 0,
+    "publication_variables": []
+  },
+  "publication_environment": {
+    "accessible": false,
+    "response": "gh: Not Found (HTTP 404)",
+    "limit": "A 404 does not distinguish absent configuration from inaccessible configuration."
+  },
+  "environment_secret_names": {
+    "accessible": false,
+    "response": "gh: Not Found (HTTP 404)",
+    "limit": "A 404 does not distinguish absent configuration from inaccessible configuration."
+  },
+  "source_head": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+  "prior_source_head": "17167b1ba34b519eaac0aaf8ff8c418f0507263d",
+  "unchanged_source_sha256": {
+    ".github/workflows/lampos-arm64.yml": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+    ".github/scripts/lampos-publish.py": "40040134e3d6754af39c1f98b74fd93e25c054834c535a7f1255faa4d8f68b3b",
+    ".github/scripts/lampos-publish-artifact.py": "831db6fc725c25eafd7c84010d7ba9569895cc048c48148fff3d35772ec929da",
+    ".github/scripts/lampos-publish-test.py": "a2bd9f5401166d17d111ed002366b7b5dac04e404d6b403f887e68a216571a0b",
+    ".github/scripts/lampos-publish-artifact-test.py": "ed37fc46e4e4e61481853cdc6a39addf4fd87e22693e967ace733ff10d703571",
+    ".github/scripts/lampos-publish-cli-test.py": "1c79139ab2e87423839c20412618e34f9cb61a662cf4f2c9a0d17da1bd5c25ae",
+    "lampOS/crates/update/src/publish.rs": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+    "lampOS/crates/update/src/manifest.rs": "1eb17a3675d99f3c9fbb9c6a80d65c06b640dfb5ac35963500e022b5c84e8548",
+    "lampOS/crates/update/src/main.rs": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277"
+  },
+  "effective_configuration_limit": "Repository-scoped variables only. Organization/environment variable inheritance and effective publication enablement are not established. Environment 404 is not proof of absence.",
+  "next_action": "First/owner supplies the attended #2810 outcome, approved #1812 lamp/person window, trusted real-key/public-half and activation/bootstrap decision, selected successful push artifact, monotonic good/bad/restoration sequences, and an isolated trial route; the delivered publisher targets lamp-voice only."
+}
