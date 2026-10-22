@@ -2104,6 +2104,7 @@ mod tests {
                 staff_note: false,
                 make_skill: false,
                 named_only: false,
+                correct: false,
                 sign_in: false,
             }),
             schedule_tools: true,
@@ -2341,6 +2342,7 @@ mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         assert_eq!(
@@ -3373,6 +3375,7 @@ mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let with = Settings {

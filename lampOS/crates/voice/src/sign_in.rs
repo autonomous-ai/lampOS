@@ -1090,6 +1090,7 @@ mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -1231,6 +1232,7 @@ mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: true,
         };
         // `bad_request`: a tasks part too old for the sign-in's ops.

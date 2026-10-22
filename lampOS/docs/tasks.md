@@ -1555,6 +1555,38 @@ the read-backs said only "the Slack channel". This isn't behind a switch:
 it changes the words of `next` only, on every route, and
 `every_read_back_names_what_the_task_names` holds all four variants.
 
+### A corrected ask after the read-back (#2838, off unless `LAMP_TASKS_CORRECT=on`)
+
+On lamp-75c9 on 21 October all three read-backs named a misheard ask, and
+the person could only say no and start again. With `LAMP_TASKS_CORRECT=on`
+(the provider worker's `--tasks-correct`, after `--tasks-named-only`; it
+needs only the tasks part) a "no, I said …" after a read-back gives the
+corrected ask, read back again, and started only on a yes:
+
+- `start_agent_task`'s `next` ends "If they say no and give a corrected ask,
+  call start_agent_task again with it: it replaces this one."
+- the second route's note beside a later request while a task waits
+  (`agent_tasks::pending_note`) says: on a yes, call `confirm_agent_task`; on
+  a no with what they meant instead ("no, I said …", "no, ask Codex …"),
+  call `start_agent_task` again with the corrected task, and who if named,
+  which replaces the one waiting; on a plain no, call nothing; never call
+  `start_agent_task` again for the same work unchanged.
+- a `start_agent_task` that prepares while another task still waits for its
+  yes (within `CONFIRM_WITHIN`) replaces it: the answer's `next` begins "The
+  earlier task was not started; this one replaces it.", the journal says
+  `lamp-voice: tasks: request N: a corrected ask replaces task <id>, which
+  is never started`, and the voice sends the tasks part a `cancel` for the
+  old id, best-effort, at the revision the new prepare left. A cancel
+  refused or unanswered changes nothing: the old task was never confirmed
+  and the yes can only start the new one, by its own id and digest.
+
+Without the switch the note, `next` and the lines sent are byte-for-byte
+as before (a second prepare already replaced the one waiting, unsaid).
+Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
+`a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction`,
+`without_the_correct_switch_the_note_and_next_are_as_before`. Not run on a
+lamp yet.
+
 ### A lead-in before a call (#799, off unless `LAMP_TOOL_LEAD_IN=on`)
 
 A turn in which the model calls `start_agent_task` or `confirm_agent_task`
