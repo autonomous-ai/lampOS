@@ -1,0 +1,635 @@
+{
+  "schema": 1,
+  "pull_request": 2764,
+  "evidence_status": "failed native run; not qualified",
+  "qualified": false,
+  "ready_for_merge": false,
+  "recorded_at_utc": "2026-10-22T03:19:11+00:00",
+  "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+  "branch_base": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+  "tested_merge": "e4366e9707811ead73c77b076b372aee6dc5b9d2",
+  "tested_merge_parents": [
+    "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+    "93d93ecb1415d1e3b97a7a94d3852fa10cb03018"
+  ],
+  "tested_merge_tree": "6acde8a556b1ef257e295d54dd3c6fcbc0cfdfb2",
+  "runs": {
+    "arm64": {
+      "id": 39713887288,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39713887288",
+      "status": "completed",
+      "conclusion": "failure",
+      "event": "pull_request",
+      "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+      "tested_merge": "e4366e9707811ead73c77b076b372aee6dc5b9d2",
+      "tested_base": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+      "tested_merge_parents": [
+        "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+        "93d93ecb1415d1e3b97a7a94d3852fa10cb03018"
+      ],
+      "tested_merge_tree": "6acde8a556b1ef257e295d54dd3c6fcbc0cfdfb2",
+      "checkout_log": {
+        "command_line": 291,
+        "hash_line": 292,
+        "sha": "e4366e9707811ead73c77b076b372aee6dc5b9d2"
+      },
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "publication failure tests (offline, no signing secret)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "record fresh source times for a cold publication build",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 10,
+              "name": "Run taiki-e/install-action@v2",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "build (release, the lamps' binaries)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "build the two selected artifact examples without filename collisions",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "which crates a pull request tests",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 16,
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "number": 17,
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 18,
+              "name": "export only current Cargo targets and their SHA-256",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 19,
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 20,
+              "name": "discard the isolated example target before saving the cache",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 21,
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 42,
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 43,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": []
+        },
+        {
+          "name": "report-full-run-failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ],
+      "warnings": [
+        {
+          "line": 505,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 510,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 515,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 520,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 655,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 660,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 665,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 670,
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 8909,
+          "message": "warning: 2132/10018 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)"
+        }
+      ],
+      "infrastructure_notices": [
+        {
+          "line": 135,
+          "message": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 8927,
+          "message": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "observed_mutable_pr_associations": [
+        {
+          "number": 2764,
+          "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+          "base": "fab69b0c4c4333ff8d51459e063169af7355e1dc"
+        }
+      ],
+      "embedded_pr_note": "Observed metadata only. Immutable run heads, checkout merge and commit parents establish the tested source.",
+      "log": {
+        "name": "arm64.log",
+        "bytes": 1875492,
+        "sha256": "8fc2ce535d567485a4bb25b3176fd48896cab204dbc084e327b5491aac1aeec2"
+      }
+    },
+    "clippy": {
+      "id": 39713887283,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39713887283",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+      "tested_merge": "e4366e9707811ead73c77b076b372aee6dc5b9d2",
+      "tested_base": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+      "tested_merge_parents": [
+        "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+        "93d93ecb1415d1e3b97a7a94d3852fa10cb03018"
+      ],
+      "tested_merge_tree": "6acde8a556b1ef257e295d54dd3c6fcbc0cfdfb2",
+      "checkout_log": {
+        "command_line": 309,
+        "hash_line": 310,
+        "sha": "e4366e9707811ead73c77b076b372aee6dc5b9d2"
+      },
+      "run_attempt": 1,
+      "jobs": [
+        {
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "clippy (every crate and target, warnings as errors)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 16,
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 17,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "warnings": [],
+      "infrastructure_notices": [
+        {
+          "line": 176,
+          "message": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 461,
+          "message": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "observed_mutable_pr_associations": [
+        {
+          "number": 2764,
+          "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+          "base": "fab69b0c4c4333ff8d51459e063169af7355e1dc"
+        }
+      ],
+      "embedded_pr_note": "Observed metadata only. Immutable run heads, checkout merge and commit parents establish the tested source.",
+      "log": {
+        "name": "clippy.log",
+        "bytes": 71567,
+        "sha256": "6e840f4de5734ce977c6770ff7c676b9e4cf4c7bb1561a446a9695446b49492e"
+      }
+    }
+  },
+  "nextest": {
+    "profile": "pr",
+    "summary_line": 8598,
+    "summary": "Summary [ 148.796s] 7886/10018 tests run: 7885 passed, 1 failed, 63 skipped",
+    "elapsed_seconds": 148.796,
+    "selected_tests": 10018,
+    "executed_tests": 7886,
+    "passed": 7885,
+    "failed": 1,
+    "leaky_passes": 0,
+    "profile_skipped_tests": 63,
+    "not_run_after_failure": 2132,
+    "selected_binaries": 160,
+    "skipped_binaries": 2,
+    "primary_row_counts": {
+      "PASS": 7885,
+      "FAIL": 1
+    },
+    "unique_primary_identities": 7886,
+    "primary_ordinals_complete_through_executed_total": true,
+    "primary_rows_reconcile_with_summary": true,
+    "failure_rows": [
+      {
+        "line": 8570,
+        "status": "FAIL",
+        "duration": "0.807s",
+        "ordinal": 7883,
+        "selected_total": 10018,
+        "binary": "lamp-voice",
+        "test": "remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+      }
+    ],
+    "diagnostic_replay_after_summary": {
+      "excluded_row_count": 24,
+      "status_counts": {
+        "PASS": 23,
+        "FAIL": 1
+      },
+      "reason": "These are repeated diagnostic results, not additional test executions."
+    },
+    "not_run_notice": {
+      "line": 8909,
+      "message": "warning: 2132/10018 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)"
+    },
+    "skip_identity_limit": "The log reports the skipped count but emits no individual SKIP rows; these 63 profile skips are separate from the 2,132 selected tests not run after the failure."
+  },
+  "failure": {
+    "binary": "lamp-voice",
+    "test": "remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing",
+    "source_file": "lampOS/crates/voice/src/remember.rs",
+    "source_line": 7896,
+    "log_location_lines": [
+      8587
+    ],
+    "expected": "adopted(&read) is None after a forget while the saving-line voice print is still pending.",
+    "observed": "An adoption result was present, so the assertion failed.",
+    "public_redaction": "The raw assertion message and adoption payload are deliberately omitted because they contain a synthetic person name. Full raw logs are retained privately and bound by hash.",
+    "root_cause": "not established",
+    "reproducibility_rate": "not established"
+  },
+  "added_cloud_test_results": [
+    {
+      "line": 1885,
+      "status": "PASS",
+      "duration": "0.004s",
+      "ordinal": 1198,
+      "selected_total": 10018,
+      "binary": "lamp-cloud",
+      "test": "reports::tests::failed_units_are_current_allowlisted_and_unambiguous"
+    },
+    {
+      "line": 1887,
+      "status": "PASS",
+      "duration": "0.039s",
+      "ordinal": 1200,
+      "selected_total": 10018,
+      "binary": "lamp-cloud",
+      "test": "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery"
+    },
+    {
+      "line": 1963,
+      "status": "PASS",
+      "duration": "0.005s",
+      "ordinal": 1276,
+      "selected_total": 10018,
+      "binary": "lamp-cloud::it",
+      "test": "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit"
+    }
+  ],
+  "missing_post_test_evidence": {
+    "workflow_step": "doc tests and the own-harness tests (nextest runs neither)",
+    "step_conclusion": "skipped",
+    "doc_tests": "not run",
+    "own_harness_tests": "not run",
+    "relay_signals": "not run",
+    "success_counts": null,
+    "log_markers_present": false
+  },
+  "artifacts": {
+    "metadata": {
+      "total_count": 0,
+      "artifacts": []
+    },
+    "export_step": "skipped",
+    "upload_step": "skipped",
+    "payload_verified": false,
+    "limit": "No artifact was reported for this failed run. No payload was downloaded or independently verified."
+  },
+  "source_comparison": {
+    "source_file": "lampOS/crates/voice/src/remember.rs",
+    "records": {
+      "branch_base": {
+        "commit": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+        "voice_tree": "8648344012186c1e020e1803aaf9ce9422308c80",
+        "remember_blob": "203b2dffba3f7aa49c553405c29911bed279f996",
+        "remember_bytes": 490584,
+        "remember_sha256": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16"
+      },
+      "cloud_head": {
+        "commit": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+        "voice_tree": "8648344012186c1e020e1803aaf9ce9422308c80",
+        "remember_blob": "203b2dffba3f7aa49c553405c29911bed279f996",
+        "remember_bytes": 490584,
+        "remember_sha256": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16"
+      },
+      "music_head": {
+        "commit": "d96f484ec0567ecd66819cb45bd44f5c39961118",
+        "voice_tree": "3d4b5473d118b727b185773a0dd845e2916a403e",
+        "remember_blob": "203b2dffba3f7aa49c553405c29911bed279f996",
+        "remember_bytes": 490584,
+        "remember_sha256": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16"
+      },
+      "observed_new_main": {
+        "commit": "f71a62f559619c996d6a85f253ed88e367549722",
+        "voice_tree": "c8c6212f8f148d89cb3129173603a03bf084fb44",
+        "remember_blob": "203b2dffba3f7aa49c553405c29911bed279f996",
+        "remember_bytes": 490584,
+        "remember_sha256": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16"
+      }
+    },
+    "cloud_voice_tree_identical_to_branch_base": true,
+    "cloud_changed_paths": [
+      "lampOS/crates/cloud/src/reports.rs",
+      "lampOS/crates/cloud/tests/it/report_contract.rs",
+      "lampOS/docs/cloud.md",
+      "lampOS/docs/verification/report-failed-units-20261022/README.md",
+      "lampOS/docs/verification/report-failed-units-20261022/control.json",
+      "lampOS/docs/verification/report-failed-units-20261022/gate.json"
+    ],
+    "new_main_voice_changed_paths": [
+      "lampOS/crates/voice/src/coordinator.rs",
+      "lampOS/crates/voice/src/onboarding.rs"
+    ],
+    "scope_note": "The Cloud head does not change Voice. The observed newer main has coordinator/onboarding changes, so only the failing file is claimed byte-identical across all four heads."
+  },
+  "unchanged_base_comparison": {
+    "file": "comparison.json",
+    "bytes": 1706,
+    "sha256": "5369aeb7c5d672a00be2f9756946885218ad32846405121d7a4fdb0f4ecc69e4",
+    "byte_exact_copy": true,
+    "run": 39713218753,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39713218753",
+    "scope": "A single unchanged-base native PASS for the same fixture; it neither qualifies the failed Cloud run nor establishes the failure cause."
+  },
+  "music_comparison": {
+    "run": 39713220661,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39713220661",
+    "head": "d96f484ec0567ecd66819cb45bd44f5c39961118",
+    "tested_merge": "be24496f5d9b0e989d62269e8d2c0ceba8cd1de4",
+    "tested_merge_parents": [
+      "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+      "d96f484ec0567ecd66819cb45bd44f5c39961118"
+    ],
+    "result": {
+      "line": 8700,
+      "status": "PASS",
+      "duration": "0.807s",
+      "ordinal": 7968,
+      "selected_total": 10172,
+      "binary": "lamp-voice",
+      "test": "remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+    },
+    "raw_evidence": [
+      {
+        "name": "arm64.run.json",
+        "bytes": 5350,
+        "sha256": "fb0e50ec9f407c9631ec22a7a737310f23ba391c329a39f47dff92f3f63fa03d"
+      },
+      {
+        "name": "arm64.api.json",
+        "bytes": 12708,
+        "sha256": "12bba36eb9ba0052606c2692028d2477c9ee7ea60819e791e9966798ce3a0c85"
+      },
+      {
+        "name": "arm64.merge.json",
+        "bytes": 919495,
+        "sha256": "2cf6dee0fd8af992a08f1b52b3aa314225c3d80f99ef87ddaae29f91f0328671"
+      },
+      {
+        "name": "arm64.log",
+        "bytes": 2452799,
+        "sha256": "625e4d07f26c4b04c465471ca1ca7563fe900d38a636c88df999de24c25694cb"
+      }
+    ],
+    "scope": "Same test and byte-identical remember.rs in a separate Music run. This comparison is not an unchanged-whole-Voice baseline or a qualification of Cloud93."
+  },
+  "raw_evidence": [
+    {
+      "name": "arm64.run.json",
+      "bytes": 5350,
+      "sha256": "f1d76fb2678bb32fa595c7def8db5825d612e0a89dec286493cdf0c3c77ced28"
+    },
+    {
+      "name": "arm64.api.json",
+      "bytes": 12685,
+      "sha256": "d03126f76bd5b5ef526743b1edcd46fb38b90a00cc61cd7466ad47850cbb52d9"
+    },
+    {
+      "name": "arm64.log",
+      "bytes": 1875492,
+      "sha256": "8fc2ce535d567485a4bb25b3176fd48896cab204dbc084e327b5491aac1aeec2"
+    },
+    {
+      "name": "arm64.merge.json",
+      "bytes": 43844,
+      "sha256": "04ab37b591e602a58df2ed0dd0b44dbed6e64c2a378b96e397f16d1316029a06"
+    },
+    {
+      "name": "clippy.run.json",
+      "bytes": 2235,
+      "sha256": "5b27d7086d88a6f105ae47d1ca6b016c4f98983c98cba95c8be5646813b1632e"
+    },
+    {
+      "name": "clippy.api.json",
+      "bytes": 12684,
+      "sha256": "ffe33b27a2546afa9fdac2a6bb231b6d1cb43c8ef36cb7ebf1b4c52b81e667b0"
+    },
+    {
+      "name": "clippy.log",
+      "bytes": 71567,
+      "sha256": "6e840f4de5734ce977c6770ff7c676b9e4cf4c7bb1561a446a9695446b49492e"
+    },
+    {
+      "name": "clippy.merge.json",
+      "bytes": 43844,
+      "sha256": "04ab37b591e602a58df2ed0dd0b44dbed6e64c2a378b96e397f16d1316029a06"
+    },
+    {
+      "name": "artifacts.json",
+      "bytes": 32,
+      "sha256": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c"
+    }
+  ],
+  "limits": [
+    "This is a failure receipt, not a green qualification or permission to merge.",
+    "Primary nextest counts exclude all diagnostic rows following the summary.",
+    "Clippy succeeded, but ARM64 stopped early and its doc/custom/relay stage and artifact export/upload were skipped.",
+    "The ARM64 combined log labels its lines UNKNOWN STEP; terminal step states come from the captured job API, not invented per-line step labels.",
+    "A passed baseline and passed separate Music run do not establish root cause, timing cause or failure frequency.",
+    "Only fixed test identifiers, source locations and sanitized failure meaning are public; raw assertion payloads and actor metadata are not copied.",
+    "No tests, builds, devices, network requests or Git mutations were performed to prepare this receipt."
+  ]
+}

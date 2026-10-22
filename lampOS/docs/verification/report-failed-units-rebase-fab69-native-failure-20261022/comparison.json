@@ -1,0 +1,36 @@
+{
+  "baseline_run": 39713218753,
+  "baseline_head": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+  "status": "completed",
+  "conclusion": "success",
+  "event": "push",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39713218753",
+  "test": "remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing",
+  "test_rows": [
+    "2026-10-22T03:03:07.1797157Z         PASS [   0.807s] ( 7880/10015) lamp-voice remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing"
+  ],
+  "summaries": [
+    "2026-10-22T03:03:29.1264430Z      Summary [ 169.740s] 10015 tests run: 10015 passed (1 leaky), 63 skipped"
+  ],
+  "source_file": "lampOS/crates/voice/src/remember.rs",
+  "source_hashes": {
+    "fab69b0c4c4333ff8d51459e063169af7355e1dc": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16",
+    "93d93ecb1415d1e3b97a7a94d3852fa10cb03018": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16",
+    "d96f484ec0567ecd66819cb45bd44f5c39961118": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16",
+    "f71a62f559619c996d6a85f253ed88e367549722": "2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16"
+  },
+  "same_file_all": true,
+  "raw_evidence": [
+    {
+      "name": "api.json",
+      "bytes": 12572,
+      "sha256": "a7602ad3cb0037b7a3a322e47acf203982be58caef2c62484520a1f4a8327793"
+    },
+    {
+      "name": "arm64.log",
+      "bytes": 2409132,
+      "sha256": "2804bbc92fba8e60671ad36296f0a5830422c5b093b3c270c3c76bbe890cc06b"
+    }
+  ],
+  "limit": "The test passed in this unchanged-base native run and failed in the Cloud PR run. No root cause or reproducibility rate is established."
+}

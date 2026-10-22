@@ -1,0 +1,20 @@
+# Failed-units report: failed ARM64 run on fab69
+
+**Not qualified; not ready to merge.** PR [#2764](https://github.com/autonomous-ai/lampOS/pull/2764), head `93d93ecb1415d1e3b97a7a94d3852fa10cb03018`, has a failed [ARM64 run 39713887288](https://github.com/autonomous-ai/lampOS/actions/runs/39713887288). [Linux Clippy 39713887283](https://github.com/autonomous-ai/lampOS/actions/runs/39713887283) succeeded. Both immutable run heads, checkout logs and merge-parent records identify merge `e4366e9707811ead73c77b076b372aee6dc5b9d2`, with parents `fab69b0c4c4333ff8d51459e063169af7355e1dc` and `93d93ecb1415d1e3b97a7a94d3852fa10cb03018`. The merge's root tree matches the Cloud head's root tree.
+
+The PR-profile nextest run stopped after **7,886 of 10,018 selected tests** in **148.796 seconds**: **7,885 passed, 1 failed, 0 leaky passes**. Separately, **63 tests were skipped by the profile** and **2,132 selected tests were not run after the failure**. The 7,886 unique primary result rows and their ordinals reconcile exactly. The 23 PASS rows and repeated FAIL after the summary are diagnostic replay and are excluded from execution totals.
+
+The sole failure is `lamp-voice` test `remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing`, at [`remember.rs:7896`](https://github.com/autonomous-ai/lampOS/blob/93d93ecb1415d1e3b97a7a94d3852fa10cb03018/lampOS/crates/voice/src/remember.rs#L7896). It expects no adoption after a forget while a saving-line voice print is pending; an adoption result was present. The raw assertion message and payload are omitted because they contain a synthetic person name. Their full log is retained privately, with its exact hash recorded below and in [ci.json](ci.json).
+
+All three added Cloud tests passed in this run. That does not change the failed gate. The later doc-test/custom-harness/relay step was skipped, as were artifact export and upload. The artifact API reports zero artifacts; no payload was downloaded or verified. ARM64 emitted eight example-output collision warnings plus the notice that 2,132 tests were not run. Clippy emitted no Rust warnings. Both logs contain certificate/Node infrastructure notices; [ci.json](ci.json) retains their sanitized text, line numbers and all terminal job/step states.
+
+The Cloud head's complete Voice tree is identical to `fab69b0c4c4333ff8d51459e063169af7355e1dc`. The failing file has SHA-256 `2fda572c209c9c3817ac833fde71f7b503ca926f6a82ff7fc43a63c8aa680e16` at that base, the Cloud head, Music head `d96f484ec0567ecd66819cb45bd44f5c39961118`, and observed newer main `f71a62f559619c996d6a85f253ed88e367549722`. The newer main changes Voice's coordinator and onboarding files, so this does not claim that its whole Voice tree is unchanged.
+
+The same fixture passed once at **0.807 seconds** in the [unchanged-base push run 39713218753](https://github.com/autonomous-ai/lampOS/actions/runs/39713218753). Its full run recorded 10,015 passed (including one leaky pass), zero failures and 63 skips; the independently prepared [comparison.json](comparison.json) is copied byte-for-byte. The fixture also passed at **0.807 seconds** in [Music run 39713220661](https://github.com/autonomous-ai/lampOS/actions/runs/39713220661), which tested `be24496f5d9b0e989d62269e8d2c0ceba8cd1de4` on the same base. These separate observations establish neither the failure's cause nor a reproducibility rate, and do not qualify the failed Cloud run.
+
+Full retained log SHA-256:
+
+- ARM64: `8fc2ce535d567485a4bb25b3176fd48896cab204dbc084e327b5491aac1aeec2`
+- Clippy: `6e840f4de5734ce977c6770ff7c676b9e4cf4c7bb1561a446a9695446b49492e`
+
+[ci.json](ci.json) binds all nine raw inputs, exact counts, source hashes and comparison limits. The ARM64 combined log uses `UNKNOWN STEP`; step conclusions are taken from the captured API, without fabricated per-line labels. [SHA256SUMS](SHA256SUMS) covers this page, the failure record and the unchanged baseline comparison. This preparation did not run tests, builds or devices, access the network, or modify Git state.
