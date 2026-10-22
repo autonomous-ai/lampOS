@@ -626,10 +626,11 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   worker counting cut-ins toward its busy room.
 - **With the switch,** while one of the lamp's own lines (the same lines as
   above: a skill's say, a reminder, news, its hello, a setup line) is
-  sounding (it has reached the speaker: its playback started or samples
-  were handed to it, so a line paused for a yield still counts; provider
-  audio still queued short of a speaker block does not), talk over it is let go and the line goes on
-  (`while_own_line_waits`, `why` `busy_room`) when all of these hold:
+  sounding (it has reached the speaker: the speaker accepted some of it,
+  `Reply::reached_speaker`, so a line paused since still counts; audio
+  still queued, or handed over and not yet accepted, does not), talk over
+  it is let go and the line goes on (`while_own_line_waits`, `why`
+  `busy_room`) when all of these hold:
   - the room was busy as the line began
     (`body_link::Attention::busy_lately`: busy now, or within the last
     180 s, room_told's `BUSY_ENDS_AFTER_US`, borrowed, not measured). It is
@@ -644,25 +645,40 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
 - **Still stops it:** "Lamp, …", a person turned to the lamp and speaking, a
   head tap or the button, and any talk in a room that wasn't busy. An answer
   to a person keeps today's rules. Needs no other switch.
-- **Fruitless counts:** unchanged. A let-go is a resume, so the existing caps
-  apply (2 in 20 s, 3 with `LAMP_CUT_IN_COUNTS_REAL`), and then the line
-  plays through: office talk can pause a say a few times but can't end it.
-- **Record:** `input_let_go_own_line` with `why` `busy_room`; the journal
-  says `talk over the lamp's own line in a busy room, with no name or face
-  turned to it, was let go; the line goes on`.
+- **No pause either:** while such a line sounds (`busy_room_line`), the
+  duplex mask doesn't yield to talk over it (`PlaybackMask::room_talk`):
+  a yield withholds the line's audio, the speaker plays zeros, and on
+  lamp-52e6 on 22 Oct the say ended `dropped`
+  (`audio_written_with_playback_gaps_unscored`) though its talk was let go
+  31 and 40 times. The talk is still heard as speech and judged as
+  candidates for the name and a turned face (one with them takes the turn as
+  before, with no yield first); a stop heard by its own listener
+  (`stop/heard`) still yields. Fruitless counts are untouched: with no
+  yield there is no resume.
+- **Record:** `input_let_go_own_line` with `why` `busy_room`, one per
+  candidate: talk going on is a new candidate every few blocks once the last
+  is let go, each judged for the name and a face. The journal says `talk
+  over the lamp's own line in a busy room, with no name or face turned to
+  it, is let go; the line goes on` once a line.
 - **Its cost:** a bare "Stop." in a busy room no longer stops a say. The
   name, a face turned to it, or a tap still does, and once the sixth
   builder's stop-words fix (#2863) is on, `stop/heard` covers the bare
   "Stop" again (`LAMP_STOP_HEARD` is off in the product today). Where the
   lamp answers office talk, `Attention` is rarely busy and the rule rarely
-  bites. A let-go still pauses the line for the resume wait.
+  bites.
 - **The busy window:** the 180 s is borrowed from room_told
   (`BUSY_ENDS_AFTER_US`), not measured for this rule; it is to be measured
   on lamp-52e6 in the lamp run.
 - **Tested:** `talk_over_the_lamps_own_line_in_a_busy_room_is_let_go` (the
   table: name, face, stop word, a room not busy, an answer to a person, not
   yet sounding, audio queued but never handed to the speaker, a line that
-  sounded and paused); `a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy`
+  sounded and paused, a block handed over and not yet accepted);
+  `talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap`
+  (the duplex harness: 200 blocks of talk over the line, each candidate let
+  go, every block handed to the speaker in order with no yield; without
+  `room_talk` the yields withhold it; a candidate not let go takes the turn;
+  a forced yield still yields);
+  `a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy`
   (30 s and 181 s); and on the loop,
   `talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch`: the say ends
   `spoken` with the switch in a busy room, and `dropped` without it or in a

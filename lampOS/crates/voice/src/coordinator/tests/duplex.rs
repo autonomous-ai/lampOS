@@ -96,6 +96,9 @@ pub(super) struct Harness {
     pub(super) reach_past_reply: bool,
     /// The test's own scenario clock, unless it waits on the host's.
     _clock: Option<crate::scenario_clock::Scope>,
+    /// Every candidate is let go, as the session loop lets go talk over the
+    /// lamp's own line in a busy room (`busy_room`, #2602).
+    let_go: bool,
 }
 
 impl Harness {
@@ -192,6 +195,7 @@ impl Harness {
             stop_words: None,
             reach_past_reply: false,
             _clock: None,
+            let_go: false,
         }
     }
     pub(super) fn old(&self) -> TurnOwner {
@@ -346,6 +350,13 @@ impl Harness {
             }
         };
         let mut tick = Tick::default();
+        let candidate = candidate.filter(|_| {
+            if self.let_go {
+                self.admission.release_prospective(at).unwrap();
+                self.detector.clear_prospective();
+            }
+            !self.let_go
+        });
         if let Some(candidate) = candidate
             && let Some(accepted) = decide_prospective_input(
                 &self.mask,
@@ -464,6 +475,66 @@ fn the_lamps_own_voice_through_a_whole_reply_neither_yields_nor_becomes_a_turn()
     assert!(h.events("duplex_yield").is_empty());
     assert_eq!(h.mask.duplex_summary(), Some(((0, 0, 0), false)));
     assert_eq!(h.mask.suppressed_blocks(), 0, "heard, not masked");
+}
+
+/// `LAMP_OWN_LINE_OVER_TALK` (#2602; lamp-52e6 on 22 Oct): talk over the
+/// lamp's own line in a busy room is let go, and the line doesn't pause for
+/// it either. There every candidate of the talk was let go, but each yield
+/// had withheld the line's audio, the speaker played zeros, and the say
+/// ended `dropped` (`audio_written_with_playback_gaps_unscored`). With the
+/// mask's `room_talk`, every block of a long run of talk over the line is
+/// handed to the speaker, in order, with no yield: no gap, so the say is
+/// `spoken`. The talk is still candidates, for the name or a face turned to
+/// the lamp to be judged in: one not let go takes the turn as before, and a
+/// stop heard by its own listener still yields. Without it, as before.
+#[test]
+fn talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap() {
+    for room_talk in [false, true] {
+        let mut h = Harness::new(TurnTaking::Duplex, 400);
+        h.let_go = true;
+        h.mask.room_talk(room_talk);
+        let old = h.old();
+        assert_eq!(dispatched(&h.blocks(20, 0.99, Some(evidence(0, OWN)))), 20);
+        let talk = h.blocks(200, 0.9, Some(evidence(0, OVER)));
+        assert!(!h.events("input_candidate").is_empty(), "{room_talk}");
+        assert_eq!(h.old(), old, "{room_talk}");
+        assert!(h.events("turn_finished").is_empty(), "{room_talk}");
+        if room_talk {
+            assert_eq!(dispatched(&talk), 200, "the line paused for the talk");
+            assert!(h.events("duplex_yield").is_empty());
+            let firsts: Vec<i16> = talk
+                .iter()
+                .map(|tick| tick.dispatched.as_ref().unwrap()[0])
+                .collect();
+            // The reply's samples count up from zero, modulo 30 000.
+            assert!(
+                firsts
+                    .windows(2)
+                    .all(|pair| i32::from(pair[1]) == (i32::from(pair[0]) + 240) % 30_000)
+            );
+        } else {
+            // Today's: each yield withholds the line from the speaker.
+            assert!(dispatched(&talk) < 200);
+            assert!(!h.events("duplex_yield").is_empty());
+        }
+    }
+    // A candidate not let go (the lamp's name in it) takes the turn.
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.mask.room_talk(true);
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    let talk = h.blocks(40, 0.9, Some(evidence(0, OVER)));
+    assert!(talk.iter().any(|tick| tick.accepted.is_some()));
+    assert_ne!(h.old(), old);
+    assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    // A stop heard by its own listener still yields.
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.let_go = true;
+    h.mask.room_talk(true);
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    assert!(h.mask.force_yield());
+    assert!(h.block(0.9, Some(evidence(0, OVER))).dispatched.is_none());
+    assert_eq!(h.events("duplex_yield").len(), 1);
 }
 
 #[test]

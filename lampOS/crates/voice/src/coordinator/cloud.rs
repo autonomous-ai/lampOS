@@ -577,6 +577,7 @@ mod tests {
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),
             handed: 0,
+            sounded: false,
         };
         (owner, Some(reply))
     }

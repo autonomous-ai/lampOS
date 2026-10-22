@@ -124,6 +124,7 @@ impl Harness {
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),
             handed: 0,
+            sounded: false,
         };
         Self {
             owner,
@@ -2174,8 +2175,9 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
         reply.input_sequence = 0;
         reply.say = Some(ticket);
         reply.had_audio = true;
-        // One block handed to the speaker: the line has sounded.
+        // One block accepted by the speaker: the line has sounded.
         reply.handed = 240;
+        reply.sounded = true;
     }
     let busy = OwnLineWait {
         heard: true,
@@ -2256,6 +2258,7 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
     {
         let reply = h.reply.as_mut().unwrap();
         reply.handed = 0;
+        reply.sounded = false;
         reply.generation_done = false;
         reply.pcm = vec![1_i16; 120].into();
         assert!(!reply.has_speaker_chunk());
@@ -2265,9 +2268,16 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
         while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
         WhileOwnLineWaits::AsBefore
     );
+    // Its first block handed to the speaker and not yet accepted (no
+    // playback): not sounding yet either (reviewer-two's second P2).
+    h.reply.as_mut().unwrap().handed = 240;
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
     // A line that sounded and then paused (for a yield: playback ended,
     // its rest queued) is still sounding for the room.
-    h.reply.as_mut().unwrap().handed = 480;
+    h.reply.as_mut().unwrap().sounded = true;
     assert_eq!(
         while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
         WhileOwnLineWaits::LetGo("busy_room")
