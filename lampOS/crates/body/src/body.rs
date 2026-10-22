@@ -4452,6 +4452,23 @@ fn run_on<P: PortIo, R: Runtime>(
     let mut on_track_at = [0u16; 3];
     let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
+    // Whether a joint held where it gave way is said as in a hand
+    // (`body/hand`). A hand starts on a joint more than `HAND_MOVED` from
+    // where it first gave, pressed past its own load bound or, limp, its
+    // contact floor, or pushed as the slump judges it (`LIMP_LAG`); once
+    // started it stays while the joint is that far off, or reads over half
+    // its bound and a quarter of its bound over what it read before it gave,
+    // and ends on the first step that is neither. A held joint reading only
+    // its own weight at its rest is not a hand: lamp-06c1's head read 124 to
+    // 136 there, over half its 240, and said a push 8 times a second.
+    let mut felt = [false; 3];
+    // What each joint read on its last step neither held, a hand nor over
+    // its bound: its own weight.
+    let mut rest_load = [0u16; 3];
+    // Where a joint first gave way, kept while it is held: re-held where a
+    // hand has it each second, `gave_at` follows the hand, and a hand that
+    // keeps a joint off its rest, pressing under its bound, is still one.
+    let mut gave_first = [0u16; 3];
     let mut kept = [0.0f32; 3];
     let mut stalls = [Stall::default(); 5];
     let contact_floor = [
@@ -5914,7 +5931,7 @@ fn run_on<P: PortIo, R: Runtime>(
             // A hand from the test input is said as a push too, so what
             // ends on a push (a skill's search, the voice's) can be run
             // from it (#2904).
-            hand: held.iter().any(|held| *held) || test_held,
+            hand: (0..3).any(|index| held[index] && felt[index]) || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             looks_dropped,
@@ -6075,6 +6092,26 @@ fn run_on<P: PortIo, R: Runtime>(
             } else {
                 0
             };
+            if !held[index] && !felt[index] && is.load <= strained {
+                rest_load[index] = is.load;
+            }
+            let moved = is.position.abs_diff(gave_first[index]) > HAND_MOVED;
+            felt[index] = held[index]
+                && (moved
+                    || is.load > strained
+                    // Over V1's contact floor, which pins a joint and slumps
+                    // the lamp under `--limp on` (below) though a gesture
+                    // allows it more: a pitch pressed at 675 in a glance,
+                    // its bound 700.
+                    || (limping && is.load > contact_floor[index])
+                    // Once a hand, still one while it presses at over half
+                    // the bound and a quarter of it over its own weight: a
+                    // press at 300 easing to 130 on a pitch bound 240 that
+                    // read 25 is the same hand; one that read 130 before
+                    // and reads 130 again is its weight.
+                    || (felt[index]
+                        && is.load > strained / 2
+                        && is.load > rest_load[index].saturating_add(strained / 4)));
             off_track[index] = if written[index].abs_diff(is.position) > astray {
                 off_track[index].saturating_add(1)
             } else {
@@ -6134,8 +6171,12 @@ fn run_on<P: PortIo, R: Runtime>(
                     || is.position.abs_diff(gave_at[index]) > LIMP_LAG;
                 in_hand[index] = if pushed { in_hand[index] + 1 } else { 0 };
                 if pushed {
-                    // Not sent back into a hand still on it (`HAND_STEPS`).
+                    // Not sent back into a hand still on it (`HAND_STEPS`),
+                    // and said as one: what slumps the lamp is a push, a
+                    // pitch held 13 counts off (over `LIMP_LAG`, under
+                    // `HAND_MOVED`) too.
                     easing[index] = easing[index].max(HAND_STEPS);
+                    felt[index] = true;
                 }
                 if in_hand[index] >= HAND_STEPS {
                     in_hand[index] = 0;
@@ -6256,6 +6297,7 @@ fn run_on<P: PortIo, R: Runtime>(
                     } else {
                         is.position
                     };
+                    gave_first[index] = gave_at[index];
                     in_hand[index] = 0;
                     over_load[index] = 0;
                     contact[index] = 0;
