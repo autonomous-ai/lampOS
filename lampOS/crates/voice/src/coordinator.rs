@@ -3391,6 +3391,8 @@ fn observe_provider_output(
         | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }
         | ProviderOutput::InputDiscarded { .. } => {}
+        // About the line still heard, for the detector, taken by the loop.
+        ProviderOutput::WordsEnd { .. } => {}
         // Only a provider configured to take a silent earlier response as
         // over reports this. It grants nothing here: the request still needs
         // its own Started before any of its output is usable.
@@ -5734,6 +5736,9 @@ fn conversation_with_gate(
     let mut early_finalize = rig
         .early_finalize
         .then(early_finalize::EarlyFinalize::default);
+    // A due end held while the second route's words so far end unfinished
+    // (`LAMP_SECOND_UNFINISHED_WAIT`): off unless set.
+    let unfinished_wait = crate::unfinished_words::on();
     if let Some(early) = early.as_ref() {
         record(
             trace,
@@ -7044,6 +7049,21 @@ fn conversation_with_gate(
                         "first_answer_audio_ms":audio_ms}),
                     )?;
                 }
+                // The second route's words so far end unfinished, or no
+                // longer do: a due end of the line in hand waits a little
+                // longer while they do (`LAMP_SECOND_UNFINISHED_WAIT`).
+                ProviderOutput::WordsEnd {
+                    request,
+                    unfinished,
+                } => {
+                    if unfinished_wait
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        detector.words_end(unfinished);
+                    }
+                }
                 ProviderOutput::RequestedAudio {
                     request,
                     session,
@@ -7980,6 +8000,13 @@ fn conversation_with_gate(
                 frame.echo.is_some().then_some(probability),
                 observed_at_us,
             )?;
+            // An end held for unfinished words, let go: counts only.
+            if let Some(waited) = detector.take_unfinished_wait() {
+                eprintln!(
+                    "{}",
+                    waited.told(reply.as_ref().map(|current| current.owner.turn()))
+                );
+            }
             check_speaker_progress(speaker_pending.as_ref(), observed_at_us)?;
             let discarded_endpoint = submission_draining && input_ended;
             if discarded_endpoint {
