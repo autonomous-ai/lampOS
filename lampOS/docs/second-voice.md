@@ -76,7 +76,8 @@ on the company relay) with the route's key, answered
 Each address is what the matching variable takes (`chat` as
 `LAMP_SECOND_DEEPSEEK_BASE_URL`, ending `/deepseek`; `speech` as
 `LAMP_SECOND_SPEECH_BASE_URL`; `listening` as
-`LAMP_SECOND_LISTENING_BASE_URL`) and is checked as the file's URLs are; a
+`LAMP_SECOND_LISTENING_BASE_URL`; `gemini` as `LAMP_SECOND_GEMINI_BASE_URL`,
+the route's own Gemini, its chat and its voice, never Live's) and is checked as the file's URLs are; a
 route on a host other than the company's is a complete API base, as those
 settings are (`/v1` is added only to `campaign-api.autonomous.ai`'s `/ai`).
 `null`, an address not to use, or a 404 is the service's own address; a
@@ -88,7 +89,9 @@ routes as they stood when it began and keep them to its end; listening
 takes the latest at each utterance. The unit's own address wins: a service
 whose variable is given is never routed, nor a chat that is not DeepSeek
 with the relay's key, Gemini's voice, Deepgram's own listening, or a voice
-or listening with another service's key from `second.json`. A near
+or listening with another service's key from `second.json`; the route's
+Gemini only when it already goes to the relay with the relay's key, never a
+Google key or Google's own address. A near
 service that fails on the link, times out, answers a 5xx or a 401 goes to
 its own address for the rest of the turn (the chat's request sent again
 there, the sentence said in the voice at its own, listening opened once
