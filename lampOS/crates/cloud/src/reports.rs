@@ -585,6 +585,11 @@ impl UnitStates {
 /// `program args…`'s output, within [`SYSTEMCTL_WITHIN`], or nothing:
 /// killed when late.
 pub fn bounded_output(program: &Path, args: &[&str]) -> Option<String> {
+    bounded_output_within(program, args, SYSTEMCTL_WITHIN)
+}
+
+/// [`bounded_output`] within `within`.
+pub fn bounded_output_within(program: &Path, args: &[&str], within: Duration) -> Option<String> {
     let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
@@ -598,7 +603,7 @@ pub fn bounded_output(program: &Path, args: &[&str]) -> Option<String> {
         let _ = stdout.by_ref().take(256 * 1_024).read_to_string(&mut out);
         out
     });
-    let deadline = Instant::now() + SYSTEMCTL_WITHIN;
+    let deadline = Instant::now() + within;
     loop {
         match child.try_wait() {
             Ok(Some(status)) if status.success() => return reader.join().ok(),
@@ -1940,6 +1945,10 @@ const REQUESTS_NAME: &str = "cloud_reports";
 pub struct Lamp {
     pub bus: Option<lamp_bus::Bus>,
     pub systemctl: PathBuf,
+    /// How long each systemctl query has: [`SYSTEMCTL_WITHIN`]. A test
+    /// whose stand-in shell may take longer on a loaded machine gives it
+    /// more, so a late start isn't read as a failed query (#1569).
+    pub systemctl_within: Duration,
     /// [`UPDATE_SELF_ENVIRONMENT`] is `on`.
     pub update_self: bool,
     requests: Option<lamp_bus::Subscriber>,
@@ -1953,6 +1962,7 @@ impl Lamp {
         Self {
             bus,
             systemctl: "/usr/bin/systemctl".into(),
+            systemctl_within: SYSTEMCTL_WITHIN,
             update_self: switched_on(std::env::var(UPDATE_SELF_ENVIRONMENT).ok().as_deref()),
             requests: None,
             requests_refused: false,
@@ -1976,7 +1986,7 @@ impl Lamp {
         }
         let mut args = vec!["show", "-p", "Id", "-p", "NRestarts", "-p", "ActiveState"];
         args.extend(UNITS.iter().copied());
-        let found = bounded_output(&self.systemctl, &args)
+        let found = bounded_output_within(&self.systemctl, &args, self.systemctl_within)
             .map(|text| UnitStates::of(&text))
             .unwrap_or_default();
         self.units_read = Some((Instant::now(), found.clone()));
@@ -2010,7 +2020,7 @@ impl Sources for Lamp {
     fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
         let mut waits = BTreeMap::new();
         if self.update_self
-            && bounded_output(
+            && bounded_output_within(
                 &self.systemctl,
                 &[
                     "show",
@@ -2022,6 +2032,7 @@ impl Sources for Lamp {
                     "ActiveState",
                     RECOVERY_TIMER,
                 ],
+                self.systemctl_within,
             )
             .is_some_and(|show| update_waits(&show))
         {
@@ -2213,6 +2224,8 @@ pub(crate) mod tests {
             seen: 0,
         };
         source.lamp.systemctl = program.clone();
+        // A stand-in shell can take seconds to start on a loaded machine.
+        source.lamp.systemctl_within = Duration::from_secs(30);
         source.lamp.update_self = false;
         let shared = Shared::new(Reports::open(places.clone()));
         let start = Instant::now();
