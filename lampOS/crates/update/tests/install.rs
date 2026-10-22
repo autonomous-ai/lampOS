@@ -854,6 +854,10 @@ fn the_product_sees_who_speaks() {
             "lamp-voice.service",
             "Environment=LAMP_SECOND_SPEAKING_FACE=on",
         ),
+        // The voice reads the eyes' switch too: a room's forget needs the
+        // face seen saying it, and without it every one is NOT_THEIRS
+        // (#3037, #3038).
+        ("lamp-voice.service", "Environment=LAMP_EYES_SPEAKING=on"),
     ] {
         assert!(
             section(unit(name), "Service").contains(&line),

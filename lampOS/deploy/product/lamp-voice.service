@@ -110,6 +110,10 @@ Environment=LAMP_CAMERA_FOLLOWS_EYES=on
 # A line another face was seen speaking is the room's, not the known person's (#2008, with lamp-eyes'
 # LAMP_EYES_SPEAKING): "seeing who speaks", which the lead's decision puts on with scoped context.
 Environment=LAMP_SECOND_SPEAKING_FACE=on
+# The eyes' own switch, read by the voice too: with it the voice reads the face seen saying a line that asks to
+# forget, so a room's "forget my face" forgets only a face seen saying it and a held forget's yes counts only from
+# that face (#3038, #3037, #2377). Without it every room's forget is told NOT_THEIRS.
+Environment=LAMP_EYES_SPEAKING=on
 Environment=LAMP_NAME_NOTE=on
 Environment=LAMP_NAME_NOTE_BUSY=face
 Environment=LAMP_EXPRESSION_OUT=on
