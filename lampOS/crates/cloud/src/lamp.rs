@@ -587,6 +587,10 @@ impl Lamp for Real {
         self.update_page
     }
 
+    fn restarts(&self) -> bool {
+        self.restart.is_some()
+    }
+
     fn guard(&self) -> Option<PathBuf> {
         self.guard.clone()
     }
