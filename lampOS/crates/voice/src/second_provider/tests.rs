@@ -6152,6 +6152,124 @@ async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
     std::fs::remove_file(&path).unwrap();
 }
 
+/// The first builder on #2805, 22 Oct 20:28 (`LAMP_MEMORY_EVENTS`): a
+/// dated follow-up's line goes last among a spoken turn's own notes, after
+/// memory's hits, right before the words, on the turn it is given for, and
+/// on no other.
+#[tokio::test]
+async fn a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What time is it?".to_owned()),
+                Ok("Good evening!".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Seven."), Ok(ChatEvent::Done)],
+                vec![text("Evening! How did it go?"), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let asked_with = Arc::new(Mutex::new(Vec::new()));
+    let words = asked_with.clone();
+    let mut engine = engine
+        .remembering(Arc::new(|_, _, _| Some("MEMORY NOTE".to_owned())))
+        .asking_after_events(Arc::new(move |request, heard: &str, _| {
+            words.lock().unwrap().push((request, heard.to_owned()));
+            crate::remember::greets(heard).then(|| "ASK FIRST".to_owned())
+        }));
+    for request in [1, 2] {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(&mut engine).await;
+    }
+    assert_eq!(
+        *asked_with.lock().unwrap(),
+        vec![
+            (1, "What time is it?".to_owned()),
+            (2, "Good evening!".to_owned())
+        ]
+    );
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2);
+    let ask_first = Message::system("ASK FIRST".to_owned());
+    assert!(!asked[0].contains(&ask_first), "{:?}", asked[0]);
+    let greeting = &asked[1];
+    let at = greeting.len() - 2;
+    assert_eq!(greeting[at], ask_first, "{greeting:?}");
+    assert_eq!(
+        greeting[at - 1],
+        Message::system("MEMORY NOTE".to_owned()),
+        "{greeting:?}"
+    );
+    assert_eq!(greeting[at + 1], Message::user("Good evening!".to_owned()));
+}
+
+/// The first builder on #2805, 22 Oct 20:28: a greeting held only by a
+/// face's gap is never asked for a dated follow-up's line, as it may be
+/// someone else's; the same greeting with the face seen is.
+#[tokio::test]
+async fn a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let path = std::env::temp_dir().join(format!("twelve-gap-event-{}", std::process::id()));
+    std::fs::write(&path, "A").unwrap();
+    let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Hi!".to_owned()), Ok("Hello!".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Hi."), Ok(ChatEvent::Done)],
+                vec![text("Hello."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let lines = Arc::new(AtomicUsize::new(0));
+    let counting = lines.clone();
+    let mut engine = engine
+        .asking_after_events(Arc::new(move |_, _, _| {
+            counting.fetch_add(1, Ordering::Relaxed);
+            Some("ASK FIRST".to_owned())
+        }))
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+    engine.memory_camera(true, 1);
+    let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+    cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    engine.memory_answered(1, Instant::now());
+    cache.replace_seen(cache.begin_refresh(), None, Some(0));
+    engine.submit(start(2));
+    assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    assert_eq!(lines.load(Ordering::Relaxed), 1, "the seen line only");
+    let asked = script.asked.lock().unwrap();
+    let ask_first = Message::system("ASK FIRST".to_owned());
+    assert!(asked[0].contains(&ask_first));
+    assert!(!asked[1].contains(&ask_first));
+    std::fs::remove_file(&path).unwrap();
+}
+
 /// The reviewer's P2 on #2449: on a line held only by a gap, a memory call
 /// the model makes anyway (a forget asked in words, a `remember`) runs for
 /// no one: the scoped runner is never called with the held scope, and the
