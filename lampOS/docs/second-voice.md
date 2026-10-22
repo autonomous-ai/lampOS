@@ -1124,7 +1124,14 @@ order is kept. A written turn is the same from the chat on.
     call at a desk, `NAMES_OF_ITS_SHAPE` ("Lynn, pass me that"), or one of
     the words written for "Lamp" on lamp-4ace, `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
     (`NAME_NEAR_LEAST`) from 0.3 s before the line's first sound to 1.3 s
-    after (`Heeding::near_name`). Then "Lamp" takes the word's place, so
+    after (`Heeding::near_name`). A word of the shape alone
+    (`LikeTheName::Shape`) also needs a face turned to the lamp in the
+    eyes' newest look (`Heeding::turned_to_the_lamp`): people's names
+    have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
+    them always trails (reviewer-three's P2 on 194accd24); the words
+    written for "Lamp" need the near hearing alone. A line that begins
+    with an earlier piece's words (`before`) is never rewritten: its start
+    is not that word's (the P3). Then "Lamp" takes the word's place, so
     the rule and the model read the call, and a lone one waits for the line
     after it as a name does (`LAMP_SECOND_NAME_CARRIES`). Either sign
     alone changes nothing: "Thanks," with a near hearing, or "Right, …"
