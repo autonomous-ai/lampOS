@@ -1,3 +1,25 @@
+## Current checkpoint: 2026-10-23 03:03 +07, corrected chat contracts pass
+
+Ready for lamp-voice: no (Live music fixture current-base gate and native CI remain)
+
+The #3107 re-read on `1d03e57b5` closes the two reproduced P2 contracts:
+the independent adopted camera and refusal tests pass **2 / 0**, with all
+6,509 bound files stable and the review tree clean. [Exact replay and read](verification/chat-hedge-reread-20261023/README.md).
+One nonblocking P3 remains: the outgoing journal line proves a send attempt,
+not transmission or a lost pooled request. Fourth's #3064 per-dispatch
+authority guard remains a separate integration requirement.
+
+Second's uninstrumented Live music fixture passed Mac formatting, strict
+Voice Clippy and full Voice **3,766 / 0 / 14 ignored** on `43bc29f9b`.
+The patch carried equally from `e488aa9ff` to `226c4e89b` on the new
+integration base `7b3e6aef8`; both changed files retain their bytes.
+[Controls and pre-rebase gate](verification/live-music-fixture-20261023/README.md).
+The final current-base Mac gate is running. Fourteen now owns the separate
+decline/music fixture, as First assigned at 02:59. #2810's attended unplug
+and #1812's real signed run still require First and the person at the lamp.
+
+---
+
 ## Current checkpoint: 2026-10-23 02:48 +07, Live music fixture contention reproduced
 
 Ready for lamp-voice: no (new test-only correction; crate and native gates remain)
