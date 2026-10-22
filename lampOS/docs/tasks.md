@@ -1569,21 +1569,35 @@ corrected ask, read back again, and started only on a yes:
   (`agent_tasks::pending_note`) says: on a yes, call `confirm_agent_task`; on
   a no with what they meant instead ("no, I said …", "no, ask Codex …"),
   call `start_agent_task` again with the corrected task, and who if named,
-  which replaces the one waiting; on a plain no, call nothing; never call
-  `start_agent_task` again for the same work unchanged.
+  which replaces the one waiting, "which you will not start now"; on a
+  plain no, call nothing; never call `start_agent_task` again for the same
+  work unchanged.
 - a `start_agent_task` that prepares while another task still waits for its
-  yes (within `CONFIRM_WITHIN`) replaces it: the answer's `next` begins "The
-  earlier task was not started; this one replaces it.", the journal says
-  `lamp-voice: tasks: request N: a corrected ask replaces task <id>, which
-  is never started`, and the voice sends the tasks part a `cancel` for the
-  old id, best-effort, at the revision the new prepare left. A cancel
-  refused or unanswered changes nothing: the old task was never confirmed
-  and the yes can only start the new one, by its own id and digest.
+  yes replaces it, but only from a request that could say yes to it
+  (`may_confirm`): a later request than the one that prepared it, heard (or
+  in the same text chat), within `CONFIRM_WITHIN`. So one line asking two
+  agents (two starts in one request) replaces nothing, nor does a request
+  the lamp wrote itself (the reviewers' P2 and P3s on #3009), nor the same
+  work for the same agent asked again (a yes taken as a new hand-over,
+  #1712; El's P3 on #3028). "The same work" is the same text, byte for
+  byte: a reworded repeat of the same ask still counts as a correction and
+  cancels the one waiting (to be heard in #2838's run on lamp-75c9). Then the
+  answer's `next` begins "This one replaces the earlier task, which you will
+  not start now.", the journal says `lamp-voice: tasks: request N: a
+  corrected ask replaces task <id>, which this voice no longer confirms`,
+  and the voice sends the tasks part a `cancel` for the old id, best-effort,
+  at the revision the new prepare left. After that this voice confirms only
+  the new task, by its own id and digest. A refused or unanswered cancel is
+  journalled (`could not be cancelled; this voice no longer confirms it`).
+  Not ruled out: a yes being confirmed at the same moment as the corrected
+  start (CONFIRM and START are not made exclusive) can still start the old
+  task. That's rare, and nothing here says it was not started.
 
 Without the switch the note, `next` and the lines sent are byte-for-byte
 as before (a second prepare already replaced the one waiting, unsaid).
 Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
 `a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction`,
+`two_starts_in_one_request_or_a_written_one_replace_nothing`,
 `without_the_correct_switch_the_note_and_next_are_as_before`. Not run on a
 lamp yet.
 

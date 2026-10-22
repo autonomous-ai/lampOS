@@ -191,6 +191,9 @@ struct Pending {
     at: Instant,
     /// Who it was prepared for, as the person calls them.
     who: &'static str,
+    /// The work as it was prepared: the same work again is no correction
+    /// (El's P3 on #3028).
+    text: String,
     /// Prepared with [`CORRECT_FLAG`]: its note says a corrected ask
     /// replaces it.
     correct: bool,
@@ -1369,7 +1372,7 @@ pub struct Place {
     /// prepares nothing and is said not to be.
     pub named_only: bool,
     /// A "no, I said …" after a read-back prepares the corrected ask in
-    /// place of the one waiting, which is never started ([`CORRECT_FLAG`],
+    /// place of the one waiting, which this voice no longer confirms ([`CORRECT_FLAG`],
     /// #2838).
     pub correct: bool,
     /// The person may sign the lamp's Harness in by voice
@@ -1597,7 +1600,7 @@ pub fn pending_note(request: u64, now: Instant) -> Option<String> {
     (request > pending.request && now.duration_since(pending.at) <= CONFIRM_WITHIN).then(|| {
         if pending.correct {
             format!(
-                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}. If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call {START} again with the corrected task, and who if they named one: it replaces the one waiting, which is never started. If they only say no, call nothing. Never call {START} again for the same work unchanged.)",
+                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}. If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call {START} again with the corrected task, and who if they named one: it replaces the one waiting, which you will not start now. If they only say no, call nothing. Never call {START} again for the same work unchanged.)",
                 pending.who
             )
         } else {
@@ -1612,7 +1615,7 @@ pub fn pending_note(request: u64, now: Instant) -> Option<String> {
 /// What [`prepared_next`] gains with [`CORRECT_FLAG`] (#2838).
 const CORRECTED_NEXT: &str = "If they say no and give a corrected ask, call start_agent_task again with it: it replaces this one.";
 /// What `next` begins with when a corrected ask replaced the one waiting.
-const REPLACED_NEXT: &str = "The earlier task was not started; this one replaces it.";
+const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will not start now.";
 
 /// [`prepared_next`], with [`CORRECT_FLAG`]'s sentence, and begun with
 /// [`REPLACED_NEXT`] when this task replaced one waiting.
@@ -1821,6 +1824,7 @@ fn run_for(
                             .filter(|waiting| {
                                 place.correct
                                     && waiting.id != id
+                                    && (waiting.text != task || waiting.who != who)
                                     && may_confirm(waiting, request, heard, Instant::now())
                             })
                             .map(|waiting| waiting.id);
@@ -1830,6 +1834,7 @@ fn run_for(
                             request,
                             at: Instant::now(),
                             who,
+                            text: task.to_owned(),
                             correct: place.correct,
                         });
                     }
@@ -2436,6 +2441,7 @@ pub(crate) mod tests {
             request: 5,
             at,
             who: CLAUDE_CODE,
+            text: String::new(),
             correct: false,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
@@ -2471,6 +2477,7 @@ pub(crate) mod tests {
             request: asked,
             at,
             who: CLAUDE_CODE,
+            text: String::new(),
             correct: false,
         };
         assert!(may_confirm(
@@ -5834,7 +5841,7 @@ pub(crate) mod tests {
 
     /// #2838: with `LAMP_TASKS_CORRECT`, "no, I said tea" after the read-back
     /// prepares the corrected ask in place of the one waiting, which is
-    /// cancelled and never started; the yes then starts only the corrected
+    /// cancelled and no longer confirmed; the yes then starts only the corrected
     /// one, with its own digest.
     #[test]
     fn a_corrected_ask_replaces_the_one_waiting_and_only_it_starts() {
@@ -5930,7 +5937,8 @@ pub(crate) mod tests {
     /// Reviewers' P2 on #3009: one line asking two agents makes two starts
     /// in the same request; the second never replaces or cancels the first,
     /// nor says it did. Nor does a start in a request the lamp wrote itself
-    /// (not heard, another chat) replace the person's waiting task.
+    /// (not heard, another chat) replace the person's waiting task, nor the
+    /// same work asked again (El's P3 on #3028).
     #[test]
     fn two_starts_in_one_request_or_a_written_one_replace_nothing() {
         let _one = ONE_AT_A_TIME
@@ -5960,6 +5968,11 @@ pub(crate) mod tests {
                     "request.sock",
                     json!({"ok":true,"id":9,"prepared_digest":"three","revision":3}),
                 ),
+                ("request.sock", status(3)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":10,"prepared_digest":"three-again","revision":4}),
+                ),
             ],
         );
         let place = correcting(&directory, true);
@@ -5985,6 +5998,14 @@ pub(crate) mod tests {
         assert!(
             !written["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
             "{written}"
+        );
+        // The same work again, heard, in a later request (a yes taken as a
+        // new hand-over, #1712): no correction either (El's P3 on #3028).
+        let (again, _) = run(&place, &call("Write a sonnet"), 3, true, PEER_WAIT);
+        assert!(again["prepared"] == json!(true), "{again}");
+        assert!(
+            !again["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+            "{again}"
         );
         let ops: Vec<String> = seen
             .try_iter()
@@ -6116,6 +6137,7 @@ pub(crate) mod tests {
             request: 1,
             at,
             who: CLAUDE_CODE,
+            text: String::new(),
             correct,
         };
         *PENDING.lock().unwrap() = Some(waiting(false));
