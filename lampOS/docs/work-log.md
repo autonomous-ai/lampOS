@@ -1,3 +1,39 @@
+## Current checkpoint: 2026-10-23 01:00 +07, Update fixture diagnostics qualified
+
+Ready for lamp-voice: yes (#3085; re-read and final train remain merge gates)
+
+Kind: tests/docs only. One commit `996511111` contains the latest integration
+head at push, `b8a9148bd`. The reviewed diagnostics source is byte-identical
+to `f5f78c35c`; the carry corrects the architecture metadata and adds the
+current-base Mac receipt. On native ARM64 macOS, formatting and strict
+all-target Update Clippy passed; full Update tests passed **308 / 0 / 4
+ignored**, Round **107 / 0**, no filtering. All 36 bound inputs match.
+
+Official [native receipt](verification/updater-fixture-exit-native-20261023/README.md):
+ARM64 **39824358667**, **10,583 / 0 / 67 skipped**, one leaky Voice journal
+pass; affected put-back **1.108 s**, CLI **0.153 s**, seven-cut checker
+**3.794 s**. Linux Clippy **39824358767** passed. Both checked merge
+`bab1994` into `b8a9148bd`; the watcher exited zero. No rerun for green.
+Integration is now `28f796223`; the read-only carry check is clean but
+First's combined latest-base gate remains required. Tests' requested
+re-read of the corrected evidence remains pending; no new source finding.
+
+Tests found no P1/P2 in the diagnostics. Its architecture P3 is corrected:
+Darwin arm64, Rust host aarch64-apple-darwin, retained Mach-O arm64 Round
+executable. The observation happened after the original run; no pre-run
+artifact capture is invented. The original failed consumer command remains
+unwaived and its cause unproven. This patch preserves the two-second bound,
+poll interval, recovery assertions and runtime behavior.
+
+#3012's automated process/CLI slice is merged. First owns #3085's final
+current-base train and merge, #2810's attended unplug and actual-device
+observer qualification, then #1812's approved real-key release, isolated
+bad-release route and attended Body acceptance. No lamp action or real
+release occurred. The preparation audit and remaining inputs are published
+on #1812; Second's next no-lamp code request is on Queue #2602.
+
+---
+
 ## Current checkpoint: 2026-10-23 00:23 +07, signed-release preparation delta checked
 
 #1812's nine scoped publisher/workflow/runtime files are byte-identical
