@@ -26,7 +26,11 @@ Environment=LAMP_BUS=on
 # Whether each face is speaking, from YuNet's five marks, on humans/faces/tracked: the voice's
 # LAMP_SECOND_SPEAKING_FACE reads it (#720, #2008; the lead, 21 Oct 07:19 on #1711).
 Environment=LAMP_EYES_SPEAKING=on
-ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known
+# How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
+# Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
+# never runs here: its training pictures are for research only. With the mesh, the speaking read
+# above reads the mesh's lips too (eyes.md).
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known --mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
