@@ -37,7 +37,7 @@ async fn asked_with(
     let asked_of: Arc<Mutex<Vec<u64>>> = Arc::default();
     if let Some(near) = near {
         let seen = asked_of.clone();
-        engine = engine.hearing_the_name_near(Arc::new(move |began_us| {
+        engine = engine.hearing_the_name_near(Arc::new(move |(began_us, _): (u64, u64)| {
             seen.lock().unwrap().push(began_us);
             (near, turned)
         }));
@@ -153,7 +153,7 @@ fn a_word_sounds_like_the_name_by_its_shape_or_as_heard_for_it() {
     }
     for not in [
         "Thanks", "Right", "Like", "Look", "Land", "Listen", "Lemon", "Lamps", "Lane's", "Mike",
-        "Lynn", "Lane", "Lan", "Lin", "Liam", "Lam", "Loan",
+        "Lynn", "Lane", "Lan", "Lin", "Liam", "Lam", "Loan", "Leanne", "Lorne",
         // Compared after its silent "e", "line" is "Lin", a name; "Lamb",
         // its "-mb" an M, is "Lam" (the rule reads "Lamb" as the lamp's
         // name already).
@@ -210,7 +210,7 @@ async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
             (!crate::attention::begins_with_the_name(words))
                 .then_some(crate::attention::NOT_SPOKEN_TO)
         }))
-        .hearing_the_name_near(Arc::new(|_| (Some(0.6), true)));
+        .hearing_the_name_near(Arc::new(|_: (u64, u64)| (Some(0.6), true)));
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
