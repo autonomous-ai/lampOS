@@ -4110,8 +4110,11 @@ fn run_on<P: PortIo, R: Runtime>(
     // glance took the head out of rest. The glance is laid on that, and
     // the head goes back to it; the base is left as it is.
     let mut glance_from: Option<[f32; 3]> = None;
-    // Steps the head has been led up while still below its way.
+    // Steps the head has been led up while below its way without coming
+    // closer, and the closest to its way it has been read since it fell
+    // below it.
     let mut led_below = 0u8;
+    let mut closest = u16::MAX;
     // A joint that has arrived and is asked nothing until the wanted pose
     // moves far enough from it; the steps each has been arriving for; and
     // the pose last wanted of each.
@@ -5145,21 +5148,25 @@ fn run_on<P: PortIo, R: Runtime>(
             // is one coming back up after a glance dipped it, while it is
             // still below its way: from below, lamp-52e6's head stopped 26
             // short of where it rested and was left there (#2818).
-            let below = index == 0
-                && report.last.is_some_and(|last| {
-                    f32::from(last[COMMANDED[0].index()].position) > commanded[0] + ARRIVED_COUNTS
-                });
+            let last_at = report
+                .last
+                .map(|last| last[COMMANDED[0].index()].position)
+                .filter(|at| index == 0 && f32::from(*at) > commanded[0] + ARRIVED_COUNTS);
+            let below = last_at.is_some();
             // A glance is judged with a gesture's bounds, so nothing else
-            // ends a lead into a hand or a stall: still below after as many
-            // steps as the tracking check lets a head stay off its goal, the
-            // head is no longer led until it is back at its way.
+            // ends a lead into a hand or a stall: led without coming a count
+            // closer for as many steps as the tracking check lets a head stay
+            // off its goal, the head is no longer led until it is back at its
+            // way. A head rising slowly against its weight keeps closing, and
+            // keeps its lead: cut after a count of steps instead, lamp-52e6's
+            // reached its way 10 s late (#2818).
             let lead = index == 0 && glance_from.is_some() && (extra[0] < 0.0 || below);
             if index == 0 {
-                led_below = if below {
-                    led_below.saturating_add(u8::from(lead))
-                } else {
-                    0
-                };
+                match last_at {
+                    Some(at) if at < closest => (closest, led_below) = (at, 0),
+                    Some(_) => led_below = led_below.saturating_add(u8::from(lead)),
+                    None => (closest, led_below) = (u16::MAX, 0),
+                }
             }
             let led = if lead && led_below <= limits.tracking_steps {
                 (commanded[index] - GLANCE_LIFT_LEAD).max(low[index].min(commanded[index]))
