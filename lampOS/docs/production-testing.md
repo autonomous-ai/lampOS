@@ -192,14 +192,18 @@ written whole and never over another record, as in `--out`.
 
 Exit status: 0 the run passed, 1 it failed, 3 it is incomplete, 2 no record
 was made (an argument or an input was refused, or the record could not be
-written). A record kept in `--out` but refused by the place also exits 2,
-and says so with the `--out` path to copy there by hand once the place can
-take it, since the same run can't be made again:
-- one already there;
-- a device id that can't be a folder of its own there: one starting with a
-  dot, such as `..`, one with an upper-case letter, since a share may not
-  tell `Lamp-4ACE` from `lamp-4ace`, or one lamps share (`autonomous`,
-  `orangepi`, `lamp-`; below);
+written). With `--records`, a device id that can't be a folder of its own
+there is refused before anything is written, `--out` included, and the
+refusal says why (El on #3091): one starting with a dot, such as `..`, one
+with an upper-case letter, since a share may not tell `Lamp-4ACE` from
+`lamp-4ace`, or one lamps share (`autonomous`, `orangepi`, `lamp-`; below),
+for which it says to give the lamp its own, such as
+`lamp-<the last four of its serial>`.
+
+A record kept in `--out` but refused by the place also exits 2. Where the
+place could take it later, it says so with the `--out` path to copy there by
+hand, since the same run can't be made again:
+- one already there (no copy);
 - a lamp folder that is a link to elsewhere, which is never followed;
 - a place that can't make hard links. A record is put in place by a hard
   link from a part file, so it's never half there and never replaces

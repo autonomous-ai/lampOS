@@ -79,9 +79,20 @@ pub fn lamp_dir(place: &Path, lamp: &str) -> io::Result<PathBuf> {
             b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_' | b'.')
         })
     {
+        let why = if !lamp.is_empty()
+            && !lamp.starts_with('.')
+            && lamp
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+            && !lamp_msgs::SelfTest::is_own_name(lamp)
+        {
+            "it's a name lamps share, not one lamp's own: give the lamp its own, such as lamp-<the last four of its serial>"
+        } else {
+            "a lamp's folder is a lower-case plain name that doesn't start with a dot"
+        };
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("{lamp:?} cannot name a lamp's folder of records"),
+            format!("{lamp:?} cannot name a lamp's folder of records: {why}"),
         ));
     }
     Ok(place.join(lamp))
