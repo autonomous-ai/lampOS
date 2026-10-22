@@ -360,6 +360,7 @@ fn tree(root: &Path) -> BTreeMap<PathBuf, String> {
 
 #[test]
 fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
+    use std::os::unix::fs::PermissionsExt;
     let mut lamp = Lamp::new(188, &[]);
     let done = lamp.install().unwrap();
     assert_eq!(done.sequence, 188);
@@ -389,6 +390,12 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
     for (name, text) in PRODUCT {
         let written = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{name}"))).unwrap();
         assert_eq!(&written, text, "{name}");
+        let mode = fs::metadata(lamp.on(&format!("/etc/systemd/system/{name}")))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o644, "{name}");
     }
     assert!(lamp.on("/etc/tmpfiles.d/lampos.conf").is_file());
     assert!(lamp.on("/etc/lampOS/controls/controls-pins.json").is_file());
