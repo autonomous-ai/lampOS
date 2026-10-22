@@ -709,18 +709,27 @@ order is kept. A written turn is the same from the chat on.
   event 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe). A warming that
   fails changes nothing; the chat connects as before.
 - **With `LAMP_SECOND_CHAT_KEPT=on` the chat's client keeps an idle
-  connection at most 25 s** (off unless set; `net::CHAT_POOL_IDLE`), not
-  reqwest's 90 s, and sends TCP keepalive every 15 s (`CHAT_KEEPALIVE`),
-  which keeps a home router's mapping alive. On lamp-4ace on 22 Oct three
-  chat requests never reached the relay (Backend's 02:09 on #2602), and the
-  turn ended unanswered at 4.5 s. That fits a request written onto a pooled
-  connection the path had already dropped, though the cause isn't shown;
-  this switch is the test of it. A line more than 25 s after the last then opens
-  a new connection, a TLS handshake before its first word; with the chat's
-  warm on, the warm opens it ahead from 20 s idle (`WARM_AFTER_KEPT`) rather
-  than 60 s. The other clients are unchanged. The journal says so at start.
-  Measured by `chat round 1 had not begun` counts against nights without it,
-  with the gap since the last request from `chat request going out` (#3107).
+  connection in its pool at most 25 s** (off unless set; `net::CHAT_POOL_IDLE`),
+  not reqwest's 90 s, counted from when the connection went back to the
+  pool. TCP keepalive is reqwest's own either way (15 s, then 3 probes 15 s
+  apart, and a 30 s TCP user timeout on Linux), so this changes only how
+  long a connection is reused. Keepalive finds a path dropped in silence
+  only after about 60 s (15 s, then 3 probes 15 s apart), past the 25 s cap,
+  so the cap and #3107's ask again are the real cover (El on #3115). With
+  the switch, at most one idle connection per host is kept, so a warm still
+  running when a chat goes can't leave two. On lamp-4ace on 22 Oct three chat requests
+  never reached the relay (Backend's 02:09 on #2602), and the turn ended
+  unanswered at 4.5 s. That fits a request written onto a pooled connection
+  the path had already dropped, though the cause isn't shown; this switch
+  is the test of it. A line whose connection the pool has let go opens a new
+  one, a TLS handshake before its first word (its cost not measured here).
+  With the chat's warm also on, the warm comes from 20 s idle
+  (`WARM_AFTER_KEPT`) rather than 60 s, counted from the last request; it
+  may still reuse a pooled connection, and may still be opening when a short
+  line ends, so it makes a ready connection likelier, not certain. The
+  other clients are unchanged. The journal says so at start. Measured by
+  `chat round 1 had not begun` counts against nights without it, with the
+  gap since the last request from `chat request going out` (#3107).
 - **With `LAMP_SECOND_SPEECH_WARM=on` the configured voice's connection is
   opened as a line begins** (off unless set, as the chat's switch is; its
   own switch, since `LAMP_SECOND_CHAT_WARM` names the chat), when no piece

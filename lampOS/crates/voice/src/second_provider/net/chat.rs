@@ -1549,7 +1549,7 @@ data: [DONE]
     #[tokio::test]
     async fn a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        async fn connections(kept: Option<(std::time::Duration, std::time::Duration)>) -> usize {
+        async fn connections(kept: Option<std::time::Duration>) -> usize {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
             let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -1588,12 +1588,67 @@ data: [DONE]
             }
             count.load(std::sync::atomic::Ordering::SeqCst)
         }
-        let short = std::time::Duration::from_millis(200);
         assert_eq!(
-            connections(Some((short, crate::second_provider::net::CHAT_KEEPALIVE))).await,
+            connections(Some(std::time::Duration::from_millis(200))).await,
             2
         );
         assert_eq!(connections(None).await, 1);
+        // The switch reads `on` alone, and the warm comes before the pool
+        // lets go (reviewer-two's P3 on #3115).
+        assert!(super::super::chat_kept(Some("on")));
+        for other in [None, Some("off"), Some("ON"), Some("1"), Some("")] {
+            assert!(!super::super::chat_kept(other), "{other:?}");
+        }
+        assert!(WARM_AFTER_KEPT < crate::second_provider::net::CHAT_POOL_IDLE);
+    }
+
+    /// El's P3 on #3115: a kept client keeps at most one idle connection
+    /// per host. Two requests at once open two; two more at once, inside
+    /// the idle limit, reuse the one kept and open one new (3 in all), where
+    /// the default keeps both and reuses them (2 in all).
+    #[tokio::test]
+    async fn a_kept_client_keeps_one_idle_connection_per_host() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        async fn connections(idle: Option<std::time::Duration>) -> usize {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let accepted = count.clone();
+            tokio::spawn(async move {
+                loop {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    tokio::spawn(async move {
+                        let mut buffer = [0; 4096];
+                        while let Ok(n) = socket.read(&mut buffer).await {
+                            if n == 0 {
+                                return;
+                            }
+                            // Slow enough that two asks overlap.
+                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                            let reply = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}";
+                            if socket.write_all(reply.as_bytes()).await.is_err() {
+                                return;
+                            }
+                        }
+                    });
+                }
+            });
+            let client = super::super::client_kept(idle).unwrap();
+            let url = format!("http://{address}/v1/models");
+            for _ in 0..2 {
+                let (one, two) = tokio::join!(client.get(&url).send(), client.get(&url).send());
+                one.unwrap().bytes().await.unwrap();
+                two.unwrap().bytes().await.unwrap();
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            count.load(std::sync::atomic::Ordering::SeqCst)
+        }
+        assert_eq!(
+            connections(Some(std::time::Duration::from_secs(10))).await,
+            3
+        );
+        assert_eq!(connections(None).await, 2);
     }
 
     /// A local plain HTTP server sends a recorded stream in two pieces.
