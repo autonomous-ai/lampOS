@@ -2312,7 +2312,19 @@ after a take-over, but now for every turn:
   short by it, are answered in its place`. If it is let out, it is answered
   itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
-  which was held, and were never said.
+  which was held, and were never said. **Stopped words never come back**
+  (a reviewer's P2 on the join, 22 Oct: "Lamp, play some jazz", a hand
+  stop, then "what time is it?" was asked as one line): a request ended
+  with the authority holding no owner (a hand, head or spoken stop, the
+  mute, a gap, its turn over) is stopped, not cut by a newer line
+  (`Engine::stop_through`), and its words, with any cut words not yet
+  taken, are let go: `request N: stopped before its answer: its words are
+  let go, not kept for the next line`. So are they at the first line after
+  a stop (`after_stop`), and when the line that cut them says stop or
+  "never mind" ("never mind" anywhere, or a stop word or pair of the stop
+  words' list in three words or fewer): `request N's words, cut short, are
+  let go: WHY`. Held or let out, those words are then neither answered in
+  its place nor joined to it.
   - **The same person going on** (`LAMP_JOIN_CUT_WORDS=on`; with
     `--attention`; the first builder on Queue #2602, 21 Oct 17:22). Let
     out, the new line is asked with the words it cut short before its own,
@@ -2363,14 +2375,18 @@ after a take-over, but now for every turn:
     is judged with no conversation going on); and the two lines' faces
     are not another's. With no face in view, or no eyes at all (the
     camera closed, the eyes not running), the room is the one sign left,
-    so it joins only when neither line was judged in a busy room: most
+    so it joins only when both lines were judged in a **quiet** room: most
     two-person scenes are busy rooms, and in a quiet one the person still
-    talking is most likely the one going on. Its why is counts only: `no
+    talking is most likely the one going on. An unknown room does not
+    count as quiet (a reviewer's P2, 22 Oct): it is the room after a
+    start, with its facts off, and the first minute of any two-person
+    scene, since busy needs three unanswered lines in a minute. Its why is counts only: `no
     sign of a second person: 1 face in view at request N's end, 1 face in
     view at request M's, no other voice heard and no two faces seen
     speaking in the conversation`; refused, the faces in view, `another
     voice or two faces speaking in the conversation (request K)`, `…, in a
-    busy room`, or `nothing kept of the room at request N` (a privacy
+    busy room`, `…, in a room not known to be quiet`, or `nothing kept of
+    the room at request N` (a privacy
     change since, which forgets how the room was too). A **held** line is
     not joined on it: it was held as perhaps not said to the lamp, and the
     cut words are answered in its place alone, as before; only the voices

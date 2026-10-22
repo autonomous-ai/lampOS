@@ -7073,11 +7073,38 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
 /// (`LAMP_JOIN_CUT_WORDS`), and `second` let out or `held` by the rule.
 /// The worker's tests ask it with the rule's own judgement.
 pub(super) async fn asked_after_a_cut(
-    (first, second): (&'static str, &'static str),
+    lines: (&'static str, &'static str),
     gap: Duration,
     same: Option<SameSpeaker>,
     held: bool,
 ) -> Message {
+    asked_after(lines, gap, same, held, Comes::Cut)
+        .await
+        .expect("the second line was asked")
+}
+
+/// How the second line of [`asked_after`] comes after the first.
+#[derive(Clone, Copy, PartialEq)]
+enum Comes {
+    /// It cuts the first short: the authority's newer owner.
+    Cut,
+    /// A hand stop first: the authority holds no owner
+    /// ([`Engine::stop_through`]).
+    Stopped,
+    /// It is the first line after a stop (`after_stop`), the stop not seen
+    /// otherwise.
+    AfterStop,
+}
+
+/// [`asked_after_a_cut`] with the second line coming `after` the first:
+/// what its chat was asked, if one was.
+async fn asked_after(
+    (first, second): (&'static str, &'static str),
+    gap: Duration,
+    same: Option<SameSpeaker>,
+    held: bool,
+    after: Comes,
+) -> Option<Message> {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(first.to_owned()), Ok(second.to_owned())].into()),
         chats: Mutex::new(
@@ -7131,8 +7158,46 @@ pub(super) async fn asked_after_a_cut(
         let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
     }
     *now.lock().unwrap() += gap;
-    engine.submit(start(2));
-    engine.retire_through(1);
+    match after {
+        Comes::Cut => {
+            engine.submit(start(2));
+            engine.retire_through(1);
+        }
+        Comes::Stopped => {
+            engine.stop_through(1);
+            engine.submit(start(2));
+        }
+        Comes::AfterStop => {
+            let ProviderInput::Start {
+                request,
+                session,
+                privacy_generation,
+                continues,
+                continues_cut_off,
+                over_the_lamp,
+                follows_on,
+                over_the_lamps_voice,
+                heard_of_cut,
+                ..
+            } = start(2)
+            else {
+                unreachable!("start is a Start")
+            };
+            engine.submit(ProviderInput::Start {
+                request,
+                session,
+                privacy_generation,
+                continues,
+                continues_cut_off,
+                over_the_lamp,
+                after_stop: true,
+                follows_on,
+                over_the_lamps_voice,
+                heard_of_cut,
+            });
+            engine.retire_through(1);
+        }
+    }
     engine.submit(audio(2, 1));
     engine.submit(end(2));
     loop {
@@ -7143,7 +7208,85 @@ pub(super) async fn asked_after_a_cut(
             break;
         }
     }
-    script.asked.lock().unwrap()[1].last().unwrap().clone()
+    script
+        .asked
+        .lock()
+        .unwrap()
+        .get(1)
+        .map(|asked| asked.last().unwrap().clone())
+}
+
+/// A reviewer's P2 on the join (22 Oct): stopped words never come back. A
+/// hand stop before the next line (the authority with no owner), or the
+/// next line being the first after a stop, lets the cut words go: the line
+/// is asked alone, joined to nothing, and held, nothing is answered in its
+/// place. A next line that says stop or "never mind" lets them go too,
+/// whatever tells one person said both.
+#[tokio::test]
+async fn stopped_words_are_never_joined_nor_answered_in_a_later_lines_place() {
+    let lines = ("Lamp, play some jazz", "what time is it?");
+    let same: SameSpeaker = Arc::new(|_, _| Joined::Same("the same voice said both"));
+    let none_seen: SameSpeaker =
+        Arc::new(|_, _| Joined::NoSecond("no sign of a second person".to_owned()));
+    let soon = Duration::from_millis(1_500);
+    for after in [Comes::Stopped, Comes::AfterStop] {
+        for joins in [same.clone(), none_seen.clone()] {
+            assert_eq!(
+                asked_after(lines, soon, Some(joins.clone()), false, after).await,
+                Some(Message::user("what time is it?")),
+                "let out after a stop: alone"
+            );
+            assert_eq!(
+                asked_after(lines, soon, Some(joins), true, after).await,
+                None,
+                "held after a stop: nothing answered in its place"
+            );
+        }
+        assert_eq!(
+            asked_after(lines, soon, None, true, after).await,
+            None,
+            "the switch off: held after a stop, nothing answered either"
+        );
+    }
+    // As before without a stop: held, the cut words are answered.
+    assert_eq!(
+        asked_after(lines, soon, None, true, Comes::Cut).await,
+        Some(Message::user("Lamp, play some jazz"))
+    );
+    for stop in [
+        "Stop.",
+        "Lamp, hold on.",
+        "Never mind.",
+        "Oh, never mind that.",
+    ] {
+        let lines = ("Lamp, play some jazz", stop);
+        for joins in [same.clone(), none_seen.clone()] {
+            assert_eq!(
+                asked_after(lines, soon, Some(joins.clone()), false, Comes::Cut).await,
+                Some(Message::user(stop)),
+                "{stop}: asked alone"
+            );
+            assert_eq!(
+                asked_after(lines, soon, Some(joins), true, Comes::Cut).await,
+                None,
+                "{stop}: held, the cut words not answered in its place"
+            );
+        }
+    }
+    // A stop word in a longer line is not a stop: "wait" goes on.
+    assert_eq!(
+        asked_after(
+            ("What's the weather like", "wait, in Saigon this weekend?"),
+            soon,
+            Some(none_seen),
+            false,
+            Comes::Cut
+        )
+        .await,
+        Some(Message::user(
+            "What's the weather like wait, in Saigon this weekend?"
+        ))
+    );
 }
 
 /// `LAMP_JOIN_CUT_WORDS` (Eighth's long request with a pause, the first
