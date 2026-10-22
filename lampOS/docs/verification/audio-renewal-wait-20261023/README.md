@@ -119,7 +119,28 @@ The updated integration head `001a3d714` has a clean merge-tree preflight,
 with identical patch and both changed files (`carry-preflight.json`).
 First carried the exact commit as `75dfd7cb1` in [train 7, #3106](https://github.com/autonomous-ai/lampOS/pull/3106);
 `train7-carry.json` records an equal range-diff and matching hashes. The train's
-combined gate is running; this receipt does not pre-claim its result.
+combined gate subsequently passed and landed as recorded below.
 Fourteen's source read found no P1/P2. Its service-admission scope note is
 retained in the PR: this fixture calls the worker directly, while adjacent
 service tests cover `Service::offer`. Original failed CI causes remain unproven.
+
+## Landed through train #3106
+
+First merged train 7 at **02:31 +07**. The authored commit `f913461d9`
+landed as `43bc29f9b`, with an **equal range-diff**. The actual checked
+merge `7c3ebdd43`, train `75dfd7cb1` and landed commit all have tree
+`99325f6f5d8f18023750fd4bd4f02f295ef65c19`; `landed.json` records the
+comparison and checked merge parents.
+
+Combined official ARM64 [39837437741](https://github.com/autonomous-ai/lampOS/actions/runs/39837437741/job/120029331630)
+passed **10,703 / 0 / 67 skipped**, one existing leaky journal pass,
+nextest **185.455 s**. The refusal fixture passed in **0.008 s** and the
+successful-renewal fixture in **0.007 s**. Strict Linux Clippy
+[39837437931](https://github.com/autonomous-ai/lampOS/actions/runs/39837437931/job/120029334498)
+passed. Both required jobs and workflows completed successfully, and the
+native watchers exited zero. `train7-native.json` retains the raw-log hashes,
+counts and exact checked source. No rerun for green or device acceptance.
+
+The source PR #3105 was closed as carried, not separately merged. The
+receipt argv P3 was corrected and rechecked; source/evidence reads found no
+P1/P2. These results do not establish either original ARM64 failure's cause.

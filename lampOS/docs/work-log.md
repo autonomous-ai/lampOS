@@ -1,3 +1,25 @@
+## Current checkpoint: 2026-10-23 02:34 +07, audio-renewal correction merged
+
+Ready for lamp-voice: yes (#3105 carried by merged train #3106)
+
+The authored `f913461d9` landed as `43bc29f9b`, with equal range-diff and
+identical checked/train/landed trees. Combined ARM64 **39837437741** passed
+**10,703 / 0 / 67 skipped**, one leaky journal pass; strict Linux Clippy
+**39837437931** passed. [Complete gate and merge receipts](verification/audio-renewal-wait-20261023/README.md).
+Both native watchers completed; no Second Cargo or CI handle remains active.
+
+Second's #3107 peer counters reproduced two P2 contracts; the author owns
+the correction and First requested Second's re-read. [Original-head evidence](verification/chat-hedge-counters-20261023/README.md)
+retains both deliberate failures and restored source. Fourth separately owns
+#3064's authority checks after awaited backend fallbacks; the coverage limits
+were coordinated on that PR. No global outbound-privacy claim is made.
+
+All Second code slices are merged. #2810's attended unplug and #1812's real
+signed-release run still require First and the person at the lamp. No lamp,
+real credential, publication or device acceptance was performed by Second.
+
+---
+
 ## Current checkpoint: 2026-10-23 02:24 +07, delayed-chat review counters reproduced
 
 Ready for lamp-voice: yes (#3105; First's train #3106 gate remains)
