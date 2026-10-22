@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
@@ -27,6 +27,9 @@ const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs
   --step-ms     80, 40, 20 or 10: a step's score is the highest of 80 / STEP_MS grids, each this
                 much later than the one before, so a name between two steps of 80 ms is
                 scored where it lies (#694); the models' work grows as many times (80)
+  --wake        with --step-ms under 80: the later grids run only while the 80 ms grid's
+                name score is over this, 0.01 to 0.5, and briefly after, scoring the steps
+                just before as they wake; a name they hear best comes up to 0.4 s late (off)
   --stop-least  also run stop.onnx (beside the others, SHA-256 checked) on the same numbers,
                 and publish stop/heard at the step its score first reaches this, 0.5 to 1;
                 then nothing new for 1 s (#828, docs/stop-word.md). Off unless set
@@ -61,6 +64,8 @@ struct Arguments {
     quiet_below: Option<f32>,
     /// `--step-ms`: the grids a step's score is the highest of (`hear::Grids`).
     step_ms: usize,
+    /// `--wake`: the 80 ms grid's score that wakes the others (`Hearer::with_wake`).
+    wake: Option<f32>,
     /// `--stop-least`: the stop model's bar, and with it the model.
     stop_least: Option<f32>,
     /// `--rescue-model`, its SHA-256 and its gate.
@@ -142,6 +147,7 @@ impl RescueGiven {
 fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, String> {
     let (mut models, mut microphone, mut least, mut bus) = (None, None, None, None);
     let (mut quiet_below, mut stop_least, mut step_ms) = (None, None, None);
+    let mut wake = None;
     let mut rescue = RescueGiven::default();
     let mut not_while_speaking = None;
     while let Some(option) = arguments.next() {
@@ -180,6 +186,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             "--quiet-below" => quiet_below.replace(bar(&value)?).is_some(),
             "--stop-least" => stop_least.replace(stop_bar(&value)?).is_some(),
             "--step-ms" => step_ms.replace(step_of(&value)?).is_some(),
+            "--wake" => wake.replace(wake_of(&value)?).is_some(),
             "--not-while-speaking" => not_while_speaking
                 .replace(match value.as_str() {
                     "on" => true,
@@ -200,12 +207,15 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             return Err(format!("{option} was given twice"));
         }
     }
+    let step_ms = step_ms.unwrap_or(80);
+    woken_step(wake, step_ms)?;
     Ok(Some(Arguments {
         models: models.ok_or("--models is required")?,
         microphone: microphone.unwrap_or_else(|| "mic2".to_owned()),
         least: least.unwrap_or(DEFAULT_LEAST),
         quiet_below,
-        step_ms: step_ms.unwrap_or(80),
+        step_ms,
+        wake,
         stop_least,
         rescue: rescue.done()?,
         not_while_speaking: not_while_speaking.unwrap_or(false),
@@ -220,6 +230,80 @@ fn step_of(value: &str) -> Result<usize, String> {
         .ok()
         .filter(|ms| lamp_name::hear::STEPS_MS.contains(ms))
         .ok_or_else(|| "--step-ms is 80, 40, 20 or 10".to_owned())
+}
+
+/// Whether a block follows on from the last one: by the microphone's own
+/// count, and by its owner's monotonic clock when it sent each, never by
+/// when this process got to them, nor by a wall clock. A wake's catch-up can
+/// take most of a second on a lamp (`Hearer::with_wake`), and the blocks sent
+/// meanwhile wait unread: timed by their arrival they would look like a gap
+/// (reviewer-two on #2759). A lamp with no battery clock has its wall clock
+/// set 30 to 70 s after boot (`lamp-schedule.service`), which would make a
+/// gap of nothing or hide a real one. Times count within one publisher (its
+/// name and the boot it picked); a new one is a fresh start.
+#[derive(Default)]
+struct Source {
+    /// The publisher's name and boot, its next count, and when it sent the
+    /// last block, by its monotonic clock.
+    epoch: Option<(String, String)>,
+    next: Option<u64>,
+    at_us: Option<u64>,
+}
+
+#[derive(Debug, PartialEq)]
+enum Follows {
+    On,
+    /// The count skipped: sound was lost.
+    Lost,
+    /// Sent [`GAP`] or more after the last by its owner's clock (the
+    /// microphone was closed, or its owner stalled), or by another
+    /// publisher, or with that clock gone back.
+    Gap,
+}
+
+impl Source {
+    fn block(&mut self, source: &str, boot: &str, sequence: u64, at_us: u64) -> Follows {
+        let same = self
+            .epoch
+            .as_ref()
+            .is_some_and(|(name, picked)| name == source && picked == boot);
+        let first = self.epoch.is_none();
+        if !same {
+            self.epoch = Some((source.to_owned(), boot.to_owned()));
+        }
+        let lost = same && self.next.is_some_and(|next| sequence != next);
+        let gap = !first
+            && (!same
+                || self
+                    .at_us
+                    .is_some_and(|at| at_us < at || at_us - at >= GAP.as_micros() as u64));
+        self.next = Some(sequence + 1);
+        self.at_us = Some(at_us);
+        if lost {
+            Follows::Lost
+        } else if gap {
+            Follows::Gap
+        } else {
+            Follows::On
+        }
+    }
+}
+
+/// `--wake`'s score: from 0.01 to 0.5.
+fn wake_of(value: &str) -> Result<f32, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|score| (0.01..=0.5).contains(score))
+        .ok_or_else(|| "--wake is a score from 0.01 to 0.5".to_owned())
+}
+
+/// `--wake` is for the later grids: refused with the 80 ms grid alone.
+fn woken_step(wake: Option<f32>, step_ms: usize) -> Result<(), String> {
+    if wake.is_some() && step_ms == 80 {
+        return Err("--wake needs --step-ms under 80".to_owned());
+    }
+    Ok(())
 }
 
 /// `--stop-least`'s score.
@@ -317,11 +401,16 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     let started = Instant::now();
     let mut models = Hearer::load(&arguments.models)
         .and_then(|models| models.with_step_ms(arguments.step_ms))
+        .and_then(|models| match arguments.wake {
+            Some(bar) => models.with_wake(bar, arguments.least),
+            None => Ok(models),
+        })
         .map_err(io::Error::other)?;
-    if arguments.stop_least.is_some() {
+    if let Some(least) = arguments.stop_least {
         models = models
             .with_stop(&arguments.models)
-            .map_err(io::Error::other)?;
+            .map_err(io::Error::other)?
+            .stop_heard_at(least);
     }
     if let Some(given) = &arguments.rescue {
         models = models
@@ -329,6 +418,8 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             .map_err(io::Error::other)?;
     }
     let mut hearer = Quiet::new(models, arguments.quiet_below);
+    // `--wake`'s counts at the last minute line, to say the minute's.
+    let mut woken_before = (0u64, 0u64, 0u64);
     let mut stops = arguments.stop_least.map(Stops::new);
     let mut rescue = arguments
         .rescue
@@ -365,7 +456,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         .transpose()?;
     let mut speaking = Speaking::default();
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} step_ms={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
         arguments.least,
@@ -373,6 +464,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             .quiet_below
             .map_or("off".to_owned(), |db| format!("{db}dBFS")),
         arguments.step_ms,
+        arguments
+            .wake
+            .map_or("off".to_owned(), |score| score.to_string()),
         arguments
             .stop_least
             .map_or("off".to_owned(), |score| score.to_string()),
@@ -395,7 +489,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     let mut hearings = Hearings::new(arguments.least);
     let mut counted = Counted::default();
     let (mut total_heard, mut total_steps) = (0u64, 0u64);
-    let mut next_sequence: Option<u64> = None;
+    let mut source = Source::default();
     let mut last_sound: Option<Instant> = None;
     let mut source_gone = false;
     let mut failed: Option<String> = None;
@@ -450,9 +544,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                 {
                     // Sound that was lost, or that begins again after the
                     // microphone was closed: the models start afresh.
-                    let lost = next_sequence.is_some_and(|next| header.sequence != next);
-                    let gap = last_sound.is_some_and(|at| now.duration_since(at) >= GAP);
-                    if lost || gap {
+                    let follows = source.block(
+                        &message.header.source,
+                        &message.header.boot,
+                        header.sequence,
+                        message.header.at_us,
+                    );
+                    let lost = follows == Follows::Lost;
+                    if follows != Follows::On {
                         counted.lost += u64::from(lost);
                         hearer.forget();
                         if let Some(rescue) = rescue.as_mut() {
@@ -460,7 +559,6 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                         }
                         name_said = hearings.cut(now);
                     }
-                    next_sequence = Some(header.sequence + 1);
                     last_sound = Some(now);
                     let block: Vec<i16> = samples
                         .chunks_exact(2)
@@ -581,9 +679,20 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         if now.duration_since(told) >= Duration::from_secs(60) {
             told = now;
             let loudest = loudness.take();
+            let models = hearer.models();
+            let woken = (models.wakes, models.woken_steps, models.overruns());
+            let wakes = arguments.wake.map_or(String::new(), |_| {
+                format!(
+                    " wakes={} woken_steps={} overruns={}",
+                    woken.0 - woken_before.0,
+                    woken.1 - woken_before.1,
+                    woken.2 - woken_before.2
+                )
+            });
+            woken_before = woken;
             if counted.steps + counted.rested > 0 {
                 log(&format!(
-                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={} steps_in_all={total_steps} passed_over_in_all={}{}",
+                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={}{wakes} steps_in_all={total_steps} passed_over_in_all={}{}",
                     counted.steps,
                     counted.rested,
                     counted.busy.as_secs_f64() * 1e3 / counted.steps.max(1) as f64,
@@ -631,6 +740,7 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
     let CheckOptions {
         quiet_below,
         step_ms,
+        wake,
         stop_least,
         rescue: given,
         files,
@@ -638,9 +748,20 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
     let directory = std::path::Path::new(models);
     let mut loaded = Hearer::load(directory)
         .and_then(|loaded| loaded.with_step_ms(*step_ms))
+        .and_then(|loaded| match wake {
+            // Each block waits for the woken grids, so a file scores the
+            // same every time.
+            Some(bar) => loaded
+                .with_wake(*bar, DEFAULT_LEAST)
+                .map(|loaded| loaded.waiting(true)),
+            None => Ok(loaded),
+        })
         .map_err(io::Error::other)?;
-    if stop_least.is_some() {
-        loaded = loaded.with_stop(directory).map_err(io::Error::other)?;
+    if let Some(least) = stop_least {
+        loaded = loaded
+            .with_stop(directory)
+            .map_err(io::Error::other)?
+            .stop_heard_at(*least);
     }
     if let Some(given) = given {
         loaded = loaded
@@ -708,6 +829,7 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
 struct CheckOptions<'a> {
     quiet_below: Option<f32>,
     step_ms: usize,
+    wake: Option<f32>,
     stop_least: Option<f32>,
     rescue: Option<RescueModel>,
     files: &'a [String],
@@ -718,7 +840,7 @@ struct CheckOptions<'a> {
 /// order.
 fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
     let (mut quiet_below, mut stop_least, mut files) = (None, None, rest);
-    let mut step_ms = None;
+    let (mut step_ms, mut wake) = (None, None);
     let mut rescue = RescueGiven::default();
     loop {
         match files {
@@ -734,6 +856,10 @@ fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
                 step_ms = Some(step_of(value)?);
                 files = more;
             }
+            [option, value, more @ ..] if option == "--wake" && wake.is_none() => {
+                wake = Some(wake_of(value)?);
+                files = more;
+            }
             [option, value, more @ ..] if option.starts_with("--rescue-") => {
                 if !rescue.take(option, value)? {
                     return Err(format!("unknown option {option}"));
@@ -741,9 +867,12 @@ fn check_options(rest: &[String]) -> Result<CheckOptions<'_>, String> {
                 files = more;
             }
             _ => {
+                let step_ms = step_ms.unwrap_or(80);
+                woken_step(wake, step_ms)?;
                 return Ok(CheckOptions {
                     quiet_below,
-                    step_ms: step_ms.unwrap_or(80),
+                    step_ms,
+                    wake,
                     stop_least,
                     rescue: rescue.done()?,
                     files,
@@ -859,6 +988,7 @@ mod tests {
                 least: 0.9,
                 quiet_below: None,
                 step_ms: 80,
+                wake: None,
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
@@ -875,6 +1005,7 @@ mod tests {
                 least: 0.999,
                 quiet_below: None,
                 step_ms: 80,
+                wake: None,
                 stop_least: None,
                 rescue: None,
                 not_while_speaking: false,
@@ -925,6 +1056,7 @@ mod tests {
             CheckOptions {
                 quiet_below: None,
                 step_ms: 80,
+                wake: None,
                 stop_least: None,
                 rescue: None,
                 files: &plain[..]
@@ -964,6 +1096,175 @@ mod tests {
             (40, Some(-50.0), 1)
         );
         assert!(check_options(&words("--step-ms 30 a.wav")).is_err());
+    }
+
+    /// Reviewer-two's two P2s on #2759: blocks sent 20 ms apart by their
+    /// owner's monotonic clock follow on however late they are read (a
+    /// wake's second of catch-up), and whatever the wall clock does; 500 ms
+    /// or more between two is a gap, so is the clock gone back or another
+    /// publisher, and a skipped count is lost.
+    #[test]
+    fn a_block_follows_on_by_its_owners_clock_not_when_it_was_read() {
+        let mut source = Source::default();
+        let ms = |ms: u64| ms * 1_000;
+        assert_eq!(source.block("voice", "b1", 0, ms(1_000)), Follows::On);
+        // Fifty blocks read in a burst after a slow step: sent 20 ms apart.
+        for k in 1..=50 {
+            assert_eq!(
+                source.block("voice", "b1", k, ms(1_000 + 20 * k)),
+                Follows::On,
+                "{k}"
+            );
+        }
+        // The owner stopped sending for half a second: a gap.
+        assert_eq!(source.block("voice", "b1", 51, ms(2_500)), Follows::Gap);
+        assert_eq!(source.block("voice", "b1", 52, ms(2_520)), Follows::On);
+        // A count skipped: lost, whatever the times.
+        assert_eq!(source.block("voice", "b1", 54, ms(2_540)), Follows::Lost);
+        assert_eq!(source.block("voice", "b1", 55, ms(2_560)), Follows::On);
+        // Its clock gone back within one publisher: not trusted, a gap.
+        assert_eq!(source.block("voice", "b1", 56, ms(1_200)), Follows::Gap);
+        assert_eq!(source.block("voice", "b1", 57, ms(1_220)), Follows::On);
+        // The voice restarted: a new boot, its count and clock from the
+        // start, is a fresh start, not lost.
+        assert_eq!(source.block("voice", "b2", 0, ms(10)), Follows::Gap);
+        assert_eq!(source.block("voice", "b2", 1, ms(30)), Follows::On);
+        // Another publisher on the topic, likewise.
+        assert_eq!(source.block("other", "b2", 2, ms(50)), Follows::Gap);
+    }
+
+    /// Reviewer-two's control on #2759: the first grid hears a call at 0 ms
+    /// and it falls at 80 ms; that call's fine score, a woken grid's, comes
+    /// 1.2 s later, past the hold-off. It is heard once, not twice. A fine
+    /// score of a call the first grid missed is heard, once.
+    #[test]
+    fn a_late_fine_score_of_a_call_already_heard_is_not_heard_again() {
+        use lamp_name::hear::{Grids, Score};
+        let score = |name| Score {
+            name,
+            stop: None,
+            rescue: None,
+        };
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let heard = |late_number: u64, first: &[f32]| {
+            let mut grids = Grids::new(2);
+            grids.hearing_at(DEFAULT_LEAST);
+            let mut hearings = Hearings::new(DEFAULT_LEAST);
+            let mut said = 0;
+            for (step, name) in first.iter().enumerate() {
+                if step == 15 {
+                    grids.later(1, late_number, score(0.99));
+                }
+                let judged = grids.first(score(*name)).name;
+                let now = at(80 * step as u64);
+                said += usize::from(hearings.score(judged, now).is_some());
+                said += usize::from(hearings.tick(now).is_some());
+            }
+            said += usize::from(hearings.cut(at(80 * first.len() as u64)).is_some());
+            said
+        };
+        let mut first = vec![0.0; 30];
+        first[0] = 0.95;
+        assert_eq!(
+            heard(0, &first),
+            1,
+            "the call the first grid heard, heard once"
+        );
+        assert_eq!(
+            heard(0, &[0.0; 30]),
+            1,
+            "a call only the fine grid heard, heard once"
+        );
+        // Reviewer-two's 09:37: the same call's fine score at 2560 ms, its
+        // first-grid high gone from the history, is let go as gone by, not
+        // heard again.
+        let late = |at_step: usize| {
+            let mut grids = Grids::new(2);
+            grids.hearing_at(DEFAULT_LEAST);
+            let mut hearings = Hearings::new(DEFAULT_LEAST);
+            let mut said = 0;
+            for step in 0..70 {
+                if step == at_step {
+                    grids.later(1, 0, score(0.99));
+                }
+                let name = if step == 0 { 0.95 } else { 0.0 };
+                let now = at(80 * step as u64);
+                said += usize::from(hearings.score(grids.first(score(name)).name, now).is_some());
+                said += usize::from(hearings.tick(now).is_some());
+            }
+            said
+        };
+        for at_step in [31, 32, 40, 42, 43, 60] {
+            assert_eq!(late(at_step), 1, "at {} ms", 80 * at_step);
+        }
+        // And a stop only a later grid heard, a second late, comes through
+        // the name being let go: one stop word, as with no name before it.
+        let stops = |name_first: f32| {
+            let mut grids = Grids::new(2);
+            grids.hearing_at(DEFAULT_LEAST);
+            grids.stop_heard_at(0.9);
+            let mut stops = Stops::new(0.9);
+            let mut said = 0;
+            for step in 0..30u64 {
+                if step == 15 {
+                    grids.later(
+                        1,
+                        0,
+                        Score {
+                            name: 0.1,
+                            stop: Some(0.99),
+                            rescue: None,
+                        },
+                    );
+                }
+                let name = if step == 0 { name_first } else { 0.0 };
+                let given = grids.first(Score {
+                    name,
+                    stop: Some(0.1),
+                    rescue: None,
+                });
+                said += usize::from(
+                    stops
+                        .score(given.stop.unwrap_or(0.0), at(80 * step))
+                        .is_some(),
+                );
+            }
+            said
+        };
+        assert_eq!(stops(0.95), 1, "after the name heard");
+        assert_eq!(stops(0.0), 1, "with no name before it");
+    }
+
+    /// `--wake` (#694): off unless given, a score from 0.01 to 0.5, and only
+    /// with a step under 80, in the program and in `check`.
+    #[test]
+    fn the_wake_bar_is_read_with_a_step_under_80_only() {
+        assert_eq!(of("--models /m").unwrap().unwrap().wake, None);
+        let read = of("--models /m --step-ms 10 --wake 0.03").unwrap().unwrap();
+        assert_eq!((read.step_ms, read.wake), (10, Some(0.03)));
+        assert_eq!(
+            of("--models /m --wake 0.03").unwrap_err(),
+            "--wake needs --step-ms under 80"
+        );
+        for bad in ["0", "0.6", "x"] {
+            assert_eq!(
+                of(&format!("--models /m --step-ms 10 --wake {bad}")).unwrap_err(),
+                "--wake is a score from 0.01 to 0.5"
+            );
+        }
+        let words = |text: &str| {
+            text.split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        };
+        let given = words("--wake 0.05 --step-ms 20 a.wav");
+        let read = check_options(&given).unwrap();
+        assert_eq!(
+            (read.step_ms, read.wake, read.files.len()),
+            (20, Some(0.05), 1)
+        );
+        assert!(check_options(&words("--wake 0.05 a.wav")).is_err());
     }
 
     /// `--rescue-model` (#1546): its SHA-256 is required with it, the gate

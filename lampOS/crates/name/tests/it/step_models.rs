@@ -27,7 +27,15 @@ fn samples_of(path: &str) -> Vec<i16> {
 
 /// The highest score the models give `samples` at steps of `step_ms`.
 fn highest(models: &Path, step_ms: usize, samples: &[i16]) -> f32 {
+    highest_woken(models, step_ms, None, samples)
+}
+
+/// The same, the later grids woken by `wake` if given.
+fn highest_woken(models: &Path, step_ms: usize, wake: Option<f32>, samples: &[i16]) -> f32 {
     let mut hearer = Hearer::load(models).unwrap().with_step_ms(step_ms).unwrap();
+    if let Some(bar) = wake {
+        hearer = hearer.with_wake(bar, 0.9).unwrap().waiting(true);
+    }
     let mut best = 0f32;
     for block in samples.chunks(320) {
         for score in hearer.hear(block).unwrap() {
@@ -66,5 +74,43 @@ fn a_word_heard_at_its_best_place_is_heard_at_10_ms_wherever_it_falls() {
                 .collect::<Vec<_>>()
                 .join(" ")
         );
+    }
+}
+
+/// `--wake` (#694): the later grids woken by the first grid's score over
+/// 0.03 hear every word they hear always awake (over 0.9), wherever the 80 ms steps
+/// fall on it, and take far less time over the sound before it. Each file
+/// is timed whole: always awake, woken, and the 80 ms grid alone.
+#[test]
+#[ignore = "needs the installed models: LAMP_NAME_MODELS and LAMP_NAME_SOUND"]
+fn woken_grids_hear_what_the_grids_always_awake_hear() {
+    let models = std::env::var("LAMP_NAME_MODELS").expect("LAMP_NAME_MODELS");
+    let sound = std::env::var("LAMP_NAME_SOUND").expect("LAMP_NAME_SOUND");
+    let models = Path::new(&models);
+    let timed = |step_ms, wake, samples: &[i16]| {
+        let started = std::time::Instant::now();
+        let best = highest_woken(models, step_ms, wake, samples);
+        (best, started.elapsed())
+    };
+    for file in sound.split(':') {
+        let samples = samples_of(file);
+        for by in 0..8 {
+            let shifted = &samples[by * STEP / 8..];
+            let (awake, awake_took) = timed(10, None, shifted);
+            let (woken, woken_took) = timed(10, Some(0.03), shifted);
+            let (alone, alone_took) = timed(80, None, shifted);
+            // Heard wherever always awake hears it; a call the first grid
+            // heard keeps its own score, its later grids' late ones let go.
+            let heard_both = awake < 0.9 || woken >= 0.9;
+            assert!(
+                heard_both && (awake >= 0.9 || woken >= awake - 0.005),
+                "{file} moved {} ms: {woken:.4} woken, {awake:.4} always awake",
+                by * 10
+            );
+            println!(
+                "{file} +{}ms: always awake {awake:.3} in {awake_took:?}, woken {woken:.3} in {woken_took:?}, 80 ms alone {alone:.3} in {alone_took:?}",
+                by * 10
+            );
+        }
     }
 }
