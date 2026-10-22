@@ -1037,7 +1037,7 @@ pub fn group_id(groups: &str, name: &str) -> Option<u32> {
 }
 
 /// The socket, removed when the voice ends if it is still the one made.
-struct Bound {
+pub(crate) struct Bound {
     path: PathBuf,
 }
 
@@ -1047,7 +1047,7 @@ impl Drop for Bound {
     }
 }
 
-fn bind(path: &Path, group: Option<u32>) -> io::Result<(UnixListener, Bound)> {
+pub(crate) fn bind(path: &Path, group: Option<u32>) -> io::Result<(UnixListener, Bound)> {
     let invalid = |why: &str| io::Error::new(io::ErrorKind::InvalidInput, why.to_owned());
     if !path.is_absolute() || path.as_os_str().len() > 103 {
         return Err(invalid(

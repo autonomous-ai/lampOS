@@ -499,7 +499,7 @@ fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
 
 /// The folder, made 0700 if it is not there; one already there is made
 /// 0700 too.
-fn ensure_private(directory: &Path) -> io::Result<()> {
+pub(crate) fn ensure_private(directory: &Path) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fs::create_dir_all(directory)?;
     fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
@@ -522,6 +522,12 @@ fn drop_unfinished(directory: &Path) {
 }
 
 /// What is kept, oldest first.
+/// The made skills' index as kept, for the app's asks
+/// (`crate::app_make`): read only.
+pub fn entries(directory: &Path) -> Vec<Value> {
+    index(directory)
+}
+
 fn index(directory: &Path) -> Vec<Value> {
     fs::read(directory.join(INDEX))
         .ok()
