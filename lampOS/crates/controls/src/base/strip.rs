@@ -31,6 +31,32 @@ pub const MAX_SPEED: f32 = 1000.0;
 pub const MAX_EFFECTS: usize = 3;
 const SPAN: f32 = 11.0;
 
+/// The strip's timing, from the board's touch pins file (`strip_qualify_ms`,
+/// `strip_release_ms`, `strip_stroke_ms`, `strip_sleep_ms`), each defaulting
+/// to the constants here when the board gives none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StripTiming {
+    /// A three-pad chord held this long qualifies a touch.
+    pub qualify_us: u64,
+    /// A contact let go this long ends.
+    pub release_us: u64,
+    /// Movement this long, slow enough, is a Stroke.
+    pub stroke_us: u64,
+    /// A stationary qualified contact held this long is Sleep.
+    pub sleep_us: u64,
+}
+
+impl Default for StripTiming {
+    fn default() -> Self {
+        Self {
+            qualify_us: QUALIFY_US,
+            release_us: RELEASE_US,
+            stroke_us: STROKE_US,
+            sleep_us: SLEEP_US,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StripDirection {
     TowardStart,
@@ -191,6 +217,7 @@ struct Contact {
 /// restart; a released baseline is still required.
 #[derive(Debug)]
 pub struct StripRecognizer {
+    timing: StripTiming,
     selected: u16,
     /// Topological rank among working electrodes, independent of their spacing.
     rank: [u8; 12],
@@ -213,6 +240,14 @@ pub struct StripRecognizer {
 
 impl StripRecognizer {
     pub fn new(pad_order: impl AsRef<[u8]>) -> Result<Self, StripError> {
+        Self::with_timing(pad_order, StripTiming::default())
+    }
+
+    /// As [`Self::new`], with the board's own timing.
+    pub fn with_timing(
+        pad_order: impl AsRef<[u8]>,
+        timing: StripTiming,
+    ) -> Result<Self, StripError> {
         let pad_order = pad_order.as_ref();
         if !(3..=12).contains(&pad_order.len()) {
             return Err(StripError::InvalidOrder);
@@ -240,6 +275,7 @@ impl StripRecognizer {
             };
         }
         Ok(Self {
+            timing,
             selected: seen,
             rank,
             coordinate,
@@ -382,7 +418,7 @@ impl StripRecognizer {
         }
 
         if let Some(released) = self.contact.as_ref().and_then(|c| c.release_us) {
-            if observed_us - released >= RELEASE_US {
+            if observed_us - released >= self.timing.release_us {
                 self.clear_contact();
             } else if mask != 0 {
                 self.contact.as_mut().expect("contact exists").release_us = None;
@@ -427,7 +463,7 @@ impl StripRecognizer {
         // third-pad spikes never accumulate into a qualifying chord.
         if self
             .qualified_since_us
-            .is_some_and(|since| observed_us - since >= QUALIFY_US)
+            .is_some_and(|since| observed_us - since >= self.timing.qualify_us)
         {
             self.qualified = true;
         }
@@ -522,7 +558,7 @@ impl StripRecognizer {
         if !contact.ambiguous
             && let Some(position) = position
         {
-            contact.motion(position, observed_us, &mut effects)?;
+            contact.motion(position, observed_us, self.timing.stroke_us, &mut effects)?;
         }
         if contact.qualified
             && !contact.touch_sent
@@ -537,7 +573,7 @@ impl StripRecognizer {
             && self.effective != 0
             && !contact.sleep_sent
             && !contact.sleep_blocked
-            && observed_us - contact.started_us >= SLEEP_US
+            && observed_us - contact.started_us >= self.timing.sleep_us
         {
             contact.sleep_sent = true;
             effects.push(contact.effect(StripEffectKind::Sleep, observed_us));
@@ -613,6 +649,7 @@ impl Contact {
         &mut self,
         position: f32,
         observed_us: u64,
+        stroke_us: u64,
         effects: &mut Vec<StripEffect>,
     ) -> Result<(), StripError> {
         let displacement = position - self.origin_position;
@@ -693,7 +730,7 @@ impl Contact {
         }
         if self
             .moving_since_us
-            .is_some_and(|since| observed_us - since >= STROKE_US)
+            .is_some_and(|since| observed_us - since >= stroke_us)
             && changed
             && !self.stroke_sent
             && self.distance >= STROKE_RANKS / SPAN

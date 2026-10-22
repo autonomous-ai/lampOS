@@ -91,6 +91,17 @@ pub struct TouchPinsConfig {
     pub head_tap_min_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_gap_ms: Option<u64>,
+    /// The base strip's timing ([`crate::base::strip::StripTiming`]), this
+    /// board's own once tuned by hand (#2858); absent values keep their
+    /// defaults. Its electrical levels are `base`'s profile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_qualify_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_stroke_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_sleep_ms: Option<u64>,
     /// Each head pad's baseline, in `head_pads`' order, from the factory
     /// step; without it each pad reads its level by its `active_low`, as
     /// before.
@@ -241,6 +252,10 @@ impl TouchPinsConfig {
             head_qualify_ms: self.head_qualify_ms,
             head_tap_min_ms: self.head_tap_min_ms,
             head_gap_ms: self.head_gap_ms,
+            strip_qualify_ms: self.strip_qualify_ms,
+            strip_release_ms: self.strip_release_ms,
+            strip_stroke_ms: self.strip_stroke_ms,
+            strip_sleep_ms: self.strip_sleep_ms,
             head_pulse_pads: self
                 .head_rest
                 .iter()
