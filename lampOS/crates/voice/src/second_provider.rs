@@ -411,7 +411,8 @@ pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 pub const SPEECH_TAGS_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_TAGS";
 /// Where the worker reads whether a turn whose every call is a light or
 /// volume change lamp-actions answered short is answered with the calls'
-/// own line, with no further chat round ([`Engine::answering_short`]):
+/// own line when the round after them adds nothing
+/// ([`Engine::answering_short`]):
 /// `on`, and nothing else. The same switch as lamp-actions' short answer
 /// (`lamp_actions::SHORT_ENVIRONMENT`, #1520): on the second route the
 /// model still spoke about ten words after it, a median of 10 off and 10 on
@@ -543,6 +544,15 @@ pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
         }
     }
     Some(line)
+}
+
+/// The note after a round's calls all answered short (`LAMP_SHORT_DONE`,
+/// #2877): the lamp answers the change itself with `line`, so the next
+/// round adds only what else was asked, or nothing at all.
+pub(crate) fn short_done_note(line: &str) -> String {
+    format!(
+        "(For you to know, not to answer: the lamp itself says \"{line}\" for this change, so say nothing about it. If they asked for anything else in the same words, answer only that. If they asked for nothing else, reply with nothing at all: no words.)"
+    )
 }
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
@@ -2315,9 +2325,11 @@ impl Engine {
     /// `LAMP_SHORT_DONE=on` ([`SHORT_DONE_ENVIRONMENT`], #2877): a turn
     /// whose every call is the light's or the volume's, each done and
     /// answered short by lamp-actions (its `"say"`), with no words of the
-    /// model's before them, is answered with the calls' own line
-    /// ([`short_done_line`]) and asks the chat no further round. Before any
-    /// turn only.
+    /// model's before them, asks the next round told the lamp says the
+    /// calls' own line ([`short_done_note`]), and says that line
+    /// ([`short_done_line`]) only when the round gives no words and no
+    /// calls; otherwise the turn goes on as without the switch (the
+    /// Reviewer-lead's P2 on #2930). Before any turn only.
     pub fn answering_short(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.short_done = on;
@@ -6943,6 +6955,10 @@ async fn answer(
         // answered with its calls' own line is one whose first calls are
         // all short (`LAMP_SHORT_DONE`, #2877).
         let mut called_earlier = false;
+        // The calls' own line, kept while the round after them is asked
+        // whether the request held more (the Reviewer-lead's P2 on #2930):
+        // said only if that round adds no words and no calls.
+        let mut short_line: Option<String> = None;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -7238,6 +7254,21 @@ async fn answer(
             if let Some(rest) = split.finish() {
                 queue.push(rest).await?;
             }
+            // The round after a turn's calls were all answered short
+            // (`LAMP_SHORT_DONE`, #2877): with no words and no calls, the
+            // request held nothing more, and the calls' own line is the
+            // answer. Words ("dim the light and tell me a joke") or calls
+            // go on as without the switch, the line unsaid.
+            if let Some(line) = short_line.take()
+                && calls.is_empty()
+                && !text.chars().any(char::is_alphanumeric)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round} added nothing to the calls answered short; said \"{line}\" (LAMP_SHORT_DONE)"
+                );
+                queue.push(line).await?;
+                return Ok(());
+            }
             if calls.is_empty() {
                 return Ok(());
             }
@@ -7529,18 +7560,22 @@ async fn answer(
                 return Ok(());
             }
             // Every call a light or volume change answered short: the calls'
-            // own line is the answer, and the chat is asked no further round
-            // (`LAMP_SHORT_DONE`, #2877). A call held, refused or run by
+            // own line is kept, and the next round is told the change is
+            // answered, to add only what else was asked, or nothing
+            // (`LAMP_SHORT_DONE`, #2877). The request may hold more than its
+            // calls ("dim the light and tell me a joke": round 1 is the call
+            // alone), so the round is asked, never assumed (the
+            // Reviewer-lead's P2 on #2930). A call held, refused or run by
             // anyone else told nothing short, so the count falls short.
             if may_answer_short
                 && short_told.len() == calls.len()
                 && let Some(line) = short_done_line(&short_told)
             {
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: every call answered short; said \"{line}\", no further round (LAMP_SHORT_DONE)"
+                    "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" kept while the next round says whether more was asked (LAMP_SHORT_DONE)"
                 );
-                queue.push(line.to_owned()).await?;
-                return Ok(());
+                messages.push(Message::system(short_done_note(line)));
+                short_line = Some(line.to_owned());
             }
             if let Some(note) = said_once {
                 eprintln!(

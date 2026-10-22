@@ -2686,15 +2686,15 @@ pub fn serve(
         );
     }
     engine = engine.speaking_tags(speech_tags);
-    // A light or volume turn answered with its calls' own line, no further
-    // chat round (`LAMP_SHORT_DONE=on`, #2877).
+    // A light or volume turn answered with its calls' own line when the next
+    // round adds nothing (`LAMP_SHORT_DONE=on`, #2877).
     let short_done = std::env::var(crate::second_provider::SHORT_DONE_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on");
     if short_done {
         eprintln!(
-            "lamp-voice second: a turn whose every call is a light or volume change answered short is said with the calls' own line, no further round (LAMP_SHORT_DONE)"
+            "lamp-voice second: a turn whose every call is a light or volume change answered short is said with the calls' own line when the next round adds nothing (LAMP_SHORT_DONE)"
         );
     }
     engine = engine.answering_short(short_done);
