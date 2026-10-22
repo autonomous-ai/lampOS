@@ -1,3 +1,35 @@
+## Current checkpoint: 2026-10-22 22:40 +07, seventh native gate green; CLI regression in progress
+
+Ready for lamp-voice: no — integration advanced; new CLI regression not yet qualified
+
+Kind: tests/docs only. #3012 head `97ca7b322` passed ARM64 39800605261
+and Clippy 39800605346: **10,496 passed / 0 failed / 67 skipped**, one
+existing leaky Voice pass. The seven-cut checker passed in **3.705 s**;
+four doctests, twelve process tests and relay also passed.
+[Exact receipt](verification/updater-process-cuts-native-20261022/rebase-97ca.json)
+retains the tested merge/base and API-only artifact metadata. Local changed-
+crate gates remain **307 passed / 0 failed / 3 ignored** on this exact head.
+
+The latest-base guard kept the PR draft after integration advanced again.
+Current protocol was reread from public `origin/lamp-voice` at `ec5428a34`,
+including all new Queue/task/PR comments. The requested coordinated merge
+window remains with First and Reviewer-lead; no stale green is transferred.
+
+Actual CLI target-kill/fixed-fallback evidence is already published. An
+isolated Rust regression is now being implemented to make actual CLI exec
+and candidate confirmation part of the ongoing test suite, with a disabled-
+self-switch control. It is not yet qualified or part of #3012's checked head.
+The [attended exec-cut worksheet](verification/updater-attended-exec-cut-20261022.md)
+passed scoped source review with no P1/P2; all lamp/person/approval/result fields remain
+unexecuted. It requires pretrial sync, forbids added sync at the cut, preserves
+sequence/refusals and distinguishes candidate success from fallback recovery.
+
+First owns the #2810 lamp/person/persistent configuration; #1812 follows its
+acceptance and still needs real signing/publication inputs. No SSH, install,
+real-key access, publication or physical cut occurred.
+
+---
+
 ## Current checkpoint: 2026-10-22 22:03 +07, actual target kill and fixed fallback shown
 
 Ready for lamp-voice: no — seventh-head native checks pending

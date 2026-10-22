@@ -168,3 +168,19 @@ The public latest-base guard still matched b722 when that head was pushed.
 Its new ARM64 39800605261 and Clippy39800605346 are pending, watched to their
 required-job completion. The [actual fixed fallback proof](../updater-cli-exec-20261022/README.md)
 uses the earlier qualified d4 artifact, not an unverified seventh-head binary.
+
+## Seventh qualified head, 22:37 +07
+
+[rebase-97ca.json](rebase-97ca.json) binds head `97ca7b322` on `b722fd212`
+to tested merge `0a29d38`, [ARM64 39800605261](https://github.com/autonomous-ai/lampOS/actions/runs/39800605261)
+and [Clippy 39800605346](https://github.com/autonomous-ai/lampOS/actions/runs/39800605346), both successful.
+Native results: **10,496 passed / 0 failed / 67 skipped**, one existing
+leaky Voice pass; the seven-cut checker passed in **3.705 s**. Four doctests,
+twelve separate process tests and the relay check also passed. Artifact
+12435629642 is API metadata only, not another independently verified download.
+
+Integration advanced after these checks. The latest-base guard kept the PR
+draft. A new real-CLI exec regression is being prepared separately; these
+checks do not qualify that unwritten/new source. The [attended exec-cut
+worksheet](../updater-attended-exec-cut-20261022.md) is preparation only.
+No lamp, cold-boot or physical-power result is claimed.
