@@ -458,14 +458,24 @@ was busy. Since then:
 1. **Claim before code.** `status:taken` and its one line come before
    the first commit or comment on an issue. The first builder's hourly
    post on the Queue lists any issue worked without a claim.
-2. **At most two per builder:** one `status:taken` and one next. Any
-   more stay unlabelled, in the Queue's order, until a builder is free.
+2. **At most four code issues taken per builder** (the project lead, 22 Oct
+   12:2x on #1711: builders code through sub-agents now), and **one lamp run
+   at a time per lamp**. The rest wait labelled, so a builder that finishes
+   takes its next one at once. Lamp runs stay on each builder's own lamp
+   (21 Oct).
 3. **Untouched means returned.** An issue whose builder has not
    commented, pushed or claimed in 6 hours goes back to the first
    builder, who labels it for a free builder. Saying "queued behind #N"
    on it keeps it.
 4. **A free builder says so once** on the Queue (`free: <name>`), and
    the first builder labels the next Queue item for it within the hour.
+   **A builder with no code piece picks its own** (the project lead, 22 Oct
+   08:1x, corrected 08:5x on #1711). It takes a piece **nobody holds**: an
+   issue with no builder on it, or a build row's piece nothing is planned for.
+   It proposes it in one line on the Queue and starts it, with sub-agents,
+   unless the first builder says no within 15 minutes. **A piece another
+   builder holds is never taken**, even if its owner is quiet. That goes to
+   the first builder, under the 6-hour rule above.
 5. **A pull request carries its builder's label** (`builder:<name>`) from
    the moment it opens, so a builder's open work can be listed. A builder
    whose account cannot add labels (read access only) asks the first
