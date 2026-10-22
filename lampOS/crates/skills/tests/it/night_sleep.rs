@@ -112,6 +112,9 @@ struct Night {
     /// The rest's window, as the skill asked it: its lease ends with it.
     during: Option<Window>,
     request_sequence: u64,
+    /// How late each rest reaches Expression: at its freshness bound, every
+    /// one is refused as stale.
+    lag: u64,
     built_in_seen: Seen,
     skill_seen: Seen,
     /// When the skills engine asked for the night's rest.
@@ -153,6 +156,7 @@ impl Night {
             resting: false,
             during: None,
             request_sequence: 0,
+            lag: 0,
             built_in_seen: Seen::default(),
             skill_seen: Seen::default(),
             rests: Vec::new(),
@@ -287,7 +291,7 @@ impl Night {
         let request = Request {
             stamp: ClockStamp {
                 clock_id: CLOCK.into(),
-                at_us: self.now,
+                at_us: self.now - self.lag,
                 sequence: self.request_sequence,
             },
             skill: "night-sleep".into(),
@@ -295,7 +299,7 @@ impl Night {
             expression_session_id: SKILL_ROUTE.into(),
             episode: self.episode,
             op: Op::Rest,
-            valid_until_us: self.now + left_us.unwrap_or(0).min(3 * SECOND),
+            valid_until_us: self.now - self.lag + left_us.unwrap_or(0).min(3 * SECOND),
         };
         self.resting = self.skill_route.ingest_rest(self.now, request).is_ok();
     }
@@ -543,27 +547,71 @@ fn night_sleep_turned_off_claims_the_night_and_nothing_sleeps() {
     assert!(night.skill_seen.asleep.is_empty());
 }
 
-/// What lamp-skills claims: the shipped folder on, off when a person turned
-/// it off or the folder is disabled, and nothing with no folder.
-#[test]
-fn the_claim_names_night_sleep_on_or_off_and_nothing_without_it() {
-    use lamp_skills::routine::{NIGHT_SLEEP, sleep_claim};
-    let dir = tempfile::tempdir().unwrap();
-    assert_eq!(sleep_claim(dir.path(), false), None);
+/// The shipped night-sleep folder copied into `dir`: its `skill.toml`.
+fn shipped_night_sleep(dir: &Path) -> String {
     let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/night-sleep");
-    let folder = dir.path().join(NIGHT_SLEEP);
+    let folder = dir.join(lamp_skills::routine::NIGHT_SLEEP);
     std::fs::create_dir(&folder).unwrap();
     std::fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
     let text = std::fs::read_to_string(from.join("skill.toml")).unwrap();
     std::fs::write(folder.join("skill.toml"), &text).unwrap();
-    assert_eq!(sleep_claim(dir.path(), false), Some(claim(true)));
-    assert_eq!(sleep_claim(dir.path(), true), Some(claim(false)));
+    text
+}
+
+/// What lamp-skills claims: the shipped folder on, off when a person turned
+/// it off or the folder is disabled, and nothing with no folder. Nothing
+/// either while it cannot rest, unless a person turned it off (#2744).
+#[test]
+fn the_claim_names_night_sleep_on_or_off_and_nothing_without_it() {
+    use lamp_skills::routine::{NIGHT_SLEEP, NOT_CONNECTED, sleep_claim};
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(sleep_claim(dir.path(), false, None), None);
+    let text = shipped_night_sleep(dir.path());
+    let folder = dir.path().join(NIGHT_SLEEP);
+    assert_eq!(sleep_claim(dir.path(), false, None), Some(claim(true)));
+    assert_eq!(sleep_claim(dir.path(), true, None), Some(claim(false)));
+    assert_eq!(sleep_claim(dir.path(), false, Some(NOT_CONNECTED)), None);
+    assert_eq!(
+        sleep_claim(dir.path(), true, Some(NOT_CONNECTED)),
+        Some(claim(false))
+    );
     std::fs::write(
         folder.join("skill.toml"),
         text.replace("enabled = true", "enabled = false"),
     )
     .unwrap();
-    assert_eq!(sleep_claim(dir.path(), false), Some(claim(false)));
+    assert_eq!(sleep_claim(dir.path(), false, None), Some(claim(false)));
+}
+
+/// The first builder's P2 on #2744: night sleep's rest is always refused,
+/// here each ask reaching Expression stale (its clock and lamp-skills' far
+/// apart, a refusal that repeats). The lamp does not sleep while the claim
+/// stands; the claim is then not said, and once the last one goes stale
+/// Expression's own sleep takes the night. A claim from the file alone
+/// would keep the lamp awake all night.
+#[test]
+fn a_rest_always_refused_gives_the_night_to_the_fallback() {
+    use lamp_skills::routine::{refusal_repeats, sleep_claim};
+    let dir = tempfile::tempdir().unwrap();
+    shipped_night_sleep(dir.path());
+    let mut night = Night::new(sleep_claim(dir.path(), false, None), true);
+    night.lag = lamp_msgs::EXPRESSION_REST_FRESH_US;
+    night.until(23, 5);
+    let state = night.skill_route.rest_state(night.now).unwrap();
+    assert_eq!(state.phase, Phase::Refused);
+    let why = state.reason.unwrap();
+    assert!(refusal_repeats(&why), "{why}");
+    assert!(night.skill_seen.asleep.is_empty(), "{:?}", night.skill_seen);
+    let claimed = sleep_claim(dir.path(), false, Some(&why));
+    assert_eq!(claimed, None);
+    // The last claim said goes stale (180 s): Expression reads none.
+    night.run(3 * MINUTE);
+    night
+        .skill_route
+        .set_sleep_claim(night.now, claimed.as_ref());
+    night.until(23, 45);
+    assert_eq!(night.skill_seen.asleep.len(), 1, "{:?}", night.skill_seen);
+    assert!(night.skill_seen.was_asleep);
 }
 
 /// The sleep grant is a core skill's, asks nobody, and allows only rest.

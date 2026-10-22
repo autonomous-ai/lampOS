@@ -160,7 +160,19 @@ either. With `LAMP_REST_REQUESTS=on`, Expression reads it once a second: a
 claim from `skills` said under 180 s ago gives the night to the skill.
 None, or one older, is the fallback: Expression sleeps by its own schedule
 as before, so a crashed lamp-skills or an old skills folder never leaves a
-lamp that does not sleep. The journal says each change once:
+lamp that does not sleep. Nor does a skill that cannot rest (the first
+builder's P2 on #2744): lamp-skills says the claim only while its rest
+client has a fresh receipt from Expression and night sleep's last rest ask
+was not refused for a reason that repeats (`routine::REPEATS`: Expression's
+`rest observation is future, stale or expired`, no trusted local clock, no
+fresh Expression, no answer in time, a spent bound). A refusal that passes
+with the moment (the voice in a turn, a hand, a lean) or an admitted rest
+clears it. Otherwise it says nothing, the last claim goes stale within
+180 s, and Expression's own sleep takes the night; a person's `on: false`
+is still said. lamp-skills' journal says each change once (`night sleep
+cannot rest (...)`, `night sleep can rest again`); the test is
+`a_rest_always_refused_gives_the_night_to_the_fallback`, which fails with
+the claim read from the file alone. The journal says each change once:
 `lamp-expression: no skill claims the night's sleep: Expression sleeps by
 its own schedule, the fallback kept for one release (#940)`, and
 `lamp-expression: night-sleep claims the night's sleep (on): ...`. A
