@@ -128,6 +128,12 @@ pub enum Request {
         person: Who,
         #[serde(default)]
         max_bytes: Option<u64>,
+        /// The Days store's (#3113): what it noticed of the person
+        /// (current observations) is listed too, by the same ids, for a
+        /// forget by name. The legacy store, which notices nothing, ignores
+        /// it.
+        #[serde(default)]
+        observations: bool,
     },
     Recall {
         #[serde(default)]
@@ -420,7 +426,9 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
                 .map_err(not_added)?;
             Response::Added { id }
         }
-        Request::Kept { person, max_bytes } => {
+        Request::Kept {
+            person, max_bytes, ..
+        } => {
             let room = usize::try_from(max_bytes.unwrap_or(KEPT_BYTES)).unwrap_or(usize::MAX);
             Response::Kept {
                 entries: store.kept(&one(person)?, room).map_err(disk)?,
@@ -1020,6 +1028,16 @@ mod tests {
             Request::Kept {
                 person: Who::Unsaid,
                 max_bytes: Some(900),
+                observations: false,
+            }
+        );
+        // #3113: the Days store's; the legacy store lists kept things alone.
+        assert_eq!(
+            parse(r#"{"op":"kept","observations":true}"#),
+            Request::Kept {
+                person: Who::Unsaid,
+                max_bytes: None,
+                observations: true,
             }
         );
         assert_eq!(

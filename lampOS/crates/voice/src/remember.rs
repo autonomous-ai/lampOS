@@ -944,10 +944,13 @@ fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
         } else if forget_all {
             Tool {
                 name: FORGET.into(),
-                description: "Call this when someone asks you to forget something. For the last thing they asked you \
-                              to remember, call it with nothing. For something recall just gave you, give its source_id; \
-                              never guess one. Then tell them plainly that it is gone, with where it came up, \
-                              and do not use it again."
+                description: "Call this when someone asks you to forget something. For something recall just gave \
+                              you, give its source_id; never guess one. When they name what to forget, such as \
+                              'forget my favourite colour', call it and the lamp forgets what it keeps about that, \
+                              from their own words. Call it with nothing for the last thing they asked you to \
+                              remember only when they say 'forget that' or 'what I just said'. Then tell them \
+                              plainly what is gone, with where it came up, and do not use it again. If it says \
+                              nothing was forgotten, say so; never forget something else instead."
                     .into(),
                 parameters: Some(json!({
                     "type": "object",
@@ -960,8 +963,12 @@ fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
         } else {
             Tool {
                 name: FORGET.into(),
-                description: "Call this when someone asks you to forget the last thing they asked you to remember. \
-                              Then tell them briefly that it is off your list, and do not use it again."
+                description: "Call this when someone asks you to forget something. When they name it, such as \
+                              'forget my favourite colour', the lamp forgets what it keeps about that, from their \
+                              own words; it forgets the last thing they asked you to remember only when they say \
+                              'forget that' or 'what I just said'. Then tell them briefly what is off your list, \
+                              and do not use it again. If it says nothing was forgotten, say so; never forget \
+                              something else instead."
                     .into(),
                 parameters: None,
                 silent: false,
@@ -991,12 +998,13 @@ fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
 /// `forget` with what it is about (#2176), and with a recalled thing's
 /// `source_id` too when [`FORGET_ALL_ENVIRONMENT`] is on.
 fn forget_about_tool(forget_all: bool) -> Tool {
-    let about = json!({"type": "string", "description": "One to four key words of what they want forgotten, such as 'bicycle' or 'dentist appointment', when they name it. Only the things they asked you to remember that have every one of these words are forgotten."});
+    let about = json!({"type": "string", "description": "One to four key words of what they want forgotten, such as 'bicycle' or 'dentist appointment', when they name it. Only what you keep of them that has every one of these words is forgotten: what they asked you to remember and what you noticed."});
     let (description, properties) = if forget_all {
         (
-            "Call this when someone asks you to forget something. When they say what it was about, such as \
-             'forget what I said about my bicycle', give about. For something recall just gave you, give its \
-             source_id; never guess one. For the last thing they asked you to remember, call it with nothing. \
+            "Call this when someone asks you to forget something. When they name what it was about, such as \
+             'forget my favourite colour' or 'forget what I said about my bicycle', give about. For something \
+             recall just gave you, give its source_id; never guess one. Call it with nothing for the last thing \
+             they asked you to remember only when they say 'forget that' or 'what I just said'. \
              Then tell them plainly what is gone, such as 'I've forgotten the two things about your bicycle', \
              without repeating what they were, and do not use it again. If it says nothing was forgotten, \
              say so; never forget something else instead.",
@@ -1007,9 +1015,10 @@ fn forget_about_tool(forget_all: bool) -> Tool {
         )
     } else {
         (
-            "Call this when someone asks you to forget something they asked you to remember. When they say \
-             what it was about, such as 'forget what I said about my bicycle', give about. For the last thing \
-             they asked you to remember, call it with nothing. Then tell them briefly what is off your list, \
+            "Call this when someone asks you to forget something. When they name what it was about, such as \
+             'forget my favourite colour' or 'forget what I said about my bicycle', give about. Call it with \
+             nothing for the last thing they asked you to remember only when they say 'forget that' or 'what \
+             I just said'. Then tell them briefly what is off your list, \
              such as 'I've forgotten the two things about your bicycle', without repeating what they were, \
              and do not use it again. If it says nothing was forgotten, say so; never forget something else \
              instead.",
@@ -1095,6 +1104,383 @@ fn about_words(about: &str) -> Vec<String> {
         }
     }
     words
+}
+
+/// The argument a forget is given by the lamp, never the model, when the
+/// heard line names what to forget ([`named_forget`], #3113): it is
+/// forgotten by `about` in the asker's own scope, whatever
+/// [`FORGET_ABOUT_ENVIRONMENT`] is.
+pub const HEARD_NAMED: &str = "heard_named";
+
+/// Words that name nothing to forget, beyond [`ABOUT_STOP_WORDS`] and
+/// [`SMALL_WORDS`] (#3113): "forget that", "forget what I just said",
+/// "never mind", "scratch that", and the Vietnamese "quên cái đó đi" and
+/// "quên điều vừa nói". Compared with their accents kept, as
+/// [`ABOUT_STOP_WORDS`] are.
+const BARE_WORDS: &[&str] = &[
+    "it",
+    "that",
+    "this",
+    "just",
+    "last",
+    "thing",
+    "things",
+    "said",
+    "told",
+    "asked",
+    "ask",
+    "keep",
+    "kept",
+    "mentioned",
+    "earlier",
+    "before",
+    "again",
+    "previous",
+    "mind",
+    "never",
+    "whatever",
+    "anything",
+    "something",
+    "stuff",
+    "forget",
+    "delete",
+    "erase",
+    "remove",
+    "wipe",
+    "clear",
+    "unremember",
+    "scratch",
+    "rid",
+    "stop",
+    "remembering",
+    "don",
+    "dont",
+    "list",
+    "actually",
+    "sorry",
+    "oops",
+    "wait",
+    "anyway",
+    "important",
+    "mistake",
+    "please",
+    "lamp",
+    "cái",
+    "điều",
+    "vừa",
+    "nói",
+    "nó",
+    "ấy",
+    "nãy",
+    "lúc",
+    "hãy",
+    "giúp",
+    "giùm",
+    "dùm",
+    "hộ",
+    "nhé",
+    "nha",
+    "nhá",
+    "mình",
+    "em",
+    "anh",
+    "chị",
+    "bạn",
+    "lại",
+    "rồi",
+    "xin",
+    "làm",
+    "ơn",
+    "vậy",
+    "kia",
+    "luôn",
+    "đấy",
+    "ạ",
+    "à",
+    "ơi",
+    "đèn",
+    "bảo",
+    "kể",
+    "mới",
+    "quên",
+    "xóa",
+    "xoá",
+];
+
+/// The words of `words` that name something to forget, accents kept, each
+/// once and joined by spaces: none of [`ABOUT_STOP_WORDS`], [`SMALL_WORDS`]
+/// or [`BARE_WORDS`], and of two letters or more. `None` when none is left.
+fn subject_of<'a>(words: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    let mut kept: Vec<&str> = vec![];
+    for word in words {
+        let folded = search_text(word);
+        let names_nothing = word.chars().count() < 2
+            || ABOUT_STOP_WORDS
+                .iter()
+                .chain(SMALL_WORDS)
+                .chain(BARE_WORDS)
+                .any(|stop| search_text(stop) == folded);
+        if !names_nothing && !kept.contains(&word) {
+            kept.push(word);
+        }
+    }
+    (!kept.is_empty()).then(|| kept.join(" "))
+}
+
+/// What a heard line asks to forget by name (#3113): of its last sentence
+/// that asks to forget ([`asks_to_forget`]), the words after its first
+/// forget word ("forget", "delete", "quên", "xóa" …), or all of it for a
+/// phrase without one ("get rid of …"), without the words that name nothing
+/// ([`subject_of`]). "Lamp, please forget my favourite colour." names
+/// "favourite colour"; "forget that", "forget what I just said", "never
+/// mind", "quên cái đó đi" and "quên điều vừa nói" name nothing. A word too
+/// many costs a repeat (nothing matches, nothing is removed); a guess at
+/// the last kept thing costs what the person kept.
+pub fn named_subject(said: &str) -> Option<String> {
+    let lower: String = said.nfc().flat_map(char::to_lowercase).collect();
+    let sentence = lower
+        .split(['.', '!', '?', ';', '\n', '\u{3002}', '\u{ff1f}'])
+        .rfind(|sentence| asks_to_forget(sentence))?;
+    let words: Vec<&str> = sentence
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let verb = words
+        .iter()
+        .position(|word| ASKS.contains(&about_fold(word).as_str()) || ASKS_KEPT.contains(word));
+    let rest = verb.map_or(&words[..], |at| &words[at + 1..]);
+    // "my favourite colour and my address" is two things (#3113, El's P2
+    // on #3127): each its own subject, joined by " and " for
+    // [`about_subjects`] to split again.
+    let subjects: Vec<String> = rest
+        .split(|word| AND_WORDS.contains(word))
+        .filter_map(|part| subject_of(part.iter().copied()))
+        .collect();
+    (!subjects.is_empty()).then(|| subjects.join(" and "))
+}
+
+/// The words that join two things to forget: "my colour and my address",
+/// "màu và địa chỉ".
+const AND_WORDS: &[&str] = &["and", "và"];
+
+/// The subjects of a forget's `about`, each its key words ([`about_words`]):
+/// split at "and", "và" and commas, so "favourite colour and address" is
+/// two (#3113). With the words as said, for the answer. None with words is
+/// left out.
+fn about_subjects(about: &str) -> Vec<(String, Vec<String>)> {
+    let lower = search_text(about);
+    let mut subjects: Vec<(String, Vec<String>)> = vec![];
+    let mut part = String::new();
+    let flush = |part: &mut String, subjects: &mut Vec<(String, Vec<String>)>| {
+        let said = part.trim().to_owned();
+        let words = about_words(&said);
+        if !words.is_empty() && !subjects.iter().any(|(_, known)| *known == words) {
+            subjects.push((said, words));
+        }
+        part.clear();
+    };
+    for piece in lower.split_inclusive(|character: char| !character.is_alphanumeric()) {
+        let word = piece.trim_end_matches(|character: char| !character.is_alphanumeric());
+        if piece.contains(',') || AND_WORDS.contains(&word) {
+            if !AND_WORDS.contains(&word) {
+                part.push_str(word);
+            }
+            flush(&mut part, &mut subjects);
+        } else {
+            part.push_str(piece);
+        }
+    }
+    flush(&mut part, &mut subjects);
+    subjects
+}
+
+/// A folded word as a forget matches it (#3113): an English plural as its
+/// one ("works" as "work", "keys" as "key", "glasses" as "glass", "stories"
+/// as "story"), so "forget where I work" finds "Works at a bakery". A word
+/// of three letters or fewer, or ending in "ss", "us" or "is", is itself.
+fn about_stem(word: &str) -> &str {
+    let long = word.chars().count() > 3;
+    if !long || !word.ends_with('s') || ["ss", "us", "is"].iter().any(|end| word.ends_with(end)) {
+        return word;
+    }
+    if word.chars().count() > 4 && word.ends_with("ies") {
+        return word;
+    }
+    if ["ches", "shes", "sses", "xes"]
+        .iter()
+        .any(|end| word.ends_with(end))
+    {
+        return &word[..word.len() - 2];
+    }
+    &word[..word.len() - 1]
+}
+
+/// Whether two folded words are one for a forget: the same, or the same
+/// once each is [`about_stem`]med, or "stories" and "story".
+fn about_same(one: &str, other: &str) -> bool {
+    let ies = |word: &str| {
+        (word.chars().count() > 4 && word.ends_with("ies"))
+            .then(|| format!("{}y", &word[..word.len() - 3]))
+    };
+    one == other
+        || about_stem(one) == about_stem(other)
+        || ies(one).is_some_and(|one| one == other)
+        || ies(other).is_some_and(|other| other == one)
+}
+
+/// The last named forget, for a "forget it" just after it (#3113): whose
+/// scope, what it named and when. A keep since clears it.
+#[derive(Default)]
+pub struct Carry(Mutex<Option<(Option<String>, String, Instant)>>);
+
+static CARRY: OnceLock<Carry> = OnceLock::new();
+
+/// [`named_forget_with`] for the asker's scope: the request's lease's
+/// person, else whoever is at the lamp now, the room's for nobody.
+pub fn named_forget(
+    call: &ToolCall,
+    said: Option<&str>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<ToolCall> {
+    if !matches!(call.name.as_str(), FORGET | REMEMBER) {
+        return None;
+    }
+    let person = match lease {
+        Some(lease) => lease.scope()?.person().map(str::to_owned),
+        None => person_now(),
+    };
+    named_forget_with(
+        call,
+        said,
+        person.as_deref(),
+        CARRY.get_or_init(Carry::default),
+    )
+}
+
+/// [`named_forget_with`] for a typed text from the app, whose memory is the
+/// room's ([`crate::tools::answer_typed`]): `said` is the text. Only the
+/// arguments, for the call as it is run.
+pub fn named_forget_typed(name: &str, args: &Value, said: &str) -> Option<Value> {
+    if !matches!(name, FORGET | REMEMBER) {
+        return None;
+    }
+    let call = ToolCall {
+        id: String::new(),
+        name: name.to_owned(),
+        args: args.clone(),
+    };
+    named_forget_with(&call, Some(said), None, CARRY.get_or_init(Carry::default))
+        .map(|call| call.args)
+}
+
+/// What a `forget` removes: the one place that picks it (#3113). The
+/// memory turns the pick into ids: [`ForgetPick::Named`] by
+/// `DaysClient::forget_about`'s listing, [`ForgetPick::Last`] by
+/// `forget_last`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ForgetPick {
+    /// As the model called it: not a `forget`, a recalled `source_id` with
+    /// [`FORGET_ALL_ENVIRONMENT`], or its own `about` with
+    /// [`FORGET_ABOUT_ENVIRONMENT`].
+    AsCalled,
+    /// What the asker's own scope keeps, or was noticed of them, that has
+    /// every one of these words; nothing when none has, never the last kept
+    /// thing instead.
+    Named(String),
+    /// The last thing they asked to keep (`forget_last`): only for a bare
+    /// "forget that" or "what I just said".
+    Last,
+    // #2808 adds its case here: a bare forget just after a follow-up was
+    // asked picks that follow-up's entry by id ([`Recent`]).
+}
+
+/// What the session did just before a bare forget, for [`pick_forget`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Recent {
+    /// What a named forget in the same scope named, within
+    /// [`HELD_FORGET_FOR`] and with nothing kept since ([`Carry`]).
+    pub named: Option<String>,
+    // #2808: the follow-up just asked of the same person, if any, as the
+    // voice's `mark_if_asked` knows it.
+}
+
+/// What `call` removes, from the heard line `said` (or, with nothing heard,
+/// the model's own `about`) and what the session did just before
+/// (`recent`), on every switch (#3113). A `forget` the memory would answer
+/// with the last kept thing (no recalled id with [`FORGET_ALL_ENVIRONMENT`],
+/// no `about` of the model's with [`FORGET_ABOUT_ENVIRONMENT`]) that names
+/// a subject ([`named_subject`]) is [`ForgetPick::Named`]; a bare one just
+/// after a named forget is that subject again (Twelve's "Yes, please forget
+/// it."); any other bare one is [`ForgetPick::Last`].
+pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> ForgetPick {
+    if call.name != FORGET
+        || (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
+        || (forget_about_on() && call.args.get("about").is_some_and(|about| !about.is_null()))
+    {
+        return ForgetPick::AsCalled;
+    }
+    let model = || {
+        call.args
+            .get("about")
+            .and_then(Value::as_str)
+            .and_then(|about| subject_of(words_of(&search_text(about)).iter().map(String::as_str)))
+    };
+    match said {
+        Some(said) => named_subject(said),
+        None => model(),
+    }
+    .or_else(|| recent.named.clone())
+    .map_or(ForgetPick::Last, ForgetPick::Named)
+}
+
+/// The lamp's guard on a `forget` ([`pick_forget`]) in `person`'s scope,
+/// with `carry` what was named just before: a named pick is the call as it
+/// runs, `about` the subject, of the asker's own scope alone; a `remember`
+/// ends the carry. `None`: the call as the model made it.
+pub fn named_forget_with(
+    call: &ToolCall,
+    said: Option<&str>,
+    person: Option<&str>,
+    carry: &Carry,
+) -> Option<ToolCall> {
+    let Ok(mut last) = carry.0.lock() else {
+        return None;
+    };
+    if call.name == REMEMBER {
+        *last = None;
+        return None;
+    }
+    let recent = Recent {
+        named: last
+            .as_ref()
+            .filter(|(whose, _, at)| whose.as_deref() == person && at.elapsed() <= HELD_FORGET_FOR)
+            .map(|(_, about, _)| about.clone()),
+    };
+    let ForgetPick::Named(subject) = pick_forget(call, said, &recent) else {
+        return None;
+    };
+    *last = Some((person.map(str::to_owned), subject.clone(), Instant::now()));
+    Some(ToolCall {
+        id: call.id.clone(),
+        name: call.name.clone(),
+        args: json!({"about": subject, HEARD_NAMED: true}),
+    })
+}
+
+/// Whether `call` is a named forget the lamp made ([`named_forget`]).
+fn heard_named(call: &ToolCall) -> bool {
+    call.name == FORGET && call.args.get(HEARD_NAMED) == Some(&json!(true))
+}
+
+/// With the legacy memory, which forgets only the last kept thing, a named
+/// forget forgets nothing and is told so (#3113); `None` for any other.
+fn legacy_named(call: &ToolCall) -> Option<(Value, bool)> {
+    heard_named(call).then(|| {
+        (
+            json!({"forgotten": false, "note": "I can forget only the last thing I was asked to keep, so I forgot nothing. Tell them plainly; they can say \"forget that\" right after keeping something."}),
+            true,
+        )
+    })
 }
 
 /// Whether the voice routes this function to the memory.
@@ -1249,6 +1635,9 @@ fn run_for_guarded(
             }
         }
         return result;
+    }
+    if let Some(told) = legacy_named(call) {
+        return told;
     }
     let now = unix_ms();
     let zone = crate::local_time::system();
@@ -3854,8 +4243,12 @@ enum Listed {
     Gone,
     /// A listing that may have been cut by its bytes.
     Cut,
-    /// The ids that match, of a whole listing.
-    Whole(Vec<u64>),
+    /// The store refused the listing (#3113): an older lamp-memory refuses
+    /// `observations`, a field it doesn't know, with `bad_request`.
+    Refused,
+    /// The ids that match, of a whole listing, and the subjects none
+    /// matched, by their index.
+    Whole(Vec<u64>, Vec<usize>),
 }
 
 enum DaysJob {
@@ -4492,12 +4885,20 @@ impl DaysClient {
             }
             FORGET_EVERYTHING => return (gone(), false),
             // #2176: what it is about, the kept things of this scope alone.
+            // #3113: or named in what was heard, on every switch, of the
+            // asker's own scope alone.
             FORGET
-                if self.forget_about.load(Ordering::Acquire)
+                if (self.forget_about.load(Ordering::Acquire) || heard_named(call))
                     && call.args.get("about").is_some_and(|about| !about.is_null()) =>
             {
                 let until = started + deadline;
-                return self.forget_about(&call.args["about"], person, until, lease);
+                return self.forget_about(
+                    &call.args["about"],
+                    person,
+                    until,
+                    lease,
+                    heard_named(call),
+                );
             }
             _ => None,
         };
@@ -4793,12 +5194,14 @@ impl DaysClient {
         said
     }
 
-    /// `forget {about}` (#2176): the kept things of this scope (the person's
-    /// own when someone known is at the lamp, else the room's), listed
-    /// whole, of which only those that have every key word of `about` are
-    /// forgotten, each by its id, all before `until`. Someone known with no
-    /// match of their own is answered from the room's too, as recall gives
-    /// them both ([`recall_both`]). Of the room's, only those this session
+    /// `forget {about}` (#2176): the kept things and observations (#3113)
+    /// of this scope (the person's own when someone known is at the lamp,
+    /// else the room's), listed whole, of which only those that have every
+    /// key word of `about` are forgotten, each by its id, all before
+    /// `until`. Someone known with no match of their own is answered from
+    /// the room's too, as recall gives them both ([`recall_both`]), unless
+    /// it is `named` in what was heard ([`named_forget`]): then only their
+    /// own, and none matching is told in their words. Of the room's, only those this session
     /// was shown or kept: the room's memory is everyone's in the house, and
     /// a guest or the TV must not reach the rest (the reviewer's guard on
     /// #1723). None matching forgets nothing, never the last kept thing
@@ -4813,6 +5216,7 @@ impl DaysClient {
         person: Option<&str>,
         until: Instant,
         lease: Option<&crate::memory_scope::ScopeLease>,
+        named: bool,
     ) -> (Value, bool) {
         let left = || {
             until
@@ -4825,39 +5229,73 @@ impl DaysClient {
                 true,
             );
         };
-        let words = about_words(about);
-        if words.is_empty() {
+        let subjects = about_subjects(about);
+        if subjects.is_empty() {
             return (
                 json!({"forgotten": false, "note": "Say in a word or two what to forget. I forgot nothing."}),
                 true,
             );
         }
+        let words: Vec<Vec<String>> = subjects.iter().map(|(_, words)| words.clone()).collect();
         let too_much = || {
             (
                 json!({"forgotten": false, "note": "I keep too much to look through it all for that, so I forgot nothing."}),
                 true,
             )
         };
+        // An older lamp-memory, updated after the voice, refuses the
+        // listing's `observations` (#3113): nothing is removed, never the
+        // last kept thing instead, and the person is told plainly.
+        let refused = || {
+            (
+                json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
+                true,
+            )
+        };
         let mut scope = person;
-        let mut matching = match self.about_matching(scope, &words, left, lease) {
+        let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease) {
             Listed::Gone => return (gone(), false),
             Listed::Cut => return too_much(),
-            Listed::Whole(matching) => matching,
+            Listed::Refused => return refused(),
+            Listed::Whole(matching, missed) => (matching, missed),
         };
         // Kept before the lamp knew who was talking: the room's, which
-        // recall gives them too.
-        let before = matching.is_empty() && person.is_some();
+        // recall gives them too. Never for a forget named in what was
+        // heard (#3113): only the asker's own scope.
+        let before = matching.is_empty() && person.is_some() && !named;
         if before {
             scope = None;
-            matching = match self.about_matching(None, &words, left, lease) {
+            (matching, missed) = match self.about_matching(None, &words, left, lease) {
                 Listed::Gone => return (gone(), false),
                 Listed::Cut => return too_much(),
-                Listed::Whole(matching) => matching,
+                Listed::Refused => return refused(),
+                Listed::Whole(matching, missed) => (matching, missed),
             };
+        }
+        // What none was found for, in their words.
+        let missed: Vec<&str> = missed
+            .drain(..)
+            .map(|index| subjects[index].0.as_str())
+            .collect();
+        if matching.is_empty() && named {
+            // Not found is not "not kept": the words may not be the kept
+            // ones. Nothing heard in this conversation is journalled or
+            // noticed after it, as after a forget, so a thing said earlier
+            // and not yet noticed isn't noticed now (#3113, El's P2 on
+            // #3127).
+            let said = match self.context.try_lock() {
+                Ok(mut context) => self.forgotten(&mut context),
+                Err(_) => None,
+            };
+            say(said);
+            return (
+                json!({"forgotten": false, "about": about, "note": format!("I couldn't find anything about {about}, so I forgot nothing, and nothing else instead, and I won't keep anything more from this conversation. Tell them plainly, such as \"I couldn't find anything about {about}.\"")}),
+                true,
+            );
         }
         if matching.is_empty() {
             return (
-                json!({"forgotten": false, "note": "Nothing they asked me to remember is about that, so I forgot nothing."}),
+                json!({"forgotten": false, "note": "Nothing I keep of them is about that, so I forgot nothing."}),
                 true,
             );
         }
@@ -4887,7 +5325,7 @@ impl DaysClient {
                 }
                 if matching.len() > ABOUT_MOST {
                     return (
-                        json!({"forgotten": false, "note": "More than eight things they asked me to remember are about that, so I forgot nothing. Ask which one they mean."}),
+                        json!({"forgotten": false, "note": "More than eight things I noticed or was asked to remember are about that, so I forgot nothing. Ask which one they mean."}),
                         true,
                     );
                 }
@@ -4935,6 +5373,15 @@ impl DaysClient {
             told["note"] =
                 json!("It was from before I knew who was talking, kept for everyone here.");
         }
+        // Some subjects found, some not (#3113): those are said, in their
+        // words, as not found.
+        if count > 0 && !missed.is_empty() {
+            let missed = missed.join(", ");
+            told["missed"] = json!(missed);
+            told["missed_note"] = json!(format!(
+                "I couldn't find anything about {missed}, so nothing about it was forgotten."
+            ));
+        }
         // What stayed in the room's memory because this conversation never
         // had it, so the model doesn't say all of it is gone.
         if not_here > 0 {
@@ -4971,21 +5418,29 @@ impl DaysClient {
         (told, true)
     }
 
-    /// The ids of `scope`'s kept things that have every one of `words`,
-    /// from the store's whole listing of them.
+    /// The ids of `scope`'s kept things and observations that have every
+    /// one of `words`, from the store's whole listing of them (#3113).
     fn about_matching(
         &self,
         scope: Option<&str>,
-        words: &[String],
+        subjects: &[Vec<String>],
         left: impl Fn() -> Option<Duration>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Listed {
-        let list = for_person(json!({"op":"kept","max_bytes":ABOUT_BYTES}), scope);
+        // What was noticed of them too (#3113): "my favourite colour" kept
+        // without being asked is found by its name.
+        let list = for_person(
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
+            scope,
+        );
         let Some(answer) = left()
             .and_then(|left| exchange_within(&self.socket, &list, left, lease, ABOUT_ANSWER_BYTES))
         else {
             return Listed::Gone;
         };
+        if answer["ok"] == false && answer["error"].is_string() {
+            return Listed::Refused;
+        }
         let Some(entries) = answer["entries"]
             .as_array()
             .filter(|_| answer["ok"] == true)
@@ -4994,6 +5449,7 @@ impl DaysClient {
         };
         let mut listed = 0usize;
         let mut matching = vec![];
+        let mut found = vec![false; subjects.len()];
         for entry in entries {
             let (Some(id), Some(text)) = (
                 entry["id"]
@@ -5004,8 +5460,20 @@ impl DaysClient {
                 return Listed::Gone;
             };
             listed = listed.saturating_add(text.len());
+            // Every word of one subject, each the same word or its plural
+            // ([`about_same`]); any of the subjects.
             let has = kept_words(text);
-            if words.iter().all(|word| has.contains(word)) {
+            let mut hit = false;
+            for (subject, words) in subjects.iter().enumerate() {
+                if words
+                    .iter()
+                    .all(|word| has.iter().any(|kept| about_same(word, kept)))
+                {
+                    found[subject] = true;
+                    hit = true;
+                }
+            }
+            if hit {
                 matching.push(id);
             }
         }
@@ -5015,7 +5483,8 @@ impl DaysClient {
         if listed.saturating_add(KEPT_TEXT_BYTES) > ABOUT_BYTES {
             return Listed::Cut;
         }
-        Listed::Whole(matching)
+        let missed = (0..subjects.len()).filter(|index| !found[*index]).collect();
+        Listed::Whole(matching, missed)
     }
 
     /// A recall or search: the room's alone, or for someone known theirs
@@ -7398,7 +7867,7 @@ mod tests {
         assert_eq!(
             read,
             [
-                json!({"op":"kept","max_bytes":ABOUT_BYTES}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
                 json!({"op":"forget","id":1}),
                 json!({"op":"forget","id":2}),
             ]
@@ -7676,7 +8145,7 @@ mod tests {
         assert_eq!(
             served.join().unwrap(),
             [
-                json!({"op":"kept","max_bytes":ABOUT_BYTES,"person":MINH}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
                 json!({"op":"forget","id":1,"person":MINH}),
             ]
         );
@@ -7857,8 +8326,8 @@ mod tests {
         assert_eq!(
             served.join().unwrap(),
             [
-                json!({"op":"kept","max_bytes":ABOUT_BYTES,"person":MINH}),
-                json!({"op":"kept","max_bytes":ABOUT_BYTES}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
             ]
         );
         drop(client);
@@ -7931,26 +8400,34 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
-    /// #2176 is off unless set: with the switch off `forget` is exactly the
-    /// function it was, with `LAMP_MEMORY_FORGET_ALL` off or on, and an
-    /// `about` sent anyway is passed over for the last kept thing.
+    /// #2176 is off unless set: with the switch off `forget` is the
+    /// function it was, with `LAMP_MEMORY_FORGET_ALL` off or on, its words
+    /// saying since #3113 that a named thing is forgotten by its name, and
+    /// an `about` sent anyway is passed over for the last kept thing.
     #[test]
     fn without_the_about_switch_forget_is_as_before() {
         assert!(!forget_about_on());
         let before = Tool {
             name: FORGET.into(),
-            description: "Call this when someone asks you to forget the last thing they asked you to remember. \
-                          Then tell them briefly that it is off your list, and do not use it again."
+            description: "Call this when someone asks you to forget something. When they name it, such as \
+                          'forget my favourite colour', the lamp forgets what it keeps about that, from their \
+                          own words; it forgets the last thing they asked you to remember only when they say \
+                          'forget that' or 'what I just said'. Then tell them briefly what is off your list, \
+                          and do not use it again. If it says nothing was forgotten, say so; never forget \
+                          something else instead."
                 .into(),
             parameters: None,
             silent: false,
         };
         let before_all = Tool {
             name: FORGET.into(),
-            description: "Call this when someone asks you to forget something. For the last thing they asked you \
-                          to remember, call it with nothing. For something recall just gave you, give its source_id; \
-                          never guess one. Then tell them plainly that it is gone, with where it came up, \
-                          and do not use it again."
+            description: "Call this when someone asks you to forget something. For something recall just gave \
+                          you, give its source_id; never guess one. When they name what to forget, such as \
+                          'forget my favourite colour', call it and the lamp forgets what it keeps about that, \
+                          from their own words. Call it with nothing for the last thing they asked you to \
+                          remember only when they say 'forget that' or 'what I just said'. Then tell them \
+                          plainly what is gone, with where it came up, and do not use it again. If it says \
+                          nothing was forgotten, say so; never forget something else instead."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -14888,5 +15365,596 @@ mod tests {
             "the next refresh takes the mark once"
         );
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #3113: what a forget's heard line names, from the words after its
+    /// forget word, without the words that name nothing. "Forget that",
+    /// "forget what I just said", "never mind" and their Vietnamese name
+    /// nothing, so they stay the last kept thing's.
+    #[test]
+    fn a_forget_names_a_subject_only_with_words_beyond_that_or_what_i_just_said() {
+        for (said, subject) in [
+            (
+                "Lamp, please forget my favourite colour.",
+                "favourite colour",
+            ),
+            (
+                "forget what I said about my sister's wedding",
+                "sister wedding",
+            ),
+            (
+                "Can you delete my dentist appointment for me?",
+                "dentist appointment",
+            ),
+            ("quên màu yêu thích của tôi", "màu yêu thích"),
+            (
+                "Đèn ơi, xóa giúp mình cái màu yêu thích đi nhé",
+                "màu yêu thích",
+            ),
+            ("My colour is violet. Forget my bicycle.", "bicycle"),
+        ] {
+            assert_eq!(named_subject(said).as_deref(), Some(subject), "{said}");
+        }
+        for said in [
+            "forget that",
+            "Forget that.",
+            "forget it",
+            "Forget what I just said.",
+            "Please forget what I just told you, lamp.",
+            "forget the last thing I asked you to remember",
+            "Never mind, forget it.",
+            "never mind",
+            "scratch that",
+            "Yes, please forget it.",
+            "My favourite colour is violet. Forget that.",
+            "quên cái đó đi",
+            "quên điều vừa nói",
+            "Quên điều tôi vừa nói đi nhé",
+            "xóa nó đi",
+            "",
+        ] {
+            assert_eq!(named_subject(said), None, "{said}");
+        }
+    }
+
+    /// The one picker (#3113): Twelve's line is named, "forget that" is the
+    /// last kept thing, a bare one just after a named one is that name, and
+    /// anything not a `forget` is as called.
+    #[test]
+    fn pick_forget_names_the_subject_and_leaves_the_last_kept_thing_to_that() {
+        let forget = call(FORGET, json!({}));
+        let none = Recent::default();
+        assert_eq!(
+            pick_forget(
+                &forget,
+                Some("Lamp, please forget my favourite colour."),
+                &none
+            ),
+            ForgetPick::Named("favourite colour".into())
+        );
+        assert_eq!(
+            pick_forget(&forget, Some("Forget that."), &none),
+            ForgetPick::Last
+        );
+        assert_eq!(pick_forget(&forget, None, &none), ForgetPick::Last);
+        let named = Recent {
+            named: Some("favourite colour".into()),
+        };
+        assert_eq!(
+            pick_forget(&forget, Some("Yes, please forget it."), &named),
+            ForgetPick::Named("favourite colour".into())
+        );
+        assert_eq!(
+            pick_forget(
+                &call(REMEMBER, json!({"text":"x"})),
+                Some("forget my colour"),
+                &none
+            ),
+            ForgetPick::AsCalled
+        );
+    }
+
+    const MAI: &str = "p-0123456789abcdef";
+
+    /// The kept things and what was noticed of Mai as `kept` with
+    /// `observations` lists them: her sister's wedding kept, then her
+    /// favourite colour noticed (#3113, Twelve's run on c0a4), and the
+    /// room's and another person's colour that must never be reached.
+    fn twelve(request: &Value) -> Value {
+        match (request["op"].as_str(), request["person"].as_str()) {
+            (Some("kept"), Some(MAI)) if request["observations"] == true => {
+                json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."},
+                    {"id":5,"at_unix_ms":NOW,"text":"Favourite colour is violet."}
+                ]})
+            }
+            (Some("kept"), Some(MAI)) => json!({"ok":true,"entries":[
+                {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."}
+            ]}),
+            (Some("kept"), _) => json!({"ok":true,"entries":[
+                {"id":9,"at_unix_ms":NOW,"text":"Favourite colour is green."}
+            ]}),
+            (Some("forget"), _) => json!({"ok":true,"removed":1}),
+            (Some("forget_last"), _) => {
+                json!({"ok":true,"removed":{"kind":"kept","id":4,"at_unix_ms":NOW-DAY}})
+            }
+            _ => json!({"ok":false}),
+        }
+    }
+
+    /// Twelve's case on the product's switches (`LAMP_MEMORY_FORGET_ABOUT`
+    /// off): "forget my favourite colour" with no id forgets the colour she
+    /// was noticed to like, in her own scope, and never the wedding kept
+    /// last by `forget_last`. In English and in Vietnamese.
+    #[test]
+    fn a_forget_that_names_a_thing_forgets_only_it_observations_included() {
+        for (index, said) in [
+            "Lamp, please forget my favourite colour.",
+            "quên màu yêu thích của tôi",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (socket, served) = memory(&format!("forget-named-{index}"), 2, |request| {
+                if request["op"] == "kept" && request["observations"] == true {
+                    json!({"ok":true,"entries":[
+                        {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."},
+                        {"id":5,"at_unix_ms":NOW,"text":"Favourite colour is violet."},
+                        {"id":6,"at_unix_ms":NOW,"text":"Màu yêu thích là màu tím."}
+                    ]})
+                } else {
+                    twelve(request)
+                }
+            });
+            let client = DaysClient::new(socket.clone()).unwrap();
+            assert!(!client.forget_about.load(Ordering::Acquire));
+            let model = call(FORGET, json!({}));
+            let named = named_forget_with(&model, Some(said), Some(MAI), &Carry::default())
+                .expect("a named forget");
+            let (told, answered) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+            assert!(answered, "{said}: {told}");
+            assert_eq!(told["forgotten"], true, "{said}: {told}");
+            assert_eq!(told["count"], 1, "{said}: {told}");
+            let read = served.join().unwrap();
+            assert_eq!(
+                read[0],
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MAI}),
+                "{said}"
+            );
+            let forgotten = if index == 0 { 5 } else { 6 };
+            assert_eq!(
+                read[1],
+                json!({"op":"forget","id":forgotten,"person":MAI}),
+                "{said}"
+            );
+            assert!(read.iter().all(|line| line["op"] != "forget_last"));
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// "Forget that" right after a keep still forgets that keep, the last
+    /// kept thing; nothing named, nothing listed.
+    #[test]
+    fn forget_that_right_after_a_keep_forgets_that_keep() {
+        let carry = Carry::default();
+        for said in ["Forget that.", "quên cái đó đi"] {
+            let model = call(FORGET, json!({}));
+            assert!(named_forget_with(&model, Some(said), Some(MAI), &carry).is_none());
+            let (socket, served) = memory("forget-that", 1, twelve);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            let (told, answered) = client.run_at(&model, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+            assert!(answered && told["forgotten"] == true, "{told}");
+            assert_eq!(
+                served.join().unwrap(),
+                [json!({"op":"forget_last","kind":"kept","person":MAI})]
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// A named thing with no match removes nothing, never the last kept
+    /// thing instead, and the answer says there is nothing about it, in the
+    /// person's own words. Nor is the room's matching thing, or another
+    /// person's, reached by her forget: only her own scope is listed.
+    #[test]
+    fn a_named_forget_with_no_match_removes_nothing_and_says_so() {
+        let (socket, served) = memory("forget-named-none", 1, |request| {
+            match (request["op"].as_str(), request["person"].as_str()) {
+                (Some("kept"), Some(MAI)) => json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."}
+                ]}),
+                _ => twelve(request),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        // The room's green this session was shown: still never reached.
+        let _ = client.context.lock().unwrap().include(None, &[9]);
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Forget my favourite colour."),
+            Some(MAI),
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, answered) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], false, "{told}");
+        let note = told["note"].as_str().unwrap();
+        // Not found, never "not kept" (El's P2 on #3127): the words may
+        // not be the kept ones.
+        assert!(
+            note.contains("I couldn't find anything about favourite colour"),
+            "{note}"
+        );
+        assert!(!note.contains("I don't have"), "{note}");
+        let read = served.join().unwrap();
+        assert_eq!(read.len(), 1, "{read:?}");
+        assert_eq!(read[0]["person"], MAI);
+        assert_eq!(read[0]["op"], "kept");
+        // Nothing more of this conversation is journalled or noticed, as
+        // after a forget: a colour said earlier isn't noticed now.
+        let context = client.context.lock().unwrap();
+        assert!(context.journal_inhibited);
+        assert_eq!(context.uncertain_writes, 0);
+        drop(context);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// El's P2 on #3127: a named thing's words need not be the kept ones'
+    /// exactly. "Forget where I work" finds "Works at a bakery" (a plural is
+    /// its one), and "forget my favourite colour and my address" is two
+    /// things, each found by its own words; nothing else goes.
+    #[test]
+    fn a_named_forget_finds_a_plural_and_each_of_two_things() {
+        for (index, said, gone) in [
+            ("work", "Lamp, forget where I work.", vec![7]),
+            (
+                "two",
+                "Forget my favourite colour and my address.",
+                vec![5, 8],
+            ),
+            ("vi", "quên màu yêu thích và địa chỉ của tôi", vec![6, 9]),
+        ] {
+            let (socket, served) = memory(
+                &format!("forget-loose-{index}"),
+                1 + gone.len(),
+                |request| match request["op"].as_str() {
+                    Some("kept") => json!({"ok":true,"entries":[
+                        {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."},
+                        {"id":5,"at_unix_ms":NOW,"text":"Favourite colour is violet."},
+                        {"id":6,"at_unix_ms":NOW,"text":"Màu yêu thích là màu tím."},
+                        {"id":7,"at_unix_ms":NOW,"text":"Works at a bakery."},
+                        {"id":8,"at_unix_ms":NOW,"text":"Address is 12 Elm Street."},
+                        {"id":9,"at_unix_ms":NOW,"text":"Địa chỉ là 12 phố Huế."},
+                        {"id":10,"at_unix_ms":NOW,"text":"Favourite food is pho."}
+                    ]}),
+                    Some("forget") => json!({"ok":true,"removed":1}),
+                    _ => json!({"ok":false}),
+                },
+            );
+            let client = DaysClient::new(socket.clone()).unwrap();
+            let named = named_forget_with(
+                &call(FORGET, json!({})),
+                Some(said),
+                Some(MAI),
+                &Carry::default(),
+            )
+            .expect("a named forget");
+            let (told, answered) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+            assert!(answered, "{said}: {told}");
+            assert_eq!(told["forgotten"], true, "{said}: {told}");
+            assert_eq!(told["count"], gone.len(), "{said}: {told}");
+            let read = served.join().unwrap();
+            let forgotten: Vec<u64> = read[1..]
+                .iter()
+                .map(|line| {
+                    assert_eq!(line["op"], "forget", "{said}");
+                    line["id"].as_u64().unwrap()
+                })
+                .collect();
+            assert_eq!(forgotten, gone, "{said}");
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// A subject's words are split at "and", "và" and commas, and a word
+    /// is its plural's for a forget, never a near word.
+    #[test]
+    fn forget_subjects_split_at_and_and_a_plural_is_its_one() {
+        assert_eq!(
+            named_subject("Forget my favourite colour and my address.").as_deref(),
+            Some("favourite colour and address")
+        );
+        assert_eq!(
+            named_subject("Lamp, forget where I work.").as_deref(),
+            Some("work")
+        );
+        let subjects: Vec<Vec<String>> = about_subjects("favourite colour and address, keys")
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        assert_eq!(
+            subjects,
+            [
+                vec!["favourite".to_owned(), "colour".to_owned()],
+                vec!["address".to_owned()],
+                vec!["keys".to_owned()],
+            ]
+        );
+        for (one, other) in [
+            ("work", "works"),
+            ("key", "keys"),
+            ("glass", "glasses"),
+            ("story", "stories"),
+            ("address", "address"),
+        ] {
+            assert!(about_same(one, other), "{one} {other}");
+        }
+        for (one, other) in [
+            ("address", "addres"),
+            ("bus", "bu"),
+            ("work", "worker"),
+            ("colour", "color"),
+        ] {
+            assert!(!about_same(one, other), "{one} {other}");
+        }
+    }
+
+    /// El's P2 on #3127: a forget runs on its own request's line. A says
+    /// "forget my favourite colour"; before the call runs, B's "don't
+    /// forget the wedding cake" is heard and replaces what is pending. The
+    /// held line is A's, so A's colour goes and the cake stays.
+    #[test]
+    fn a_forget_runs_on_its_own_lines_words_never_the_next_line() {
+        let now = Instant::now();
+        let mut thread = crate::thread::Thread::new();
+        thread.person("Lamp, forget my favourite colour.", true, now);
+        // The second route holds the request's own words as it is made;
+        // the Live route holds what was heard at its first call.
+        thread.hold_line(7, now);
+        thread.person("Don't forget the wedding cake.", true, now);
+        assert_eq!(
+            thread.heard_for(7, now).as_deref(),
+            Some("Lamp, forget my favourite colour.")
+        );
+        // Without a held line, the pending words are the next line's.
+        assert_eq!(
+            thread.heard_for(8, now).as_deref(),
+            Some("Don't forget the wedding cake.")
+        );
+        let (socket, served) = memory("forget-own-line", 2, |request| {
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":NOW-DAY,"text":"Wedding cake is chocolate."},
+                    {"id":5,"at_unix_ms":NOW,"text":"Favourite colour is violet."}
+                ]}),
+                Some("forget") => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let said = thread.heard_for(7, now);
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            said.as_deref(),
+            Some(MAI),
+            &Carry::default(),
+        )
+        .expect("a named forget");
+        let (told, _) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+        assert_eq!(told["count"], 1, "{told}");
+        let read = served.join().unwrap();
+        assert_eq!(read[1], json!({"op":"forget","id":5,"person":MAI}));
+        // A forgetting lets the held lines go.
+        thread.forget();
+        assert_eq!(thread.heard_for(7, now), None);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// An older Days lamp-memory (the first builder's hold on #3127: a part
+    /// updated before the other): `kept` there takes `op`, `person` and
+    /// `max_bytes` only, and its `deny_unknown_fields` refuses
+    /// `observations` with the answer below, as `days_protocol::answer`
+    /// gives it on `lamp-voice` before #3113. The client's real request
+    /// reaches it; nothing is removed, `forget_last` (or any `forget`) is
+    /// never sent, and the model is told plainly that it couldn't forget it.
+    #[test]
+    fn a_named_forget_with_an_older_days_memory_removes_nothing_and_says_so() {
+        let (socket, served) = memory("forget-named-older", 2, |request| {
+            let known: &[&str] = match request["op"].as_str() {
+                Some("kept") => &["op", "person", "max_bytes"],
+                Some("forget_last") => &["op", "person", "kind"],
+                Some("forget") => &["op", "person", "id"],
+                _ => &["op"],
+            };
+            let fields = request.as_object().unwrap();
+            if fields.keys().any(|field| !known.contains(&field.as_str())) {
+                return json!({"ok":false,"error":"bad_request","message":"invalid fields for this operation"});
+            }
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[
+                    {"id":4,"at_unix_ms":NOW-DAY,"text":"Sister's wedding is on Saturday."}
+                ]}),
+                Some("forget_last") | Some("forget") => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":true,"end":true}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Lamp, please forget my favourite colour."),
+            Some(MAI),
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, answered) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], false, "{told}");
+        let note = told["note"].as_str().unwrap();
+        assert!(note.contains("I couldn't forget that just now"), "{note}");
+        assert!(note.contains("forgot nothing"), "{note}");
+        // Whatever the client sent next would be read before this line.
+        let mut end = std::os::unix::net::UnixStream::connect(&socket).unwrap();
+        end.write_all(b"{\"op\":\"end\"}\n").unwrap();
+        let mut ended = String::new();
+        BufReader::new(end).read_line(&mut ended).unwrap();
+        let read = served.join().unwrap();
+        assert_eq!(
+            read,
+            [
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MAI}),
+                json!({"op":"end"}),
+            ],
+            "nothing removed, no forget_last"
+        );
+        let context = client.context.lock().unwrap();
+        assert!(!context.journal_inhibited);
+        assert_eq!(context.uncertain_writes, 0);
+        drop(context);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Another person's matching thing is never reached: Mai's forget of
+    /// her colour lists and forgets in her scope alone, and An's green,
+    /// listed only in An's, stays.
+    #[test]
+    fn a_named_forget_never_reaches_another_persons_matching_thing() {
+        let (socket, served) = memory("forget-named-theirs", 2, twelve);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("forget my favourite colour"),
+            Some(MAI),
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, _) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
+        assert_eq!(told["count"], 1, "{told}");
+        let read = served.join().unwrap();
+        assert!(read.iter().all(|line| line["person"] == MAI), "{read:?}");
+        assert!(read.iter().all(|line| line["id"] != 9), "{read:?}");
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The room's: with nobody known, a named forget is the room's, of what
+    /// this session had, as `forget {about}` is; and a named forget with
+    /// an id or, with the switch, the model's own about, is left as it is.
+    #[test]
+    fn a_named_forget_in_the_room_reaches_only_what_this_session_had() {
+        let (socket, served) = memory("forget-named-room", 3, twelve);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("forget the favourite colour"),
+            None,
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, _) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), None);
+        assert_eq!(told["forgotten"], false, "{told}");
+        let _ = client.context.lock().unwrap().include(None, &[9]);
+        let (told, _) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), None);
+        assert_eq!(told["count"], 1, "{told}");
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[1],
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        let carry = Carry::default();
+        let said = Some("forget my favourite colour");
+        // Not the last thing kept, but not ours to change either: an id
+        // recall gave, with `LAMP_MEMORY_FORGET_ALL`.
+        assert!(!forget_all_on() && !forget_about_on());
+        let named = named_forget_with(&call(FORGET, json!({"source_id":5})), said, None, &carry);
+        assert_eq!(named.unwrap().args["about"], "favourite colour");
+        // The model's about with nothing heard: its own words name it.
+        let named = named_forget_with(
+            &call(FORGET, json!({"about":"my colour"})),
+            None,
+            None,
+            &carry,
+        );
+        assert_eq!(named.unwrap().args["about"], "colour");
+        assert!(
+            named_forget_with(&call(REMEMBER, json!({"text":"x"})), said, None, &carry).is_none()
+        );
+        // Kept since: nothing named, nothing carried.
+        assert!(named_forget_with(&call(FORGET, json!({})), None, None, &carry).is_none());
+    }
+
+    /// Twelve's second turn: "Yes, please forget it." just after a named
+    /// forget is that named thing again, never the last kept thing; once
+    /// something is kept after it, "forget that" is that keep's again.
+    #[test]
+    fn forget_it_just_after_a_named_forget_is_that_thing_again() {
+        let carry = Carry::default();
+        let forget = call(FORGET, json!({}));
+        let first = named_forget_with(
+            &forget,
+            Some("forget my favourite colour"),
+            Some(MAI),
+            &carry,
+        );
+        assert_eq!(first.unwrap().args["about"], "favourite colour");
+        let again = named_forget_with(&forget, Some("Yes, please forget it."), Some(MAI), &carry);
+        assert_eq!(again.unwrap().args["about"], "favourite colour");
+        // Someone else's "forget it" is their own.
+        assert!(named_forget_with(&forget, Some("forget it"), None, &carry).is_none());
+        let _ = named_forget_with(
+            &call(REMEMBER, json!({"text":"x"})),
+            None,
+            Some(MAI),
+            &carry,
+        );
+        assert!(named_forget_with(&forget, Some("Forget that."), Some(MAI), &carry).is_none());
+    }
+
+    /// With the legacy memory, which can forget only the last kept thing, a
+    /// named forget forgets nothing and says so; nothing is sent.
+    #[test]
+    fn a_named_forget_with_the_legacy_memory_forgets_nothing() {
+        let named = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("forget my favourite colour"),
+            None,
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, answered) = legacy_named(&named).unwrap();
+        assert!(answered);
+        assert_eq!(told["forgotten"], false, "{told}");
+        assert!(legacy_named(&call(FORGET, json!({}))).is_none());
+    }
+
+    /// The `forget` function says a named thing is forgotten by naming it
+    /// and the last kept thing only for "that" or "what I just said", on
+    /// every switch set.
+    #[test]
+    fn the_forget_function_says_a_named_thing_is_forgotten_by_its_name() {
+        for (forget_all, forget_about) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let tools = tools_for(false, forget_all, forget_about);
+            let forget = tools.iter().find(|tool| tool.name == FORGET).unwrap();
+            assert!(
+                forget.description.contains("what I just said"),
+                "{forget_all} {forget_about}: {}",
+                forget.description
+            );
+            assert!(
+                forget.description.contains("never forget something else"),
+                "{forget_all} {forget_about}: {}",
+                forget.description
+            );
+        }
     }
 }

@@ -6836,6 +6836,11 @@ async fn answer(
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });
     let heard_at = Instant::now();
+    // The request's own words, for a forget it calls (#3113): never the
+    // next line, which may be someone else's.
+    if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
+        thread.line_of(request, &said);
+    }
     // Its speech socket opened now, while the chat thinks, with the switch
     // (`LAMP_SECOND_SPEECH_SOCKET`).
     shared.services.open_speech_ahead(request);

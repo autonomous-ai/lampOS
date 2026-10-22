@@ -9,9 +9,11 @@ use lamp_memory::{
     days_protocol,
     protocol::Answer,
     server::{Memory, Stopper},
+    tidy::{Category, Proposal},
 };
 use lamp_voice::remember::{
-    DaysClient, FORGET, FORGET_EVERYTHING, RECALL, REMEMBER, switch_forget_all, tools_with,
+    Carry, DaysClient, FORGET, FORGET_EVERYTHING, RECALL, REMEMBER, named_forget_with,
+    switch_forget_all, tools_with,
 };
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
@@ -325,4 +327,98 @@ fn after_forgetting_the_next_thing_remembered_is_kept() {
     assert!(ok && told["everything"] == true, "{told}");
     let (told, ok) = run_fresh(REMEMBER, json!({"text":"synthetic green scarf"}));
     assert!(ok && told["remembered"] == true, "{told}");
+}
+
+/// One request on the store's socket, as the observe pass's own client
+/// sends it, and the store's answer.
+fn raw(socket: &std::path::Path, request: Value) -> Value {
+    use std::io::{BufRead, BufReader, Write};
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).unwrap();
+    writeln!(stream, "{request}").unwrap();
+    let mut answer = String::new();
+    BufReader::new(stream).read_line(&mut answer).unwrap();
+    serde_json::from_str(&answer).unwrap()
+}
+
+/// What `person` keeps and was noticed of, as texts.
+fn listed(socket: &std::path::Path, person: &str) -> Vec<String> {
+    let answer = raw(
+        socket,
+        json!({"op":"kept","person":person,"observations":true,"max_bytes":16384}),
+    );
+    let mut texts: Vec<String> = answer["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["text"].as_str().unwrap().to_owned())
+        .collect();
+    texts.sort();
+    texts
+}
+
+/// #3113, Twelve's c0a4 run with `LAMP_MEMORY_FORGET_ALL` on (the third reviewer's
+/// P1 on #3127): in one conversation the colour is said, the wedding is
+/// kept (with that conversation's exchange as its source), and the observe
+/// pass notices the colour from the same exchange. "Forget my favourite
+/// colour" removes the colour and the exchange it was noticed from; the
+/// wedding stays.
+#[test]
+fn forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation() {
+    assert!(switch_forget_all(true));
+    const MAI: &str = "p-0000000000000a0a";
+    let fixture = Fixture::new(|_, _| {}, None);
+    let client = fixture.client();
+    assert!(client.finished_exchange_for(
+        fixture.now,
+        "synthetic: my favourite colour is violet",
+        "Lovely",
+        Some(MAI)
+    ));
+    let (_, said) = fixture.next("append_linked");
+    let said = said["id"].as_u64().unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let wedding = "synthetic: sister's wedding is on Saturday";
+    let (told, ok) = client.run_for(&call(REMEMBER, json!({"text":wedding})), BUDGET, Some(MAI));
+    assert!(ok && told["remembered"] == true, "{told}");
+    let (keep, _) = fixture.next("remember");
+    assert_eq!(keep["source_ids"], json!([said]), "FORGET_ALL's sources");
+    // The observe pass: the colour, noticed from the same exchange.
+    let ended = raw(
+        &fixture.socket,
+        json!({"op":"conversation_end","person":MAI,"conversation":"c0a4","source_ids":[said]}),
+    );
+    let colour = "synthetic: favourite colour is violet";
+    let noticed = Proposal {
+        text: colour.into(),
+        category: Category::Preference,
+        source_ids: vec![said],
+        supersedes: None,
+        on: None,
+    };
+    let applied = raw(
+        &fixture.socket,
+        json!({"op":"tidy_apply","person":MAI,"job":ended["input"]["job"],"observations":[noticed]}),
+    );
+    assert_eq!(applied["ok"], true, "{applied}");
+    let mut both = vec![colour.to_owned(), wedding.to_owned()];
+    both.sort();
+    assert_eq!(listed(&fixture.socket, MAI), both);
+
+    let model = call(FORGET, json!({}));
+    let carry = Carry::default();
+    let named = named_forget_with(
+        &model,
+        Some("Lamp, please forget my favourite colour."),
+        Some(MAI),
+        &carry,
+    )
+    .expect("a named forget");
+    let (told, ok) = client.run_for(&named, BUDGET, Some(MAI));
+    assert!(
+        ok && told["forgotten"] == true && told["count"] == 1,
+        "{told}"
+    );
+    assert_eq!(listed(&fixture.socket, MAI), [wedding], "the wedding stays");
+    let (told, ok) = client.run_for(&call(RECALL, json!({"about":"colour"})), BUDGET, Some(MAI));
+    assert!(ok && !told.to_string().contains("violet"), "{told}");
 }

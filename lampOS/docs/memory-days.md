@@ -483,6 +483,15 @@ immediately recreating the forgotten observation. This can delete a whole
 exchange containing unrelated subjects. It is one step back, the person's
 own exchanges only (#2003): an exchange's own sources are what its session
 was shown, so they, and the kept things and facts among them, are retained.
+Nothing goes because it derives from that evidence (#3113): the
+descendants are walked from the target and its versions only, and the
+evidence joins after. One exchange can be the evidence of a noticed colour
+and, with `LAMP_MEMORY_FORGET_ALL`, a source of a wedding kept in the same
+conversation; forgetting either leaves the other, its link to the removed
+exchange going by the foreign key, as on expiry. No forget's walk takes a
+kept thing that isn't the target or its version, so a forgotten exchange
+leaves the kept things remembered from it. `forget_all` is unchanged: it
+removes every entry of the person's.
 When the target is a raw exchange, unrelated ancestors are retained. No historical version is
 reactivated after deletion.
 
