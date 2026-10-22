@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-22 10:08 +07, prepared metadata branch pushed
+
+Metadata diagnostics is pushed as `81b3be0b408971324008aabeb54e6e3b08f43fc6`,
+rebased onto Music's tested merge `be24496f5` (parents `fab69b0c4` and
+`d96f484ec`). [Equal range and fresh gate](verification/requested-audio-metadata-rebase-be244-20261022/README.md)
+record six byte-identical follow-up files, fmt, strict Skills Clippy and
+**467 passed / 0 failed / 0 ignored / 0 filtered out**. The gate's 28 source
+hashes stayed fixed. Its PR follows Music's merge; no follow-up native result
+is claimed.
+
+The voice-state follow-up is now tracked as **#2792**. Its prepared rebase
+`31e432d51` onto the same tested merge has an equal patch; fresh Voice and
+focused consumer gates are running before push. The new assignment requires
+both the positive test and failing mutant on ARM64 after #1757 lands.
+**#2810**, the updater's persisted-step power-cut fixtures, is next; its
+source and existing failure hooks are being audited. #2833 and #2853 remain
+queued, preserving the two-item limit.
+
+**#1757** `d96f484ec` and **#2764** `93d93ecb1` have green Linux Clippy;
+their native ARM64 runs continue. The integration branch advanced again to
+`f71a62f55`, so the earlier requested stable-base window did not hold.
+Final receipts will bind the bases actually tested, without claiming current
+ancestry. First still owns #2767's installer read and Music's merge; the next
+Cloud rebase must account for the selected intervening merges.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 09:58 +07, failed-unit candidate on the coordinated base
 
 **#2764:** Pushed `93d93ecb1415d1e3b97a7a94d3852fa10cb03018` on

@@ -1,0 +1,29 @@
+{
+  "old_head": "1bdecb484def9c1e843bda1f445f107110f1ce4d",
+  "old_base": "0a878cd4d9d44867b2971e70c118244f0c21ad38",
+  "new_head": "81b3be0b408971324008aabeb54e6e3b08f43fc6",
+  "prepared_parent": "be24496f5d9b0e989d62269e8d2c0ceba8cd1de4",
+  "prepared_parent_is_music_pr_tested_merge": true,
+  "tested_merge_parents": [
+    "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+    "d96f484ec0567ecd66819cb45bd44f5c39961118"
+  ],
+  "followup_pr_waits_for_music_merge": true,
+  "source_hashes_before": {
+    "lampOS/crates/skills/src/requested_audio.rs": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+    "lampOS/docs/requested-audio.md": "1ed1923ea4bc855637e58300104a43f2c0e1d7b1fb0f7e0ce206dd2b26cd82af",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/README.md": "5f22ed887f7ea2435a6cc2251327e5e067c913d4f8b52897764aac04b10c9c23",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/attempt-1-gate.json": "7d667d9686b61851e8bffb50eacd7baaf3f226f84f25a0d6a7c560d37ee1aefc",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/control.json": "9eb721f226a994f56becd7baaeeb0da895fda917c66ca564f516e4774f198cc4",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/gate.json": "44d9aa5c3c9f2a7c1cd41b0d5624999f9dda5244a6a1013315ce9ee058864f3b"
+  },
+  "source_hashes_after": {
+    "lampOS/crates/skills/src/requested_audio.rs": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+    "lampOS/docs/requested-audio.md": "1ed1923ea4bc855637e58300104a43f2c0e1d7b1fb0f7e0ce206dd2b26cd82af",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/README.md": "5f22ed887f7ea2435a6cc2251327e5e067c913d4f8b52897764aac04b10c9c23",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/attempt-1-gate.json": "7d667d9686b61851e8bffb50eacd7baaf3f226f84f25a0d6a7c560d37ee1aefc",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/control.json": "9eb721f226a994f56becd7baaeeb0da895fda917c66ca564f516e4774f198cc4",
+    "lampOS/docs/verification/requested-audio-metadata-diagnostics-20261022/gate.json": "44d9aa5c3c9f2a7c1cd41b0d5624999f9dda5244a6a1013315ce9ee058864f3b"
+  },
+  "range_diff": "1:  1bdecb484 = 1:  81b3be0b4 lampOS: explain requested audio metadata refusals"
+}
