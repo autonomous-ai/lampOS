@@ -582,7 +582,9 @@ fn reauthorize_camera(
 /// After an open that did not open, the `failed`th in a row: the camera's
 /// helper asked, if there is one and it's time (`asked`, the last ask, in
 /// seconds of the monotonic clock), on a thread of its own so the loop
-/// never waits for it; its answer said once (#2892).
+/// never waits for it; its answer said once (#2892). Linux only, as its
+/// callers are.
+#[cfg(target_os = "linux")]
 fn ask_helper(helper: Option<&Path>, failed: u32, asked: &mut Option<u64>) {
     let Some(helper) = helper else {
         return;
