@@ -646,7 +646,14 @@ pub fn deepseek_key(
     }
     match config.hosted.deepseek_base_url {
         Some(_) => Ok(config.llm_key.clone()),
-        None => unit_credential(credentials, DEEPSEEK_CREDENTIAL),
+        // Another relay than the company's gives no address of its own
+        // (#2978): say what else would do (El's P3).
+        None => unit_credential(credentials, DEEPSEEK_CREDENTIAL).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("{error}; or, on a relay, its DeepSeek address as second.json's deepseek_base_url"),
+            )
+        }),
     }
 }
 
