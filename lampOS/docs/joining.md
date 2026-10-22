@@ -370,7 +370,10 @@ another builder's branch.
 
 ## Talking with the first builder
 
-Everything goes through Git, once each way. No back-and-forth.
+Since 21 October this is done in comments on the Queue issue (#2602), as
+[AGENTS.md](../AGENTS.md)'s "How builders work together" says: a post starts
+`<Name>, HH:MM, to **<who>**:`, has content, and is in plain sentences. The
+log entries below still record what you took and did.
 
 - **Taken, done:** an entry in your log, pushed.
 - **A proposal**, for work found that cannot be folded into a listed task:
