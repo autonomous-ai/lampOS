@@ -1,0 +1,23 @@
+{
+  "source_head": "b1b8ab445ff431d96d70c91fc2a4ad37c31a82ff",
+  "source_parent": "3989219969f2460e6cfd69d32d06a58dd5c2e269",
+  "host": "Darwin arm64",
+  "rust": "1.96.0; aarch64-apple-darwin",
+  "scope": {
+    "lampOS/crates/voice/src/second_provider/services.rs": {
+      "original": "bf8d57f7d34686aca48849c255368d4e7f92400c38a2a51ca49a83ffc6054a76",
+      "with_counter": "b1bcaa06b3c6842bca544ece412fde229a4aea32eb1300639c87f4c2e7549cf9",
+      "restored": "bf8d57f7d34686aca48849c255368d4e7f92400c38a2a51ca49a83ffc6054a76"
+    },
+    "lampOS/crates/voice/src/second_provider/tests.rs": {
+      "original": "d818f10895d248db769ca82443887557fac5d26d8b9856aaaec65cc02693150c",
+      "with_counter": "fcd211382cda6b236fab6a59bd95220559c94c1de92595bb8cd9a3d88c6f7322",
+      "restored": "d818f10895d248db769ca82443887557fac5d26d8b9856aaaec65cc02693150c"
+    }
+  },
+  "all_probe_inputs_unchanged": true,
+  "input_count": 6503,
+  "complete_private_binding_sha256": "c3226ab2a4d0e177f6e11b7800a7c30117e70af2799723361bfaa0eb2a93322e",
+  "source_restored": true,
+  "working_tree_clean": true
+}
