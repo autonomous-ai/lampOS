@@ -967,6 +967,10 @@ fn worker_command(
             role,
             var(crate::remember::ROOM_NOT_ASKER_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_personal_needs_face_worker_environment(
+            role,
+            var(crate::remember::needs_face::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_room_after_forget_worker_environment(
             role,
             var(crate::remember::ROOM_AFTER_FORGET_ENVIRONMENT).as_deref(),
@@ -1275,6 +1279,17 @@ fn memory_room_not_asker_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::ROOM_NOT_ASKER_ENVIRONMENT, "on"))
+}
+
+// Nothing about a person kept while nobody is known, passed the same narrow
+// way: the exact `on`, to the two routes that run `remember` (the second's
+// observation pass too).
+fn memory_personal_needs_face_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::needs_face::ENVIRONMENT, "on"))
 }
 
 // The room's lines about a person kept from whoever forgot everything, for
@@ -1875,6 +1890,12 @@ mod tests {
                         "LAMP_MEMORY_ROOM_NOT_ASKER",
                         ["provider", "second"].as_slice(),
                     ),
+                    // Nothing about a person kept while nobody is known: both.
+                    (
+                        memory_personal_needs_face_worker_environment,
+                        "LAMP_MEMORY_PERSONAL_NEEDS_FACE",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // The room's lines about a person after a forget of
                     // everything (#2849): both routes.
                     (
@@ -2062,6 +2083,7 @@ mod tests {
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::ROOM_NOT_ASKER_ENVIRONMENT,
                     crate::remember::ROOM_AFTER_FORGET_ENVIRONMENT,
+                    crate::remember::needs_face::ENVIRONMENT,
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::LINK_USED_ENVIRONMENT,
@@ -2208,6 +2230,7 @@ mod tests {
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
+                    "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REPLACES=on",
@@ -2243,6 +2266,7 @@ mod tests {
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_OBSERVE=on",
+                    "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REOPEN_QUIET=on",
