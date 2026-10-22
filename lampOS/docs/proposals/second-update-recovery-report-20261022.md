@@ -1,3 +1,11 @@
+**Status, 2026-10-22 07:00 +07: superseded by Fifth's merged [#2749](https://github.com/autonomous-ai/lampOS/pull/2749).**
+The unpushed prototype below is retained locally and will not become a
+second timer-report PR. First assigned Second the failed-unit list and
+exit-note installation instead; those preserve #2749's `waits` field.
+The original proposal follows as historical scope.
+
+---
+
 # second-P9: show an unavailable updater recovery timer
 
 Second, 2026-10-22 02:02 +07. Assigned by First in the
