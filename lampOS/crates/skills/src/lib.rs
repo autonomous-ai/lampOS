@@ -6272,7 +6272,11 @@ fn calls(
 /// cuts others first (the owner's rule, on #2614).
 /// The lists include enabled skills only, even when given the inventory.
 pub fn tools_file(skills: &[Skill]) -> Value {
-    tools_file_with_requested_audio(skills, requested_audio::from_environment())
+    tools_file_with(
+        skills,
+        requested_audio::from_environment(),
+        watch::words_v2(std::env::var(watch::WORDS_ENVIRONMENT).ok().as_deref()),
+    )
 }
 
 /// Explicit switch form, including deterministic tests. Package validation
@@ -6281,6 +6285,15 @@ pub fn tools_file(skills: &[Skill]) -> Value {
 /// emitted name as the tools; an omitted definition cannot add a body grant
 /// or core priority.
 pub fn tools_file_with_requested_audio(skills: &[Skill], enabled: bool) -> Value {
+    tools_file_with(skills, enabled, false)
+}
+
+/// [`tools_file_with_requested_audio`] with guard mode's words too:
+/// `guard_words_v2` gives `keep_watch` [`watch::WORDS_V2_DESCRIPTION`] and
+/// [`watch::WORDS_V2_TURN`] in place of its `SKILL.md` description and its
+/// `[choice]` `about` (#2827, `LAMP_GUARD_WORDS_V2`); off, every tool is
+/// as its skill says, byte for byte.
+pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) -> Value {
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
@@ -6297,12 +6310,23 @@ pub fn tools_file_with_requested_audio(skills: &[Skill], enabled: bool) -> Value
             if skill.kind == SkillKind::Core {
                 core.push(name);
             }
-            let mut tool = json!({"name": name, "description": skill.description});
+            let reworded = guard_words_v2 && skill.name == watch::GUARD;
+            let description = if reworded {
+                watch::WORDS_V2_DESCRIPTION
+            } else {
+                skill.description.as_str()
+            };
+            let mut tool = json!({"name": name, "description": description});
             let mut properties = serde_json::Map::new();
             if let Some(choice) = &skill.choice {
+                let about = if reworded {
+                    watch::WORDS_V2_TURN
+                } else {
+                    choice.about.as_str()
+                };
                 properties.insert(
                     choice.name.clone(),
-                    json!({"type": "string", "enum": choice.one_of, "description": choice.about}),
+                    json!({"type": "string", "enum": choice.one_of, "description": about}),
                 );
             }
             if let Some(flag) = &skill.flag {
