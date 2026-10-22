@@ -239,36 +239,48 @@ impl Discovery {
     }
 }
 
-#[cfg(target_os = "linux")]
-pub fn run(seconds: u64, rest_seconds: u64) -> io::Result<Report> {
-    use crate::pins::{GpioLines, Lines, Pin, PinsConfig, Pull};
+/// Samples the four candidates for `seconds`, the first `rest_seconds` after
+/// the settle hands away. With `lines_from` (`--lines-from FILE`, a test
+/// input, #2818) their levels are read from FILE instead of the chip: the
+/// candidates' numbers that are high now (`97`, `97 98`, or `none`), read at
+/// each sample as [`crate::pins::FileLines`] reads `--touch-from`, so a
+/// script touches a line by writing it. Every line probes low at idle then.
+/// A missing file or a word that is no candidate fails the read. No product
+/// unit passes it.
+pub fn run(
+    seconds: u64,
+    rest_seconds: u64,
+    lines_from: Option<&std::path::Path>,
+) -> io::Result<Report> {
+    use crate::pins::{FileLines, Pin, Pull};
     use std::{thread, time::Duration};
     if !(2..=60).contains(&seconds) || rest_seconds >= seconds {
         return Err(io::Error::other(
             "head discovery lasts 2..60 seconds, its rest less",
         ));
     }
-    let chip = "/dev/gpiochip0";
-    let mut probes = [(false, false); 4];
-    for (index, line) in HEAD_CANDIDATES.iter().enumerate() {
-        probes[index] = GpioLines::probe(chip, *line)?;
-    }
-    let wiring = PinsConfig {
-        privacy: None,
-        chip: chip.into(),
-        buttons: vec![],
-        every_ms: 5,
-        head_pads: HEAD_CANDIDATES
-            .into_iter()
-            .map(|line| Pin {
-                name: format!("candidate-{line}"),
-                line,
-                active_low: false,
-                pull: Pull::Up,
-            })
-            .collect(),
+    let (probes, mut lines): Chip = match lines_from {
+        Some(path) => {
+            eprintln!(
+                "lamp-controls: head lines from a test input: {}, not the chip (--lines-from, a test flag no product unit passes)",
+                path.display()
+            );
+            let pads = HEAD_CANDIDATES
+                .into_iter()
+                .map(|line| Pin {
+                    name: line.to_string(),
+                    line,
+                    active_low: false,
+                    pull: Pull::Down,
+                })
+                .collect();
+            (
+                [(false, false); 4],
+                Box::new(FileLines::new(path, pads, None)),
+            )
+        }
+        None => open_chip()?,
     };
-    let mut lines = GpioLines::open(&wiring)?;
     let started = lamp_ipc::monotonic_us();
     let mut discovery = Discovery::with_rest(started, probes, rest_seconds * 1_000_000)?;
     while lamp_ipc::monotonic_us() - started < seconds * 1_000_000 {
@@ -290,7 +302,37 @@ pub fn run(seconds: u64, rest_seconds: u64) -> io::Result<Report> {
     Ok(discovery.report)
 }
 
+/// The candidates' probed idle levels (pull-down, pull-up) and their lines.
+type Chip = ([(bool, bool); 4], Box<dyn crate::pins::Lines>);
+
+/// The candidates' probed idle levels and their lines on chip 0.
+#[cfg(target_os = "linux")]
+fn open_chip() -> io::Result<Chip> {
+    use crate::pins::{GpioLines, Pin, PinsConfig, Pull};
+    let chip = "/dev/gpiochip0";
+    let mut probes = [(false, false); 4];
+    for (index, line) in HEAD_CANDIDATES.iter().enumerate() {
+        probes[index] = GpioLines::probe(chip, *line)?;
+    }
+    let wiring = PinsConfig {
+        privacy: None,
+        chip: chip.into(),
+        buttons: vec![],
+        every_ms: 5,
+        head_pads: HEAD_CANDIDATES
+            .into_iter()
+            .map(|line| Pin {
+                name: format!("candidate-{line}"),
+                line,
+                active_low: false,
+                pull: Pull::Up,
+            })
+            .collect(),
+    };
+    Ok((probes, Box::new(GpioLines::open(&wiring)?)))
+}
+
 #[cfg(not(target_os = "linux"))]
-pub fn run(_: u64, _: u64) -> io::Result<Report> {
+fn open_chip() -> io::Result<Chip> {
     Err(io::Error::other("head discovery requires Linux GPIO"))
 }

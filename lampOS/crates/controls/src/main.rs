@@ -20,7 +20,7 @@ use std::{
 const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE] [--touch-from FILE]\n\
 lamp-controls replay --input FILE --config FILE --clock-id ID [--touch --pins FILE] [--enable] [--output FILE] [--until-us N]\n\
 lamp-controls probe --pins FILE\n\
-lamp-controls discover-head --seconds N [--rest-seconds R]\n\
+lamp-controls discover-head --seconds N [--rest-seconds R] [--lines-from FILE]\n\
 lamp-controls calibrate-touch --pins FILE --output FILE [--settle-seconds N] [--quiet-seconds N] [--swipe-seconds N] [--touch-percent P] [--release-percent P] [--record FILE | --replay FILE]\n\
 lamp-controls clock [--clock-id ID]\n\n\
 Shadow is the default. A config file cannot enable the process without --enable.\n\
@@ -40,6 +40,8 @@ Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; abs
 gap for no reading, fault for an unreadable switch), and the journal says so. No product unit passes it.\n\
 --touch-from FILE is for tests on a lamp only, with --touch: the head pads are read from FILE instead of their lines\n\
 (the touched pads' names, or none), at their own poll; the journal says so. No product unit passes it.\n\
+--lines-from FILE is for tests only, with discover-head: the candidates' levels are read from FILE instead of chip 0\n\
+(the high lines' numbers, e.g. 97 98, or none), at each sample; stderr says so. No product unit passes it.\n\
 LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
 and serve's controls/state says no_privacy_slide at the route's cadence. Replay under it is as off.\n\
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
@@ -70,6 +72,8 @@ struct Args {
     privacy_from: Option<PathBuf>,
     /// `serve --touch --touch-from FILE`: the head pads read from a test input.
     touch_from: Option<PathBuf>,
+    /// `discover-head --lines-from FILE`: the candidates read from a test input.
+    lines_from: Option<PathBuf>,
 }
 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
@@ -126,7 +130,9 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             ]
             .contains(&option.as_str()),
             "probe" => option == "--pins",
-            "discover-head" => ["--seconds", "--rest-seconds"].contains(&option.as_str()),
+            "discover-head" => {
+                ["--seconds", "--rest-seconds", "--lines-from"].contains(&option.as_str())
+            }
             "calibrate-touch" => [
                 "--pins",
                 "--output",
@@ -170,6 +176,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             "--replay" => out.replay = Some(value.into()),
             "--privacy-from" => out.privacy_from = Some(value.into()),
             "--touch-from" => out.touch_from = Some(value.into()),
+            "--lines-from" => out.lines_from = Some(value.into()),
             "--clock-id" => out.clock = Some(value),
             "--bus-root" => {
                 let path = PathBuf::from(value);
@@ -418,7 +425,8 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             "{}",
             serde_json::to_string(&lamp_controls::head_discovery::run(
                 args.seconds.unwrap(),
-                args.rest_seconds.unwrap_or(0)
+                args.rest_seconds.unwrap_or(0),
+                args.lines_from.as_deref(),
             )?)?
         );
         return Ok(());
