@@ -525,6 +525,10 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `body` | moves the lamp | — | `body` |
   | `output_limits` | caps the light and the volume at set hours | — | `output_limits` |
   | `messages` | sends a short message to your phone | — | `messages` |
+  | `propose_say` | suggests its own words for the lamp to say, quoted; the lamp may say no | — | an add-on's `propose` naming `say`, or `say = "quoted"` |
+  | `propose_light` | suggests a change of light; the lamp may say no | — | an add-on's `propose` naming `light` |
+  | `propose_move` | suggests a small move; the lamp may say no | — | an add-on's `propose` naming `move` |
+  | `propose_mood` | suggests a change of mood; the lamp may say no | — | an add-on's `propose` naming `mood` |
   | `camera` | uses the camera when it runs | the privacy switch stops it | `look` |
   | `faces` | notices faces in front of it, with the camera | the privacy switch stops it | `humans/faces/tracked` |
   | `known_faces` | knows whether a face is one it has met, never whose | the privacy switch stops it | `known_faces` |

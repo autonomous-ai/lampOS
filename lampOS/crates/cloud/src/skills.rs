@@ -153,7 +153,7 @@ pub struct Use {
 }
 
 /// What a skill may use, by machine name, in the order the page shows it.
-pub const USES: [Use; 17] = [
+pub const USES: [Use; 21] = [
     use_of("speak", "speaks, or plays a short sound", false),
     use_of("light", "changes the light", false),
     use_of("body", "moves the lamp", false),
@@ -163,6 +163,28 @@ pub const USES: [Use; 17] = [
         false,
     ),
     use_of("messages", "sends a short message to your phone", false),
+    // An add-on's only output, `propose` (lampOS/docs/addons.md): each act
+    // it may propose, which the lamp's judge may drop.
+    use_of(
+        "propose_say",
+        "suggests its own words for the lamp to say, quoted; the lamp may say no",
+        false,
+    ),
+    use_of(
+        "propose_light",
+        "suggests a change of light; the lamp may say no",
+        false,
+    ),
+    use_of(
+        "propose_move",
+        "suggests a small move; the lamp may say no",
+        false,
+    ),
+    use_of(
+        "propose_mood",
+        "suggests a change of mood; the lamp may say no",
+        false,
+    ),
     use_of("camera", "uses the camera when it runs", true),
     use_of(
         "faces",
@@ -238,6 +260,20 @@ pub fn may_use(permissions: &Permissions) -> Vec<Use> {
         if given {
             named.insert(name);
         }
+    }
+    for act in &permissions.propose {
+        named.insert(match act.as_str() {
+            "say" => "propose_say",
+            "light" => "propose_light",
+            "move" => "propose_move",
+            "mood" => "propose_mood",
+            _ => continue,
+        });
+    }
+    // The say grant goes only with `propose` naming `say`; either names the
+    // same row, so the person reads that its words may reach the voice.
+    if permissions.say.as_deref() == Some("quoted") {
+        named.insert("propose_say");
     }
     for topic in &permissions.topics {
         named.insert(topic_use(topic));
@@ -919,6 +955,29 @@ pub mod tests {
             ]
         );
         assert!(may_use(&Permissions::default()).is_empty());
+        // An add-on: each act it may propose, in the page's order, and its
+        // say grant the same row as proposing `say`.
+        let addon = Permissions {
+            propose: vec!["mood".into(), "say".into(), "note".into()],
+            say: Some("quoted".into()),
+            ..Permissions::default()
+        };
+        let names: Vec<&str> = may_use(&addon).iter().map(|used| used.name).collect();
+        assert_eq!(names, ["propose_say", "propose_mood"]);
+        let quoted_only = Permissions {
+            say: Some("quoted".into()),
+            ..Permissions::default()
+        };
+        assert_eq!(
+            may_use(&quoted_only)
+                .iter()
+                .map(|used| (used.name, used.says))
+                .collect::<Vec<_>>(),
+            [(
+                "propose_say",
+                "suggests its own words for the lamp to say, quoted; the lamp may say no"
+            )]
+        );
         // Every name is the page's key, once.
         let names: BTreeSet<&str> = USES.iter().map(|used| used.name).collect();
         assert_eq!(names.len(), USES.len());
