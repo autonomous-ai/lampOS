@@ -1003,6 +1003,8 @@ the policy as the lamp would:
 - `short` asks lines under the commit's floor from 0.2 s, as `LAMP_ENDPOINT_SHORT_VERDICT` does. Each turn says its `short_asks`.
 - `start` counts the line's start toward `LEAST_MS` (`ConfirmPolicy::count_start`), as `LAMP_ENDPOINT_LEAST_SPEECH_MS` does with its floor in `LEAST_MS`; so `lower:400:0.9:500:start` is the switch at 500 beside `lamp:400:0.9:800`. Each turn says its `speech_ms`, as counted.
 
+`--unfinished-below P` and `--unsure-ms MS` are the night dials, `LAMP_ENDPOINT_UNFINISHED_BELOW` and `LAMP_ENDPOINT_UNSURE_MS`, read as the voice reads them (`lamp_voice::activity::unfinished_below` and `unsure_ms`: 0.01 to 0.6, and 600 to 1500 ms in steps of 10). A value out of range is refused, not ignored. With either, each clip and profile is replayed twice, `"dials": "before"` as the profile is and `"dials": "after"` with them, and each line says the `unfinished_below` and `unsure_ms` it ran with (0 is the silence window). Each turn's `basis`, `p` and `silence_ms` are its end's.
+
 On 21 Oct (#2135, #1722 07:45) neither paid. On 53 real-speech lines the second ask ended 1 line 140 ms sooner. On 428 played lines it ended 12 sooner and cut 2 in two. The short verdict changed no End on either, for 340 more inferences. Both are kept to measure the next real bundles. Its evidence for #782 is in
 [verification/comma-pause-20261015/](verification/comma-pause-20261015/).
 
