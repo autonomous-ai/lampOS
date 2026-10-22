@@ -1,0 +1,28 @@
+{
+  "external_log_bytes": 33131,
+  "external_log_sha256": "ca19adad124f2be0db375ea31bc9d33d17ec2c719072e2de421894bc8cd5e630",
+  "format": "Exact non-lint warning excerpts; inclusive one-based source ranges.",
+  "segments": [
+    {
+      "label": "observed rustup existing-settings warning",
+      "first_line": 277,
+      "last_line": 278,
+      "bytes": 165,
+      "sha256": "8b2a4b8e80b9155b987818d67bdf4b3cf2f52b57e99e0d374e78507cec871d25",
+      "text_lines": [
+        "2026-10-22T17:30:47.4562658Z warn: it looks like you have an existing rustup settings file at:\n",
+        "2026-10-22T17:30:47.4562996Z warn: /home/runner/.rustup/settings.toml\n"
+      ]
+    },
+    {
+      "label": "observed Clippy job action-runtime warning",
+      "first_line": 414,
+      "last_line": 414,
+      "bytes": 313,
+      "sha256": "8f4b1dfe9d510416493118ae60883e3f97116b1fe8fef59437661584bc81736e",
+      "text_lines": [
+        "2026-10-22T17:32:20.8991568Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n"
+      ]
+    }
+  ]
+}

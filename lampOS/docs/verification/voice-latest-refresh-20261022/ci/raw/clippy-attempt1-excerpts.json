@@ -1,0 +1,44 @@
+{
+  "external_log_bytes": 4741,
+  "external_log_sha256": "b5e01b883e4036380af7672be90b0315e511c5d272da0c887f6bca03b0aeab87",
+  "format": "Each segment retains exact original UTF-8 lines. Join text_lines with no separator and encode UTF-8 to verify the segment byte count and SHA256. Ranges are one-based inclusive. These are excerpts, not complete logs.",
+  "segments": [
+    {
+      "label": "complete attempted apt command and output through cancellation/cleanup",
+      "first_line": 35,
+      "last_line": 62,
+      "bytes": 2636,
+      "sha256": "483d34e9a996ef2e7b24b11ae67401c91848c7e4b005b91e0116add32f094cbc",
+      "text_lines": [
+        "2026-10-22T16:42:42.4161743Z ##[group]Run sudo apt-get update\n",
+        "2026-10-22T16:42:42.4162419Z \u001b[36;1msudo apt-get update\u001b[0m\n",
+        "2026-10-22T16:42:42.4163269Z \u001b[36;1msudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \\\u001b[0m\n",
+        "2026-10-22T16:42:42.4164825Z \u001b[36;1m  ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev\u001b[0m\n",
+        "2026-10-22T16:42:42.4206958Z shell: /usr/bin/bash -e {0}\n",
+        "2026-10-22T16:42:42.4207845Z ##[endgroup]\n",
+        "2026-10-22T16:42:42.5517438Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]\n",
+        "2026-10-22T16:42:42.5840220Z Get:6 https://packages.microsoft.com/ubuntu/22.04/prod jammy InRelease [3632 B]\n",
+        "2026-10-22T16:42:42.6808064Z Get:7 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main arm64 Packages [661 kB]\n",
+        "2026-10-22T16:42:42.7017867Z Get:8 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main amd64 Packages [919 kB]\n",
+        "2026-10-22T16:42:57.8281091Z Ign:2 http://azure.archive.ubuntu.com/ubuntu jammy InRelease\n",
+        "2026-10-22T16:42:57.8282533Z Ign:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates InRelease\n",
+        "2026-10-22T16:42:57.8283553Z Ign:4 http://azure.archive.ubuntu.com/ubuntu jammy-backports InRelease\n",
+        "2026-10-22T16:42:57.8284871Z Ign:5 http://azure.archive.ubuntu.com/ubuntu jammy-security InRelease\n",
+        "2026-10-22T16:42:58.8290705Z Ign:2 http://azure.archive.ubuntu.com/ubuntu jammy InRelease\n",
+        "2026-10-22T16:42:58.8347055Z Ign:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates InRelease\n",
+        "2026-10-22T16:42:58.8348540Z Ign:4 http://azure.archive.ubuntu.com/ubuntu jammy-backports InRelease\n",
+        "2026-10-22T16:42:58.8349792Z Ign:5 http://azure.archive.ubuntu.com/ubuntu jammy-security InRelease\n",
+        "2026-10-22T16:42:59.6897359Z Hit:2 https://archive.ubuntu.com/ubuntu jammy InRelease\n",
+        "2026-10-22T16:42:59.8671886Z Get:3 https://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]\n",
+        "2026-10-22T16:43:00.4162391Z Ign:9 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages\n",
+        "2026-10-22T16:43:00.4163635Z Ign:10 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en\n",
+        "2026-10-22T16:43:00.4165469Z Ign:11 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages\n",
+        "2026-10-22T16:43:00.4166457Z Ign:12 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en\n",
+        "2026-10-22T16:43:00.4945676Z Get:4 https://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]\n",
+        "2026-10-22T16:43:00.7725581Z Get:5 https://archive.ubuntu.com/ubuntu jammy-security InRelease [129 kB]\n",
+        "2026-10-22T17:27:59.8166758Z ##[error]The operation was canceled.\n",
+        "2026-10-22T17:27:59.8324343Z Cleaning up orphan processes\n"
+      ]
+    }
+  ]
+}

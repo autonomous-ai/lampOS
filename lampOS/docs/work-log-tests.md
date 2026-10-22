@@ -1,5 +1,33 @@
 # Tests work log
 
+## 2026-10-23 00:45 +0700 — Voice terminal Linux checks retain failed Mac qualification
+
+Ready for lamp-voice: **no, [#3023](https://github.com/autonomous-ai/lampOS/pull/3023)**.
+Head `735b2cb5d` has terminal ARM workflow and actual job success:
+[39816208565 / 119955315181](https://github.com/autonomous-ai/lampOS/actions/runs/39816208565/job/119955315181).
+This is the full-workspace **PR-profile parallel** run: four cores, realtime
+included, **10,552/0/67** with one passing LEAK; Voice library **3,414/0**.
+The two own-harness binaries run separately: relay_signals reports ok, process
+**12/0**; workspace doctests **4/0**. These counts are separate from nextest.
+It is not the workflow's `full=true` serial mode.
+
+Clippy run [39816208251](https://github.com/autonomous-ai/lampOS/actions/runs/39816208251)
+attempt 1 / job `119955314523` was cancelled during apt setup, before checkout,
+Rust or lint. One same-head retry, attempt 2 / job `119979869875`, completed
+strict workspace/all-target Clippy successfully. Both successful jobs checked
+merge `482eedcaf` into `0de443066`; authored parent remains `ec5428a34`.
+[Terminal appendix](verification/voice-latest-refresh-20261022/ci/) preserves
+both attempts, exact commands/identities, lossless raw excerpts, original log
+hashes and availability limits. Actual filename-collision and setup/action
+warnings are recorded; no separate Linux formatting execution was run.
+
+The full Mac consumer **1,916/1/11** and candidate parallel **3,366/18/14**
+remain failed. The unchanged current-head **3,387/7/14** control has two named
+overlaps and waives none of them. All seven assigned cases passed those Voice
+library observations, but no current result establishes common causality or
+clears the failed gates. No new test, source change or device run was performed
+for this publication; latest-parent and reviewer disposition remain.
+
 ## 2026-10-23 00:39 +0700 — unchanged current-head Voice control retains seven failures
 
 Ready for lamp-voice: **no, [#3023](https://github.com/autonomous-ai/lampOS/pull/3023)**.

@@ -1,0 +1,94 @@
+{
+  "record": {
+    "id": 119955314523,
+    "run_id": 39816208251,
+    "run_attempt": 1,
+    "head_sha": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "head_branch": "tests/1569-voice-full-run-events",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "created_at": "2026-10-22T16:42:37Z",
+    "started_at": "2026-10-22T16:42:40Z",
+    "completed_at": "2026-10-22T17:28:01Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39816208251/job/119955314523",
+    "name": "lampOS — clippy, every crate and target (x86 Linux)",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-22T16:42:41Z",
+        "completed_at": "2026-10-22T16:42:42Z"
+      },
+      {
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "number": 2,
+        "started_at": "2026-10-22T16:42:42Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 3,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 4,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 5,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 6,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "clippy (every crate and target, warnings as errors)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 7,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 8,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-22T17:27:59Z",
+        "completed_at": "2026-10-22T17:27:59Z"
+      }
+    ]
+  },
+  "external_original_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci/clippy/terminal-job.json",
+  "external_original_bytes": 3074,
+  "external_original_sha256": "ea3fbad97390ec597b5f1b90260c08a67bd31f8cf04e26fdbeb91661b24d7e51",
+  "fields_omitted": "API actor/author/account, runner identity, credentials and unrelated repository fields. Steps retain only name, number, status, conclusion and timestamps."
+}

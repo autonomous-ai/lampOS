@@ -1,0 +1,25 @@
+{
+  "arm64_output_filename_collision_diagnostics": 8,
+  "unique_colliding_output_paths": [
+    "target/release/examples/replay_cost",
+    "target/release/examples/replay_cost.dwp",
+    "target/release/examples/progress_cost",
+    "target/release/examples/progress_cost.dwp"
+  ],
+  "occurrences": "The four paths are reported in the release build and again in nextest compilation.",
+  "affected_example_packages": {
+    "replay_cost": [
+      "lamp-expression",
+      "lamp-controls"
+    ],
+    "progress_cost": [
+      "lamp-tasks",
+      "lamp-policy"
+    ]
+  },
+  "arm64_action_runtime_warning": true,
+  "clippy_attempt2_existing_rustup_settings_warning": true,
+  "clippy_attempt2_action_runtime_warning": true,
+  "clippy_strict_rust_command_conclusion": "success",
+  "limitation": "The successful jobs are not claimed warning-free. These receipts establish the observed warnings, without assigning their origin or treating them as new source changes."
+}

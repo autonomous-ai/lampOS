@@ -1,0 +1,152 @@
+{
+  "external_log_bytes": 1803747,
+  "external_log_sha256": "a6cd5cefec2328c1b95a5ec36d9a8eca69fa55a4445e7e01f289a94b2d6859cf",
+  "format": "Each segment retains exact original UTF-8 lines. Join text_lines with no separator and encode UTF-8 to verify the segment byte count and SHA256. Ranges are one-based inclusive. These are excerpts, not complete logs.",
+  "segments": [
+    {
+      "label": "checkout merge declaration",
+      "first_line": 238,
+      "last_line": 238,
+      "bytes": 145,
+      "sha256": "a98bf2e8ee12710e4d5b8a6cce69613aec7bfd04467fa6946fd9f8a62d158fbc",
+      "text_lines": [
+        "2026-10-22T16:43:27.3372552Z HEAD is now at 482eedc Merge 735b2cb5db21176a0ad80fcb42c48e739f8362fe into 0de443066a369eddd21a84f9416fcfc7fd74d316\n"
+      ]
+    },
+    {
+      "label": "full checked-out commit hash",
+      "first_line": 240,
+      "last_line": 241,
+      "bytes": 140,
+      "sha256": "49ad32a5c03a567130e99b97d88ea9b4d669f0ba6bb4b80bd92ebb60bf02a6cb",
+      "text_lines": [
+        "2026-10-22T16:43:27.3952695Z [command]/usr/bin/git log -1 --format=%H\n",
+        "2026-10-22T16:43:27.3978484Z 482eedcaf1e4c21c87b5752d50a57167097c603c\n"
+      ]
+    },
+    {
+      "label": "actual nextest workspace command, exclusions, pr profile and four-core parallelism",
+      "first_line": 612,
+      "last_line": 625,
+      "bytes": 909,
+      "sha256": "7404c7eb5bff32a2dbf57849d27f2b76bb216401eae7d0cedc72789e7096cb07",
+      "text_lines": [
+        "2026-10-22T16:48:23.5184537Z ##[group]Run echo \"cores: $(nproc)\"\n",
+        "2026-10-22T16:48:23.5185205Z \u001b[36;1mecho \"cores: $(nproc)\"\u001b[0m\n",
+        "2026-10-22T16:48:23.5185711Z \u001b[36;1mfilter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'\u001b[0m\n",
+        "2026-10-22T16:48:23.5186286Z \u001b[36;1mif [ -n \"$PICKED\" ]; then filter=\"$filter & ($PICKED)\"; fi\u001b[0m\n",
+        "2026-10-22T16:48:23.5186792Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m\n",
+        "2026-10-22T16:48:23.5187146Z \u001b[36;1m  --profile pr \\\u001b[0m\n",
+        "2026-10-22T16:48:23.5187471Z \u001b[36;1m  --no-tests=pass -j num-cpus \\\u001b[0m\n",
+        "2026-10-22T16:48:23.5187799Z \u001b[36;1m  --partition hash:1/1 \\\u001b[0m\n",
+        "2026-10-22T16:48:23.5188087Z \u001b[36;1m  -E \"$filter\"\u001b[0m\n",
+        "2026-10-22T16:48:23.5210464Z shell: /usr/bin/bash -e {0}\n",
+        "2026-10-22T16:48:23.5210861Z env:\n",
+        "2026-10-22T16:48:23.5211077Z   PICKED: \n",
+        "2026-10-22T16:48:23.5211349Z ##[endgroup]\n",
+        "2026-10-22T16:48:23.5499247Z cores: 4\n"
+      ]
+    },
+    {
+      "label": "nextest run identity and primary inventory",
+      "first_line": 661,
+      "last_line": 662,
+      "bytes": 215,
+      "sha256": "a131ca5f9729a333274bfdba10d781103742fecd22fc1e799d4f587589568db9",
+      "text_lines": [
+        "2026-10-22T16:58:39.1266414Z  Nextest run ID 1b6d1802-c06d-4498-a4dd-b633c5141dd9 with nextest profile: pr\n",
+        "2026-10-22T16:58:39.1266980Z     Starting 10552 tests across 162 binaries (67 tests and 2 binaries skipped)\n"
+      ]
+    },
+    {
+      "label": "selected lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "first_line": 6862,
+      "last_line": 6862,
+      "bytes": 168,
+      "sha256": "420b66f8c3809c82c01ab32b4ae8a527b75d430bb1c439b640f38cb5e22eec05",
+      "text_lines": [
+        "2026-10-22T17:00:39.6290935Z         PASS [   1.091s] ( 6200/10552) lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "first_line": 7703,
+      "last_line": 7703,
+      "bytes": 191,
+      "sha256": "814f59a3a5a60b6c63829c410b4884c5e6745a620c0fb748a987db006cc82010",
+      "text_lines": [
+        "2026-10-22T17:00:53.1394608Z         PASS [   0.116s] ( 7041/10552) lamp-voice coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "first_line": 8577,
+      "last_line": 8577,
+      "bytes": 198,
+      "sha256": "da00b4e1fd5655a98c1462622e4b633bfa8a4ea485973fda05bd885b6065427e",
+      "text_lines": [
+        "2026-10-22T17:01:09.8794478Z         PASS [   0.014s] ( 7915/10552) lamp-voice provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "first_line": 8602,
+      "last_line": 8602,
+      "bytes": 173,
+      "sha256": "725fc3e9c7816c066652ef5c8d62ec8fcd49b31a69f28b994da2bee696099b4f",
+      "text_lines": [
+        "2026-10-22T17:01:10.2000800Z         PASS [   0.008s] ( 7940/10552) lamp-voice provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "first_line": 8623,
+      "last_line": 8623,
+      "bytes": 169,
+      "sha256": "56a1688fd4d1828b4cda98f216b13efe10a65494e443b53d71487dfb879616f0",
+      "text_lines": [
+        "2026-10-22T17:01:10.5984920Z         PASS [   0.054s] ( 7961/10552) lamp-voice provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "first_line": 8880,
+      "last_line": 8880,
+      "bytes": 161,
+      "sha256": "60e6f3d71c5a8932bbb6be6e69467900dc0d488f333dde8a59999a213b61bf98",
+      "text_lines": [
+        "2026-10-22T17:01:14.2020730Z         PASS [   0.007s] ( 8218/10552) lamp-voice remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "first_line": 9850,
+      "last_line": 9850,
+      "bytes": 190,
+      "sha256": "bf60341f15b80c55e53ba85ae24318811fa37168c6b5810718676ffada58846b",
+      "text_lines": [
+        "2026-10-22T17:01:22.3649254Z         PASS [   0.011s] ( 9188/10552) lamp-voice second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply\n"
+      ]
+    },
+    {
+      "label": "selected lamp-voice second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "first_line": 9864,
+      "last_line": 9864,
+      "bytes": 168,
+      "sha256": "e2bfb2b2cb977b988b66a3752b06b13f0a9e2a339e9be51f17c67c211b465a8d",
+      "text_lines": [
+        "2026-10-22T17:01:22.3969965Z         PASS [   0.008s] ( 9202/10552) lamp-voice second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going\n"
+      ]
+    },
+    {
+      "label": "terminal primary nextest summary",
+      "first_line": 11216,
+      "last_line": 11216,
+      "bytes": 106,
+      "sha256": "2816304a82cf886e017ab46c32726beba7c438d660be8c771c984d8aece6e824",
+      "text_lines": [
+        "2026-10-22T17:01:38.3344220Z      Summary [ 179.208s] 10552 tests run: 10552 passed (1 leaky), 67 skipped\n"
+      ]
+    }
+  ]
+}

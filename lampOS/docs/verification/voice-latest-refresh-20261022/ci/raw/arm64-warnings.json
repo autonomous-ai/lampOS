@@ -1,0 +1,75 @@
+{
+  "external_log_bytes": 1803747,
+  "external_log_sha256": "a6cd5cefec2328c1b95a5ec36d9a8eca69fa55a4445e7e01f289a94b2d6859cf",
+  "format": "Exact warning excerpts with inclusive one-based source ranges; join text_lines without separators.",
+  "segments": [
+    {
+      "label": "observed output filename collision diagnostics",
+      "first_line": 468,
+      "last_line": 487,
+      "bytes": 2972,
+      "sha256": "1960a94665be4530fef5c24f8478703cb172deaa7d5e8e5a0ec10016b1adbd36",
+      "text_lines": [
+        "2026-10-22T16:44:15.9208436Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\n",
+        "2026-10-22T16:44:15.9209489Z   |\n",
+        "2026-10-22T16:44:15.9210460Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n",
+        "2026-10-22T16:44:15.9211784Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:44:15.9212344Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:44:15.9212962Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\n",
+        "2026-10-22T16:44:15.9213452Z   |\n",
+        "2026-10-22T16:44:15.9214551Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n",
+        "2026-10-22T16:44:15.9215782Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:44:15.9216342Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:44:15.9217084Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\n",
+        "2026-10-22T16:44:15.9217558Z   |\n",
+        "2026-10-22T16:44:15.9218467Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n",
+        "2026-10-22T16:44:15.9219640Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:44:15.9220200Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:44:15.9220823Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\n",
+        "2026-10-22T16:44:15.9221318Z   |\n",
+        "2026-10-22T16:44:15.9222224Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n",
+        "2026-10-22T16:44:15.9223392Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:44:15.9223944Z   = help: consider changing their names to be unique or compiling them separately\n"
+      ]
+    },
+    {
+      "label": "observed output filename collision diagnostics",
+      "first_line": 626,
+      "last_line": 645,
+      "bytes": 2972,
+      "sha256": "285602f3f2a725f7063ce87ad6707840ebd909488fd271aa6274b709411549dc",
+      "text_lines": [
+        "2026-10-22T16:48:24.0182611Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\n",
+        "2026-10-22T16:48:24.0183207Z   |\n",
+        "2026-10-22T16:48:24.0184568Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n",
+        "2026-10-22T16:48:24.0185953Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:48:24.0186617Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:48:24.0187297Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\n",
+        "2026-10-22T16:48:24.0187840Z   |\n",
+        "2026-10-22T16:48:24.0188914Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n",
+        "2026-10-22T16:48:24.0190194Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:48:24.0190828Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:48:24.0191549Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\n",
+        "2026-10-22T16:48:24.0192061Z   |\n",
+        "2026-10-22T16:48:24.0193050Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n",
+        "2026-10-22T16:48:24.0194480Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:48:24.0195130Z   = help: consider changing their names to be unique or compiling them separately\n",
+        "2026-10-22T16:48:24.0195813Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\n",
+        "2026-10-22T16:48:24.0196808Z   |\n",
+        "2026-10-22T16:48:24.0197789Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n",
+        "2026-10-22T16:48:24.0199012Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n",
+        "2026-10-22T16:48:24.0199658Z   = help: consider changing their names to be unique or compiling them separately\n"
+      ]
+    },
+    {
+      "label": "observed ARM job action-runtime warning",
+      "first_line": 12009,
+      "last_line": 12009,
+      "bytes": 341,
+      "sha256": "24fa03c50da80790c7e15bd4fbfaf10210eba8f42c93b4dc198e73956ac182a9",
+      "text_lines": [
+        "2026-10-22T17:02:00.8687394Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n"
+      ]
+    }
+  ]
+}

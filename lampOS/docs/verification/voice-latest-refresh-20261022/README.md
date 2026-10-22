@@ -7,7 +7,7 @@ clears the consumer failure. This receipt is for pushed head
 [`735b2cb5d`](https://github.com/autonomous-ai/lampOS/commit/735b2cb5db21176a0ad80fcb42c48e739f8362fe),
 parent `ec5428a34`, on [#3023](https://github.com/autonomous-ai/lampOS/pull/3023).
 
-| Native command | Actual terminal result | Wall time |
+| Mac command | Actual terminal result | Wall time |
 |---|---|---:|
 | `cargo fmt --all --check` | exit 0 | 12.693 s |
 | strict all-target Clippy: Voice and five consumers | exit 0 | 89.647 s |
@@ -15,8 +15,10 @@ parent `ec5428a34`, on [#3023](https://github.com/autonomous-ai/lampOS/pull/3023
 | full serial five-consumer command, `--no-fail-fast` | **exit 101** | 2,213.501 s |
 | separate `cargo build --workspace --offline` | exit 0; source unchanged | 67.417 s |
 
-Native x86_64 macOS, offline dependencies, four compiler jobs, no debug info
-or incremental compilation, explicit `--test-threads=1`. Exact argv,
+The captured Mac execution context reports Darwin x86_64; physical hardware
+ISA and translation were not established by this receipt. It used offline
+dependencies, four compiler jobs, no debug info or incremental compilation,
+and explicit `--test-threads=1`. Exact argv,
 environment, times and hashes are in [results.json](results.json) and
 [workspace-build-result.json](workspace-build-result.json). The original
 driver stopped on consumer exit 101 and did not run its planned build; the
@@ -93,11 +95,21 @@ doc/fixture closure. The [compiled inventory](compiled-inventory.json) is
 **3,398 = 3,390 + eight upstream additions**, with no removed test names;
 both raw name lists were compared and remain external with their digests.
 
-[Qualification state](qualification.json) remains failed/not ready. Fresh
-current-head CI is pending; no old-head CI is reused as current evidence.
-The fixed default-parallel base/candidate Voice pair is running separately;
-its live outputs and results are excluded here. The latest-parent window
-and independent reviewer read remain. Earlier
+[Qualification state](qualification.json) remains failed/not ready. The
+[terminal CI appendix](ci/) records full-workspace ARM64 PR-profile parallel
+qualification, including realtime, at **10,552/0/67** and Voice **3,414/0**.
+Clippy's original setup attempt was cancelled before checkout or lint; its
+one same-head retry passed. Both attempts, exact merge identities, separate
+doctest/own-harness counts and observed warnings remain in the appendix.
+A separate Linux formatting execution was not run.
+
+The completed [fixed default-parallel pair](../voice-ec-parallel-20261022/)
+is **3,384/0/14** on EC and **3,366/18/14** on the candidate; all seven assigned
+cases and kept-start pass both. A separate
+[unchanged-current-head control](../voice-current-parallel-control-20261023/)
+failed **3,387/7/14**, with two named overlaps. Those changed-base observations
+do not waive the candidate's 18 failures or this full consumer failure.
+The latest-parent window and independent reviewer disposition remain. Earlier
 [full failures and controls](../voice-full-run-events-final-20261022/README.md)
 and the [prior serial timeout/completion](../voice-serial-refresh-20261022/README.md)
 remain recorded; this receipt erases none of them.

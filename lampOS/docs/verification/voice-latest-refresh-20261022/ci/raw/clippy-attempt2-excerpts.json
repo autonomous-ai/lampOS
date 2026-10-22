@@ -1,0 +1,87 @@
+{
+  "external_log_bytes": 33131,
+  "external_log_sha256": "ca19adad124f2be0db375ea31bc9d33d17ec2c719072e2de421894bc8cd5e630",
+  "format": "Each segment retains exact original UTF-8 lines. Join text_lines with no separator and encode UTF-8 to verify the segment byte count and SHA256. Ranges are one-based inclusive. These are excerpts, not complete logs.",
+  "segments": [
+    {
+      "label": "checkout merge declaration",
+      "first_line": 267,
+      "last_line": 267,
+      "bytes": 145,
+      "sha256": "59cc3c46635bb7fba34df6399c02f24944c278362454037c7453ac684754e0f6",
+      "text_lines": [
+        "2026-10-22T17:30:47.0439704Z HEAD is now at 482eedc Merge 735b2cb5db21176a0ad80fcb42c48e739f8362fe into 0de443066a369eddd21a84f9416fcfc7fd74d316\n"
+      ]
+    },
+    {
+      "label": "full checked-out commit hash",
+      "first_line": 269,
+      "last_line": 270,
+      "bytes": 140,
+      "sha256": "4dc1cc7aef0d8d7fedabd1b22aa8740baf879f4ec0fa6734042ecf65b910085e",
+      "text_lines": [
+        "2026-10-22T17:30:47.0798448Z [command]/usr/bin/git log -1 --format=%H\n",
+        "2026-10-22T17:30:47.0810808Z 482eedcaf1e4c21c87b5752d50a57167097c603c\n"
+      ]
+    },
+    {
+      "label": "installed toolchain",
+      "first_line": 286,
+      "last_line": 286,
+      "bytes": 111,
+      "sha256": "131d003defbe646db66a6b76cf9610bf1c8549da00171d27ac4193b0ec7c6d53",
+      "text_lines": [
+        "2026-10-22T17:30:53.8937966Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)\n"
+      ]
+    },
+    {
+      "label": "complete strict workspace all-target Clippy command and output",
+      "first_line": 359,
+      "last_line": 398,
+      "bytes": 4330,
+      "sha256": "da0a1f5776c22faf0fccbcabaa3c9ca6a6167c12c59247a88719518585592f5e",
+      "text_lines": [
+        "2026-10-22T17:31:21.3030970Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings\n",
+        "2026-10-22T17:31:21.3031261Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m\n",
+        "2026-10-22T17:31:21.3045157Z shell: /usr/bin/bash -e {0}\n",
+        "2026-10-22T17:31:21.3045302Z ##[endgroup]\n",
+        "2026-10-22T17:31:21.3384077Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu\n",
+        "2026-10-22T17:31:21.5825902Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)\n",
+        "2026-10-22T17:31:21.5895449Z info: component clippy is up to date\n",
+        "2026-10-22T17:31:21.5898116Z info: downloading component rustfmt\n",
+        "2026-10-22T17:31:22.1556926Z     Checking lamp-msgs v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/msgs)\n",
+        "2026-10-22T17:31:22.1646448Z     Checking lamp-audio v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/audio)\n",
+        "2026-10-22T17:31:24.2519193Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)\n",
+        "2026-10-22T17:31:24.2520092Z     Checking lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)\n",
+        "2026-10-22T17:31:24.2520726Z     Checking lamp-schedule v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/schedule)\n",
+        "2026-10-22T17:31:24.2521358Z     Checking lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)\n",
+        "2026-10-22T17:31:24.4081103Z     Checking lamp-health v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/health)\n",
+        "2026-10-22T17:31:24.6241329Z     Checking lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)\n",
+        "2026-10-22T17:31:25.6092754Z     Checking lamp-memory v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/memory)\n",
+        "2026-10-22T17:31:25.9394950Z     Checking lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)\n",
+        "2026-10-22T17:31:25.9395508Z     Checking lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)\n",
+        "2026-10-22T17:31:25.9395979Z     Checking lamp-actions v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/actions)\n",
+        "2026-10-22T17:31:26.5514486Z     Checking lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)\n",
+        "2026-10-22T17:31:26.5515218Z     Checking lamp-ears v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ears)\n",
+        "2026-10-22T17:31:26.9404837Z     Checking lamp-records v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/records)\n",
+        "2026-10-22T17:31:27.0812407Z     Checking lamp-eyes v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/eyes)\n",
+        "2026-10-22T17:31:27.2809118Z     Checking lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)\n",
+        "2026-10-22T17:31:28.0223681Z     Checking lamp-air v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/air)\n",
+        "2026-10-22T17:31:28.4830255Z     Checking lamp-surround v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/surround)\n",
+        "2026-10-22T17:31:28.7131242Z     Checking lamp-name v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/name)\n",
+        "2026-10-22T17:31:28.8229643Z     Checking lamp-mood v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/mood)\n",
+        "2026-10-22T17:31:29.1643742Z     Checking lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)\n",
+        "2026-10-22T17:31:29.2822214Z     Checking lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)\n",
+        "2026-10-22T17:31:29.5231509Z     Checking lamp-settings v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/settings)\n",
+        "2026-10-22T17:31:30.3151249Z     Checking lamp-peek v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/peek)\n",
+        "2026-10-22T17:31:30.4233264Z     Checking lamp-addons v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/addons)\n",
+        "2026-10-22T17:31:30.7443071Z     Checking lamp-selftest v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/selftest)\n",
+        "2026-10-22T17:31:30.7443890Z     Checking lamp-station v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/station)\n",
+        "2026-10-22T17:31:48.7831166Z     Checking lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)\n",
+        "2026-10-22T17:31:49.5604849Z     Checking lamp-voice-eval v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-eval)\n",
+        "2026-10-22T17:31:51.9441316Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)\n",
+        "2026-10-22T17:32:20.6960860Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 58.76s\n"
+      ]
+    }
+  ]
+}

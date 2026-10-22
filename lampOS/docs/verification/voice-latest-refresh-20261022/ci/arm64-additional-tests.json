@@ -1,0 +1,490 @@
+{
+  "nextest_count_excludes_this_step": true,
+  "commands": [
+    "cargo test --locked --release --workspace --doc -- --test-threads=1",
+    "cargo test --locked --release -p lamp-ipc --test relay_signals",
+    "cargo test --locked --release -p lamp-turn-end-wire --test process"
+  ],
+  "doctests": {
+    "harnesses": 46,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "by_crate": [
+      {
+        "crate": "lamp_actions",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_addons",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_air",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_audio",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_body",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_bus",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_camera",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_cloud",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_controls",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_ears",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_environment",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_expression",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_eyes",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_gemini",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_health",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_ipc",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_keeper",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_lean",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_local_time",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_memory",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_mood",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_msgs",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_name",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_near_call",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_observer",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_peek",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_policy",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_records",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_ring",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_same_voice",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_schedule",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_selftest",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_settings",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_setup",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_skills",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_sound_fixtures",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_station",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_surround",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_tasks",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_turn_end",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_turn_end_wire",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_turn_owner",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_update",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_voice",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_voice_eval",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      },
+      {
+        "crate": "lamp_voice_processes",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0,
+        "seconds": 0.0
+      }
+    ]
+  },
+  "relay_signals": {
+    "result": "relay_signals: ok",
+    "numeric_case_count": "Not emitted by this own-harness output; do not invent a numeric test count."
+  },
+  "turn_end_wire_process": {
+    "passed": 12,
+    "failed": 0,
+    "rows": [
+      {
+        "test": "an_idle_worker_stays_ready_across_a_long_quiet",
+        "milliseconds": 2011
+      },
+      {
+        "test": "a_worker_reporting_another_model_is_refused_before_any_request",
+        "milliseconds": 2
+      },
+      {
+        "test": "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+        "milliseconds": 4
+      },
+      {
+        "test": "verdict_carries_identity_and_one_request_at_a_time",
+        "milliseconds": 56
+      },
+      {
+        "test": "missing_model_is_final_and_never_restarted",
+        "milliseconds": 162
+      },
+      {
+        "test": "missing_executable_fails_at_once",
+        "milliseconds": 2
+      },
+      {
+        "test": "startup_failures_are_final",
+        "milliseconds": 411
+      },
+      {
+        "test": "serving_failures_are_replaced_within_budget",
+        "milliseconds": 514
+      },
+      {
+        "test": "protocol_violations_are_replaced",
+        "milliseconds": 177
+      },
+      {
+        "test": "cancelled_answers_are_never_delivered",
+        "milliseconds": 155
+      },
+      {
+        "test": "close_during_inference_never_waits",
+        "milliseconds": 233
+      },
+      {
+        "test": "sustained_requests_stay_bounded",
+        "milliseconds": 692
+      }
+    ]
+  },
+  "step_conclusion": "success",
+  "raw": "raw/arm64-doctests-own-harness.json"
+}

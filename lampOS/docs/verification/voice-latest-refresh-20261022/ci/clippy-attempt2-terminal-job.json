@@ -1,0 +1,102 @@
+{
+  "record": {
+    "id": 119979869875,
+    "run_id": 39816208251,
+    "run_attempt": 2,
+    "head_sha": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "head_branch": "tests/1569-voice-full-run-events",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-22T17:30:24Z",
+    "started_at": "2026-10-22T17:30:27Z",
+    "completed_at": "2026-10-22T17:32:22Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39816208251/job/119979869875",
+    "name": "lampOS — clippy, every crate and target (x86 Linux)",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-22T17:30:28Z",
+        "completed_at": "2026-10-22T17:30:29Z"
+      },
+      {
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-22T17:30:29Z",
+        "completed_at": "2026-10-22T17:30:40Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-22T17:30:40Z",
+        "completed_at": "2026-10-22T17:30:47Z"
+      },
+      {
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-22T17:30:47Z",
+        "completed_at": "2026-10-22T17:30:53Z"
+      },
+      {
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-22T17:30:53Z",
+        "completed_at": "2026-10-22T17:31:20Z"
+      },
+      {
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-22T17:31:20Z",
+        "completed_at": "2026-10-22T17:31:21Z"
+      },
+      {
+        "name": "clippy (every crate and target, warnings as errors)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-22T17:31:21Z",
+        "completed_at": "2026-10-22T17:32:20Z"
+      },
+      {
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 8,
+        "started_at": "2026-10-22T17:32:20Z",
+        "completed_at": "2026-10-22T17:32:20Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-10-22T17:32:20Z",
+        "completed_at": "2026-10-22T17:32:20Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-10-22T17:32:20Z",
+        "completed_at": "2026-10-22T17:32:20Z"
+      }
+    ]
+  },
+  "external_original_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci-clippy-attempt2/clippy/terminal-job.json",
+  "external_original_bytes": 3299,
+  "external_original_sha256": "31c7a7a56e70917db1c5aa93e3f3079d1487c299541bac00031f069466a5fb72",
+  "fields_omitted": "API actor/author/account, runner identity, credentials and unrelated repository fields. Steps retain only name, number, status, conclusion and timestamps."
+}

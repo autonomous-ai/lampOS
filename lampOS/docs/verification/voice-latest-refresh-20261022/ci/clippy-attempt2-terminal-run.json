@@ -1,0 +1,34 @@
+{
+  "record": {
+    "id": 39816208251,
+    "run_number": 2104,
+    "run_attempt": 2,
+    "head_sha": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "head_branch": "tests/1569-voice-full-run-events",
+    "status": "completed",
+    "conclusion": "success",
+    "event": "pull_request",
+    "created_at": "2026-10-22T17:30:23Z",
+    "updated_at": "2026-10-22T17:32:23Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39816208251",
+    "name": "lampOS clippy",
+    "path": ".github/workflows/lampos-clippy.yml",
+    "pull_requests": [
+      {
+        "number": 3023,
+        "head": {
+          "ref": "tests/1569-voice-full-run-events",
+          "sha": "735b2cb5db21176a0ad80fcb42c48e739f8362fe"
+        },
+        "base": {
+          "ref": "lamp-voice",
+          "sha": "0de443066a369eddd21a84f9416fcfc7fd74d316"
+        }
+      }
+    ]
+  },
+  "external_original_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci-clippy-attempt2/clippy/terminal-run.json",
+  "external_original_bytes": 14364,
+  "external_original_sha256": "4c12e50a8a32b2c9bf4b9c4be164e233d206a9f361a345d5cedff246a35de1e5",
+  "fields_omitted": "API actor/author/account, runner identity, credentials and unrelated repository fields. Steps retain only name, number, status, conclusion and timestamps."
+}

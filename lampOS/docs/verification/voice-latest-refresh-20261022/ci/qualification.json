@@ -1,0 +1,84 @@
+{
+  "source_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "branch_parent": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "tested_merge": "482eedcaf1e4c21c87b5752d50a57167097c603c",
+  "merge_base": "0de443066a369eddd21a84f9416fcfc7fd74d316",
+  "ready_for_lamp_voice": false,
+  "ready_blockers": [
+    "Existing full Mac consumer command exit101: 1916 passed, 1 failed, 11 ignored (Update Round watchdog).",
+    "Existing fixed Mac default-parallel Voice after command exit101: 3366 passed, 18 failed, 14 ignored; EC before passed 3384/0/14."
+  ],
+  "arm64": {
+    "run": 39816208565,
+    "attempt": 1,
+    "job": 119955315181,
+    "workflow": "success",
+    "job_conclusion": "success",
+    "nextest_passed": 10552,
+    "nextest_failed": 0,
+    "nextest_skipped": 67,
+    "passing_leak": 1,
+    "voice_library_passed": 3414,
+    "selected_assigned_passed": 7,
+    "update_selfcut_seconds": 1.091
+  },
+  "clippy": [
+    {
+      "run": 39816208251,
+      "attempt": 1,
+      "job": 119955314523,
+      "workflow": "cancelled",
+      "job_conclusion": "cancelled",
+      "clippy_executed": false,
+      "checkout_executed": false,
+      "reason_limit": "Cancelled while apt-get update was running; API does not establish any more specific cause."
+    },
+    {
+      "run": 39816208251,
+      "attempt": 2,
+      "job": 119979869875,
+      "workflow": "success",
+      "job_conclusion": "success",
+      "clippy_executed": true,
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "checked_merge": "482eedcaf1e4c21c87b5752d50a57167097c603c",
+      "reported_clippy_seconds": 58.76,
+      "source_unchanged_from_attempt1": true
+    }
+  ],
+  "separate_linux_fmt_executed": false,
+  "new_execution_by_packaging": false,
+  "pending_required_jobs_in_these_terminal_records": 0,
+  "full_logs": {
+    "arm64": {
+      "bytes": 1803747,
+      "sha256": "a6cd5cefec2328c1b95a5ec36d9a8eca69fa55a4445e7e01f289a94b2d6859cf",
+      "external_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci/arm64/job.log"
+    },
+    "clippy-attempt1": {
+      "bytes": 4741,
+      "sha256": "b5e01b883e4036380af7672be90b0315e511c5d272da0c887f6bca03b0aeab87",
+      "external_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci/clippy/job.log"
+    },
+    "clippy-attempt2": {
+      "bytes": 33131,
+      "sha256": "ca19adad124f2be0db375ea31bc9d33d17ec2c719072e2de421894bc8cd5e630",
+      "external_path": "/private/tmp/tests-voice-latest-refresh-20261022/ci-clippy-attempt2/clippy/job.log"
+    }
+  },
+  "nextest_pr_default_filter": "all()",
+  "nextest_pr_realtime_included": true,
+  "nextest_configuration_provenance": "nextest-profile-source.json",
+  "arm64_additional_tests": "arm64-additional-tests.json",
+  "warnings": "warning-summary.json",
+  "current_upstream_comparison": {
+    "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+    "exit": 101,
+    "passed": 3387,
+    "failed": 7,
+    "ignored": 14,
+    "overlapping_candidate_failures": 2,
+    "candidate_failures_waived": 0,
+    "receipt": "https://github.com/autonomous-ai/lampOS/tree/e8f065cb61c5964f48cb75bbd04d0bbb333cf669/lampOS/docs/verification/voice-current-parallel-control-20261023"
+  }
+}

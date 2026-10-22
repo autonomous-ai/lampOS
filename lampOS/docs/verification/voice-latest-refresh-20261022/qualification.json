@@ -1,5 +1,5 @@
 {
-  "status": "failed_consumer_qualification",
+  "status": "failed_consumer_and_parallel_qualification",
   "ready_for_lamp_voice": false,
   "source_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
   "source_parent": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
@@ -44,11 +44,63 @@
     "compiled_identity": false,
     "cause": "unproven"
   },
-  "current_ci": "Fresh735 jobs started/requested after push; no terminal current-head result is part of this receipt.",
-  "parallel_pair": "A fixed one-before/one-after default-parallel Voice library pair is in progress separately. No live pair output or counts included.",
+  "current_ci": {
+    "appendix": "ci/README.md",
+    "arm64_run": 39816208565,
+    "arm64_job": 119955315181,
+    "arm64_conclusion": "success",
+    "arm64_scope": "full-workspace PR-profile parallel, realtime included; distinct from full=true serial scheduling",
+    "arm64_nextest": {
+      "passed": 10552,
+      "failed": 0,
+      "skipped": 67,
+      "passing_leak": 1
+    },
+    "voice_library_passed": 3414,
+    "clippy_run": 39816208251,
+    "clippy_attempt1": {
+      "job": 119955314523,
+      "conclusion": "cancelled",
+      "lint_executed": false
+    },
+    "clippy_attempt2": {
+      "job": 119979869875,
+      "conclusion": "success"
+    },
+    "separate_linux_fmt_run": false
+  },
+  "parallel_pair": {
+    "receipt": "../voice-ec-parallel-20261022/",
+    "before": {
+      "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "exit": 0,
+      "passed": 3384,
+      "failed": 0,
+      "ignored": 14
+    },
+    "after": {
+      "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+      "exit": 101,
+      "passed": 3366,
+      "failed": 18,
+      "ignored": 14
+    },
+    "all_seven_assigned_and_kept_start_pass_both": true,
+    "causality": "unresolved"
+  },
   "remaining": [
-    "Resolve/disposition the failed Update consumer observation with the responsible reviewer.",
-    "Fresh exact-head Linux checks, latest-parent window and reviewer read."
+    "Responsible reviewer disposition of the failed Update consumer observation and all 18 candidate parallel failures.",
+    "Latest-parent window and independent reviewer disposition; Linux success does not waive failed Mac gates."
   ],
-  "no_new_gates_during_packaging": true
+  "no_new_gates_during_packaging": true,
+  "current_upstream_control": {
+    "receipt": "../voice-current-parallel-control-20261023/",
+    "head": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+    "exit": 101,
+    "passed": 3387,
+    "failed": 7,
+    "ignored": 14,
+    "overlaps_with_candidate_failures": 2,
+    "candidate_failures_waived": 0
+  }
 }

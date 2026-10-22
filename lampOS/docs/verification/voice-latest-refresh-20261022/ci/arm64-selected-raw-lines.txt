@@ -1,0 +1,10 @@
+2026-10-22T16:43:27.3372552Z HEAD is now at 482eedc Merge 735b2cb5db21176a0ad80fcb42c48e739f8362fe into 0de443066a369eddd21a84f9416fcfc7fd74d316
+2026-10-22T17:00:39.6290935Z         PASS [   1.091s] ( 6200/10552) lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart
+2026-10-22T17:00:53.1394608Z         PASS [   0.116s] ( 7041/10552) lamp-voice coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news
+2026-10-22T17:01:09.8794478Z         PASS [   0.014s] ( 7915/10552) lamp-voice provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet
+2026-10-22T17:01:10.2000800Z         PASS [   0.008s] ( 7940/10552) lamp-voice provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by
+2026-10-22T17:01:10.5984920Z         PASS [   0.054s] ( 7961/10552) lamp-voice provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply
+2026-10-22T17:01:14.2020730Z         PASS [   0.007s] ( 8218/10552) lamp-voice remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked
+2026-10-22T17:01:22.3649254Z         PASS [   0.011s] ( 9188/10552) lamp-voice second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply
+2026-10-22T17:01:22.3969965Z         PASS [   0.008s] ( 9202/10552) lamp-voice second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going
+2026-10-22T17:01:38.3344220Z      Summary [ 179.208s] 10552 tests run: 10552 passed (1 leaky), 67 skipped

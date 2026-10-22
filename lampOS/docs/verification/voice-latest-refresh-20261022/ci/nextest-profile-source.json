@@ -1,0 +1,27 @@
+{
+  "path": "lampOS/.config/nextest.toml",
+  "source_heads": [
+    "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "0de443066a369eddd21a84f9416fcfc7fd74d316"
+  ],
+  "git_blob_ids": [
+    "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+    "3463c6682e8126b0c02cedda3d67cfc5bc081169"
+  ],
+  "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "bytes": 5157,
+  "parents_byte_identical": true,
+  "tested_merge_file_read": false,
+  "provenance_limit": "Read both source-head and base-parent Git blobs locally. The tested synthetic merge file was not read directly; unchanged parents support the normal-merge inference.",
+  "pr_profile_excerpt": {
+    "first_line": 67,
+    "last_line": 68,
+    "text_lines": [
+      "[profile.pr]\n",
+      "default-filter = 'all()'\n"
+    ]
+  },
+  "default_filter": "all()",
+  "realtime_included_in_default_selection": true,
+  "realtime_group_max_threads": 1
+}
