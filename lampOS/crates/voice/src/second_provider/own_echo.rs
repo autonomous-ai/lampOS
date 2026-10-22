@@ -11,22 +11,28 @@
 //! (`Start`'s `over_the_lamps_voice`), or within [`TAIL_US`] after the time
 //! its words sent would have played to their end (the same end the rule's
 //! conversation goes on from, [`super::Did::Said`]), is judged against the
-//! lamp's latest answer so far with the journal's own word matching
-//! ([`super::word_key`]):
+//! lamp's latest answer so far. A heard word is the lamp's own only inside a
+//! run of at least [`STRIP_RUN`] heard words that the answer says in the
+//! same order, one after another ([`super::word_key`] matching); the
+//! journal's count matches words as a set, so its K can be higher.
 //!
-//! - mostly the lamp's own words (M ≥ N/2, at least [`HELD_LEAST`]): held as its echo, not answered;
-//! - fewer, all of them one run at the line's start or its end, at least
-//!   [`STRIP_RUN`] words: that run is taken out of what the model is sent.
-//!   Own words anywhere else, or one alone, leave the line as heard.
+//! - every word the lamp's own, in such runs, and at least [`HELD_LEAST`]
+//!   words: held as its echo, not answered;
+//! - one such run at the line's start or its end, the rest words the lamp
+//!   did not say: that run is taken out of what the model is sent. Own words
+//!   anywhere else leave the line as heard.
 //!
-//! A person repeating the lamp is never held, nor has words taken out: a line
-//! begun later than the tail, one with the lamp's name
-//! ([`crate::attention::called_by_name_on`], or only the name called), a
-//! question of its own ([`crate::remarks::questions`] with at least one word
-//! that is not the lamp's: "Did you say five o'clock?"), or one begun after
-//! the lamp's words when they ended on a question (its answer: "Yes, start
-//! it." after "Shall I start it?") is the person's, sent as heard. The
-//! journal says counts only, never words.
+//! A line that adds a word the lamp did not say is never held. A line is the
+//! person's and sent as heard, never held nor cut, when it begins later than
+//! the tail, has the lamp's name ([`crate::attention::called_by_name_on`],
+//! or only the name called), is a question of its own
+//! ([`crate::remarks::questions`] with at least one word that is not the
+//! lamp's: "Did you say five o'clock?"), begins after the lamp's words when
+//! they ended on a question ("Yes, start it." after "Shall I start it?"), or
+//! answers an offer in the answer ([`OFFERS`]): begun after the lamp's
+//! words, or over its voice with a word the lamp did not say. Only a line
+//! heard over the lamp's voice that is nothing but the offer's own words is
+//! still held. The journal says counts only, never words.
 
 /// How long after the lamp's words would have played to their end a line
 /// may begin and still be judged as its echo: 1.5 s. The end is when the
@@ -45,6 +51,27 @@ pub const STRIP_RUN: usize = 2;
 /// a short line sharing two common words with the answer ("it is raining"
 /// over "it is five") is as likely the person's barging in.
 pub const HELD_LEAST: usize = 3;
+
+/// Words that make the lamp's answer an offer the person may take up, each
+/// matched as a run of [`super::word_key`] words anywhere in the answer (so
+/// "I can't" is not "I can"). A line answering one ("set a reminder for
+/// six" after "I can set a reminder for six.") repeats the lamp's words
+/// because it accepts them, so it is the person's, "?" or not. Kept short
+/// and English on purpose: a missed offer only leaves the line judged as
+/// before.
+pub const OFFERS: &[&str] = &[
+    "i can",
+    "i could",
+    "shall i",
+    "should i",
+    "want me to",
+    "would you like",
+    "do you want",
+    "let me know if",
+    "if you want",
+    "if you'd like",
+    "if you like",
+];
 
 /// The heard line, as the turn knows it.
 pub(super) struct Line<'a> {
@@ -69,14 +96,55 @@ pub(super) struct Said<'a> {
 /// What becomes of a heard line.
 #[derive(Debug, PartialEq)]
 pub(super) enum Echo {
-    /// Answered as heard, with the journal's line when it was mostly the
-    /// lamp's own words but the person's by a guard.
+    /// Answered as heard, with the journal's line when it would have been
+    /// held or had words taken out but is the person's by a guard.
     Answered(Option<String>),
     /// Held as the lamp's own echo, with the journal's line.
     Held(String),
     /// Answered with the lamp's own words at its start or end taken out:
     /// what the model is sent, and the journal's line.
     Stripped(String, String),
+}
+
+/// The answer's words as [`super::word_key`] keys, empty ones left out.
+fn keys(words: &str) -> Vec<String> {
+    words
+        .split_whitespace()
+        .map(super::word_key)
+        .filter(|key| !key.is_empty())
+        .collect()
+}
+
+/// Whether `answer`'s keys hold an offer of [`OFFERS`].
+fn offers(answer: &[String]) -> bool {
+    OFFERS.iter().any(|offer| {
+        let offer = keys(offer);
+        answer.windows(offer.len()).any(|window| window == offer)
+    })
+}
+
+/// Which of the `heard` words are the lamp's own: those inside a run of at
+/// least [`STRIP_RUN`] heard words said one after another, in that order,
+/// in `answer`. Words of the answer heard in another order are not.
+fn own_in_order(heard: &[&str], answer: &[String]) -> Vec<bool> {
+    let heard: Vec<String> = heard.iter().map(|word| super::word_key(word)).collect();
+    let mut own = vec![false; heard.len()];
+    for i in 0..heard.len() {
+        let longest = (0..answer.len())
+            .map(|at| {
+                heard[i..]
+                    .iter()
+                    .zip(&answer[at..])
+                    .take_while(|(word, said)| !word.is_empty() && word == said)
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+        if longest >= STRIP_RUN {
+            own[i..i + longest].fill(true);
+        }
+    }
+    own
 }
 
 /// Judge `line` against the lamp's answer `said`.
@@ -92,20 +160,25 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     if n == 0 {
         return Echo::Answered(None);
     }
-    let lamps: std::collections::HashSet<String> =
-        said.words.split_whitespace().map(super::word_key).collect();
-    let own: Vec<bool> = words
-        .iter()
-        .map(|word| {
-            let key = super::word_key(word);
-            !key.is_empty() && lamps.contains(&key)
-        })
-        .collect();
+    let answer = keys(said.words);
+    let own = own_in_order(&words, &answer);
     let m = own.iter().filter(|own| **own).count();
-    if m == 0 {
+    // Held: nothing the lamp did not say. Cut: one own run at an end.
+    let echo = m == n && n >= HELD_LEAST;
+    let leading = own.iter().take_while(|own| **own).count();
+    let trailing = own.iter().rev().take_while(|own| **own).count();
+    let cut = if m == 0 || m == n {
+        None
+    } else if leading == m {
+        Some((&words[m..], "start"))
+    } else if trailing == m {
+        Some((&words[..n - m], "end"))
+    } else {
+        None
+    };
+    if !echo && cut.is_none() {
         return Echo::Answered(None);
     }
-    let mostly = 2 * m >= n && m >= HELD_LEAST;
     let within = line.over_the_lamps_voice
         || line.began_us != 0
             && said.until_us != 0
@@ -118,42 +191,33 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it is a question of its own")
     } else if !line.over_the_lamps_voice && said.words.trim_end().ends_with('?') {
         Some("it began after the lamp's question")
+    } else if (!line.over_the_lamps_voice || m < n) && offers(&answer) {
+        Some("it answers the lamp's offer")
     } else {
         None
     };
     let of = said.request;
     if let Some(why) = guard {
-        return Echo::Answered(mostly.then(|| {
-            format!(
-                "lamp-voice second: request {request}: of its {n} words, {m} in the lamp's answer to request {of}, but {why}: answered as the person's (LAMP_SECOND_OWN_ECHO)"
-            )
-        }));
+        return Echo::Answered(Some(format!(
+            "lamp-voice second: request {request}: of its {n} words, {m} in the lamp's answer to request {of}, but {why}: answered as the person's (LAMP_SECOND_OWN_ECHO)"
+        )));
     }
     let when = if line.over_the_lamps_voice {
         "over the lamp's voice"
     } else {
         "within 1.5 s of the lamp's words"
     };
-    if mostly {
-        return Echo::Held(format!(
+    match cut {
+        None => Echo::Held(format!(
             "lamp-voice second: request {request}: its answer is held back: the lamp's own echo: of its {n} words, {m} in the lamp's answer to request {of}, begun {when} (LAMP_SECOND_OWN_ECHO)"
-        ));
-    }
-    let leading = own.iter().take_while(|own| **own).count();
-    let trailing = own.iter().rev().take_while(|own| **own).count();
-    let (kept, at) = if leading == m && m >= STRIP_RUN {
-        (&words[m..], "start")
-    } else if trailing == m && m >= STRIP_RUN {
-        (&words[..n - m], "end")
-    } else {
-        return Echo::Answered(None);
-    };
-    Echo::Stripped(
-        kept.join(" "),
-        format!(
-            "lamp-voice second: request {request}: {m} of its {n} words, the lamp's own answer to request {of} at its {at}, are taken out of what the model is sent (LAMP_SECOND_OWN_ECHO)"
+        )),
+        Some((kept, at)) => Echo::Stripped(
+            kept.join(" "),
+            format!(
+                "lamp-voice second: request {request}: {m} of its {n} words, the lamp's own answer to request {of} at its {at}, are taken out of what the model is sent (LAMP_SECOND_OWN_ECHO)"
+            ),
         ),
-    )
+    }
 }
 
 #[cfg(test)]
@@ -182,46 +246,136 @@ mod tests {
         }
     }
 
-    /// The journal's count and this judgement agree on whose words are
-    /// whose: the same matching.
+    /// The journal's count matches words as a set; this judgement counts
+    /// only runs in the answer's own order, so its count is never more than
+    /// the journal's: equal for a chunk heard in order, less for the same
+    /// words out of order.
     #[test]
-    fn its_counts_are_the_journals() {
+    fn its_counts_are_at_most_the_journals() {
+        let journal =
+            |heard: &str| super::super::whose_words(5, heard, None, Some((3, ANSWER.to_owned())));
         let heard = "the meeting starts at six";
-        let Echo::Held(journal) = judge(&line(heard, 9_000_000, true), Some(&said())) else {
+        let Echo::Held(held) = judge(&line(heard, 9_000_000, true), Some(&said())) else {
             panic!("held")
         };
-        let count = super::super::whose_words(5, heard, None, Some((3, ANSWER.to_owned())));
         assert_eq!(
-            count.as_deref(),
+            journal(heard).as_deref(),
             Some(
                 "lamp-voice second: request 5: of its 5 words, 5 in the lamp's answer to request 3 so far"
             )
         );
-        assert!(journal.contains("of its 5 words, 5 in the lamp's answer to request 3"));
+        assert!(held.contains("of its 5 words, 5 in the lamp's answer to request 3"));
+        // The same words out of order: 5 by the journal's set, none in order.
+        let shuffled = "six at starts meeting the";
+        assert_eq!(
+            journal(shuffled).as_deref(),
+            Some(
+                "lamp-voice second: request 5: of its 5 words, 5 in the lamp's answer to request 3 so far"
+            )
+        );
+        assert_eq!(
+            judge(&line(shuffled, 9_000_000, true), Some(&said())),
+            Echo::Answered(None)
+        );
     }
 
     #[test]
-    fn mostly_its_own_words_during_playback_are_held_as_its_echo() {
-        // 4 of 6 words the lamp's, over its voice.
+    fn a_true_echo_of_its_words_is_held() {
+        // A chunk of the answer heard over its voice.
+        assert_eq!(
+            judge(
+                &line("and the meeting starts at six", 9_000_000, true),
+                Some(&said())
+            ),
+            Echo::Held(
+                "lamp-voice second: request 5: its answer is held back: the lamp's own echo: of its 6 words, 6 in the lamp's answer to request 3, begun over the lamp's voice (LAMP_SECOND_OWN_ECHO)".to_owned()
+            )
+        );
+        // Two runs in order, a word dropped between, begun 1 s after the
+        // lamp's words would have ended.
+        assert_eq!(
+            judge(
+                &line("in Hanoi the meeting starts", UNTIL_US + 1_000_000, false),
+                Some(&said())
+            ),
+            Echo::Held(
+                "lamp-voice second: request 5: its answer is held back: the lamp's own echo: of its 5 words, 5 in the lamp's answer to request 3, begun within 1.5 s of the lamp's words (LAMP_SECOND_OWN_ECHO)".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn its_words_out_of_order_are_not_its_own() {
+        // Every word is in the answer, none two in its order.
+        for heard in ["six at starts meeting the", "meeting six Hanoi the at"] {
+            assert_eq!(
+                judge(&line(heard, 9_000_000, true), Some(&said())),
+                Echo::Answered(None),
+                "{heard}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_line_adding_words_the_lamp_did_not_say_is_never_held() {
+        // 4 of 6 words the lamp's, in order: not held, its run taken out.
         assert_eq!(
             judge(
                 &line("and the meeting starts uh huh", 9_000_000, true),
                 Some(&said())
             ),
-            Echo::Held(
-                "lamp-voice second: request 5: its answer is held back: the lamp's own echo: of its 6 words, 4 in the lamp's answer to request 3, begun over the lamp's voice (LAMP_SECOND_OWN_ECHO)".to_owned()
+            Echo::Stripped(
+                "uh huh".to_owned(),
+                "lamp-voice second: request 5: 4 of its 6 words, the lamp's own answer to request 3 at its start, are taken out of what the model is sent (LAMP_SECOND_OWN_ECHO)".to_owned()
             )
         );
-        // Half its words, begun 1 s after the lamp's would have ended.
+        // A partial echo of an answer that is no offer: the new words kept.
+        let set = Said {
+            words: "Your reminder is set for six.",
+            ..said()
+        };
+        assert!(matches!(
+            judge(&line("reminder is set for my dentist too", UNTIL_US + 500_000, false), Some(&set)),
+            Echo::Stripped(kept, _) if kept == "my dentist too"
+        ));
+    }
+
+    #[test]
+    fn a_line_taking_up_the_lamps_offer_is_the_persons() {
+        // Every word the lamp's, within the tail: answered.
+        let offer = Said {
+            words: "I can set a reminder for six.",
+            ..said()
+        };
         assert_eq!(
             judge(
-                &line("starts at six okay right now", UNTIL_US + 1_000_000, false),
-                Some(&said())
+                &line("set a reminder for six", UNTIL_US + 500_000, false),
+                Some(&offer)
             ),
-            Echo::Held(
-                "lamp-voice second: request 5: its answer is held back: the lamp's own echo: of its 6 words, 3 in the lamp's answer to request 3, begun within 1.5 s of the lamp's words (LAMP_SECOND_OWN_ECHO)".to_owned()
-            )
+            Echo::Answered(Some(
+                "lamp-voice second: request 5: of its 5 words, 5 in the lamp's answer to request 3, but it answers the lamp's offer: answered as the person's (LAMP_SECOND_OWN_ECHO)".to_owned()
+            ))
         );
+        // A partial echo plus new words: sent unchanged, after its words or
+        // over its voice.
+        let offer = Said {
+            words: "I can set a reminder.",
+            ..said()
+        };
+        for (began_us, over) in [(UNTIL_US + 500_000, false), (9_000_000, true)] {
+            assert!(matches!(
+                judge(&line("set a reminder for my dentist too", began_us, over), Some(&offer)),
+                Echo::Answered(Some(journal)) if journal.contains("it answers the lamp's offer")
+            ));
+        }
+        // Nothing but the offer's own words over its voice is still its echo.
+        assert!(matches!(
+            judge(&line("set a reminder", 9_000_000, true), Some(&offer)),
+            Echo::Held(_)
+        ));
+        // "I can't" is no offer.
+        assert!(!offers(&keys("I can't set a reminder.")));
+        assert!(offers(&keys("Would you like a reminder?")));
     }
 
     #[test]
@@ -232,11 +386,16 @@ mod tests {
             judge(&line("it is raining", 5_000_000, true), Some(&said())),
             Echo::Answered(None)
         );
+        // Only two words, both its own: too short to hold, nothing left to cut.
+        assert_eq!(
+            judge(&line("at six", 9_000_000, true), Some(&said())),
+            Echo::Answered(None)
+        );
     }
 
     #[test]
     fn the_persons_line_with_a_few_of_its_words_is_answered_as_heard() {
-        // "the" and "at" are the lamp's too, in its middle: 2 of 9.
+        // "the" and "at" are the lamp's too, in its middle, one alone.
         assert_eq!(
             judge(
                 &line(
@@ -371,6 +530,7 @@ mod tests {
         for heard in [
             "six set an alarm for seven thirty please Hanoi",
             "six set an alarm for seven thirty please",
+            "at six set an alarm in Hanoi",
         ] {
             assert_eq!(
                 judge(&line(heard, 9_000_000, true), Some(&said())),
