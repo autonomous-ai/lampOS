@@ -463,3 +463,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   #2887 is now stacked on #2874, so `asked` is the offer a spoken yes would put on now. `make-skill.sh` gained `MAKE_FROM=app` for #2813's lamp check, with stand-in arms.
 - **Fourteen:** #2814's screen merged (ecm-sds-mobile#38, plus #39 fixing two wire names). #2813 waits only on its lamp check.
 - **Note:** the screen-person script and media tool are under `/tmp/claude-1000/lamp-helper/` (my helper, 22 Oct).
+- **12:4x–13:0x:** #2768 merged (`da41d3657`); #2874 carried as #2909 and merged. #2887's three P2 fixes pushed and restacked onto lamp-voice (`fe6cec965`); #2889 restacked (`c0af364e9`). Full lamp-voice had 3 failures in provider/coordinator tests outside this change; each passed 2/2 alone.
+- **13:0x:** the first builder plays #2811 on lamp-4ace at 14:20–14:30. Mobile merged ecm-sds-mobile#39 and will run #2813 on lamp-0c89 once #2887 and #2889 are on a build.
