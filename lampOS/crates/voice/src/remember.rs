@@ -1564,6 +1564,34 @@ pub fn run_scoped(
     }
 }
 
+/// [`run_scoped`] for a keep whose line was admitted as the room's and whose
+/// known face the eyes named later (#2807,
+/// [`crate::memory_scope::ScopeLease::keeper_within`]): kept as `person`'s,
+/// while the lease still guards it. Revoked is never kept.
+pub fn run_scoped_for(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> (Value, bool) {
+    if lease.scope().is_none() {
+        return (gone(), false);
+    }
+    let result = run_for_guarded(
+        socket,
+        call,
+        deadline,
+        Some(person),
+        (Some(lease), Some(lease.key().request)),
+    );
+    if lease.is_current() {
+        result
+    } else {
+        (gone(), false)
+    }
+}
+
 /// [`run`] for this request's turn: with [`LINK_USED_ENVIRONMENT`], what it
 /// gives is linked to that request's exchange (#2176 finding 14).
 pub fn run_of(socket: &Path, call: &ToolCall, deadline: Duration, request: u64) -> (Value, bool) {
