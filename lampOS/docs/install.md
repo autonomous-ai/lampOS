@@ -625,7 +625,12 @@ mood socket, `/run/lampos-body/mood.sock`, with `lamp-body-mood`, five times
 0.2 s apart (an up voice tells it `resting` every 40 ms), and given 9 s
 (`HEAD_STAND_WAIT`) to stand and rest again, standing, before the self-test
 runs. It folds by itself 90 s after (`--awake-seconds`), however the steps
-end. With `lamp-body` not active nothing is stood and `head_move` says why. A key already in place is kept
+end. Step 1 needs `lamp-body` stopped and nothing after it starts it
+again, so step 4 starts a `lamp-body` that is not active
+(`systemctl start lamp-body`), whatever step the run began at, before the
+stand, and waits up to 30 s (`BODY_START_WAIT`) for its mood socket; one
+that does not come up fails step 4 and says to fix it first, since a
+self-test without it leaves `head_move` unchecked (#2818). A key already in place is kept
 when it is the same and fails the step when it is not. A failed step stops
 the rest and says which; `--from N` goes on from it. It runs nothing but
 the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests
