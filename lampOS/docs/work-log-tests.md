@@ -1,5 +1,56 @@
 # Tests work log
 
+## 2026-10-22 08:15:32  — Skills and rebased Tasks ready; Guard pushed; row 72 reproduced
+
+#2693 is ready at `bc8d8605e`. [ARM64 #5444](https://github.com/autonomous-ai/lampOS/actions/runs/39701618635)
+passed 9,945 tests (one leaky), 63 skipped, nextest 165.271 s; job 15m33s,
+plus doc/own-harness checks. Enabled/disabled add-on cases took 0.661/0.622 s.
+Clippy #1452 passed. CI checkout `a3af988` merged into `372188cc7`.
+The correction's range-diff and [ready request](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330179503)
+are on #2602; Reviewer-two owns its read/merge.
+
+Reviewer-two confirmed #2637's P3 correction with no P1/P2, then requested
+a plain current-base rebase. It is ready again at `1690f4c27` on `1f92c96ed`.
+Range-diff `!` is only changed hunk context; all eight files' added/removed
+lines are identical. Tasks and its complete local dependency trees match
+the prior green merge byte for byte. [ARM64 #5452](https://github.com/autonomous-ai/lampOS/actions/runs/39702646763)
+passed 9,961 tests (one leaky), 63 skipped, nextest 170.319 s; job 10m57s,
+plus doc/own-harness checks. Clippy #1460 passed. CI checkout `83d9403`
+merged into `bf8c3f2e1`. [Ready request](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330235589).
+
+#2647 stays ready at `83cdeab8c`, both native gates green. Reviewer-two
+confirmed on #2602 at 07:58 that this read remains Reviewer-lead's under
+First's 07:10 split. The approved add-on serve seam is delivered here;
+photo-faces was already merged in #2628. No duplicate seam PRs.
+
+#2625 is pushed at `7b21fa72a` on `1f92c96ed`, with a final plain `=` rebase.
+All relevant verified source hashes remain unchanged. The four earlier
+routine failures did not recur in one actual-base library run or one final
+Skills gate: 417 passed, zero failed/ignored; workspace build passed.
+The original failure remains recorded without a cause claim.
+[Compact evidence](https://github.com/autonomous-ai/lampOS/blob/7b21fa72afde49b6dd780f0234a4a6fed9503b07/lampOS/docs/verification/guard-mark-acks-20261022/README.md)
+includes all 24 samples, both controls, all failures and restoration proof.
+Clippy #1464 passed; [ARM64 #5456](https://github.com/autonomous-ai/lampOS/actions/runs/39703499366)
+is running, so the PR remains draft.
+
+#2653's remaining Expression controls behaved as required: both injected
+failures passed the old kill-on-start fixture and failed the restored
+natural-success assertion. Those controls and the three exact Mood
+baseline reproductions remain old-base evidence. The candidate was then
+rebased onto `1f92c96ed`, preserving the two restorations and only three
+fixture speedups. Fresh five-package gates passed **1,522 tests, 5 existing
+ignored**, with formatting, strict Clippy, workspace build and diff checks.
+Compact evidence is being prepared before the folded push and new CI.
+
+#1569 row 72's controlled 3 s host pause after continued-request capture
+mapping produced StaleInput 3/3 before and passed 3/3 after. Three clean
+cases and the full early-end module also passed. The first clean process
+wall was 9.2518 s and is retained. Controls use `0566796d7`; the candidate
+is now on `1f92c96ed`, with capture paths and Gemini source byte-identical
+between bases. Formatting/strict Voice+Gemini Clippy passed; full serial
+Voice is running. Sixth's lost original diagnostic is not identified as
+this reproduced defect. No ARM64 build on the Mac or device access.
+
 ## 2026-10-22 07:48:39  — add-ons and Tasks ready; Skills correction pushed
 
 #2703 and #2646 are merged (`0566796d7` and `515e43d3a` respectively);
