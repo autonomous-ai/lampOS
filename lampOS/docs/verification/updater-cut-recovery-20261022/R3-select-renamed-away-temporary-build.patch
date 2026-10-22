@@ -1,0 +1,11 @@
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -2310,7 +2310,7 @@
+         }
+         own::begin(self.records.folder(), &old, &file.sha256)
+             .map_err(|error| format!("self.json cannot be written: {error}"))?;
+-        replace_link(&link, &file.sha256).map_err(|error| {
++        replace_link(&link, &format!(".{}.lamp-update", file.sha256)).map_err(|error| {
+             format!(
+                 "{} cannot be pointed at {}: {error}",
+                 own::CURRENT,

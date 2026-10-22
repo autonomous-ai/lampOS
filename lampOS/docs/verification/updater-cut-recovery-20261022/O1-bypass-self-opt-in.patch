@@ -1,0 +1,12 @@
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -473,8 +473,7 @@
+     {
+         outcome = climbed;
+     }
+-    if config.self_switch
+-        && let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
++    if let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
+         && let Some(switched) = run.own(sequence)
+     {
+         outcome = switched;

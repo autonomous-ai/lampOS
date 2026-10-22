@@ -1,0 +1,12 @@
+--- a/lampOS/crates/update/src/own.rs
++++ b/lampOS/crates/update/src/own.rs
+@@ -440,8 +440,8 @@
+         replace_link(&on_root(root, CURRENT), &pending.old)
+             .map_err(|error| format!("{CURRENT}: {error}"))?;
+     }
++    end(records).map_err(|error| format!("{PENDING}: {error}"))?;
+     refuse(records, &pending.new)?;
+-    end(records).map_err(|error| format!("{PENDING}: {error}"))?;
+     say(&format!(
+         "lamp-update's build {} did not confirm itself ({}): {CURRENT} names {} again",
+         &pending.new[..12],

@@ -1,0 +1,12 @@
+--- a/lampOS/crates/update/src/own.rs
++++ b/lampOS/crates/update/src/own.rs
+@@ -436,6 +436,9 @@
+     if !is_build(&pending.old) || !is_build(&pending.new) {
+         return Err(format!("{PENDING} does not name two builds"));
+     }
++    if refused(records).contains(&pending.new) {
++        return Ok(Back::Nothing);
++    }
+     if link_names(root, &pending.new) {
+         replace_link(&on_root(root, CURRENT), &pending.old)
+             .map_err(|error| format!("{CURRENT}: {error}"))?;
