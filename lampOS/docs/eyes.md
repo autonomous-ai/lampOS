@@ -845,10 +845,19 @@ this room" until someone asks to be recognised.
     memory.md). The voice asks the eyes for that person under the name the
     eyes keep, read from the known file, never the model's guess, and never
     for anyone else's face (voice-side, `known_faces::forget_name`). A
-    room's line (no known person's) sends a forget only when the known file
-    names the person the model asked for, their face at the lamp now; else
-    nothing is sent and the model hears that only the asker's face, seen at
-    the lamp, can be forgotten (the first builder on #2602). A remove from the owner's page (`face.remove`) takes their
+    room's line (no known person's) sends a forget only when it is that
+    person's own: the eyes judged speaking through it (`LAMP_EYES_SPEAKING=on`),
+    the known file, fresh when the line was heard, named the person the
+    model asked for, and their face (`known-face`, beside it) was the only
+    one seen saying it. A visitor or a screen saying it while they sit
+    nearest, two faces speaking, no face read speaking, a line not judged,
+    or a known file stale when it was heard sends nothing, and the model
+    hears that only the asker's face, seen at the lamp, can be forgotten
+    (the first builder on #2602, El's P2 and P3 on #3018). The words are
+    judged at the line's end, so someone who sat down during a slow turn
+    did not say it. Speaking is read from a face's mouth, not its
+    liveness: a photo or a screen showing their face is not told from them.
+    A remove from the owner's page (`face.remove`) takes their
     memory too (cloud.md, "The faces it knows"). Memory names a person by
     their name's hash, so until person ids are stable (#2176 row 3), a new
     face kept under the same name would be given those memories.
