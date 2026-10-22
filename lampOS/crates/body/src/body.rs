@@ -2868,6 +2868,21 @@ const SET_STRAIGHT: [&str; 3] = [
     "My head is twisted too far. Please turn it gently back toward the middle, and I will start by myself.",
     "My base is turned too far. Please turn it gently back toward the middle, and I will start by myself.",
 ];
+/// Said instead when the head is found tipped up out of range, against its
+/// weight: its pitch keeps its torque, since let go it would drop onto the
+/// base or a hand (#2938), so no hand can set it straight while it waits.
+const PROPPED: &str = "My head is tipped up too far, and I am holding it so it does not drop. I need someone to help me set it straight.";
+/// How long the lamp asks before it stops (#2938): after this nobody has
+/// set it straight, and it stays let go, reads every `WAIT_READ_LATE` and
+/// says `STOPPED_ASKING` instead. Counted from the first time it let go in
+/// this run, so a take-hold that fails and lets go again does not restart it.
+pub const WAIT_ASKING: Duration = Duration::from_secs(600);
+/// Reads once the lamp has stopped asking: a fifth as often, and still
+/// often enough that the body's diagnostic, one per read then, stays inside
+/// the second `diagnostics` is declared at.
+pub const WAIT_READ_LATE: Duration = Duration::from_millis(500);
+/// What it says, no longer asking, once `WAIT_ASKING` has passed.
+pub const STOPPED_ASKING: &str = "Nobody has set me straight, so I have stopped asking. I am let go, and I will start by myself once I am set straight.";
 
 /// A start refused for a pose a hand can set straight (#2602): where each
 /// of pitch, roll and yaw may be found and start, the joints let go while
@@ -2925,15 +2940,21 @@ fn pose_wait(
         let (low, high) = ranges[*index];
         !(low..=high).contains(&found[*index])
     })?;
-    let joints = if stands {
+    let mut joints = if stands {
         Joint::ALL.to_vec()
     } else {
         COMMANDED.to_vec()
     };
+    // Let go only what gravity already holds (#2938): a head tipped up out
+    // of range (fewer counts, see `lifts`) keeps its torque.
+    let propped = found[0] < ranges[0].0;
+    if propped {
+        joints.retain(|joint| *joint != Joint::WristPitch);
+    }
     Some(PoseWait {
         ranges,
         joints,
-        say: SET_STRAIGHT[out],
+        say: if propped { PROPPED } else { SET_STRAIGHT[out] },
     })
 }
 
@@ -2945,11 +2966,14 @@ fn pose_wait(
 /// joints let go where they are, as `--torque on` does. Only torque off is
 /// written until then, and no goal. One that moves when taken hold of is
 /// let go again and waited for. Asked to stop, it ends let go; a wire that
-/// fails for `WIRE_STEPS` reads ends it as a run's would.
+/// fails for `WIRE_STEPS` reads ends it as a run's would. From `asked_since`
+/// plus `WAIT_ASKING` on it reads every `WAIT_READ_LATE` and says
+/// `STOPPED_ASKING`, still let go and still starting once set straight.
 fn wait_in_range<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
     wait: &PoseWait,
+    asked_since: Duration,
     (news, asked): (
         &mut impl FnMut() -> Option<(Mood, u8)>,
         &mut impl FnMut() -> (Asked, Priority, Option<Source>),
@@ -2960,7 +2984,13 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     let (mut misses, mut in_range) = (0u8, 0u8);
     let mut before: Option<[u16; 5]> = None;
     loop {
-        let due = bus.runtime.now() + WAIT_READ;
+        let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
+        let (every, say) = if late {
+            (WAIT_READ_LATE, STOPPED_ASKING)
+        } else {
+            (WAIT_READ, wait.say)
+        };
+        let due = bus.runtime.now() + every;
         if !matches!(bus.runtime.cancelled(), Ok(false)) {
             return Err(Stop::Cancelled);
         }
@@ -2974,7 +3004,7 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                 report.last = Some(now);
                 let pose = COMMANDED.map(|joint| now[joint.index()].position);
                 watch(&Glimpse {
-                    waiting: Some(wait.say),
+                    waiting: Some(say),
                     ..glimpse_of(Glimpse::default(), report.steps, &now, pose)
                 });
                 let positions = now.map(|sample| sample.position);
@@ -3325,14 +3355,17 @@ fn run_until_stopped(
     // #2602: refused for a pose a hand can set straight, it lets go, says
     // so and starts again once the pose is in range, until asked to stop.
     let mut said = None;
+    let mut asked_since = None;
     while matches!(report.stop, Stop::Refused { .. })
         && let Some(wait) = report.pose_wait.take()
     {
         said = Some(wait.say);
+        let since = *asked_since.get_or_insert_with(|| bus.runtime.now());
         if let Err(stop) = wait_in_range(
             &mut bus,
             &mut report,
             &wait,
+            since,
             (&mut news, &mut asked),
             &mut watch,
         ) {

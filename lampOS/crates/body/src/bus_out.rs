@@ -51,10 +51,12 @@ fn offered(glimpse: &Glimpse) -> bool {
 
 /// Offered steps between the body's reports, for the step `glimpse`.
 fn report_every(glimpse: &Glimpse) -> u32 {
-    if glimpse.waiting.is_some() {
-        WAITING_REPORT_EVERY
-    } else {
-        REPORT_EVERY
+    match glimpse.waiting {
+        // No longer asking (#2938), it reads every `WAIT_READ_LATE`: a
+        // report with each.
+        Some(crate::body::STOPPED_ASKING) => 1,
+        Some(_) => WAITING_REPORT_EVERY,
+        None => REPORT_EVERY,
     }
 }
 /// How long a message of where the joints are means anything. A body that

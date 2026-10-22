@@ -12363,6 +12363,70 @@ fn refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range()
     assert!(lamp.nothing_was_written() && report.refused_let_go.is_none());
 }
 
+/// #2938: a head found tipped up out of range, against its weight, is not
+/// let go, or it would drop onto the base or a hand: its pitch keeps its
+/// torque, the roll and the base are let go, and it says it holds the head.
+#[test]
+fn refused_with_its_head_tipped_up_it_keeps_holding_the_head() {
+    let (mut lamp, mut clock) = knocked(Duration::from_secs(2), None);
+    lamp.servos[PITCH].position = 1_500.0;
+    lamp.servos[PITCH].goal = 1_500;
+    let mut said = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        || None,
+        |glimpse| said.push(glimpse.waiting),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.refused_let_go, Some(PROPPED));
+    assert_eq!(lamp.servos[PITCH].torque, 1);
+    let pitch = Joint::WristPitch.id();
+    assert!(
+        !lamp.registers.iter().any(|(id, _, _)| *id == pitch),
+        "{:?}",
+        lamp.registers
+    );
+    for joint in [Joint::WristRoll, Joint::BaseYaw] {
+        assert_eq!(lamp.servos[usize::from(joint.id()) - 1].torque, 0);
+    }
+    assert!(!said.is_empty() && said.iter().all(|say| *say == Some(PROPPED)));
+}
+
+/// #2938: nobody setting it straight, after `WAIT_ASKING` it stops asking,
+/// stays let go and reads every `WAIT_READ_LATE` instead of `WAIT_READ`.
+#[test]
+fn nobody_setting_it_straight_it_stops_asking_and_reads_less() {
+    let (mut lamp, mut clock) = knocked(WAIT_ASKING + Duration::from_secs(60), None);
+    let mut said = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        || None,
+        |glimpse| said.push(glimpse.waiting),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let asking = said
+        .iter()
+        .filter(|say| **say == Some(SET_STRAIGHT[0]))
+        .count();
+    let stopped = said
+        .iter()
+        .filter(|say| **say == Some(STOPPED_ASKING))
+        .count();
+    // Ten reads a second for ten minutes, then two a second for one.
+    assert!((5_900..=6_001).contains(&asking), "{asking}");
+    assert!((110..=121).contains(&stopped), "{stopped}");
+    assert_eq!(asking + stopped, said.len());
+    for joint in COMMANDED {
+        assert_eq!(lamp.servos[usize::from(joint.id()) - 1].torque, 0);
+    }
+}
+
 /// Once a hand has set the head in range and it has stayed there a second,
 /// the lamp takes hold where it is and starts as it would have: the wake
 /// brings it home slowly and it runs.
@@ -12458,7 +12522,19 @@ fn the_ranges_waited_for_are_the_starts_own_bounds() {
         wait.ranges,
         [(1_940, 2_020), (1_984, 2_104), (1_955, 2_075)]
     );
-    assert_eq!(wait.joints, COMMANDED.to_vec());
+    // Found under its window, the head is tipped up: it keeps its torque.
+    assert_eq!(wait.joints, vec![Joint::WristRoll, Joint::BaseYaw]);
+    assert_eq!(wait.say, PROPPED);
+    let drooped = pose_wait(
+        &limits,
+        home,
+        at,
+        [2_030, 2_044, 2_015],
+        (true, false),
+        false,
+    )
+    .unwrap();
+    assert_eq!(drooped.joints, COMMANDED.to_vec());
     assert!(
         pose_wait(
             &limits,
