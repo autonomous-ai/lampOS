@@ -2,7 +2,7 @@
 //! lamp's name, is the name only when lamp-name heard it near (0.5 or
 //! more) within 1.3 s of the line's start. In 22 Oct's played rounds on
 //! lamp-4ace, 24 of 132 lines that began with the name had it written as
-//! another word ("Louvre", "Month", "Life", "Light", "Lynn"), and lamp-name
+//! another word ("Louvre", "Month", "Life", "Light", "Length"), and lamp-name
 //! said nothing at its bar of 0.9 for some whose clean files scored 0.97
 //! and more.
 use super::*;
@@ -77,7 +77,7 @@ async fn a_first_word_like_the_name_is_it_only_with_lamp_names_near_hearing() {
         Some("Hey Lamp, what time is it?")
     );
     assert_eq!(
-        asked_as("Lynn.", Some(Some(0.5))).await.0.as_deref(),
+        asked_as("Lump.", Some(Some(0.5))).await.0.as_deref(),
         Some("Lamp.")
     );
     for (heard, near) in [
@@ -85,6 +85,7 @@ async fn a_first_word_like_the_name_is_it_only_with_lamp_names_near_hearing() {
         (line, Some(Some(0.49))),
         (line, None),
         ("Thanks, I want to start reading more.", Some(Some(0.6))),
+        ("Lynn, pass me that", Some(Some(0.6))),
         ("Right, I'll be there at four.", Some(None)),
         ("Right, I'll be there at four.", Some(Some(0.6))),
         ("Louvre is a museum in Paris.", Some(Some(0.9))),
@@ -94,20 +95,21 @@ async fn a_first_word_like_the_name_is_it_only_with_lamp_names_near_hearing() {
 }
 
 /// The word's shape: one of the words written for "Lamp" on lamp-4ace,
-/// or one syllable from an L to an M, P or N. Never a word with an
-/// apostrophe, two syllables, or another ending.
+/// or one syllable from an L to an M, P or N. Never a person's name of
+/// that shape ("Lynn", "Lan", "Liam"), a word with an apostrophe, two
+/// syllables, or another ending.
 #[test]
 fn a_word_sounds_like_the_name_by_its_shape_or_as_heard_for_it() {
     use super::super::sounds_like_the_name;
     for like in [
-        "Louvre", "Month", "Life", "Light", "Length", "Lane", "Lynn", "Lan", "Lin", "line", "LUMP",
-        "loom", "Lean", "Learn", "lawn", "Lamb", "lip",
+        "Louvre", "Month", "Life", "Light", "Length", "line", "LUMP", "loom", "Lean", "Learn",
+        "lawn", "Lamb", "lip",
     ] {
         assert!(sounds_like_the_name(like), "{like}");
     }
     for not in [
         "Thanks", "Right", "Like", "Look", "Land", "Listen", "Lemon", "Lamps", "Lane's", "Mike",
-        "What", "No", "", "1",
+        "Lynn", "Lane", "Lan", "Lin", "Liam", "Lam", "Loan", "What", "No", "", "1",
     ] {
         assert!(!sounds_like_the_name(not), "{not}");
     }

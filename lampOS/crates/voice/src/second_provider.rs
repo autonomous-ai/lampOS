@@ -940,16 +940,27 @@ pub const NAME_NEAR_LEAST: f32 = 0.5;
 /// Words the speech to text wrote for "Lamp" at a line's start on
 /// lamp-4ace in 22 Oct's played rounds that the shape in
 /// [`sounds_like_the_name`] misses (`LAMP_NAME_NEAR`).
-const HEARD_FOR_THE_NAME: [&str; 7] =
-    ["louvre", "month", "life", "light", "length", "lane", "lynn"];
+const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
+
+/// People's names of the name's shape, that a colleague may call at a desk
+/// ("Lynn, pass me that"), English and Vietnamese: never the lamp's
+/// (`LAMP_NAME_NEAR`, the first builder's P3 on 3d0b34d50).
+const NAMES_OF_ITS_SHAPE: [&str; 15] = [
+    "lynn", "lyn", "lin", "linn", "lane", "lan", "len", "lam", "lim", "liam", "loan", "luan",
+    "lien", "leanne", "lorne",
+];
 
 /// Whether a word sounds like the lamp's name (`LAMP_NAME_NEAR`): one of
 /// [`HEARD_FOR_THE_NAME`], or one syllable from an L to an M, P or N
-/// ("Lan", "Lin", "Lump", "Loom", "Lean"; "-mb" as "Lamb" is an M).
-/// Never a word with an apostrophe, nor alone a call.
+/// ("Lump", "Loom", "Lean", "Line"; "-mb" as "Lamb" is an M), never a
+/// person's name of that shape ([`NAMES_OF_ITS_SHAPE`]). Never a word
+/// with an apostrophe, nor alone a call.
 fn sounds_like_the_name(word: &str) -> bool {
     let word = word.to_ascii_lowercase();
-    if !word.chars().all(|c| c.is_ascii_alphabetic()) || word.is_empty() {
+    if !word.chars().all(|c| c.is_ascii_alphabetic())
+        || word.is_empty()
+        || NAMES_OF_ITS_SHAPE.contains(&word.as_str())
+    {
         return false;
     }
     if HEARD_FOR_THE_NAME.contains(&word.as_str()) {

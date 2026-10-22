@@ -1120,8 +1120,9 @@ order is kept. A written turn is the same from the chat on.
     signs** (`named_near`): it is set off (past a greeting at most, then a
     comma or a stop, or it is the whole piece, `first_word_set_off`) and
     sounds like the name (`sounds_like_the_name`: one syllable from an L
-    to an M, P or N, or one of the words written for "Lamp" on lamp-4ace,
-    `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
+    to an M, P or N, never a person's name of that shape a colleague may
+    call at a desk, `NAMES_OF_ITS_SHAPE` ("Lynn, pass me that"), or one of
+    the words written for "Lamp" on lamp-4ace, `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
     (`NAME_NEAR_LEAST`) from 0.3 s before the line's first sound to 1.3 s
     after (`Heeding::near_name`). Then "Lamp" takes the word's place, so
     the rule and the model read the call, and a lone one waits for the line
