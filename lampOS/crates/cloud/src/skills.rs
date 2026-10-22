@@ -585,6 +585,25 @@ fn cut(text: &str, most: usize) -> String {
 pub mod tests {
     use super::*;
 
+    /// The off file as earlier builds of lamp-skills kept it (its
+    /// `tests/fixtures/stores/`): lamp-cloud reads the same skills off.
+    #[test]
+    fn each_kept_off_file_reads_the_same_skills_off() {
+        let kept: [(&str, &str); 1] = [(
+            "2026-10-22",
+            include_str!("../../skills/tests/fixtures/stores/off-2026-10-22"),
+        )];
+        for (day, text) in kept {
+            let places = places(&format!("kept-off-{day}"));
+            fs::write(&places.off, text).unwrap();
+            assert_eq!(
+                read_off(&places.off),
+                Some(BTreeSet::from(["sip".to_owned()])),
+                "{day}"
+            );
+        }
+    }
+
     /// A skills folder of its own, and an off file beside it.
     pub fn places(name: &str) -> Places {
         let root = PathBuf::from(format!("/tmp/lcsk-{name}-{}", std::process::id()));
