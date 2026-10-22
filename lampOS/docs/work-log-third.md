@@ -5,6 +5,49 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 08:25 — Controls native gates passed; waiting on First
+
+Ready for lamp-voice: yes (#2677; First owns merge and lamp-4ace checks).
+
+- #2677 head `4d94973f49293ee07b08699e8fb0ea0a95bcfe61` targets
+  `lamp-voice`, base `75bddc520`. Range-diff remains
+  `c3c272ff4 = 4d94973f4`; no source changed after the local gate.
+- Native [ARM64 39703666978](https://github.com/autonomous-ai/lampOS/actions/runs/39703666978)
+  passed on that head, tested as merge `2ebd167`: **9,991 nextest tests
+  passed (one leaky), 63 skipped**, four doc tests, `relay_signals`, and
+  all 12 own-harness tests passed. The release build, binary classification,
+  checksums and head-named artifact upload passed. The leak was
+  `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`;
+  it did not fail the gate. No ARM64 link on the Mac.
+- [Linux Clippy 39703666785](https://github.com/autonomous-ai/lampOS/actions/runs/39703666785)
+  passed for every workspace crate and target with warnings denied. All
+  PR checks are green. Updated the PR body, marked it ready, and posted
+  the [head, range-diff and gates](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330398835)
+  on #2602. First measures strip read latency during speech, RR 30,
+  thread-clock cost, and loop health on lamp-4ace. The clock calls are
+  outside `Service::step`; `longest_step_us` alone cannot measure their cost.
+- #2695 is merged as `1f92c96ed`; #2651 is merged as `613986c596`.
+  ResetOnFork remains absent in both Controls units: the strip keeps
+  RR 30 above Voice's RR 20 with the CPU-rest floor. #1362 remains draft.
+- The [resume audit](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329363812)
+  is delivered. Seventh owns the policy decision and is preparing separate
+  measurement and off-flag counting work; Third offered to read the latter.
+  No product change to the 30/40/110-block bounds by Third.
+- A read-only audit of #2487 at `75bddc520` finds that privacy needs 60 ms
+  stable permission but `microphone_not_allowed` consumes the pending wake.
+  A bounded retry would keep its original start and explicitly refuse any
+  success at/after 1.5 s: the current check bounds retries only. Preserve
+  mute/sleep cancellation and the separate 2 s wake-marker freshness.
+  Its fixture must send fresh capture after Allowed/StartCapture using the
+  new microphone generation. The existing fixture pre-grants permission,
+  so it misses the race. No code claimed: First's list names Fifth while
+  Fifth waits on Third; the [handoff question](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330281840)
+  remains with First/Fifth. The 500 ms tap-to-first-write target still needs
+  their lamp rerun, not a host claim.
+- No lamp accessed. `cargo clean` completed: 94,750 files, 25.8 GiB removed.
+  The source worktree is clean. Remaining steps belong to First (merge and
+  lamp checks), Seventh (policy/PR), and First/Fifth (wake code handoff).
+
 ## 2026-10-22 08:08 — Controls and strip CPU pacing pushed
 
 Ready for lamp-voice: no (#2677 awaits current-head native gates).
