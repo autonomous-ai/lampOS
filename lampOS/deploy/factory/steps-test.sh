@@ -23,6 +23,16 @@ cat >"$T/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "systemctl $*" >>"$FAKE_LOG"
 [[ $1 == is-active && $2 == lamp-expression ]] && { echo "${FAKE_EXPRESSION_STATE:-inactive}"; [[ ${FAKE_EXPRESSION_STATE:-inactive} == active ]]; exit; }
+# "start lamp-body": active from then on, its mood socket opened unless
+# FAKE_BODY_NO_SOCKET.
+if [[ $1 == start && $2 == lamp-body ]]; then
+  touch "$FAKE_LOG.body-started"
+  [[ -n ${FAKE_BODY_NO_SOCKET:-} ]] && exit 0
+  mkdir -p "$ETC_ROOT/run/lampos-body"
+  python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM).bind(sys.argv[1])' "$ETC_ROOT/run/lampos-body/mood.sock"
+  exit
+fi
+[[ $1 == is-active && -e $FAKE_LOG.body-started ]] && { echo active; exit 0; }
 [[ $1 == is-active ]] && { echo "${FAKE_BODY_STATE:-inactive}"; [[ ${FAKE_BODY_STATE:-inactive} == active ]]; exit; }
 [[ $1 == show ]] && { echo "Environment=${FAKE_CONTROLS_ENV:-}"; exit 0; }
 exit 0
@@ -104,7 +114,7 @@ lamp() {
   printf '{"chip":"/dev/gpiochip0","head_pads":[{"name":"head-1","line":37}]}\n' \
     >"$T/root/etc/lampOS/controls/controls-pins.json"
   : >"$T/log"
-  rm -f "$T/log.let-go"
+  rm -f "$T/log.let-go" "$T/log.body-started"
 }
 run() {
   ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 QUIET_WAIT=0 \
@@ -137,6 +147,11 @@ check "each stand is told listening on its own socket, and eased back" '[[ $(gre
 check "lamp.env holds this arm's stand" 'grep -q -- "--stand 1772,2054,2033,2637,2541 " "$T/root/$ENV" && grep -q "this arm.s, stood at 100%" "$T/root/$ENV"'
 check "a written run places the key" 'cmp -s "$KEYFILE" "$T/root/etc/lampOS/update/key.pub"'
 check "a written run runs the self-test after its yes" 'grep -q "^selftest --occasion factory" "$T/log"'
+# Step 1 left lamp-body stopped: a whole run starts it before step 4 and
+# stands it, so head_move is checked (#2818).
+check "a whole run starts lamp-body after step 1 and stands it for the self-test" '[[ $(grep "^measure\|systemctl start lamp-body\|^mood --socket $T/root/run/lampos-body\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "measure|systemctl start lamp-body|mood|selftest|" ]]'
+lamp; ASK_ANSWER=y FAKE_BODY_NO_SOCKET=1 BODY_START_WAIT=1 run --write --update-key "$KEYFILE"; status=$?
+check "a lamp-body that does not come up fails step 4 and says why" '[[ $status == 1 ]] && grep -q "lamp-body did not come up with .*mood.sock within 1 s: fix it" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out" && ! grep -q "^selftest" "$T/log"'
 lamp; ASK_ANSWER=y FAKE_SELFTEST_EXIT=3 run --write --update-key "$KEYFILE"; status=$?
 check "a part not checked (exit 3) counts as done" '[[ $status == 0 ]]'
 lamp; ASK_ANSWER=y FAKE_SELFTEST_EXIT=1 run --write --update-key "$KEYFILE"; status=$?
@@ -159,7 +174,7 @@ check "step 4 stops lamp-expression before the stand and starts it after the sel
 lamp; FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active FAKE_SELFTEST_EXIT=1 ASK_ANSWER=y run --write --from 4; status=$?
 check "a failed self-test still starts lamp-expression again" '[[ $status == 1 ]] && [[ $(grep -c "systemctl start lamp-expression" "$T/log") == 1 ]]'
 lamp; FAKE_BODY_STATE=inactive ASK_ANSWER=y run --write --from 4; status=$?
-check "step 4 with lamp-body down: nothing stood, the self-test says why" '[[ $status == 0 ]] && ! grep -q "^mood" "$T/log" && grep -q "lamp-body is inactive: the lamp is not stood up" "$T/out" && grep -q "^selftest" "$T/log"'
+check "--from 4 with lamp-body down: it is started and stood, so head_move is checked (#2818)" '[[ $status == 0 ]] && grep -q "lamp-body is inactive: starting it" "$T/out" && [[ $(grep "systemctl start lamp-body\|^mood --socket $T/root/run/lampos-body\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "systemctl start lamp-body|mood|selftest|" ]]'
 lamp; FAKE_BODY_STATE=active ASK_ANSWER=n run --write --from 4; status=$?
 check "step 4 without a yes stands nothing" '[[ $status == 1 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
 lamp; FAKE_BODY_STATE=active run --from 4; status=$?

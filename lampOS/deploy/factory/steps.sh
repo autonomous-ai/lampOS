@@ -31,6 +31,8 @@
 # SYSTEMCTL, JQ, SETPRIV and ETC_ROOT (a folder standing for /) replace them;
 # STAND_WAIT is the seconds a stand is given (34), HEAD_STAND_WAIT the
 # seconds the running body is given to stand before the self-test (9),
+# BODY_START_WAIT the seconds lamp-body, started for step 4 when it is not
+# running, is given to open its mood socket (30),
 # QUIET_WAIT the seconds waited after lamp-expression stops (61), STOP_WAIT
 # the seconds a stopped body is given to fold and end (12), and
 # AS_BODY_USER=1 runs the body as --body-user under ETC_ROOT too.
@@ -50,6 +52,7 @@ BODY_BIN=${BODY_BIN:-/opt/lampOS/body/current/lamp-body}
 MOOD_BIN=${MOOD_BIN:-/opt/lampOS/body/current/lamp-body-mood}
 STAND_WAIT=${STAND_WAIT:-34}
 HEAD_STAND_WAIT=${HEAD_STAND_WAIT:-9}
+BODY_START_WAIT=${BODY_START_WAIT:-30}
 QUIET_WAIT=${QUIET_WAIT:-61}
 # A body told SIGTERM eases the arm back and folds, up to about 6 s; twice
 # that is waited before it is called stuck.
@@ -469,11 +472,21 @@ step_key() {
 BODY_MOOD=$ROOT/run/lampos-body/mood.sock
 HEAD_STOOD=0
 stand_for_head() {
-  local body_state
+  local body_state tenths=0
   body_state=$("$SYSTEMCTL" is-active lamp-body 2>/dev/null)
+  # Step 1 needs lamp-body stopped and nothing after it starts it again, so a
+  # body not running is started here, whatever step the run began at, and
+  # given BODY_START_WAIT at most for its mood socket, as addon-say.sh waits
+  # for the voice's (#2818); a self-test without it leaves head_move unchecked.
   if [[ $body_state != active ]]; then
-    say "lamp-body is $body_state: the lamp is not stood up, and head_move says why"
-    return 0
+    say "lamp-body is $body_state: starting it; waiting up to ${BODY_START_WAIT} s for its mood socket"
+    "$SYSTEMCTL" start lamp-body || { fail "could not start lamp-body: fix it (journalctl -u lamp-body says why) before the self-test, which checks head_move only on a running body"; return 1; }
+    until [[ $("$SYSTEMCTL" is-active lamp-body 2>/dev/null) == active && -S $BODY_MOOD ]]; do
+      ((tenths < BODY_START_WAIT * 10)) \
+        || { fail "lamp-body did not come up with $BODY_MOOD within ${BODY_START_WAIT} s: fix it (journalctl -u lamp-body says why) before the self-test, which checks head_move only on a running body"; return 1; }
+      pause 0.1
+      tenths=$((tenths + 1))
+    done
   fi
   if [[ $("$SYSTEMCTL" is-active lamp-expression 2>/dev/null) == active ]]; then
     "$SYSTEMCTL" stop lamp-expression || { fail "could not stop lamp-expression"; return 1; }
