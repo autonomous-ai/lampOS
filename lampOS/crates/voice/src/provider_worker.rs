@@ -33,6 +33,46 @@ use std::{
 
 mod reminder_policy;
 
+/// Only an explicitly installed fixture changes the capture Instant's domain.
+/// Its connector uses the same clock; other tests and release builds keep the
+/// system clock. The guard cannot move to another test thread.
+#[cfg(test)]
+pub(crate) mod fixture_capture_clock {
+    use lamp_gemini::testing::CaptureClock;
+    use std::{cell::RefCell, marker::PhantomData, rc::Rc, sync::Arc, time::Instant};
+
+    thread_local! {
+        static CLOCK: RefCell<Option<Arc<dyn CaptureClock>>> = const { RefCell::new(None) };
+    }
+
+    pub(crate) struct Scope {
+        previous: Option<Arc<dyn CaptureClock>>,
+        _thread: PhantomData<Rc<()>>,
+    }
+
+    impl Scope {
+        pub(crate) fn enter(clock: Arc<dyn CaptureClock>) -> Self {
+            Self {
+                previous: CLOCK.with(|current| current.replace(Some(clock))),
+                _thread: PhantomData,
+            }
+        }
+    }
+
+    impl Drop for Scope {
+        fn drop(&mut self) {
+            let installed = CLOCK.with(|clock| clock.replace(self.previous.take()));
+            drop(installed);
+        }
+    }
+
+    pub(crate) fn now() -> Instant {
+        CLOCK
+            .with(|clock| clock.borrow().clone())
+            .map_or_else(Instant::now, |clock| clock.now())
+    }
+}
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 const MAX_QUEUED_OUTPUT: usize = 512;
 /// Above this backlog no further provider event is taken. The transport then
@@ -5736,7 +5776,11 @@ impl InputHandoff {
                     .map(Duration::from_micros)
                     .filter(|age| *age < lamp_gemini::MAX_INPUT_AGE)
                     .ok_or_else(|| io::Error::other("invalid or stale capture time"))?;
-                let mut captured = Instant::now()
+                #[cfg(test)]
+                let capture_now = fixture_capture_clock::now();
+                #[cfg(not(test))]
+                let capture_now = Instant::now();
+                let mut captured = capture_now
                     .checked_sub(age)
                     .ok_or_else(|| io::Error::other("invalid capture age"))?;
                 // The age comes from one clock and is taken off another, read

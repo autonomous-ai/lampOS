@@ -31,13 +31,13 @@ use crate::{
 use lamp_audio::ownership::PlaybackCursor;
 use lamp_gemini::{
     BarrierPolicy, Credential, RecoveryPolicy, Resumption, SessionConfig, Supervisor,
-    testing::{Dial, audio, connector, sent_audio},
+    testing::{Dial, audio, connector, connector_with_capture_clock, sent_audio},
 };
 use std::{
     rc::Rc,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -56,6 +56,36 @@ const FIXTURE_SCENARIO_WATCHDOG: Duration = Duration::from_secs(20);
 const STEP: Duration = Duration::from_millis(2);
 /// Speech probability of each 10 ms capture block, by block number.
 type Script = fn(u64) -> f32;
+
+/// Acquisition time shared with both Gemini's sender and its session actor.
+/// Only the scenario pump advances it. Reads never sample or advance either
+/// runtime clock, and a retained connector never falls back to host time.
+struct CaptureClock {
+    origin: Instant,
+    elapsed_us: AtomicU64,
+}
+
+impl CaptureClock {
+    fn new(origin: Instant) -> Self {
+        Self {
+            origin,
+            elapsed_us: AtomicU64::new(0),
+        }
+    }
+
+    fn advance_to(&self, at: Instant) {
+        let elapsed = at.checked_duration_since(self.origin).unwrap();
+        let elapsed_us = u64::try_from(elapsed.as_micros()).unwrap();
+        assert!(elapsed_us >= self.elapsed_us.load(Ordering::SeqCst));
+        self.elapsed_us.store(elapsed_us, Ordering::SeqCst);
+    }
+}
+
+impl lamp_gemini::testing::CaptureClock for CaptureClock {
+    fn now(&self) -> Instant {
+        self.origin + Duration::from_micros(self.elapsed_us.load(Ordering::SeqCst))
+    }
+}
 
 /// One client message, as the service received it.
 #[derive(Clone, Debug, PartialEq)]
@@ -713,6 +743,9 @@ impl Setup {
         // coordinator, its peers, the provider worker and the scripted
         // service share one logical clock on this thread.
         let scope = crate::scenario_clock::Scope::enter(FIXTURE_SCENARIO_WATCHDOG).unwrap();
+        let capture_clock = Arc::new(CaptureClock::new(crate::scenario_clock::instant()));
+        let _capture_scope =
+            crate::provider_worker::fixture_capture_clock::Scope::enter(capture_clock.clone());
         let mut owner = Controller::new(new_boot().unwrap(), now());
         let boot = owner.snapshot(now()).unwrap().boot();
         let stop = Arc::new(AtomicBool::new(false));
@@ -745,7 +778,11 @@ impl Setup {
                     .barrier_policy(BarrierPolicy::Require),
                 )
                 .unwrap();
-            let (connect, dials) = connector(config);
+            let (connect, dials) = connector_with_capture_clock(
+                config,
+                lamp_gemini::MAX_WIRE_BYTES * 2,
+                capture_clock.clone(),
+            );
             let provider = Supervisor::new(
                 connect,
                 RecoveryPolicy {
@@ -832,6 +869,7 @@ impl Setup {
             .set_pump({
                 let runtime = runtime.clone();
                 move |phase| {
+                    capture_clock.advance_to(crate::scenario_clock::instant());
                     runtime.block_on(async {
                         match phase {
                             crate::scenario_clock::Phase::Run => {

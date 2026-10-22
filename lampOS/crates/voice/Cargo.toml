@@ -71,6 +71,8 @@ workspace = true
 [dev-dependencies]
 lamp-actions = { path = "../actions" }
 lamp-ears = { path = "../ears" }
+# The early-end fixture shares its acquisition clock with the scripted service.
+lamp-gemini = { path = "../gemini", features = ["fixture-clock"] }
 # The reader of what `expression_out` says: tested against, never linked.
 lamp-expression = { path = "../expression" }
 # What decides progress news (`tests/progress_news.rs`): tested against,

@@ -1,0 +1,62 @@
+{
+  "control_base": "0566796d79c162077fd9b254956d66e3728adbb3",
+  "final_gate_base": "1f92c96edfac69dd34ed8211b1518ca244a6dd69",
+  "final_gates": "passed",
+  "capture_paths_identical_between_bases": true,
+  "gemini_tree": "2e327a77698ebad19895681504be0bfec7b1f496",
+  "source_sha256": {
+    "lampOS/crates/voice/src/provider_worker.rs": "2d29ebdab8c4a5fdbd313164f3e927c0f8846213ee61120c31b0a016b48ee417",
+    "lampOS/crates/voice/src/coordinator/tests/early_end.rs": "afa1c9409a539f5629dd538673c4bbfc34b05e4d4ee2504004f01aacb677d38d",
+    "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+    "lampOS/docs/realtime-tests.md": "5eb1720a345325a3b5276507b74036408db7e6ff3a4d81e7cf45e350f888c374",
+    "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+    "lampOS/crates/voice/src/provider_link.rs": "76c6463746ddac62eab9067ab60a0945a298d308642f5c12a6b09c1f62e84990",
+    "lampOS/crates/voice/src/transport.rs": "49f8001bb1a8b0b440a4bc49d69ba1195800cf936d7a5130958b9a4c1035246a",
+    "lampOS/crates/gemini/src/lib.rs": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0",
+    "lampOS/crates/gemini/src/session.rs": "8c29dcd0de4de5c205fbe8308d545455b30a802803fbb1bbea9eed1c0e0b9615",
+    "lampOS/crates/gemini/src/testing.rs": "ac34ac1c456b9e87557bec5aa9c6c4f1a5bc86fcbd09d9518bc13c98859081d3",
+    "lampOS/crates/gemini/Cargo.toml": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0"
+  },
+  "invariants": {
+    "provider_logic_except_test_guard_and_clock_selection_identical": true,
+    "every_original_test_body_and_assertion_identical": true,
+    "privacy_bound_watchdogs_and_step_identical": true,
+    "gemini_input_age_limit_2500_ms_unchanged": true,
+    "regular_dependency_manifest_identical": true,
+    "gemini_lib_sha256": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0"
+  },
+  "original_fixture_test_bodies_sha256": "ea5a23d03c94437e355b1a0cfd37d8188545d53a86a93c3af6b4697dc002ff62",
+  "before_pause_patch_sha256": "6bb5acfaec47d37462d30d5ac436525a69d7b124526cdf9c391a521f3bb2d922",
+  "after_pause_patch_sha256": "096161742b7c2763be09e3b905d2b9388904f05853b8dbf14a27606aa891f39d",
+  "old_verifier_sha256": "d73d9246cdc0b085fe4d2004aa03b748fedfcc129dee529b20b0568cc40a5cda",
+  "final_verifier_sha256": "bc4dbbb0331d735284ba9bd4e5c267ddfa52fc48d0f24982a1452175191726aa",
+  "full_compile_logs_retained_externally": true,
+  "python_kept_outside_repository": true,
+  "original_fixture_test_bodies_hash_scope": "All bytes after the first literal mod fixture_policy_tests { through EOF; that marker is excluded.",
+  "failure_log_wrappers": {
+    "explanation": "Each failure file starts with every original output byte at offset zero, including original trailing blank lines. An explicit closing marker follows that stream. Command and observation log hashes identify the original stream; wrapped_file_sha256 identifies the complete evidence file.",
+    "files": [
+      {
+        "file": "before-pause-1.txt",
+        "original_offset_bytes": 0,
+        "original_length_bytes": 7522,
+        "original_sha256": "00326ad67be22f51c68789a42f3081fd6d23dbe5be22790608973eafb0f77f30",
+        "wrapped_file_sha256": "efe1c5e4510e613c730b920eb78c6eba3c7ee6e2aa8f73bc9b67732947c0d287"
+      },
+      {
+        "file": "before-pause-2.txt",
+        "original_offset_bytes": 0,
+        "original_length_bytes": 7516,
+        "original_sha256": "041dc47890ffeb770f5222d576e904ab2e4492e85bb6848485858aff58cad1fa",
+        "wrapped_file_sha256": "d84a8090bd613a04ad611dea6a70997e97eec0b36cc393205b61c058820e3570"
+      },
+      {
+        "file": "before-pause-3.txt",
+        "original_offset_bytes": 0,
+        "original_length_bytes": 7524,
+        "original_sha256": "a622291f5f75589449cd8bd7fb37fb79a15cd16aeceb6d5a9b5efaf9c05351ee",
+        "wrapped_file_sha256": "9d740f5d298d86032dead9f9114a7f4b3e3d681fc59ed4418cf234744c6ce4b3"
+      }
+    ]
+  }
+}

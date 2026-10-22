@@ -1,0 +1,194 @@
+
+running 1 test
+test coordinator::tests::early_end::the_link_dropping_after_a_continued_request_fails_it_unheard_and_the_next_has_no_note ... {"seconds":7,"status":"listening_ready"}
+ROW72 pause_begin request=2 sequence=1 logical_us=3158177800616
+ROW72 pause_end request=2 sequence=1 logical_us=3158177800616 host_us=3007607
+ROW72 pcm_refused request=2 sequence=1 error=StaleInput
+
+thread 'coordinator::tests::early_end::the_link_dropping_after_a_continued_request_fails_it_unheard_and_the_next_has_no_note' (689828399) panicked at crates/voice/src/coordinator/tests/early_end.rs:577:13:
+the session ended: Connection reset by peer (os error 54); the provider worker: Some("Gemini Live StaleInput"); the last records, newest first: [
+    Object {
+        "at_us": Number(3158177802616),
+        "error": String("privacy worker did not stop within shared 300 ms deadline; forced termination required; reaped with signal: 9 (SIGKILL)"),
+        "kind": String("worker_forced_shutdown"),
+        "worker": String("privacy"),
+    },
+    Object {
+        "at_us": Number(3158177802616),
+        "error": String("provider worker did not stop within shared 300 ms deadline; forced termination required; reaped with signal: 9 (SIGKILL)"),
+        "kind": String("worker_forced_shutdown"),
+        "worker": String("provider"),
+    },
+    Object {
+        "at_us": Number(3158177802616),
+        "error": String("capture worker did not stop within shared 300 ms deadline; forced termination required; reaped with signal: 9 (SIGKILL)"),
+        "kind": String("worker_forced_shutdown"),
+        "worker": String("capture"),
+    },
+    Object {
+        "at_us": Number(3158177802616),
+        "error": String("speaker worker did not stop within shared 300 ms deadline; forced termination required; reaped with signal: 9 (SIGKILL)"),
+        "kind": String("worker_forced_shutdown"),
+        "worker": String("speaker"),
+    },
+    Object {
+        "at_us": Number(3158177802616),
+        "error": String("provider.c.p: Destination address required (os error 39)"),
+        "kind": String("stop_delivery_error"),
+        "worker": String("provider"),
+    },
+    Object {
+        "after_early_end_ms": Number(160),
+        "at_us": Number(3158177800616),
+        "boundary": String("someone spoke again before the lamp was sure: given up as a continued utterance"),
+        "early_end_at_us": Number(3158177640616),
+        "kind": String("early_end_given_up"),
+        "opening_blocks": Number(16),
+        "successor": Number(2),
+        "turn": Number(1),
+    },
+    Object {
+        "admission_basis": String("continued_after_early_end"),
+        "at_us": Number(3158177800616),
+        "authority_issued_at_us": Number(3158177800616),
+        "candidate": Null,
+        "kind": String("input_admitted"),
+        "owner": Object {
+            "boot": Array [
+                Number(83),
+                Number(110),
+                Number(8),
+                Number(13),
+                Number(149),
+                Number(52),
+                Number(93),
+                Number(131),
+                Number(238),
+                Number(25),
+                Number(200),
+                Number(28),
+                Number(54),
+                Number(196),
+                Number(137),
+                Number(184),
+            ],
+            "generation": Number(5),
+            "turn": Number(2),
+        },
+        "prefix_first_host_read_us": Number(3158177648616),
+        "provider_session": Number(1),
+        "turn": Number(2),
+    },
+    Object {
+        "at_us": Number(3158177800616),
+        "failure_notice": Null,
+        "kind": String("turn_finished"),
+        "outcome": String("user_interrupted"),
+        "owner": Object {
+            "boot": Array [
+                Number(83),
+                Number(110),
+                Number(8),
+                Number(13),
+                Number(149),
+                Number(52),
+                Number(93),
+                Number(131),
+                Number(238),
+                Number(25),
+                Number(200),
+                Number(28),
+                Number(54),
+                Number(196),
+                Number(137),
+                Number(184),
+            ],
+            "generation": Number(3),
+            "turn": Number(1),
+        },
+        "playback_gaps": Number(0),
+        "provider_audio_seen": Bool(true),
+        "provider_outcome": Null,
+        "provider_session": Number(1),
+        "start_deficit_us": Number(0),
+        "start_gate": Object {
+            "added_latency_us": Null,
+            "age_since_first_audio_us": Null,
+            "boundary": String("coordinator queue condition; not accepted PCM or acoustic onset"),
+            "continuity": Null,
+            "horizon_us": Number(350000),
+            "included_final_holdback_frames": Null,
+            "measured_lead_us": Number(0),
+            "opened_at_us": Null,
+            "opened_by": Null,
+            "opened_by_complete_flag": Null,
+            "queued_frames_at_open": Null,
+            "scope": String("first_dispatchable_chunk_of_reply; later generations do not rebuffer"),
+        },
+        "start_horizon_needed_us": Number(0),
+        "start_need_censored": Bool(true),
+        "start_need_scope": String("all retained reply arrivals including later generations; excludes local handoff"),
+        "turn": Number(1),
+    },
+    Object {
+        "at_us": Number(3158177774616),
+        "frames": Number(960),
+        "held_final_frames": Number(240),
+        "kind": String("provider_audio_enqueued"),
+        "provider_event_at_us": Number(3158177770616),
+        "provider_event_to_enqueue_us": Number(4000),
+        "reply_queued_frames": Number(2880),
+        "sequence": Number(3),
+        "source_frames": Number(960),
+        "source_offset": Number(0),
+        "speaker_pending_sequence": Null,
+        "turn": Number(1),
+    },
+    Object {
+        "at_us": Number(3158177734616),
+        "frames": Number(960),
+        "held_final_frames": Number(240),
+        "kind": String("provider_audio_enqueued"),
+        "provider_event_at_us": Number(3158177730616),
+        "provider_event_to_enqueue_us": Number(4000),
+        "reply_queued_frames": Number(1920),
+        "sequence": Number(2),
+        "source_frames": Number(960),
+        "source_offset": Number(0),
+        "speaker_pending_sequence": Null,
+        "turn": Number(1),
+    },
+    Object {
+        "at_us": Number(3158177694616),
+        "finished": Bool(false),
+        "input_correlation": String("output lineage"),
+        "kind": String("transcript"),
+        "text": String("Here is an answer."),
+        "turn": Number(1),
+    },
+    Object {
+        "at_us": Number(3158177694616),
+        "frames": Number(960),
+        "held_final_frames": Number(240),
+        "kind": String("provider_audio_enqueued"),
+        "provider_event_at_us": Number(3158177690616),
+        "provider_event_to_enqueue_us": Number(4000),
+        "reply_queued_frames": Number(960),
+        "sequence": Number(1),
+        "source_frames": Number(960),
+        "source_offset": Number(0),
+        "speaker_pending_sequence": Null,
+        "turn": Number(1),
+    },
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    coordinator::tests::early_end::the_link_dropping_after_a_continued_request_fails_it_unheard_and_the_next_has_no_note
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3089 filtered out; finished in 3.58s
+
+[End of original failure output: 7516 bytes; SHA-256 041dc47890ffeb770f5222d576e904ab2e4492e85bb6848485858aff58cad1fa]
