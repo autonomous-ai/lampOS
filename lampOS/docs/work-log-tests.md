@@ -1,5 +1,51 @@
 # Tests work log
 
+## 2026-10-22 08:50:59 +0700 — row 72 and Small green; Skills refreshed; guard pause P3 published
+
+Ready for lamp-voice: yes (#2776, #2653, #2637, #2647); no (#2625 while its new native gates run). #2693's refreshed native gates are green; its ready handoff is being posted.
+
+#2776 at `1a6635772` passed [ARM64 #5475](https://github.com/autonomous-ai/lampOS/actions/runs/39706058790):
+9,994 passed (one leaky), 63 skipped; nextest 170.020 s, job 12m49s,
+plus doc/own-harness tests. Clippy #1483 passed. Native checkout `b25afbf`
+merges into `efff7c4a5`; the link-drop case passed in 0.428 s. Ready and
+posted to Reviewer-two. The controls remain 3/3 StaleInput before, 3/3 passes
+after; the original report's missing diagnostic remains an evidence limit.
+
+#2653 at `04e891cd8` passed [ARM64 #5473](https://github.com/autonomous-ai/lampOS/actions/runs/39705891483):
+9,994 passed (one leaky), 63 skipped; nextest 171.673 s, job 17m15s,
+plus doc/own-harness tests. Clippy #1481 passed. Native checkout `0206218`
+merges into `efff7c4a5`; Body/Controls/Name cases took 0.265/0.521/0.706 s.
+These are current observations, not a fresh before/after comparison.
+Ready, with Expression's natural exit and Mood's 600 ms restored, for
+Reviewer-lead's read of the P3 corrections and retained controls/failures.
+
+#2693 is rebased as `6bf167a6c` on `efff7c4a5`, preserving upstream greeting
+docs and the complete original patch (`bc8d8605e = 6bf167a6c`). Fresh local
+Skills gates passed 427 tests, zero failures/ignores, with fmt, strict Clippy
+and workspace build. [ARM64 #5478](https://github.com/autonomous-ai/lampOS/actions/runs/39706613131)
+passed 9,995 tests (one leaky), 63 skipped; nextest 169.574 s, job 11m35s.
+Clippy #1486 passed; checkout `78fd661` merges into `a498ecc03`.
+Enabled/disabled add-on cases took 0.663/0.628 s. Back to Reviewer-two.
+
+Reviewer-lead found no P1/P2 in #2625, but its pause P3 was valid: the final
+300 ms no-text check survived while the original additional 500 ms after
+light-on did not. Unchanged assertion counts had missed this temporal loss.
+The PR was returned to draft and the P3 claimed before code. On current
+base `a498ecc03`, `093e80cc1` restores the original 500 ms as an explicit
+no-text assertion, then keeps the original separate 300 ms after the visit.
+The historical evidence and current docs now correct the coverage wording.
+[Follow-up evidence](https://github.com/autonomous-ai/lampOS/blob/093e80cc1/lampOS/docs/verification/guard-pause-observation-20261022/README.md):
+427 local Skills tests passed, zero failures/ignores, plus fmt, strict Clippy
+and workspace build. The plain rebase was `7b21fa72a = 7c3396ba3`; the final
+delta is the observation and its documentation. ARM64 #5483 and Clippy #1491
+are running; Reviewer-lead retains the read. No product change or new speedup
+claim, no ARM64 build on the Mac, and no device access.
+
+#2637 and #2647 remain ready with their earlier green receipts, awaiting
+Reviewer-two and Reviewer-lead respectively. #2703/#2646 and photo-faces
+#2628 are already merged; the add-on seam is #2647. Cloud confirmation
+remains on hold behind the ordered work.
+
 ## 2026-10-22 08:33:01 +0700 — P3 corrections and row 72 published; Skills refresh underway
 
 Ready for lamp-voice: yes (#2625, #2637, #2647); no (#2653, #2776 and refreshed #2693 until their native gates pass).
