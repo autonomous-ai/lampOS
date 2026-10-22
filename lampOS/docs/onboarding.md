@@ -14,8 +14,10 @@ new creature, not filling in a form.
 
 ## The steps
 
-The runner in the voice's coordinator owns the order and the timing. Every
-line is the model's: each step begins as a written note in place of speech
+The installed core skill (`skills/onboarding/skill.toml`) owns the step order,
+first and repeat notes, re-offer interval, nudge notes and answer counts, and
+completion and coaching notes. The voice's coordinator owns the physical
+checks, cancellation and interaction timing. Every line is the model's: each step begins as a written note in place of speech
 (`ProviderInput::Written`, as the hello in [speaking-first.md](speaking-first.md)),
 and only when the lamp is at rest (nothing heard, nothing owed, a provider
 ready, not paused) and a face is in front of it.
@@ -50,6 +52,60 @@ on. Nobody in front of the lamp for 30 s: the step being led is dropped and
 asked again when someone is back. The keeper's pause
 ([keeper.md](keeper.md)) stops it the same way: nothing is begun while
 paused, and the step being led is asked again afterwards.
+
+## Installed walk data
+
+Voice reads `/var/lib/lampOS/skills/onboarding/skill.toml` once when its service
+invocation begins, before opening audio. The same immutable definition is used
+by every walk and mute/reopen cycle in that invocation; conversation turns do
+not read the file. A later skill-only install, edit, or restored missing file
+needs an operator-managed Voice restart to activate it. The updater installs
+product skill files before restarting changed binaries, so the initial binary
+and data rollout has the data in place first; a skill-only update deliberately
+does not restart Voice.
+
+The manifest must be a regular file, not a link, at most 65,536 bytes; a FIFO
+never waits for a writer. It must be enabled and `kind = "core"`, with the
+`onboarding` core grant and checked `[onboarding]` data. Missing, unreadable,
+disabled or invalid data disables this service's automatic walk and invitations and emits one fixed
+journal diagnostic. There is no built-in word or order fallback. Physical
+privacy waiting, microphone cleanup and the onboarding storage owner still
+run. Existing `setup_step` and `redo_setup` provider tools still follow
+`LAMP_ONBOARDING` and its file setting; they are not removed by this failure.
+Repair the file and restart Voice to recover the automatic walk.
+
+`order` names each of the eight stable step IDs exactly once; `steps` provides
+`first` and `reoffer` notes for every ID. `reoffer_after_s` is 1 to 31,536,000
+(the shipped value is 86,400). Only `who_you_are` and `preferences` may have a
+`nudge`, with `words` and `after_answers` from 1 to 8. Every note is 1 to 900
+bytes with no control characters. Only the privacy step's notes have one
+`{location}` slot, and only `words.who_confirm` has one `{name}` slot; other
+notes have no slots. Consent remains a code-checked mechanism: both `first`
+and `reoffer` for `who_you_are` must retain the exact clause
+`only after a clear yes call remember_my_face`; both notes for `room_sounds`
+must retain `done only after a clear yes`. Voice's installed-file loader and
+Skills loading/packaging reject a missing or altered clause. Surrounding
+words remain editable. The shipped notes are unchanged. The privacy notes
+fit a 1,024-byte written turn with the
+verified location's maximum 160 Unicode characters. An expanded name
+confirmation over 1,024 bytes is omitted, without cutting the name or claiming
+it was confirmed. Filled data is never interpreted as another slot.
+
+`[onboarding.words]` requires `sit_no_face`, `sit_closer`, `sit_turn`,
+`sit_done`, `sit_failed`, `who_again`, `touch_remind`, `privacy_done`,
+`privacy_done_camera`, `privacy_failed`, `near_again`, `near_done`,
+`near_failed`, `sentence_first`, `sentence_louder`, `sentence_closer`,
+`sentence_again`, `sentence_done`, `sentence_failed`, `give_done`,
+`give_failed` and `who_confirm`. Unknown or missing data fields are refused.
+
+Skills uses the same validator when loading or packaging this core skill.
+Changing order or words cannot add a mechanism, grant physical authority,
+remove privacy's priority or change proof, timeout and cancellation rules.
+The shipped data reproduces the previous order and notes byte for byte;
+`onboarding/legacy_words.rs` is a test-only oracle, absent from production.
+Host targets are under 50 ms for the startup read and validation and under
+1 ms for a cached note selection. These are local boundaries, not spoken or
+lamp latency measurements; the unchanged walk still needs its lamp run.
 
 ## Room sounds (#1722 item 1)
 
@@ -112,8 +168,10 @@ has it, the runner offers just that step once the walk is over, at a rest
 with someone there, never in the middle of another step. It is led like
 any step to its end. Offered and left unfinished (they walked off, the
 pause), it is offered again no sooner than a day later
-(`offered_at_unix_s`). Its note is its owner's to word, beginning "one more
-thing I can do now"; until then a placeholder note says so.
+(`offered_at_unix_s`), using the skill's `reoffer_after_s` (one day in the
+shipped data). Its note is that step's `reoffer` in the installed skill;
+the shipped touch re-offer introduces the newly available ability. Each
+other shipped re-offer matches its former invitation.
 
 ## Why a step is not_available
 
@@ -271,7 +329,7 @@ evidence. A restart re-arms the wait.
 
 The runner gives the model one short sentence to say and nothing else,
 about 3-5 s spoken: "Try my privacy switch <verified location>: close it,
-then open it again." (`privacy_invitation` in `onboarding.rs`; closed =
+then open it again." (`onboarding.steps.privacy` in the skill data; closed =
 microphones off, so the words end with the lamp hearing). The attempt is
 armed as the invitation's turn begins (its words taken for that turn, the
 `onboarding_privacy_armed` row), not when the turn ends: a fresh close from

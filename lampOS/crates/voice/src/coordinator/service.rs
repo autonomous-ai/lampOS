@@ -31,7 +31,42 @@ pub(super) fn supervise(
         room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
         room_sounds_group: room_sounds_group(),
     });
-    supervise_with_checkpoint(trace, cues, termination, paths.as_ref(), wait, active)
+    supervise_with_installed_skill(
+        trace,
+        cues,
+        termination,
+        paths.as_ref(),
+        Path::new(crate::skill_words::INSTALLED),
+        wait,
+        active,
+    )
+}
+
+fn supervise_with_installed_skill(
+    trace: &mut SessionState,
+    cues: &mut Option<CueSink>,
+    termination: &Termination,
+    paths: Option<&crate::onboarding::storage::Paths>,
+    skills: &Path,
+    wait: impl FnMut(&mut SessionState, &mut Option<CueSink>) -> Result<WaitOutcome>,
+    active: impl FnMut(&mut SessionState, &mut Option<CueSink>) -> Result<()>,
+) -> Result<()> {
+    // Skill-only installs do not restart Voice. A new service invocation is
+    // the activation boundary; never read or reload skill data inside a cycle.
+    trace.onboarding_definition =
+        paths.and_then(|_| match crate::onboarding::skill::read_installed(skills) {
+            Ok(definition) => {
+                eprintln!("lamp-voice: onboarding skill loaded for this service invocation");
+                Some(std::sync::Arc::new(definition))
+            }
+            Err(_) => {
+                eprintln!(
+                    "lamp-voice: onboarding skill unavailable; walk disabled until Voice restarts"
+                );
+                None
+            }
+        });
+    supervise_with_checkpoint(trace, cues, termination, paths, wait, active)
 }
 
 /// [`crate::onboarding::ROOM_SOUNDS_GROUP`]'s id. Not known: the yes is
@@ -333,6 +368,129 @@ mod tests {
         .unwrap();
         attempt.observe_close(sample(2, 200, true), 200).unwrap();
         Checkpoint::new(attempt, path)
+    }
+
+    #[test]
+    fn onboarding_skill_snapshot_survives_mute_reopen_and_recovers_only_in_a_new_service() {
+        use crate::onboarding::{Framing, Onboarding};
+        let directory = SessionDirectory::create().unwrap();
+        let skills = directory.path.join("skills");
+        let installed = skills.join("onboarding/skill.toml");
+        fs::create_dir_all(installed.parent().unwrap()).unwrap();
+        let shipped = include_str!("../../../../skills/onboarding/skill.toml");
+        let changed = shipped.replace("Say hello in a few warm words", "Say a short hello");
+        let expected = crate::onboarding::skill::parse(shipped)
+            .unwrap()
+            .note(crate::onboarding::Step::WhereYouSit, false)
+            .to_owned();
+        let revised = crate::onboarding::skill::parse(&changed)
+            .unwrap()
+            .note(crate::onboarding::Step::WhereYouSit, false)
+            .to_owned();
+        let face = Some(Framing {
+            size: 0.2,
+            x: 0.0,
+            y: 0.0,
+        });
+        for initially_present in [true, false] {
+            if installed.exists() {
+                fs::remove_file(&installed).unwrap();
+            }
+            if initially_present {
+                fs::write(&installed, shipped).unwrap();
+            }
+            let paths = test_paths(&directory.path.join(if initially_present {
+                "present.json"
+            } else {
+                "missing.json"
+            }));
+            let cycles = Cell::new(0);
+            let mut trace = SessionState::default();
+            let began = Instant::now();
+            let mut startup = None;
+            supervise_with_installed_skill(
+                &mut trace,
+                &mut None,
+                &Termination::inactive(),
+                Some(&paths),
+                &skills,
+                |trace, _| {
+                    storage_idle(trace);
+                    Ok(WaitOutcome::Allowed)
+                },
+                |trace, _| {
+                    startup.get_or_insert_with(|| began.elapsed());
+                    cycles.set(cycles.get() + 1);
+                    assert!(
+                        trace.onboarding_storage.is_some(),
+                        "skill failure must not disable physical privacy storage"
+                    );
+                    assert_eq!(trace.onboarding_definition.is_some(), initially_present);
+                    if let Some(definition) = &trace.onboarding_definition {
+                        let mut walk = Onboarding::with_definition(
+                            paths.progress.clone(),
+                            trace.onboarding_storage.as_ref().unwrap().client(),
+                            definition.clone(),
+                        );
+                        walk.drain_storage_for_test(4_000_000);
+                        assert_eq!(
+                            walk.tick(4_000_000, 4_000_000, true, false, face, true),
+                            Some(expected.clone())
+                        );
+                    }
+                    if cycles.get() == 1 {
+                        fs::write(&installed, &changed).unwrap();
+                        Err(Box::new(SoftwareMute {
+                            observed_at_us: 5_000_000,
+                            asleep: false,
+                        }))
+                    } else {
+                        // Updates and recovery during mute are not read on reopen.
+                        Ok(())
+                    }
+                },
+            )
+            .unwrap();
+            assert_eq!(cycles.get(), 2);
+            assert_eq!(
+                trace
+                    .iter()
+                    .filter(|row| row["kind"] == "service_cycle_start")
+                    .count(),
+                2
+            );
+            let mut fresh = SessionState::default();
+            supervise_with_installed_skill(
+                &mut fresh,
+                &mut None,
+                &Termination::inactive(),
+                Some(&paths),
+                &skills,
+                |trace, _| {
+                    storage_idle(trace);
+                    Ok(WaitOutcome::Allowed)
+                },
+                |trace, _| {
+                    let definition = trace.onboarding_definition.as_ref().unwrap();
+                    let mut walk = Onboarding::with_definition(
+                        paths.progress.clone(),
+                        trace.onboarding_storage.as_ref().unwrap().client(),
+                        definition.clone(),
+                    );
+                    walk.drain_storage_for_test(4_000_000);
+                    assert_eq!(
+                        walk.tick(4_000_000, 4_000_000, true, false, face, true),
+                        Some(revised.clone())
+                    );
+                    Ok(())
+                },
+            )
+            .unwrap();
+            eprintln!(
+                "onboarding service timing: initially_present={initially_present} startup_to_active_us={}",
+                startup.unwrap().as_micros()
+            );
+        }
     }
 
     #[test]

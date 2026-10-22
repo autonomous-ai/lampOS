@@ -415,7 +415,7 @@ fn stalled_old_done_cannot_overwrite_redo_or_publish_its_acknowledgement() {
         },
     );
     walk.desired.privacy_done_attempt = Some(BootId::new([9; 16]).unwrap());
-    walk.owed = Some(PRIVACY_DONE);
+    walk.owed = Some(PRIVACY_DONE.into());
     walk.save();
     armed.store(true, Ordering::SeqCst);
     walk.poll_storage(T);
@@ -638,7 +638,7 @@ enum Eyes {
 
 /// One verified close and reopen with eyes told; the step's outcome and
 /// the words owed for it.
-fn camera_flow(eyes: Eyes) -> (Outcome, &'static str) {
+fn camera_flow(eyes: Eyes) -> (Outcome, String) {
     let (store, mut first) = walk();
     let root = store.path.join("bus");
     let bus = lamp_bus::Bus::new(&root).unwrap();
@@ -737,7 +737,7 @@ fn camera_flow(eyes: Eyes) -> (Outcome, &'static str) {
     second.maintain_privacy(after_io + 2, true).unwrap();
     let _ = std::fs::remove_file(&socket);
     let outcome = second.desired.steps["privacy"].outcome;
-    let owed = second.owed.unwrap();
+    let owed = second.owed.clone().unwrap();
     drop(publisher);
     (outcome, owed)
 }
@@ -749,7 +749,7 @@ fn with_eyes_that_give_receipts_done_needs_the_receipt_for_this_close() {
             token_offset: 0,
             released: true
         }),
-        (Outcome::Done, PRIVACY_DONE_CAMERA)
+        (Outcome::Done, PRIVACY_DONE_CAMERA.into())
     );
     // A receipt for another close, one that says the device may be held,
     // or none at all: the camera is not proven and the check has failed.
@@ -764,13 +764,16 @@ fn with_eyes_that_give_receipts_done_needs_the_receipt_for_this_close() {
         },
         Eyes::Silent,
     ] {
-        assert_eq!(camera_flow(eyes), (Outcome::Failed, PRIVACY_FAILED));
+        assert_eq!(camera_flow(eyes), (Outcome::Failed, PRIVACY_FAILED.into()));
     }
 }
 
 #[test]
 fn without_eyes_on_the_bus_done_claims_the_microphones_only() {
-    assert_eq!(camera_flow(Eyes::Absent), (Outcome::Done, PRIVACY_DONE));
+    assert_eq!(
+        camera_flow(Eyes::Absent),
+        (Outcome::Done, PRIVACY_DONE.into())
+    );
 }
 
 #[test]

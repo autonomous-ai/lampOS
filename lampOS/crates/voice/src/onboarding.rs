@@ -2,7 +2,7 @@
 //! new person through where to sit, their name and face, and a few
 //! preferences, one step at a time.
 //!
-//! The runner here owns the order and the timing; every line is the
+//! The installed skill owns the order and words; the runner owns timing. Every line is the
 //! model's, from a written note per step, begun only when the lamp is at
 //! rest and someone is in front of it. A step the model leads ends when the
 //! model calls [`STEP`]; the provider worker writes that into a small
@@ -17,9 +17,16 @@
 //! file is read or written.
 pub(crate) mod giving_way;
 pub(crate) mod hardware;
+#[cfg(test)]
+pub(crate) mod legacy_words;
 pub(crate) mod near;
 pub(crate) mod privacy;
+pub mod skill;
 pub(crate) mod storage;
+#[cfg(test)]
+pub(crate) use legacy_words::*;
+#[cfg(test)]
+const OFFER_EVERY_S: u64 = 86_400;
 
 use crate::wire::PrivacyReceipt;
 use lamp_gemini::{Tool, ToolCall};
@@ -30,6 +37,7 @@ use std::{
     collections::BTreeMap,
     io::{self, Write},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub const ENVIRONMENT: &str = "LAMP_ONBOARDING";
@@ -89,7 +97,8 @@ const TOUCH_GIVE_UP_US: u64 = 60_000_000;
 /// The name the walk reads Controls' touches under.
 const SUBSCRIBER: &str = "voice_onboarding";
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Step {
     #[default]
     WhereYouSit,
@@ -103,15 +112,16 @@ pub enum Step {
 }
 
 impl Step {
-    pub const ALL: [Step; 8] = [
-        Step::WhereYouSit,
-        Step::WhoYouAre,
-        Step::HowYouSound,
-        Step::Touch,
-        Step::Privacy,
-        Step::GivingWay,
-        Step::RoomSounds,
-        Step::Preferences,
+    /// Stable mechanism IDs for validation and the tool schema, not walk order.
+    pub const IDS: [&'static str; 8] = [
+        "where_you_sit",
+        "who_you_are",
+        "how_you_sound",
+        "touch",
+        "privacy",
+        "giving_way",
+        "room_sounds",
+        "preferences",
     ];
 
     pub fn name(self) -> &'static str {
@@ -128,7 +138,17 @@ impl Step {
     }
 
     pub fn named(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|step| step.name() == name)
+        match name {
+            "where_you_sit" => Some(Self::WhereYouSit),
+            "who_you_are" => Some(Self::WhoYouAre),
+            "how_you_sound" => Some(Self::HowYouSound),
+            "touch" => Some(Self::Touch),
+            "privacy" => Some(Self::Privacy),
+            "giving_way" => Some(Self::GivingWay),
+            "room_sounds" => Some(Self::RoomSounds),
+            "preferences" => Some(Self::Preferences),
+            _ => None,
+        }
     }
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
@@ -156,34 +176,6 @@ impl Step {
         }
     }
 
-    /// What the model is given to begin the step, `again` when it is
-    /// offered after the walk.
-    fn note(self, again: bool) -> &'static str {
-        match self {
-            Step::WhereYouSit => SIT_NOTE,
-            Step::WhoYouAre => WHO_NOTE,
-            Step::Touch if again => TOUCH_OFFER,
-            Step::Touch => TOUCH_NOTE,
-            Step::RoomSounds => ROOM_SOUNDS_NOTE,
-            Step::Preferences => PREFERENCES_NOTE,
-            // PLACEHOLDER (#841): each owner words its own step's note,
-            // opening with "one more thing I can do now" for the re-offer.
-            _ => ONE_MORE_NOTE,
-        }
-    }
-
-    /// A step only the model's `setup_step` ends: the note to report it,
-    /// and how many answered lines it waits for first (row 10 try 4 on
-    /// lamp-52e6: the name heard, the step never reported).
-    fn nudge(self) -> Option<(&'static str, u8)> {
-        match self {
-            Step::WhoYouAre => Some((WHO_NUDGE, 1)),
-            // Two questions, one at a time: nudged after the second answer.
-            Step::Preferences => Some((PREFERENCES_NUDGE, 2)),
-            _ => None,
-        }
-    }
-
     /// Only the GivingWay step may request a completion movement.
     /// Other onboarding steps stay physically still (the owner's #841 decision).
     fn gesture(self) -> &'static str {
@@ -194,23 +186,6 @@ impl Step {
     }
 }
 
-pub const ONE_MORE_NOTE: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now that you could not when you first met, and show them.)";
-/// A step not available at the first walk is offered again at most this
-/// often, until it has an outcome.
-const OFFER_EVERY_S: u64 = 86_400;
-
-pub const SIT_NOTE: &str = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)";
-pub const SIT_NO_FACE: &str = "(You cannot see their face. Ask them in a few words to sit where they usually sit and look at you.)";
-pub const SIT_CLOSER: &str = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer if they like, and that where they are is fine too.)";
-pub const SIT_TURN: &str = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them if they like, and that where they are is fine too.)";
-pub const SIT_DONE: &str =
-    "(Now you can see them well where they sit. Tell them so in a few words.)";
-pub const SIT_FAILED: &str = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)";
-pub const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)";
-pub const WHO_NUDGE: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
-pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
-pub const WHO_AGAIN: &str =
-    "(That was not their name. Ask them once more, in a few words, what you should call them.)";
 /// The room sounds step (#1722 item 1): asked only on a lamp with no
 /// privacy slide (`LAMP_PRIVACY_CONTROLS=no-slide`), where music and
 /// laughter are off until a yes. A yes (`done`) is kept as [`ROOM_SOUNDS_PATH`]
@@ -224,11 +199,6 @@ pub const ROOM_SOUNDS_PATH: &str = "/var/lib/lampOS/consent/room-sounds.json";
 pub const ROOM_SOUNDS_GROUP: &str = "lampos";
 /// The only value of `LAMP_PRIVACY_CONTROLS` that offers the step.
 pub const NO_SLIDE: &str = "no-slide";
-pub const ROOM_SOUNDS_NOTE: &str = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)";
-pub const TOUCH_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)";
-pub const TOUCH_OFFER: &str = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)";
-pub const TOUCH_REMIND: &str = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)";
-pub const PREFERENCES_NOTE: &str = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -476,24 +446,15 @@ fn fresh_token() -> io::Result<u64> {
 // The voice's own teardown is verified for the microphones. The camera is
 // claimed only when the eyes' receipt for this close was read (#1802):
 // without eyes that give receipts, the microphones alone are claimed.
-const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
-const PRIVACY_DONE_CAMERA: &str = "(Their physical switch closed the microphones and the camera, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
 /// The eyes' receipt for a close is said within this of the ask, or the
 /// camera is not proven: the eyes shut it within half a second when well.
 pub(crate) const CAMERA_RECEIPT_MS: u64 = 2_000;
 /// The eyes' name on the bus (`lamp_eyes::bus_out::SOURCE`).
 const EYES_SOURCE: &str = "eyes";
-/// The invitation's note: one sentence, about 3-5 s spoken, so the person
-/// can act before the lamp is done talking (the lead's 52e6 run, 21 October).
-fn privacy_invitation(location: &str) -> String {
-    format!(
-        "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
-    )
-}
-const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
 
 pub struct Onboarding {
     file: PathBuf,
+    definition: Arc<skill::Definition>,
     /// Desired state; only this runner mutates it. Old I/O completions never replace it.
     desired: Progress,
     committed: Progress,
@@ -513,7 +474,7 @@ pub struct Onboarding {
     fixture_storage: Option<storage::ServiceStorage>,
     led: Option<Led>,
     /// A word owed before the next step: how "where you sit" ended.
-    owed: Option<&'static str>,
+    owed: Option<String>,
     seen_us: Option<u64>,
     read_us: Option<u64>,
     finished_recorded: bool,
@@ -607,12 +568,15 @@ pub fn mailbox_of(file: &Path) -> PathBuf {
 
 impl Onboarding {
     /// The service owns the sole I/O executor across all voice cycles.
-    pub(crate) fn from_storage(client: storage::Client) -> Option<Self> {
+    pub(crate) fn from_storage(
+        client: storage::Client,
+        definition: Arc<skill::Definition>,
+    ) -> Option<Self> {
         let file = switched_on(
             std::env::var(ENVIRONMENT).ok().as_deref(),
             std::env::var(FILE_ENVIRONMENT).ok().as_deref(),
         )?;
-        let mut walk = Self::with_storage(file, client);
+        let mut walk = Self::with_definition(file, client, definition);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
         // The head pads' touches, from `--touch` Controls, only with the
@@ -635,9 +599,19 @@ impl Onboarding {
         Some(walk)
     }
 
+    #[cfg(test)]
     pub(crate) fn with_storage(file: PathBuf, storage: storage::Client) -> Self {
+        Self::with_definition(file, storage, skill::fixture())
+    }
+
+    pub(crate) fn with_definition(
+        file: PathBuf,
+        storage: storage::Client,
+        definition: Arc<skill::Definition>,
+    ) -> Self {
         Self {
             file,
+            definition,
             desired: Progress::default(),
             committed: Progress::default(),
             storage,
@@ -907,7 +881,7 @@ impl Onboarding {
     }
 
     #[cfg(test)]
-    fn drain_storage_for_test(&mut self, now_us: u64) {
+    pub(crate) fn drain_storage_for_test(&mut self, now_us: u64) {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
             self.poll_storage(now_us);
@@ -1053,7 +1027,10 @@ impl Onboarding {
         offer.claimed = true;
         offer.ready = false;
         offer.claimed_us = now_us;
-        Some(privacy_invitation(location))
+        Some(self.definition.privacy_invitation(
+            self.desired.steps.contains_key(Step::Privacy.name()),
+            location,
+        ))
     }
 
     /// Arms the attempt as the invitation's turn begins, not when it ends:
@@ -1422,11 +1399,14 @@ impl Onboarding {
                 json!({"kind":"onboarding_step","step":"privacy","outcome":outcome,"at_us":now_us}),
             );
             let camera = std::mem::take(&mut self.privacy_flow.camera_proven);
-            self.owed = Some(match outcome {
-                Outcome::Done if camera => PRIVACY_DONE_CAMERA,
-                Outcome::Done => PRIVACY_DONE,
-                _ => PRIVACY_FAILED,
-            });
+            self.owed = Some(
+                match outcome {
+                    Outcome::Done if camera => self.definition.words.privacy_done_camera.as_str(),
+                    Outcome::Done => self.definition.words.privacy_done.as_str(),
+                    _ => self.definition.words.privacy_failed.as_str(),
+                }
+                .to_owned(),
+            );
             self.erase_on_commit = true;
             self.save();
             self.poll_storage(now_us);
@@ -1708,13 +1688,11 @@ impl Onboarding {
     }
 
     /// A line the person finished saying: with the nudge on, an answer to
-    /// a step the model ends ([`Step::nudge`]) being led.
+    /// a step the model ends (the skill's nudge) being led.
     pub fn heard_line(&mut self, text: &str) {
-        let Some(led) = self
-            .led
-            .as_mut()
-            .filter(|led| self.nudge && led.asked_us.is_some() && led.step.nudge().is_some())
-        else {
+        let Some(led) = self.led.as_mut().filter(|led| {
+            self.nudge && led.asked_us.is_some() && self.definition.nudge(led.step).is_some()
+        }) else {
             return;
         };
         if !text.chars().any(char::is_alphanumeric) {
@@ -1745,7 +1723,7 @@ impl Onboarding {
         if let Some(led) = self.led.as_ref()
             && self.nudge
             && led.asked_us.is_some()
-            && led.step.nudge().is_some()
+            && self.definition.nudge(led.step).is_some()
         {
             self.records
                 .push(json!({"kind":"onboarding_nudge","step":led.step.name(),
@@ -1805,11 +1783,8 @@ impl Onboarding {
         if !self.storage_idle() {
             return None;
         }
-        if let Some(note) = self.owed
-            && can_speak
-        {
-            self.owed = None;
-            return Some(note.into());
+        if can_speak && let Some(note) = self.owed.take() {
+            return Some(note);
         }
         let Some(step) = self.next_step() else {
             if !self.finished_recorded && !self.desired.steps.is_empty() {
@@ -1895,10 +1870,10 @@ impl Onboarding {
                 );
                 if again.is_some() {
                     self.save();
-                    self.owed = Some(step.note(true));
+                    self.owed = Some(self.definition.note(step, true).to_owned());
                     return None;
                 }
-                return Some(step.note(false).into());
+                return Some(self.definition.note(step, false).into());
             }
             return None;
         };
@@ -1920,7 +1895,7 @@ impl Onboarding {
                 led.guided_us = Some(now_us);
                 self.records
                     .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
-                return Some(TOUCH_REMIND.into());
+                return Some(self.definition.words.touch_remind.as_str().into());
             }
             return None;
         }
@@ -1942,7 +1917,7 @@ impl Onboarding {
                 self.finish(step, outcome, None, now_us);
                 return None;
             }
-            let (nudge, answers) = step.nudge().filter(|_| self.nudge)?;
+            let (nudge, answers) = self.definition.nudge(step).filter(|_| self.nudge)?;
             // "Did I get that right?" answered yes: kept as the model's
             // done would be. No: asked once more, then as before.
             if led.confirm == Confirm::Asked(Some(true)) {
@@ -1953,7 +1928,7 @@ impl Onboarding {
             let at_rest = can_speak && quiet_us >= START_QUIET_US;
             if led.confirm == Confirm::Asked(Some(false)) && at_rest {
                 led.confirm = Confirm::Over;
-                return Some(WHO_AGAIN.into());
+                return Some(self.definition.words.who_again.as_str().into());
             }
             // Answered and not reported: one note, at the next quiet moment.
             if led.answers >= answers && led.nudged_us.is_none() && at_rest {
@@ -1969,11 +1944,13 @@ impl Onboarding {
                 && at_rest
                 && let Some(name) = led.name.as_ref()
             {
-                let note = format!(
-                    "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)"
-                );
-                led.confirm = Confirm::Asked(None);
-                return Some(note);
+                let note = self.definition.who_confirm(name);
+                led.confirm = if note.is_some() {
+                    Confirm::Asked(None)
+                } else {
+                    Confirm::Over
+                };
+                return note;
             }
             return None;
         }
@@ -2008,7 +1985,7 @@ impl Onboarding {
                 let since = *led.held_since.get_or_insert(now_us);
                 if now_us.saturating_sub(since) >= HOLD_US {
                     self.finish(step, Outcome::Done, Some(framing), now_us);
-                    self.owed = Some(SIT_DONE);
+                    self.owed = Some(self.definition.words.sit_done.clone());
                     return None;
                 }
                 // Settled, a face that never stays still fails at 60 s.
@@ -2023,7 +2000,7 @@ impl Onboarding {
         }
         if now_us.saturating_sub(asked_us) >= SIT_GIVE_UP_US {
             self.finish(step, Outcome::Failed, face, now_us);
-            self.owed = Some(SIT_FAILED);
+            self.owed = Some(self.definition.words.sit_failed.clone());
             return None;
         }
         // A face off the middle is looked at first, as a creature turns to
@@ -2041,9 +2018,9 @@ impl Onboarding {
         {
             led.guided_us = Some(now_us);
             let note = match face {
-                None => SIT_NO_FACE,
-                Some(face) if face.size < NEAR => SIT_CLOSER,
-                Some(_) => SIT_TURN,
+                None => self.definition.words.sit_no_face.as_str(),
+                Some(face) if face.size < NEAR => self.definition.words.sit_closer.as_str(),
+                Some(_) => self.definition.words.sit_turn.as_str(),
             };
             self.records.push(
                 json!({"kind":"onboarding_guide","step":step.name(),"face":face,"at_us":now_us}),
@@ -2054,7 +2031,8 @@ impl Onboarding {
     }
 
     /// The first step with no outcome; once every step has one, a step that
-    /// was not available then and is now, offered at most once a day and
+    /// was not available then and is now, offered at the skill's interval
+    /// (one day in the shipped data) and
     /// never before the walk is over (First's addition 2).
     fn next_step(&self) -> Option<Step> {
         let unix_s = unix_ms() / 1_000;
@@ -2065,8 +2043,10 @@ impl Onboarding {
         {
             return Some(Step::Privacy);
         }
-        Step::ALL
-            .into_iter()
+        self.definition
+            .order
+            .iter()
+            .copied()
             .find(|step| !self.desired.steps.contains_key(step.name()))
             .or_else(|| {
                 // One being offered again now is led to its end.
@@ -2076,13 +2056,13 @@ impl Onboarding {
                     .map(|led| led.step)
             })
             .or_else(|| {
-                Step::ALL.into_iter().find(|step| {
+                self.definition.order.iter().copied().find(|step| {
                     self.step_available(*step)
                         && self.desired.steps.get(step.name()).is_some_and(|kept| {
                             kept.outcome == Outcome::NotAvailable
-                                && kept
-                                    .offered_at_unix_s
-                                    .is_none_or(|at| unix_s.saturating_sub(at) >= OFFER_EVERY_S)
+                                && kept.offered_at_unix_s.is_none_or(|at| {
+                                    unix_s.saturating_sub(at) >= self.definition.reoffer_after_s
+                                })
                         })
                 })
             })
@@ -2453,7 +2433,7 @@ fn nearest(faces: &lamp_msgs::Faces) -> Option<Framing> {
 
 /// The two functions the model is told of when the walk is switched on.
 pub fn tools() -> Vec<Tool> {
-    let names: Vec<&str> = Step::ALL.iter().map(|step| step.name()).collect();
+    let names = Step::IDS;
     vec![
         Tool {
             name: STEP.into(),
@@ -2667,6 +2647,99 @@ mod tests {
     }
 
     const NONE: [&str; 0] = [];
+
+    #[test]
+    fn installed_order_words_and_nudge_drive_the_existing_runner() {
+        let shipped = include_str!("../../../skills/onboarding/skill.toml");
+        let changed = shipped
+            .replacen(
+                "order = [\"where_you_sit\", \"who_you_are\"",
+                "order = [\"who_you_are\", \"where_you_sit\"",
+                1,
+            )
+            .replacen(
+                "Ask them, in a few words, what you should call them.",
+                "Ask for their preferred name.",
+                1,
+            )
+            .replace("after_answers = 1", "after_answers = 3")
+            .replace(
+                "Otherwise call setup_step with step",
+                "Otherwise promptly call setup_step with step",
+            );
+        let definition = Arc::new(skill::parse(&changed).unwrap());
+        let mut room = Room::nudged("installed-order");
+        room.walk.definition = definition.clone();
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            [definition.note(Step::WhoYouAre, false)]
+        );
+        room.walk.heard_line("one");
+        room.walk.heard_line("two");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        room.walk.heard_line("three");
+        assert_eq!(
+            room.wait(S, Some(NEAR_MIDDLE)),
+            [definition.nudge(Step::WhoYouAre).unwrap().0]
+        );
+        // A file's order cannot give model reports physical authority.
+        assert!(!Step::Privacy.reportable(Outcome::Done));
+        assert!(!Step::GivingWay.reportable(Outcome::Done));
+        room.walk.set_privacy_context(
+            privacy::Epoch {
+                device_boot: "test-boot".into(),
+                clock_id: "test-clock".into(),
+            },
+            true,
+            None,
+            Some("beside the base"),
+        );
+        assert_eq!(room.walk.next_step(), Some(Step::Privacy));
+    }
+
+    #[test]
+    fn installed_reoffer_words_and_interval_drive_the_existing_runner() {
+        let mut room = Room::new("installed-reoffer");
+        let mut definition = (*skill::fixture()).clone();
+        definition.reoffer_after_s = 10;
+        definition
+            .steps
+            .get_mut(&Step::Preferences)
+            .unwrap()
+            .reoffer = "(Offer the preferences once more.)".into();
+        room.walk.definition = Arc::new(definition.checked().unwrap());
+        let now = unix_ms() / 1_000;
+        for step in room.walk.definition.order.iter().copied() {
+            room.walk.desired.steps.insert(
+                step.name().into(),
+                Kept {
+                    outcome: if step == Step::Preferences {
+                        Outcome::NotAvailable
+                    } else {
+                        Outcome::Skipped
+                    },
+                    at_unix_s: now,
+                    framing: None,
+                    offered_at_unix_s: Some(now),
+                },
+            );
+        }
+        assert_eq!(room.walk.next_step(), None);
+        room.walk
+            .desired
+            .steps
+            .get_mut(Step::Preferences.name())
+            .unwrap()
+            .offered_at_unix_s = Some(now - 11);
+        assert_eq!(room.walk.next_step(), Some(Step::Preferences));
+        room.walk.save();
+        room.walk.drain_storage_for_test(0);
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            ["(Offer the preferences once more.)"]
+        );
+    }
+
     const LEFT: Framing = Framing {
         size: 0.2,
         x: -0.7,

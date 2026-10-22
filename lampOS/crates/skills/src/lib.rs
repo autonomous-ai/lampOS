@@ -182,6 +182,9 @@ struct SkillFile {
     /// The same for a `say = { from = "schedule" }`, a due reminder
     /// (`[reminder.words]`, #940).
     reminder: Option<lamp_voice::skill_words::Section<lamp_voice::skill_words::ReminderWords>>,
+    /// The core onboarding runner's order and words, checked by the same
+    /// validator Voice uses when it takes its service-start snapshot.
+    onboarding: Option<lamp_voice::onboarding::skill::Definition>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
     /// The most runs it starts itself a local day (#1685's nudges).
@@ -3653,6 +3656,19 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             );
         }
         reminder.words.checked()?;
+    }
+    match (file.onboarding, file.permissions.grants("onboarding")) {
+        (Some(definition), true) => {
+            if manifest_text.len() as u64 > lamp_voice::onboarding::skill::MOST_MANIFEST_BYTES {
+                return Err("onboarding skill manifest exceeds 65536 bytes".into());
+            }
+            definition.checked()?;
+        }
+        (None, true) => return Err("a core onboarding skill requires [onboarding] data".into()),
+        (Some(_), false) => {
+            return Err("[onboarding] data belongs only to a core onboarding skill".into());
+        }
+        (None, false) => {}
     }
     // The words are the grant's: a skill granted it says them all, and no
     // other skill has them (#940).
