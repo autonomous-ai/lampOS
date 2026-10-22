@@ -735,9 +735,23 @@ impl Days {
     }
 
     pub fn kept(&self, person: &Person, max_bytes: usize) -> Result<Vec<Kept>> {
-        // A replaced kept thing (#2510) is no longer kept: only its history.
-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id DESC")?;
-        let rows = statement.query_map([person.as_str()], |r| {
+        self.kept_with(person, max_bytes, false)
+    }
+
+    /// [`Self::kept`], with `observations` what was noticed of the person
+    /// too (#3113): their current observations, by the same ids, so a
+    /// forget by name reaches "my favourite colour" kept without being
+    /// asked. Newest first up to `max_bytes`, given oldest first.
+    pub fn kept_with(
+        &self,
+        person: &Person,
+        max_bytes: usize,
+        observations: bool,
+    ) -> Result<Vec<Kept>> {
+        // A replaced kept thing (#2510) is no longer kept: only its history;
+        // and a superseded observation is no longer what was noticed.
+        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 ORDER BY id DESC")?;
+        let rows = statement.query_map(params![person.as_str(), observations], |r| {
             Ok(Kept {
                 id: r.get(0)?,
                 at_unix_ms: r.get(1)?,
@@ -873,6 +887,40 @@ impl Days {
         )?)
     }
 
+    /// An observation of `person`'s, as the observe pass keeps one, for
+    /// tests: `active` false is one superseded.
+    #[cfg(test)]
+    pub(crate) fn observe_for_test(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        active: bool,
+    ) -> u64 {
+        ensure_person(&self.db, person).unwrap();
+        let id = next_id(&self.db, person).unwrap();
+        insert_record(
+            &self.db,
+            &Record {
+                id,
+                person: person.as_str().into(),
+                kind: "observation".into(),
+                at_unix_ms: at,
+                heard: String::new(),
+                said: String::new(),
+                text: text.into(),
+                category: Some(tidy::Category::Preference),
+                source_ids: vec![],
+                supersedes: None,
+                active,
+            },
+            &self.local,
+            self.now,
+        )
+        .unwrap();
+        id
+    }
+
     pub fn forget(&mut self, person: &Person, id: u64) -> Result<u64> {
         let count = self.forget_here(person, id)?;
         self.forget_set_aside()?;
@@ -899,10 +947,27 @@ impl Days {
         // not where the fact came from, so climbing them removed kept things
         // that were only shown (#2003). A rule the exchange followed, in the
         // scope beside theirs, is not evidence either.
-        if record.kind == "observation" || record.kind == "kept" {
-            tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
-        }
+        //
+        // The evidence goes, but nothing goes because it derives from the
+        // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
+        // sources are its conversation's exchanges, so one exchange can be
+        // the evidence of the colour and a source of the wedding, and of
+        // other things noticed in it. Forgetting the colour took the wedding;
+        // forgetting the wedding took the colour. So the walk below starts
+        // from what is named (with its versions) only, and the evidence joins
+        // after it; a link from something kept to a removed exchange goes by
+        // the foreign key, as on expiry.
+        let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
+            tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
+                .query_map([person.as_str()], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        } else {
+            Vec::new()
+        };
         descendants(&tx, None)?;
+        for rid in evidence {
+            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+        }
         let count = erase(&tx)?;
         tx.commit()?;
         Ok(count)
@@ -2136,8 +2201,9 @@ fn versions(db: &Connection) -> Result<()> {
     Ok(())
 }
 /// What goes with the doomed rows: for a forget (`expiry` None), all that
-/// derives from them and every version; for expiry, from the first day
-/// whose events no longer hold (`expiry`), what derives from them only.
+/// derives from them and every version, except a kept thing that isn't
+/// itself doomed already (#3113); for expiry, from the first day whose
+/// events no longer hold (`expiry`), what derives from them only.
 fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     if let Some(event) = expiry {
         // Expiry: a kept thing never expires, even one remembered with its
@@ -2147,7 +2213,13 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // its follow-up window. A forget, below, still follows those links.
         db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
     } else {
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+        // A forget: a kept thing goes only when it is named (the doomed rows
+        // this walk starts from, with their versions), never because it
+        // derives from a doomed row (#3113). With `LAMP_MEMORY_FORGET_ALL` a
+        // kept thing's sources are its conversation's exchanges, so a named
+        // exchange would take every kept thing said in its conversation. Its
+        // link to the exchange goes by the foreign key, as on expiry.
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
 }

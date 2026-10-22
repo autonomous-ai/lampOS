@@ -3762,6 +3762,12 @@ impl ToolDesk {
         // a yes to a task cannot come in one.
         let heard =
             crate::attention::own_request().load(std::sync::atomic::Ordering::Acquire) != request;
+        // The Live route's lines come without their request: what was heard
+        // for it is held at its first call, before the call runs, so a
+        // forget never runs on a later line's words (#3113).
+        if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
+            thread.hold_line(request, Instant::now());
+        }
         // A skill's answer may ask for a look, called itself, in either of
         // its folders, or through `use_skill` (#1668, #1656).
         let skill =

@@ -287,8 +287,16 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             (id, true) => json!({"ok":true,"id":id,"existing":true}),
             (id, false) => value(Response::Added { id }),
         },
-        Request::Kept { person, max_bytes } => value(Response::Kept {
-            entries: store.kept(&one(person)?, max_bytes.unwrap_or(4096).min(16384) as usize)?,
+        Request::Kept {
+            person,
+            max_bytes,
+            observations,
+        } => value(Response::Kept {
+            entries: store.kept_with(
+                &one(person)?,
+                max_bytes.unwrap_or(4096).min(16384) as usize,
+                observations,
+            )?,
         }),
         Request::Recall {
             person,
@@ -1119,5 +1127,82 @@ mod tests {
             ]
         );
         assert_eq!(submissions, [false, true]);
+    }
+
+    /// #3113: `kept` with `observations` lists what the lamp noticed of a
+    /// person beside what they asked it to keep, current ones only, so a
+    /// forget by name finds "my favourite colour" kept on its own. Without
+    /// it the listing is what it was, and no other person's is listed.
+    #[test]
+    fn kept_with_observations_lists_the_persons_current_observations_too() {
+        const MAI: &str = "p-0123456789abcdef";
+        const AN: &str = "p-fedcba9876543210";
+        let (_scratch, mut store) = Scratch::new("kept-observations");
+        let mai = Person::new(MAI).unwrap();
+        let an = Person::new(AN).unwrap();
+        let ask = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW + 9).line)
+                .unwrap()
+        };
+        let wedding = ask(
+            &mut store,
+            json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"Sister's wedding is on Saturday."}),
+        );
+        assert_eq!(wedding, json!({"ok":true,"id":1}));
+        let old = store.observe_for_test(&mai, NOW, "Favourite colour is blue.", false);
+        let colour = store.observe_for_test(&mai, NOW + 1, "Favourite colour is violet.", true);
+        store.observe_for_test(&an, NOW, "Favourite colour is green.", true);
+        let texts = |line: &Value| -> Vec<(u64, String)> {
+            line["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| {
+                    (
+                        entry["id"].as_u64().unwrap(),
+                        entry["text"].as_str().unwrap().to_owned(),
+                    )
+                })
+                .collect()
+        };
+        let plain = ask(&mut store, json!({"op":"kept","person":MAI}));
+        assert_eq!(
+            texts(&plain),
+            [(1, "Sister's wedding is on Saturday.".into())]
+        );
+        let off = ask(
+            &mut store,
+            json!({"op":"kept","person":MAI,"observations":false}),
+        );
+        assert_eq!(off, plain);
+        let both = ask(
+            &mut store,
+            json!({"op":"kept","person":MAI,"observations":true,"max_bytes":16384}),
+        );
+        assert_eq!(
+            texts(&both),
+            [
+                (1, "Sister's wedding is on Saturday.".into()),
+                (colour, "Favourite colour is violet.".into())
+            ],
+            "{both}"
+        );
+        assert!(!texts(&both).iter().any(|(id, _)| *id == old));
+        // Forgotten by its id, it is listed no more; the kept line stays.
+        let forgotten = ask(&mut store, json!({"op":"forget","person":MAI,"id":colour}));
+        assert_eq!(forgotten["removed"], 1, "{forgotten}");
+        let after = ask(
+            &mut store,
+            json!({"op":"kept","person":MAI,"observations":true}),
+        );
+        assert_eq!(
+            texts(&after),
+            [(1, "Sister's wedding is on Saturday.".into())]
+        );
+        let theirs = ask(
+            &mut store,
+            json!({"op":"kept","person":AN,"observations":true}),
+        );
+        assert_eq!(texts(&theirs).len(), 1);
     }
 }
