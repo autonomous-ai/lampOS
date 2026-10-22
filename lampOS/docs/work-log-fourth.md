@@ -6103,6 +6103,38 @@ Ready for lamp-voice: yes (#2774, #2782 and #2870; #2824 is not ready).
   pieces await the requested owner contract. No lamp, account, unit or
   permission change was made.
 
+## 2026-10-22 11:53 ICT: plain memory rebases and current-base onboarding gates
+
+Ready for lamp-voice: yes (#2870 only; the memory PRs await fresh native gates).
+
+- The owner now requires latest-base ancestry immediately before each merge
+  (Queue issuecomment-6332794369). Both memory source reads found no P1/P2;
+  First also read #2774 cleanly and posted two focused passing groups.
+- #2782 pushed `e845f94d05fb3671191be1aced99ee153521730c` on
+  `22061b427805e4f6131cd5b15f2f1f287107fdf2`. Whole-commit range-diff is
+  `892fef9f2 = e845f94d0`. Fresh formatting, strict workspace Clippy and
+  three callback checks pass, zero failed/ignored. ARM64 39724398107 is
+  running; Clippy 39724398004 passed. Raw:
+  `/private/tmp/fourth-kept-name-callback-checks/rebase-latest-20261022/`.
+- #2774 pushed `c5d57ce4a41812b8e8524515bc68cc9e04a8adf2` on the same
+  parent, with `c7418b765 = c5d57ce4a`. Fresh formatting, strict workspace
+  Clippy, nine worker checks, six client checks and the repaired fixture
+  pass: 16/0/0. ARM64 39724754112 and Clippy 39724754301 are running.
+  Raw: `/private/tmp/fourth-memory-note-retry-checks/rebase-latest-20261022/`.
+- Requested an ordered merge window, #2774 then #2782, so the second can
+  preserve the first before its final rebase/native run. Queue:
+  issuecomment-6333012467. First's P3 coverage and future narrowing
+  invariant are recorded for follow-up; the reviewed patch is unchanged.
+- #2824 is on the same current base. Root independently checked 40 prompt
+  fields, the order and interval against the original code. Initial strict
+  Clippy errors were corrected and its rerun passed. The first sandboxed
+  focused run had 118 passes and ten failures: eight socket denials and
+  two new fixture defects (unsettled storage and invalid measured-step
+  completion). Both fixtures are fixed. Full current-base gates, with
+  authorized socket binding, are running; no readiness or lamp proof claimed.
+- #2789's remaining reader-group/bus contract is still unanswered. No lamp
+  access, account, group or unit changes were made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
