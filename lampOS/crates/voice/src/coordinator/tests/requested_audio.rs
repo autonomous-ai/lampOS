@@ -29,6 +29,12 @@ use std::{
 const WAIT: Duration = Duration::from_secs(3);
 const CLOCK: &str = "requested-recording-fixture";
 
+fn fixture_clock() -> crate::scenario_clock::Scope {
+    let scope = crate::scenario_clock::Scope::enter(Duration::from_secs(30)).unwrap();
+    scope.set_pump(|_| Ok(())).unwrap();
+    scope
+}
+
 /// One bounded fake daemon, on the real private call.sock protocol. A held
 /// Start is released by an explicit test message, never a timing sleep.
 struct Skills {
@@ -41,7 +47,7 @@ struct Skills {
 }
 
 impl Skills {
-    fn new(directory: &Path, lease_us: u64, hold_start: bool) -> Self {
+    fn new(directory: &Path, lease_us: u64, hold_start: bool, clock: Arc<AtomicU64>) -> Self {
         let socket = directory.join(crate::tools::CALL_SOCKET);
         let listener = UnixListener::bind(&socket).unwrap();
         let (send, operations) = mpsc::sync_channel(32);
@@ -81,8 +87,8 @@ impl Skills {
                                     assert_eq!(active.as_ref(), Some(&offer));
                                 }
                             }
-                            let until_us =
-                                (lamp_ipc::monotonic_us() + lease_us).min(offer.finish_before_us);
+                            let until_us = (clock.load(Ordering::Acquire) + lease_us)
+                                .min(offer.finish_before_us);
                             lease_until.store(until_us, Ordering::Release);
                             json!({"ok":true,"result":RequestedAudioLease {
                                 skills_boot: offer.skills_boot,
@@ -230,14 +236,17 @@ struct Test {
 
 impl Test {
     fn new(route: Route, lease_us: u64, hold_start: bool) -> Self {
+        assert!(crate::scenario_clock::is_active());
+        let clock = Arc::new(AtomicU64::new(monotonic_us()));
         let directory = SessionDirectory::create().unwrap();
-        let skills = Skills::new(&directory.path, lease_us, hold_start);
+        let skills = Skills::new(&directory.path, lease_us, hold_start, clock.clone());
         let bus = Bus::new(directory.path.join("bus")).unwrap();
         let mut publisher = bus
             .publisher_declared(SpeakerState::TOPIC, &SpeakerState::declaration(), "actions")
             .unwrap();
         publish_state(&mut publisher, 0, false);
-        let service = Service::new(bus, directory.path.clone(), CLOCK.into()).unwrap();
+        let service =
+            Service::new_stepped(bus, directory.path.clone(), CLOCK.into(), clock).unwrap();
         assert!(service.wait_cached(WAIT));
         let asset = directory.path.join("recording.wav");
         let mut wav = hound::WavWriter::create(
@@ -293,7 +302,15 @@ impl Test {
         test
     }
 
+    fn step(&self) {
+        assert!(self.service.step_fixture(WAIT, || {
+            assert!(crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap());
+            monotonic_us()
+        }));
+    }
+
     fn renew_input(&mut self) {
+        self.step();
         let until = MonoTime::from_micros(monotonic_us() + 1_000_000);
         self.owner
             .set_capture(now(), CaptureState::RetainingUntil(until))
@@ -435,7 +452,7 @@ impl Test {
     }
 
     fn offer(&self, id: u64) -> RequestedAudioOffer {
-        let issued_us = lamp_ipc::monotonic_us();
+        let issued_us = monotonic_us();
         RequestedAudioOffer {
             skills_boot: "skills-fixture".into(),
             definition_generation: 1,
@@ -683,7 +700,7 @@ fn publish_state(publisher: &mut Publisher, generation: u64, muted: bool) {
     let state = SpeakerState {
         stamp: ClockStamp {
             clock_id: CLOCK.into(),
-            at_us: lamp_ipc::monotonic_us(),
+            at_us: monotonic_us(),
             sequence: publisher.totals().published + 1,
         },
         session_id: publisher.boot().into(),
@@ -696,6 +713,7 @@ fn publish_state(publisher: &mut Publisher, generation: u64, muted: bool) {
 
 #[test]
 fn requested_audio_keeps_voice_state_non_resting_until_final_retirement() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let bus = Bus::new(test._directory.path.join("bus")).unwrap();
     let mut out = crate::bus_out::BusOut::on(&bus).unwrap();
@@ -754,8 +772,10 @@ fn requested_audio_keeps_voice_state_non_resting_until_final_retirement() {
 
 #[test]
 fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let mut handoffs = Vec::new();
+    let mut host_handoffs = Vec::new();
     for id in 1..=2 {
         if id > 1 {
             assert!(test.service.wait_idle(WAIT));
@@ -774,6 +794,7 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
         test.accept(&confirmation, 120);
         assert!(!test.prepare(), "accepted final PCM has not retired");
         assert!(!test.reply.as_ref().unwrap().settled(&test.pending));
+        let host_retired = std::time::Instant::now();
         let retired = test.retire(&confirmation);
         assert!(test.prepare());
         let first = test.dispatch().unwrap();
@@ -784,6 +805,11 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
         let accepted = test.accept(&first, 240);
         handoffs.push(accepted - retired);
         assert!(accepted - retired <= 250_000);
+        // Keep the host latency gate as well as the logical receipt/trace
+        // assertion. This wider boundary includes both IPC event handlers.
+        let host_handoff = host_retired.elapsed();
+        assert!(host_handoff <= Duration::from_millis(250));
+        host_handoffs.push(host_handoff.as_micros());
         let final_chunk = test.dispatch().unwrap();
         assert_eq!(final_chunk.permit.owner(), original_owner);
         assert!(final_chunk.end_of_speech);
@@ -815,12 +841,13 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
     assert_eq!(traced, handoffs);
     eprintln!(
         "requested audio prepared host handoff: first={}us repeated={}us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured",
-        handoffs[0], handoffs[1]
+        host_handoffs[0], host_handoffs[1]
     );
 }
 
 #[test]
 fn news_in_a_music_confirmation_is_heard_once_after_both_parts_retire() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let offer = test.load(1);
     test.answer_news();
@@ -858,6 +885,7 @@ fn news_in_a_music_confirmation_is_heard_once_after_both_parts_retire() {
 
 #[test]
 fn cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news() {
+    let _clock = fixture_clock();
     for reason in ["hand_stop", "new_owner", "privacy", "gap", "expiry"] {
         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
         let offer = test.load(1);
@@ -923,6 +951,7 @@ fn cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news() 
 
 #[test]
 fn offers_require_the_current_worker_session_request_and_privacy_identity() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let good = test.offer(1);
     for field in [
@@ -980,6 +1009,7 @@ fn offers_require_the_current_worker_session_request_and_privacy_identity() {
 
 #[test]
 fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings() {
+    let _clock = fixture_clock();
     for route in [Route::Written, Route::Reminder, Route::Say, Route::Offline] {
         let mut test = Test::new(route, REQUESTED_AUDIO_LEASE_US, false);
         let offer = test.offer(1);
@@ -992,6 +1022,7 @@ fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings()
 
 #[test]
 fn an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording() {
+    let _clock = fixture_clock();
     for gapped in [false, true] {
         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
         let offer = test.load(1);
@@ -1033,6 +1064,7 @@ fn an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording() {
 
 #[test]
 fn stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader() {
+    let _clock = fixture_clock();
     for playing in [false, true] {
         for reason in ["hand_stop", "privacy", "capture_gap", "new_owner"] {
             let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, !playing);
@@ -1078,6 +1110,7 @@ fn stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader()
 
 #[test]
 fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
+    let _clock = fixture_clock();
     for playing in [false, true] {
         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
         let offer = test.load(1);
@@ -1089,6 +1122,7 @@ fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
         }
         publish_state(&mut test.publisher, 1, true);
         publish_state(&mut test.publisher, 1, false);
+        assert!(test.service.observe_fixture(WAIT));
         // Even if Latest coalesces the mute, the generation still revokes the
         // old recording. Finish is a positive monitor/worker synchronization.
         test.skills
@@ -1108,6 +1142,7 @@ fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
 
 #[test]
 fn the_actual_speaker_permit_cannot_outlive_a_short_skills_lease() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, 90_000, true);
     let offer = test.offer(1);
     assert!(test.accept_offer(offer.clone()));
@@ -1135,6 +1170,7 @@ fn the_actual_speaker_permit_cannot_outlive_a_short_skills_lease() {
 
 #[test]
 fn an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let offer = test.load(1);
     let current = test.reply.as_ref().unwrap();
@@ -1236,6 +1272,7 @@ fn an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_r
 
 #[test]
 fn an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy() {
+    let _clock = fixture_clock();
     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
     let offer = test.load(1);
     let current = test.reply.as_ref().unwrap();

@@ -729,8 +729,9 @@ async fn the_lamp_answers(rig: &mut LiveRig, dial: &mut Dial) {
 /// timer is held (the reviewer on #1054). The volume in such a turn is
 /// still held, and so is a cancel, which is silent and cannot be undone
 /// (Fourth on #1054).
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet() {
+    let _clock = logical_clock();
     for spoke in [true, false] {
         let mut desk = Desk::new(if spoke { "follows" } else { "follows-silent" });
         let mut rig = LiveRig::start_with(quick_policy(), desk.options(true));

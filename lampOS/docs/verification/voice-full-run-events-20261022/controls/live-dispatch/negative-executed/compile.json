@@ -1,0 +1,26 @@
+{
+  "label": "compile",
+  "argv": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "test",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+  "timeout_s": 900,
+  "stdout": "compile.stdout",
+  "stderr": "compile.stderr",
+  "started_utc": "2026-10-22T11:25:52.458361+00:00",
+  "pid": 62338,
+  "exit": 0,
+  "timed_out": false,
+  "wall_seconds": 197.827305,
+  "stdout_bytes": 249229,
+  "stdout_sha256": "f6ce6bdd9e559911e1b88fb83083dbe1a48e6650d6d0ec067790755f1ee2ddc8",
+  "stderr_bytes": 167,
+  "stderr_sha256": "36566b132c530b2ca7d5f9b05fb58a5d9a8dbf251d664ec50817d5fc393d8003"
+}

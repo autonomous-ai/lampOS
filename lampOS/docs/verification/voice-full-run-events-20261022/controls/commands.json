@@ -1,0 +1,324 @@
+[
+  {
+    "label": "before-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--offline",
+      "--message-format=json"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+    "started": "2026-10-22T11:16:18.472150+00:00",
+    "seconds": 134.08132720785215,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "before-compile.txt",
+    "sha256": "55e6a6aa4e103f598bda014f17a7c3008b66998a5711613aaa099a4347bdc68f",
+    "summaries": []
+  },
+  {
+    "label": "before-timer",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:32.561744+00:00",
+    "seconds": 2.3700577658601105,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-timer.txt",
+    "sha256": "82c6129ab8dd3d976a814bd7713b650b2eeccfbcdf113b328e160359936886d2",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.24s"
+    ]
+  },
+  {
+    "label": "before-reminder",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:34.932568+00:00",
+    "seconds": 0.2526679039001465,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-reminder.txt",
+    "sha256": "78e95e7f91a75d5464502cc40b56279cbbe43d597b112a5d90637a1a5a2283e8",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.22s"
+    ]
+  },
+  {
+    "label": "before-decline",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:35.185854+00:00",
+    "seconds": 4.10819297702983,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-decline.txt",
+    "sha256": "7b259e8859905f01f7f4dc85ce2c9e8a4d9a330851f75fd939e6ef60cd7f2989",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 4.02s"
+    ]
+  },
+  {
+    "label": "before-live",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:39.294470+00:00",
+    "seconds": 4.090326222125441,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-live.txt",
+    "sha256": "8dacbec20764a3c5b2c4f22f775e6a6228809a5aed205ce0a37ef2e353cc3781",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 4.02s"
+    ]
+  },
+  {
+    "label": "before-thread-1",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:43.385517+00:00",
+    "seconds": 0.09671685425564647,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-thread-1.txt",
+    "sha256": "efd3151422e56e0d2bcc50169073eb071bc618bf4fd2d06f6e19b88b50258b22",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.03s"
+    ]
+  },
+  {
+    "label": "before-thread-2",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:43.486153+00:00",
+    "seconds": 0.05397241096943617,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-thread-2.txt",
+    "sha256": "8765beb19bda9dc038ad712107d585236859cd8e9e6cec4afc56ffa241fb6751",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.02s"
+    ]
+  },
+  {
+    "label": "before-thread-3",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:18:43.540672+00:00",
+    "seconds": 0.05531821073964238,
+    "exit": 101,
+    "watchdog_timeout": false,
+    "log": "before-thread-3.txt",
+    "sha256": "9c5e94849b447ab0c6d7904c138e4d1aa234a31c02e83c48af13b1856874a04e",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.02s"
+    ]
+  },
+  {
+    "label": "after-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--offline",
+      "--message-format=json"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+    "started": "2026-10-22T11:18:43.847708+00:00",
+    "seconds": 184.91307672811672,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-compile.txt",
+    "sha256": "9deee4e4abb62db38b9b17ce7134c65432450da6cc0cd1a77d6c5e7936e38756",
+    "summaries": []
+  },
+  {
+    "label": "after-timer",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:21:48.808740+00:00",
+    "seconds": 5.312065500300378,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-timer.txt",
+    "sha256": "200eed874dd94c1a9d72a03fcb22ebecb662b264f372265c819aca8bfffc5101",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 1.15s"
+    ]
+  },
+  {
+    "label": "after-reminder",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:21:54.122775+00:00",
+    "seconds": 0.370939405169338,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-reminder.txt",
+    "sha256": "0313b9a6832098bac16e2d31b2ac756b1aafdfcc0d95cb809adbbac5692664b0",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.31s"
+    ]
+  },
+  {
+    "label": "after-decline",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:21:54.496227+00:00",
+    "seconds": 8.37820414826274,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-decline.txt",
+    "sha256": "69e6731889f5d5412c260fa931bf366cb84a537b98ee8b98775da4651bd796bb",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 8.26s"
+    ]
+  },
+  {
+    "label": "after-live",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:22:02.875612+00:00",
+    "seconds": 8.341864493209869,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-live.txt",
+    "sha256": "c4a5e12bd1f6f672310444efeb81859a5c9851e4d4d29413d98853066d472978",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 8.26s"
+    ]
+  },
+  {
+    "label": "after-thread-1",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:22:11.241631+00:00",
+    "seconds": 0.5397767219692469,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-thread-1.txt",
+    "sha256": "75b81b26888d29d8cd5304d017a0fe37c34956486274a79e4bf5661130d0b305",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.44s"
+    ]
+  },
+  {
+    "label": "after-thread-2",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:22:11.834931+00:00",
+    "seconds": 0.6153916879557073,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-thread-2.txt",
+    "sha256": "5551a7efaaeb9f14ec3f4d18dc7479438e22900429a7196d65a2e65acaaa2883",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.55s"
+    ]
+  },
+  {
+    "label": "after-thread-3",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice",
+    "started": "2026-10-22T11:22:12.478901+00:00",
+    "seconds": 0.5835890690796077,
+    "exit": 0,
+    "watchdog_timeout": false,
+    "log": "after-thread-3.txt",
+    "sha256": "01b2d36d71537a3e78ed89feda4a9aae294f52e0f7645e0fe752d4c2b9d9ffed",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.51s"
+    ]
+  }
+]

@@ -1,0 +1,24 @@
+
+running 18 tests
+test requested_audio::runtime::tests::admission_requires_a_continuously_audible_baseline_before_the_spoken_call ... ok
+test requested_audio::runtime::tests::equal_sequence_changes_regression_and_restart_break_permission ... ok
+test requested_audio::runtime::tests::monitor_stalls_and_the_wire_deadline_cannot_be_refreshed_by_repeated_reads ... ok
+test requested_audio::runtime::tests::cancellation_between_playback_check_and_completion_cannot_report_success ... ok
+test requested_audio::runtime::tests::cache_contention_after_start_is_terminal_even_when_the_cache_recovers ... ok
+test requested_audio::runtime::tests::pending_preparation_is_live_and_samples_can_only_be_taken_once ... ok
+test requested_audio::runtime::tests::output_permits_are_capped_by_both_lease_and_monitor_freshness ... ok
+test requested_audio::runtime::tests::completion_is_only_recorded_after_start_and_drop_cancels_without_a_lock ... ok
+test requested_audio::runtime::tests::mute_loss_and_worker_failure_never_revive_an_admitted_ticket ... ok
+test requested_audio::runtime::tests::process_factory_keeps_construction_failure_instead_of_retrying_each_session ... ok
+test requested_audio::runtime::tests::a_retained_speaker_snapshot_expires_an_actual_ticket_and_cannot_revive_it ... ok
+test requested_audio::runtime::tests::original_start_is_exact_and_started_is_idempotent_without_extending_finish ... ok
+test requested_audio::runtime::tests::process_factory_reuses_the_same_workers_after_a_session_releases_its_arc ... ok
+test requested_audio::runtime::tests::real_worker_cache_contention_cancels_before_start_and_never_revives ... ok
+test requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement ... ok
+test requested_audio::runtime::tests::drop_during_a_blocked_start_does_not_wait_or_accept_its_late_success ... ok
+test requested_audio::runtime::tests::rejected_baseline_releases_capacity_for_a_new_spoken_offer ... ok
+test requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 3351 filtered out; finished in 0.22s
+
+END RAW CONTROL OUTPUT

@@ -1656,3 +1656,35 @@ Left as they are, for what each is there to show:
 - `judges_program` keeps `--seconds 2`. The child's time starts at its
   start, and inside it the test waits for the ready report, sends a line,
   and waits for a decision with a 1 s deadline.
+
+## Voice fixtures under a full parallel library run (#1569, 22 October)
+
+The full x86 Voice library shares one process; passing a case alone does
+not establish that its fixtures are isolated. The requested-audio Skills
+fake and `DeclineMusic` now begin their original three-second accept
+watchdog at an explicit dispatch rendezvous. Time spent constructing the
+provider, or waiting for another fixture's guard, cannot use that watchdog.
+The long memory-hit fake prepares its 150-entry reply before either real
+60 ms call and acknowledges readiness separately for each request.
+
+The timer-following-answer and busy-room-reminder cases already wait for
+provider/Policy events. They now opt into the existing paused fixture
+clock, so host scheduling does not expire their original logical authority.
+The music-RPC Stop fixture takes the existing process conversation guard
+through worker shutdown and restoration; it cannot replace another test's
+stored question. Its Stop deadline and the own-answer assertions remain.
+
+The coordinator recording fixture drives the real loader and Skills socket
+worker with the existing scenario clock. It consumes each real Bus publication
+at an explicit observation event, then steps its original wire stamp and cache
+bounds together while the worker is parked. Production construction still
+starts its independent monitor; runtime tests still assert that cache contention
+cancels. Recording tests retain an independent real 250 ms handoff assertion
+alongside their logical receipt and trace checks.
+
+[The verification record](verification/voice-full-run-events-20261022/README.md)
+keeps the unchanged full-run failures, controlled before/after stalls,
+scheduled conversation overlap, negative controls and complete x86/ARM64
+counts. The injected stalls are reproduction patches only; no fixed sleep
+is added to the submitted tests. These are fixture measurements, not
+acoustic or device latency evidence.

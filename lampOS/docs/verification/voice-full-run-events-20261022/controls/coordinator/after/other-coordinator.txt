@@ -1,0 +1,20 @@
+
+running 11 tests
+lamp-voice: the news (tasks-fixture:2:4) was not heard whole (no_audio_answer): its harness stays open
+requested audio prepared host handoff: first=1330us repeated=768us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured
+test coordinator::tests::requested_audio::an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy ... ok
+test coordinator::tests::requested_audio::an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply ... ok
+test coordinator::tests::requested_audio::news_in_a_music_confirmation_is_heard_once_after_both_parts_retire ... ok
+test coordinator::tests::requested_audio::the_actual_speaker_permit_cannot_outlive_a_short_skills_lease ... ok
+lamp-voice: the news (tasks-fixture:2:4) was not heard whole (audio_written_with_playback_gaps_unscored): its harness stays open
+test coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement ... ok
+test coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement ... ok
+test coordinator::tests::requested_audio::offers_require_the_current_worker_session_request_and_privacy_identity ... ok
+test coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording ... ok
+test coordinator::tests::requested_audio::a_real_bus_mute_generation_is_terminal_even_after_unmute ... ok
+test coordinator::tests::requested_audio::written_reminder_say_and_offline_turns_never_authorize_requested_recordings ... ok
+test coordinator::tests::requested_audio::stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 3358 filtered out; finished in 0.28s
+
+END RAW CONTROL OUTPUT

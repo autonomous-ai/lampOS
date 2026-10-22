@@ -615,6 +615,7 @@ async fn a_line_the_model_declines_is_told_held_back() {
 struct DeclineMusic {
     home: crate::process::SessionDirectory,
     asked: std::sync::mpsc::Receiver<serde_json::Value>,
+    dispatch: Option<std::sync::mpsc::Sender<()>>,
     stop: std::sync::Arc<AtomicBool>,
     worker: Option<std::thread::JoinHandle<()>>,
     /// The rigs' one-at-a-time lock, held from before the peer's 3 s accept
@@ -638,9 +639,14 @@ impl DeclineMusic {
             std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
                 .unwrap();
         let (sent, asked) = std::sync::mpsc::channel();
+        let (dispatch, dispatched) = std::sync::mpsc::channel();
         let stop = std::sync::Arc::new(AtomicBool::new(false));
         let ending = stop.clone();
         let worker = std::thread::spawn(move || {
+            // Worker setup must not spend the first Skills accept watchdog.
+            if dispatched.recv().is_err() {
+                return;
+            }
             loop {
                 let mut stream = match music_accept(&listener) {
                     Ok(stream) => stream,
@@ -689,10 +695,19 @@ impl DeclineMusic {
         Self {
             home,
             asked,
+            dispatch: Some(dispatch),
             stop,
             worker: Some(worker),
             _one: one,
         }
+    }
+
+    fn arm(&mut self) {
+        self.dispatch
+            .take()
+            .expect("Skills dispatch armed twice")
+            .send(())
+            .unwrap();
     }
 
     fn options(&self, wrapped: bool) -> Options {
@@ -709,6 +724,8 @@ impl DeclineMusic {
 impl Drop for DeclineMusic {
     fn drop(&mut self) {
         self.stop.store(true, std::sync::atomic::Ordering::Release);
+        // Setup may have failed before dispatch; release that wait before join.
+        drop(self.dispatch.take());
         // Keep the wake peer connected until accept and its timeout setup
         // finish: macOS rejects SO_RCVTIMEO after that peer disconnects.
         let wake =
@@ -787,7 +804,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
     let _turn = one_at_a_time().await;
     for mixed in [false, true] {
         for wrapped in [false, true] {
-            let skills = DeclineMusic::new();
+            let mut skills = DeclineMusic::new();
             let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
             let mut dial = rig.ready().await;
             let request = rig.speak(&mut dial, false, true).await;
@@ -796,6 +813,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
                 matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
             );
             if mixed {
+                skills.arm();
                 dial.service
                     .send(json!({"toolCall":{"functionCalls":[decline_function(),music_function(wrapped)]}}))
                     .await;
@@ -809,6 +827,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
             // Decline is recorded before its function response is sent.
             // That response proves the next call cannot precede the guard.
             if !mixed {
+                skills.arm();
                 dial.service
                     .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
                     .await;
@@ -833,7 +852,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
 async fn an_accepted_decline_does_not_release_a_parked_music_call() {
     let _turn = one_at_a_time().await;
     for wrapped in [false, true] {
-        let skills = DeclineMusic::new();
+        let mut skills = DeclineMusic::new();
         let policy_root = skills.home.path.join("policy");
         let mut decisions = lamp_bus::Bus::new(&policy_root)
             .unwrap()
@@ -852,6 +871,7 @@ async fn an_accepted_decline_does_not_release_a_parked_music_call() {
         assert!(
             matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
         );
+        skills.arm();
         dial.service
             .send(
                 json!({"toolCall":{"functionCalls":[music_function(wrapped),decline_function()]}}),
@@ -890,10 +910,11 @@ async fn an_accepted_decline_does_not_release_a_parked_music_call() {
 async fn a_music_action_before_decline_keeps_its_single_offer_and_confirmation() {
     let _turn = one_at_a_time().await;
     for wrapped in [false, true] {
-        let skills = DeclineMusic::new();
+        let mut skills = DeclineMusic::new();
         let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
         let mut dial = rig.ready().await;
         let request = rig.speak(&mut dial, false, true).await;
+        skills.arm();
         dial.service
             .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
             .await;

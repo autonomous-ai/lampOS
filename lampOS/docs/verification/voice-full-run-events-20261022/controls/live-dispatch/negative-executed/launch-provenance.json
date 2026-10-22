@@ -1,0 +1,7 @@
+{
+  "previous_launch": "launch-1-cargo-not-found",
+  "previous_cargo_processes": 0,
+  "previous_test_executions": 0,
+  "correction": "Absolute Cargo path plus Rust toolchain directory in PATH; no test retry.",
+  "runner_sha256": "e1d4eacba9e30811b94da98a2282bf84e6557e275511891b9cc2bc58e8b10a91"
+}

@@ -1,0 +1,392 @@
+{
+  "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "worktree": "/private/tmp/tests-codex-voice-clock-probe-20261022",
+  "target": "/private/tmp/tests-codex-small-native-20261022",
+  "started_at": "20261022T115921.324372Z",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_TARGET": null,
+    "RUST_TEST_THREADS": null
+  },
+  "compiles": [
+    {
+      "variant": "before",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 147.78143379604444,
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "2221e62f5a132defdb5245861f9b6c973efea33c97b79c1bd364e558489d4e5e",
+        "lampOS/crates/voice/src/provider_worker.rs": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+        "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+        "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+        "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+        "lampOS/crates/voice/src/remember.rs": "59ce1dab98d25c03e0cf946d1a805fa04e0568b955c4d5cd6c352dce2d7dadc8",
+        "lampOS/crates/voice/src/requested_audio/runtime.rs": "635aace9f582a1ad81c89893b55723ca1570858fefca9f5241ee977ad3dde819",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+      },
+      "binary_sha256": "c2d3dccfe5345c555939a546afa08488953a20ad333ba92749d87673ded7b567",
+      "reused_from": "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/requested-audio/executed-20261022T115433.573062Z",
+      "reverified_source_and_binary": true
+    },
+    {
+      "variant": "after",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 120.04341979930177,
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "526276a777f7f95d6f90431d03dd1e2135703d50081d615325e8e2b42348091c",
+        "lampOS/crates/voice/src/provider_worker.rs": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+        "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+        "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "b1370e287f9ffa4b52574fceaaa16b4e3fb9cc4d440bab9d6cbbf27db1ea3f1f",
+        "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+        "lampOS/crates/voice/src/remember.rs": "a92cb09849f024cd1e2344ee19b5a11f9159133360258b673fce11016aa6e8c2",
+        "lampOS/crates/voice/src/requested_audio/runtime.rs": "5d76c1b00352bdf4395f0d39c8c5293b2d3ad0b299261df902ce664aa0f2bbf2",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+      },
+      "binary_sha256": "e409f1a0f457d74fefcbd2dd6e8058d06d93b519d973f2037c91f4800fe700fb"
+    },
+    {
+      "variant": "watchdog-after",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 136.3657738622278,
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+        "lampOS/crates/voice/src/provider_worker.rs": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+        "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+        "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "b1370e287f9ffa4b52574fceaaa16b4e3fb9cc4d440bab9d6cbbf27db1ea3f1f",
+        "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+        "lampOS/crates/voice/src/remember.rs": "a92cb09849f024cd1e2344ee19b5a11f9159133360258b673fce11016aa6e8c2",
+        "lampOS/crates/voice/src/requested_audio/runtime.rs": "db9b1079b408e17b63b83ce0044842e60f2d4c53879bf5e497b789298c877aa3",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+      },
+      "binary_sha256": "931b081213179cd76c0d1e1f288ef194c21c6265232b398f52df1472317a3d8e"
+    },
+    {
+      "variant": "watchdog-before",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 121.53623258322477,
+      "source_sha256": {
+        "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+        "lampOS/crates/voice/src/provider_worker.rs": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+        "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+        "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "b1370e287f9ffa4b52574fceaaa16b4e3fb9cc4d440bab9d6cbbf27db1ea3f1f",
+        "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+        "lampOS/crates/voice/src/remember.rs": "a92cb09849f024cd1e2344ee19b5a11f9159133360258b673fce11016aa6e8c2",
+        "lampOS/crates/voice/src/requested_audio/runtime.rs": "1e247b9ebe7337685a16223c98d0e6cf81ca1172a026cffe1c2a1088b4d69567",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+      },
+      "binary_sha256": "45858b2138b8ccc983f8141c9108b07cfe97a05be684e43d79587e4715d7955e"
+    }
+  ],
+  "tests": [
+    {
+      "label": "before-pause-1",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 0.34851220808923244,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.3038692260161042
+        }
+      ],
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.32s"
+      ],
+      "log_sha256": "b16ac72081a8ab838deeb299b176751cc39cca7731c1a667792cdb4954590861"
+    },
+    {
+      "label": "before-pause-2",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 0.34083062782883644,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.3040361790917814
+        }
+      ],
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.31s"
+      ],
+      "log_sha256": "c8242911250740418e69f9c1c63db554c70bf60fc4f6c8a6b1b4e4f84bf4141b"
+    },
+    {
+      "label": "before-pause-3",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 0.34729974204674363,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.3039785451255739
+        }
+      ],
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.31s"
+      ],
+      "log_sha256": "52ed26f2179f78b66d47601f170bfd0e8da9883d400377868fca5d13921f860c"
+    },
+    {
+      "label": "after-pause-1",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 3.92375065991655,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.30397200817242265
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=new_owner",
+          "whole_child_pause_seconds": 0.3047530138865113
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=privacy",
+          "whole_child_pause_seconds": 0.30450576869770885
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=gap",
+          "whole_child_pause_seconds": 0.3042405960150063
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=expiry",
+          "whole_child_pause_seconds": 0.30438738223165274
+        }
+      ],
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.70s"
+      ],
+      "log_sha256": "47ab259667e5449579b9df4c57b6025d33225a13a623279ffcf37caa79e01945"
+    },
+    {
+      "label": "after-pause-2",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 1.7274996573105454,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.3048342918045819
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=new_owner",
+          "whole_child_pause_seconds": 0.30400677025318146
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=privacy",
+          "whole_child_pause_seconds": 0.30453381687402725
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=gap",
+          "whole_child_pause_seconds": 0.3041930911131203
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=expiry",
+          "whole_child_pause_seconds": 0.3044207086786628
+        }
+      ],
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.69s"
+      ],
+      "log_sha256": "e05543bc2ed28a73dec7275310a5bb117258b6e9cb983e05ece3c586aaec7b49"
+    },
+    {
+      "label": "after-pause-3",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 1.7395154777914286,
+      "events": [
+        {
+          "marker": "test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=hand_stop",
+          "whole_child_pause_seconds": 0.304870393127203
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=new_owner",
+          "whole_child_pause_seconds": 0.3049687249585986
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=privacy",
+          "whole_child_pause_seconds": 0.30385659309104085
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=gap",
+          "whole_child_pause_seconds": 0.3042140337638557
+        },
+        {
+          "marker": "REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason=expiry",
+          "whole_child_pause_seconds": 0.3050440661609173
+        }
+      ],
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.71s"
+      ],
+      "log_sha256": "9477b3478b605767d95ee636f0d30d3bee2fd7e9507208d524a24af03892f875"
+    },
+    {
+      "label": "watchdog-after",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 1.9920674683526158,
+      "events": [],
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.01s"
+      ],
+      "log_sha256": "4ff2ac89fe2058ccdc9d4a3704c611b89e594a0f5bf4828dd7788a195793af6c"
+    },
+    {
+      "label": "watchdog-before",
+      "command": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--exact",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": -6,
+      "seconds": 2.1607003626413643,
+      "events": [],
+      "summaries": [],
+      "log_sha256": "8354442db6919d762b56ae8670a78227f0cfca37efe3ccf65d4a24024896d11f"
+    }
+  ],
+  "candidate_sha256": {
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+    "lampOS/crates/voice/src/provider_worker.rs": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "b1370e287f9ffa4b52574fceaaa16b4e3fb9cc4d440bab9d6cbbf27db1ea3f1f",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+    "lampOS/crates/voice/src/remember.rs": "a92cb09849f024cd1e2344ee19b5a11f9159133360258b673fce11016aa6e8c2",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "5d76c1b00352bdf4395f0d39c8c5293b2d3ad0b299261df902ce664aa0f2bbf2",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+  },
+  "restored_sha256": {
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c",
+    "lampOS/crates/voice/src/provider_worker.rs": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+    "lampOS/crates/voice/src/remember.rs": "59ce1dab98d25c03e0cf946d1a805fa04e0568b955c4d5cd6c352dce2d7dadc8",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "635aace9f582a1ad81c89893b55723ca1570858fefca9f5241ee977ad3dde819",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+  },
+  "candidate_unchanged": true,
+  "status": "passed",
+  "original_coordinator_assertions_preserved": 142,
+  "unchanged_runtime_case": "real_worker_cache_contention_cancels_before_start_and_never_revives",
+  "runner_sha256": "ff5a8a4fc158cb0204bd22c0f43a0dee32d3bc064197c532d6030a2e51fb8d76",
+  "infrastructure_attempt": {
+    "label": "before-pause-1",
+    "command": [
+      "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "seconds": 2.0019270200282335,
+    "events": [],
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.01s"
+    ],
+    "log_sha256": "15bb4f7f1d9112b2db6cdeed7b17716a8a9d89733cd2a23b479793244df86291"
+  },
+  "infrastructure_classification": "Before positive marker; no SIGSTOP or SIGCONT; not a controlled reproduction.",
+  "earlier_runner_parse_failure": {
+    "first_attempt": "Python SyntaxError before execution; no source mutation, Cargo or test executed",
+    "error": "unmatched closing parenthesis in zero_park return",
+    "preserved_script": "run-controls-first-syntax-error.py"
+  },
+  "patch_sha256": {
+    "after-after-load.patch": "53d59f0375a2b2702619d86e7efbcdcfb1953976ce5b369f93e3ef71438a77c2",
+    "before-after-load.patch": "93328e614fde7b036dab34fb9c985d24d877c7bf7f6a7cb7e99cd651d5d68ec7",
+    "watchdog-after.patch": "b33a6c4fd149716e94965fa6ba6c94dcb6558deb2b9e871cf9227a450690d7eb",
+    "watchdog-before.patch": "96808637ef6e080c69b2f39fac6e3609ac9288e6234ceed69941d31d7c7e04b1"
+  },
+  "raw_representation": "Decode each utf8 JSON string and encode UTF-8; the bytes exactly match byte_length and sha256. No bytes are trimmed in raw-output.json."
+}

@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
+@@ -860,6 +860,8 @@
+ fn cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news() {
+     for reason in ["hand_stop", "new_owner", "privacy", "gap", "expiry"] {
+         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
++        // Controlled host stall: fixture scheduling is not speaker liveness.
++        std::thread::sleep(Duration::from_secs(4));
+         let offer = test.load(1);
+         test.answer_news();
+         test.confirmed();

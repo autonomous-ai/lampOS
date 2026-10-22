@@ -1,0 +1,18 @@
+
+failures:
+
+---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----
+light calls, fastest to slowest: [1.700034ms, 2.577934ms, 2.933853ms, 3.010865ms, 3.341294ms, 4.329956ms, 5.765743ms, 21.660478ms, 42.171585ms, 42.873524ms, 43.437335ms, 75.333133ms, 78.128357ms, 95.156965ms, 96.408486ms, 99.212585ms, 111.587281ms, 114.237693ms, 115.573346ms, 136.91273ms]
+
+thread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (696316686) panicked at crates/voice/tests/it/light_call.rs:90:5:
+[1.700034ms, 2.577934ms, 2.933853ms, 3.010865ms, 3.341294ms, 4.329956ms, 5.765743ms, 21.660478ms, 42.171585ms, 42.873524ms, 43.437335ms, 75.333133ms, 78.128357ms, 95.156965ms, 96.408486ms, 99.212585ms, 111.587281ms, 114.237693ms, 115.573346ms, 136.91273ms]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them
+
+test result: FAILED. 265 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.91s
+
+error: test failed, to rerun pass `-p lamp-voice --test it`
+END RAW FAILURE SECTION

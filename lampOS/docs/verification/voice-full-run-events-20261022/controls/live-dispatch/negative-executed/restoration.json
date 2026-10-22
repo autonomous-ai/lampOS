@@ -1,0 +1,15 @@
+{
+  "baseline_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "restored_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "baseline_bytes_equal": true,
+  "candidate_sha256_after": "fbf70c5d8f52ca0f250c02c7064464fa0bf5ae1d54dd88b7608b731f0c010005",
+  "candidate_unchanged": true,
+  "neighbor_sha256_after": {
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+    "lampOS/crates/voice/src/remember.rs": "5745a9e5e4b5ef532016f8583f15fef950da49d6ab50571c884ee7b558bfec9d",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+  },
+  "neighbors_unchanged": true
+}

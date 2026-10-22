@@ -1,0 +1,11 @@
+BEGIN RAW STDOUT
+
+running 1 test
+test remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3365 filtered out; finished in 0.37s
+
+END RAW STDOUT
+BEGIN RAW STDERR
+END RAW STDERR
+END RAW CONTROL OUTPUT

@@ -1,0 +1,11 @@
+Diff in /private/tmp/tests-codex-voice-events-20261022/lampOS/crates/voice/src/provider_worker.rs:11323:
+             let skill = std::thread::spawn(move || {
+                 // Provider setup must not spend the Skills accept watchdog.
+                 // Dropping the sender also releases this wait on unwind.
+-                dispatched.recv().expect("test ended before Skills dispatch");
++                dispatched
++                    .recv()
++                    .expect("test ended before Skills dispatch");
+                 let mut stream = music_accept(&listener).unwrap();
+                 let mut line = String::new();
+                 std::io::BufReader::new((&stream).take(16_384))

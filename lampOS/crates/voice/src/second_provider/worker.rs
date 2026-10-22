@@ -11333,6 +11333,9 @@ mod tests {
     }
 
     fn check_stop_during_music_rpc(warm_stt: bool) {
+        // The real worker reads and writes the process's conversation too.
+        // Hold its fixture guard until the runtime stops and THREAD is restored.
+        let _one = crate::provider_worker::tests::one_thread();
         use crate::second_provider::requested_audio_tests::{RecordingScript, offered};
         use serde_json::json;
         use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

@@ -1,0 +1,9 @@
+{
+  "lampOS/crates/voice/src/provider_worker.rs": "644e9e4c7f04a852fdbef5ea499378c1dc3cbf20cd202f2bb6285a2f014170d8",
+  "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "2616d6f5264b1819348f94403375b583ef42620278a37c179fc8da918f6452f5",
+  "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "37faa99af003db3f69ce93fa2398e8321895a500d5fec7613591267587680697",
+  "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "98f45dcd9a45854938e78f52c2e10c54a70451b5f60fd80195827d24552d8199",
+  "lampOS/crates/voice/src/second_provider/worker.rs": "0da37831144c18a2b46ac552a9d6772543eb15c827161af9dff080bae55f13f3",
+  "lampOS/crates/voice/src/remember.rs": "5745a9e5e4b5ef532016f8583f15fef950da49d6ab50571c884ee7b558bfec9d",
+  "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9fb366b4edf2958d90f15fbb0df0ea23bbc94c3f36ddf1db6abafca77bd0681c"
+}

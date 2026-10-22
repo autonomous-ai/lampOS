@@ -1,0 +1,168 @@
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -9422,11 +9422,30 @@
+         static HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+     }
+
++    thread_local! {
++        // Scratch control: report an actual contention before blocking normally.
++        static THREAD_OVERLAP_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
++            const { std::cell::RefCell::new(None) };
++    }
++
++    pub(crate) fn observe_thread_overlap_wait(tell: impl FnOnce() + 'static) {
++        THREAD_OVERLAP_WAIT.with(|observer| {
++            assert!(observer.borrow_mut().replace(Box::new(tell)).is_none());
++        });
++    }
++
+     /// The lock, or another hold on it if this thread has it already.
+     pub(crate) fn one_thread() -> OneThread {
+         let held = HELD.with(|held| held.replace(held.get() + 1));
+         OneThread {
+             _lock: (held == 0).then(|| {
++                if let Some(tell) = THREAD_OVERLAP_WAIT.with(|observer| observer.borrow_mut().take()) {
++                    match ONE_THREAD.try_lock() {
++                        Ok(lock) => return lock,
++                        Err(std::sync::TryLockError::Poisoned(poisoned)) => return poisoned.into_inner(),
++                        Err(std::sync::TryLockError::WouldBlock) => tell(),
++                    }
++                }
+                 ONE_THREAD
+                     .lock()
+                     .unwrap_or_else(|poisoned| poisoned.into_inner())
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -6433,6 +6433,105 @@
+
+ #[cfg(test)]
+ mod tests {
++    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
++    enum ThreadOverlapEvent {
++        OwnReady,
++        MusicContended,
++        MusicPending,
++        OwnFinished,
++        MusicFinished,
++    }
++
++    struct ThreadOverlapProbe {
++        events: std::sync::mpsc::Sender<ThreadOverlapEvent>,
++        resume: std::sync::mpsc::Receiver<()>,
++    }
++
++    thread_local! {
++        static THREAD_OVERLAP_PROBE: std::cell::RefCell<Option<ThreadOverlapProbe>> =
++            const { std::cell::RefCell::new(None) };
++    }
++
++    fn thread_overlap_active() -> bool {
++        THREAD_OVERLAP_PROBE.with(|probe| probe.borrow().is_some())
++    }
++
++    fn thread_overlap_pause(event: ThreadOverlapEvent) {
++        THREAD_OVERLAP_PROBE.with(|probe| {
++            let probe = probe.borrow();
++            let probe = probe.as_ref().unwrap();
++            eprintln!("THREAD_OVERLAP {event:?}");
++            probe.events.send(event).unwrap();
++            probe.resume.recv_timeout(Duration::from_secs(3))
++                .expect("the overlap driver must release its fixture");
++        });
++    }
++
++    #[test]
++    fn own_answers_and_pending_music_share_no_conversation_state() {
++        use std::sync::mpsc;
++        use ThreadOverlapEvent::*;
++
++        let (events, seen) = mpsc::channel();
++        let (own_resume, own_wait) = mpsc::channel();
++        let own_events = events.clone();
++        let own = std::thread::spawn(move || {
++            THREAD_OVERLAP_PROBE.with(|probe| {
++                *probe.borrow_mut() = Some(ThreadOverlapProbe {
++                    events: own_events.clone(), resume: own_wait,
++                });
++            });
++            let result = std::panic::catch_unwind(
++                the_lamps_own_answers_to_talk_keep_no_conversation_going,
++            );
++            own_events.send(OwnFinished).unwrap();
++            result
++        });
++        let next = || seen.recv_timeout(Duration::from_secs(3))
++            .expect("the overlap driver must receive its next positive event");
++        assert_eq!(next(), OwnReady);
++        let (music_resume, music_wait) = mpsc::channel();
++        let music_events = events.clone();
++        let music = std::thread::spawn(move || {
++            THREAD_OVERLAP_PROBE.with(|probe| {
++                *probe.borrow_mut() = Some(ThreadOverlapProbe {
++                    events: music_events.clone(), resume: music_wait,
++                });
++            });
++            let contended = music_events.clone();
++            crate::provider_worker::tests::observe_thread_overlap_wait(move || {
++                eprintln!("THREAD_OVERLAP MusicContended");
++                contended.send(MusicContended).unwrap();
++            });
++            let result = std::panic::catch_unwind(|| check_stop_during_music_rpc(false));
++            music_events.send(MusicFinished).unwrap();
++            result
++        });
++        let first = next();
++        assert!(matches!(first, MusicContended | MusicPending), "{first:?}");
++        own_resume.send(()).unwrap();
++        let mut own_finished = false;
++        let mut music_pending = first == MusicPending;
++        while !own_finished || !music_pending {
++            match next() {
++                OwnFinished => own_finished = true,
++                MusicPending => music_pending = true,
++                event => panic!("unexpected overlap event: {event:?}"),
++            }
++        }
++        music_resume.send(()).unwrap();
++        assert_eq!(next(), MusicFinished);
++        let own_result = own.join().unwrap();
++        let music_result = music.join().unwrap();
++        eprintln!("THREAD_OVERLAP own_ok={} music_ok={}", own_result.is_ok(), music_result.is_ok());
++        assert!(music_result.is_ok(), "the original Music checks must pass");
++        // Preserve the original fixture's assertion and panic payload.
++        if let Err(panic) = own_result {
++            std::panic::resume_unwind(panic);
++        }
++        assert_eq!(first, MusicContended, "the held conversation must exclude Music");
++    }
++
+     /// The reviewer on #2218 (P3 2): a skill's look is taken only with the
+     /// switch exactly `on` and a full look; nothing else turns it on.
+     #[test]
+@@ -7509,6 +7608,14 @@
+                     );
+                     heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                     heeding.hear(request, Heard::Ended);
++                }
++                if *heard == "Yes, remind me after lunch." && thread_overlap_active() {
++                    assert!(crate::thread::THREAD.lock().unwrap().lamp_asked(request),
++                        "the original fixture prepared the lamp's question");
++                    eprintln!("THREAD_OVERLAP own_question_before=true request={request}");
++                    thread_overlap_pause(ThreadOverlapEvent::OwnReady);
++                    eprintln!("THREAD_OVERLAP own_question_after={} request={request}",
++                        crate::thread::THREAD.lock().unwrap().lamp_asked(request));
+                 }
+                 let held = match named.filter(|_| request == 1) {
+                     Some(score) => {
+@@ -9353,6 +9460,11 @@
+                     }
+                 }
+             }).await.expect("the Music RPC and enabled warm STT opening must both be pending");
++            if thread_overlap_active() {
++                eprintln!("THREAD_OVERLAP music_question_for_own_request={}",
++                    crate::thread::THREAD.lock().unwrap().lamp_asked(3));
++                thread_overlap_pause(ThreadOverlapEvent::MusicPending);
++            }
+             assert_eq!(services.listens.load(Ordering::SeqCst), 1 + usize::from(warm_stt));
+             assert!(!cancelled.load(Ordering::SeqCst), "the spare is still opening before Stop");
+             assert_eq!((context.request, context.provider_session, context.privacy_generation), (request,1,privacy_generation));

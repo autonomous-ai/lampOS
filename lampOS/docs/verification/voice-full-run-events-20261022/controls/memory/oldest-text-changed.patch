@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -9611,7 +9611,7 @@
+         const NOW: u64 = 1_792_000_000_000;
+         let answer = {
+             let mut entries = vec![
+-                json!({"id":1,"at_unix_ms":NOW - 100 * 86_400_000,"text":"Their sister lives in Hue."}),
++                json!({"id":1,"at_unix_ms":NOW - 100 * 86_400_000,"text":"Their sister lives in Da Nang."}),
+             ];
+             for id in 2..=150u64 {
+                 entries.push(json!({"id":id,"at_unix_ms":NOW - id,"text":format!("A kept thing about the garden, number {id}.")}));

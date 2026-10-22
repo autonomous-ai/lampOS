@@ -1,0 +1,27 @@
+Raw failure section of the unchanged full library run; preceding passing test lines omitted.
+
+failures:
+
+---- coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording stdout ----
+lamp-voice: the news (tasks-fixture:2:4) was not heard whole (no_audio_answer): its harness stays open
+
+thread 'coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording' (695371347) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:474:9:
+assertion failed: self.reply.as_ref().unwrap().wait_requested_audio_ready(WAIT)
+
+---- provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation stdout ----
+lamp-voice provider: request 1 asked for play_relaxing_music; the executive did not answer in 0 ms; the answer was sent
+
+thread 'provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation' (695399221) panicked at crates/voice/src/provider_worker/tests/review_2026_10_14.rs:896:9:
+assertion `left == right` failed
+  left: Object {"error": String("That part of me is not running right now, so I could not do it.")}
+ right: Object {"next": String("Confirm.")}
+
+
+failures:
+    coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording
+    provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation
+
+test result: FAILED. 3350 passed; 2 failed; 14 ignored; 0 measured; 0 filtered out; finished in 246.67s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
+END RAW FAILURE SECTION

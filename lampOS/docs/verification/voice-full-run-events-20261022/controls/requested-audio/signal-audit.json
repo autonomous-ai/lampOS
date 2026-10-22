@@ -1,0 +1,34 @@
+{
+  "runner_sha256": "ff5a8a4fc158cb0204bd22c0f43a0dee32d3bc064197c532d6030a2e51fb8d76",
+  "signal_sites": [
+    {
+      "line": 74,
+      "source": "child=subprocess.Popen(cmd,cwd=WT/'lampOS',env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,start_new_session=True)"
+    },
+    {
+      "line": 87,
+      "source": "stopped=time.monotonic();os.kill(child.pid,signal.SIGSTOP)"
+    },
+    {
+      "line": 89,
+      "source": "os.kill(child.pid,signal.SIGCONT)"
+    },
+    {
+      "line": 95,
+      "source": "os.killpg(child.pid,signal.SIGKILL);child.wait();raise"
+    }
+  ],
+  "pause_target": "Only child.pid from the directly created Popen object; each child starts its own session.",
+  "normal_completed_pause_samples": [
+    "before-pause-1",
+    "before-pause-2",
+    "before-pause-3",
+    "after-pause-1",
+    "after-pause-2",
+    "after-pause-3"
+  ],
+  "exception_cleanup_reached_in_completed_samples": false,
+  "cleanup_scope": "Only the isolated child process group; SIGKILL is in the exception path, which did not execute in these six samples.",
+  "numeric_pid_limit": "The original runner did not persist numeric PIDs for completed children. These cannot be supplied retrospectively; no rerun was done to manufacture them. Ownership is established by the unchanged runner source and normal completion records.",
+  "shared_host_load_limit": "Native compilation used two jobs alongside the parent gate. Shared host load is a possible scheduling variable; the signal fault targets only its own child."
+}

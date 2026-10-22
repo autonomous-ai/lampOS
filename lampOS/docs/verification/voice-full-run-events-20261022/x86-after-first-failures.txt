@@ -1,0 +1,36 @@
+
+failures:
+
+---- coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics stdout ----
+
+thread 'coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics' (696031665) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:
+signal child did not finish
+
+---- coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics stdout ----
+
+thread 'coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics' (696032017) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:
+signal child did not finish
+
+---- coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken stdout ----
+{"seconds":null,"status":"listening_ready"}
+result Err("scenario host watchdog; verified cleanup failed: session Fixture: fixture child 72458 exit observation timed out (5 occurrences)")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted", "ring_requested", "provider_input_started", "ring_feedback", "ring_renewals", "ring_requested", "ring_feedback", "ring_renewals", "ring_requested", "local_endpoint", "ring_requested", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "ring_feedback", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "ring_requested", "speech_queue_drained", "provider_audio_enqueued", "ring_feedback", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "ring_renewals", "ring_requested", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "turn_finished", "ring_shutdown_write"]
+phases [Listening, Waiting, Speaking]
+installs [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]
+
+thread 'coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken' (696023630) panicked at crates/voice/src/coordinator/tests/second_route.rs:374:9:
+result Err("scenario host watchdog; verified cleanup failed: session Fixture: fixture child 72458 exit observation timed out (5 occurrences)")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted", "ring_requested", "provider_input_started", "ring_feedback", "ring_renewals", "ring_requested", "ring_feedback", "ring_renewals", "ring_requested", "local_endpoint", "ring_requested", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "ring_feedback", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "ring_requested", "speech_queue_drained", "provider_audio_enqueued", "ring_feedback", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "ring_renewals", "ring_requested", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "ring_requested", "ring_feedback", "speech_queue_drained", "ring_renewals", "ring_requested", "speech_queue_drained", "turn_finished", "ring_shutdown_write"]
+phases [Listening, Waiting, Speaking]
+installs [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]
+
+
+failures:
+    coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken
+    coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics
+    coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics
+
+test result: FAILED. 3352 passed; 3 failed; 14 ignored; 0 measured; 0 filtered out; finished in 299.96s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
+END RAW FAILURE SECTION

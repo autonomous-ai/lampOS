@@ -1,0 +1,33 @@
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -11369,28 +11369,9 @@
+             );
+             let mut dial = rig.ready().await;
+             let request = rig.speak(&mut dial, false, true).await;
+-            let name = if wrapped {
+-                crate::use_skill::NAME
+-            } else {
+-                "play_relaxing_music"
+-            };
+             dispatch.send(()).unwrap();
+-            dial.service
+-                .send(json!({"toolCall":{"functionCalls":[{
+-                    "id":"music-original", "name":name,
+-                    "args":if wrapped { json!({"skill":"play_relaxing_music"}) } else { json!({}) },
+-                }]}}))
+-                .await;
+-            // Gemini ends the turn that asked the function separately from
+-            // the answer it gives after the reply. The first completion is
+-            // deliberately consumed by the transport's calls_turn_open guard.
+-            dial.service.send(idle_complete()).await;
+-            assert_eq!(
+-                rig.service_message(&mut dial).await,
+-                json!({"toolResponse":{"functionResponses":[{
+-                    "id":"music-original", "name":name, "response":{"next":"Confirm."}
+-                }]}})
+-            );
++            // Fault injection: no tool call follows the dispatch arm. Observe
++            // the original accept failure directly, before another watchdog.
+             let offer = skill.join().unwrap();
+             assert_eq!(
+                 offer.context.worker_boot,

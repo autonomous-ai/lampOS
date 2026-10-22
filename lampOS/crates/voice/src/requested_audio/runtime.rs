@@ -174,6 +174,8 @@ struct Shared {
     samples: Mutex<Option<Vec<i16>>>,
     #[cfg(test)]
     changed: Condvar,
+    #[cfg(test)]
+    fixture_time: Option<Arc<FixtureTime>>,
 }
 
 impl Shared {
@@ -182,7 +184,12 @@ impl Shared {
             self.terminal
                 .compare_exchange(ACTIVE, CANCELLED, Ordering::AcqRel, Ordering::Acquire);
         #[cfg(test)]
-        self.changed.notify_all();
+        {
+            self.changed.notify_all();
+            if let Some(time) = &self.fixture_time {
+                time.wake();
+            }
+        }
     }
 
     fn limit(&self, now_us: u64, playback: bool) -> Option<u64> {
@@ -272,25 +279,41 @@ impl Ticket {
             .compare_exchange(ACTIVE, COMPLETED, Ordering::AcqRel, Ordering::Acquire)
             .is_ok();
         #[cfg(test)]
-        self.shared.changed.notify_all();
+        {
+            self.shared.changed.notify_all();
+            if let Some(time) = &self.shared.fixture_time {
+                time.wake();
+            }
+        }
         completed
     }
 
     #[cfg(test)]
     pub(crate) fn wait_ready(&self, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
         let Ok(samples) = self.shared.samples.lock() else {
             return false;
         };
-        let Ok((samples, _)) =
-            self.shared
-                .changed
-                .wait_timeout_while(samples, timeout, |samples| {
-                    samples.is_none() && self.shared.terminal.load(Ordering::Acquire) == ACTIVE
-                })
-        else {
+        let Ok((samples, _)) = self.shared.changed.wait_timeout_while(
+            samples,
+            deadline.saturating_duration_since(Instant::now()),
+            |samples| samples.is_none() && self.shared.terminal.load(Ordering::Acquire) == ACTIVE,
+        ) else {
             return false;
         };
-        samples.is_some() && self.live(lamp_ipc::monotonic_us())
+        let ready = samples.is_some();
+        drop(samples);
+        let now = if let Some(time) = &self.shared.fixture_time {
+            // Loading publishes samples before the worker checks permission
+            // again. Observe its park before the fixture reads the same cache.
+            if !time.wait_quiet(deadline.saturating_duration_since(Instant::now())) {
+                return false;
+            }
+            time.now_us()
+        } else {
+            lamp_ipc::monotonic_us()
+        };
+        ready && self.live(now)
     }
 }
 
@@ -307,6 +330,8 @@ pub(crate) struct Service {
     busy: Arc<Capacity>,
     monitor: Thread,
     worker: Thread,
+    #[cfg(test)]
+    fixture: Option<FixtureService>,
 }
 
 impl Service {
@@ -404,6 +429,8 @@ impl Service {
             busy,
             monitor: monitor.thread().clone(),
             worker: worker.thread().clone(),
+            #[cfg(test)]
+            fixture: None,
         })
     }
 
@@ -411,6 +438,11 @@ impl Service {
     /// channel. A second offer is refused rather than becoming a future sound.
     pub(crate) fn offer(&self, offer: RequestedAudioOffer) -> Option<Ticket> {
         let now_us = lamp_ipc::monotonic_us();
+        #[cfg(test)]
+        let now_us = self
+            .fixture
+            .as_ref()
+            .map_or(now_us, |fixture| fixture.time.now_us());
         if offer.check().is_err() || !self.running.live() || now_us >= offer.start_before_us {
             return None;
         }
@@ -442,6 +474,8 @@ impl Service {
             samples: Mutex::new(None),
             #[cfg(test)]
             changed: Condvar::new(),
+            #[cfg(test)]
+            fixture_time: self.fixture.as_ref().map(|fixture| fixture.time.clone()),
         });
         if self.queue.try_send(shared.clone()).is_err() {
             self.busy.release();
@@ -455,6 +489,13 @@ impl Service {
     /// context. This seam performs no action and is absent from runtime builds.
     #[cfg(test)]
     pub(crate) fn wait_cached(&self, timeout: Duration) -> bool {
+        if let Some(fixture) = &self.fixture {
+            if !self.observe_fixture(timeout) {
+                return false;
+            }
+            let now = fixture.time.now_us();
+            return self.speaker.cache.lock().unwrap().bind(now, now).is_some();
+        }
         let Ok(cache) = self.speaker.cache.lock() else {
             return false;
         };
@@ -503,6 +544,19 @@ impl Drop for Service {
         self.running.stop.store(true, Ordering::Release);
         self.monitor.unpark();
         self.worker.unpark();
+        #[cfg(test)]
+        if let Some(fixture) = &mut self.fixture {
+            fixture.time.wake();
+            let done = fixture
+                .finished
+                .get_mut()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(3));
+            if !thread::panicking() {
+                done.expect("requested audio fixture worker stopped");
+                fixture.worker.take().unwrap().join().unwrap();
+            }
+        }
     }
 }
 
@@ -537,6 +591,206 @@ impl WorkerTime for RealWorkerTime {
 
     fn park(&self, interval: Duration) {
         thread::park_timeout(interval);
+    }
+}
+
+// The coordinator fixture drives the same worker and cache checks, but gives
+// each monitor observation and worker iteration an explicit logical instant.
+// Host scheduling cannot manufacture a stale cache or try_lock collision.
+#[cfg(test)]
+struct FixtureTime {
+    now_us: Arc<AtomicU64>,
+    busy: Arc<Capacity>,
+    running: Arc<Running>,
+    parked: AtomicBool,
+    wake: AtomicBool,
+}
+
+#[cfg(test)]
+impl FixtureTime {
+    fn wake(&self) {
+        let _held = self
+            .busy
+            .lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.parked.store(false, Ordering::Release);
+        self.wake.store(true, Ordering::Release);
+        self.busy.changed.notify_all();
+    }
+
+    fn wait_quiet(&self, timeout: Duration) -> bool {
+        let held = self.busy.lock.lock().unwrap();
+        let (_held, _) = self
+            .busy
+            .changed
+            .wait_timeout_while(held, timeout, |_| {
+                self.busy.active.load(Ordering::Acquire) && !self.parked.load(Ordering::Acquire)
+            })
+            .unwrap();
+        !self.busy.active.load(Ordering::Acquire) || self.parked.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(test)]
+impl WorkerTime for FixtureTime {
+    fn now_us(&self) -> u64 {
+        self.now_us.load(Ordering::Acquire)
+    }
+
+    fn park(&self, interval: Duration) {
+        assert_eq!(interval, MONITOR_EVERY);
+        let held = self.busy.lock.lock().unwrap();
+        // A cancellation between the preceding limit check and this park must
+        // retain its wakeup, just like Thread::unpark's token.
+        if self.wake.swap(false, Ordering::AcqRel) {
+            return;
+        }
+        self.parked.store(true, Ordering::Release);
+        self.busy.changed.notify_all();
+        let (held, result) = self
+            .busy
+            .changed
+            .wait_timeout_while(held, Duration::from_secs(3), |_| {
+                !self.wake.load(Ordering::Acquire) && !self.running.stop.load(Ordering::Acquire)
+            })
+            .unwrap();
+        self.parked.store(false, Ordering::Release);
+        self.wake.store(false, Ordering::Release);
+        drop(held);
+        assert!(
+            !result.timed_out(),
+            "requested audio fixture worker was not stepped"
+        );
+    }
+}
+
+#[cfg(test)]
+struct FixtureService {
+    time: Arc<FixtureTime>,
+    bus: Bus,
+    clock_id: String,
+    state: Mutex<Option<SpeakerState>>,
+    finished: Mutex<Receiver<()>>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+#[cfg(test)]
+impl Service {
+    /// Real WAV loading, Unix authorization and terminal receipts; only the
+    /// monitor schedule and worker clock belong to the fixture. Production
+    /// construction still starts both independent real-time workers above.
+    pub(crate) fn new_stepped(
+        bus: Bus,
+        skills: PathBuf,
+        clock_id: String,
+        now_us: Arc<AtomicU64>,
+    ) -> io::Result<Self> {
+        let socket = skills.join(crate::tools::CALL_SOCKET);
+        lamp_schedule::client::validate_socket(&socket).map_err(io::Error::other)?;
+        lamp_msgs::ClockStamp {
+            clock_id: clock_id.clone(),
+            at_us: 0,
+            sequence: 1,
+        }
+        .check()
+        .map_err(io::Error::other)?;
+        let speaker = Arc::new(Speaker::default());
+        let running = Arc::new(Running {
+            stop: AtomicBool::new(false),
+            monitor: AtomicBool::new(true),
+            worker: AtomicBool::new(true),
+        });
+        let busy = Arc::new(Capacity::default());
+        let time = Arc::new(FixtureTime {
+            now_us,
+            busy: busy.clone(),
+            running: running.clone(),
+            parked: AtomicBool::new(false),
+            wake: AtomicBool::new(false),
+        });
+        let (queue, receive) = mpsc::sync_channel(1);
+        let (done, finished) = mpsc::sync_channel(1);
+        let worker = {
+            let (running, busy, time) = (running.clone(), busy.clone(), time.clone());
+            thread::Builder::new()
+                .name("requested-audio-fixture".into())
+                .spawn(move || {
+                    let _alive = Alive(&running.worker);
+                    work(receive, &socket, &running, &busy, time.as_ref());
+                    let _ = done.send(());
+                })?
+        };
+        Ok(Self {
+            queue,
+            speaker,
+            running,
+            busy,
+            monitor: worker.thread().clone(),
+            worker: worker.thread().clone(),
+            fixture: Some(FixtureService {
+                time,
+                bus,
+                clock_id,
+                state: Mutex::new(None),
+                finished: Mutex::new(finished),
+                worker: Some(worker),
+            }),
+        })
+    }
+
+    /// Consume a real Bus publication at its fixture event, including envelope,
+    /// boot, sequence and mute-generation validation. Repeated monitor ticks
+    /// keep that observation's wire stamp and all original freshness bounds.
+    pub(crate) fn observe_fixture(&self, timeout: Duration) -> bool {
+        let fixture = self.fixture.as_ref().unwrap();
+        fixture.time.wait_quiet(timeout)
+            && self.drive_fixture(timeout, || fixture.time.now_us(), true)
+    }
+
+    pub(crate) fn step_fixture(&self, timeout: Duration, advance: impl FnOnce() -> u64) -> bool {
+        self.drive_fixture(timeout, advance, false)
+    }
+
+    fn drive_fixture(
+        &self,
+        timeout: Duration,
+        advance: impl FnOnce() -> u64,
+        observe: bool,
+    ) -> bool {
+        let fixture = self.fixture.as_ref().unwrap();
+        let held = self.busy.lock.lock().unwrap();
+        let active = self.busy.active.load(Ordering::Acquire);
+        if active && !fixture.time.parked.load(Ordering::Acquire) {
+            // A deliberately held Start can coexist with confirmation setup.
+            // Its pending I/O does not advance either side of the lease clock.
+            return !observe;
+        }
+        let now_us = advance();
+        fixture.time.now_us.store(now_us, Ordering::Release);
+        let mut state = fixture.state.lock().unwrap();
+        if observe {
+            let message = fixture.bus.latest(SpeakerState::TOPIC).ok().flatten();
+            let unix_ms = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |age| age.as_millis().min(u128::from(u64::MAX)) as u64);
+            *state = message.as_ref().and_then(|message| {
+                SpeakerState::from_message(message, &fixture.clock_id, now_us, unix_ms).ok()
+            });
+        }
+        self.speaker
+            .cache
+            .lock()
+            .unwrap()
+            .observe(state.clone(), now_us);
+        drop(state);
+        if active {
+            fixture.time.parked.store(false, Ordering::Release);
+            fixture.time.wake.store(true, Ordering::Release);
+            self.busy.changed.notify_all();
+        }
+        drop(held);
+        !active || fixture.time.wait_quiet(timeout)
     }
 }
 
@@ -735,6 +989,7 @@ mod tests {
                 lease_until_us: AtomicU64::new(if ready { now_us + 500_000 } else { 0 }),
                 samples: Mutex::new(ready.then(|| vec![100; 480])),
                 changed: Condvar::new(),
+                fixture_time: None,
             }),
         }
     }

@@ -674,8 +674,9 @@ async fn unanswered_reminders_and_sounds_are_not_talk_but_speech_and_actual_audi
 /// `RoomTold::spoke_unasked`, so the room stays busy for three minutes from
 /// its talk, not a minute from the reminder. The room is made after the
 /// worker has started, since it sets the room's switches then.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by() {
+    let _clock = logical_clock();
     let _restore = RestoreRoom::quiet();
     let mut rig = LiveRig::start_with(quick_policy(), options(true));
     let mut dial = rig.ready().await;

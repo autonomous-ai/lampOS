@@ -1,0 +1,12 @@
+
+running 1 test
+test provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply ... FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3365 filtered out; finished in 3.02s
+
+END RAW CONTROL OUTPUT

@@ -1,0 +1,19 @@
+
+running 1 test
+test provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation ... lamp-voice provider: request 1 asked for play_relaxing_music; the executive did not answer in 0 ms; the answer was sent
+
+thread 'provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation' (695529302) panicked at crates/voice/src/provider_worker/tests/review_2026_10_14.rs:898:9:
+assertion `left == right` failed
+  left: Object {"error": String("That part of me is not running right now, so I could not do it.")}
+ right: Object {"next": String("Confirm.")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 4.02s
+
+END RAW CONTROL OUTPUT
