@@ -252,6 +252,27 @@ says so once. While it runs, the classifier reads the yes again every 2 s
 window is dropped, `ears/classes` says `privacy`, the journal says so once
 and the classifier stays stopped until lamp-ears starts again.
 
+**Face reads stay off without a yes.** lamp-eyes' read of how the near
+face seems (`--seems-blendshapes` in the product's unit, `--seems` for our
+own lamps' measure; `humans/seems`, eyes.md) is gated the same way, on every
+lamp, slide or not (the reviewer-lead's P2 on #2872): when a read is due,
+`seems::due` reads `/var/lib/lampOS/consent/face-expressions.json`, beside
+the room sounds' yes and kept the same way (`root:lampos` 0640 in the 0750
+folder lamp-eyes, in group `lampos`, can traverse), and only a JSON object
+whose `face_expressions` is exactly `"yes"` counts. Missing, unreadable,
+over 4096 bytes or anything else is no: no face is read and nothing goes on
+`humans/seems` or into `--seems-log`. The yes is read again every 2 s while
+a face is near, so a removed yes stops the reads within that and the one read
+already running. The journal says once each time the yes comes or goes. The
+eyes still look: the camera, the gaze, presence, who is there and the
+speaking read are unchanged. **Nothing on the lamp writes this file yet**:
+the voice's onboarding asks only the room sounds' question, so until a
+face-expressions step is added there (with its forget, redo and the reset
+plan's removal, as `room-sounds.json` has), no product lamp reads a face,
+and a test lamp's yes is written by hand, as root:
+`printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
+`chown root:lampos` and `chmod 0640` it, and remove it after.
+
 **Only for a board with no slide.** Controls refuses `no-slide` only when the
 pins file has a `privacy` section, and no pins file has one today. A slide
 that is fitted but not declared (the product's hardware contract gives it

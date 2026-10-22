@@ -33,6 +33,7 @@ pub mod facing;
 pub mod full_look;
 pub mod glance_log;
 pub mod kept;
+pub mod latest;
 pub mod mesh;
 pub mod permit;
 pub mod photo;
