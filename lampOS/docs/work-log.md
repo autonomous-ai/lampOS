@@ -1,3 +1,33 @@
+## Current checkpoint: 2026-10-22 10:18 +07, Music merged
+
+First merged **#1757** as `2d1d353965b6b9f9bdc043ee4d19832630b3a6d8`.
+[Native evidence](verification/requested-audio-rebase-17fdf-native-20261022/README.md)
+qualifies head `d96f484ec`, tested merge `be24496f5` on `fab69b0c4`:
+**10172 passed / 0 failed / 63 skipped**, including one leaky pass,
+**184.814 s**; four doc tests, twelve custom-harness tests, relay and all
+twelve selected Music regressions passed. Linux Clippy is green with zero
+Rust warnings. The original-reviewed and incremental range-diffs remain
+[with the rebase proof](verification/requested-audio-rebase-17fdf-20261022/README.md).
+First's merge and Nine's separate lamp assignment are recorded on #1757.
+
+Both prepared follow-ups are rebased onto the actual merge: voice-state
+**#2792** at `4e060a224`, metadata diagnostics at `db7db7a5f`. Their new-base
+gates and PRs follow; the previous prepared voice-state gate passed
+**3492/0/14/0**, plus one Skills and one Ears consumer test. No unrun current
+head is qualified by that earlier result.
+
+**#2764** ARM64 `39713887288` failed in an unchanged Voice memory fixture:
+**7885 passed / 1 failed / 63 skipped; 2132 selected tests not run**.
+The failed run and source-identical baseline comparison are retained for
+publication. The complete Cloud patch/tree stays unchanged; its current
+rebase `d05d22ce4` on Music's merge is receiving a fresh scoped Mac gate.
+**#2767** still waits for First's installer read. **#2810** is claimed and
+its logical persisted-prefix recovery fixtures are being implemented.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:08 +07, prepared metadata branch pushed
 
 Metadata diagnostics is pushed as `81b3be0b408971324008aabeb54e6e3b08f43fc6`,
