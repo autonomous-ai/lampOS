@@ -472,3 +472,7 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - El's P1 on #2889: the app arm greets the lamp before waiting for the spoken ask (the news gate needs someone seen or heard).
   - Heads: #2887 `e98f71880`, #2889 `51b278f86`.
 - **Lesson:** never rebuild a crate's test binary while its full run is going; it broke ~20 subprocess tests and voided that run.
+- **17:49, #2889:** El's two later P3s are folded in.
+  - The played greeting now comes only while no new ask has been said. The stand-in models the news gate, and a `FAKE_FACE` case checks that no greeting is played.
+  - `skills.made` refuses a non-string or bad `request_id` before it asks lamp-voice.
+  - Rebased onto lamp-voice `e9b0a46fb` and pushed as `07324d094`. The lamp-cloud gate (fmt, clippy, tests) is ok and the stand-in suite passed. Waiting on reviewer-two and El.
