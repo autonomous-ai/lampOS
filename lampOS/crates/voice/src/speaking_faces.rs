@@ -58,6 +58,43 @@ pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Who the eyes saw saying one heard line, read at its end
+/// (`LAMP_EYES_SPEAKING=on`): its request, the faces seen speaking through
+/// it, and the known person with their face ([`known_with_face`]), fresh
+/// as the known file was when the line was heard, not when a call ran.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LineSeen {
+    pub request: u64,
+    pub speakers: Speakers,
+    pub known: Option<(String, String)>,
+}
+
+/// More lines than run at once: an older answer still running keeps its own.
+const MOST_LINES_SEEN: usize = 8;
+
+static LINES_SEEN: Mutex<VecDeque<LineSeen>> = Mutex::new(VecDeque::new());
+
+/// Keeps what the eyes saw saying a line, for its calls ([`line_seen`]).
+pub fn saw_line(seen: LineSeen) {
+    if let Ok(mut lines) = LINES_SEEN.lock() {
+        lines.retain(|line| line.request != seen.request);
+        lines.push_back(seen);
+        while lines.len() > MOST_LINES_SEEN {
+            lines.pop_front();
+        }
+    }
+}
+
+/// What the eyes saw saying request `request`'s line, if it was read.
+pub fn line_seen(request: u64) -> Option<LineSeen> {
+    LINES_SEEN
+        .lock()
+        .ok()?
+        .iter()
+        .find(|line| line.request == request)
+        .cloned()
+}
+
 /// Who the eyes saw speaking through a line: the passing ids, none when no
 /// face read speaking or there were too few looks to say.
 pub type Speakers = Vec<String>;

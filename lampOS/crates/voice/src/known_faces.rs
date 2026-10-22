@@ -826,17 +826,22 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             visits: false,
         },
         None,
+        None,
     )
 }
 
 /// [`run`] as switched, for a request whose admitted scope is `person`'s
 /// (`crate::remember::person_id`, `None` for the room's or unknown): a yes
-/// to being named is taken only from that person's own scope.
+/// to being named is taken only from that person's own scope. `line` is
+/// who the eyes saw saying the request's line, if it was read
+/// ([`crate::speaking_faces::line_seen`]): a room's "forget my face" needs
+/// it ([`forget_name`]).
 pub fn run_for(
     socket: &Path,
     call: &ToolCall,
     switches: FaceSwitches,
     person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
 ) -> (Value, bool) {
     if matches!(call.name.as_str(), TELL | DONT_TELL) {
         return if switches.visits {
@@ -847,14 +852,14 @@ pub fn run_for(
     }
     // "Forget my face" asks for the face of the known person whose line
     // this is, under the name the eyes keep (#2850); on a room's line, only
-    // a named person whose face is at the lamp now.
+    // a named person whose own face was seen saying it.
     let mine;
     let call = if call.name == FORGET {
         let asked = call.args.get("name").and_then(Value::as_str);
         let known = FaceObservation::read(&known_file_of(socket));
-        let Some(name) = forget_name(asked, known.as_ref(), person) else {
+        let Some(name) = forget_name(asked, known.as_ref(), person, line) else {
             eprintln!(
-                "lamp-voice: forget my face named nobody whose line this is or whose face is at the lamp; nothing was sent"
+                "lamp-voice: forget my face named nobody whose line this is or whose face was seen saying it; nothing was sent"
             );
             return (json!({"error": NOT_THEIRS}), true);
         };
@@ -879,7 +884,7 @@ pub fn run_for(
 }
 
 /// What the model is told when "forget my face" names no face of the person
-/// whose line it is, or, on a room's line, no face at the lamp now
+/// whose line it is, or, on a room's line, no face seen saying it
 /// ([`forget_name`]): nothing is sent.
 pub const NOT_THEIRS: &str = "I can only forget the face of the person asking, while I can see them at the lamp. They should look at me and ask again.";
 
@@ -891,23 +896,37 @@ pub const NOT_THEIRS: &str = "I can only forget the face of the person asking, w
 /// So the known person at the lamp now, when they are `person`, is asked
 /// for under the name the eyes keep, whatever the model wrote; else the
 /// model's name only when it is `person`'s own; else nobody (`None`), so a
-/// forget never reaches someone else's face. A line of the room's
-/// (`person` `None`, no known person's) names nobody it may forget unless
-/// the known file names the person the model asked for, their face at the
-/// lamp now: then they are asked for under the eyes' name; else nobody, so
-/// a room's line never forgets a face that isn't there (the first builder
-/// on #2602).
+/// forget never reaches someone else's face.
+///
+/// A line of the room's (`person` `None`, no known person's) forgets the
+/// named person only when it is theirs: the eyes judged speaking through it
+/// (`line`, read when it was heard, [`crate::speaking_faces::LineSeen`]),
+/// the known file then named the person the model asked for, and that
+/// person's face, and no other, was seen saying it
+/// ([`crate::speaking_faces::seen_saying`]); then they are asked for under
+/// the eyes' name. Else nobody: no reading, a known file stale when the
+/// line was heard, or another face speaking (a visitor or a screen while
+/// they sit nearest) forgets nothing, since a forget destroys their face
+/// and memory (the first builder on #2602, El's P2 on #3018). The call-time
+/// `known` is not used for it: someone who sat down during a slow turn did
+/// not say a line heard before they came (El's P3).
 pub fn forget_name(
     asked: Option<&str>,
     known: Option<&FaceObservation>,
     person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
 ) -> Option<String> {
     let asked = asked.map(str::trim).filter(|asked| !asked.is_empty());
     let Some(person) = person else {
-        let known = known?;
+        let line = line?;
+        let (name, _) = line.known.as_ref()?;
+        let theirs = memory_person(name);
         return asked
-            .filter(|asked| memory_person(asked) == known.person())
-            .map(|_| known.name().to_owned());
+            .filter(|asked| memory_person(asked) == theirs)
+            .filter(|_| {
+                crate::speaking_faces::seen_saying(&line.speakers, &theirs, line.known.clone())
+            })
+            .map(|_| name.clone());
     };
     if let Some(known) = known.filter(|known| known.person() == person) {
         return Some(known.name().to_owned());
@@ -2368,7 +2387,7 @@ mod tests {
         // The known person whose line it is: the eyes' name, not the guess.
         for asked in [Some("Alexander"), Some("me"), Some(""), None, Some("Bo")] {
             assert_eq!(
-                forget_name(asked, Some(&alex), theirs).as_deref(),
+                forget_name(asked, Some(&alex), theirs, None).as_deref(),
                 Some("Alex"),
                 "{asked:?}"
             );
@@ -2377,37 +2396,79 @@ mod tests {
         // is theirs.
         for known in [None, Some(&bo)] {
             assert_eq!(
-                forget_name(Some(" alex "), known, theirs).as_deref(),
+                forget_name(Some(" alex "), known, theirs, None).as_deref(),
                 Some("alex")
             );
-            assert_eq!(forget_name(Some("Bo"), known, theirs), None);
-            assert_eq!(forget_name(None, known, theirs), None);
+            assert_eq!(forget_name(Some("Bo"), known, theirs, None), None);
+            assert_eq!(forget_name(None, known, theirs, None), None);
         }
-        // A room's line: only the named person whose face is at the lamp,
-        // under the eyes' name; nobody known now, someone else, or no name
-        // is nobody.
+        // A room's line: only the named person whose own face, and no
+        // other, was seen saying it, under the eyes' name.
+        use crate::speaking_faces::LineSeen;
+        let seen = |speakers: &[&str], known: Option<(&str, &str)>| LineSeen {
+            request: 1,
+            speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
+            known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
+        };
+        let theirs_said = seen(&["f1"], Some(("Alex", "f1")));
+        for known in [Some(&alex), Some(&bo), None] {
+            assert_eq!(
+                forget_name(Some(" alex "), known, None, Some(&theirs_said)).as_deref(),
+                Some("Alex")
+            );
+        }
+        // El's P2 on #3018: Alex sits nearest while someone else says it, or
+        // both speak, or nobody was seen speaking: nobody.
+        for line in [
+            seen(&["f2"], Some(("Alex", "f1"))),
+            seen(&["f1", "f2"], Some(("Alex", "f1"))),
+            seen(&[], Some(("Alex", "f1"))),
+        ] {
+            assert_eq!(
+                forget_name(Some("Alex"), Some(&alex), None, Some(&line)),
+                None,
+                "{line:?}"
+            );
+        }
+        // No reading of the line, a known file stale when it was heard
+        // (`known_with_face` gives none), someone else known, or no name.
+        assert_eq!(forget_name(Some("Alex"), Some(&alex), None, None), None);
+        let stale = seen(&["f1"], None);
         assert_eq!(
-            forget_name(Some(" alex "), Some(&alex), None).as_deref(),
-            Some("Alex")
+            forget_name(Some("Alex"), Some(&alex), None, Some(&stale)),
+            None
         );
-        assert_eq!(forget_name(Some("Alex"), Some(&bo), None), None);
-        assert_eq!(forget_name(Some("Alex"), None, None), None);
-        assert_eq!(forget_name(Some(" "), Some(&alex), None), None);
-        assert_eq!(forget_name(None, Some(&alex), None), None);
+        let bo_said = seen(&["f1"], Some(("Bo", "f1")));
+        assert_eq!(
+            forget_name(Some("Alex"), Some(&alex), None, Some(&bo_said)),
+            None
+        );
+        assert_eq!(
+            forget_name(Some(" "), Some(&alex), None, Some(&theirs_said)),
+            None
+        );
+        assert_eq!(
+            forget_name(None, Some(&alex), None, Some(&theirs_said)),
+            None
+        );
     }
 
-    /// The first builder on #2602: a room's line (no known person's) asking
-    /// to forget a named person sends nothing unless the eyes' known file
-    /// shows that person's face at the lamp now; else the model hears
+    /// The first builder on #2602 and El's P2 on #3018: a room's line (no
+    /// known person's) asking to forget a named person sends nothing unless
+    /// the eyes saw that person's own face, and no other, saying it, with
+    /// their known file fresh when it was heard (read as the voice reads it,
+    /// `speaking_faces::known_with_face`); else the model hears
     /// [`NOT_THEIRS`] and the eyes are never asked.
     #[test]
-    fn a_rooms_forget_needs_the_named_face_at_the_lamp() {
+    fn a_rooms_forget_needs_the_named_face_seen_saying_it() {
+        use crate::speaking_faces::{LineSeen, known_face_of, known_with_face};
         use std::io::{BufRead, BufReader, Write};
         let directory =
             std::env::temp_dir().join(format!("lamp-voice-room-forget-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         let socket = directory.join("who.sock");
+        let known = known_file_of(&socket);
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         listener.set_nonblocking(true).unwrap();
         let call = |name: &str| ToolCall {
@@ -2416,32 +2477,79 @@ mod tests {
             args: json!({ "name": name }),
         };
         let switches = FaceSwitches::default();
-        // Nobody known at the lamp, then someone else: refused, nothing sent.
-        let told = run_for(&socket, &call("Alex"), switches, None);
-        assert_eq!(told, (json!({"error": NOT_THEIRS}), true));
-        std::fs::write(known_file_of(&socket), "Bo\n").unwrap();
-        let told = run_for(&socket, &call("Alex"), switches, None);
-        assert_eq!(told, (json!({"error": NOT_THEIRS}), true));
+        // The eyes' files as the line is heard, and the faces seen saying it.
+        let at_the_lamp = |text: &str, face: &str| {
+            std::fs::write(&known, text).unwrap();
+            std::fs::write(known_face_of(&known), format!("{face}\n")).unwrap();
+        };
+        let heard = |speakers: &[&str]| LineSeen {
+            request: 1,
+            speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
+            known: known_with_face(&known),
+        };
+        let refused = |line: Option<&LineSeen>| {
+            let told = run_for(&socket, &call("Alex"), switches, None, line);
+            assert_eq!(told, (json!({"error": NOT_THEIRS}), true), "{line:?}");
+        };
+        // Nobody known at the lamp, then someone else.
+        refused(Some(&heard(&["f1"])));
+        at_the_lamp("Bo\n", "f1");
+        refused(Some(&heard(&["f1"])));
+        // Alex sits nearest while a visitor or a screen says it, or both
+        // speak, or nobody's face was seen speaking it, or speaking was not
+        // judged for the line at all.
+        at_the_lamp("Alex\n", "f1");
+        refused(Some(&heard(&["f2"])));
+        refused(Some(&heard(&["f1", "f2"])));
+        refused(Some(&heard(&[])));
+        refused(None);
+        // Alex's known file stale when the line was heard: a line said
+        // before they sat down is not theirs, whatever the file says now.
+        let old = SystemTime::now() - Duration::from_secs(10);
+        std::fs::File::options()
+            .write(true)
+            .open(&known)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let before = heard(&["f1"]);
+        at_the_lamp("Alex\n", "f1");
+        refused(Some(&before));
         assert_eq!(
             listener.accept().map(|_| ()).unwrap_err().kind(),
             std::io::ErrorKind::WouldBlock,
             "the eyes were asked"
         );
-        // Alex's face at the lamp: forgotten under the eyes' name.
+        // Alex's own face seen saying it: forgotten under the eyes' name; and
+        // so with the eyes' memory id after the name
+        // (`LAMP_MEMORY_STABLE_ID=on`, #2176).
         listener.set_nonblocking(false).unwrap();
         let asked = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut line = String::new();
-            BufReader::new(stream.try_clone().unwrap())
-                .read_line(&mut line)
-                .unwrap();
-            stream.write_all(b"{\"forgot\":true}\n").unwrap();
-            serde_json::from_str::<Value>(&line).unwrap()
+            (0..2)
+                .map(|_| {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let mut line = String::new();
+                    BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .unwrap();
+                    stream.write_all(b"{\"forgot\":true}\n").unwrap();
+                    serde_json::from_str::<Value>(&line).unwrap()
+                })
+                .collect::<Vec<_>>()
         });
-        std::fs::write(known_file_of(&socket), "Alex\n").unwrap();
-        let told = run_for(&socket, &call("alex"), switches, None);
+        let theirs = heard(&["f1"]);
+        let told = run_for(&socket, &call("alex"), switches, None, Some(&theirs));
         assert_eq!(told, (json!({"ok": true}), true));
-        assert_eq!(asked.join().unwrap(), json!({"forget": "Alex"}));
+        let id = crate::remember::person_id("an id the eyes gave");
+        at_the_lamp(&format!("Alex\n{id}\n"), "f7");
+        let theirs = heard(&["f7"]);
+        assert_eq!(theirs.known, Some(("Alex".to_owned(), "f7".to_owned())));
+        let told = run_for(&socket, &call("Alex"), switches, None, Some(&theirs));
+        assert_eq!(told, (json!({"ok": true}), true));
+        assert_eq!(
+            asked.join().unwrap(),
+            [json!({"forget": "Alex"}), json!({"forget": "Alex"})]
+        );
         std::fs::remove_dir_all(&directory).unwrap();
     }
 
@@ -2479,11 +2587,18 @@ mod tests {
             &call("Alexander"),
             FaceSwitches::default(),
             Some(&alex),
+            None,
         );
         assert_eq!(told, (json!({"ok": true}), true));
         assert_eq!(asked.join().unwrap(), json!({"forget": "Alex"}));
         std::fs::write(known_file_of(&socket), "Bo\n").unwrap();
-        let told = run_for(&socket, &call("Bo"), FaceSwitches::default(), Some(&alex));
+        let told = run_for(
+            &socket,
+            &call("Bo"),
+            FaceSwitches::default(),
+            Some(&alex),
+            None,
+        );
         assert_eq!(told, (json!({"error": NOT_THEIRS}), true));
         std::fs::remove_dir_all(&directory).unwrap();
     }
