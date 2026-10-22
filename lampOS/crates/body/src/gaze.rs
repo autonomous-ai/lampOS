@@ -84,6 +84,9 @@ const NEAR: [f32; 2] = [0.15, 0.20];
 const NEAR_SPEAKING: [f32; 2] = [0.35, 0.40];
 /// No face for this long and the gaze lets go.
 const LOST_US: u64 = 6_000_000;
+/// A face nearer the middle of the picture than this, across, is on
+/// neither side: a turn toward a place is never refused for it.
+const FACE_SIDE: f32 = 0.1;
 /// It goes back to the pose's own direction at this many counts a second.
 const RETURN: f32 = 60.0;
 
@@ -97,6 +100,8 @@ pub struct Gaze {
     recent: [[f32; 2]; SIGHTS as usize],
     sights: u8,
     face_at: Option<u64>,
+    /// Where across the picture the last face was, with `face_at`.
+    face_x: Option<f32>,
     last_us: Option<u64>,
 }
 
@@ -108,6 +113,7 @@ impl Gaze {
             recent: [[0.0; 2]; SIGHTS as usize],
             sights: 0,
             face_at: None,
+            face_x: None,
             last_us: None,
         }
     }
@@ -132,6 +138,7 @@ impl Gaze {
         match seen {
             Some(Seen { face: Some(sight) }) => {
                 self.face_at = Some(now_us);
+                self.face_x = sight.x.is_finite().then_some(sight.x);
                 if still && sight.x.is_finite() && sight.y.is_finite() {
                     self.recent[usize::from(self.sights) % usize::from(SIGHTS)] =
                         [sight.x.clamp(-1.0, 1.0), sight.y.clamp(-1.0, 1.0)];
@@ -188,6 +195,20 @@ impl Gaze {
         }
         (self.looking.turn[0] * toward.clamp(-1.0, 1.0) * SHARE)
             .clamp(-self.looking.reach[0], self.looking.reach[0])
+    }
+
+    /// Whether a turn toward `toward` goes to the side a face was last seen
+    /// on, while it is not lost (`LOST_US`, as the gaze lets go): a search
+    /// never looks toward a person (#1738). A face near the middle, or one
+    /// on the other side, refuses nothing.
+    pub fn face_toward(&self, toward: f32, now_us: u64) -> bool {
+        let fresh = self
+            .face_at
+            .is_some_and(|at| now_us.saturating_sub(at) <= LOST_US);
+        fresh
+            && self
+                .face_x
+                .is_some_and(|x| x.abs() > FACE_SIDE && x * toward > 0.0)
     }
 }
 
