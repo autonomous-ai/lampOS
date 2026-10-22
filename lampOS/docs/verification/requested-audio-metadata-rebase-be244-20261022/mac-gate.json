@@ -1,0 +1,153 @@
+{
+  "mode": "gate",
+  "started_at": "2026-10-22T09:57:46.987015+07:00",
+  "base": "81b3be0b408971324008aabeb54e6e3b08f43fc6",
+  "sources_before": {
+    "crates/skills/Cargo.toml": "d9ee4669331413d4b5f60004e6b4f35f8911627e7fb2c63ecdd7b5a88651fde6",
+    "crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "crates/skills/src/addon.rs": "cdfb0cee0c3a84815f0f08c762c7cb36c9afc70dea8a233034fb7cd9ef2fd476",
+    "crates/skills/src/clock.rs": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+    "crates/skills/src/daily.rs": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+    "crates/skills/src/glow.rs": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+    "crates/skills/src/known.rs": "7b653eda23224b47fba44c7d30eadfae44dec17aca81eb71815c89e2f675d50f",
+    "crates/skills/src/lib.rs": "c96c7249a4714f13391db219a688af0f3ca33c7bc91f83b712a95981925e6060",
+    "crates/skills/src/limits.rs": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+    "crates/skills/src/main.rs": "2a5309f866aef30d63c143bd3d6b772347014692f735493db3e55424df9895bb",
+    "crates/skills/src/package.rs": "93dbca6b25d9fa2623e490ac3325930c865634dcd57e30229fe7d652015b09fd",
+    "crates/skills/src/requested_audio.rs": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+    "crates/skills/src/routine.rs": "1cabd790ba4a7deb904d51bf14fa8ff3bf5bbaa7992628b49bf706e7d0a00a4a",
+    "crates/skills/src/unplug.rs": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+    "crates/skills/src/visits.rs": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+    "crates/skills/src/watch.rs": "29275ce96a4936e12ed7833dd49bfc72e08a15a89bd6bf8ba64448cf6ff1fa3c",
+    "crates/skills/tests/it/addon.rs": "bbf6c811fa9be9a69ef62fd228eb43d91ae732ac36ace52c26e11ff8b2891d33",
+    "crates/skills/tests/it/call_wait.rs": "b2167b2c4b7712d93553bf596adaf204e75de405da04c5cd447400b050dc3b0e",
+    "crates/skills/tests/it/daily_engine.rs": "1ae028917e66e29647992496668f6db723a0843b6a01daf011c48fe8628308cd",
+    "crates/skills/tests/it/journal_output.rs": "4986ed082fbe495123718d9761fc40b70797961e1cae0efc79662f75880c2478",
+    "crates/skills/tests/it/made.rs": "80155c290a75ce9f39b3b81a1365299b664c2a399007fb069b1fc6c8b52058ec",
+    "crates/skills/tests/it/main.rs": "ab9176a56448bc112873c95972b5b15a1b2b6f2ad8c32ac36ea70d0ca0cc2f6d",
+    "crates/skills/tests/it/night_sleep.rs": "00d3e997944eee7893dcce3407d4393b820abc7339d9c95a35227dea83ac1293",
+    "crates/skills/tests/it/package.rs": "685d14a76aeeef0842980470075d0fb77528df886786774cb7ee4cdbb1367a23",
+    "crates/skills/tests/it/routine_service.rs": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+    "crates/skills/tests/it/skills.rs": "a8bd9371022a25a51bf7faab695a07826521a5859996401c1c66a64d62f8272b",
+    "crates/skills/tests/it/store.rs": "de63fa5e8792ffe1af9374b061f078a360994f4b08b7c56cd63736e43bd62b82",
+    "crates/skills/tests/requested_audio.rs": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 4.962,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 17.047,
+      "log_name": "clippy.log",
+      "log_sha256": "5e8602f8c77aba0aec9448953e90e9206d0c2cba6cd98347e093f2be531bf5d4",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 177.869,
+      "log_name": "tests.log",
+      "log_sha256": "328fc183f23bfd1452f9380ec2baf8faa6ca3fc05c895bdf0287342538b57b89",
+      "summaries": [
+        "test result: ok. 146 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.42s",
+        "test result: ok. 271 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 134.41s",
+        "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.37s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 467,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      }
+    }
+  ],
+  "status": "passed",
+  "sources_after": {
+    "crates/skills/Cargo.toml": "d9ee4669331413d4b5f60004e6b4f35f8911627e7fb2c63ecdd7b5a88651fde6",
+    "crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "crates/skills/src/addon.rs": "cdfb0cee0c3a84815f0f08c762c7cb36c9afc70dea8a233034fb7cd9ef2fd476",
+    "crates/skills/src/clock.rs": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+    "crates/skills/src/daily.rs": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+    "crates/skills/src/glow.rs": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+    "crates/skills/src/known.rs": "7b653eda23224b47fba44c7d30eadfae44dec17aca81eb71815c89e2f675d50f",
+    "crates/skills/src/lib.rs": "c96c7249a4714f13391db219a688af0f3ca33c7bc91f83b712a95981925e6060",
+    "crates/skills/src/limits.rs": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+    "crates/skills/src/main.rs": "2a5309f866aef30d63c143bd3d6b772347014692f735493db3e55424df9895bb",
+    "crates/skills/src/package.rs": "93dbca6b25d9fa2623e490ac3325930c865634dcd57e30229fe7d652015b09fd",
+    "crates/skills/src/requested_audio.rs": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+    "crates/skills/src/routine.rs": "1cabd790ba4a7deb904d51bf14fa8ff3bf5bbaa7992628b49bf706e7d0a00a4a",
+    "crates/skills/src/unplug.rs": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+    "crates/skills/src/visits.rs": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+    "crates/skills/src/watch.rs": "29275ce96a4936e12ed7833dd49bfc72e08a15a89bd6bf8ba64448cf6ff1fa3c",
+    "crates/skills/tests/it/addon.rs": "bbf6c811fa9be9a69ef62fd228eb43d91ae732ac36ace52c26e11ff8b2891d33",
+    "crates/skills/tests/it/call_wait.rs": "b2167b2c4b7712d93553bf596adaf204e75de405da04c5cd447400b050dc3b0e",
+    "crates/skills/tests/it/daily_engine.rs": "1ae028917e66e29647992496668f6db723a0843b6a01daf011c48fe8628308cd",
+    "crates/skills/tests/it/journal_output.rs": "4986ed082fbe495123718d9761fc40b70797961e1cae0efc79662f75880c2478",
+    "crates/skills/tests/it/made.rs": "80155c290a75ce9f39b3b81a1365299b664c2a399007fb069b1fc6c8b52058ec",
+    "crates/skills/tests/it/main.rs": "ab9176a56448bc112873c95972b5b15a1b2b6f2ad8c32ac36ea70d0ca0cc2f6d",
+    "crates/skills/tests/it/night_sleep.rs": "00d3e997944eee7893dcce3407d4393b820abc7339d9c95a35227dea83ac1293",
+    "crates/skills/tests/it/package.rs": "685d14a76aeeef0842980470075d0fb77528df886786774cb7ee4cdbb1367a23",
+    "crates/skills/tests/it/routine_service.rs": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+    "crates/skills/tests/it/skills.rs": "a8bd9371022a25a51bf7faab695a07826521a5859996401c1c66a64d62f8272b",
+    "crates/skills/tests/it/store.rs": "de63fa5e8792ffe1af9374b061f078a360994f4b08b7c56cd63736e43bd62b82",
+    "crates/skills/tests/requested_audio.rs": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36"
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T10:01:06.894780+07:00"
+}
