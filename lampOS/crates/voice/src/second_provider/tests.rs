@@ -4872,21 +4872,30 @@ async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
 }
 
 /// #1671 (`LAMP_SECOND_SEEMS`): a spoken request from a known person in view
-/// is told how they seem; the same words with no known face in view, or a
-/// written turn, are not, and are never asked of the note.
+/// is told how they seem; a written turn, a line held only by the face's
+/// gap (no face to read), and one with no known face in view are not, and
+/// are never asked of the note.
 #[tokio::test]
 async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
-    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
     let path = std::env::temp_dir().join(format!("seems-known-{}", std::process::id()));
     std::fs::write(&path, "Maya").unwrap();
-    let cache = Arc::new(FaceCache::holding_gaps(None));
+    let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
     let script = Arc::new(Script {
-        heard: Mutex::new([Ok("How was my day?".to_owned()), Ok("And now?".to_owned())].into()),
+        heard: Mutex::new(
+            [
+                Ok("How was my day?".to_owned()),
+                Ok("And now?".to_owned()),
+                Ok("And then?".to_owned()),
+            ]
+            .into(),
+        ),
         chats: Mutex::new(
             [
                 vec![text("Sounds full."), Ok(ChatEvent::Done)],
                 vec![text("Hello."), Ok(ChatEvent::Done)],
                 vec![text("Still here."), Ok(ChatEvent::Done)],
+                vec![text("Yes."), Ok(ChatEvent::Done)],
             ]
             .into(),
         ),
@@ -4920,13 +4929,26 @@ async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
     engine.submit(audio(1, 1));
     engine.submit(end(1));
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    engine.memory_answered(1, Instant::now());
     engine.submit(written(2, "Say hello."));
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
-    // Nobody known in view now: the room's scope.
+    // No face in view, just after the answer: the person held only by the
+    // gap, whose face can't be read.
     cache.replace_seen(cache.begin_refresh(), None, Some(0));
     engine.submit(start(3));
+    assert!(engine.memory_lease().unwrap().scope().unwrap().held());
     engine.submit(audio(3, 1));
     engine.submit(end(3));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    // Two faces, none known: the room's scope.
+    cache.replace_seen(cache.begin_refresh(), None, Some(2));
+    engine.submit(start(4));
+    assert_eq!(
+        engine.memory_lease().unwrap().scope().unwrap().person(),
+        None
+    );
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     std::fs::remove_file(&path).unwrap();
     let told = |messages: &Vec<Message>| {
@@ -4940,10 +4962,11 @@ async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
         })
     };
     let asked = script.asked.lock().unwrap();
-    assert_eq!(asked.len(), 3);
+    assert_eq!(asked.len(), 4);
     assert!(told(&asked[0]), "{:?}", asked[0]);
-    assert!(!told(&asked[1]), "{:?}", asked[1]);
-    assert!(!told(&asked[2]), "{:?}", asked[2]);
+    for unseen in &asked[1..] {
+        assert!(!told(unseen), "{unseen:?}");
+    }
     assert_eq!(
         *asked_for.lock().unwrap(),
         [1],

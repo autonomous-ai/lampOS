@@ -5,8 +5,9 @@
 //! says "you look happy". So a spoken request from a known person in view
 //! is told, beside their words, that they seem in good spirits from their
 //! face just now, with the rule to let it shape the tone only and never
-//! mention it. Only after two `positive` reads in a row by Blendshape V2
-//! (the product's reader), each a distinct message, fresh and sure, as
+//! mention it. The eyes read the nearest face, so a read counts only while
+//! exactly one face is in view: with two, the smile may be the other's. Only after two
+//! `positive` reads in a row by Blendshape V2 (the product's reader), each a distinct message, fresh and sure, as
 //! Mood's own run (#2716); only in a room that is not busy, and not again
 //! for ten minutes once heard. Nothing of the read is kept past the note.
 //!
@@ -70,6 +71,20 @@ impl SeemsTold {
             && read.from == SeemsReader::Blendshapes
             && read.confidence >= SURE_FROM;
         self.run = if smiling { self.run + 1 } else { 0 };
+    }
+
+    /// [`Self::seen`], with how many faces the eyes have in view now
+    /// (`humans/faces`): `humans/seems` reads the nearest face, which is
+    /// not always the one talking, so a read counts only with exactly one
+    /// face in view, and any other count, or none known, breaks the run
+    /// (the reviewer-lead's P2 on #2778).
+    pub fn seen_in_view(
+        &mut self,
+        read: Option<(HumanSeems, u64)>,
+        faces_in_view: Option<usize>,
+        now_us: u64,
+    ) {
+        self.seen(read.filter(|_| faces_in_view == Some(1)), now_us);
     }
 
     /// The note, if one is due now.
@@ -179,6 +194,21 @@ mod tests {
             seems.seen(read(SeemsKind::Positive, 0.9, 3), 0);
             assert_eq!(seems.due(0), None, "{breaker:?}");
         }
+    }
+
+    #[test]
+    fn a_second_face_in_view_breaks_the_run_since_the_read_may_be_theirs() {
+        for faces in [Some(0), Some(2), None] {
+            let mut seems = SeemsTold::default();
+            seems.seen_in_view(read(SeemsKind::Positive, 0.9, 1), Some(1), 0);
+            seems.seen_in_view(read(SeemsKind::Positive, 0.9, 2), faces, 0);
+            seems.seen_in_view(read(SeemsKind::Positive, 0.9, 3), Some(1), 0);
+            assert_eq!(seems.due(0), None, "{faces:?}");
+        }
+        let mut seems = SeemsTold::default();
+        seems.seen_in_view(read(SeemsKind::Positive, 0.9, 1), Some(1), 0);
+        seems.seen_in_view(read(SeemsKind::Positive, 0.9, 2), Some(1), 0);
+        assert!(seems.due(0).is_some(), "one face, two smiles");
     }
 
     #[test]

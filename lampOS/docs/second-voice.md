@@ -2553,7 +2553,10 @@ after a take-over, but now for every turn:
   message's 5 s. Two `positive` reads in a row by Blendshape V2, the
   product's reader (distinct messages by their bus time, 0.6 or over,
   `SURE_FROM`), as Mood's own run (#2716); an `unsure`, a `negative`, a
-  FER+ read or none breaks the run. Then a spoken request whose scope is a
+  FER+ read or none breaks the run. The eyes read the **nearest face**,
+  not necessarily the one talking, so a read counts only while exactly one
+  face is in view (`humans/faces`, `known_faces::faces_in_view`): no face,
+  two faces, or an unknown count break the run too. Then a spoken request whose scope is a
   known person in view, not the room's and not one held only by a gap (so
   never while the camera is closed to memory), is told, beside its words,
   that they seem in good spirits from their face just now, with the rule
