@@ -92,5 +92,34 @@ Both changed files are byte-identical across that carry. The final clean
 six result lines and no filtering. Formatting took 5.257 s, strict all-target
 Voice Clippy 28.998 s, and the Voice command 332.739 s. All 6,512
 bound files stayed unchanged. `mac-current/` retains the exact commands,
-complete outputs and source binding. Official PR ARM64 and Linux Clippy
-remain required; neither Mac pass substitutes for them.
+complete outputs and source binding. Neither Mac pass substitutes for the
+official PR qualification below.
+
+## Official PR qualification
+
+Public [PR #3117](https://github.com/autonomous-ai/lampOS/pull/3117), head
+`226c4e89b`, passed both official checks on their first attempts:
+
+- [Linux ARM64 run 39846332230](https://github.com/autonomous-ai/lampOS/actions/runs/39846332230/job/120060466263):
+  **7,008 passed, 0 failed, 31 skipped**, including one passing test
+  classified as leaky. Nextest ran its selected scope across 60 binaries
+  in 139.986 s; another 106 binaries were outside that selection. This is
+  the PR's selected gate, not a claim of a full unfiltered workspace run.
+- The changed Live music fixture passed in **0.053 s**. The leaky result
+  was `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`
+  and remains in the receipt.
+- [Strict Linux Clippy run 39846332487](https://github.com/autonomous-ai/lampOS/actions/runs/39846332487/job/120060466552):
+  successful, every crate and target.
+
+Both logs identify the same tested merge,
+`a5f0ce4a9470778b8320c6c263358d5f04401b41`, joining head `226c4e89b`
+to base `7b3e6aef8`. Both native watchers exited 0. `native.json` records
+the exact run, attempt, job, merge parents, selection and output digests.
+Complete downloaded job logs remain retained locally: ARM64 1,237,428 bytes,
+Clippy 36,048 bytes, each bound by SHA-256 and its primary job URL. Embedded
+Cargo result lines are retained separately and are not added again to the
+nextest total. Publication was skipped, as expected for a pull request.
+
+Fourteen's independent source and combined-fixture read found no P1, P2 or
+P3. First owns later current-base integration and merge. These checks do
+not establish a played-audio, physical-lamp or historical-failure result.
