@@ -27,6 +27,9 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+#[cfg(test)]
+mod memory_note_retries;
+
 /// The coordinator renews authority at least this often.
 const CONTROL_LEASE_US: u64 = 250_000;
 /// The longest a backlog left by a stall may hold the fresh authority back
@@ -1920,21 +1923,16 @@ pub fn serve(
     // With a lease, the turn is told for its admitted scope alone: that
     // person's (or the room's) Days note and exchanges, never those of the
     // person the eyes or the sticky session name when its chat begins.
-    let told_for = move |lease: Option<&crate::memory_scope::ScopeLease>| {
+    let tell = move |sessions: &mut Sessions,
+                     scope: Option<&crate::memory_scope::ScopeSnapshot>| {
         let now = Instant::now();
-        let Ok(mut sessions) = sessions.lock() else {
-            return Told::default();
-        };
         // Counted at every ask, before anything can return early: a turn's
         // second ask (its prepared chat, then its rounds) is never quiet.
         let quiet = sessions.quiet_long_enough(now);
         let (opened, person) = sessions.open(who.as_deref(), now);
-        let (changed, person) = match lease {
+        let (changed, person) = match scope {
             None => (opened, person),
-            Some(lease) => {
-                let Some(scope) = lease.scope() else {
-                    return Told::default();
-                };
+            Some(scope) => {
                 let person = scope.person().map(str::to_owned);
                 (sessions.told_for(&person), person)
             }
@@ -1942,9 +1940,7 @@ pub fn serve(
         // A line held only by a known face's gap is told no one's memory
         // note: it may not be theirs (the reviewer's P2 on #2449). Its
         // exchanges, the conversation as it stood, are told as before.
-        let held = lease
-            .and_then(crate::memory_scope::ScopeLease::scope)
-            .is_some_and(crate::memory_scope::ScopeSnapshot::held);
+        let held = scope.is_some_and(crate::memory_scope::ScopeSnapshot::held);
         let memory = match &socket {
             _ if held => String::new(),
             // Every request here is built afresh from the thread and the
@@ -1962,13 +1958,8 @@ pub fn serve(
                         "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
                     );
                 }
-                sessions.frozen(opens_anew(changed) || quiet || kept, |session| {
-                    crate::remember::told_for_fresh_session(
-                        socket,
-                        session,
-                        person.as_deref(),
-                        true,
-                    )
+                sessions.frozen(opens_anew(changed) || quiet || kept, now, |session| {
+                    crate::remember::fresh_session_note(socket, session, person.as_deref(), true)
                 })
             }
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
@@ -2018,7 +2009,9 @@ pub fn serve(
             )
         }
     };
-    let told_for = Arc::new(told_for);
+    let told_for = Arc::new(move |lease: Option<&crate::memory_scope::ScopeLease>| {
+        told_while_scope_holds(&sessions, lease, &tell)
+    });
     let scoped_system = scoped_context_from_environment().then(|| {
         let told_for = told_for.clone();
         Arc::new(move |lease: &crate::memory_scope::ScopeLease| told_for(Some(lease)))
@@ -5534,6 +5527,32 @@ fn spoken_by_the_caller_alone(
     matches!((speakers.as_slice(), caller_faces.as_slice()), ([face], [caller]) if face == caller)
 }
 
+/// Do not hand a context to a prepared or ordinary chat if its authority
+/// changed during the note read. A revoked lease is never the room.
+fn told_while_scope_holds(
+    sessions: &Mutex<Sessions>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    tell: impl FnOnce(&mut Sessions, Option<&crate::memory_scope::ScopeSnapshot>) -> Told,
+) -> Told {
+    let Ok(mut sessions) = sessions.lock() else {
+        return Told::default();
+    };
+    // A prior context's slow read may have held the lock through this
+    // request's cancellation. Check only after that wait, before any I/O.
+    let scope = lease
+        .and_then(crate::memory_scope::ScopeLease::scope)
+        .cloned();
+    if lease.is_some() && scope.is_none() {
+        return Told::default();
+    }
+    let told = tell(&mut sessions, scope.as_ref());
+    if lease.is_some_and(|lease| lease.scope() != scope.as_ref()) {
+        Told::default()
+    } else {
+        told
+    }
+}
+
 /// Whose the second route's turns are, and the Days note of that person's
 /// run of turns.
 #[derive(Default)]
@@ -5542,6 +5561,9 @@ struct Sessions {
     /// Runs of turns opened so far: the Days session number.
     opened: u64,
     note: Option<String>,
+    /// An incomplete snapshot is retried only on a later context build,
+    /// no more than once per interval measured from the attempt's start.
+    note_retry_at: Option<Instant>,
     /// The admitted scope the Days note was last asked for.
     scoped: Option<Option<String>>,
     /// A change of person seen by [`Sessions::open_ahead`] that the turn's
@@ -5620,15 +5642,38 @@ impl Sessions {
     fn told_for(&mut self, person: &Option<String>) -> bool {
         let changed = self.scoped.as_ref() != Some(person);
         self.scoped = Some(person.clone());
+        if changed {
+            // A held-scope turn can skip the read below. Discard the old
+            // person's cache now so the next admitted turn cannot use it.
+            self.note = None;
+            self.note_retry_at = None;
+        }
         changed
     }
 
     /// The Days note for this run of turns, asked anew when the person
-    /// changed or, with the switch, after a quiet.
-    fn frozen(&mut self, changed: bool, ask: impl FnOnce(u64) -> String) -> String {
-        if changed || self.note.is_none() {
+    /// changes, something is kept, or a failed read is eligible to retry.
+    /// Successful empty snapshots are cached exactly like populated ones.
+    fn frozen(
+        &mut self,
+        changed: bool,
+        now: Instant,
+        ask: impl FnOnce(u64) -> crate::remember::SessionNote,
+    ) -> String {
+        let retry = self.note_retry_at.is_some_and(|at| now >= at);
+        if changed || self.note.is_none() || retry {
             self.opened += 1;
-            self.note = Some(ask(self.opened));
+            let note = ask(self.opened);
+            self.note_retry_at = (!note.complete).then_some(now + crate::remember::FRESH_RETRY);
+            if !note.complete {
+                eprintln!(
+                    "lamp-voice second: memory note incomplete; retry on a later context after {} ms",
+                    crate::remember::FRESH_RETRY.as_millis()
+                );
+            } else if retry {
+                eprintln!("lamp-voice second: memory note retry complete");
+            }
+            self.note = Some(note.text);
         }
         self.note.clone().unwrap_or_default()
     }
@@ -9830,11 +9875,15 @@ mod tests {
     #[test]
     fn with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns() {
         let mut sessions = Sessions::default();
+        let now = Instant::now();
         let mut asked = Vec::new();
         let mut note = |changed: bool| {
-            sessions.frozen(changed, |session| {
+            sessions.frozen(changed, now, |session| {
                 asked.push(session);
-                format!("note {session}")
+                crate::remember::SessionNote {
+                    text: format!("note {session}"),
+                    complete: true,
+                }
             })
         };
         assert_eq!(note(false), "note 1", "the first turn asks");
@@ -9861,9 +9910,12 @@ mod tests {
             let mut asked = Vec::new();
             for &turn in turns {
                 let changed = sessions.quiet_long_enough(at(turn));
-                sessions.frozen(changed, |session| {
+                sessions.frozen(changed, at(turn), |session| {
                     asked.push(session);
-                    format!("note {session}")
+                    crate::remember::SessionNote {
+                        text: format!("note {session}"),
+                        complete: true,
+                    }
                 });
             }
             asked
@@ -13651,11 +13703,13 @@ mod memory_switches {
                     while let Some(Ok(line)) = lines.next() {
                         let request: Value = serde_json::from_str(&line).unwrap();
                         let answer = match request["op"].as_str() {
-                            // A person's frozen note (`remember::PERSON_SCOPE`).
+                            // Each snapshot carries its requested scope.
                             Some("session_open") => json!({"ok":true,"snapshot":{
                                 "session":request["session"],"opened_unix_ms":1,"generation":1,
                                 "invalidated":false,"source_ids":[7],
-                                "note":json!({"scope":"caller-supplied person; identity not verified",
+                                "note":json!({"scope":if request["person"].is_string() {
+                                    "caller-supplied person; identity not verified"
+                                } else { "said in this room; speaker unknown" },
                                     "untrusted":true,"facts":[{"id":7,"kind":"preference","text":"tea"}]})
                                     .to_string()}}),
                             Some("follow_up") => json!({"ok":true,"follow_up":
@@ -13813,8 +13867,8 @@ mod memory_switches {
         for seconds in [0, 60, 60 + quiet, 61 + quiet] {
             let at = start + std::time::Duration::from_secs(seconds);
             let changed = sessions.quiet_long_enough(at);
-            notes.push(sessions.frozen(changed, |session| {
-                crate::remember::told_for_session(&socket, session + 10, Some(&person))
+            notes.push(sessions.frozen(changed, at, |session| {
+                crate::remember::fresh_session_note(&socket, session + 10, Some(&person), false)
             }));
             let runs = if seconds < 60 + quiet { 1 } else { 2 };
             assert_eq!(count("follow_up"), follow_ups + runs, "at {seconds} s");

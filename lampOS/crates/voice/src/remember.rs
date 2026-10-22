@@ -1759,22 +1759,48 @@ pub fn told_for_fresh_session(
     person: Option<&str>,
     fresh: bool,
 ) -> String {
+    fresh_session_note(socket, session, person, fresh).text
+}
+
+/// A rendered note and whether every requested snapshot scope was read.
+/// A valid empty snapshot is complete; unavailable personal data is not.
+pub(crate) struct SessionNote {
+    pub text: String,
+    pub complete: bool,
+}
+
+impl SessionNote {
+    fn unavailable() -> Self {
+        Self {
+            text: UNAVAILABLE.into(),
+            complete: false,
+        }
+    }
+}
+
+/// The second route needs completion separately from the prompt text so a
+/// temporary failure is not frozen for the rest of its conversation.
+pub(crate) fn fresh_session_note(
+    socket: &Path,
+    session: u64,
+    person: Option<&str>,
+    fresh: bool,
+) -> SessionNote {
     if DAYS_MODE.get() != Some(&true) {
-        return theirs_too(socket, told(), person, FIRST_READ);
+        return SessionNote {
+            text: theirs_too(socket, told(), person, FIRST_READ),
+            complete: true,
+        };
     }
     match DAYS
         .get()
         .and_then(Option::as_ref)
         .filter(|client| client.socket == socket)
     {
-        Some(client) => client.told_for_fresh_session_within(
-            session,
-            person,
-            crate::rules::on(),
-            FIRST_READ,
-            fresh,
-        ),
-        None => UNAVAILABLE.into(),
+        Some(client) => {
+            client.session_note_within(session, person, crate::rules::on(), FIRST_READ, fresh)
+        }
+        None => SessionNote::unavailable(),
     }
 }
 
@@ -1811,11 +1837,28 @@ impl DaysClient {
         deadline: Duration,
         fresh: bool,
     ) -> String {
+        self.session_note_within(session, person, rules, deadline, fresh)
+            .text
+    }
+
+    /// Keep the validated snapshot outcome independent of rendering. Rules
+    /// and follow-ups still share the original total deadline.
+    pub(crate) fn session_note_within(
+        &self,
+        session: u64,
+        person: Option<&str>,
+        rules: bool,
+        deadline: Duration,
+        fresh: bool,
+    ) -> SessionNote {
         let started = Instant::now();
         let room_not_asker = self.room_not_asker.load(Ordering::Acquire);
         let mut counted = None;
-        let mut note = self
-            .open_fresh_session_within(session, deadline, person, fresh)
+        let opened = self.open_fresh_session_within(session, deadline, person, fresh);
+        let complete = opened
+            .as_ref()
+            .is_some_and(|(_, theirs)| person.is_none() || theirs.is_some());
+        let mut note = opened
             .map(|(snapshot, theirs)| {
                 let (snapshot, room_rule, first) = if room_not_asker {
                     let (snapshot, room, someone) = room_as_someone_s(&snapshot);
@@ -1847,7 +1890,10 @@ impl DaysClient {
             let read = self.tell_policy(person, started + deadline);
             let Some((room, theirs)) = read else {
                 // Rules that could not be read: the session's are kept.
-                return note;
+                return SessionNote {
+                    text: note,
+                    complete,
+                };
             };
             // What this session's provider is told is what its exchanges
             // follow: a rule forgotten in an earlier one is not among them.
@@ -1862,7 +1908,7 @@ impl DaysClient {
                         _ => said,
                     }
                 }
-                Err(_) => return UNAVAILABLE.into(),
+                Err(_) => return SessionNote::unavailable(),
             };
             say(said);
             note.push_str(&crate::rules::note(&room, theirs.as_deref()));
@@ -1870,7 +1916,10 @@ impl DaysClient {
         if let Some(person) = person.filter(|_| self.threads.load(Ordering::Acquire)) {
             note.push_str(&self.follow_up(person, started + deadline));
         }
-        note
+        SessionNote {
+            text: note,
+            complete,
+        }
     }
 
     /// One open thread of this person's to ask about once, as the memory
@@ -1988,9 +2037,9 @@ const CONVERSATION_IDLE: Duration = Duration::from_secs(45);
 /// What a forget waits, at most, for the writer to finish an exchange it
 /// has in hand ([`HandOns::settle`]).
 const FORGET_SETTLE: Duration = Duration::from_millis(300);
-/// After a fresh open that didn't resume journalling, how long before one is
-/// asked for again ([`DaysClient::wants_fresh_session`]).
-const FRESH_RETRY: Duration = Duration::from_secs(30);
+/// Minimum interval between retries of an incomplete note or a fresh open
+/// that did not resume journalling ([`DaysClient::wants_fresh_session`]).
+pub(crate) const FRESH_RETRY: Duration = Duration::from_secs(30);
 const ANSWER_BYTES: usize = 8_192;
 
 /// A separate, explicitly selected client for Memory's Days protocol. The
@@ -11667,5 +11716,284 @@ mod tests {
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    fn empty_session_note(request: &Value) -> Value {
+        let mut snapshot = snapshot(request["session"].as_str().unwrap());
+        snapshot["source_ids"] = json!([]);
+        snapshot["note"] = json!(
+            json!({
+                "scope": if request["person"].is_string() { PERSON_SCOPE } else { ROOM_SCOPE },
+                "untrusted": true,
+                "facts": []
+            })
+            .to_string()
+        );
+        json!({"ok":true,"snapshot":snapshot})
+    }
+
+    /// The typed result records a validated read, not whether it found facts.
+    #[test]
+    fn session_note_empty_room_and_person_snapshots_are_complete() {
+        const PERSON: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("note-empty", 3, empty_session_note);
+        let client = resumes_test_client(socket.clone(), false);
+        let room = client.session_note_within(1, None, false, FIRST_READ, true);
+        let both = client.session_note_within(2, Some(PERSON), false, FIRST_READ, true);
+        let requests = served.join().unwrap();
+        assert!(room.complete && both.complete);
+        assert!(
+            room.text
+                .contains(&empty_session_note(&requests[0])["snapshot"].to_string())
+        );
+        assert!(both.text.contains("two frozen memory snapshots"));
+        for request in &requests[1..] {
+            assert!(
+                both.text
+                    .contains(&empty_session_note(request)["snapshot"].to_string())
+            );
+        }
+        assert_eq!(requests[2]["person"], PERSON);
+        let context = client.context.lock().unwrap();
+        assert!(context.of(None).is_empty() && context.of(Some(PERSON)).is_empty());
+        drop(context);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A refusal or malformed snapshot is unavailable, and a later session
+    /// on the same client can recover without a restart or another keep.
+    #[test]
+    fn session_note_refused_and_malformed_room_reads_can_recover() {
+        let (socket, served) = memory("note-room-recovery", 3, |request| match request["session"]
+            .as_str()
+            .unwrap()
+        {
+            "voice-test-1" => json!({"ok":false}),
+            "voice-test-2" => {
+                let mut answer = empty_session_note(request);
+                answer["snapshot"]["generation"] = Value::Null;
+                answer
+            }
+            _ => dylan(request),
+        });
+        let client = resumes_test_client(socket.clone(), false);
+        for session in [1, 2] {
+            let note = client.session_note_within(session, None, false, FIRST_READ, true);
+            assert!(!note.complete, "session {session}");
+            assert_eq!(note.text, UNAVAILABLE);
+        }
+        let recovered = client.session_note_within(3, None, false, FIRST_READ, true);
+        assert!(recovered.complete && recovered.text.contains("Their name is Dylan"));
+        let requests = served.join().unwrap();
+        assert_eq!(
+            requests
+                .iter()
+                .map(|request| request["session"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["voice-test-1", "voice-test-2", "voice-test-3"]
+        );
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A room note is useful partial text, but it cannot stand for a failed
+    /// personal read. Both a refusal and malformed personal data may recover.
+    #[test]
+    fn session_note_failed_personal_reads_remain_incomplete_until_recovered() {
+        const PERSON: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("note-person-recovery", 6, |request| {
+            if request["person"].is_string() {
+                match request["session"].as_str().unwrap() {
+                    "voice-test-1" => return json!({"ok":false}),
+                    "voice-test-2" => {
+                        let mut answer = dylan(request);
+                        answer["snapshot"]["source_ids"] = json!([]);
+                        return answer;
+                    }
+                    _ => {}
+                }
+            }
+            dylan(request)
+        });
+        let client = resumes_test_client(socket.clone(), false);
+        for session in [1, 2] {
+            let note = client.session_note_within(session, Some(PERSON), false, FIRST_READ, true);
+            assert!(!note.complete, "session {session}");
+            assert!(note.text.contains("Their name is Dylan"));
+            assert!(!note.text.contains("Their name is Minh"));
+        }
+        let recovered = client.session_note_within(3, Some(PERSON), false, FIRST_READ, true);
+        assert!(recovered.complete);
+        assert!(recovered.text.contains("Their name is Dylan"));
+        assert!(recovered.text.contains("Their name is Minh"));
+        let requests = served.join().unwrap();
+        assert_eq!(requests.len(), 6);
+        for pair in requests.chunks_exact(2) {
+            assert_eq!(pair[0]["session"], pair[1]["session"]);
+            assert!(pair[0]["person"].is_null());
+            assert_eq!(pair[1]["person"], PERSON);
+        }
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A bounded accept/read for held-reply fixtures: a missing request
+    /// fails instead of leaving the test waiting for its own client forever.
+    fn session_note_request(listener: &UnixListener) -> (UnixStream, Value) {
+        use rustix::event::{PollFd, PollFlags, Timespec, poll};
+        let mut ready = [PollFd::new(listener, PollFlags::IN)];
+        let timeout = Timespec {
+            tv_sec: 2,
+            tv_nsec: 0,
+        };
+        assert_eq!(poll(&mut ready, Some(&timeout)).unwrap(), 1);
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(stream.try_clone().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        (stream, serde_json::from_str(&line).unwrap())
+    }
+
+    #[test]
+    fn session_note_a_room_timeout_is_incomplete_within_the_note_budget() {
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-note-room-timeout-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let client = resumes_test_client(socket.clone(), false);
+        std::thread::scope(|threads| {
+            let (finished, result) = sync_channel(1);
+            let client = &client;
+            let asking = threads.spawn(move || {
+                let began = Instant::now();
+                let note = client.session_note_within(1, None, false, FIRST_READ, true);
+                finished.send((note, began.elapsed())).unwrap();
+            });
+            let (held, request) = session_note_request(&listener);
+            assert_eq!(request["op"], "session_open");
+            let outcome = result.recv_timeout(Duration::from_secs(2));
+            drop(held);
+            asking.join().unwrap();
+            let (note, elapsed) = outcome.expect("a held room reply must time out");
+            eprintln!(
+                "memory note deadline: scopes=1 elapsed_us={}",
+                elapsed.as_micros()
+            );
+            assert!(!note.complete);
+            assert_eq!(note.text, UNAVAILABLE);
+            assert!(
+                elapsed >= FIRST_READ - Duration::from_millis(20),
+                "{elapsed:?}"
+            );
+            assert!(
+                elapsed < FIRST_READ + Duration::from_millis(100),
+                "{elapsed:?}"
+            );
+        });
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// The room uses part of the 300 ms before replying. Holding the person's
+    /// reply then proves it receives the remainder, not another whole budget.
+    #[test]
+    fn session_note_room_and_person_share_one_300ms_deadline() {
+        const PERSON: &str = "p-0123456789abcdef";
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-note-total-timeout-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let client = resumes_test_client(socket.clone(), false);
+        assert_eq!(FIRST_READ, Duration::from_millis(300));
+        std::thread::scope(|threads| {
+            let (finished, result) = sync_channel(1);
+            let client = &client;
+            let asking = threads.spawn(move || {
+                let began = Instant::now();
+                let note = client.session_note_within(1, Some(PERSON), false, FIRST_READ, true);
+                finished.send((note, began.elapsed())).unwrap();
+            });
+            let (mut room, room_request) = session_note_request(&listener);
+            assert!(room_request["person"].is_null());
+            // The read is held by this fixture; waiting on its result makes
+            // the first 200 ms explicit, without a free-running sleeper.
+            let before_room_reply = result.recv_timeout(Duration::from_millis(200));
+            assert!(matches!(before_room_reply, Err(RecvTimeoutError::Timeout)));
+            writeln!(room, "{}", empty_session_note(&room_request)).unwrap();
+            let (personal, person_request) = session_note_request(&listener);
+            assert_eq!(person_request["person"], PERSON);
+            assert_eq!(person_request["session"], room_request["session"]);
+            let outcome = result.recv_timeout(Duration::from_secs(2));
+            drop(personal);
+            drop(room);
+            asking.join().unwrap();
+            let (note, elapsed) = outcome.expect("both scopes share the original deadline");
+            eprintln!(
+                "memory note deadline: scopes=2 elapsed_us={}",
+                elapsed.as_micros()
+            );
+            assert!(!note.complete);
+            assert!(
+                elapsed >= FIRST_READ - Duration::from_millis(20),
+                "{elapsed:?}"
+            );
+            assert!(
+                elapsed < FIRST_READ + Duration::from_millis(100),
+                "{elapsed:?}"
+            );
+        });
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A new keep can commit after the snapshot was taken but before it is
+    /// returned. Finishing that older read must not consume the new marker.
+    #[test]
+    fn session_note_a_keep_committed_during_its_read_marks_the_next_refresh() {
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-note-concurrent-keep-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let client = resumes_test_client(socket.clone(), false);
+        assert!(!client.kept_since_note());
+        std::thread::scope(|threads| {
+            let reading = threads
+                .spawn(|| client.session_note_within(1, None, false, Duration::from_secs(2), true));
+            let (mut read, request) = session_note_request(&listener);
+            assert_eq!(request["op"], "session_open");
+            let before_keep = empty_session_note(&request);
+            let remembering = threads.spawn(|| {
+                client.run_at(
+                    &call(REMEMBER, json!({"text":"Their name is Bramble"})),
+                    Duration::from_secs(2),
+                    NOW,
+                    Some(&EAST),
+                    None,
+                )
+            });
+            let (mut keep, request) = session_note_request(&listener);
+            assert_eq!(request["op"], "remember");
+            writeln!(keep, "{}", json!({"ok":true,"id":26})).unwrap();
+            let (answer, ok) = remembering.join().unwrap();
+            assert!(ok && answer["remembered"] == true, "{answer}");
+            writeln!(read, "{before_keep}").unwrap();
+            let note = reading.join().unwrap();
+            assert!(note.complete && !note.text.contains("Bramble"));
+        });
+        assert!(
+            client.kept_since_note(),
+            "the newer keep still needs a refresh"
+        );
+        assert!(
+            !client.kept_since_note(),
+            "the next refresh takes the mark once"
+        );
+        std::fs::remove_file(socket).unwrap();
     }
 }
