@@ -465,3 +465,10 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **Note:** the screen-person script and media tool are under `/tmp/claude-1000/lamp-helper/` (my helper, 22 Oct).
 - **12:4x–13:0x:** #2768 merged (`da41d3657`); #2874 carried as #2909 and merged. #2887's three P2 fixes pushed and restacked onto lamp-voice (`fe6cec965`); #2889 restacked (`c0af364e9`). Full lamp-voice had 3 failures in provider/coordinator tests outside this change; each passed 2/2 alone.
 - **13:0x:** the first builder plays #2811 on lamp-4ace at 14:20–14:30. Mobile merged ecm-sds-mobile#39 and will run #2813 on lamp-0c89 once #2887 and #2889 are on a build.
+- **13:1x–14:0x, #2887 and #2889 (#2813), more review:**
+  - reviewer-two's staged control showed a fast-failing task stayed `making`; the settle now runs before the told/offered skip;
+  - reviewer-two took the played app mode out of #2887 (inline Python, Bash 3.2 false PASS); it was rebuilt in #2889 as `lamp-cloud make-skill make|made`, run as `lampos`, with Bash-3.2-safe checks and negative controls;
+  - El and reviewer-two: the app hand-over now finds the one Claude target when the target is the default (none or several refused), keeps a lost confirm as handed, and gives a malformed request id its own reason; seen ids are kept, the newest 100;
+  - El's P1 on #2889: the app arm greets the lamp before waiting for the spoken ask (the news gate needs someone seen or heard).
+  - Heads: #2887 `e98f71880`, #2889 `51b278f86`.
+- **Lesson:** never rebuild a crate's test binary while its full run is going; it broke ~20 subprocess tests and voided that run.
