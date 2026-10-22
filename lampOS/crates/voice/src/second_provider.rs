@@ -174,6 +174,15 @@ pub const KEEP_AFTER_END: Duration = Duration::from_secs(2);
 /// prints came 181–311 ms after they were asked on lamp-52e6 on 21 Oct
 /// (Seventh on Queue #2602, 17:3x). Only such a line pays it.
 pub const JOIN_WAIT: Duration = Duration::from_millis(300);
+/// Functions one chat request of this route may be told of. Live's bound of
+/// [`lamp_gemini::MAX_TOOLS`] (32) is Gemini Live's; the chat models this
+/// route asks take far more (DeepSeek's API up to 128). On lamp-4ace on
+/// 22 Oct the lamp's own 17 actions, its skills' and the voice's own came to
+/// 37, and Live's bound left out the time, the search and the light scenes
+/// from 00:35 on, and the web search too after the look became one of the
+/// core at 15:42: "what's the weather in Hanoi" was answered from the
+/// lamp's own place, with no search (the owner at the lamp, 16:0x).
+pub const MAX_TOOLS: usize = 48;
 /// How often it asks again meanwhile.
 const JOIN_POLL: Duration = Duration::from_millis(25);
 /// How soon after the cut line's end a line must begin to be joined with
