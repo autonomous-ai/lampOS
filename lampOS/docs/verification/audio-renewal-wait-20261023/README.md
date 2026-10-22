@@ -66,7 +66,9 @@ requested-audio runtime. No other crate consumes a changed API.
 
 Both commands select the exact test with `--lib --offline`,
 `-- --exact --nocapture`; their full argument lists and mutated source hashes
-are in `controls.json`. The candidate was restored byte-for-byte before the
+are in `controls.json`. The command arrays split `cargo` and `+1.96.0`
+into separate arguments for direct replay (reviewer-two's receipt P3); raw
+outputs and source hashes are unchanged. The candidate was restored byte-for-byte before the
 full gates.
 
 1. **Old fixture, cache held after Start:** exit **101**, **0 passed / 1 failed**.

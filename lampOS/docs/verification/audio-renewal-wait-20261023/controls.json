@@ -5,7 +5,8 @@
     {
       "control": "base-cache-contention",
       "command": [
-        "cargo +1.96.0",
+        "cargo",
+        "+1.96.0",
         "test",
         "-q",
         "-p",
@@ -26,7 +27,8 @@
     {
       "control": "candidate-renewal-accepted",
       "command": [
-        "cargo +1.96.0",
+        "cargo",
+        "+1.96.0",
         "test",
         "-q",
         "-p",
