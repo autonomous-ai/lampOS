@@ -60,6 +60,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut close_told = false;
     let mut set_up_later = false;
     let mut sign_in_by_code = false;
+    let mut folder_missing = false;
     let mut from_machines = None;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
@@ -76,6 +77,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--close-told" => close_told = true,
             "--set-up-later" => set_up_later = true,
             "--sign-in-by-code" => sign_in_by_code = true,
+            "--folder-missing" => folder_missing = true,
             "--targets-from-machines" => {
                 let engine = args
                     .next()
@@ -178,7 +180,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let stop = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGTERM, stop.clone())?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, stop.clone())?;
-    serve(config, clock, executable, as_person, stop)?;
+    serve(config, clock, executable, as_person, folder_missing, stop)?;
     Ok(())
 }
 

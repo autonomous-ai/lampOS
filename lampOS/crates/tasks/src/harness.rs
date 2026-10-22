@@ -332,6 +332,11 @@ pub struct CliConfig {
     /// lamp-4ace on 2026-10-14). The person's spoken yes to each exact task
     /// is still required either way.
     pub as_person: bool,
+    /// A hand-over Harness refuses for a folder that isn't on the computer
+    /// ends `not_sent` with `folder_missing`, so the voice can say so
+    /// (`serve --folder-missing`, #2840). Off unless set: `uncertain` with
+    /// `new_failed`, as any failed `new`.
+    pub folder_missing: bool,
 }
 
 impl CliConfig {
@@ -346,6 +351,7 @@ impl CliConfig {
                 .collect(),
             cancel: None,
             as_person: false,
+            folder_missing: false,
         }
     }
 }
@@ -527,6 +533,9 @@ impl Cli {
         ]);
         match self.run(&args, self.config.launch_timeout) {
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
+            Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
+                not_sent("folder_missing")
+            }
             Ok(_) => uncertain("new_failed"),
             Err(error) if error.spawned => uncertain(error.code),
             Err(error) => not_sent(error.code),
@@ -1265,6 +1274,25 @@ struct CreatedAgent {
 /// `None` (by `default`).
 fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, D::Error> {
     Value::deserialize(deserializer).map(Some)
+}
+
+/// Whether a failed `new` says the target's folder isn't on the computer
+/// (#2840). Harness refuses that before it makes anything (`CWD_NOT_FOUND`,
+/// openharness `core/agents/create.ts`; `INVALID_CWD` in its own words), so
+/// the task surely did not start. It never makes the folder (lamp-75c9, 22
+/// Oct). Any other failure may have started an agent.
+fn folder_missing(bytes: &[u8]) -> bool {
+    #[derive(Deserialize)]
+    struct Failed {
+        ok: bool,
+        error: String,
+    }
+    serde_json::from_slice::<Failed>(bytes).is_ok_and(|reply| {
+        !reply.ok
+            && (reply.error == "CWD_NOT_FOUND"
+                || reply.error.starts_with("CWD_NOT_FOUND (")
+                || reply.error == "That folder does not exist on the machine.")
+    })
 }
 
 fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
