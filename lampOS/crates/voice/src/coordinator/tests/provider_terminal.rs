@@ -78,7 +78,13 @@ fn run_with_notice_policy(
     let maximum_played = 480
         + notices.capability()["available"]["frames"]
             .as_u64()
-            .unwrap_or(0) as usize;
+            .unwrap_or(0) as usize
+        // The sigh that stands in for a missing line (#2943 part 3).
+        + if notices.capability()["fallback"] == "sigh" {
+            crate::head_cue::breath(notices::FALLBACK_DBFS).len()
+        } else {
+            0
+        };
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut spawn = |role| {
@@ -838,6 +844,25 @@ fn failure_notice_is_absent_for_idle_or_successful_terminal_and_default_stays_si
             .iter()
             .any(|e| e["kind"] == "failure_notice_selected" && e["notice"]["state"] == "skipped")
     );
+    assert_outcome(&trace, "provider_failed");
+}
+
+/// #2943 part 3 (lamp-dbda, 22 Oct: `no_directory` and silence): a failed
+/// answer with the notices folder configured but missing plays the lamp's
+/// own sigh through the real conversation, and the evidence says what it
+/// stood in for; the outcome stays the provider's failure.
+#[test]
+fn a_failed_answer_with_its_line_missing_sighs_rather_than_staying_silent() {
+    let catalog = FailureNotices::missing_with_sigh();
+    let (trace, evidence) = run_with_notices(Case::AwaitingAnswer, &catalog);
+    let sigh = crate::head_cue::breath(notices::FALLBACK_DBFS);
+    assert_eq!(evidence.played.len(), sigh.len());
+    let selected = trace
+        .iter()
+        .find(|e| e["kind"] == "failure_notice_selected")
+        .unwrap();
+    assert_eq!(selected["fallback_for"], "no_directory");
+    assert_eq!(selected["notice"]["kind"], "failure_notice");
     assert_outcome(&trace, "provider_failed");
 }
 

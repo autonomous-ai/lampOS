@@ -249,6 +249,25 @@ files is #2943's part 2. The manifest lists every kind, so it goes only
 onto a voice that knows them all: `wifi_lost` is known from `a441fea06`,
 build 4142 on.
 
+## When a line is missing: the lamp's sigh (#2943)
+
+With `--failure-notice-dir` given and a line that can't be loaded (no
+folder, no manifest, not provisioned, or a file that fails its check), the
+lamp no longer meets a failed answer with silence. Seen on lamp-dbda on
+22 October: 26 lines admitted, every turn `provider_failed`, every notice
+`no_directory`, nothing said. In the missing line's place it plays its own
+sigh, the hand's sleep breath (`head_cue::breath`), at `FALLBACK_DBFS`
+(-26 dBFS, under its speech, not yet tuned by ear). It goes through the same
+selection, permits and cancellation as a recording. That holds for the
+failed turn's line (`turn_lost`), the offline line and the service's line;
+"back online" is never stood in for, since nothing failed. The evidence says
+it: `failure_notice_selected` carries `"fallback_for":"<the missing
+reason>"`, and `failure_notice_capability` carries `"fallback":"sigh"`. With
+no `--failure-notice-dir` nothing stands in, and the lamp stays silent as
+before. The sigh says only that something is wrong, not what. The recorded
+lines, which say why, are still the answer: the product's come from
+`notices-2026-10-20`, and the generic package's are #2943 part 2.
+
 ## Optional same-owner live integration
 
 `lamp-voice directed` and `lamp-voice serve` accept the paired options
