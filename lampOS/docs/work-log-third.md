@@ -5,6 +5,23 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 23:16 — disabled wake-cue review follow-up taken
+
+Ready for lamp-voice: no (new follow-up on `third/wake-cue-off-record`).
+
+- Read the latest builder protocol, all 64 Queue comments since the
+  previous post, and discussion, inline and formal reviews on #3021 and
+  draft #2948. Reviewer-lead carried #3021 as #3065, merged as
+  `17167b1ba`. Its remaining P3 is taken: when no hum is configured, a
+  consumed wake must not leave a refused cue row at conversation exit.
+- Start from `6b8cb6e8f`; local AGENTS.md matches integration. Reproduce
+  the disabled-cue path, keep consuming its marker, and retain a pending
+  cue only when a hum exists. The two-second marker freshness, 1.5 s
+  conversation window and privacy/readiness gates stay unchanged.
+- No gate or lamp result is claimed yet. First owns the coherent #2948
+  carry and Fifth/person its hand trial; #2948 remains draft. Third
+  continues this software correction while those handoffs wait.
+
 ## 2026-10-22 22:18 — wake native gates and peer read passed
 
 Ready for lamp-voice: yes (#3021 qualified source; final current-base carry/merge remains Reviewer-lead's).
