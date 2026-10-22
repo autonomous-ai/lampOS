@@ -663,17 +663,33 @@ the unchanged legacy client, used unless the new Days client is selected.
   mark) is that kept thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
-  `{"remembered":true,"note":"Already kept before this session. Tell them
-  you already knew it."}`, so it doesn't promise to remember it a second
-  time, and says it knew already. With "That was already kept.", a repeat
-  in a new session was said to be known already 1 time in 20 (10 English,
-  10 Vietnamese, the relay's DeepSeek); with this note, 20 in 20. Off, the
+  `{"remembered":true,"note":"Already kept: tell them you already knew
+  it."}`, so it doesn't promise to remember it a second time, and says it
+  knew already. The note names no time it was kept: the store answers
+  `existing` for a repeat in the same session as for one kept in an
+  earlier session. That is in a known person's own scope only. In the
+  room's scope (nobody known by face, `Person::everyone()`) the thing kept
+  already may be another person's room entry, so the model is told
+  `{"remembered":true}`, as for a first keep: a visitor is never told the
+  lamp knew it, nor that someone here said it (#2995's P2). Off, the
   request is as before.
+  Measured on the relay's DeepSeek (deepseek-flash, thinking off), re-run
+  on 22 Oct for #3030, 20 runs of each line, a reply counted when it says
+  the lamp knew or had it already. A new session, the person's own scope:
+  with "That was already kept.", 0 of 20 in English and 0 of 20 in
+  Vietnamese; with this note, 18 of 20 and 12 of 20. The room's scope, a
+  visitor repeating a room entry: with this note, 20 of 20 and 19 of 20;
+  told as a first keep, 0 of 20 and 0 of 20. A repeat in the same session
+  said "before" 0 times with either note (the earlier run).
   Tests: `days_protocol::tests::a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing`,
   `days::tests::a_remember_once_passes_over_a_kept_thing_no_longer_active`,
   `days::tests::a_remember_once_links_its_sources_to_the_kept_thing_it_finds`,
-  `protocol::tests::the_legacy_store_ignores_once` and
-  `remember::tests::with_the_switch_remember_asks_once_and_says_what_was_kept_already`.
+  `protocol::tests::the_legacy_store_ignores_once`,
+  `remember::tests::with_the_switch_remember_asks_once_and_says_what_was_kept_already`,
+  `remember::tests::a_repeat_in_the_same_session_is_told_kept_already_claiming_no_earlier_session`,
+  `remember::tests::a_repeat_in_the_rooms_scope_is_told_as_a_plain_keep`,
+  `remember::tests::a_repeat_in_a_persons_own_scope_is_told_known_already` and
+  `remember::tests::without_the_switch_a_remember_in_either_scope_is_as_before`.
 
 - **A correction replaces a kept thing** (#2510, `LAMP_MEMORY_REPLACES=on`,
   with the Days client only; off unless set; both voice routes).
