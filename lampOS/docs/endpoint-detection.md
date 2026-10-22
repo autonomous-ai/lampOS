@@ -219,6 +219,19 @@ Each `Activity::End` records an `EndpointDecision`:
   (`lamp-turn-end`, `smart-turn-v3.2-gpu.onnx`).
 - The client starts at the beginning of `spawn_rig`, so loading overlaps the
   other workers' startup.
+- Two switches for the night's A/B on lamp-4ace (22 Oct, `switches.md`),
+  read as the policy is built (`coordinator/endpoint.rs`), each today's
+  value unset or `off`, and said once and ignored out of its range:
+  `LAMP_ENDPOINT_UNFINISHED_BELOW` (0.01 to 0.6) is the bar under which a
+  verdict holds the line to the 1.5 s unfinished window
+  (`incomplete_probability`, 0.01 without it), and `LAMP_ENDPOINT_UNSURE_MS`
+  (600 to 1500 ms, in 10 ms steps) the silence an uncertain verdict waits
+  (`uncertain_blocks`, never less than the silence window; the window
+  without it). A confident verdict still ends at the commit. The
+  `endpoint_policy` trace records both (`uncertain_blocks` only when set).
+  Why: in the baseline round that night, of 110 Ends 36 were uncertain at
+  the 600 ms window, 17 of them at p 0.2 or under, and 1 unfinished,
+  while lines split at natural pauses of 0.6 to 1.4 s.
 - Traces:
   - `endpoint_policy`: the policy, worker command and model hash;
   - `endpoint_worker`: each availability change, with the worker report;
