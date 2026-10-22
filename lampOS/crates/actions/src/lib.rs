@@ -72,11 +72,14 @@ impl Outcome {
     /// the answer, seen or heard; the words after it only cost time
     /// (`LAMP_SHORT_DONE`, the first builder on #705, 13:4x). What was
     /// established is still told, and a call not done, or one that changed
-    /// nothing ([`Outcome::Already`]), is said as before.
+    /// nothing ([`Outcome::Already`]), is said as before. The line carries
+    /// the call's own words too ([`short_say`], `"say"`), which the voice's
+    /// second route speaks in place of a further chat round when every call
+    /// of a turn is so answered (#2877).
     pub fn line_for(&self, name: &str, short: bool) -> Value {
         match self {
             Self::Done(said) if short && is_short(name) => {
-                json!({"ok": true, "result": {"result": said, "next": SHORT_NEXT}})
+                json!({"ok": true, "result": {"result": said, "next": SHORT_NEXT, "say": short_say(name)}})
             }
             _ => self.line(),
         }
@@ -95,6 +98,26 @@ pub const SHORT_ENVIRONMENT: &str = "LAMP_SHORT_DONE";
 pub fn is_short(name: &str) -> bool {
     name.starts_with("light_") || (name.starts_with("volume_") && !is_app_call(name))
 }
+
+/// The call's own short line for a change answered short (#2877): a step
+/// is named by its way ("Brighter.", "Quieter."), anything else is
+/// "Done.". At most two words, as the battery's row asks of the reply
+/// after "make it brighter" (#2877).
+pub fn short_say(name: &str) -> &'static str {
+    match name {
+        "light_brighter" => "Brighter.",
+        "light_dimmer" => "Dimmer.",
+        "light_warmer" => "Warmer.",
+        "light_cooler" => "Cooler.",
+        "volume_up" => "Louder.",
+        "volume_down" => "Quieter.",
+        _ => SHORT_DONE_SAY,
+    }
+}
+
+/// [`short_say`] for a change with no way to name: on, off, a colour, mute
+/// and unmute.
+pub const SHORT_DONE_SAY: &str = "Done.";
 
 /// The functions that can be carried out now.
 pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
@@ -328,16 +351,18 @@ mod tests {
     #[test]
     fn only_a_done_light_or_volume_call_is_answered_short_and_only_with_the_switch() {
         let done = Outcome::Done("The light is warm now.".into());
-        let short =
-            json!({"ok": true, "result": {"result": "The light is warm now.", "next": SHORT_NEXT}});
-        for name in [
-            "light_warmer",
-            "light_colour",
-            "light_off",
-            "volume_up",
-            "volume_mute",
+        for (name, say) in [
+            ("light_warmer", "Warmer."),
+            ("light_colour", "Done."),
+            ("light_off", "Done."),
+            ("volume_up", "Louder."),
+            ("volume_down", "Quieter."),
+            ("volume_mute", "Done."),
         ] {
+            let short = json!({"ok": true, "result": {"result": "The light is warm now.", "next": SHORT_NEXT, "say": say}});
             assert_eq!(done.line_for(name, true), short, "{name}");
+            // At most two words (#2877).
+            assert!(say.split_whitespace().count() <= 2, "{name}");
             assert_eq!(done.line_for(name, false), done.line(), "{name}");
         }
         // The app's numbers and anything else are not the light or the

@@ -2664,6 +2664,18 @@ pub fn serve(
         );
     }
     engine = engine.speaking_tags(speech_tags);
+    // A light or volume turn answered with its calls' own line, no further
+    // chat round (`LAMP_SHORT_DONE=on`, #2877).
+    let short_done = std::env::var(crate::second_provider::SHORT_DONE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if short_done {
+        eprintln!(
+            "lamp-voice second: a turn whose every call is a light or volume change answered short is said with the calls' own line, no further round (LAMP_SHORT_DONE)"
+        );
+    }
+    engine = engine.answering_short(short_done);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
