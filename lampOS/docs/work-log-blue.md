@@ -438,3 +438,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - Restored, and released to Nine.
 - **Asked the first builder on #2530:** should lamp-skills count only kept says toward its cap?
 - **07:3x, the first builder's answer:** yes. A dropped say costs nothing, and after a drop that add-on waits 5 minutes. Opened as #2768 (`blue/addon-say-cap`). The hold (`AFTER_A_DROP_US`, 300 s, that add-on only) was folded in at 08:00 (`2ecc994f2`), with a unit test and an e2e check; both fail with the hold taken out.
+- **08:21, reviewer-two on #2768:** P1/P2 none at `2ecc994f2`, and asked for a rebase because `6bb802490` changed `main.rs`. Rebased at 08:3x to `c806ac0f8` on `efff7c4a5` (range-diff `=`). Locally, lamp-skills passes 140 + 22 + 271 and clippy is clean; fresh ARM64 is running.
+- **08:2x, my person's decision:** everything related to mood measurement belongs to Sixth from now on. Blue takes no mood work and points any mood task to Sixth.
