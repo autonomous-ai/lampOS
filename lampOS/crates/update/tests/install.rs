@@ -696,6 +696,32 @@ fn time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set() {
     assert!(voice.contains(&"Environment=LAMP_KERNEL_CLOCK=on"));
 }
 
+/// #2860: the product sees who speaks, the eyes reading each face's speaking
+/// and the voice reading it, so a full update gives one lamp what the
+/// real-face run had.
+#[test]
+fn the_product_sees_who_speaks() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    for (name, line) in [
+        ("lamp-eyes.service", "Environment=LAMP_EYES_SPEAKING=on"),
+        (
+            "lamp-voice.service",
+            "Environment=LAMP_SECOND_SPEAKING_FACE=on",
+        ),
+    ] {
+        assert!(
+            section(unit(name), "Service").contains(&line),
+            "{name} lacks {line}"
+        );
+    }
+}
+
 /// #1176 (Nine and the reviewer): Expression's `--head-touch` only beside
 /// the voice's own head touch and its sleep mute (`LAMP_HEAD_TOUCH=on` and
 /// `--controls-mute`). Without the mute a hand held 3 s puts the face to
