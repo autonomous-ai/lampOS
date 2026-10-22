@@ -384,9 +384,9 @@ pub const OFF_LINE: &str = off_line!();
 pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     (
         "desk-tutor",
-        "it reads handwriting from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), \
-         which the product doesn't run: its look is the working frame, 320 across; and with its \
-         marks its two functions would be 33 of a session's 32",
+        "with its marks its two functions would be 33 of a Live session's 32; the full look it \
+         reads handwriting from (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) is in the \
+         product since #2791's product half",
     ),
     (
         "desk-tutor-marks",

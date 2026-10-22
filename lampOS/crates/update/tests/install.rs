@@ -4027,3 +4027,36 @@ fn the_plans_install_shipped_are_listed() {
     unique.dedup();
     assert_eq!(unique.len(), install::RESET_PLAN_SHIPPED.len());
 }
+
+/// #2791's product half: a product lamp's look is the eyes' full look, so
+/// the voice's full look and the eyes' `--full-look` go on together, with
+/// the same file, and the sight file is encoded from the look's picture.
+#[test]
+fn the_product_full_look_is_on_in_both_units_with_one_file() {
+    let eyes = include_str!("../../../deploy/product/lamp-eyes.service");
+    let voice = include_str!("../../../deploy/product/lamp-voice.service");
+    let exec = eyes
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(
+        exec.contains(
+            " --full-look 1280x960 --full-look-file /run/lampos-eyes/look.jpg --sight-from-look on"
+        ),
+        "{exec}"
+    );
+    assert!(
+        exec.contains(" --sight-file /run/lampos-eyes/sight.jpg "),
+        "{exec}"
+    );
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_LOOK_FULL=on")
+    );
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg")
+    );
+}

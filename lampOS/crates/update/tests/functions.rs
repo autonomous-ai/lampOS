@@ -85,7 +85,7 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
             _ => Vec::new(),
         };
     // A spoken turn's look, as the worker offers it: with a full look and
-    // the eyes' look file (#2905); the product sets neither today.
+    // the eyes' look file (#2905); the product sets both (#2791's product half).
     let look = lamp_voice::sight::full_look_file().is_some()
         && std::env::var_os(lamp_voice::sight::LOOK_ENVIRONMENT).is_some();
     for tool in lamp_voice::second_provider::worker::chat_tools(&settings, &search, look) {
@@ -259,6 +259,12 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
     assert!(
         chat.iter()
             .any(|name| name == lamp_voice::second_provider::net::search::NAME),
+        "{chat:?}"
+    );
+    // The product's full look (#2791's product half): a spoken turn's look.
+    assert!(
+        chat.iter()
+            .any(|name| name == lamp_voice::second_provider::LOOK_CALL),
         "{chat:?}"
     );
     assert_eq!(chat[..declared.len()], declared[..]);

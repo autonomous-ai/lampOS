@@ -194,6 +194,9 @@ Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # and used for the hello when no face is known (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
 Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
+# What the lamp sees, when asked, from the eyes' full look (lamp-eyes --full-look), not the 320 working frame.
+Environment=LAMP_LOOK_FULL=on
+Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg
 # Only the body opens the servo port. Defence in depth, not a mechanical stop.
 InaccessiblePaths=/dev/ttyACM0
 
