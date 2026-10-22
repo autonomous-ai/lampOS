@@ -1,3 +1,44 @@
+## Current checkpoint: 2026-10-22 11:16 +07, current work finished for review
+
+Music #1757 is merged. All five remaining PRs have passed their required
+Mac crate gates, native ARM64 and Linux Clippy checks; the reviewer owns merge.
+
+| PR | Head | Native passed / failed / skipped | Waiting for |
+| --- | --- | --- | --- |
+| #2764 failed-unit reports | `27ab70a2c` | 10,190 / 0 / 63 | First/Reviewer-two final current-base check and merge |
+| #2767 install exit-note drop-ins | `19d1a46d9` | 9,951 / 0 / 63 | First's default-install read and merge |
+| #2871 metadata diagnostics | `db7db7a5f` | 10,189 / 0 / 63 | Reviewer-two's read and merger |
+| #2879 voice-state regression | `4e060a224` | 10,186 / 0 / 63 | Reviewer/First's read and merge |
+| #2885 updater cut recovery | `b0e8bf3b9` | 10,193 / 0 / 63 | First's acceptance-scope read and merge |
+
+Each positive native run also passed 4 doc tests, 12 custom-harness tests
+and relay; each contains one leaky pass. Counts stay bound to their exact
+heads and tested merge commits in the receipts.
+
+- #2764: [fresh Mac rebase and equal range](verification/report-failed-units-rebase-3095487-20261022/README.md)
+  and [current native evidence](verification/report-failed-units-rebase-3095487-native-20261022/README.md).
+  Current local Cloud count is 178/0/1; the upstream capability addition is
+  included. The preceding failed native run and withheld local candidates
+  remain recorded separately. Parent `3095487ad` matched main at the last check.
+- #2879: [positive and negative native evidence](verification/requested-audio-voice-state-native-20261022/README.md).
+  The separate unshown control compiled and failed only the intended
+  “recording prepared” assertion: Resting instead of Thinking. Native
+  6,819 passed / 1 failed / 63 skipped / 3,360 selected tests unrun.
+  Its direct control checkout and the positive integration merge are
+  distinguished. The control has no PR and must never be merged.
+- #2885: [native evidence](verification/updater-cut-recovery-native-20261022/README.md).
+  All six added fixtures passed. Mac Update is 297/0/2; twelve behavioral
+  controls failed as intended and were restored before the positive gate.
+  First must settle #2810's wording: the five entrypoint controls break
+  `current/lamp-update` while retained copies and the fixed fallback remain.
+  The post-refusal prefix is reconstructed. No broader cut claim is made.
+
+The owner requested completion of existing work. No new queue item was
+started. Application worktrees and the separate control are clean. No device
+was touched. Remaining actions are the named people's review and merge.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:56 +07, metadata diagnostics native green
 
 #2871 head `db7db7a5f5c029dd442aa2120f357b5af9149643` is CI-qualified for

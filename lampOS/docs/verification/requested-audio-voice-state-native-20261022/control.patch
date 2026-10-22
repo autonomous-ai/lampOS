@@ -1,0 +1,18 @@
+diff --git a/lampOS/crates/voice/src/coordinator/notices.rs b/lampOS/crates/voice/src/coordinator/notices.rs
+index 7d117be04..94d2e7164 100644
+--- a/lampOS/crates/voice/src/coordinator/notices.rs
++++ b/lampOS/crates/voice/src/coordinator/notices.rs
+@@ -193,7 +193,12 @@ impl SpeechOrigin {
+     pub(super) fn unshown(self) -> bool {
+         matches!(
+             self,
+-            Self::HeadCue | Self::UnclearHum | Self::SleepBreath | Self::WakeHum | Self::SkillSound
++            Self::HeadCue
++                | Self::UnclearHum
++                | Self::SleepBreath
++                | Self::WakeHum
++                | Self::SkillSound
++                | Self::RequestedAudio
+         )
+     }
+     /// The trace's name for what plays.

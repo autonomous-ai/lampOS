@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "issue": "https://github.com/autonomous-ai/lampOS/pull/2764",
+  "current_head": "27ab70a2c6dbf1e4769de767082fc66291a87c8d",
+  "current_parent": "3095487ad6330c89566e7d6db6208dcc882f47e9",
+  "current_publication": "pushed, per captured successful identity receipt",
+  "current_native": {
+    "status": "pending-at-this-checkpoint",
+    "arm64_run": 39720328972,
+    "clippy_run": 39720329001
+  },
+  "integration_context": {
+    "includes_pr_2780": true,
+    "upstream_cloud_change_pr": 2864
+  },
+  "patch_range_diff_equal": true,
+  "own_report_files_byte_identical": {
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68"
+  },
+  "complete_cloud_tree": {
+    "before": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+    "after": "df643415a4ba38a75c584c0a825b54f86cc6d785",
+    "unchanged": false
+  },
+  "recorded_cloud_files": 29,
+  "unchanged_cloud_files": 27,
+  "changed_cloud_files": {
+    "crates/cloud/src/answer.rs": {
+      "before": "e4cfa21c1a9b222298d54e51618d7ecb2746cfeb1da0df422d27f279a9e2c947",
+      "after": "9fb0cbc12d5e35f87658e7932531a55da628dbb860e4cf8cfe6b1b1ee54c1147"
+    },
+    "crates/cloud/src/lamp.rs": {
+      "before": "55abc71e2c9f94a93f48c12d3c72194dca3117517c585a58c39bb60526f4b3ac",
+      "after": "840a55104284aae4537672119e19d07de12b43727c665e101fd2fabfa3860750"
+    }
+  },
+  "added_passing_test": [
+    "answer::tests::system_info_says_each_switchs_kinds_only_while_it_is_on"
+  ],
+  "docs_cloud": {
+    "observation": "Upstream system.info can table row; failed-unit section unchanged",
+    "source": "pre-gate-composition-review.json",
+    "whole_document_unchanged_claimed": false
+  },
+  "pre_gate_review": {
+    "file": "pre-gate-composition-review.json",
+    "sha256": "ab0231f978f12bca55c7e4203a115ac6e537bac72daab5597bdaf425aafb165c",
+    "status_context": "historical review recorded before the fresh gate; its new_gate required/not-yet-run field is superseded by mac-gate.json, not a current pending local gate"
+  },
+  "historical_candidate": {
+    "head": "beb1a412386a69af7687b5c17dfbf6602603afea",
+    "parent": "5c8b03a2eb2f7755262397c46216be2af41b4a95",
+    "status": "successful local gate; push withheld when main advanced",
+    "pushed": false,
+    "native_qualification_claimed": false,
+    "gate": "historical-beb1a412/mac-gate.json"
+  },
+  "prior_public_receipts": {
+    "proof_commit": "f90b1d028ba6cd2a76f4188fc10b18265f94b799",
+    "unpublished_d05_mac": "https://github.com/autonomous-ai/lampOS/blob/f90b1d028ba6cd2a76f4188fc10b18265f94b799/lampOS/docs/verification/report-failed-units-rebase-2d1d3-20261022/README.md",
+    "failed_93d93_native": "https://github.com/autonomous-ai/lampOS/blob/f90b1d028ba6cd2a76f4188fc10b18265f94b799/lampOS/docs/verification/report-failed-units-rebase-fab69-native-failure-20261022/README.md"
+  },
+  "limits": [
+    "Fresh local validation qualifies the integrated Cloud checkout only; exact-head native qualification remains pending.",
+    "Historical unpublished gates and failed native results remain separate; no successful Mac gate erases the prior native failure.",
+    "No full workspace test/build, local ARM64, device, deployment, artifact payload or device-latency evidence is claimed.",
+    "Gate JSON files here are compact normalized records, not byte-exact copies; raw receipt hashes and full before/after map digests bind the retained originals."
+  ]
+}
