@@ -12,7 +12,10 @@ night's rest. Expression settles into its sleeping bow and slow breath, as
 it always has. Its name heard with speech, a touch, a tap on the head, a
 reminder coming due, a conversation, or the first face after 06:00 wakes
 it, as before. Woken at night, it sleeps again after the same fifteen
-minutes. A sound the voice only listens to does not wake it.
+minutes. A sound the voice only listens to does not wake it. With
+`LAMP_REST_THROUGH_SOUNDS=on`, a sound heard as no words does not start the
+fifteen minutes again either: only words, its name, a push, a touch
+or the lamp speaking do.
 
 Turning this skill off is a choice that the lamp not sleep at night: it
 still tells Expression that the night is its own, so Expression does not

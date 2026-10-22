@@ -9,7 +9,15 @@ kind = "core"
 version = "1.0.0"
 
 [permissions]
-topics = ["humans/faces/tracked", "voice/state", "expression/state"]
+topics = [
+    "humans/faces/tracked",
+    "voice/state",
+    "expression/state",
+    "voice/heard",
+    "name/heard",
+    "body/hand",
+    "controls/touch",
+]
 body = true
 # The creature's own: asked of nobody, and its rest is all it does.
 core = ["sleep"]
@@ -31,12 +39,19 @@ from = "23:00"
 to = "06:00"
 
 # The voice resting all those 15 minutes: Expression's nobody-clock began
-# again whenever the voice was not resting.
+# again whenever the voice was not resting. With LAMP_REST_THROUGH_SOUNDS=on
+# (#1672), a sound heard as no words is slept through: the voice listening
+# or thinking does not begin the 15 minutes again. Only words heard, its
+# name heard (even with no words written down), a push, a touch or the
+# lamp's own speech do. A sound with no words, a baby or an alarm too, does not. It still sleeps only while
+# the voice rests.
 [[while]]
 topic = "voice/state"
 field = "state"
 equals = "resting"
 for = "15m"
+through = ["listening", "thinking"]
+broken_by = ["voice/heard", "name/heard", "body/hand", "controls/touch"]
 
 # Awake all those 15 minutes: woken by a reflex, it sleeps again only after
 # nobody for as long, as before.
