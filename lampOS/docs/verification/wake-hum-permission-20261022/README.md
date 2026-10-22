@@ -132,6 +132,62 @@ focused commands above. The synthetic 60/60/62/64 ms timings are unchanged.
 Exact-head native results are reported in the PR and the builder log.
 No ARM64 linking runs on the Mac.
 
+## A disabled cue has no refused decision
+
+Reviewer-lead's final #3021 read found that the wrapper also recorded
+`conversation_ended` when no hum was configured. This is reachable when
+a button clears a saved hand sleep after head touch has been disabled.
+After #3065 merged the original fix, this follow-up consumes the wake
+marker as before but retains pending cue state only when `head_cue`
+exists. The same sound may also be enabled by the unclear or misheard
+hum switches; their existing behavior is preserved. No deadline, privacy
+rule, sound level, product switch or input path changes.
+
+The new real-loop regression starts with head touch and both other hum
+switches off. The actual privacy gate grants permission and the fixture
+produces fresh synthetic capture frames before a physical closure
+scheduled at 100 ms. The loop exits at 104 ms of scenario time, well
+inside the marker's two-second freshness. It checks that the marker was
+consumed, no speaker PCM chunks or provider input requests were sent, and
+no wake-cue decision was recorded. On unchanged `6b8cb6e8f` product code,
+this failed on the false `conversation_ended` row, after all the earlier
+checks passed.
+
+During fixture construction, an initial exact-name invocation matched
+zero tests and was discarded. The first executed version assumed closure
+before 104 ms and failed at that setup assertion; its corrected bound
+checks the relevant two-second marker freshness instead. Neither attempt
+is counted as a passing regression. The actual failing regression above
+and the final gates are separate evidence. No device latency is inferred
+from this scenario-clock test; the existing 500 ms lamp target remains.
+
+With the correction on the same base, formatting passed and the complete
+hand-controls group passed **104 tests, zero failed, three ignored**:
+`CARGO_BUILD_JOBS=2 cargo test -q --offline --locked -p lamp-voice --lib hand_controls -- --test-threads=1 --nocapture`.
+The enabled wake still reports permission, capture, decision and first
+speaker send at 60/60/62/64 ms of scenario time. These are local Mac
+fixtures, not device or acoustic measurements.
+
+The same full twelve-crate test command in Gate above passed on
+`a37144927` plus this follow-up: **6,790 passed, zero failed, 29 ignored**.
+The command exited successfully; its seventy result summaries include the
+crate and documentation test targets. These counts are separate from the
+earlier runs. Strict workspace Clippy on that base failed only at Eyes'
+unused `ask_helper`, fixed upstream by #3071.
+
+After the full test command ended, the clean branch advanced to
+`bad114496`, including that Mac Clippy correction. The four-file follow-up
+patch before and after the base update compares byte for byte equal. The
+new base's setup, cloud and update changes are not claimed as covered by
+the earlier full test run.
+
+On `bad114496` plus the identical correction, formatting, strict workspace
+Clippy and the workspace build all passed using the Gate commands above.
+The complete hand-controls command was repeated on that base: **104
+passed, zero failed, three ignored**, with the same 60/60/62/64 ms enabled
+wake timings. Native Linux results belong to the new PR's exact head;
+no local ARM64 link or device run was performed.
+
 ## Lamp handoff
 
 Fifth owns lamp-52e6 and the hand try, using one coherent build and #2948's
