@@ -268,8 +268,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Eleven keep their folders'
-/// own default: ten enabled, and Bedtime and Morning disabled by its own
+/// `tests/install.rs` holds the two lists equal). Twelve keep their folders'
+/// own default: eleven enabled, and Bedtime and Morning disabled by its own
 /// `enabled = false` until its lamp comparison (#1672); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -295,6 +295,9 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // lamp-52e6 with the lead, 20 Oct 11:35, read it as unwell, not broken.
     "not-feeling-well",
     "prepare-unplug",
+    // The startle (#2822): Expression's glance at a sudden sound, its move
+    // read from this skill's file when Expression starts.
+    "startle",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "watch-you-leave",
@@ -515,6 +518,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.
     skill_file!("prepare-unplug", "skill.toml"),
     skill_file!("prepare-unplug", "SKILL.md"),
+    skill_file!("startle", "skill.toml"),
+    skill_file!("startle", "SKILL.md"),
     // Installed disabled (PRODUCT_SKILLS_OFF).
     skill_file_off!("light-out"),
     skill_file!("light-out", "SKILL.md"),

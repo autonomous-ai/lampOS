@@ -1,5 +1,6 @@
-//! A glance at a sudden sound (`ears/sudden`): optional, head only, once.
-use lamp_expression::{Behaviour, Catalogue, Engine, Input, Keyframe, Output, Trigger};
+//! A glance at a sudden sound (`ears/sudden`): head only, once, its move
+//! read from the startle skill's own file (#2822).
+use lamp_expression::{Behaviour, Catalogue, Engine, Input, Keyframe, Output, Trigger, startle};
 use lamp_msgs::{
     BodyOffsets, ClockStamp, JointState, Light, Room, RoomState, SuddenSound, Voice, VoiceEvent,
     VoiceProgress, VoiceTiming,
@@ -16,7 +17,13 @@ fn pose(head_pitch: f64, head_roll: f64) -> BodyOffsets {
     }
 }
 
+/// The startle as Expression reads it: from its skill's own file (#2822).
 fn glance() -> Behaviour {
+    startle::parse(include_str!("../../../../skills/startle/skill.toml")).unwrap()
+}
+
+/// The glance the catalogues carried before #2822, frame for frame.
+fn catalogues_glance_before() -> Behaviour {
     let frame = |at_us, offsets| Keyframe {
         at_us,
         offsets,
@@ -27,7 +34,7 @@ fn glance() -> Behaviour {
         trigger: Trigger::Sudden,
         weight: 1.0,
         delay_us: 0,
-        cooldown_us: 8_000_000,
+        cooldown_us: 30_000_000,
         stroke_us: 200_000,
         repeat: false,
         hold: false,
@@ -37,7 +44,7 @@ fn glance() -> Behaviour {
         continue_in: vec![],
         keyframes: vec![
             frame(0, BodyOffsets::ZERO),
-            frame(200_000, pose(-0.07, 0.0)),
+            frame(250_000, pose(-0.07, 0.0)),
             frame(800_000, pose(-0.07, 0.03)),
             frame(1_600_000, BodyOffsets::ZERO),
         ],
@@ -45,7 +52,11 @@ fn glance() -> Behaviour {
 }
 
 fn catalogue(with_glance: bool) -> Catalogue {
-    let mut value = Catalogue::from_json(include_str!("../../rest-behaviours.json")).unwrap();
+    catalogue_from(include_str!("../../rest-behaviours.json"), with_glance)
+}
+
+fn catalogue_from(text: &str, with_glance: bool) -> Catalogue {
+    let mut value = Catalogue::from_json(text).unwrap();
     // This is an injected zero lag for planner tests, not a motor measurement.
     value.timing.body_lag_us = Some(0);
     if with_glance {
@@ -63,8 +74,12 @@ struct Lamp {
 
 impl Lamp {
     fn new(with_glance: bool, state: Voice) -> Self {
+        Self::with(catalogue(with_glance), state)
+    }
+
+    fn with(catalogue: Catalogue, state: Voice) -> Self {
         let mut lamp = Self {
-            engine: Engine::new(catalogue(with_glance), true, CLOCK).unwrap(),
+            engine: Engine::new(catalogue, true, CLOCK).unwrap(),
             sequence: 0,
             state,
         };
@@ -180,8 +195,8 @@ fn a_second_sound_inside_the_cooldown_gets_nothing_and_one_after_it_a_glance() {
     assert!(lamp.watch(500_000, 2_200_000).0);
     lamp.sound(4_000_000, true);
     assert!(!lamp.watch(4_000_000, 5_800_000).0);
-    lamp.sound(9_000_000, true);
-    assert!(lamp.watch(9_000_000, 10_800_000).0);
+    lamp.sound(31_000_000, true);
+    assert!(lamp.watch(31_000_000, 32_800_000).0);
 }
 
 #[test]
@@ -202,7 +217,7 @@ fn a_sound_while_the_lamp_thinks_gets_a_glance_as_a_person_would() {
 }
 
 #[test]
-fn without_the_behaviour_in_the_catalogue_nothing_changes() {
+fn without_the_skills_startle_nothing_glances() {
     let mut with = Lamp::new(false, Voice::Resting);
     with.sound(500_000, true);
     let (ran, lifted) = with.watch(500_000, 2_200_000);
@@ -229,17 +244,90 @@ fn a_glance_that_moves_the_body_or_lasts_or_repeats_is_refused() {
 }
 
 #[test]
-fn lamp_4ace_catalogue_is_valid_and_glances_at_a_sound() {
-    let lamp = Catalogue::from_json(include_str!(
-        "../../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"
-    ))
-    .unwrap();
-    let glance = lamp
-        .behaviours
-        .iter()
-        .find(|behaviour| behaviour.trigger == Trigger::Sudden)
-        .expect("lamp-4ace glances at a sudden sound");
-    assert!(glance.cooldown_us >= 30_000_000);
+fn the_startle_skills_file_is_the_glance_the_catalogues_had() {
+    assert_eq!(glance(), catalogues_glance_before());
+}
+
+/// The product's catalogue with the skill's startle glances at a short
+/// sound as the catalogue's own clip did before #2822: the same frames.
+#[test]
+fn the_product_with_the_skills_startle_glances_as_before() {
+    let product = include_str!("../../../../deploy/product/settings/expression.json");
+    let mut before = catalogue_from(product, false);
+    before.behaviours.push(catalogues_glance_before());
+    let mut after = catalogue_from(product, false);
+    after.behaviours.push(
+        startle::read(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../skills/startle/skill.toml"
+        )))
+        .unwrap(),
+    );
+    let run = |catalogue: Catalogue| {
+        let mut lamp = Lamp::with(catalogue, Voice::Resting);
+        lamp.step(1_000_000);
+        lamp.sound(1_000_000, true);
+        (1..=24)
+            .map(|step| {
+                let out = lamp.step(1_000_000 + step * 100_000);
+                (
+                    out.state.behaviours.iter().any(|name| name == GLANCE),
+                    out.body.map(|body| body.offsets),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let (before, after) = (run(before), run(after));
+    assert!(after.iter().any(|(ran, _)| *ran));
+    assert_eq!(before, after);
+}
+
+/// No fallback: a catalogue file's own sudden clip (one written before
+/// #2822 and kept on a lamp) is named and dropped, never played.
+#[test]
+fn a_catalogues_own_sudden_clip_is_never_played() {
+    let mut written: serde_json::Value =
+        serde_json::from_str(include_str!("../../rest-behaviours.json")).unwrap();
+    let behaviours = written["behaviours"].as_array_mut().unwrap();
+    let at = behaviours.len();
+    behaviours.push(serde_json::to_value(catalogues_glance_before()).unwrap());
+    let (read, unread) = Catalogue::from_json_naming(&written.to_string()).unwrap();
+    assert!(
+        read.behaviours
+            .iter()
+            .all(|clip| clip.trigger != Trigger::Sudden)
+    );
+    assert_eq!(
+        unread,
+        [format!("behaviours[{at}] (the startle is its skill's)")]
+    );
+    let mut lamp = Lamp::with(catalogue_from(&written.to_string(), false), Voice::Resting);
+    lamp.sound(500_000, true);
+    let (ran, lifted) = lamp.watch(500_000, 2_200_000);
+    assert!(!ran && lifted.abs() < 1e-9);
+    // And none of the lamp's catalogues carries one any more.
+    for text in [
+        include_str!("../../../../deploy/product/settings/expression.json"),
+        include_str!("../../../../deploy/lamp-4ace/expression-rest-lamp-4ace.json"),
+        include_str!("../../../../deploy/lamp-4ace/expression-alive-lamp-4ace.json"),
+        include_str!("../../../../deploy/lamp-4ace/expression-alive-name-speech-lamp-4ace.json"),
+        include_str!("../../alive-behaviours.json"),
+    ] {
+        assert!(Catalogue::from_json_naming(text).unwrap().1.is_empty());
+    }
+}
+
+/// A skill file without `[startle]`, or with a startle that moves the
+/// body, is no startle.
+#[test]
+fn a_skill_file_without_a_bounded_startle_is_refused() {
+    let file = include_str!("../../../../skills/startle/skill.toml");
+    let cut = file.find("[startle]").unwrap();
+    assert!(startle::parse(&file[..cut]).is_err());
+    assert!(startle::parse(&file.replacen("shoulder = 0.0", "shoulder = 0.1", 2)).is_err());
+    assert!(
+        startle::parse(&file.replace("cooldown_us = 30000000", "cooldown_us = 1000000")).is_err()
+    );
 }
 
 #[test]

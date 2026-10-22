@@ -19,7 +19,8 @@ pub enum Trigger {
     Concentrating,
     Rest,
     /// A short sound rose suddenly out of the room's quiet (`ears/sudden`).
-    /// Optional: a catalogue without such a behaviour does not react.
+    /// Only the startle skill's own clip ([`crate::startle`], #2822): a
+    /// catalogue file's is dropped, and without the skill's none reacts.
     Sudden,
 }
 
@@ -57,6 +58,162 @@ pub struct Behaviour {
 impl Behaviour {
     pub fn duration_us(&self) -> u64 {
         self.keyframes.last().map_or(0, |frame| frame.at_us)
+    }
+
+    /// One clip's own bounds, whichever catalogue or skill file it came
+    /// from: a startle read from its skill's file is held to the same.
+    pub fn check(&self) -> Result<(), Error> {
+        let clip = self;
+        if !(0.0..=1.0).contains(&clip.weight) {
+            return Err(Error(format!(
+                "{}: weight must be finite in 0..1",
+                clip.name
+            )));
+        }
+        if clip.states.is_empty() || clip.states.len() > 4 {
+            return Err(Error(format!(
+                "{}: declare 1..4 allowed voice states",
+                clip.name
+            )));
+        }
+        if clip
+            .states
+            .iter()
+            .enumerate()
+            .any(|(index, value)| clip.states[..index].contains(value))
+        {
+            return Err(Error(format!("{}: voice states must be unique", clip.name)));
+        }
+        if !clip.continue_in.is_empty()
+            && (clip.trigger != Trigger::Pause
+                || clip.states != [Voice::Listening]
+                || clip.continue_in != [Voice::Thinking])
+        {
+            return Err(Error(
+                "only a listening pause nod may continue into Thinking".into(),
+            ));
+        }
+        if clip.trigger != Trigger::Rest
+            && (clip.delay_us > 1_000_000 || clip.cooldown_us > 60_000_000)
+        {
+            return Err(Error(format!("{}: unbounded delay or cooldown", clip.name)));
+        }
+        if clip.keyframes.len() < 2
+            || clip.keyframes.len() > MAX_KEYFRAMES
+            || clip.keyframes[0].at_us != 0
+            || clip.keyframes.windows(2).any(|v| v[0].at_us >= v[1].at_us)
+            || clip.duration_us() > 10_000_000
+            || clip.stroke_us > clip.duration_us()
+            || (clip.repeat && clip.hold)
+        {
+            return Err(Error(format!(
+                "{}: keyframes must begin at zero, increase and last at most 10 seconds",
+                clip.name
+            )));
+        }
+        for frame in &clip.keyframes {
+            frame.offsets.check()?;
+            if !(-1.0..=1.0).contains(&frame.brightness) {
+                return Err(Error(format!(
+                    "{}: brightness must be finite in -1..1",
+                    clip.name
+                )));
+            }
+        }
+        if clip.trigger == Trigger::Pause
+            && (clip.repeat
+                || clip.hold
+                || clip.duration_us()
+                    > if clip.continue_in.is_empty() {
+                        600_000
+                    } else {
+                        2_000_000
+                    }
+                || clip.cooldown_us < 2_000_000)
+        {
+            return Err(Error(
+                "a pause nod needs a 2 s cooldown and at most 600 ms, or 2 s with Thinking continuation".into(),
+            ));
+        }
+        if clip.trigger == Trigger::Rest
+            && (clip.states != [Voice::Resting]
+                || !clip.continue_in.is_empty()
+                || !clip.quiet_only
+                || !clip.stop_when_concentrating
+                || clip.repeat
+                || clip.hold
+                || !(20_000_000..=3_600_000_000).contains(&clip.delay_us)
+                || !(60_000_000..=3_600_000_000).contains(&clip.cooldown_us)
+                || !(2_000_000..=6_000_000).contains(&clip.duration_us())
+                || clip.keyframes.first().unwrap().offsets != BodyOffsets::ZERO
+                || clip.keyframes.last().unwrap().offsets != BodyOffsets::ZERO
+                || clip.keyframes.iter().any(|frame| {
+                    frame.offsets.base_yaw != 0.0
+                        || frame.offsets.shoulder != 0.0
+                        || frame.offsets.elbow != 0.0
+                        || frame.offsets.head_pitch.abs() > 0.06
+                        || frame.offsets.head_roll.abs() > 0.06
+                        || frame.brightness != 0.0
+                })
+                || clip.keyframes.windows(2).any(|pair| {
+                    let seconds = (pair[1].at_us - pair[0].at_us) as f64 / 1_000_000.0;
+                    [
+                        pair[1].offsets.head_pitch - pair[0].offsets.head_pitch,
+                        pair[1].offsets.head_roll - pair[0].offsets.head_roll,
+                    ]
+                    .into_iter()
+                    .any(|delta| {
+                        // Smoothstep's maximum speed is 1.5 * displacement
+                        // / duration; maximum acceleration is 6 * displacement
+                        // / duration squared. A long clip cannot hide a snap.
+                        1.5 * delta.abs() / seconds > 0.06
+                            || 6.0 * delta.abs() / (seconds * seconds) > 0.12
+                    })
+                }))
+        {
+            return Err(Error(
+                "rest needs one slow quiet-only head clip, zero endpoints, 20 s delay and 60 s cooldown or longer".into(),
+            ));
+        }
+        if clip.trigger == Trigger::Sudden
+            && (clip.repeat
+                || clip.hold
+                || clip.states.iter().any(|state| {
+                    !matches!(state, Voice::Resting | Voice::Listening | Voice::Thinking)
+                })
+                || !clip.continue_in.is_empty()
+                || clip.duration_us() > 2_000_000
+                || clip.cooldown_us < 5_000_000
+                || clip.keyframes.first().unwrap().offsets != BodyOffsets::ZERO
+                || clip.keyframes.last().unwrap().offsets != BodyOffsets::ZERO
+                || clip.keyframes.iter().any(|frame| {
+                    frame.offsets.base_yaw != 0.0
+                        || frame.offsets.shoulder != 0.0
+                        || frame.offsets.elbow != 0.0
+                        || frame.brightness != 0.0
+                }))
+        {
+            return Err(Error(
+                "a glance at a sudden sound is one head clip of at most 2 s from and back to rest, never while speaking, with a 5 s cooldown or longer".into(),
+            ));
+        }
+        if clip.repeat && clip.trigger != Trigger::Playout {
+            return Err(Error("only actual playout may repeat a clip".into()));
+        }
+        if clip.trigger == Trigger::Concentrating
+            && (clip.weight != 1.0
+                || clip.delay_us != 0
+                || !clip.hold
+                || clip
+                    .keyframes
+                    .iter()
+                    .any(|f| f.offsets != BodyOffsets::ZERO || f.brightness != 0.0))
+        {
+            return Err(Error(
+                "concentration must hold still immediately with no movement or pulse".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn sample(&self, elapsed_us: u64) -> Option<(BodyOffsets, f32)> {
@@ -232,15 +389,25 @@ impl Catalogue {
         if text.len() > MAX_CATALOGUE_BYTES {
             return Err(Error("catalogue exceeds 128 KiB".into()));
         }
-        let catalogue: Self = serde_json::from_str(text)
+        let mut catalogue: Self = serde_json::from_str(text)
             .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
-        catalogue.check()?;
         let written: serde_json::Value = serde_json::from_str(text)
             .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
         let read = serde_json::to_value(&catalogue)
             .map_err(|error| Error(format!("catalogue JSON: {error}")))?;
         let mut unread = Vec::new();
         unread_paths(&written, &read, "", &mut unread);
+        // The startle is its skill's file's alone (#2822): a sudden clip a
+        // catalogue from before it still carries is named and never played.
+        for (index, clip) in catalogue.behaviours.iter().enumerate() {
+            if clip.trigger == Trigger::Sudden {
+                unread.push(format!("behaviours[{index}] (the startle is its skill's)"));
+            }
+        }
+        catalogue
+            .behaviours
+            .retain(|clip| clip.trigger != Trigger::Sudden);
+        catalogue.check()?;
         Ok((catalogue, unread))
     }
 
@@ -346,157 +513,12 @@ impl Catalogue {
                 ));
             }
             triggers.insert(clip.trigger);
-            if !(0.0..=1.0).contains(&clip.weight) {
-                return Err(Error(format!(
-                    "{}: weight must be finite in 0..1",
-                    clip.name
-                )));
-            }
-            if clip.states.is_empty() || clip.states.len() > 4 {
-                return Err(Error(format!(
-                    "{}: declare 1..4 allowed voice states",
-                    clip.name
-                )));
-            }
-            if clip
-                .states
-                .iter()
-                .enumerate()
-                .any(|(index, value)| clip.states[..index].contains(value))
-            {
-                return Err(Error(format!("{}: voice states must be unique", clip.name)));
-            }
-            if !clip.continue_in.is_empty()
-                && (clip.trigger != Trigger::Pause
-                    || clip.states != [Voice::Listening]
-                    || clip.continue_in != [Voice::Thinking])
-            {
-                return Err(Error(
-                    "only a listening pause nod may continue into Thinking".into(),
-                ));
-            }
-            if clip.trigger != Trigger::Rest
-                && (clip.delay_us > 1_000_000 || clip.cooldown_us > 60_000_000)
-            {
-                return Err(Error(format!("{}: unbounded delay or cooldown", clip.name)));
-            }
-            if clip.keyframes.len() < 2
-                || clip.keyframes.len() > MAX_KEYFRAMES
-                || clip.keyframes[0].at_us != 0
-                || clip.keyframes.windows(2).any(|v| v[0].at_us >= v[1].at_us)
-                || clip.duration_us() > 10_000_000
-                || clip.stroke_us > clip.duration_us()
-                || (clip.repeat && clip.hold)
-            {
-                return Err(Error(format!(
-                    "{}: keyframes must begin at zero, increase and last at most 10 seconds",
-                    clip.name
-                )));
-            }
-            for frame in &clip.keyframes {
-                frame.offsets.check()?;
-                if !(-1.0..=1.0).contains(&frame.brightness) {
-                    return Err(Error(format!(
-                        "{}: brightness must be finite in -1..1",
-                        clip.name
-                    )));
-                }
-            }
-            if clip.trigger == Trigger::Pause
-                && (clip.repeat
-                    || clip.hold
-                    || clip.duration_us()
-                        > if clip.continue_in.is_empty() {
-                            600_000
-                        } else {
-                            2_000_000
-                        }
-                    || clip.cooldown_us < 2_000_000)
-            {
-                return Err(Error(
-                    "a pause nod needs a 2 s cooldown and at most 600 ms, or 2 s with Thinking continuation".into(),
-                ));
-            }
+            clip.check()?;
             if clip.trigger == Trigger::Rest {
                 rest_clips += 1;
-                if rest_clips > 1
-                    || clip.states != [Voice::Resting]
-                    || !clip.continue_in.is_empty()
-                    || !clip.quiet_only
-                    || !clip.stop_when_concentrating
-                    || clip.repeat
-                    || clip.hold
-                    || !(20_000_000..=3_600_000_000).contains(&clip.delay_us)
-                    || !(60_000_000..=3_600_000_000).contains(&clip.cooldown_us)
-                    || !(2_000_000..=6_000_000).contains(&clip.duration_us())
-                    || clip.keyframes.first().unwrap().offsets != BodyOffsets::ZERO
-                    || clip.keyframes.last().unwrap().offsets != BodyOffsets::ZERO
-                    || clip.keyframes.iter().any(|frame| {
-                        frame.offsets.base_yaw != 0.0
-                            || frame.offsets.shoulder != 0.0
-                            || frame.offsets.elbow != 0.0
-                            || frame.offsets.head_pitch.abs() > 0.06
-                            || frame.offsets.head_roll.abs() > 0.06
-                            || frame.brightness != 0.0
-                    })
-                    || clip.keyframes.windows(2).any(|pair| {
-                        let seconds = (pair[1].at_us - pair[0].at_us) as f64 / 1_000_000.0;
-                        [
-                            pair[1].offsets.head_pitch - pair[0].offsets.head_pitch,
-                            pair[1].offsets.head_roll - pair[0].offsets.head_roll,
-                        ]
-                        .into_iter()
-                        .any(|delta| {
-                            // Smoothstep's maximum speed is 1.5 * displacement
-                            // / duration; maximum acceleration is 6 * displacement
-                            // / duration squared. A long clip cannot hide a snap.
-                            1.5 * delta.abs() / seconds > 0.06
-                                || 6.0 * delta.abs() / (seconds * seconds) > 0.12
-                        })
-                    })
-                {
-                    return Err(Error(
-                        "rest needs one slow quiet-only head clip, zero endpoints, 20 s delay and 60 s cooldown or longer".into(),
-                    ));
+                if rest_clips > 1 {
+                    return Err(Error("a catalogue has at most one rest clip".into()));
                 }
-            }
-            if clip.trigger == Trigger::Sudden
-                && (clip.repeat
-                    || clip.hold
-                    || clip.states.iter().any(|state| {
-                        !matches!(state, Voice::Resting | Voice::Listening | Voice::Thinking)
-                    })
-                    || !clip.continue_in.is_empty()
-                    || clip.duration_us() > 2_000_000
-                    || clip.cooldown_us < 5_000_000
-                    || clip.keyframes.first().unwrap().offsets != BodyOffsets::ZERO
-                    || clip.keyframes.last().unwrap().offsets != BodyOffsets::ZERO
-                    || clip.keyframes.iter().any(|frame| {
-                        frame.offsets.base_yaw != 0.0
-                            || frame.offsets.shoulder != 0.0
-                            || frame.offsets.elbow != 0.0
-                            || frame.brightness != 0.0
-                    }))
-            {
-                return Err(Error(
-                    "a glance at a sudden sound is one head clip of at most 2 s from and back to rest, never while speaking, with a 5 s cooldown or longer".into(),
-                ));
-            }
-            if clip.repeat && clip.trigger != Trigger::Playout {
-                return Err(Error("only actual playout may repeat a clip".into()));
-            }
-            if clip.trigger == Trigger::Concentrating
-                && (clip.weight != 1.0
-                    || clip.delay_us != 0
-                    || !clip.hold
-                    || clip
-                        .keyframes
-                        .iter()
-                        .any(|f| f.offsets != BodyOffsets::ZERO || f.brightness != 0.0))
-            {
-                return Err(Error(
-                    "concentration must hold still immediately with no movement or pulse".into(),
-                ));
             }
         }
         if let Some(alive) = &self.alive {

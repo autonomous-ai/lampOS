@@ -16,6 +16,8 @@ lamp-body = { path = "../body" }
 base64 = "0.22"
 # Local time across daylight saving (#820).
 lamp-local-time = { path = "../local-time" }
+# The startle skill's file (`src/startle.rs`, #2822), read as lamp-skills reads it.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [dev-dependencies]
 jiff = "0.2"

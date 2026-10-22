@@ -357,6 +357,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "prepare-unplug",
             "reminders",
             "smoky-air",
+            "startle",
             "stretch-break",
             "stuffy-air",
             "task-news",
@@ -11165,6 +11166,52 @@ fn unplug_operation_is_the_core_grant_not_the_skill_name() {
         ))
         .unwrap_err();
         assert!(why.contains("[permissions] core"), "{why}");
+    }
+}
+
+/// The startle (#2822): its move is its own `[startle]`, only with the
+/// `startle` grant, held to Expression's check, and it is Expression's
+/// reflex, so the skill has no trigger, tool or steps of its own.
+#[test]
+fn the_startle_is_its_granted_skills_move_and_nothing_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&repo_skill_with(
+        dir.path(),
+        "startle",
+        "version",
+        "version",
+    ))
+    .unwrap();
+    assert!(skill.tool.is_none());
+    for (case, from, to, why) in [
+        (
+            "no-grant",
+            "core = [\"startle\"]",
+            "",
+            "[startle] belongs only",
+        ),
+        ("no-move", "\n[startle]\n", "\n[unknown]\n", "skill.toml"),
+        (
+            "moves-the-body",
+            "shoulder = 0.0",
+            "shoulder = 0.1",
+            "head clip",
+        ),
+        (
+            "an-ask",
+            "\n[startle]\n",
+            "\n[ask]\npolicy = \"nudge\"\n\n[startle]\n",
+            "Expression's reflex",
+        ),
+    ] {
+        let error = load(&repo_skill_with(
+            &dir.path().join(case),
+            "startle",
+            from,
+            to,
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{case}: {error}");
     }
 }
 

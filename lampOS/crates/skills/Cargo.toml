@@ -30,6 +30,10 @@ lamp-body = { path = "../body" }
 # The voice's own check of a skill's sound (`lamp_voice::say::read_sound`),
 # so that what loads is what the voice plays.
 lamp-voice = { path = "../voice" }
+# The startle's `[startle]` (#2822), held to Expression's own check, so that
+# what loads is what Expression plays. Night sleep's replay
+# (`tests/it/night_sleep.rs`, #940) tests against its planner too.
+lamp-expression = { path = "../expression" }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 # A skill's package for the Skills Store (src/package.rs): a tar of its
 # folder and a manifest of each file's SHA-256, checked on install.
@@ -55,9 +59,6 @@ rustix = { version = "=1.1.5", features = ["pipe", "fs", "event", "net", "proces
 [dev-dependencies]
 tempfile = "3"
 hound.workspace = true
-# Night sleep's replay through both routes (`tests/it/night_sleep.rs`, #940):
-# Expression's planner, tested against, never linked.
-lamp-expression = { path = "../expression" }
 
 [lints]
 workspace = true

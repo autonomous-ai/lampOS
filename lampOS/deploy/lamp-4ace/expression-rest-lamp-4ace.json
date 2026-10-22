@@ -366,69 +366,6 @@
           "brightness": 0.0
         }
       ]
-    },
-    {
-      "name": "glance at a sound",
-      "trigger": "sudden",
-      "weight": 1.0,
-      "delay_us": 0,
-      "cooldown_us": 30000000,
-      "stroke_us": 200000,
-      "repeat": false,
-      "hold": false,
-      "quiet_only": false,
-      "stop_when_concentrating": true,
-      "states": [
-        "resting",
-        "listening",
-        "thinking"
-      ],
-      "keyframes": [
-        {
-          "at_us": 0,
-          "offsets": {
-            "base_yaw": 0.0,
-            "shoulder": 0.0,
-            "elbow": 0.0,
-            "head_roll": 0.0,
-            "head_pitch": 0.0
-          },
-          "brightness": 0.0
-        },
-        {
-          "at_us": 250000,
-          "offsets": {
-            "base_yaw": 0.0,
-            "shoulder": 0.0,
-            "elbow": 0.0,
-            "head_roll": 0.0,
-            "head_pitch": -0.07
-          },
-          "brightness": 0.0
-        },
-        {
-          "at_us": 800000,
-          "offsets": {
-            "base_yaw": 0.0,
-            "shoulder": 0.0,
-            "elbow": 0.0,
-            "head_roll": 0.03,
-            "head_pitch": -0.07
-          },
-          "brightness": 0.0
-        },
-        {
-          "at_us": 1600000,
-          "offsets": {
-            "base_yaw": 0.0,
-            "shoulder": 0.0,
-            "elbow": 0.0,
-            "head_roll": 0.0,
-            "head_pitch": 0.0
-          },
-          "brightness": 0.0
-        }
-      ]
     }
   ],
   "resumable_voice": true
