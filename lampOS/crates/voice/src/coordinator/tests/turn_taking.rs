@@ -2149,6 +2149,132 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
     assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::AsBefore);
 }
 
+/// `LAMP_OWN_LINE_OVER_TALK` (#2602's design): while a line the lamp
+/// started on its own is sounding, talk over it in a room busy as the line
+/// began is let go (`busy_room`), unless the lamp's name, a stop word or a
+/// face turned to the lamp is in it. A room that wasn't busy (or the switch
+/// off: `busy` is false either way), an answer to a person, and a line that
+/// hasn't sounded yet are as before.
+#[test]
+fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
+    let mut h = Harness::new(TurnTaking::Duplex);
+    let trigger = h.base + 300_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: trigger - 60_000,
+        decision_deadline_us: trigger + 1_200_000,
+    };
+    let (ticket, _answered) = crate::say::ticket_for_test("stretch");
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = Some(ticket);
+        reply.had_audio = true;
+    }
+    let busy = OwnLineWait {
+        heard: true,
+        busy: true,
+        ..OwnLineWait::default()
+    };
+    let in_it = Some(trigger - crate::activity::CALL_BEFORE_US);
+    let table = [
+        (
+            "busy, no name, no face",
+            busy,
+            WhileOwnLineWaits::LetGo("busy_room"),
+        ),
+        (
+            "with LAMP_OWN_LINE_KEEPS too",
+            OwnLineWait { on: true, ..busy },
+            WhileOwnLineWaits::LetGo("busy_room"),
+        ),
+        (
+            "the lamp's name",
+            OwnLineWait {
+                name_began_us: in_it,
+                ..busy
+            },
+            WhileOwnLineWaits::AsBefore,
+        ),
+        (
+            "a name heard before it",
+            OwnLineWait {
+                name_began_us: Some(trigger - crate::activity::CALL_BEFORE_US - 1),
+                ..busy
+            },
+            WhileOwnLineWaits::LetGo("busy_room"),
+        ),
+        (
+            "a face turned to the lamp",
+            OwnLineWait {
+                theirs: true,
+                ..busy
+            },
+            WhileOwnLineWaits::AsBefore,
+        ),
+        (
+            "a stop word",
+            OwnLineWait {
+                stop_began_us: in_it,
+                ..busy
+            },
+            WhileOwnLineWaits::AsBefore,
+        ),
+        (
+            "a room not busy, or the switch off",
+            OwnLineWait {
+                busy: false,
+                ..busy
+            },
+            WhileOwnLineWaits::AsBefore,
+        ),
+        (
+            "heard without echo evidence",
+            OwnLineWait {
+                heard: false,
+                ..busy
+            },
+            WhileOwnLineWaits::AsBefore,
+        ),
+    ];
+    for (case, wait, then) in table {
+        assert_eq!(
+            while_own_line_waits(wait, h.reply.as_ref(), &candidate, trigger),
+            then,
+            "{case}"
+        );
+    }
+    // Not yet sounding: only `LAMP_OWN_LINE_KEEPS` waits, as before.
+    h.reply.as_mut().unwrap().had_audio = false;
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+    assert_eq!(
+        while_own_line_waits(
+            OwnLineWait { on: true, ..busy },
+            h.reply.as_ref(),
+            &candidate,
+            trigger
+        ),
+        WhileOwnLineWaits::Wait
+    );
+    // An answer to a person's words keeps today's rules.
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.had_audio = true;
+        reply.input_sequence = 1;
+    }
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+}
+
 /// #2602 (lamp-06c1, 22:21:49 on 21 Oct, `LAMP_OWN_LINE_KEEPS=on`): a
 /// sound let go at its deadline while the lamp's own hello waited stays
 /// that sound while it goes on. The played room talk was let go at +2.144 s,
