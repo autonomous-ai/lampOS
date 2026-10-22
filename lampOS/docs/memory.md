@@ -465,7 +465,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   the reviewer's P3 1 on #2340). Without that, the engine knows only the
   face at the lamp, not who spoke, so anyone in the room could say the
   yes. With `LAMP_EYES_SPEAKING=on` in the voice's unit as well as the
-  eyes' (and the bus and the eyes' known file), the voice reads the eyes'
+  eyes' (the product's units pin both, #3038; and the bus and the eyes' known file), the voice reads the eyes'
   faces on its own thread ([`speaking_faces`](../crates/voice/src/speaking_faces.rs),
   as `LAMP_SECOND_SPEAKING_FACE` does). The yes runs the call only when,
   over the yes line's own sound, from its start to its end, the held
@@ -1452,11 +1452,17 @@ then use that person's scope:
   name, and on lamp-c0a4 its guess matched nobody. A line naming nobody
   whose line it is sends nothing. A room's line (no known person's) sends
   nothing for a named person either, unless it is that person's own: the
-  eyes judged speaking through it (`LAMP_EYES_SPEAKING=on`), the known
-  file, as fresh when the line was heard, named that same person, and
-  their face was the only one seen saying it (read at the line's end with
-  its words, `speaking_faces::LineSeen`, and only for a line whose words
-  ask to forget). Then they are asked for under the eyes' name; else, with
+  eyes judged speaking through it (`LAMP_EYES_SPEAKING=on` in the voice's
+  own unit as well as the eyes': without it the voice never reads it and
+  every room's forget is `NOT_THEIRS`; the product's `lamp-voice.service`
+  pins it, #3038), the known file, as fresh when the line was heard,
+  named that same person, and their face was the only one seen saying it
+  (read at the line's end with its words, `speaking_faces::LineSeen`, and
+  only for a line whose words ask to forget; each id with the eyes' boot,
+  so a passing id reused after the eyes start again is not theirs,
+  #3037). The second route only: Live (`LAMP_VOICE_ROUTE=gemini`) never
+  records who was seen saying a line, so there a room's forget is always
+  refused. Then they are asked for under the eyes' name; else, with
   someone else's face speaking while they sit nearest, no face read
   speaking, a line not judged or a stale known file, the model hears
   `NOT_THEIRS` and the eyes are never asked (the first builder on #2602,

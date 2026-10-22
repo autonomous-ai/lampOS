@@ -846,10 +846,18 @@ this room" until someone asks to be recognised.
     eyes keep, read from the known file, never the model's guess, and never
     for anyone else's face (voice-side, `known_faces::forget_name`). A
     room's line (no known person's) sends a forget only when it is that
-    person's own: the eyes judged speaking through it (`LAMP_EYES_SPEAKING=on`),
+    person's own: the eyes judged speaking through it (`LAMP_EYES_SPEAKING=on`,
+    which the voice needs in its own unit too: without it every room's
+    forget is refused; the product's `lamp-voice.service` pins it, #3038),
     the known file, fresh when the line was heard, named the person the
     model asked for, and their face (`known-face`, beside it) was the only
-    one seen saying it. A visitor or a screen saying it while they sit
+    one seen saying it. The ids are compared with the eyes' boot: the
+    speaking faces' with the boot their frames came under, and
+    `known-face`'s, which holds the bare id, with the newest boot the voice
+    read a frame of before the file was written (or up to 250 ms after), so after
+    the eyes start again a still-fresh file names none of the new faces
+    (#3037). The second route only: Live never records who was seen saying
+    a line, so there a room's forget is always refused. A visitor or a screen saying it while they sit
     nearest, two faces speaking, no face read speaking, a line not judged,
     or a known file stale when it was heard sends nothing, and the model
     hears that only the asker's face, seen at the lamp, can be forgotten

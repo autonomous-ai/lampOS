@@ -1876,6 +1876,14 @@ mod tests {
             "a forget not said by that face reached the eyes"
         );
         seen(request + 1, "f1");
+        // Each call reads its own request's line, not the newest: the
+        // first line is still another face's (El on #3038).
+        let (_, (told, _)) = run_call(&route, &call, request, true);
+        assert_eq!(told["error"], crate::known_faces::NOT_THEIRS);
+        assert!(
+            listener.accept().is_err(),
+            "a call read a later request's line"
+        );
         let asking = std::thread::spawn(move || run_call(&route, &call, request + 1, true));
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         let reached = loop {

@@ -3209,13 +3209,14 @@ async fn spoken(
             .is_ok_and(|hold| hold.held.is_some());
         let asks = crate::remember::asks_to_forget(&text);
         if held || asks {
-            let speakers = eyes.speakers(begun, finishing);
-            let known = known.clone();
-            let pair =
-                tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
-                    .await
-                    .ok()
-                    .flatten();
+            // Each id with the eyes' boot, the known face's too: after the
+            // eyes start again a passing id names someone else (#3037).
+            let speakers = eyes.speakers_with_boot(begun, finishing);
+            let (eyes, known) = (eyes.clone(), known.clone());
+            let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
+                .await
+                .ok()
+                .flatten();
             if asks {
                 crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
                     request,
