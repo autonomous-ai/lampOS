@@ -86,8 +86,8 @@ those two changes is claimed. Neither trial injected voice or health traffic.
   one-second quiet-wait deadline and watch duration; production 45-second
   quiet admission and 60-second health behavior were not tested here.
 - There was no cross-version compatibility or updater-level climb.
-- The updater was not killed in these two scenarios. Its fixed-path `back`
-  CLI was not invoked; that needs a separate disposable-container test.
+- Those two scenarios do not kill the updater. The separate fixed-root
+  test below exercises actual updater SIGKILL and the fixed-path `back` CLI.
 - No physical power interruption, kernel-cache loss, flash durability,
   real signing key, internet publication or attended-device acceptance is shown.
 
@@ -98,3 +98,35 @@ release and attended Body run. No device connection or deployment occurred.
 The measuring code remains in scratch outside lampOS. These files publish
 normalized evidence and source/log hashes only: no Python, binaries, raw
 logs, private keys or personal host paths. `SHA256SUMS` binds this proof.
+
+## Actual updater SIGKILL and fixed fallback
+
+[fixed-back.json](fixed-back.json) adds one scenario using the verified
+replacement artifact: **0.340 s case / 0.348 s overall**, passed. A new
+network-disabled, disposable container supplied the fixed paths the real
+`back` CLI uses. The runner required explicit opt-in, Linux ARM64, root
+inside Podman, absent lamp paths and no separate mounts over their parents.
+No host `/opt`, `/var` or `/etc` directory was mounted or modified.
+
+The real old CLI again wrote the records and switched to its candidate.
+At the verified second exec, before candidate main, the parent checked
+the actual pending/current/state prefix and killed its owned target.
+It required and reaped **target exit -9** before recovery. The observer
+drained the killed tracee and exited 0; this was not observer-death release.
+
+The actual verified ELF at `/usr/local/lib/lampos/lamp-update-back` then
+ran `back` and exited 0. The fixture reported the updater inactive. Back
+selected the old hash, refused the candidate exactly once and removed
+pending, preserving the installed sequence-2 state bytes. A **directly
+invoked** old updater round then exited 0 with `up to date: build 2`;
+old selection, refusal bytes and installed state remained unchanged.
+The killed candidate never confirmed. Old, new and fixed fallback
+executable hashes/modes remained intact.
+
+The four exact simulated systemctl calls were: recovery-readiness query,
+inactive-updater query, `reset-failed`, and nonblocking `restart`.
+No service actually restarted; the old next round was invoked separately.
+There was no deadline expiry, timer, reboot or physical power loss.
+All owned children were reaped without cleanup kills; private fixture keys
+were removed. No warnings occurred. The independent audit found no P1/P2
+within this scope. Container and owned rehearsal VM are stopped.

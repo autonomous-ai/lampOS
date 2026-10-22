@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-22 22:03 +07, actual target kill and fixed fallback shown
+
+Ready for lamp-voice: no — seventh-head native checks pending
+
+Kind: tests/docs only. #3012 head `97ca7b322` is pushed on `b722fd212`,
+confirmed latest at push. Its unchanged authored patch is rebased over an
+upstream Update installer change. Fresh local fmt, strict Update Clippy and
+Update tests passed: **307 passed / 0 failed / 3 ignored / 0 filtered**.
+ARM64 39800605261 and Clippy39800605346 are watched to completion.
+
+[Actual CLI proof](verification/updater-cli-exec-20261022/README.md)
+now includes real target SIGKILL at candidate exec, reaped as signal9,
+actual fixed-fallback `back` exit0, old selection/refusal/pending cleanup,
+and a direct old next round exit0 at sequence2. The killed candidate never
+confirmed; state and executable identities stayed intact. Four exact systemctl
+calls are simulated, so this does not show a real service restart or timer.
+The independent audit found no P1/P2 within that scope. No warnings occurred;
+older fixture warnings remain published separately. Owned container/VM stopped.
+
+This proof uses the independently verified earlier d4 ARM64 artifact. It
+adds no current-head native, physical-power-loss, flash, Body or real-release
+claim. The attended #2810 unplug still needs First's lamp/person/window and
+persistent trial setup. #1812 follows with owner/key/publication inputs.
+Queue and PR remain the coordination route; no device or real-key action.
+
+---
+
 ## Current checkpoint: 2026-10-22 21:56 +07, real CLI handover shown; next integration gate running
 
 Ready for lamp-voice: no — replacement latest-base qualification pending
