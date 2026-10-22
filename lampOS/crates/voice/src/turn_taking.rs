@@ -263,6 +263,8 @@ struct Duplex {
     onset: YieldEvidence,
     /// The window of the yield in force, or of the last one.
     window: YieldEvidence,
+    /// See [`PlaybackMask::room_talk`].
+    room_talk: bool,
 }
 
 impl Duplex {
@@ -356,6 +358,7 @@ impl PlaybackMask {
                 matched: 0,
                 listened_at_us: 0,
                 keeps_listening: false,
+                room_talk: false,
                 over_run: 0,
                 counts_real: false,
                 onset: YieldEvidence::default(),
@@ -415,6 +418,18 @@ impl PlaybackMask {
     pub fn count_real_cut_ins(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.counts_real = true;
+        }
+    }
+    /// `LAMP_OWN_LINE_OVER_TALK=on` (#2602): the lamp's own line is sounding
+    /// in a room busy as it began, so talk over it is the room's and makes it
+    /// yield no more: withheld, its audio left the speaker playing zeros, a
+    /// playback gap. The talk is still heard as a person's and judged as a
+    /// candidate (the lamp's name, a face turned to it), and a stop heard by
+    /// its own listener still yields. Set for every block; a yield already
+    /// in force runs on.
+    pub fn room_talk(&mut self, on: bool) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.room_talk = on;
         }
     }
     /// Remember enough hearing for a yield's first words (#828): every
@@ -572,8 +587,10 @@ impl PlaybackMask {
             && duplex.over_run > KEEPS_TRYING_BLOCKS;
         // A reply that keeps yielding to nothing stops yielding.
         // A stop heard by its own listener yields however many did not.
-        let may_yield =
-            speaking && (!fallen || keeps_trying || duplex.interruption.force_pending());
+        // Nor does the lamp's own line yield to a busy room's talk.
+        let may_yield = speaking
+            && (duplex.interruption.force_pending()
+                || !duplex.room_talk && (!fallen || keeps_trying));
         let plain = duplex.hearing.plain(heard, evidence);
         let was_yielded = duplex.interruption.yielded();
         let step = duplex.interruption.observe(heard, plain, may_yield);
