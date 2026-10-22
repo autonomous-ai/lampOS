@@ -1368,8 +1368,18 @@ then use that person's scope:
   now goes on, when the lamp has a memory: what they ask to keep and say is
   theirs, and what recall marks "theirs" they told it themselves, so with
   them it may say "you told me" about that and never about the rest.
-- **"Forget my face"** forgets the face only: what they said stays theirs.
-  Forgetting everything (`forget_all`) is as before.
+- **"Forget my face"** forgets the face only: what they said stays theirs,
+  unless `LAMP_MEMORY_FORGET_ALL=on` (#2850). Then, on a line whose admitted
+  scope is the known person's, once the eyes answer that their face is
+  forgotten, the voice runs their own `forget_everything` (`forget_all` in
+  their scope, their rules too, never the room's; `remember::forget_face_memory`)
+  and the model hears `memory: "forgotten too"`, or that it could not be done
+  now. The face asked for is the known person's at the lamp, under the name
+  the eyes keep (their known file), whatever name the model wrote: on the
+  second route without `LAMP_SECOND_FACE_NAME` the model is never told the
+  name, and on lamp-c0a4 its guess matched nobody. A line naming nobody
+  whose line it is sends nothing; a room's line sends the model's name, as
+  before. Forgetting everything (`forget_all`) is as before.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`

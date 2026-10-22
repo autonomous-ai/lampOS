@@ -1427,6 +1427,14 @@ fn run_call_with_scope(
                 crate::follows_face::forgot();
             }
             let told = crate::known_faces::run_for(socket, call, *switches, person);
+            // "Forget my face" by the known person whose line it is: their
+            // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).
+            let told = match lease {
+                Some(lease) if call.name == crate::known_faces::FORGET && person.is_some() => {
+                    crate::remember::forget_face_memory(told, lease, deadline)
+                }
+                _ => told,
+            };
             // A face saved in a line of the room's: the caller's own lines
             // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
             if call.name == crate::known_faces::REMEMBER

@@ -340,6 +340,59 @@ pub fn forget_all_on() -> bool {
     FORGET_ALL.get() == Some(&true)
 }
 
+/// "Forget my face", and everything it came from (#2850, the
+/// `LAMP_MEMORY_FORGET_ALL` row): once the eyes forgot the face of the
+/// known person whose line it is (`told`, as the model hears it, `ok`),
+/// their own memory goes too, as their `forget_everything` would empty it,
+/// in their scope alone, never the room's. Off, with no Days memory, or on
+/// a line of the room's, `told` is as it was.
+pub fn forget_face_memory(
+    told: (Value, bool),
+    lease: &crate::memory_scope::ScopeLease,
+    deadline: Duration,
+) -> (Value, bool) {
+    let theirs = lease.scope().is_some_and(|scope| scope.person().is_some());
+    if !forget_all_on() || !theirs || told.0["ok"] != true {
+        return told;
+    }
+    let Some(socket) = DAYS
+        .get()
+        .and_then(Option::as_ref)
+        .map(|client| client.socket.clone())
+    else {
+        return told;
+    };
+    let call = ToolCall {
+        id: String::new(),
+        name: FORGET_EVERYTHING.into(),
+        args: json!({}),
+    };
+    let (memory, _) = run_scoped(&socket, &call, deadline, lease);
+    (face_and_memory(told.0, &memory), told.1)
+}
+
+/// What the model hears for a face forgotten (`face`) and the person's
+/// memory's answer to being emptied (`memory`) ([`forget_face_memory`]).
+/// Nothing kept of them is forgotten too; a failure is said, and the journal
+/// says so without a name.
+pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
+    let emptied =
+        memory["forgotten"] == true || memory["note"] == json!("I was keeping nothing of them.");
+    if emptied {
+        face["memory"] = json!("forgotten too");
+    } else {
+        eprintln!(
+            "lamp-voice: a face was forgotten, but its person's memory could not be emptied now"
+        );
+        face["memory"] = json!(FACE_MEMORY_KEPT);
+    }
+    face
+}
+
+/// What the model is told when the face went but the person's memory
+/// couldn't be emptied ([`face_and_memory`]).
+pub const FACE_MEMORY_KEPT: &str = "Their face is forgotten, but what they told you could not be forgotten just now. Tell them so; they can ask you to forget everything.";
+
 /// Set it once for this process, as [`start`] does from the environment;
 /// the first setting stands. For a caller that runs the Days client itself.
 pub fn switch_forget_all(on: bool) -> bool {
@@ -5571,6 +5624,33 @@ mod tests {
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
     };
+
+    /// #2850: "forget my face" with its person's memory emptied says so;
+    /// one with nothing kept of them is as good; a memory that couldn't be
+    /// emptied is said, the face's own answer and its note kept.
+    #[test]
+    fn a_face_forgotten_with_its_memory_says_which_went() {
+        let face = json!({"ok": true, "note": crate::known_faces::FORGOTTEN_SOME_KEPT_APART});
+        for memory in [
+            json!({"forgotten": true, "everything": true}),
+            json!({"forgotten": false, "note": "I was keeping nothing of them."}),
+        ] {
+            let told = face_and_memory(face.clone(), &memory);
+            assert_eq!(told["memory"], "forgotten too", "{memory}");
+            assert_eq!(told["note"], face["note"]);
+        }
+        for memory in [
+            gone(),
+            json!({"forgotten": false, "note": "I can forget everything only for someone I know by face"}),
+        ] {
+            let told = face_and_memory(json!({"ok": true}), &memory);
+            assert_eq!(
+                told,
+                json!({"ok": true, "memory": FACE_MEMORY_KEPT}),
+                "{memory}"
+            );
+        }
+    }
 
     fn scoped_request(name: Option<&str>, request: u64) -> crate::memory_scope::RequestScope {
         let cache = crate::memory_scope::FaceCache::default();
