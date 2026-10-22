@@ -2325,8 +2325,11 @@ line needs the name, a tap or its words calling the lamp. In a room not known to
 switch, a face a reason and the windows as they were: on lamp-4ace from 17:06
 with the busy-room rule everywhere, the owner said at 18:0x that a person
 alone with the lamp does not say its name a thousand times a day. So the room
-turns busy from the talk the lamp holds: there a line held as said to nobody,
-or to someone else, is talk even with `LAMP_SPOKEN_TO`, and two faces in the
+turns busy from the talk the lamp holds: there a line held as said to someone
+else by name, or as said to nobody with someone in view and turned away, is
+talk even with `LAMP_SPOKEN_TO`, never a lone voice's held lines with nobody
+in view (that evening one unseen person's misheard call and the lines after it
+turned the room busy, and the scene was lost), and two faces in the
 eyes' newest look, or a line in another voice, make it busy at once
 (`room_told::RoomTold::count_held_talk`, `two_people`). What the model is told
 of the conversation is not changed. Off until a real desk-talk set passes.

@@ -497,6 +497,24 @@ fn turned_in(message: &lamp_bus::Message) -> Option<bool> {
     Some(faces.faces.iter().any(|face| face.facing == Some(true)))
 }
 
+/// Whether the eyes' newest fresh look has someone in view and nobody turned
+/// to the lamp: a face seen turned away, none turned to it. A line said to
+/// nobody then is people talking to each other (`LAMP_NAME_OR_FOLLOW_UP`,
+/// `room_told::RoomTold::seen_talking`); with nobody in view it may be one
+/// person whose face the eyes don't see.
+pub fn someone_in_view_turned_away(bus: &Bus) -> bool {
+    let Ok(Some(message)) = bus.latest(lamp_msgs::Faces::TOPIC) else {
+        return false;
+    };
+    if message.expired {
+        return false;
+    }
+    message.parse::<lamp_msgs::Faces>().is_ok_and(|faces| {
+        faces.faces.iter().any(|face| face.facing == Some(false))
+            && !faces.faces.iter().any(|face| face.facing == Some(true))
+    })
+}
+
 /// How many faces the eyes see now (`humans/faces/tracked`), turned to the
 /// lamp or not: in their newest look, nothing when they have said nothing
 /// still fresh, as [`someone_turned_to_lamp`] reads them. Two or more is

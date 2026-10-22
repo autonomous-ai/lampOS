@@ -3026,6 +3026,15 @@ async fn serve_with_visual<C: Connect>(
                             // October); so is a remark to the room, which two
                             // in a row end (#1522; `RoomTold::judged`).
                             if let Ok(mut told) = crate::room_told::room().lock() {
+                                // `LAMP_NAME_OR_FOLLOW_UP`: a held line is people
+                                // talking to each other with someone in view
+                                // and turned away, never a lone voice's.
+                                if face_or_window
+                                    && verdict.is_some()
+                                    && eyes.as_ref().is_some_and(crate::bus_out::someone_in_view_turned_away)
+                                {
+                                    told.seen_talking(request);
+                                }
                                 told.judged(request, verdict, other_voice);
                             }
                             if let (Some(log), Some(verdict)) = (first_output.as_mut(), verdict) {
