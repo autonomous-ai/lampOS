@@ -1354,7 +1354,9 @@ hotspot's `/wifi` page), so this one is new. Off unless
 ### A person's own keys (`keys.*`, #2094)
 
 Off unless `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` and
-`LAMP_CLOUD=on`. `lamp-cloud` hands one line (`{"set", "key", "base_url"?}`,
+`LAMP_CLOUD=on`. The product's unit sets `LAMP_OWN_KEYS` and `LAMP_CLOUD`
+(#2846) but not yet `LAMP_SETTINGS_CHANGE`, so a product lamp answers "not
+on this lamp" until that switch is on. `lamp-cloud` hands one line (`{"set", "key", "base_url"?}`,
 `{"remove"}` or `{"which": true}`) to root's keys helper on
 `/run/lampos-setup-keys/keys.sock`, on a thread of its own, waiting 15 s at
 most (the helper's one check is 5 s). The helper answers only a peer in

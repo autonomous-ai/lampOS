@@ -48,7 +48,7 @@ pub struct Unit {
     pub credentials: Vec<(String, String)>,
     /// Each `ConfigurationDirectory=`, under `/etc`: systemd makes it before
     /// it loads credentials, so a credential's folder named here need not
-    /// be there yet (the own keys', `own-keys-voice.conf`).
+    /// be there yet (the own keys', in `lamp-voice.service`).
     pub configuration_directories: Vec<String>,
 }
 
@@ -140,7 +140,7 @@ pub enum Looked {
     Missing,
     Empty,
     /// A folder: never a key, but a unit's credential may be one, which
-    /// systemd loads file by file (`own-keys-voice.conf`, #2094).
+    /// systemd loads file by file (the own keys', #2094).
     Folder,
     /// Not a regular file nor a folder.
     NotAFile,
@@ -370,6 +370,21 @@ mod tests {
 
     const PRODUCT: &str = "Environment=LAMP_BUS=on\nEnvironment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json\n";
 
+    /// The own keys' lines of the product's voice unit (#2094, #2846), as a
+    /// drop-in; `the_product_unit_has_the_own_keys_lines` holds them in it.
+    const OWN_KEYS: &str = "[Service]\nEnvironment=LAMP_OWN_KEYS=on\nConfigurationDirectory=lampOS/voice/own\nConfigurationDirectoryMode=0700\nLoadCredential=own:/etc/lampOS/voice/own\n";
+
+    #[test]
+    fn the_product_unit_has_the_own_keys_lines() {
+        let shipped = include_str!("../../../deploy/product/lamp-voice.service");
+        for line in OWN_KEYS.lines().skip(1) {
+            assert!(
+                shipped.lines().any(|kept| kept == line),
+                "lamp-voice.service lacks {line}"
+            );
+        }
+    }
+
     /// Files as `look` and `read` see them: the configuration's text, or
     /// closed, and the rest by how they look.
     fn judged(unit: &Unit, files: &[(&str, Looked)], config: Result<&str, bool>) -> PartResult {
@@ -444,10 +459,7 @@ mod tests {
     /// not; a key a configuration names that is a folder still fails.
     #[test]
     fn a_credentials_folder_passes_and_a_key_that_is_a_folder_does_not() {
-        let with = Unit::read(&[
-            PRODUCT.to_owned(),
-            include_str!("../../../deploy/product/own-keys-voice.conf").to_owned(),
-        ]);
+        let with = Unit::read(&[PRODUCT.to_owned(), OWN_KEYS.to_owned()]);
         assert_eq!(
             with.credentials,
             [("own".into(), "/etc/lampOS/voice/own".into())]
@@ -498,10 +510,7 @@ mod tests {
     /// a fail. A key the self-test can look at that is wrong still fails.
     #[test]
     fn a_closed_voice_folder_is_not_checked_and_a_missing_key_outside_it_still_fails() {
-        let with = Unit::read(&[
-            PRODUCT.to_owned(),
-            include_str!("../../../deploy/product/own-keys-voice.conf").to_owned(),
-        ]);
+        let with = Unit::read(&[PRODUCT.to_owned(), OWN_KEYS.to_owned()]);
         let closed = [
             ("/etc/lampOS/voice/second.json", Looked::Closed),
             (RELAY_KEY, Looked::Closed),
@@ -556,7 +565,7 @@ mod tests {
 
     /// A voice unit at `root`: the product's, its second configuration and
     /// relay key there (each a regular file, never a real key), and the own
-    /// keys' drop-in as `own-keys-voice.conf` writes it, pointed at `own`.
+    /// keys' lines of the product's unit as a drop-in, pointed at `own`.
     fn lamp(root: &Path, own: &Path) -> VoiceRoute {
         let _ = fs::remove_dir_all(root);
         let drop_ins = root.join("lamp-voice.service.d");
@@ -580,10 +589,9 @@ mod tests {
             ),
         )
         .unwrap();
-        let shipped = include_str!("../../../deploy/product/own-keys-voice.conf");
         fs::write(
             drop_ins.join("own-keys.conf"),
-            shipped.replace("/etc/lampOS/voice/own", own.to_str().unwrap()),
+            OWN_KEYS.replace("/etc/lampOS/voice/own", own.to_str().unwrap()),
         )
         .unwrap();
         VoiceRoute {

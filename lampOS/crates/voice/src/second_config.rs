@@ -1422,15 +1422,15 @@ mod tests {
         assert_eq!(none, relay);
     }
 
-    /// #2094: the voice's drop-in turns the switch on and loads the keys'
-    /// folder as `own`, so each file is the `own_<file>` read here, the
-    /// files root's helper writes.
+    /// #2094, #2846: the product's voice unit turns the switch on and loads
+    /// the keys' folder as `own`, so each file is the `own_<file>` read here,
+    /// the files root's helper writes.
     #[test]
-    fn the_own_keys_drop_in_loads_the_folder_the_names_here_read() {
-        let drop_in = include_str!("../../../deploy/product/own-keys-voice.conf");
-        assert!(drop_in.contains(&format!("Environment={OWN_KEYS_ENV}=on\n")));
-        assert!(drop_in.contains("LoadCredential=own:/etc/lampOS/voice/own\n"));
-        assert!(drop_in.contains("ConfigurationDirectory=lampOS/voice/own\n"));
+    fn the_product_unit_loads_the_own_keys_folder_the_names_here_read() {
+        let product = include_str!("../../../deploy/product/lamp-voice.service");
+        assert!(product.contains(&format!("\nEnvironment={OWN_KEYS_ENV}=on\n")));
+        assert!(product.contains("\nLoadCredential=own:/etc/lampOS/voice/own\n"));
+        assert!(product.contains("\nConfigurationDirectory=lampOS/voice/own\n"));
         for (name, file) in [
             (OWN_DEEPSEEK_KEY, "deepseek.key"),
             (OWN_DEEPSEEK_URL, "deepseek.url"),
@@ -1438,9 +1438,6 @@ mod tests {
         ] {
             assert_eq!(name, format!("own_{file}"));
         }
-        // The product's own unit never loads it: off unless the drop-in is there.
-        let product = include_str!("../../../deploy/product/lamp-voice.service");
-        assert!(!product.contains(OWN_KEYS_ENV) && !product.contains("LoadCredential=own"));
     }
 
     /// A unit's credential is read from its `CREDENTIALS_DIRECTORY`, as the

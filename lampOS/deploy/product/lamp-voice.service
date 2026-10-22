@@ -93,6 +93,15 @@ Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
 # (second_config::relay_deepseek, #2978) with its llm_credential_file,
 # so no deepseek.key (#1934, #1939). Not LAMP_SECOND_DEEPSEEK_BASE_URL here: an address the unit gives is never
 # routed, so with LAMP_RELAY_ROUTES the relay may name a nearer one (#2882, the first builder's (a)).
+# A person's own DeepSeek and Deepgram keys, from setup or the app (#2094, #2846; lampOS/docs/own-keys.md): with
+# one in the folder root's keys helper keeps, DeepSeek's chat, search and observation pass or speech to text use it,
+# else the relay, as above. The folder is loaded whole: each file is the credential own_<file> (own_deepseek.key,
+# own_deepseek.url, own_deepgram.key) in $CREDENTIALS_DIRECTORY. ConfigurationDirectory= makes it 0700 if missing, so
+# an empty one is no credential, never a failed start. A build rolled back to before #2094 has no reader for either.
+Environment=LAMP_OWN_KEYS=on
+ConfigurationDirectory=lampOS/voice/own
+ConfigurationDirectoryMode=0700
+LoadCredential=own:/etc/lampOS/voice/own
 Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 Environment=LAMP_SECOND_LOOK=on

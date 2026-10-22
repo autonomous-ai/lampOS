@@ -850,6 +850,45 @@ fn an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named() {
     );
 }
 
+/// #2846: the voice's old own-keys drop-in, placed by hand before the
+/// product's unit held its lines, is removed by install, with systemd told;
+/// the lamp's other drop-ins and the folder they are in stay.
+#[test]
+fn install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let old = "/etc/systemd/system/lamp-voice.service.d/own-keys.conf";
+    let other = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    for path in [old, other] {
+        fs::write(lamp.on(path), "[Service]\nEnvironment=LAMP_OWN_KEYS=on\n").unwrap();
+    }
+    let calls = lamp.host.calls.len();
+    let done = lamp.install().unwrap();
+    assert!(!lamp.on(old).exists());
+    assert!(lamp.on(other).is_file());
+    assert!(
+        lamp.on("/etc/systemd/system/lamp-voice.service.d/exit-note.conf")
+            .is_file()
+    );
+    assert_eq!(
+        done.changed[0],
+        format!("removed {old}"),
+        "{:?}",
+        done.changed
+    );
+    assert!(
+        lamp.host.calls[calls..]
+            .iter()
+            .any(|call| call.starts_with("enable ")),
+        "{:?}",
+        lamp.host.calls
+    );
+    assert!(!lamp.state().systemd_owed);
+    assert!(install::RETIRED_DROP_INS.contains(&"lamp-voice.service.d/own-keys.conf"));
+    // Gone, the next install changes nothing.
+    assert!(lamp.install().unwrap().changed.is_empty());
+}
+
 #[test]
 fn a_failed_exit_note_write_keeps_reload_debt_for_the_next_install() {
     let mut lamp = Lamp::new(188, &[]);
@@ -1061,7 +1100,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 24, "{gated:?}");
+    assert_eq!(gated.len(), 25, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1148,6 +1187,53 @@ fn the_product_sees_who_speaks() {
             "{name} lacks {line}"
         );
     }
+}
+
+/// #2846: a person's own keys are on in the product, on the three units
+/// that read the switch: setup (its request's fields), the cloud (the app's
+/// `keys.*`) and the voice, which loads the keys' folder whole. Its
+/// `ConfigurationDirectory=` makes the folder, so a lamp with no key starts
+/// on the relay; the reset wipes it; and root's keys helper is installed
+/// with its socket enabled, so a full update brings all of it.
+#[test]
+fn the_product_takes_a_persons_own_keys() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    for name in [
+        "lamp-setup.service",
+        "lamp-cloud.service",
+        "lamp-voice.service",
+    ] {
+        assert!(
+            section(unit(name), "Service").contains(&"Environment=LAMP_OWN_KEYS=on"),
+            "{name} lacks LAMP_OWN_KEYS=on"
+        );
+    }
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "LoadCredential=own:/etc/lampOS/voice/own",
+        "ConfigurationDirectory=lampOS/voice/own",
+        "ConfigurationDirectoryMode=0700",
+    ] {
+        assert!(voice.contains(&line), "lamp-voice.service lacks {line}");
+    }
+    let helper = section(unit("lamp-setup-keys@.service"), "Service");
+    assert!(
+        helper
+            .iter()
+            .any(|line| line.contains(" keys --folder /etc/lampOS/voice/own ")),
+        "{helper:?}"
+    );
+    unit("lamp-setup-keys.socket");
+    assert!(
+        install::RESET_PLAN.contains("\"/etc/lampOS/voice/own\""),
+        "the reset leaves the keys"
+    );
 }
 
 /// #1176 (Nine and the reviewer): Expression's `--head-touch` only beside

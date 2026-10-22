@@ -1000,8 +1000,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
    `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer`,
    `lamp-update-back.timer`, `lampos-setup-done.path`, and the helpers'
-   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket` and
-   `lamp-setup-wifi.socket` (#2853; each template is started by its socket,
+   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
+   `lamp-setup-wifi.socket` and `lamp-setup-keys.socket` (#2853, #2846; each
+   template is started by its socket,
    never enabled; each timer's service is started by the timer
    alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680;
    `lamp-update-apply.service` is never enabled: only a round starts it,

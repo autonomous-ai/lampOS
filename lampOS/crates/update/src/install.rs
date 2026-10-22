@@ -232,6 +232,16 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-setup-wifi-restore.service",
         include_str!("../../../deploy/product/lamp-setup-wifi-restore.service"),
     ),
+    // Root's helper for a person's own keys from the app (#2094, #2846):
+    // its socket enabled and its template never, as the others'.
+    (
+        "lamp-setup-keys.socket",
+        include_str!("../../../deploy/product/lamp-setup-keys.socket"),
+    ),
+    (
+        "lamp-setup-keys@.service",
+        include_str!("../../../deploy/product/lamp-setup-keys@.service"),
+    ),
     // The waking face, from power-on until the voice takes the ring
     // (#1681); off unless `LAMP_WAKING_FACE=on`.
     (
@@ -286,6 +296,12 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-voice.service",
     "lamp-waking.service",
 ];
+/// Drop-ins an older build's hand steps placed that a product unit now
+/// holds itself, removed by install so a lamp never names the same lines
+/// twice: the voice's own keys (#2094), in `lamp-voice.service` since #2846.
+/// Each folder goes too only once nothing else is in it.
+pub const RETIRED_DROP_INS: &[&str] = &["lamp-voice.service.d/own-keys.conf"];
+
 /// The existing recorder command: local bounded notes, never a cloud send.
 pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf");
 
@@ -876,6 +892,7 @@ fn enabled() -> Vec<String> {
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
             "lamp-eyes-camera.socket",
+            "lamp-setup-keys.socket",
         ])
         .map(str::to_owned)
         .collect()
@@ -1340,10 +1357,16 @@ pub fn install(
         }))
         .chain([(TMPFILES_PATH.to_owned(), TMPFILES.as_bytes())])
         .collect();
+    let retired: Vec<String> = RETIRED_DROP_INS
+        .iter()
+        .map(|name| format!("{UNITS}{name}"))
+        .filter(|path| fs::symlink_metadata(config.on(path)).is_ok())
+        .collect();
     if !state.systemd_owed
-        && for_systemd
-            .iter()
-            .any(|(path, bytes)| fs::read(config.on(path)).map_or(true, |now| now != *bytes))
+        && (!retired.is_empty()
+            || for_systemd
+                .iter()
+                .any(|(path, bytes)| fs::read(config.on(path)).map_or(true, |now| now != *bytes)))
     {
         state.systemd_owed = true;
         save(&records, &state).map_err(|why| format!("{UNITS_NOT_WRITTEN}: {why}"))?;
@@ -1353,6 +1376,17 @@ pub fn install(
     for (path, bytes) in &for_systemd {
         put(config, path, bytes, 0o644, &mut changed)
             .map_err(|why| format!("units not all written: {why}"))?;
+    }
+    for path in &retired {
+        let at = config.on(path);
+        fs::remove_file(&at).map_err(|error| format!("{}: {error}", at.display()))?;
+        changed.push(format!("removed {path}"));
+        // Its folder only once empty: a lamp's own drop-ins stay.
+        if let Some(folder) = at.parent()
+            && fs::read_dir(folder).is_ok_and(|mut entries| entries.next().is_none())
+        {
+            let _ = fs::remove_dir(folder);
+        }
     }
     // The tmpfiles are install's, recorded as the settings are, so a
     // build's newer tmpfiles reach this lamp (#1680, crate::apply).
@@ -2945,12 +2979,16 @@ mod tests {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset, the waking face, its recovery (#3020) and
-        // setup's three helpers (the names', the Wi-Fi's and its boot
-        // restore) share one binary, and so do the air and its bus clock,
+        // setup's four helpers (the names', the Wi-Fi's and its boot
+        // restore, and the own keys') share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, and the eyes and their camera
         // helper (#2892); every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 9, "every product service is a part");
+        assert_eq!(
+            parts.len(),
+            services - 10,
+            "every product service is a part"
+        );
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
@@ -2984,14 +3022,9 @@ mod tests {
     /// why it is not yet; every socket installed is enabled.
     #[test]
     fn every_deploy_product_unit_is_installed_or_named_left_out() {
-        // Left out until their lamp check: the keeper's restart helper
-        // (#2193) and the own keys' helper (#2094).
-        const LEFT_OUT: &[&str] = &[
-            "lamp-keeper-restart.socket",
-            "lamp-keeper-restart@.service",
-            "lamp-setup-keys.socket",
-            "lamp-setup-keys@.service",
-        ];
+        // Left out until its lamp check: the keeper's restart helper
+        // (#2193).
+        const LEFT_OUT: &[&str] = &["lamp-keeper-restart.socket", "lamp-keeper-restart@.service"];
         let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
         let listed: Vec<&str> = PRODUCT.iter().map(|(name, _)| *name).collect();
         let mut missing = Vec::new();
@@ -3029,7 +3062,11 @@ mod tests {
                 .any(|name| name == "lamp-setup-wifi-restore.service"),
             "{on:?}"
         );
-        for template in ["lamp-setup-change@.service", "lamp-setup-wifi@.service"] {
+        for template in [
+            "lamp-setup-change@.service",
+            "lamp-setup-wifi@.service",
+            "lamp-setup-keys@.service",
+        ] {
             assert!(listed.contains(&template), "{template} is not installed");
             assert!(!on.iter().any(|name| name == template), "{on:?}");
         }
