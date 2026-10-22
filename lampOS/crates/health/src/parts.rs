@@ -720,6 +720,7 @@ mod tests {
             verdict: SelfTest::verdict_of(&parts),
             parts,
             build: None,
+            lamp: None,
         }
     }
 
