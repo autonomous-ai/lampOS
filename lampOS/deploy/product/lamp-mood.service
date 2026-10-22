@@ -20,6 +20,9 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=10
+# With LAMP_MOOD on, how the near face seems (the eyes' Blendshape reader on humans/seems) is one
+# of Mood's inputs: a smile or someone low, seen only in the breath and the idle head (#1671, #2799).
+Environment=LAMP_MOOD_SEEMS=on
 # The lamp's own zone, followed as it changes, for the time of day it dozes by.
 ExecStart=/opt/lampOS/mood/current/lamp-mood serve --zone system --bus-root /run/lampos-bus
 Restart=on-failure

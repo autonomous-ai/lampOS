@@ -42,7 +42,7 @@ cat >"$T/bin/systemctl" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >>"$CALLS"
 case "$1" in
-  cat) printf '# /etc/systemd/system/%s\n[Service]\nExecStart=/opt/lampOS/%s/current/%s --own-flag\n' "$2" "${2%.service}" "${2%.service}" ;;
+  cat) printf '# /etc/systemd/system/%s\n[Service]\nExecStart=/opt/lampOS/%s/current/%s --own-flag%s\n' "$2" "${2%.service}" "${2%.service}" "${OWN_EXTRA:-}" ;;
   is-active) echo "${MOOD_WAS:-inactive}"; [ "${MOOD_WAS:-inactive}" = active ] ;;
 esac
 SH
@@ -94,6 +94,12 @@ CALLS="$T/calls" DIR="$T/run" SEEMS_LOG="$T/seems.log" MEASURE="$T/bin/measure" 
 code=$?
 check "no FER+: read prints Blendshape's rows only" \
   '[ $code = 0 ] && grep -qx "smiling	blendshapes	1	0	0	0	0" "$T/read1" && grep -q "^blendshapes	0.5" "$T/read1" && ! grep -q fer_plus "$T/read1" && [ ! -e "$T/run/no-fer-plus" ]'
+env_on env FERPLUS= "$SCRIPT" off 2>/dev/null
+# The product's unit already runs the mesh and Blendshape (#2799): neither is
+# given twice, which lamp-eyes would refuse.
+env_on env FERPLUS= OWN_EXTRA=" --mouth-model /m.onnx --seems-blendshapes /b.onnx" "$SCRIPT" on 2>/dev/null
+check "the product's readers are not given twice" \
+  'grep -qx "ExecStart=/opt/lampOS/lamp-eyes/current/lamp-eyes --own-flag --mouth-model /m.onnx --seems-blendshapes /b.onnx --seems-log $T/seems.log" "$T/dropins/lamp-eyes.service.d/zz-seems-session.conf"'
 env_on env FERPLUS= "$SCRIPT" off 2>/dev/null
 
 # read: each stretch's reads by reader and kind, Mood's smiles and quiets,

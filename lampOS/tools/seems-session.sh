@@ -67,9 +67,12 @@ BUS=${BUS:-$(command -v lamp-bus || echo /opt/lampOS/bus/current/lamp-bus)}
 
 # The unit's own command line, with `extra` added: a drop-in that clears
 # ExecStart and gives it again, so nothing of the unit's is lost.
+own_exec() { # $1: unit
+  "$SYSTEMCTL" cat "$1" | grep '^ExecStart=' | tail -1 | sed 's/^ExecStart=//'
+}
 dropin() { # $1: unit, $2: extra arguments, $3: environment (KEY=value ...)
   local exec
-  exec=$("$SYSTEMCTL" cat "$1" | grep '^ExecStart=' | tail -1 | sed 's/^ExecStart=//')
+  exec=$(own_exec "$1")
   [ -n "$exec" ] || { echo "seems-session: $1 has no ExecStart" >&2; exit 2; }
   printf '[Service]\nExecStart=\nExecStart=%s%s\n' "$exec" "${2:+ $2}"
   [ -z "${3:-}" ] || printf 'Environment=%s\n' "$3"
@@ -84,9 +87,15 @@ on() {
   # Without FER+ (not shipped, #811), Blendshape alone; `read` then prints
   # its rows only.
   if [ -n "${FERPLUS:-}" ]; then fer="--seems $FERPLUS "; rm -f "$DIR/no-fer-plus"; else : >"$DIR/no-fer-plus"; fi
+  # The product's unit runs the mesh and Blendshape already (#2799): a flag
+  # given twice is refused, so only what the unit lacks is added.
+  local own blend=
+  own=$(own_exec lamp-eyes.service)
+  case " $own " in *" --mouth-model "*) ;; *) blend="--mouth-model $MESH " ;; esac
+  case " $own " in *" --seems-blendshapes "*) ;; *) blend="$blend--seems-blendshapes $BLEND " ;; esac
   "$SYSTEMCTL" is-active lamp-mood.service >"$DIR/mood-was" || true
   install -d "$DROPINS/lamp-eyes.service.d" "$DROPINS/lamp-mood.service.d"
-  dropin lamp-eyes.service "$fer--mouth-model $MESH --seems-blendshapes $BLEND --seems-log $SEEMS_LOG" \
+  dropin lamp-eyes.service "$fer$blend--seems-log $SEEMS_LOG" \
     "LAMP_SEEMS_BROW_LOW=on" >"$DROPINS/lamp-eyes.service.d/zz-seems-session.conf"
   dropin lamp-mood.service "" "LAMP_MOOD=on LAMP_MOOD_SEEMS=on" \
     >"$DROPINS/lamp-mood.service.d/zz-seems-session.conf"
