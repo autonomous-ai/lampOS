@@ -1065,19 +1065,27 @@ pub fn search_for(
 }
 
 /// The functions each chat request of this route is given, before a spoken
-/// turn's own (the look, the name signal): the lamp's ([`crate::tools::uncut`]),
+/// turn's name signal: the lamp's ([`crate::tools::uncut`]),
 /// [`crate::tools::THE_TIME`] only for elsewhere (the time here is told in
-/// every request), then the search's, within Live's bound of
+/// every request), then the search's, and with `look` (a spoken turn with a
+/// full look) the look's ([`look_tool`]), within Live's bound of
 /// [`lamp_gemini::MAX_TOOLS`] ([`crate::tools::fit`]): cut by
-/// [`chat_cut`], never a core skill's function.
+/// [`chat_cut`], never a core skill's function nor the look, which is one
+/// of the core (the first builder on #2602, 22 Oct 12:3x: added after the
+/// bound, a list already at it left the look out, and nothing said so).
 pub fn chat_tools(
     tools: &crate::tools::Settings,
     search: &[lamp_gemini::Tool],
+    look: bool,
 ) -> Vec<lamp_gemini::Tool> {
     let places = tools.clock && tools.places;
-    let (lamp, skills, core) = crate::tools::uncut(tools);
+    let (lamp, skills, mut core) = crate::tools::uncut(tools);
     let mut told = time_elsewhere(lamp, places);
     told.extend(search.iter().cloned());
+    if look {
+        told.push(look_tool());
+        core.insert(crate::second_provider::LOOK_CALL.to_owned());
+    }
     crate::tools::fit(told, &chat_cut(skills), &core)
 }
 
@@ -1201,18 +1209,24 @@ pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool
     format!("{character}{SPOKEN_NOTE}{look}{memory}")
 }
 
-/// The lamp's functions with the look's after them, within Live's bound of
-/// [`lamp_gemini::MAX_TOOLS`] (#1712).
-pub(crate) fn with_look(mut tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
-    if tools.len() < lamp_gemini::MAX_TOOLS {
-        tools.push(lamp_gemini::Tool {
-            name: crate::second_provider::LOOK_CALL.into(),
-            description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web.".into(),
-            parameters: None,
-            silent: false,
-        });
+/// The look's function (#1712): a spoken turn with a full look looks by it.
+pub(crate) fn look_tool() -> lamp_gemini::Tool {
+    lamp_gemini::Tool {
+        name: crate::second_provider::LOOK_CALL.into(),
+        description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web.".into(),
+        parameters: None,
+        silent: false,
     }
-    tools
+}
+
+/// `tools`, already fitted, with the look's after them (the probe's list):
+/// within Live's bound of [`lamp_gemini::MAX_TOOLS`], the last that isn't
+/// the lamp's own leaves for it, never the look, and it is said.
+pub(crate) fn with_look(tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
+    let mut tools = tools;
+    tools.push(look_tool());
+    let core = [crate::second_provider::LOOK_CALL.to_owned()].into();
+    crate::tools::fit(tools, &[], &core)
 }
 
 /// A search begun from a request's words before the model asks (#1712):
@@ -1740,8 +1754,10 @@ pub fn serve(
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
-    let declare: crate::second_provider::net::Declare =
-        Arc::new(move || chat_tools(&declared, &searched));
+    let declare: crate::second_provider::net::Declare = Arc::new({
+        let (declared, searched) = (declared.clone(), searched.clone());
+        move || chat_tools(&declared, &searched, false)
+    });
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -1756,8 +1772,7 @@ pub fn serve(
     // texts, which see nothing, are not offered it.
     let look_by_call = files.look.is_some() && files.look_full;
     let spoken_declare: crate::second_provider::net::Declare = if look_by_call {
-        let declare = declare.clone();
-        Arc::new(move || with_look(declare()))
+        Arc::new(move || chat_tools(&declared, &searched, true))
     } else {
         declare.clone()
     };
@@ -12813,22 +12828,65 @@ mod tests {
         assert!(own.get("error").is_some(), "searched as asked: {own}");
     }
 
-    /// #1712: the look's function follows the lamp's, while there is room.
+    /// The first builder on #2602 (22 Oct 12:3x): the look is one of the
+    /// core, so a list already at the bound before it keeps it and the bound
+    /// cuts the next in its order instead, `fetch_page` first. On lamp-75c9
+    /// at 12:2x the head's list was cut so; one at the bound with the look
+    /// added after it had left the look out, and said nothing.
     #[test]
-    fn the_look_is_offered_after_the_lamps_functions_while_there_is_room() {
+    fn a_spoken_turns_look_is_never_the_one_the_bound_cuts() {
         let tool = |name: &str| lamp_gemini::Tool {
             name: name.into(),
             description: String::new(),
             parameters: None,
             silent: false,
         };
-        let looked = super::with_look(vec![tool("light_on")]);
-        let names: Vec<&str> = looked.iter().map(|tool| tool.name.as_str()).collect();
-        assert_eq!(names, ["light_on", crate::second_provider::LOOK_CALL]);
+        let settings = crate::tools::Settings::default();
+        let lamp = crate::tools::declared(&settings).len();
+        // The search's two, and others of its, to exactly the bound.
+        let mut search = vec![
+            tool(crate::second_provider::net::search::NAME),
+            tool(crate::second_provider::net::search::FETCH),
+        ];
+        let fill = lamp_gemini::MAX_TOOLS - lamp - search.len();
+        search.extend((0..fill).map(|n| tool(&format!("search_{n}"))));
+        let names = |tools: &[lamp_gemini::Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let plain = chat_tools(&settings, &search, false);
+        assert_eq!(plain.len(), lamp_gemini::MAX_TOOLS, "exactly at the bound");
+        assert!(!names(&plain).contains(&crate::second_provider::LOOK_CALL.to_owned()));
+        let looked = names(&chat_tools(&settings, &search, true));
+        assert_eq!(looked.len(), lamp_gemini::MAX_TOOLS);
+        assert!(looked.contains(&crate::second_provider::LOOK_CALL.to_owned()));
+        assert!(!looked.contains(&crate::second_provider::net::search::FETCH.to_owned()));
+        assert!(looked.contains(&crate::second_provider::net::search::NAME.to_owned()));
+        // With nothing left in the cut's order to cut, the last that isn't
+        // core leaves, never the look.
+        let others: Vec<_> = (0..lamp_gemini::MAX_TOOLS - lamp)
+            .map(|n| tool(&format!("other_{n}")))
+            .collect();
+        let past = names(&chat_tools(&settings, &others, true));
+        assert_eq!(past.len(), lamp_gemini::MAX_TOOLS);
+        assert!(past.contains(&crate::second_provider::LOOK_CALL.to_owned()));
+        assert!(!past.contains(&format!("other_{}", lamp_gemini::MAX_TOOLS - lamp - 1)));
+        // Below the bound, nothing leaves for it.
+        let room = chat_tools(&settings, &search[..2], true);
+        assert_eq!(room.len(), lamp + 3);
+        // The probe's list, fitted already: the look kept, the last leaves.
         let full: Vec<_> = (0..lamp_gemini::MAX_TOOLS)
             .map(|n| tool(&format!("f{n}")))
             .collect();
-        assert_eq!(super::with_look(full).len(), lamp_gemini::MAX_TOOLS);
+        let probed = names(&super::with_look(full));
+        assert_eq!(probed.len(), lamp_gemini::MAX_TOOLS);
+        assert_eq!(
+            probed.last().map(String::as_str),
+            Some(crate::second_provider::LOOK_CALL)
+        );
+        assert_eq!(
+            names(&super::with_look(vec![tool("light_on")])),
+            ["light_on", crate::second_provider::LOOK_CALL]
+        );
     }
 
     /// #1712, lamp-4ace 19 Oct: "Hey Lamp, how are you today?" heard as

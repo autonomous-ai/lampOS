@@ -84,7 +84,11 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
                 .declarations(),
             _ => Vec::new(),
         };
-    for tool in lamp_voice::second_provider::worker::chat_tools(&settings, &search) {
+    // A spoken turn's look, as the worker offers it: with a full look and
+    // the eyes' look file (#2905); the product sets neither today.
+    let look = lamp_voice::sight::full_look_file().is_some()
+        && std::env::var_os(lamp_voice::sight::LOOK_ENVIRONMENT).is_some();
+    for tool in lamp_voice::second_provider::worker::chat_tools(&settings, &search, look) {
         println!("{CHAT}{}", tool.name);
     }
 }

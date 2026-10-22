@@ -2436,8 +2436,14 @@ after a take-over, but now for every turn:
   route.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
-  (`second_provider::LOOK_CALL`, `worker::with_look`; texts are not) and
-  told "When you would look, call take_a_look" (`worker::LOOK_CALL_NOTE`).
+  (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
+  are not) and told "When you would look, call take_a_look"
+  (`worker::LOOK_CALL_NOTE`). It is one of the core within the bound of 32:
+  a list at the bound before it keeps it, and the bound cuts the next in
+  its order instead (`fetch_page` first), said once as every cut is
+  (`past the bound of 32, left out: …`). Added after the bound before, a
+  list already at it left the look out and said nothing (the first builder
+  on #2602, 22 Oct 12:3x, from lamp-75c9's runs that morning).
   The call asks the coordinator for the turn's full look (`LookAsked`, as a
   skill's look step does), the lamp says "Let me look." if the model said
   nothing, and the turn ends with no further round; the picture comes in
