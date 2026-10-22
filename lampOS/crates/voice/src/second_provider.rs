@@ -423,6 +423,12 @@ pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 /// `not_for_me` on it is not taken ([`Engine::answering_named_to_a_face`]).
 pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 
+/// Where the worker reads whether a reply to a line told
+/// `worker::CONVERSATION_ALONE` that opens with the words "not for me" is
+/// taken as `not_for_me` ([`Engine::declining_in_words`]): `on`, and nothing
+/// else.
+pub const NOT_FOR_ME_WORDS_ENVIRONMENT: &str = "LAMP_NOT_FOR_ME_WORDS";
+
 /// Where the worker reads whether the lamp's own answers to lines let out
 /// only as the conversation going on keep that conversation going: `on`, and
 /// nothing else, and they don't when another face than the caller's is
@@ -720,6 +726,10 @@ struct Shared {
     /// [`Engine::saying_once`]: a round that said words before its calls
     /// tells the next one so ([`said_once_note`]).
     said_once: bool,
+    /// [`Engine::declining_in_words`]: a reply to a line told
+    /// `worker::CONVERSATION_ALONE` that opens with "not for me" is
+    /// `not_for_me`.
+    declines_in_words: bool,
     /// [`Engine::speaking_tags`]: each piece of a reply is cut into what
     /// the voice is given and the lamp's words; `Some(true)` when the voice
     /// reads tags.
@@ -1672,6 +1682,7 @@ impl Engine {
                 note_looks: false,
                 walk_looks: false,
                 said_once: false,
+                declines_in_words: false,
                 speech_tags: None,
                 written_wait: false,
                 resend: None,
@@ -2228,6 +2239,21 @@ impl Engine {
     pub fn saying_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.said_once = on;
+        }
+        self
+    }
+
+    /// `LAMP_NOT_FOR_ME_WORDS=on` ([`NOT_FOR_ME_WORDS_ENVIRONMENT`]): on a
+    /// line told `worker::CONVERSATION_ALONE`, a reply whose text opens with
+    /// "not for me" ([`crate::not_speech::opens_not_for_me`]) ends as the
+    /// `not_for_me` call does: nothing said, the line held back. Its first
+    /// piece, and the announcement, wait only until its opening is known. A
+    /// line with the name, a call, a turned face or an answer to the lamp's
+    /// own question is never told that note, and nothing of it waits.
+    /// Before any turn only.
+    pub fn declining_in_words(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.declines_in_words = on;
         }
         self
     }
@@ -6743,6 +6769,13 @@ async fn answer(
     // The turn's tools, for its journal line (`LAMP_MEMORY_REPLACES`).
     let turn_tools = Mutex::new(TurnTools::default());
     let tools_noted = shared.note_tools.then_some(&turn_tools);
+    // `LAMP_NOT_FOR_ME_WORDS`: on a line told it may be people's talk, the
+    // reply's text is held until its opening is known: "not for me" written
+    // as words is the decline itself (lamp-4ace, r06, request 131). On any
+    // other line, or with the switch off, nothing is held.
+    let mut opening = (shared.declines_in_words
+        && notes.iter().any(|note| note == worker::CONVERSATION_ALONE))
+    .then(String::new);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -6996,6 +7029,25 @@ async fn answer(
                 match event {
                     ChatEvent::Text(piece) => {
                         text.push_str(&piece);
+                        // `LAMP_NOT_FOR_ME_WORDS`: nothing goes to the voice
+                        // until the reply's opening is known; then what was
+                        // held goes on as one piece.
+                        let piece = match opening.as_mut() {
+                            None => piece,
+                            Some(held) => {
+                                held.push_str(&piece);
+                                match crate::not_speech::opens_not_for_me(held, false) {
+                                    None => continue,
+                                    Some(true) => {
+                                        eprintln!(
+                                            "lamp-voice second: request {request}: its reply opens with \"not for me\" on a line let out only as the conversation going on: taken as not_for_me, nothing said (LAMP_NOT_FOR_ME_WORDS)"
+                                        );
+                                        return Err(Stop::Declined);
+                                    }
+                                    Some(false) => opening.take().unwrap_or_default(),
+                                }
+                            }
+                        };
                         // The model has chosen to speak: the announcement
                         // need not wait for its first sentence.
                         // A call written as words opens nothing: no
@@ -7030,6 +7082,19 @@ async fn answer(
             if refused {
                 round -= 1;
                 continue;
+            }
+            // The round ended with its opening still not known ("Not for"):
+            // whole now, and said unless it is the decline.
+            if let Some(held) = opening.take_if(|held| !held.is_empty()) {
+                if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: its reply is \"not for me\" on a line let out only as the conversation going on: taken as not_for_me, nothing said (LAMP_NOT_FOR_ME_WORDS)"
+                    );
+                    return Err(Stop::Declined);
+                }
+                for sentence in split.push(&held) {
+                    queue.push(sentence).await?;
+                }
             }
             // Asked on `messages` as they still are: what the round's chat
             // was given, and what it called.

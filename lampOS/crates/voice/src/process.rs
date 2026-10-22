@@ -1458,6 +1458,7 @@ fn second_route_worker_environment(
         crate::second_provider::CUE_AFTER_ENVIRONMENT,
         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::second_provider::LOOK_WALK_ENVIRONMENT,
+        crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -1536,6 +1537,7 @@ mod tests {
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
+            crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
@@ -2072,6 +2074,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
+                    || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
@@ -2173,6 +2176,7 @@ mod tests {
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",

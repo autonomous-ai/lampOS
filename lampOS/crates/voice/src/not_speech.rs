@@ -374,6 +374,39 @@ fn a_call_so_far(text: &str) -> bool {
         })
 }
 
+/// Whether a reply so far opens with the words "not for me", case,
+/// punctuation, quotes and dashes aside (`LAMP_NOT_FOR_ME_WORDS`): the
+/// model's refusal written as words. On lamp-4ace, r06, request 131, a line
+/// let out only as the conversation going on ("That lamp is cute, where did
+/// you get it?") got "Not for me — that's about me, not to me.", spoken.
+/// `Some(true)`: it does; `Some(false)`: it can't ("Nothing for me…",
+/// "Note for me", "Not formal"); `None`: not yet known, the text ending
+/// inside one of its first three words. `ended`: no more text comes, so a
+/// last word is whole. A typographic apostrophe is a word's own, as `'` is,
+/// so "me’s" is no "me".
+pub fn opens_not_for_me(text: &str, ended: bool) -> Option<bool> {
+    const WORDS: [&str; 3] = ["not", "for", "me"];
+    let in_word = |c: char| c.is_alphanumeric() || c == '\'' || c == '\u{2019}';
+    let open_end = !ended && text.ends_with(in_word);
+    let words: Vec<&str> = text
+        .split(|c| !in_word(c))
+        .filter(|w| !w.is_empty())
+        .collect();
+    for (at, want) in WORDS.iter().enumerate() {
+        let Some(word) = words.get(at) else {
+            return ended.then_some(false);
+        };
+        let word = word.to_lowercase();
+        if open_end && at + 1 == words.len() {
+            return (!want.starts_with(word.as_str())).then_some(false);
+        }
+        if word != *want {
+            return Some(false);
+        }
+    }
+    Some(true)
+}
+
 /// What follows a function's name at the start of `text`.
 fn call_arguments(text: &str) -> Option<&str> {
     if !names_a_function(text) {
@@ -775,6 +808,53 @@ pub fn unclear_in_conversation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `LAMP_NOT_FOR_ME_WORDS`: a reply opening with "not for me", however
+    /// written, is a refusal; one that only begins like it is not, and one
+    /// whose opening is cut short is not known until more comes or it ends.
+    #[test]
+    fn a_reply_opening_with_not_for_me_is_told_from_one_that_does_not() {
+        for refusal in [
+            "Not for me — that's about me, not to me.",
+            "not for me.",
+            "  \"NOT FOR ME\"",
+            "\u{2014} Not, for me.",
+            "\u{201c}Not for me\u{201d}",
+            "not_for_me{}",
+        ] {
+            assert_eq!(opens_not_for_me(refusal, false), Some(true), "{refusal}");
+        }
+        assert_eq!(opens_not_for_me("Not for me", true), Some(true));
+        for reply in [
+            "Nothing for me to add, but",
+            "Note for me",
+            "Not formal",
+            "Not sure",
+            "No, ",
+            "Sure",
+            "It's not for me",
+            "Not for me\u{2019}s",
+            "Not for meat ",
+        ] {
+            assert_eq!(opens_not_for_me(reply, false), Some(false), "{reply}");
+        }
+        for so_far in [
+            "",
+            " ",
+            "\u{2014} ",
+            "N",
+            "No",
+            "Not",
+            "Not f",
+            "Not for",
+            "Not for me",
+        ] {
+            assert_eq!(opens_not_for_me(so_far, false), None, "{so_far:?}");
+        }
+        for ended in ["", "No", "Not for"] {
+            assert_eq!(opens_not_for_me(ended, true), Some(false), "{ended:?}");
+        }
+    }
 
     /// #926: `LAMP_TRANSCRIPTION_LANGUAGE` reaches the provider worker as a
     /// flag and its tag, and from there the session's transcript, and only
