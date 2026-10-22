@@ -41,7 +41,11 @@ against lamp-06c1.
   (`WILL_DELAY_S`, MQTT v5's will delay). The backend takes it as the lamp
   gone, and its next ping or `info` as back. Without it, the backend marks a
   lamp offline 5 to 8 min after its last ping or `info` (Backend3 on #2602,
-  21 Oct 19:4x). The will's `time` is when the connection was made. What it
+  21 Oct 19:4x). The will's `time` (and its `timezone` and `local_ip`) are
+  those of when the client was made, at start or on a relink after a Wi-Fi
+  join; a reconnect inside the event loop keeps them. The backend reads only
+  `type`, `id` and `device` of an `offline`, in the order the channel brings
+  them (Backend3 on #3035). What it
   means in practice (the Reviewer on #2636, MQTT v5 3.1.2.5, 3.1.2.10,
   3.1.3.2.2):
   - **A reconnect sends it at once.** Every connection asks for a clean
