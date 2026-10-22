@@ -2058,6 +2058,12 @@ pub fn serve(
     let hits_sessions = sessions.clone();
     // Whose a greeting turn is, for a dated follow-up's line (#2805).
     let (event_sessions, event_who) = (sessions.clone(), who.clone());
+    // The Days note asked as each spoken line begins, off the loop (lamp-4ace,
+    // 22 Oct 17:45).
+    let note_ahead = socket
+        .clone()
+        .filter(|_| days)
+        .map(|socket| Ahead::reading(sessions.clone(), who.clone(), socket));
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
@@ -2228,6 +2234,9 @@ pub fn serve(
     .doing_though_held(though_held)
     .announcing(!route.only_voice)
     .saying_reminders(reminders);
+    if let Some(ahead) = note_ahead {
+        engine = engine.asking_the_note_ahead(ahead.told_as());
+    }
     // The air, with `LAMP_AIR_FACTS=on` and the bus (#1712's map, item 6).
     let air = files
         .air_facts
@@ -6439,20 +6448,16 @@ fn memory_context(
             // session's snapshot: a new session is a fresh context (#2176
             // row 1b).
             // After a stop, the next turn opens one, so journalling can go on
-            // (Friday's P1 on #2226). After a quiet, the same synchronous ask
-            // a person change makes, within the note's 300 ms
-            // (`remember::told_for_fresh_session`). After something kept,
-            // the same ask, so it's in the run's next turns (#2540).
-            Some(socket) if days => {
-                let kept = crate::remember::kept_since_note();
-                if kept {
-                    eprintln!(
-                        "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
-                    );
-                }
-                sessions.frozen(opens_anew(changed) || quiet || kept, now, |session| {
-                    crate::remember::fresh_session_note(socket, session, person.as_deref(), true)
-                })
+            // (Friday's P1 on #2226). After a quiet, or a person change, the
+            // note is asked again (`remember::told_for_fresh_session`). After
+            // something kept, the same ask, so it's in the run's next turns
+            // (#2540). Never read here, on the worker's loop: asked as the
+            // line began, or as the turn is told, on a thread of its own
+            // ([`Ahead`]), and only taken here.
+            Some(_) if days => {
+                let kept = crate::remember::kept_since_note_peek();
+                let fresh = crate::remember::wants_fresh_session();
+                sessions.taken(changed || quiet || kept, fresh, person.as_deref())
             }
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
@@ -6496,9 +6501,20 @@ struct Sessions {
     /// Runs of turns opened so far: the Days session number.
     opened: u64,
     note: Option<String>,
-    /// An incomplete snapshot is retried only on a later context build,
-    /// no more than once per interval measured from the attempt's start.
+    /// When an incomplete note may be asked again: on a line begun after
+    /// it failed, at once after one failure, and after two or more back to
+    /// back no sooner than [`crate::remember::FRESH_RETRY`] from the last
+    /// attempt's start ([`Sessions::retry_due`]).
     note_retry_at: Option<Instant>,
+    /// Notes failed back to back since the last complete one.
+    failures: u32,
+    /// Spoken lines begun so far ([`Ahead::begin`]), and how many had begun
+    /// when the note last failed: it is asked again only on a later line.
+    lines: u64,
+    failed_on: u64,
+    /// The note's one read, asked ahead as a line began or as a turn is
+    /// told, until a turn takes its answer or a later line lets it go.
+    asked: Option<NoteAsk>,
     /// The admitted scope the Days note was last asked for.
     scoped: Option<Option<String>>,
     /// A change of person seen by [`Sessions::open_ahead`] that the turn's
@@ -6582,35 +6598,408 @@ impl Sessions {
             // person's cache now so the next admitted turn cannot use it.
             self.note = None;
             self.note_retry_at = None;
+            self.failures = 0;
         }
         changed
     }
 
-    /// The Days note for this run of turns, asked anew when the person
-    /// changes, something is kept, or a failed read is eligible to retry.
-    /// Successful empty snapshots are cached exactly like populated ones.
+    /// A whole turn with its note asked in place, for the tests of when the
+    /// note is asked: its line begun, then the Days note for this run of
+    /// turns, asked anew when the person changes, something is kept, or a
+    /// failed read may be asked again ([`Self::note_due`]), by the rules the
+    /// worker's note asked ahead keeps ([`Ahead`]). Successful empty
+    /// snapshots are cached exactly like populated ones.
+    #[cfg(test)]
     fn frozen(
         &mut self,
         changed: bool,
         now: Instant,
         ask: impl FnOnce(u64) -> crate::remember::SessionNote,
     ) -> String {
-        let retry = self.note_retry_at.is_some_and(|at| now >= at);
-        if changed || self.note.is_none() || retry {
+        self.lines += 1;
+        if self.note_due(changed, now) {
             self.opened += 1;
             let note = ask(self.opened);
-            self.note_retry_at = (!note.complete).then_some(now + crate::remember::FRESH_RETRY);
-            if !note.complete {
-                eprintln!(
-                    "lamp-voice second: memory note incomplete; retry on a later context after {} ms",
-                    crate::remember::FRESH_RETRY.as_millis()
-                );
-            } else if retry {
-                eprintln!("lamp-voice second: memory note retry complete");
-            }
-            self.note = Some(note.text);
+            self.settle(note, now, false);
         }
         self.note.clone().unwrap_or_default()
+    }
+
+    /// Whether the run's note is to be asked now: `changed` (the person or
+    /// the run changed, it was quiet, or something was kept), there is
+    /// none, or a failed one may be asked again.
+    fn note_due(&self, changed: bool, now: Instant) -> bool {
+        changed || self.note.is_none() || self.retry_due(now)
+    }
+
+    /// Whether a failed note may be asked again now: on a line begun after
+    /// it failed, and, once two have failed back to back, no sooner than
+    /// [`crate::remember::FRESH_RETRY`] after the last attempt began. So a
+    /// memory slow once costs one turn its note, and one that is down is
+    /// asked twice a minute, not on every turn.
+    fn retry_due(&self, now: Instant) -> bool {
+        self.lines > self.failed_on && self.note_retry_at.is_some_and(|at| now >= at)
+    }
+
+    /// An attempt at the note begun at `at` failed: incomplete, or `late`
+    /// (not in by what was left of its 300 ms as the line ended).
+    fn failed(&mut self, at: Instant, late: bool) {
+        self.failures = self.failures.saturating_add(1);
+        self.failed_on = self.lines;
+        let what = if late { "late" } else { "incomplete" };
+        if self.failures == 1 {
+            self.note_retry_at = Some(at);
+            eprintln!("lamp-voice second: memory note {what}; retry on the next turn");
+        } else {
+            self.note_retry_at = Some(at + crate::remember::FRESH_RETRY);
+            eprintln!(
+                "lamp-voice second: memory note {what} again; retry after {} ms",
+                crate::remember::FRESH_RETRY.as_millis()
+            );
+        }
+    }
+
+    /// What an attempt begun at `at` gave, kept for the run. An incomplete
+    /// one replaces the note too, so a failed refresh never brings back a
+    /// forgotten fact or another person's note; `counted` when its
+    /// lateness was already counted as a failure.
+    fn settle(&mut self, note: crate::remember::SessionNote, at: Instant, counted: bool) {
+        if note.complete {
+            if self.failures > 0 {
+                eprintln!("lamp-voice second: memory note retry complete");
+            }
+            self.failures = 0;
+            self.note_retry_at = None;
+        } else if !counted {
+            self.failed(at, false);
+        }
+        self.note = Some(note.text);
+    }
+
+    /// Whose note a turn told in `lease` (its admitted scope; without one,
+    /// the session's, as memory's hits find it, [`Self::open_ahead`]) would
+    /// be, and whether that is someone other than the last turn's: nothing
+    /// for a revoked scope or a line held by a gap, which is told no note.
+    fn whose_note(
+        &mut self,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        who: Option<&Path>,
+        now: Instant,
+    ) -> Option<(Option<String>, bool)> {
+        match lease {
+            Some(lease) => {
+                let scope = lease.scope().filter(|scope| !scope.held())?;
+                let person = scope.person().map(str::to_owned);
+                let changed = self.scoped.as_ref() != Some(&person);
+                Some((person, changed))
+            }
+            None => {
+                let (_, person) = self.open_ahead(who, now);
+                Some((person, self.unsaid))
+            }
+        }
+    }
+
+    /// Ask `person`'s note on a thread of its own when it is due and no
+    /// read is going on: at most one at a time, so a slow memory is never
+    /// asked twice at once. An answer already in for them stands, unless
+    /// something was kept or forgotten since. `ahead` when a line begins.
+    fn ask_if_due(
+        &mut self,
+        (person, changed): (Option<String>, bool),
+        now: Instant,
+        ask: &AskNote,
+        ahead: bool,
+    ) {
+        if self.asked.as_ref().is_some_and(NoteAsk::reading) {
+            return;
+        }
+        let kept = crate::remember::kept_since_note_peek();
+        let fresh = crate::remember::wants_fresh_session();
+        if !kept
+            && !fresh
+            && self
+                .asked
+                .as_ref()
+                .is_some_and(|asked| !asked.void && asked.person == person)
+        {
+            return;
+        }
+        let quiet = self.reopen_quiet
+            && self.last_told.is_some_and(|at| {
+                now.saturating_duration_since(at) >= crate::thread::REMEMBERED_FOR
+            });
+        if !self.note_due(opens_anew(changed) || quiet || kept, now) {
+            return;
+        }
+        // Taken as the read begins: a keep after it marks the note again.
+        if crate::remember::kept_since_note() {
+            eprintln!(
+                "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
+            );
+        }
+        self.opened += 1;
+        self.asked = Some(NoteAsk::start(self.opened, person, now, ask, ahead));
+    }
+
+    /// The Days note a turn is told, taken from what was asked for `person`
+    /// ([`Ahead`]), never read here: the worker's loop builds it. `due` is
+    /// the turn's own reason the run's note may not stand: the person or the
+    /// run changed, it was quiet, or something was kept that no read has
+    /// covered; `fresh` when journalling waits for a fresh context, so an
+    /// answer read before a forget is never told.
+    fn taken(&mut self, due: bool, fresh: bool, person: Option<&str>) -> String {
+        let unavailable = || crate::remember::SessionNote::unavailable().text;
+        let theirs = self
+            .asked
+            .as_mut()
+            .filter(|asked| !fresh && !asked.void && asked.person.as_deref() == person);
+        if let Some(asked) = theirs {
+            if let Some(note) = asked.take() {
+                let (at, late) = (asked.at, asked.late);
+                self.asked = None;
+                self.settle(note, at, late);
+                return self.note.clone().unwrap_or_default();
+            }
+            let at = asked.at;
+            if asked.waited {
+                // Not in by what was left of its 300 ms: this turn is told
+                // the note it may (none, when the run's may not stand), the
+                // read goes on, and the next line asks again if it fails.
+                if !std::mem::replace(&mut asked.late, true) {
+                    self.failed(at, true);
+                }
+                if due || self.note.is_none() {
+                    self.note = Some(unavailable());
+                }
+                return self.note.clone().unwrap_or_default();
+            }
+            // Asked and not in yet, before the line's end (a chat begun on
+            // its early words): the turn's own ask takes it later.
+            if due {
+                self.note = None;
+            }
+            return self.note.clone().unwrap_or_else(unavailable);
+        }
+        if due || fresh || self.note.is_none() {
+            // Nothing asked for them, or what was may hold what was
+            // forgotten: told none, and the next ask is theirs.
+            self.note = None;
+            return unavailable();
+        }
+        // The run's note, or a failed one until it may be asked again.
+        self.note.clone().unwrap_or_default()
+    }
+}
+
+/// How long a note asked ahead may take to read ([`Ahead`]): a turn waits
+/// for no more than what is left of the note's 300 ms from the ask
+/// (`remember::FIRST_READ`), but an answer that comes later, before the line
+/// ends, is still the line's. Two seconds, as the memory gives a client.
+const NOTE_AHEAD_WITHIN: Duration = Duration::from_secs(2);
+
+/// How a Days note is read: its session number, whose (a person's memory
+/// id, or none for the room's), and within how long.
+type AskNote =
+    Arc<dyn Fn(u64, Option<&str>, Duration) -> crate::remember::SessionNote + Send + Sync>;
+
+/// One read of the memory's note, on a thread of its own, never the
+/// worker's loop.
+struct NoteAsk {
+    /// Whose note it is: a person's memory id, or none for the room's.
+    person: Option<String>,
+    /// When it was asked: a turn waits from here, at most `FIRST_READ`.
+    at: Instant,
+    /// The answer, once the read is done. The thread holds the other
+    /// reference while it reads.
+    answer: Arc<Mutex<Option<crate::remember::SessionNote>>>,
+    /// Told when the read is done.
+    done: tokio::sync::watch::Receiver<bool>,
+    /// A turn waited for it ([`Ahead::ready`]): not in then, it is late.
+    waited: bool,
+    /// Its lateness was counted as a failed note, once.
+    late: bool,
+    /// Let go when the camera or the microphone closed or opened: never
+    /// told, though while it is still read no other is asked.
+    void: bool,
+}
+
+impl NoteAsk {
+    fn start(
+        session: u64,
+        person: Option<String>,
+        now: Instant,
+        ask: &AskNote,
+        ahead: bool,
+    ) -> Self {
+        let answer = Arc::new(Mutex::new(None));
+        let (said, done) = tokio::sync::watch::channel(false);
+        let read = {
+            let (ask, answer, person) = (ask.clone(), answer.clone(), person.clone());
+            move || {
+                let began = Instant::now();
+                let note = ask(session, person.as_deref(), NOTE_AHEAD_WITHIN);
+                // Counts and times only, never the note.
+                eprintln!(
+                    "lamp-voice second: memory note asked {}; {} in {} ms",
+                    if ahead {
+                        "ahead as the line began"
+                    } else {
+                        "as the turn is told"
+                    },
+                    if note.complete { "ready" } else { "incomplete" },
+                    began.elapsed().as_millis()
+                );
+                if let Ok(mut answer) = answer.lock() {
+                    *answer = Some(note);
+                }
+                let _ = said.send(true);
+            }
+        };
+        // A thread that cannot be started leaves no reader: the note is
+        // then incomplete ([`Self::take`]).
+        if let Err(error) = std::thread::Builder::new()
+            .name("lamp-voice-note".into())
+            .spawn(read)
+        {
+            eprintln!("lamp-voice second: the memory note could not be asked: {error}");
+        }
+        Self {
+            person,
+            at: now,
+            answer,
+            done,
+            waited: false,
+            late: false,
+            void: false,
+        }
+    }
+
+    /// Whether its read is still going on.
+    fn reading(&self) -> bool {
+        Arc::strong_count(&self.answer) > 1 && self.answer.lock().is_ok_and(|note| note.is_none())
+    }
+
+    /// Its answer, once the read is done: incomplete when the read ended
+    /// without one.
+    fn take(&mut self) -> Option<crate::remember::SessionNote> {
+        if self.reading() {
+            return None;
+        }
+        Some(
+            self.answer
+                .lock()
+                .ok()
+                .and_then(|mut note| note.take())
+                .unwrap_or_else(crate::remember::SessionNote::unavailable),
+        )
+    }
+}
+
+/// The second route's memory note asked ahead (lamp-4ace, 22 Oct 17:45: asked
+/// as the line ended, the note held the worker's one thread 300 ms, came
+/// 60 ms after the voice gave up, and wasn't asked again for 30 s). As a
+/// spoken line begins its run's note is asked, when due, on a thread of its
+/// own, for the person known then; the turn waits for it off the loop, no
+/// longer than what is left of the note's 300 ms from that ask, and its
+/// context only takes it ([`Sessions::taken`]).
+#[derive(Clone)]
+struct Ahead {
+    sessions: Arc<Mutex<Sessions>>,
+    who: Option<PathBuf>,
+    ask: AskNote,
+}
+
+impl Ahead {
+    /// Asked with the voice's Days client on `socket`.
+    fn reading(sessions: Arc<Mutex<Sessions>>, who: Option<PathBuf>, socket: PathBuf) -> Self {
+        Self {
+            sessions,
+            who,
+            ask: Arc::new(move |session, person, within| {
+                crate::remember::fresh_session_note_within(&socket, session, person, true, within)
+            }),
+        }
+    }
+
+    /// A spoken line begins, its turn told in `lease`: an answer of an
+    /// earlier line's is let go, and the note asked now if it is due.
+    fn begin(&self, lease: Option<&crate::memory_scope::ScopeLease>, now: Instant) {
+        let Ok(mut sessions) = self.sessions.lock() else {
+            return;
+        };
+        sessions.lines += 1;
+        if sessions
+            .asked
+            .as_ref()
+            .is_some_and(|asked| !asked.reading())
+        {
+            sessions.asked = None;
+        }
+        if let Some(whose) = sessions.whose_note(lease, self.who.as_deref(), now) {
+            sessions.ask_if_due(whose, now, &self.ask, true);
+        }
+    }
+
+    /// Just before a turn told in `lease` is built: the note asked for
+    /// whoever it is for now if it is due and none is (someone else's answer
+    /// let go), and what to wait on, until `FIRST_READ` after that ask
+    /// began. Reads nothing itself.
+    fn ready_now(
+        &self,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        now: Instant,
+    ) -> Option<(tokio::sync::watch::Receiver<bool>, Instant)> {
+        let mut sessions = self.sessions.lock().ok()?;
+        let whose = sessions.whose_note(lease, self.who.as_deref(), now)?;
+        if sessions
+            .asked
+            .as_ref()
+            .is_some_and(|asked| asked.person != whose.0 && !asked.reading())
+        {
+            sessions.asked = None;
+        }
+        let person = whose.0.clone();
+        sessions.ask_if_due(whose, now, &self.ask, false);
+        let asked = sessions
+            .asked
+            .as_mut()
+            .filter(|asked| !asked.void && asked.person == person)?;
+        asked.waited = true;
+        Some((asked.done.clone(), asked.at + crate::remember::FIRST_READ))
+    }
+
+    /// [`Self::ready_now`], then the wait, on the runtime's timer.
+    async fn ready(self, lease: Option<crate::memory_scope::ScopeLease>) {
+        let Some((mut done, until)) = self.ready_now(lease.as_ref(), Instant::now()) else {
+            return;
+        };
+        let until = tokio::time::Instant::from_std(until);
+        let _ = tokio::time::timeout_at(until, done.wait_for(|done| *done)).await;
+    }
+
+    /// The camera or the microphone closed or opened: what was asked
+    /// before is never told.
+    fn forget(&self) {
+        if let Ok(mut sessions) = self.sessions.lock()
+            && let Some(asked) = sessions.asked.as_mut()
+        {
+            if asked.reading() {
+                asked.void = true;
+            } else {
+                sessions.asked = None;
+            }
+        }
+    }
+
+    /// As the engine is given it.
+    fn told_as(self) -> crate::second_provider::NoteAhead {
+        let (begin, ready, forget) = (self.clone(), self.clone(), self);
+        crate::second_provider::NoteAhead {
+            begin: Arc::new(move |lease| begin.begin(lease, Instant::now())),
+            ready: Arc::new(move |lease| Box::pin(ready.clone().ready(lease))),
+            forget: Arc::new(move || forget.forget()),
+        }
     }
 }
 

@@ -64,6 +64,15 @@ impl ScopeSnapshot {
             held: false,
         }
     }
+    /// A known person's scope kept only by its held gap, for other parts'
+    /// tests.
+    #[cfg(test)]
+    pub fn held_of(name: &str) -> Self {
+        Self {
+            held: true,
+            ..Self::of(name)
+        }
+    }
 }
 
 struct CachedFace {
