@@ -1070,14 +1070,14 @@ the unchanged legacy client, used unless the new Days client is selected.
   "I'm back", whose other words are fillers ("good", "there", "again",
   "lamp", "everyone", "xin", "buổi", "sáng" and the like) but for at most
   one, a name ("Good evening, Lumi", "Hi lamp, good evening.", "Hey,
-  good evening."). A line of no words, or of no greeting and nothing but
-  fillers and one other word (an echo, noise, the lamp's name alone,
-  "hmm"), is not the first line: it decides nothing and the next line
-  does (the c0a4 set on #3059, 22 Oct: four greeting-only sessions were
+  good evening."). A line of no words, of no greeting and nothing but
+  fillers and known noise ("hmm", "um", "uh", "Thank you", "Cảm ơn"), or
+  of the lamp's name alone ("Lamp?", "Lynn.") is not the first line: it
+  decides nothing and the next line does (the c0a4 set on #3059, 22 Oct: four greeting-only sessions were
   taken back after 0-word lines came first). A line held before its
   answer is begun (an echo of the lamp, one not said to the lamp) never
   reaches it. A first line that asks or tells more ("Hi, what time is
-  it?") is a request: the model is told nothing, neither the line nor the
+  it?", or one word of a request such as "Weather?") is a request: the model is told nothing, neither the line nor the
   note's section for it, which every chat of that session is told
   without (`remember::DaysClient::event_withheld`,
   `second_provider::Told::without`; reviewer-two's P2 on #3059), and the
