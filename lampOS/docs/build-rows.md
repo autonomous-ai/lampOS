@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-22 19:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-22 20:05 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 89.8% over 72 rows. Quality 61.9% over 16 rows.**
+**Build 89.9% over 72 rows. Quality 61.9% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -37,7 +37,7 @@ Written by the first builder from the team's review page at 2026-10-22 19:47 (+0
 | One install for a new lamp | 1.00 | #811 | nine | Shown 19 Oct 15:1x on a second lamp, lamp-c0a4: build 3162 installed over V1 from a test-signed local channel, all 45 files equal to the build’s checksums, V1 stopped and kept, no reboot; |
 | No internet at home | 1.00 | #830 #1242 #1256 #1247 | nine | 21 Oct 14:1x: its lamp runs passed on lamp-75c9 (Nine): the outage found with nobody speaking, the offline line once, “back online” after, and the unavailable face. |
 | Everything is a skill, core and installable, no one-off code | 0.70 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh | 22 Oct 15:1x, up from 0.65: look for things’ walk, its note, places, order and words now live in its skill’s file, read by the voice from lamp-skills’ tools file (Thirteen, #2916, a16545d92; |
-| An owner makes their own skill | 0.70 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 15:1x, up from 0.65: a skill typed in the app is taken on the voice’s own socket, handed over as its brief and told aloud (LAMP_APP_MAKE_SKILL, blue’s #2887 carried as #2935, merged 15:00 as 8613304e4). |
+| An owner makes their own skill | 0.75 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 20:0x, up from 0.7: an app request makes a skill, put on only after the spoken yes at the lamp, both halves merged (#2935, #3031; |
 | A Skills Store to publish skills | 0.55 | #1698 #2801 #2802 | fourteen | 22 Oct 11:4x, up from 0.45: a sent skill is checked and waits for review before it is listed, shown on the test environment (Backend3, #2802): its files, checksums and permissions shown in the lamp’s words, a changed byt… |
 | Updates over the internet, by themselves | 0.65 | #737 #1812 | migrate, second | 20 Oct 06:11: shown again on lamp-4ace on the merged code (El’s test, three cases: a good build kept, one that fails to start put back in under 2 min, one that never confirms put back after its 10 min), the lamp left exa… |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, ten, backend, third, eighth, twelve | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
