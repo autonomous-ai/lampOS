@@ -16,6 +16,9 @@
 //! `HAND_MOVED` of where it is (the body holds it where the hand has it, the
 //! negation of its "in a hand" test), and then `body/hand` says released.
 //! The model may only skip it. Nothing here asks the body for anything.
+#[cfg(test)]
+pub use super::legacy_words::{GIVE_ASK, GIVE_DONE, GIVE_FAILED};
+
 use super::{
     FRESH_MS, GONE_US, Onboarding, Outcome, SIT_GIVE_UP_US, START_QUIET_US, STEP_GIVE_UP_US, Step,
     TIMED_OUT_QUIET_US, fresh_token, near::CLOCK_SLACK_MS,
@@ -41,10 +44,6 @@ const WINDOW_MS: u64 = WINDOW_US / 1_000;
 pub(super) const MOST_TRIES: u8 = 2;
 /// The bus is read at most this often.
 const LOOK_EVERY_US: u64 = 20_000;
-
-pub const GIVE_ASK: &str = "(Nobody has spoken. Tell them in a few words that your head gives way to a hand: ask them to take it gently and move it a little, then let go. Do not claim anything has been felt yet.)";
-pub const GIVE_DONE: &str = "(You felt their hand move your head, gave way, and they let go. Tell them so in a few warm words. Nothing more.)";
-pub const GIVE_FAILED: &str = "(You did not feel your head moved by a hand this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was felt.)";
 
 /// One reading from the body, validated and dated in Unix milliseconds.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -292,7 +291,14 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
-        Some(GIVE_ASK.to_owned())
+        Some(
+            self.definition
+                .note(
+                    Step::GivingWay,
+                    self.desired.steps.contains_key(Step::GivingWay.name()),
+                )
+                .to_owned(),
+        )
     }
 
     pub(super) fn bind_giving_invitation(
@@ -400,7 +406,7 @@ impl Onboarding {
                 self.records
                     .push(json!({"kind":"onboarding_giving_way_try","felt":true,"at_us":now_us}));
                 self.finish(Step::GivingWay, Outcome::Done, None, now_us);
-                self.owed = Some(GIVE_DONE);
+                self.owed = Some(self.definition.words.give_done.clone());
             }
         }
     }
@@ -515,5 +521,5 @@ fn flow_end(walk: &mut Onboarding, now_us: u64) {
         return;
     }
     walk.finish(Step::GivingWay, Outcome::Failed, None, now_us);
-    walk.owed = Some(GIVE_FAILED);
+    walk.owed = Some(walk.definition.words.give_failed.clone());
 }

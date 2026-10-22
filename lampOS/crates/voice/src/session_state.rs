@@ -78,6 +78,8 @@ pub(crate) struct SessionState {
     pub(crate) onboarding_storage_failed_epoch: Option<u64>,
     /// The sole onboarding filesystem executor, retained across voice cycles.
     pub(crate) onboarding_storage: Option<crate::onboarding::storage::ServiceStorage>,
+    /// Checked once before audio opens, retained across mute/reopen cycles.
+    pub(crate) onboarding_definition: Option<std::sync::Arc<crate::onboarding::skill::Definition>>,
     events: Vec<Value>,
     pub(crate) receipts: ReceiptHistory,
     pub(crate) yield_interval: Option<YieldInterval>,

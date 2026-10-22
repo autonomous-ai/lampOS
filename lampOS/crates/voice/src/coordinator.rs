@@ -5303,7 +5303,10 @@ fn conversation_with_gate(
                     storage.client(),
                 ));
             }
-            crate::onboarding::Onboarding::from_storage(storage.client())
+            crate::onboarding::Onboarding::from_storage(
+                storage.client(),
+                trace.onboarding_definition.as_ref()?.clone(),
+            )
         })
     } else {
         None

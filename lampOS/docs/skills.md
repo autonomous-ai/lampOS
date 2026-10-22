@@ -307,6 +307,30 @@ topics while the thing happens, or publish it by hand with
     lamp-bus record skills/welcome-back/tests/CASE humans/faces/tracked --seconds 40 --root R &
     lamp-bus pub humans/faces/tracked latest '{"faces":[]}' --type lamp_msgs/Faces --at-us 0 --root R
 
+### The onboarding walk's data
+
+`[onboarding]` holds the first-five-minutes walk's checked order and notes
+(#2824), and is required for the onboarding core grant. Only a core
+onboarding manifest may supply it; missing or invalid data rejects loading
+and packaging. Voice also requires the skill to be enabled.
+
+`order` is a permutation of the eight stable step IDs; `reoffer_after_s` is
+1 to 31,536,000. `[onboarding.steps.<id>]` requires `first` and `reoffer`;
+only `who_you_are` and `preferences` may have `.nudge` with `words` and
+`after_answers` (1 to 8). `[onboarding.words]` holds every coaching,
+completion and name-confirmation note. Notes are 1 to 900 bytes, no
+controls, with only the exact `{location}` / `{name}` slots where specified.
+Consent clauses remain mandatory in code: `who_you_are`'s `first` and
+`reoffer` each retain `only after a clear yes call remember_my_face`, and
+`room_sounds`' two notes retain `done only after a clear yes`. Removing or
+altering either clause rejects Voice loading and Skills loading/packaging;
+surrounding prose may change.
+
+Voice reads the installed regular file, at most 65,536 bytes and not a link,
+once per service invocation, with no built-in fallback; a file-only update
+or repair needs a Voice restart. Physical checks and privacy stay in Voice.
+See [onboarding.md](onboarding.md#installed-walk-data) for all fields and bounds.
+
 ### `lamp-skills`, a new part
 
 Its own process, its own owner, like every part
@@ -1359,6 +1383,8 @@ core = []       # a core skill's alone (kind = "core"): its core-only grants
 - **Core-only grants.** `core` lists what a skill that comes with the lamp
   may do that no other may: `"onboarding"`, a `say = { from = "onboarding" }`
   on the onboarding invitation trigger, and that trigger's first snapshot;
+  the grant also requires checked `[onboarding]` walk data, activated once per
+  Voice service invocation ([onboarding.md](onboarding.md#installed-walk-data));
   `"prepare_unplug"`, `body = { prepare_unplug = true }`, its completion
   reads and the reserved `stay_plugged_in` tool; `"sleep"` (#940, Night
   sleep), the night's sleep: its runs ask nobody (no `[ask]`, whatever
