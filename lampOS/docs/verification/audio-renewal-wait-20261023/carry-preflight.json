@@ -1,0 +1,15 @@
+{
+  "observed_at_utc": "2026-10-22T19:08:07.153035+00:00",
+  "authored_head": "f913461d92b7928e5361c51de357ca7aef4b1a8d",
+  "integration_head": "001a3d714db50aaac36c68a524ec0844c17c2090",
+  "merge_tree": "860a75c3e88fabc7d7c40e0c8e3dfbb1a37c852c",
+  "clean_worktree": true,
+  "conflicts": false,
+  "patch_identical": true,
+  "candidate_file_hashes": {
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+    "lampOS/docs/requested-audio.md": "134707e3bd0c1613f6cc8d79dbf495287b01ddefe579b822ad5d9c027d7e5b40"
+  },
+  "current_agents_matches_worktree": true,
+  "limits": "Read-only merge-tree preflight; no integration tests ran on this combined tree. First owns the combined train gate and merge."
+}
