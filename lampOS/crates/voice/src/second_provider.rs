@@ -63,6 +63,7 @@ use tokio::{
 
 pub mod link;
 pub mod net;
+mod own_echo;
 pub mod policy;
 pub mod probe;
 mod services;
@@ -757,6 +758,10 @@ struct Shared {
     /// A line whose words end before a name waits for it
     /// ([`Engine::waiting_for_a_name`]).
     open_name: bool,
+    /// A line mostly of the lamp's own words heard back is held, and its
+    /// own words at a line's start or end are taken out
+    /// ([`Engine::holding_own_echo`]).
+    own_echo: bool,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
     /// The privacy generation one was opened under before any line
@@ -1069,6 +1074,10 @@ struct Marks {
     /// end this one began, when none of that one's words or sound began
     /// this one already ([`Engine::joining_cut_words`]).
     after_end: Option<(u64, Duration)>,
+    /// Begun while the lamp's answer could be heard, not only over its wait
+    /// sound (`Start`'s `over_the_lamps_voice`): judged for its echo
+    /// ([`Engine::holding_own_echo`]).
+    over_the_lamps_voice: bool,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -1227,6 +1236,7 @@ impl Engine {
                 tools_journal: None,
                 keep_listener: false,
                 open_name: false,
+                own_echo: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
                 warmed: Mutex::new(None),
@@ -1599,6 +1609,18 @@ impl Engine {
     pub fn waiting_for_a_name(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.open_name = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_OWN_ECHO=on` ([`own_echo`], #2997): a spoken line begun
+    /// over the lamp's answer or just after it, mostly of the lamp's own
+    /// words, is held as its echo; fewer of them, one run at its start or
+    /// end, are taken out of what the model is sent. A person repeating it
+    /// is never held. Before any turn only.
+    pub fn holding_own_echo(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.own_echo = on;
         }
         self
     }
@@ -2297,6 +2319,7 @@ impl Engine {
                     // Never twice: a line its sound or words begin already
                     // goes on from it.
                     after_end: after_end.filter(|_| carried.is_none() && before.is_none()),
+                    over_the_lamps_voice,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -3313,7 +3336,32 @@ async fn spoken(
             "lamp-voice second: request {request}: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)"
         );
     }
+    // The lamp's own words heard back (`LAMP_SECOND_OWN_ECHO`, #2997): held
+    // as its echo when mostly its own; taken out at the line's start or end
+    // when fewer, before the model is sent it. Judged before the rule.
+    let echo = if shared.own_echo && !empty && !held {
+        own_echo_of(&shared, request, &text, &said, &marks)
+    } else {
+        own_echo::Echo::Answered(None)
+    };
+    let (echoed, stripped) = match echo {
+        own_echo::Echo::Answered(line) => {
+            if let Some(line) = line {
+                eprintln!("{line}");
+            }
+            (false, None)
+        }
+        own_echo::Echo::Held(line) => {
+            eprintln!("{line}");
+            (true, None)
+        }
+        own_echo::Echo::Stripped(kept, line) => {
+            eprintln!("{line}");
+            (false, Some(kept))
+        }
+    };
     let mut heeded = match &shared.heed {
+        _ if echoed => Some(OWN_ECHO_HELD),
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             heed(request, window, &text, continues_from)
@@ -3336,7 +3384,8 @@ async fn spoken(
             }
         };
     }
-    if let Some(why) = heeded {
+    // A held echo's journal line, with its counts, is said above.
+    if let Some(why) = heeded.filter(|_| !echoed) {
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
     }
     // Words cut short by this line: answered in its place if it is held,
@@ -3377,6 +3426,7 @@ async fn spoken(
         // stopped; beside the words carried, so their answer never waits.
         let though_held = async {
             if heeded.is_some()
+                && !echoed
                 && shared.though_held
                 && crate::attention::held_line_names_reports(&text)
             {
@@ -3444,6 +3494,7 @@ async fn spoken(
         // Held as unclear: the coordinator asks again, or hums, as for the
         // Live route (#926, #828). Told once, before the turn completes.
         if heeded.is_some()
+            && !echoed
             && let Some((_, ask)) = &shared.ask_again
             && let Some((why, cut_in)) = ask(request)
         {
@@ -3477,6 +3528,9 @@ async fn spoken(
         }
         return;
     }
+    // The lamp's own words at its start or end are not sent to the model
+    // (`LAMP_SECOND_OWN_ECHO`); the line was told as heard above.
+    let text = stripped.unwrap_or(text);
     // Words cut short by this line, the same person's: asked before its
     // own, as one line (`LAMP_JOIN_CUT_WORDS`).
     let (text, carried) = match carried {
@@ -3829,6 +3883,10 @@ pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
 /// `on`, and nothing else.
 pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 
+/// Where the worker reads [`Engine::holding_own_echo`] (#2997): `on`, and
+/// nothing else.
+pub const OWN_ECHO_ENVIRONMENT: &str = "LAMP_SECOND_OWN_ECHO";
+
 /// The known person's name told to the model each turn, as the Live route
 /// tells it (#2539, the forgotten name): `on`, and nothing else.
 pub const FACE_NAME_ENVIRONMENT: &str = "LAMP_SECOND_FACE_NAME";
@@ -3952,18 +4010,21 @@ impl Drop for AbortOnDrop {
 /// and digits in lower case ("It's" is "its"), so the count is never more
 /// than the line's own words.
 fn shared_words(heard: &str, other: &str) -> usize {
-    let key = |word: &str| -> String {
-        word.chars()
-            .filter(|c| c.is_alphanumeric())
-            .flat_map(char::to_lowercase)
-            .collect()
-    };
-    let others: std::collections::HashSet<String> = other.split_whitespace().map(key).collect();
+    let others: std::collections::HashSet<String> =
+        other.split_whitespace().map(word_key).collect();
     heard
         .split_whitespace()
-        .map(key)
+        .map(word_key)
         .filter(|word| !word.is_empty() && others.contains(word))
         .count()
+}
+
+/// A word as [`shared_words`] matches it: its letters and digits, lower case.
+fn word_key(word: &str) -> String {
+    word.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 /// The journal's count, never the words, of how many of a line's words were
@@ -3990,6 +4051,43 @@ fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
     if let Some(line) = whose_words(request, heard, cut, said) {
         eprintln!("{line}");
     }
+}
+
+/// Why a line held as the lamp's own echo is held ([`own_echo`]).
+const OWN_ECHO_HELD: &str = "the lamp's own echo (LAMP_SECOND_OWN_ECHO)";
+
+/// [`own_echo::judge`] for `request`'s words `heard`: when its line began
+/// (`said`, the microphone's read time of its first packet), over the lamp's
+/// voice or not, and the lamp's latest answer so far, as
+/// [`tell_whose_words`] counts it, with when its words sent would have
+/// played to their end.
+fn own_echo_of(
+    shared: &Shared,
+    request: u64,
+    heard: &str,
+    said: &Mutex<(u64, u64)>,
+    marks: &Marks,
+) -> own_echo::Echo {
+    let began_us = said.lock().map_or(0, |said| said.0);
+    let answer = shared.lamp_said.lock().ok().map(|said| said.clone());
+    let until_us = shared.said_until_us.load(Ordering::Relaxed);
+    own_echo::judge(
+        &own_echo::Line {
+            request,
+            heard,
+            began_us,
+            over_the_lamps_voice: marks.over_the_lamps_voice,
+            called: marks.called.load(Ordering::Acquire),
+        },
+        answer
+            .as_ref()
+            .map(|(of, words)| own_echo::Said {
+                request: *of,
+                words,
+                until_us,
+            })
+            .as_ref(),
+    )
 }
 
 /// The journal's line for [`tell_whose_words`]: `request`'s words counted
@@ -5840,11 +5938,12 @@ async fn answer(
                 }
                 // Each packet's words, as long as it plays, after the one
                 // before it or from now.
-                if answering && let Some(did) = &shared.did {
-                    did(Did::Said(
-                        request,
-                        shared.said_through(samples.len(), monotonic_us()),
-                    ));
+                // Also kept for the echo's tail (`LAMP_SECOND_OWN_ECHO`).
+                if answering && (shared.did.is_some() || shared.own_echo) {
+                    let until = shared.said_through(samples.len(), monotonic_us());
+                    if let Some(did) = &shared.did {
+                        did(Did::Said(request, until));
+                    }
                 }
             }
         }
