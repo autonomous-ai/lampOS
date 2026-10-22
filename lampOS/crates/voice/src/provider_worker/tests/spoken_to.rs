@@ -904,7 +904,9 @@ async fn after_the_lamps_words(on: bool, busy: bool, ago_s: i64, long_s: u64, li
 
 /// Voice prints made at once from the line's sound: one voice says 1s,
 /// another -1s.
-struct TwoVoices(std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>);
+pub(super) struct TwoVoices(
+    pub(super) std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>,
+);
 
 impl crate::same_voice::Printer for TwoVoices {
     fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
@@ -938,7 +940,7 @@ async fn line(
 /// The same, answered by the service or, when not `answered`, left alone:
 /// the worker then closes it as unanswered. Said over the lamp, its voice
 /// could be heard.
-async fn voice_line(
+pub(super) async fn voice_line(
     rig: &mut LiveRig,
     dial: &mut Dial,
     over_the_lamp: bool,
