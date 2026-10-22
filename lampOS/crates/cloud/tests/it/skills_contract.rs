@@ -75,6 +75,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         update_page: false,
         restart: None,
         guard: None,
+        make_skill: None,
     }
 }
 

@@ -209,3 +209,19 @@ fn the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it() {
     assert!(SKILLS.contains("--tools-dir /run/lampos-skills "));
     assert_eq!(lamp_cloud::guard::SOCKET, "/run/lampos-skills/call.sock");
 }
+
+/// #2813: lamp-cloud's unit may reach lamp-voice's app-make socket, in the
+/// folder lamp-voice makes for it; a lamp without it still starts (`-`).
+#[test]
+fn the_unit_may_reach_lamp_voices_app_make_socket() {
+    let writable: Vec<&str> = UNIT
+        .lines()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .collect();
+    assert!(writable.contains(&"-/run/lampos-app-make"), "{writable:?}");
+    assert_eq!(
+        std::path::Path::new(lamp_cloud::make_skill::SOCKET).parent(),
+        Some(std::path::Path::new("/run/lampos-app-make"))
+    );
+}

@@ -46,8 +46,10 @@ for n, arm in enumerate(arms):
     # The script reads the journal since its arm began: this arm's lines only.
     out["journal"] = []
     yeses = sum(1 for line in arm if line == "Yes, please.")
-    offered = yeses >= 1 if confirm else True
-    handed = yeses >= (2 if confirm else 1)
+    # Typed in the app (MAKE_FROM=app): handed over at once, with no yes.
+    app = arm[0].startswith("APP ")
+    offered = app or (yeses >= 1 if confirm else True)
+    handed = app or yeses >= (2 if confirm else 1)
     if offered:
         out["journal"].append("lamp-voice provider: request 7 asked for make_skill")
         out["said"].append("I'll ask the computer to make a skill that nudges you to stand up. Shall I start it?")
@@ -56,7 +58,10 @@ for n, arm in enumerate(arms):
         out["show"] += 1
         if kept:
             out["journal"].append("lamp-voice: a skill made by voice is kept, version 1.0.0, sha256 " + os.environ["FAKE_SHA"])
-            out["said"].append("It breathes the light once an hour. Shall I put it on the lamp?")
+            # The news gate (El on #2889): typed in the app, the ask comes only once someone was heard (the greeting)
+            # or is seen (FAKE_FACE).
+            if not app or os.environ.get("FAKE_FACE") or "Hey Lamp, I'm back at my desk." in arm:
+                out["said"].append("It breathes the light once an hour. Shall I put it on the lamp?")
             # FAKE_EARLY: put on before anyone answered, and the yes then refused as already on.
             if os.environ.get("FAKE_EARLY"):
                 open(os.path.join(d, "installed"), "w").close()
@@ -88,6 +93,12 @@ cat >"$T/lamp_ssh" <<'EOF'
 state() { "$FAKE_STATE" "$1"; }
 echo "$*" >>"$FAKE_DIR/calls"
 case "$*" in
+  *"lamp-cloud >/dev/null"*) cat >/dev/null ;;  # the run's lamp-cloud, put beside the stand-in
+  *"lamp-cloud make-skill make"*)  # the app's skills.make, by lamp-cloud's own call
+    echo "APP make me a skill" >>"$FAKE_DIR/played"; echo making ;;
+  *"lamp-cloud make-skill made"*)  # the app's skills.made: on once installed, else asked (FAKE_APP_ to differ)
+    if [[ -e $FAKE_DIR/installed ]]; then on=on; else on=asked; fi
+    echo "${FAKE_APP_STATE:-$on} ${FAKE_APP_SHA:-$FAKE_SHA}" ;;
   *"rm -rf /usr/local/lib/played-stand-in"*) true ;;
   *"sudo -n true"*) true ;;
   *"systemctl show"*) printf 'ActiveState=active\nEnvironment=%s\n' "$FAKE_ENV" ;;
@@ -149,6 +160,28 @@ assert "```toml skill.toml\n" in answer and "```markdown SKILL.md\n" in answer, 
 assert 'kind = "installable"' in answer and "name: stand-up-nudge" in answer and 'policy = "nudge"' in answer, answer
 assert "speak" not in answer and "tool" not in answer, answer
 PY
+
+# Typed in the app (#2813): the words to the voice's app-make socket, no spoken ask and no yes to the hand-over; the
+# app's view kept with the same SHA-256, then on (yes) or still off (no); only the spoken yes puts it on.
+CLOUD=$T/fixture MAKE_FROM=app run app both 0 "PASS asked by the app" "PASS handed over" "PASS the app told it kept, the same SHA-256" \
+  "PASS installed after the yes, the kept SHA-256" "PASS the app told it on" "PASS removed" "PASS nothing installed" \
+  "PASS the app told it still off" "0 failed" "put back"
+grep -q "LAMP_APP_MAKE_SKILL=on" "$T/d/setup" || { echo "FAIL app: the app's switch was not given to the voice"; fail=1; }
+grep -q "^Hey Lamp, make me a skill" "$T/d/played" && { echo "FAIL app: the request was spoken"; fail=1; }
+grep -q "python3" "$T/d/calls" && { echo "FAIL app: Python was run on the lamp"; fail=1; }
+grep -q "sudo -n -u lampos .*lamp-cloud make-skill make" "$T/d/calls" || { echo "FAIL app: not asked as lampos"; fail=1; }
+grep -qx "Hey Lamp, I'm back at my desk." "$T/d/played" || { echo "FAIL app: nothing said for the news to be told"; fail=1; }
+# reviewer-two's controls on #2887: the app told another SHA-256, or on in the no arm, fails its check and the run.
+FAKE_APP_SHA=$(printf 'b%.0s' $(seq 64)) CLOUD=$T/fixture MAKE_FROM=app run app-other-sha both 1 \
+  "FAIL the app told it kept, the same SHA-256" "FAIL the app told it on" "FAIL the app told it still off"
+FAKE_APP_STATE=on CLOUD=$T/fixture MAKE_FROM=app run app-on-at-no no 1 "FAIL the app told it still off"
+# A face in view: the ask comes without the greeting, and no greeting is played over it (El on #2889).
+FAKE_FACE=1 CLOUD=$T/fixture MAKE_FROM=app run app-face yes 0 "PASS asked to put it on" "PASS the app told it on" "0 failed"
+grep -qx "Hey Lamp, I'm back at my desk." "$T/d/played" && { echo "FAIL app-face: the greeting was played over the ask"; fail=1; }
+# No lamp-cloud given: nothing changed, nothing played.
+MAKE_FROM=app run app-no-cloud yes 2 "needs CLOUD=PATH"
+[[ ! -e $T/d/played ]] || { echo "FAIL app-no-cloud: something was played"; fail=1; }
+FAKE_ENV="LAMP_VOICE_ROUTE=second LAMP_TASKS_DIR=/run/lampos-tasks LAMP_APP_MAKE_SKILL=on" CLOUD=$T/fixture MAKE_FROM=app run app-set yes 3 "already set"
 
 # The lamp's own confirm before the hand-over: answered, then the hand-over's yes.
 FAKE_CONFIRM=1 run confirm yes 0 "PASS asked to confirm: the lamp's answer played" "PASS handed over" "0 failed"

@@ -92,6 +92,10 @@ pub struct Real {
     /// lamp-skills' call socket, for guard mode from the owner's app, with
     /// `LAMP_GUARD_FROM_APP=on` (#2562, `crate::guard`).
     pub guard: Option<PathBuf>,
+    /// lamp-voice's app-make socket, for a skill typed in the owner's app,
+    /// with `LAMP_APP_MAKE_SKILL=on` and the skills page (#2813,
+    /// `crate::make_skill`).
+    pub make_skill: Option<PathBuf>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -610,6 +614,10 @@ impl Lamp for Real {
         self.guard.clone()
     }
 
+    fn make_skill(&self) -> Option<PathBuf> {
+        self.make_skill.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -829,6 +837,7 @@ mod tests {
             update_page: false,
             restart: None,
             guard: None,
+            make_skill: None,
         };
         let level = Volume {
             volume: 35,
@@ -957,6 +966,7 @@ mod tests {
             update_page: false,
             restart: None,
             guard: None,
+            make_skill: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
