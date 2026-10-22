@@ -962,6 +962,14 @@ fn worker_command(
             role,
             var(crate::remember::REMEMBER_ONCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_replaces_worker_environment(
+            role,
+            var(crate::remember::REPLACES_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_stable_id_worker_environment(
+            role,
+            var(lamp_msgs::known::ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -997,6 +1005,10 @@ fn worker_command(
         .envs(person_name_worker_environment(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
+        ))
+        .envs(tasks_told_worker_environment(
+            role,
+            var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
         ))
         .envs(credentials_worker_environment(
             role,
@@ -1146,6 +1158,28 @@ fn memory_keep_heard_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::heard::ENVIRONMENT, "on"))
+}
+
+// A correction replacing a kept thing (#2510), passed the same narrow way:
+// the exact `on`, to the two routes that run `remember` (each reads it in
+// `remember::start`; the second route also for its turns' journal lines).
+fn memory_replaces_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::REPLACES_ENVIRONMENT, "on"))
+}
+
+// Memory keyed on the eyes' stable id (#2176), passed the same narrow way:
+// the exact `on`, to the two routes that make a memory id from a name the
+// eyes gave (`known_faces::memory_person`).
+fn memory_stable_id_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((lamp_msgs::known::ENVIRONMENT, "on"))
 }
 
 // The note asked again after ten quiet minutes (#1693 (1)), passed the
@@ -1300,6 +1334,20 @@ fn person_name_worker_environment(
         .map(|path| (crate::person::ENVIRONMENT, path.to_owned()))
 }
 
+// The file of task news already told (#2762), to the two workers that read
+// it as the coordinator does: the second route's text news
+// (`task_news::ForTexts::for_tasks`) and both routes' task tools
+// (`agent_tasks::run`). A path, passed only when absolute; cleared, a set
+// file was the coordinator's alone and the workers kept the default.
+fn tasks_told_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| matches!(role, "provider" | "second") && Path::new(path).is_absolute())
+        .map(|path| (crate::task_news::TOLD_ENVIRONMENT, path.to_owned()))
+}
+
 // The voice unit's credentials (`LoadCredential=`, systemd's
 // `CREDENTIALS_DIRECTORY`), to the one worker that reads them: the second
 // route's, for OpenRouter's and DeepSeek's keys. A path, passed only when
@@ -1352,6 +1400,8 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+        // Read by the second route's same-voice check (#2602).
+        crate::same_voice::CALLER_ONLY_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -1423,6 +1473,7 @@ mod tests {
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
+            crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
@@ -1485,6 +1536,83 @@ mod tests {
                     .lines()
                     .any(|line| line == "LAMP_TASKS_NAMED_ASK=on"),
                 expected,
+                "{role}"
+            );
+        }
+    }
+
+    /// #2510: on lamp-06c1 `LAMP_MEMORY_REPLACES` never reached a worker,
+    /// so `replaces` was never offered. Each switch below, alone, reaches a
+    /// started worker of its routes and no other.
+    #[test]
+    fn the_memory_switches_alone_reach_the_started_routes() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let boot = new_boot().unwrap();
+        for (name, routes) in [
+            (
+                crate::remember::REPLACES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                lamp_msgs::known::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+                ["second"].as_slice(),
+            ),
+        ] {
+            let only = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
+            for role in ["second", "provider", "capture", "speaker"] {
+                let status = status_of_fresh(&mut worker_command(
+                    &script,
+                    &home.path,
+                    role,
+                    (boot, boot),
+                    &[],
+                    only,
+                ));
+                assert!(status.success(), "{name} {role}");
+                let written =
+                    std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+                assert_eq!(
+                    written.lines().any(|line| line == format!("{name}=on")),
+                    routes.contains(&role),
+                    "{name} {role}"
+                );
+            }
+        }
+    }
+
+    /// The told file of task news goes to the provider and second workers
+    /// only, and only as an absolute path (#2762).
+    #[test]
+    fn the_told_file_reaches_only_the_workers_that_tell_task_news() {
+        let absolute = std::ffi::OsStr::new("/var/lib/lampOS/voice/tasks-told");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                tasks_told_worker_environment(role, Some(absolute)),
+                Some((crate::task_news::TOLD_ENVIRONMENT, absolute.to_owned()))
+            );
+            assert_eq!(tasks_told_worker_environment(role, None), None);
+            for unfit in ["tasks-told", "", "on"] {
+                assert_eq!(
+                    tasks_told_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in [
+            "capture", "speaker", "denoise", "echo", "ring", "camera", "privacy",
+        ] {
+            assert_eq!(
+                tasks_told_worker_environment(role, Some(absolute)),
+                None,
                 "{role}"
             );
         }
@@ -1611,6 +1739,18 @@ mod tests {
                     (
                         memory_remember_once_worker_environment,
                         "LAMP_MEMORY_REMEMBER_ONCE",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // A correction replacing a kept thing (#2510).
+                    (
+                        memory_replaces_worker_environment,
+                        "LAMP_MEMORY_REPLACES",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // Memory keyed on the eyes' stable id (#2176).
+                    (
+                        memory_stable_id_worker_environment,
+                        "LAMP_MEMORY_STABLE_ID",
                         ["provider", "second"].as_slice(),
                     ),
                     // The room's early words, the Live route alone (#2176).
@@ -1764,7 +1904,7 @@ mod tests {
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
     /// days, the clock, the name's file (#1323) and its scoped context
-    /// (#1839), capture the quiet
+    /// (#1839), both task news's told file (#2762), capture the quiet
     /// evidence switch (#1285) and the detector's input (#828), and the ring
     /// the unplug switch (#1674, the reviewer on #1699). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
@@ -1795,6 +1935,8 @@ mod tests {
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
+                    crate::remember::REPLACES_ENVIRONMENT,
+                    lamp_msgs::known::ENVIRONMENT,
                     crate::early_words::ENVIRONMENT,
                     crate::follows_face::ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
@@ -1815,6 +1957,8 @@ mod tests {
                     "6-7"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
+                } else if name == crate::task_news::TOLD_ENVIRONMENT {
+                    "/var/lib/lampOS/voice/tasks-told"
                 } else if name == crate::second_config::CREDENTIALS_ENV {
                     "/run/credentials/lamp-voice.service"
                 } else if name == crate::second_config::GEMINI_BASE_URL_ENV {
@@ -1848,6 +1992,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
+                    || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
@@ -1914,10 +2059,13 @@ mod tests {
                     "LAMP_MEMORY_LINK_USED=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
+                    "LAMP_MEMORY_REPLACES=on",
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
+                    "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                 ],
             ),
             (
@@ -1945,8 +2093,10 @@ mod tests {
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REOPEN_QUIET=on",
+                    "LAMP_MEMORY_REPLACES=on",
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
+                    "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAME_SECOND_SIGN=on",
@@ -1954,6 +2104,7 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
@@ -1983,6 +2134,7 @@ mod tests {
                     "LAMP_SECOND_WEATHER=on",
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_TASKS_NAMED_ASK=on",
+                    "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                     "LAMP_TURNED_SPEAKING=on",
                 ],
             ),
@@ -2156,3 +2308,6 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) mod ring_startup_tests;
+
+#[cfg(test)]
+mod switch_census_tests;
