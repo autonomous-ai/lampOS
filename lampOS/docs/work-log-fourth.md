@@ -5969,6 +5969,36 @@ Ready for lamp-voice: no (#2782 awaits its new exact-head gates; #2774 waits for
   https://github.com/autonomous-ai/lampOS/issues/2789#issuecomment-6331681498.
   No group, ACL, product default or device change has been made.
 
+## 2026-10-22 10:21 ICT: peek read status published as #2870
+
+Ready for lamp-voice: no (#2870 and #2782 await native gates; #2774 waits for the fixture merge).
+
+- #2789 piece 1 is draft #2870, head `7f6a6afe4ec8b1d24d644c7370bf180e919cafa5`,
+  base `2d1d353965b6b9f9bdc043ee4d19832630b3a6d8` on `fourth/peek-read-status`.
+  One commit, `lampOS: show when peek cannot read voice sessions`.
+  Typed permission/missing/other status reaches Turns and Overview;
+  cached rows are marked stale and successful reads clear the warning.
+  Fixed messages expose no filesystem path or raw OS error.
+- A single blocking read retains an owned async cache guard even if its
+  SSE request is cancelled. Waiting streams yield the runtime thread.
+  The guard-acquisition regression is explicitly synchronized.
+- Local fmt, strict workspace Clippy, 26 Peek checks (15 unit, 11 HTTP;
+  0 failed/ignored) and workspace build pass. Peek has no Cargo reverse
+  dependencies; CI's file-reader crates stay under its native gate.
+  One earlier lint failure was corrected and retained in the raw logs.
+  Authored/host-tested base `fab69b0c4`; the clean rebase preserved all
+  five validated source/doc hashes (`2c805df8d = 6cde4f593`).
+- Single-stream host timings: first denial 1.103 ms; first readable
+  1007.352 ms; stale 1007.041 ms; recovery 1008.003 ms. Target below
+  2 s with ordinary local files and fast unit status. Existing systemd
+  status reads can still delay a whole push up to 10 s. No lamp timing.
+- Exact-head ARM64 39716259731 and Clippy 39716259849 are running.
+  Evidence is `docs/verification/peek-read-status-20261022/README.md`;
+  raw logs/receipt `/private/tmp/fourth-peek-read-status-checks/`.
+  Parts 2–4 remain open: required Voice/bus contract confirmation,
+  narrow Records grant support, own-account unit, authorized lamp proof.
+  No account, group, ACL, product default or device was changed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
