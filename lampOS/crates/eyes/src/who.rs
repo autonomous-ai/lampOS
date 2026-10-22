@@ -16,7 +16,10 @@ use std::{
     io::{self, Read, Write},
     os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use tract_onnx::prelude::*;
 
@@ -467,6 +470,41 @@ pub(crate) fn near_name(a: &str, b: &str) -> bool {
     }
 }
 
+/// An unchanged person reserved for an explicitly approved face repair.
+/// Private, non-cloneable and deliberately not Debug or serializable: the
+/// snapshot contains biometric prints. It is valid only in its live store,
+/// before another committed save, and is consumed by one replacement attempt.
+/// This is a store precondition, not proof of account or spoken consent.
+pub struct RepairTarget {
+    owner: Arc<AtomicU64>,
+    revision: u64,
+    person: Person,
+}
+
+/// Fixed outcomes contain no name, identifier, print, or filesystem path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepairError {
+    TargetChanged,
+    InvalidPrints,
+    KnownElsewhere,
+    /// No rename completed: the old file and in-memory records remain.
+    NotWritten,
+    /// Rename completed and RAM follows that visible file, but directory
+    /// durability is unconfirmed. Consume the approval, reload and report
+    /// uncertainty; never retry it as if the old face were still installed.
+    Indeterminate,
+}
+
+/// Before each actual I/O operation. The private hook lets tests fail these
+/// boundaries without replacing the filesystem or changing ordinary saves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RepairStep {
+    Write,
+    SyncFile,
+    Rename,
+    SyncDirectory,
+}
+
 /// The people the lamp was asked to remember, in one file of mode 0600.
 pub struct People {
     path: PathBuf,
@@ -485,6 +523,10 @@ pub struct People {
     /// With `LAMP_MEMORY_STABLE_ID=on`: each person keeps one memory id
     /// ([`Person::id`]), told beside their name in the known file.
     stable_ids: bool,
+    /// Process-local store identity and save revision. Any visible write
+    /// invalidates staged repairs, including a delete followed by recreation.
+    /// Exhaustion disables new repairs instead of wrapping to an old revision.
+    repair_revision: Arc<AtomicU64>,
 }
 
 impl People {
@@ -513,6 +555,7 @@ impl People {
                     counted: Vec::new(),
                     unscored: Vec::new(),
                     stable_ids: lamp_msgs::known::stable_ids(),
+                    repair_revision: Arc::new(AtomicU64::new(0)),
                 });
             }
             Err(error) => return Err(error.into()),
@@ -531,6 +574,7 @@ impl People {
                 counted: Vec::new(),
                 unscored: Vec::new(),
                 stable_ids: lamp_msgs::known::stable_ids(),
+                repair_revision: Arc::new(AtomicU64::new(0)),
             })
         };
         if bytes.len() as u64 > MOST_FILE_BYTES {
@@ -575,6 +619,7 @@ impl People {
             counted: Vec::new(),
             unscored: Vec::new(),
             stable_ids: false,
+            repair_revision: Arc::new(AtomicU64::new(0)),
         };
         if !aside.is_empty() {
             let kept = write_set_aside(
@@ -665,6 +710,135 @@ impl People {
             .iter()
             .map(|person| person.name.clone())
             .collect()
+    }
+
+    /// Snapshot an existing canonical record without freeing its name or
+    /// changing its ID. Missing legacy IDs stay missing; no ID is allocated.
+    /// The controller must separately bind account approval, the fresh lamp
+    /// capture and spoken consent, and enforce cancellation and expiry.
+    pub fn repair_target(&self, name: &str) -> Option<RepairTarget> {
+        let name = plain_name(name)?;
+        let person = self
+            .people
+            .iter()
+            .find(|person| same_name(&person.name, &name))?;
+        let revision = self.repair_revision.load(Ordering::Relaxed);
+        (revision != u64::MAX).then(|| RepairTarget {
+            owner: self.repair_revision.clone(),
+            revision,
+            person: person.clone(),
+        })
+    }
+
+    /// Conditionally replace only this person's prints. Their canonical name,
+    /// stable memory ID, familiarity and added time stay; named-visit consent
+    /// is cleared because new face prints cannot inherit the previous yes.
+    /// No record is deleted or re-added, and no memory or rule store is called.
+    ///
+    /// This blocking store operation belongs off the capture path. The caller
+    /// must exclusively own this People writer; this is not a cross-process
+    /// transaction or an authorization API. Success follows file sync, atomic
+    /// rename and parent-directory sync. A post-rename failure is explicitly
+    /// indeterminate, with RAM already matching the newly visible file.
+    pub fn replace_prints(
+        &mut self,
+        target: RepairTarget,
+        prints: Vec<Vec<f32>>,
+    ) -> std::result::Result<(), RepairError> {
+        self.replace_prints_at(target, prints, |_| Ok(()))
+    }
+
+    fn replace_prints_at(
+        &mut self,
+        target: RepairTarget,
+        prints: Vec<Vec<f32>>,
+        mut before: impl FnMut(RepairStep) -> io::Result<()>,
+    ) -> std::result::Result<(), RepairError> {
+        if !Arc::ptr_eq(&target.owner, &self.repair_revision)
+            || target.revision != self.repair_revision.load(Ordering::Relaxed)
+        {
+            return Err(RepairError::TargetChanged);
+        }
+        let Some(index) = self
+            .people
+            .iter()
+            .position(|person| *person == target.person)
+        else {
+            return Err(RepairError::TargetChanged);
+        };
+        // Recognition uses dot products of unit prints. Refuse malformed or
+        // scaled vectors rather than allowing scale to hide another match.
+        if !(1..=MOST_PRINTS).contains(&prints.len())
+            || prints.iter().any(|print| {
+                if print.len() != PRINT {
+                    return true;
+                }
+                let squared = print.iter().map(|value| value * value).sum::<f32>();
+                !print.iter().all(|value| value.is_finite())
+                    || !squared.is_finite()
+                    || (squared - 1.0).abs() > 0.001
+            })
+        {
+            return Err(RepairError::InvalidPrints);
+        }
+        // Check every other record, not only who()'s best match: a print
+        // matching the target more strongly may still match somebody else.
+        if self.people.iter().enumerate().any(|(other, person)| {
+            other != index
+                && person.prints.iter().any(|kept| {
+                    prints
+                        .iter()
+                        .any(|print| likeness(kept, print) >= SAME_PERSON)
+                })
+        }) {
+            return Err(RepairError::KnownElsewhere);
+        }
+        let mut next = self.people.clone();
+        next[index].prints = prints;
+        next[index].tell_visits = None;
+        let text = serde_json::to_vec(&Kept {
+            version: 1,
+            scored_at_unix_s: self.scored_at,
+            people: next.clone(),
+        })
+        .map_err(|_| RepairError::NotWritten)?;
+        if text.len() as u64 > MOST_FILE_BYTES {
+            return Err(RepairError::NotWritten);
+        }
+        let parent = self
+            .path
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let directory = File::open(parent).map_err(|_| RepairError::NotWritten)?;
+        let (temporary, mut file) = repair_file(&self.path).map_err(|_| RepairError::NotWritten)?;
+        let written = (|| -> io::Result<()> {
+            before(RepairStep::Write)?;
+            file.write_all(&text)?;
+            before(RepairStep::SyncFile)?;
+            file.sync_all()?;
+            before(RepairStep::Rename)?;
+            std::fs::rename(&temporary, &self.path)
+        })();
+        drop(file);
+        if written.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+            return Err(RepairError::NotWritten);
+        }
+        // No fallible step or callback between the visible rename and RAM.
+        self.people = next;
+        self.advance_repair_revision();
+        before(RepairStep::SyncDirectory)
+            .and_then(|()| directory.sync_all())
+            .map_err(|_| RepairError::Indeterminate)
+    }
+
+    fn advance_repair_revision(&self) {
+        let _ =
+            self.repair_revision
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |revision| {
+                    Some(revision.saturating_add(1))
+                });
     }
 
     /// The names of those who said yes to being named to others in Who was
@@ -1147,8 +1321,36 @@ impl People {
         file.write_all(&text)?;
         file.sync_all()?;
         std::fs::rename(&temporary, &self.path)?;
+        self.advance_repair_revision();
         Ok(())
     }
+}
+
+/// A fresh sibling, never the ordinary save's .new file. create_new refuses
+/// stale files and symlinks without truncating them; the bounded suffix search
+/// tolerates a few copies left by a terminated process with a reused PID.
+fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    for _ in 0..16 {
+        let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
+        let mut temporary = path.as_os_str().to_owned();
+        temporary.push(format!(".repair-{}-{sequence}.new", std::process::id()));
+        let temporary = PathBuf::from(temporary);
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)
+        {
+            Ok(file) => return Ok((temporary, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "repair temporary files occupied",
+    ))
 }
 
 /// What the voice service asks of the eyes on their request socket: one
@@ -1960,6 +2162,362 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
         directory.join("people.json")
+    }
+
+    fn repair_print(axis: usize) -> Vec<f32> {
+        let mut print = vec![0.0; PRINT];
+        print[axis] = 1.0;
+        print
+    }
+
+    fn repair_people(label: &str) -> People {
+        let mut people = People::open(file(label)).unwrap().with_stable_ids(true);
+        people
+            .remember("Fixture Original", vec![repair_print(0)], 101)
+            .unwrap();
+        people
+            .remember_one("Fixture Target", vec![repair_print(0)], 202, true, false)
+            .unwrap();
+        people
+            .remember("Fixture Other", vec![repair_print(1)], 303)
+            .unwrap();
+        people.people[0].familiar = Some(4.5);
+        people.people[0].tell_visits = Some(true);
+        people.people[1].tell_visits = Some(true);
+        people.scored_at = Some(404);
+        people.counted = vec![("Fixture Target".into(), 505)];
+        people.unscored = vec!["Fixture Target".into()];
+        people.save(&people.people).unwrap();
+        people
+    }
+
+    #[test]
+    fn repair_reserves_the_whole_record_then_replaces_only_prints_and_visit_consent() {
+        use std::os::unix::fs::PermissionsExt;
+        let mut people = repair_people("repair-preserves");
+        let before = people.people.clone();
+        let bytes = std::fs::read(&people.path).unwrap();
+        let counted = people.counted.clone();
+        let unscored = people.unscored.clone();
+        let target = people.repair_target("fixture target").unwrap();
+        assert_eq!(people.people, before, "staging removes no record");
+        assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        assert_eq!(people.who(&repair_print(0)).unwrap().0, "Fixture Target");
+        assert_eq!(
+            people.remember_one("Fixture Target", vec![repair_print(2)], 606, true, true),
+            Err(Refused::NotLikeThem),
+            "the reserved name cannot be taken by ordinary remembering"
+        );
+        assert_eq!(
+            people.id_of("Fixture Target"),
+            Some(lamp_msgs::known::person_id("Fixture Original")),
+            "the repair starts from a renamed person's original memory ID"
+        );
+        let untouched = people.path.with_file_name("unrelated-private-state");
+        std::fs::write(&untouched, b"synthetic memory and rules marker").unwrap();
+        let prints = vec![repair_print(2), repair_print(3)];
+        people.replace_prints(target, prints.clone()).unwrap();
+        let mut expected = before;
+        expected[0].prints = prints;
+        expected[0].tell_visits = None;
+        assert_eq!(people.people, expected);
+        assert_eq!(people.scored_at, Some(404));
+        assert_eq!(people.counted, counted);
+        assert_eq!(people.unscored, unscored);
+        assert_eq!(people.tellable(), ["Fixture Other"]);
+        assert_eq!(
+            std::fs::read(&untouched).unwrap(),
+            b"synthetic memory and rules marker"
+        );
+        let reopened = People::open(people.path.clone())
+            .unwrap()
+            .with_stable_ids(true);
+        assert_eq!(reopened.people, expected);
+        assert_eq!(reopened.scored_at, people.scored_at);
+        assert_eq!(
+            std::fs::metadata(&people.path)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
+
+    #[test]
+    fn repair_never_allocates_an_id_for_a_legacy_record() {
+        let mut people = People::open(file("repair-no-id"))
+            .unwrap()
+            .with_stable_ids(false);
+        people
+            .remember("Fixture Target", vec![repair_print(0)], 101)
+            .unwrap();
+        let target = people.repair_target("Fixture Target").unwrap();
+        people
+            .replace_prints(target, vec![repair_print(2)])
+            .unwrap();
+        assert_eq!(people.people[0].id, None);
+        let kept: Kept = serde_json::from_slice(&std::fs::read(&people.path).unwrap()).unwrap();
+        assert_eq!(kept.people[0].id, None);
+        assert_eq!(kept.people[0].name, "Fixture Target");
+        assert_eq!(kept.people[0].added_unix_s, 101);
+    }
+
+    #[test]
+    fn repair_targets_are_missing_or_bound_to_their_original_live_store() {
+        let people = repair_people("repair-target-owner");
+        assert!(people.repair_target("Fixture Missing").is_none());
+        assert!(people.repair_target("not/a/name").is_none());
+        let target = people.repair_target("Fixture Target").unwrap();
+        let mut reopened = People::open(people.path.clone())
+            .unwrap()
+            .with_stable_ids(true);
+        let bytes = std::fs::read(&people.path).unwrap();
+        assert_eq!(
+            reopened.replace_prints(target, vec![repair_print(2)]),
+            Err(RepairError::TargetChanged)
+        );
+        assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        let target = people.repair_target("Fixture Target").unwrap();
+        let mut elsewhere = repair_people("repair-target-elsewhere");
+        assert_eq!(
+            elsewhere.replace_prints(target, vec![repair_print(2)]),
+            Err(RepairError::TargetChanged)
+        );
+    }
+
+    #[test]
+    fn repair_refuses_every_changed_target_field() {
+        for field in ["name", "id", "prints", "added", "familiar", "visits"] {
+            let mut people = repair_people(&format!("repair-changed-{field}"));
+            let target = people.repair_target("Fixture Target").unwrap();
+            let person = &mut people.people[0];
+            match field {
+                "name" => person.name = "Fixture Renamed".into(),
+                "id" => person.id = Some(lamp_msgs::known::person_id("Fixture Different")),
+                "prints" => person.prints = vec![repair_print(4)],
+                "added" => person.added_unix_s += 1,
+                "familiar" => person.familiar = Some(5.0),
+                "visits" => person.tell_visits = None,
+                _ => unreachable!(),
+            }
+            // Exercise the snapshot comparison itself, independently of the
+            // save revision: a future in-memory metadata change must refuse too.
+            let before = people.people.clone();
+            let bytes = std::fs::read(&people.path).unwrap();
+            assert_eq!(
+                people.replace_prints(target, vec![repair_print(2)]),
+                Err(RepairError::TargetChanged),
+                "{field}"
+            );
+            assert_eq!(people.people, before);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn repair_refuses_deleted_renamed_and_deleted_then_recreated_targets() {
+        for change in ["deleted", "renamed", "recreated"] {
+            let mut people = repair_people(&format!("repair-{change}"));
+            let target = people.repair_target("Fixture Target").unwrap();
+            let original = people.people.clone();
+            if change == "renamed" {
+                people
+                    .remember_one("Fixture Renamed", vec![repair_print(0)], 606, true, false)
+                    .unwrap();
+            } else {
+                people.forget_at("Fixture Target", 606).unwrap();
+                if change == "recreated" {
+                    people.people = original;
+                    people.save(&people.people).unwrap();
+                }
+            }
+            let before = people.people.clone();
+            let bytes = std::fs::read(&people.path).unwrap();
+            assert_eq!(
+                people.replace_prints(target, vec![repair_print(2)]),
+                Err(RepairError::TargetChanged),
+                "{change}"
+            );
+            assert_eq!(people.people, before);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn repair_cas_rejects_a_second_snapshot_and_an_intervening_save_even_if_restored() {
+        let mut people = repair_people("repair-cas");
+        let first = people.repair_target("Fixture Target").unwrap();
+        let second = people.repair_target("Fixture Target").unwrap();
+        people.replace_prints(first, vec![repair_print(2)]).unwrap();
+        let bytes = std::fs::read(&people.path).unwrap();
+        assert_eq!(
+            people.replace_prints(second, vec![repair_print(3)]),
+            Err(RepairError::TargetChanged)
+        );
+        assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        let target = people.repair_target("Fixture Target").unwrap();
+        let before = people.people.clone();
+        people.tell_visits("Fixture Target", true).unwrap();
+        people.tell_visits("Fixture Target", false).unwrap();
+        assert_eq!(people.people, before);
+        assert_eq!(
+            people.replace_prints(target, vec![repair_print(4)]),
+            Err(RepairError::TargetChanged),
+            "a change and restoration cannot revive a staged repair"
+        );
+    }
+
+    #[test]
+    fn repair_rejects_invalid_embeddings_without_changing_memory_or_disk() {
+        let mut nan = repair_print(2);
+        nan[3] = f32::NAN;
+        let mut infinite = repair_print(2);
+        infinite[3] = f32::INFINITY;
+        let mut negative_infinite = repair_print(2);
+        negative_infinite[3] = f32::NEG_INFINITY;
+        let mut scaled = repair_print(2);
+        scaled[2] = 0.1;
+        let mut people = repair_people("repair-invalid");
+        let before = people.people.clone();
+        let bytes = std::fs::read(&people.path).unwrap();
+        for prints in [
+            vec![],
+            vec![repair_print(2); MOST_PRINTS + 1],
+            vec![vec![1.0; PRINT - 1]],
+            vec![vec![1.0; PRINT + 1]],
+            vec![nan],
+            vec![infinite],
+            vec![negative_infinite],
+            vec![vec![0.0; PRINT]],
+            vec![vec![f32::MAX; PRINT]],
+            vec![scaled],
+        ] {
+            let target = people.repair_target("Fixture Target").unwrap();
+            assert_eq!(
+                people.replace_prints(target, prints),
+                Err(RepairError::InvalidPrints)
+            );
+            assert_eq!(people.people, before);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn repair_rejects_any_print_matching_another_person_even_when_the_target_matches_better() {
+        let mut people = repair_people("repair-other-person");
+        let before = people.people.clone();
+        let bytes = std::fs::read(&people.path).unwrap();
+        let mut shared = vec![0.0; PRINT];
+        shared[0] = 0.8;
+        shared[1] = 0.6;
+        assert_eq!(people.who(&shared).unwrap().0, "Fixture Target");
+        for prints in [
+            vec![repair_print(1)],
+            vec![repair_print(2), repair_print(1)],
+            vec![shared],
+        ] {
+            let target = people.repair_target("Fixture Target").unwrap();
+            assert_eq!(
+                people.replace_prints(target, prints),
+                Err(RepairError::KnownElsewhere)
+            );
+            assert_eq!(people.people, before);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn repair_write_faults_leave_ram_matching_the_visible_old_or_new_file() {
+        for step in [
+            RepairStep::Write,
+            RepairStep::SyncFile,
+            RepairStep::Rename,
+            RepairStep::SyncDirectory,
+        ] {
+            let mut people = repair_people(&format!("repair-fault-{step:?}"));
+            let target = people.repair_target("Fixture Target").unwrap();
+            let mut expected = people.people.clone();
+            let changed = step == RepairStep::SyncDirectory;
+            let prints = vec![repair_print(2)];
+            if changed {
+                expected[0].prints = prints.clone();
+                expected[0].tell_visits = None;
+            }
+            let result = people.replace_prints_at(target, prints, |at| {
+                if at == step {
+                    Err(io::Error::other("injected repair boundary"))
+                } else {
+                    Ok(())
+                }
+            });
+            assert_eq!(
+                result,
+                Err(if changed {
+                    RepairError::Indeterminate
+                } else {
+                    RepairError::NotWritten
+                })
+            );
+            assert_eq!(people.people, expected, "{step:?}");
+            let reopened = People::open(people.path.clone())
+                .unwrap()
+                .with_stable_ids(true);
+            assert_eq!(reopened.people, expected, "{step:?}");
+            assert_eq!(
+                reopened.id_of("Fixture Target"),
+                Some(lamp_msgs::known::person_id("Fixture Original"))
+            );
+            assert!(
+                std::fs::read_dir(people.path.parent().unwrap())
+                    .unwrap()
+                    .all(|entry| {
+                        !entry
+                            .unwrap()
+                            .file_name()
+                            .to_string_lossy()
+                            .contains(".repair-")
+                    }),
+                "failed temporary copies do not accumulate"
+            );
+        }
+    }
+
+    #[test]
+    fn repair_syncs_the_file_before_rename_and_the_directory_before_success() {
+        let mut people = repair_people("repair-durable-order");
+        let target = people.repair_target("Fixture Target").unwrap();
+        let path = people.path.clone();
+        let before = people.people.clone();
+        let mut expected = before.clone();
+        expected[0].prints = vec![repair_print(2)];
+        expected[0].tell_visits = None;
+        let mut reached = Vec::new();
+        people
+            .replace_prints_at(target, vec![repair_print(2)], |step| {
+                reached.push(step);
+                let visible: Kept = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+                assert_eq!(
+                    visible.people,
+                    if step == RepairStep::SyncDirectory {
+                        expected.clone()
+                    } else {
+                        before.clone()
+                    }
+                );
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            reached,
+            [
+                RepairStep::Write,
+                RepairStep::SyncFile,
+                RepairStep::Rename,
+                RepairStep::SyncDirectory
+            ]
+        );
+        assert_eq!(people.people, expected);
     }
 
     /// #1997, the lead's yes: a remembered person's yes to being named to
