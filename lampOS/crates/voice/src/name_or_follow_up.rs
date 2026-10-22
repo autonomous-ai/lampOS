@@ -38,8 +38,12 @@
 //! the lamp does not say its name; one says it when others are around. So
 //! the room must turn busy from the talk the lamp holds
 //! (`room_told::RoomTold::count_held_talk`): in a room not known to be busy,
-//! a line held as said to nobody, or to someone else, is talk even with only
-//! talk counted, and two people seen or heard (two faces in the eyes'
+//! a line held as said to someone else by name, or as said to nobody with
+//! someone in view and turned away (`bus_out::someone_in_view_turned_away`),
+//! is talk even with only talk counted, never a lone voice's lines held with
+//! nobody in view (on lamp-4ace on 22 October an unseen person's misheard
+//! call and the lines after it turned the room busy, and the scene was
+//! lost); and two people seen or heard (two faces in the eyes'
 //! newest look, `bus_out::faces_in_view`, or a line in another voice than
 //! the conversation's) make the room busy at once
 //! (`room_told::RoomTold::two_people`). Its costs: a colleague off camera,
