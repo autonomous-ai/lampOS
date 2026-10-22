@@ -1048,16 +1048,25 @@ the unchanged legacy client, used unless the new Days client is selected.
   something else.", their words quoted as untrusted. An undated thread is
   told the old sentence. **Marked when the lamp asks:** a dated one is
   given unmarked (`"until_asked": true`), and the voice watches that
-  person's exchanges: when the lamp's own reply shares two of the event's
-  key words, or one with a question mark ("how was your sister's
-  wedding?", "how was Saturday?"; `remember::asks_about`), it sends
-  `follow_up_asked` once and the memory never gives it again. Not seen
-  (a paraphrase with none of its words, "how did the big day go?", or a
-  reply in another language than its words), it is offered again on a
+  person's exchanges: when one sentence of the lamp's own finished reply
+  is itself a question (ending in `?` or `？`) and holds two of the
+  event's key words, or one of its own that is not a when word (a
+  weekday, a month, a time word such as "weekend", or a word with a
+  digit), as in "how was your sister's wedding?" or "did the wedding go
+  well?" (`remember::asks_about`), it sends `follow_up_asked` once and
+  the memory never gives it again (reviewer-two's P2 on #2894:
+  "Saturday should be sunny. Anything else I can help with?" has the
+  day and the question in different sentences, and does not count). The
+  mark is apart from the journal: a remember or forget turn's reply,
+  kept out of the journal, still marks it ("I'll remember that. How was
+  your sister's wedding?"). Not seen (a paraphrase with none of its own
+  words, "how did the big day go?", a question by its day alone, "how
+  was Saturday?", a statement, "your sister's wedding sounds lovely", or
+  a reply in another language than its words), it is offered again on a
   later day, in at most three sessions in all, the last recorded as given,
-  never more than one follow-up a day; a reply that names it without
-  asking ("your sister's wedding sounds lovely") counts, as it was brought
-  up. An older memory refuses `until_asked` and the session is told none,
+  never more than one follow-up a day; a question about something else
+  that names one of its own words ("is your sister well?") counts. An
+  older memory refuses `until_asked` and the session is told none,
   as it refuses `events`. Off, the prompt,
   the job, what goes to `tidy_apply` (every `on` stripped, so an older
   memory never sees it) and the note are byte for byte as before. Either
@@ -1079,6 +1088,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   `remember::tests::the_lamp_asking_about_a_dated_follow_up_sends_the_mark_once`,
   `remember::tests::with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask`,
   `remember::tests::the_writer_sends_the_mark_as_follow_up_asked`,
+  `remember::tests::a_question_in_a_remember_turn_marks_the_follow_up_but_is_not_journalled`,
   `days::a_dated_one_given_until_asked_is_offered_again_until_marked_asked`,
   `days::a_dated_one_never_asked_is_offered_at_most_three_times`,
   `days::until_asked_holds_back_only_a_dated_one`,
