@@ -1,5 +1,43 @@
 # Tests work log
 
+## 2026-10-23 00:20 +0700 — Skills fixtures admitted to First's train
+
+Ready for lamp-voice: **yes, train-only** for [#2693](https://github.com/autonomous-ai/lampOS/pull/2693)
+head `381e5ce54` and [#3076](https://github.com/autonomous-ai/lampOS/pull/3076)
+head `273f8fb96`. [Reviewer-two's clearance](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6346529799)
+clears their source/local holds; both are out of draft.
+[First's next train](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6346630405)
+contains #2693, #3076 and #3062. First owns the current-base carry, both
+requested documentation paragraphs and fresh combined native ARM qualification.
+This is admission to that coordinated train, not a merged or independently
+current-base qualification claim. Earlier hold entries remain historical.
+
+## 2026-10-23 00:20 +0700 — fixed full-parallel Voice pair retains 18 failures
+
+Ready for lamp-voice: **no, [#3023](https://github.com/autonomous-ai/lampOS/pull/3023)**.
+The requested one-before/one-after Mac library commands used default
+CPU parallelism: unchanged `ec5428a34` passed **3,384/0/14**, candidate
+`735b2cb5d` failed **3,366/18/14**. Both compiled inventories contain the same
+**3,398** identities. All seven assigned cases and kept-start pass both;
+light-call integration was outside these `--lib` commands. No suite was retried.
+The captured execution context reports Darwin x86_64; physical hardware ISA
+and translation status were not established.
+
+[Portable complete receipt](verification/voice-ec-parallel-20261022/) retains
+all raw streams, exact 18 failures, commands, exits, source maps and hashes.
+The external parser initially missed three passed `- should panic` rows after
+the baseline command exited 0. A strict stored-output check recovered all rows
+before only the unrun after arm executed; that parser error is separate from
+the candidate's genuine Cargo exit 101. Both worktrees remained clean.
+
+Read-only tracing found no direct clock leakage or new guard dependency in the
+failing motor/body/ring/microphone/signal paths. Indirect scheduling, child
+startup and filesystem interaction remain possible; neither inherited failure,
+host-load cause nor patch causation is established. The earlier full candidate
+Update consumer failure remains held despite its single focused EC pass and
+the successful separate workspace build. Different Round artifact hashes do
+not establish compiled identity. No new fix or deadline change was made.
+
 ## 2026-10-22 23:49 +0700 — Voice rebase receipt retains failed Update consumer gate
 
 Ready for lamp-voice: **no; [#3023](https://github.com/autonomous-ai/lampOS/pull/3023) remains draft**.

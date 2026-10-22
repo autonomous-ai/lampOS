@@ -1,0 +1,614 @@
+{
+  "status": "fixed before/after observations completed; no repeated test executions",
+  "observations": [
+    {
+      "arm": "before",
+      "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "command": {
+        "label": "full-library",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--offline"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS",
+        "timeout_seconds": 1800,
+        "started_utc": "2026-10-22T16:40:17.190939+00:00",
+        "started_epoch_ns": 1792687217190962000,
+        "load_average_before": [
+          6.544921875,
+          8.33544921875,
+          9.95556640625
+        ],
+        "stdout": "full-library.stdout",
+        "stderr": "full-library.stderr",
+        "pid": 32866,
+        "exit": 0,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 376.357434,
+        "load_average_after": [
+          32.197265625,
+          17.94384765625,
+          13.16357421875
+        ],
+        "stdout_sha256": "b5e8ff1281067aeabcaaaa8289455fd7ce2ffe096f35d3584b9ad4809a694502",
+        "stdout_bytes": 336976,
+        "stderr_sha256": "340f74d6a591090778912d77038a4d6310c911906175fe00d568b7ba80c10367",
+        "stderr_bytes": 3083
+      },
+      "summary": [
+        "ok",
+        "3384",
+        "0",
+        "14",
+        "0",
+        "0",
+        "276.28"
+      ],
+      "inventory": {
+        "label": "compiled-inventory",
+        "argv": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS",
+        "timeout_seconds": 60,
+        "started_utc": "2026-10-22T16:46:33.852923+00:00",
+        "started_epoch_ns": 1792687593852962000,
+        "load_average_before": [
+          32.197265625,
+          17.94384765625,
+          13.16357421875
+        ],
+        "stdout": "compiled-inventory.stdout",
+        "stderr": "compiled-inventory.stderr",
+        "pid": 68461,
+        "exit": 0,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 0.260931,
+        "load_average_after": [
+          32.197265625,
+          17.94384765625,
+          13.16357421875
+        ],
+        "stdout_sha256": "3193568c3decdd2880965bf02ad941d8c566f35c51e783e563075bb0b6e9ffcd",
+        "stdout_bytes": 315532,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "artifact": {
+        "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "sha256": "f3972a8a1019627418229df914e583cfb833d8f243558ad0bbc26b49021305b2",
+        "mtime_ns": 1792687314652964336,
+        "size": 106524576,
+        "fresh_compile_line": "   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS/crates/voice)"
+      },
+      "inventory_count": 3398,
+      "inventory_names_sha256": "3ba3d2c615880182a9a0edd60b78ef115894887a2b84b5ac25eda1dac0a95abc",
+      "assigned_rows": {
+        "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": "ok",
+        "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet": "ok",
+        "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by": "ok",
+        "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked": "ok",
+        "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply": "ok",
+        "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going": "ok",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news": "ok"
+      },
+      "kept_start": "ok",
+      "all_failed_tests": [],
+      "scope": "Library only. light_call integration not executed."
+    },
+    {
+      "arm": "after",
+      "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+      "command": {
+        "label": "full-library",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--offline"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-events-20261022/lampOS",
+        "timeout_seconds": 1800,
+        "started_utc": "2026-10-22T16:48:54.103799+00:00",
+        "started_epoch_ns": 1792687734103826000,
+        "load_average_before": [
+          28.552734375,
+          20.16943359375,
+          14.67041015625
+        ],
+        "stdout": "full-library.stdout",
+        "stderr": "full-library.stderr",
+        "pid": 80759,
+        "exit": 101,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 511.770055,
+        "load_average_after": [
+          11.54833984375,
+          12.56494140625,
+          13.00634765625
+        ],
+        "stdout_sha256": "1a70b8496a075e86075287e86369fdf051b251fe8a3bc2d34c2fbc3a86209a7f",
+        "stdout_bytes": 346695,
+        "stderr_sha256": "44a8250f1819c201566da7cd18187c0bf9eb19f81ed58eba66cc54de1b09623b",
+        "stderr_bytes": 3975
+      },
+      "summary": [
+        "FAILED",
+        "3366",
+        "18",
+        "14",
+        "0",
+        "0",
+        "360.55"
+      ],
+      "inventory": {
+        "label": "compiled-inventory",
+        "argv": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "cwd": "/private/tmp/tests-codex-voice-events-20261022/lampOS",
+        "timeout_seconds": 60,
+        "started_utc": "2026-10-22T16:57:26.178894+00:00",
+        "started_epoch_ns": 1792688246178919000,
+        "load_average_before": [
+          11.54833984375,
+          12.56494140625,
+          13.00634765625
+        ],
+        "stdout": "compiled-inventory.stdout",
+        "stderr": "compiled-inventory.stderr",
+        "pid": 31177,
+        "exit": 0,
+        "timed_out": false,
+        "cleanup": {
+          "initial_members": [],
+          "signals": [],
+          "final_members": [],
+          "no_live_owned_children": true
+        },
+        "wall_seconds": 0.232902,
+        "load_average_after": [
+          11.54833984375,
+          12.56494140625,
+          13.00634765625
+        ],
+        "stdout_sha256": "3193568c3decdd2880965bf02ad941d8c566f35c51e783e563075bb0b6e9ffcd",
+        "stdout_bytes": 315532,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "artifact": {
+        "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "sha256": "3b1a1e4233d456984a3011b02db9281ff87b12bece8ddc584856bc7f99803cf0",
+        "mtime_ns": 1792687875664435392,
+        "size": 106593272,
+        "fresh_compile_line": "   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-voice-events-20261022/lampOS/crates/voice)"
+      },
+      "inventory_count": 3398,
+      "inventory_names_sha256": "3ba3d2c615880182a9a0edd60b78ef115894887a2b84b5ac25eda1dac0a95abc",
+      "assigned_rows": {
+        "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": "ok",
+        "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet": "ok",
+        "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by": "ok",
+        "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked": "ok",
+        "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply": "ok",
+        "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going": "ok",
+        "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news": "ok"
+      },
+      "kept_start": "ok",
+      "all_failed_tests": [
+        "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+        "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+        "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+        "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+        "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+        "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+        "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+        "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+        "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+        "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+        "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+        "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+        "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+        "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+        "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+        "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+        "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back",
+        "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics"
+      ],
+      "scope": "Library only. light_call integration not executed."
+    }
+  ],
+  "prior_runner_parser_failure_preserved": true,
+  "update_baseline_observation": {
+    "command": {
+      "label": "update-focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice-eval",
+        "--offline",
+        "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS",
+      "timeout_seconds": 1200,
+      "started_utc": "2026-10-22T16:37:57.807636+00:00",
+      "started_epoch_ns": 1792687077807907000,
+      "load_average_before": [
+        7.458984375,
+        9.13134765625,
+        10.47216796875
+      ],
+      "stdout": "update-focused.stdout",
+      "stderr": "update-focused.stderr",
+      "pid": 23954,
+      "exit": 0,
+      "timed_out": false,
+      "cleanup": {
+        "initial_members": [],
+        "signals": [],
+        "final_members": [],
+        "no_live_owned_children": true
+      },
+      "wall_seconds": 135.987934,
+      "load_average_after": [
+        6.85400390625,
+        8.42578125,
+        9.99658203125
+      ],
+      "stdout_sha256": "800b7a428d601dc99d0b012041d810cb0ab53d065accff46c5021f60948553a8",
+      "stdout_bytes": 3618,
+      "stderr_sha256": "92fb01fd689b6df2dcf36d957a4f2673df1838a289a1fbbe1e575551f41c3fec",
+      "stderr_bytes": 7345
+    },
+    "summaries": [
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "165",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "30",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "96",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "8",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "8",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "3",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "23",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "151",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "4",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "2",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "2",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "2",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "155",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "20",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "291",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "31",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "113",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "4",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "78",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "8",
+        "0.00"
+      ],
+      [
+        "ok",
+        "1",
+        "0",
+        "0",
+        "0",
+        "105",
+        "28.46"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "378",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "7",
+        "0.00"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "238",
+        "0.00"
+      ]
+    ],
+    "test_row": [
+      "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "ok"
+    ],
+    "artifact": {
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/round-dfc8ec2a48b28ab1",
+      "sha256": "693a8bc43fd1a54151317badb2d94774cb5e0ba061d6003f692e5b908887b1f4",
+      "size": 14283596,
+      "mtime_ns": 1792687140382584887,
+      "fresh_compile_line": "   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS/crates/update)"
+    },
+    "candidate_artifact_sha256": "5bb29df8755ad7caddbeaae7e8af054d866bad5774be93840e9d229f333dad57",
+    "identical_candidate_binary": false,
+    "causal_limit": "If binaries differ, source identity and one focused result do not establish the cause of the earlier whole-gate failure. A matching binary rules out different compiled Round code, but does not reproduce the earlier execution context."
+  },
+  "identical_test_inventories": true,
+  "distinct_current_source_binaries": true,
+  "raw_stream_index": "raw/index.json",
+  "summary_columns": [
+    "status",
+    "passed",
+    "failed",
+    "ignored",
+    "measured",
+    "filtered_out",
+    "libtest_seconds"
+  ]
+}

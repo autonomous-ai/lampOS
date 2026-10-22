@@ -1,0 +1,111 @@
+{
+  "external_root": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022",
+  "platform": {
+    "system": "Darwin",
+    "node": "m0.local",
+    "release": "25.6.0",
+    "version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+    "machine": "x86_64",
+    "processor": "i386"
+  },
+  "cpu_count": 16,
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "unset_environment": [
+    "RUST_TEST_THREADS",
+    "CARGO_BUILD_TARGET"
+  ],
+  "scope": "Library only; default CPU parallelism; before once then after once; no retries.",
+  "cleanup": "Each command owns a new session. After exit/timeout, inspect that session, including separate child process groups; terminate leftovers within 10 seconds and reject the observation if any live process remains. No unrelated sessions are signaled.",
+  "background_at_preparation": "Root five-consumer/build command owns MAIN. Another Skills agent uses SMALL; background load is context, not causal evidence.",
+  "after_background_context": {
+    "recorded_utc": "2026-10-22T16:49:03.832302+00:00",
+    "source": "Parent /root message after continuation started",
+    "message": "No local Cargo other agent now; SMALL released soon. No concurrent new Skills tests now. Root owns remote ARM64/Clippy watchers.",
+    "limit": "Reported concurrent workload context only; no matched-load or host-isolation claim."
+  },
+  "source_hash_scope": "Every Git-tracked lampOS file, including all tracked docs, Cargo/toolchain/config files and crate inputs. Excludes ignored/untracked files and paths outside lampOS.",
+  "release": {
+    "released": true,
+    "target": "/private/tmp/tests-codex-1569-target",
+    "heads": [
+      "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "735b2cb5db21176a0ad80fcb42c48e739f8362fe"
+    ],
+    "root_message": "RELEASE MAIN now: root55921 failed consumer terminal101; separate workspace build45307 terminal0, source735 unchanged hash guard. Exclusively own MAIN for updated one-baseline-exact-Update observation then fixed one-per-arm Voice parallel pair. Root will not Cargo/touch sources. Previous wait-for-root-push waived; no source changes. Preserve five-package feature unification, report baseline result/round hash before continuing without waiting for acknowledgement."
+  },
+  "original_external_files": [
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/plan.json",
+      "bytes": 4362,
+      "sha256": "6d521fe27baab4f7ee8128ba91dd16a1ae5ddae0edc8c6d45d2da278975af58a"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/started.json",
+      "bytes": 5614,
+      "sha256": "35e5cc30f01c7d95ebcf1fa5772f49601615ebff023e6625ba8ea1009a7dcc84"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/results.json",
+      "bytes": 8293,
+      "sha256": "8253914d3ade164fca8154984d44c822c561d929d68af410e9da4fb300a4cab4"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/continuation-results.json",
+      "bytes": 18653,
+      "sha256": "8c75f4541370a12387317fb1280d85decc23b87fcc242287994ebd2104f0f275"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/continuation-started.json",
+      "bytes": 1383,
+      "sha256": "074311fea0c7115a5411ae80a7e0644b92d97e5337f0f173541666c011e2052b"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/continuation-restoration.json",
+      "bytes": 770,
+      "sha256": "870ca39dd78c2047e5763e9de39f59632f6c29cbfae8eefd65c8a868e540b383"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/verify_parallel.py",
+      "bytes": 20931,
+      "sha256": "e13aaeca13288d0f1997082272791625f560fe77a3950d114f00c612c1a4c35d"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/continue_after.py",
+      "bytes": 7663,
+      "sha256": "efd89a0f26b777771edef9d7f061b2635d7980e8fd1e25a68598c6ead0db8943"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/candidate-round-artifact.json",
+      "bytes": 762,
+      "sha256": "2e337aa9f5700b291d924a90e666959fd77f36d5b1639124975e868e53dd9f1a"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/candidate-round-symbol-scan.json",
+      "bytes": 43048,
+      "sha256": "a49722544f373a33e7ca1a9497d57159089ee31f12f368045a904a998e6eb98c"
+    },
+    {
+      "path": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/baseline-round-cargo-fingerprint.json",
+      "bytes": 2800,
+      "sha256": "5e70c2d2a0b246fe318ad0931b90e874ee6985e1e045cb72d8f88c5e222f0e9b"
+    }
+  ],
+  "portability_limit": "Runner code and compiled binaries are intentionally external, not published. Full human-readable command streams, exact metadata and reconstructible whole-source hash maps are portable. Registry/build-cache state and host workload are not reproduced by these receipts.",
+  "architecture_qualification": {
+    "captured_process_identity": "Darwin x86_64; processor i386; 16 logical CPUs",
+    "physical_hardware_isa": "not established",
+    "translation_status": "not established",
+    "rustc_vV_in_this_pair_receipt": false,
+    "macho_architecture_tied_to_recorded_binary_hashes": "not captured",
+    "limitation": "uname/process architecture is not proof of physical Intel hardware or native ISA execution. The reused target artifact was not inspected to infer architecture of earlier hashes."
+  }
+}

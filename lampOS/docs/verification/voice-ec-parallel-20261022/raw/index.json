@@ -1,0 +1,54 @@
+{
+  "format": "Join text_lines without a separator, encode UTF-8, then verify bytes and SHA256. No original stream whitespace was changed.",
+  "shared_inventory": "The before/after inventory stdout and stderr are byte-identical; each original invocation remains in results.json.",
+  "streams": [
+    {
+      "external_source": "before/full-library.stdout",
+      "portable": "raw/before-library-stdout.json",
+      "sha256": "b5e8ff1281067aeabcaaaa8289455fd7ce2ffe096f35d3584b9ad4809a694502",
+      "bytes": 336976
+    },
+    {
+      "external_source": "before/full-library.stderr",
+      "portable": "raw/before-library-stderr.json",
+      "sha256": "340f74d6a591090778912d77038a4d6310c911906175fe00d568b7ba80c10367",
+      "bytes": 3083
+    },
+    {
+      "external_source": "after/full-library.stdout",
+      "portable": "raw/after-library-stdout.json",
+      "sha256": "1a70b8496a075e86075287e86369fdf051b251fe8a3bc2d34c2fbc3a86209a7f",
+      "bytes": 346695
+    },
+    {
+      "external_source": "after/full-library.stderr",
+      "portable": "raw/after-library-stderr.json",
+      "sha256": "44a8250f1819c201566da7cd18187c0bf9eb19f81ed58eba66cc54de1b09623b",
+      "bytes": 3975
+    },
+    {
+      "external_source": "before/compiled-inventory.stdout",
+      "portable": "raw/shared-inventory-stdout.json",
+      "sha256": "3193568c3decdd2880965bf02ad941d8c566f35c51e783e563075bb0b6e9ffcd",
+      "bytes": 315532
+    },
+    {
+      "external_source": "before/compiled-inventory.stderr",
+      "portable": "raw/shared-inventory-stderr.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "external_source": "before/update-focused.stdout",
+      "portable": "raw/update-focused-stdout.json",
+      "sha256": "800b7a428d601dc99d0b012041d810cb0ab53d065accff46c5021f60948553a8",
+      "bytes": 3618
+    },
+    {
+      "external_source": "before/update-focused.stderr",
+      "portable": "raw/update-focused-stderr.json",
+      "sha256": "92fb01fd689b6df2dcf36d957a4f2673df1838a289a1fbbe1e575551f41c3fec",
+      "bytes": 7345
+    }
+  ]
+}

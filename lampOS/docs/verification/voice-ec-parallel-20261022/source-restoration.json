@@ -1,0 +1,89 @@
+{
+  "scope": "Every Git-tracked lampOS file, including all tracked docs, Cargo/toolchain/config files and crate inputs. Excludes ignored/untracked files and paths outside lampOS.",
+  "aggregate_algorithm": "SHA256(json.dumps(sorted path-to-file-SHA256 map, sort_keys=True).encode())",
+  "preparation": [
+    {
+      "arm": "before",
+      "worktree": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022",
+      "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "tree": "09a42738a67dac48b55e820f62efe98a5ae12475",
+      "file_count": 6422,
+      "aggregate_sha256": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "committed_blobs_verified": true
+    },
+    {
+      "arm": "after",
+      "worktree": "/private/tmp/tests-codex-voice-events-20261022",
+      "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+      "tree": "3d0753c759db7a5554d365176b7c71b5908422e5",
+      "file_count": 6517,
+      "aggregate_sha256": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "committed_blobs_verified": true
+    }
+  ],
+  "freshness_scope": "All the same tracked lampOS inputs; refreshed only after explicit target release, with identical content hashes before/after.",
+  "freshness": {
+    "before/source-freshness.json": {
+      "file_count": 6422,
+      "before": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "after": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "content_identical": true
+    },
+    "before/pre-voice-source-freshness.json": {
+      "file_count": 6422,
+      "before": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "after": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "content_identical": true
+    },
+    "after/source-freshness.json": {
+      "file_count": 6517,
+      "before": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "after": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "content_identical": true
+    }
+  },
+  "original_runner_finally": [
+    {
+      "arm": "before",
+      "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "source_mutations": 0,
+      "file_count": 6422,
+      "before_aggregate": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "after_aggregate": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "all_bytes_unchanged": true,
+      "git_status_porcelain": ""
+    },
+    {
+      "arm": "after",
+      "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+      "source_mutations": 0,
+      "file_count": 6517,
+      "before_aggregate": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "after_aggregate": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "all_bytes_unchanged": true,
+      "git_status_porcelain": ""
+    }
+  ],
+  "continuation_finally": [
+    {
+      "arm": "before",
+      "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+      "file_count": 6422,
+      "before_aggregate": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "after_aggregate": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+      "all_bytes_unchanged": true,
+      "git_status_porcelain": "",
+      "source_mutations": 0
+    },
+    {
+      "arm": "after",
+      "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+      "file_count": 6517,
+      "before_aggregate": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "after_aggregate": "9b8099c7f9d975432dc2d89d1a963d6f21fb7c6427a7fb7b7a921a2e3bcf021e",
+      "all_bytes_unchanged": true,
+      "git_status_porcelain": "",
+      "source_mutations": 0
+    }
+  ]
+}

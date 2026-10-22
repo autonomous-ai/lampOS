@@ -1,0 +1,15 @@
+{
+  "json_parsed_before_validation_and_manifest": 18,
+  "lossless_streams": 8,
+  "inventory_names_each": 3398,
+  "terminal_rows_each": 3398,
+  "identical_inventory_bytes": true,
+  "assigned_and_kept_start_pass_both": true,
+  "failure_blocks_exactly_match_failed_rows": 18,
+  "complete_source_map_before": 6422,
+  "reconstructed_source_map_after": 6517,
+  "original_aggregate_hashes_verified": true,
+  "new_file_whitespace_checked": true,
+  "relative_markdown_links_checked": true,
+  "source_or_test_execution_during_packaging": false
+}

@@ -1,0 +1,134 @@
+{
+  "count": 18,
+  "source": "raw/after-library-stdout.json",
+  "failures": [
+    {
+      "test": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/body_motion.rs:389:9",
+      "original_stdout_block": "\nthread 'body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found' (699359703) panicked at crates/voice/src/body_motion.rs:389:9:\nStill\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants' (699364241) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup' (699363510) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches' (699364773) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn' (699363505) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only' (699365561) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal' (699365577) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests' (699365639) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant' (699365746) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:676:61",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority' (699366365) panicked at crates/voice/src/coordinator/motor/tests.rs:676:61:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"motor fixture preflight did not exit\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:883:9",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure' (699367136) panicked at crates/voice/src/coordinator/motor/tests.rs:883:9:\nowned child timed out: adapter=Some(\"motor worker ended independently\"); connected=true; ready=false; reaped=true; supervisor=Some(\"motor inhibited: ControlLost\"); largest_poll_gap_us=1888; output=\nrunning 1 test\nmotor_fixture_phase=child_entry at_us=3215349389824\nmotor_fixture_phase=channels_bound at_us=3215349510367\nmotor_fixture_phase=channels_connected at_us=3215349617109\nmotor_fixture_event=Inhibited { at_us: 3215349659999, motion: \n\n"
+    },
+    {
+      "test": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/optional_ring_tests.rs:881:5",
+      "original_stdout_block": "lamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n\nthread 'coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean' (699369433) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:881:5:\nrestart tick took 97.852923ms\n\n"
+    },
+    {
+      "test": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/optional_ring_tests.rs:881:5",
+      "original_stdout_block": "lamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n\nthread 'coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean' (699370447) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:881:5:\nrestart tick took 78.187015ms\n\n"
+    },
+    {
+      "test": "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/tests/duplex.rs:424:10",
+      "original_stdout_block": "\nthread 'coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back' (699372921) panicked at crates/voice/src/coordinator/tests/duplex.rs:424:10:\ncalled `Result::unwrap()` on an `Err` value: StaleOwner\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:134:72",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::pending_inspection_revoke_survives_a_host_pause_before_the_gated_worker_is_released' (699367025) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"stepped motor child did not finish its step\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:134:72",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate' (699366858) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"stepped motor child did not finish its step\" }\n\n"
+    },
+    {
+      "test": "coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/motor/tests.rs:134:72",
+      "original_stdout_block": "\nthread 'coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write' (699367043) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"stepped motor child did not finish its step\" }\n\n"
+    },
+    {
+      "test": "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "baseline": "ok",
+      "candidate": "FAILED",
+      "first_panic_location": "crates/voice/src/coordinator/tests/termination.rs:72:5",
+      "original_stdout_block": "\nthread 'coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics' (699407171) panicked at crates/voice/src/coordinator/tests/termination.rs:72:5:\nchild assertions failed: exit status: 101\n\n\n"
+    }
+  ],
+  "signal_child_primary_stderr_source": "raw/after-library-stderr.json",
+  "signal_child_limit": "The isolated child first panics at termination.rs:328 on an Option::unwrap while downcasting the original error. The original non-io error was not printed; StaleOwner is not established. Four subsequent peer ConnectionReset panics are also retained in the full stderr."
+}

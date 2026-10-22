@@ -1,0 +1,59 @@
+{
+  "original_runner_exit": 1,
+  "original_native_baseline_exit": 0,
+  "original_status": "execution or verification stopped; no retry",
+  "original_error": "AssertionError('Full-library output does not match the compiled inventory.')",
+  "original_results_sha256": "8253914d3ade164fca8154984d44c822c561d929d68af410e9da4fb300a4cab4",
+  "original_runner_sha256": "e13aaeca13288d0f1997082272791625f560fe77a3950d114f00c612c1a4c35d",
+  "missed_passed_rows": [
+    "test coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic ... ok",
+    "test coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic ... ok",
+    "test coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic ... ok"
+  ],
+  "recovery": {
+    "started_utc": "2026-10-22T16:48:49.516182+00:00",
+    "runner_sha256": "efd89a0f26b777771edef9d7f061b2635d7980e8fd1e25a68598c6ead0db8943",
+    "original_runner_sha256": "e13aaeca13288d0f1997082272791625f560fe77a3950d114f00c612c1a4c35d",
+    "original_results_sha256": "8253914d3ade164fca8154984d44c822c561d929d68af410e9da4fb300a4cab4",
+    "reason": "Original parser omitted the libtest \" - should panic\" annotation on three passed baseline tests. Baseline command and its existing inventory listing are retained without repetition.",
+    "new_test_commands": 1,
+    "new_command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline"
+    ],
+    "unchanged_release": {
+      "released": true,
+      "target": "/private/tmp/tests-codex-1569-target",
+      "heads": [
+        "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+        "735b2cb5db21176a0ad80fcb42c48e739f8362fe"
+      ],
+      "root_message": "RELEASE MAIN now: root55921 failed consumer terminal101; separate workspace build45307 terminal0, source735 unchanged hash guard. Exclusively own MAIN for updated one-baseline-exact-Update observation then fixed one-per-arm Voice parallel pair. Root will not Cargo/touch sources. Previous wait-for-root-push waived; no source changes. Preserve five-package feature unification, report baseline result/round hash before continuing without waiting for acknowledgement."
+    }
+  },
+  "strict_validation": {
+    "inventory_count_each": 3398,
+    "unique_terminal_rows_each": 3398,
+    "identities_equal": true,
+    "no_rows_dropped": true,
+    "before_summary": [
+      3384,
+      0,
+      14
+    ],
+    "after_summary": [
+      3366,
+      18,
+      14
+    ]
+  },
+  "continuation_runner_exit": 0,
+  "actual_candidate_cargo_exit": 101,
+  "execution_count_before": 1,
+  "execution_count_after": 1,
+  "explanation": "The external parser omitted the should-panic annotation after the successful baseline command. The continuation validated all stored baseline rows and the stored compiled inventory before running only the previously unrun after arm once. This was not a failed test rerun."
+}
