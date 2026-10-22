@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{self, Read, Write},
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
+    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -539,9 +539,19 @@ impl People {
     /// name or prints this build does not keep, a second of one name, a
     /// twenty-first) is written there, and the rest saved back without them,
     /// so a restart does not set them aside again. Each is said in one line,
-    /// with a count and never a name. Only a failure to set aside is an
-    /// error: the eyes do not start rather than lose a record.
+    /// with a count and never a name. Before reading, unlink only the exact
+    /// `.new` and `.repair.new` siblings left by interrupted writes; neither
+    /// is a committed record. Opening requires the same exclusive writer
+    /// ownership as saving. A failure to clean a temporary or set aside a
+    /// record is an error, so the eyes do not start in that state.
     pub fn open(path: PathBuf) -> Result<Self> {
+        for suffix in [".new", ".repair.new"] {
+            match std::fs::remove_file(temporary_path(&path, suffix)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
         let mut bytes = Vec::new();
         match File::open(&path) {
             Ok(file) => {
@@ -818,6 +828,12 @@ impl People {
             before(RepairStep::SyncFile)?;
             file.sync_all()?;
             before(RepairStep::Rename)?;
+            if file.metadata()?.mode() & 0o7777 != 0o600 {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "repair temporary is not private",
+                ));
+            }
             std::fs::rename(&temporary, &self.path)
         })();
         drop(file);
@@ -1309,9 +1325,7 @@ impl People {
             scored_at_unix_s,
             people: people.to_vec(),
         })?;
-        let mut temporary = self.path.clone().into_os_string();
-        temporary.push(".new");
-        let temporary = PathBuf::from(temporary);
+        let temporary = temporary_path(&self.path, ".new");
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -1326,31 +1340,22 @@ impl People {
     }
 }
 
-/// A fresh sibling, never the ordinary save's .new file. create_new refuses
-/// stale files and symlinks without truncating them; the bounded suffix search
-/// tolerates a few copies left by a terminated process with a reused PID.
+fn temporary_path(path: &Path, suffix: &str) -> PathBuf {
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(suffix);
+    PathBuf::from(temporary)
+}
+
+/// One exact sibling, included in the reset plan. The exclusive writer must
+/// not overwrite a stale file or symlink; only startup unlinks leftovers.
 fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    for _ in 0..16 {
-        let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
-        let mut temporary = path.as_os_str().to_owned();
-        temporary.push(format!(".repair-{}-{sequence}.new", std::process::id()));
-        let temporary = PathBuf::from(temporary);
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)
-        {
-            Ok(file) => return Ok((temporary, file)),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error),
-        }
-    }
-    Err(io::Error::new(
-        io::ErrorKind::AlreadyExists,
-        "repair temporary files occupied",
-    ))
+    let temporary = temporary_path(path, ".repair.new");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&temporary)?;
+    Ok((temporary, file))
 }
 
 /// What the voice service asks of the eyes on their request socket: one
@@ -2518,6 +2523,199 @@ mod tests {
             ]
         );
         assert_eq!(people.people, expected);
+    }
+
+    #[test]
+    fn open_discards_partial_and_complete_uncommitted_people_files_only() {
+        for partial in [true, false] {
+            let people = repair_people(&format!("repair-open-leftovers-{partial}"));
+            let bytes = std::fs::read(&people.path).unwrap();
+            let expected = people.people.clone();
+            let mut staged = expected.clone();
+            staged[0].prints = vec![repair_print(2)];
+            let staged = serde_json::to_vec(&Kept {
+                version: 1,
+                scored_at_unix_s: people.scored_at,
+                people: staged,
+            })
+            .unwrap();
+            let unfinished = if partial {
+                &staged[..staged.len() / 2]
+            } else {
+                &staged[..]
+            };
+            let directory = people.path.parent().unwrap();
+            for name in ["people.json.new", "people.json.repair.new"] {
+                std::fs::write(directory.join(name), unfinished).unwrap();
+            }
+            let untouched = directory.join("people.json.repair.new.keep");
+            std::fs::write(&untouched, b"unrelated synthetic setting").unwrap();
+            let reopened = People::open(people.path.clone()).unwrap();
+            assert_eq!(reopened.people, expected);
+            assert_eq!(reopened.scored_at, people.scored_at);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+            for name in ["people.json.new", "people.json.repair.new"] {
+                assert!(std::fs::symlink_metadata(directory.join(name)).is_err());
+            }
+            assert_eq!(
+                std::fs::read(untouched).unwrap(),
+                b"unrelated synthetic setting"
+            );
+        }
+    }
+
+    #[test]
+    fn open_discards_uncommitted_files_even_without_a_canonical_store() {
+        let people = repair_people("repair-open-no-canonical");
+        let bytes = std::fs::read(&people.path).unwrap();
+        let directory = people.path.parent().unwrap();
+        for name in ["people.json.new", "people.json.repair.new"] {
+            std::fs::write(directory.join(name), &bytes).unwrap();
+        }
+        std::fs::remove_file(&people.path).unwrap();
+        let reopened = People::open(people.path.clone()).unwrap();
+        assert!(reopened.people.is_empty());
+        assert!(!people.path.exists());
+        for name in ["people.json.new", "people.json.repair.new"] {
+            assert!(std::fs::symlink_metadata(directory.join(name)).is_err());
+        }
+    }
+
+    #[test]
+    fn open_unlinks_temporary_symlinks_without_following_them() {
+        use std::os::unix::fs::symlink;
+        for kind in ["file", "directory", "missing"] {
+            let people = repair_people(&format!("repair-open-link-{kind}"));
+            let directory = people.path.parent().unwrap();
+            let destination = directory.join("unrelated");
+            let retained = if kind == "directory" {
+                std::fs::create_dir(&destination).unwrap();
+                destination.join("keep")
+            } else {
+                destination.clone()
+            };
+            if kind != "missing" {
+                std::fs::write(&retained, b"unrelated synthetic setting").unwrap();
+            }
+            for name in ["people.json.new", "people.json.repair.new"] {
+                symlink(&destination, directory.join(name)).unwrap();
+            }
+            let reopened = People::open(people.path.clone()).unwrap();
+            assert_eq!(reopened.people, people.people);
+            for name in ["people.json.new", "people.json.repair.new"] {
+                assert!(std::fs::symlink_metadata(directory.join(name)).is_err());
+            }
+            if kind == "missing" {
+                assert!(!destination.exists());
+            } else {
+                assert_eq!(
+                    std::fs::read(retained).unwrap(),
+                    b"unrelated synthetic setting"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn open_refuses_a_temporary_entry_it_cannot_unlink() {
+        for name in ["people.json.new", "people.json.repair.new"] {
+            for canonical in [true, false] {
+                let people = repair_people(&format!("repair-open-refused-{name}-{canonical}"));
+                let bytes = std::fs::read(&people.path).unwrap();
+                if !canonical {
+                    std::fs::remove_file(&people.path).unwrap();
+                }
+                // A directory is not an unfinished file. Do not broaden
+                // startup cleanup to recursively delete its contents.
+                let unexpected = people.path.with_file_name(name);
+                std::fs::create_dir(&unexpected).unwrap();
+                std::fs::write(unexpected.join("keep"), b"unexpected synthetic entry").unwrap();
+                assert!(People::open(people.path.clone()).is_err());
+                if canonical {
+                    assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+                } else {
+                    assert!(!people.path.exists());
+                }
+                assert_eq!(
+                    std::fs::read(unexpected.join("keep")).unwrap(),
+                    b"unexpected synthetic entry"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn repair_refuses_an_occupied_fixed_temporary_without_overwriting_it() {
+        use std::os::unix::fs::symlink;
+        for kind in ["file", "link", "directory"] {
+            let mut people = repair_people(&format!("repair-occupied-{kind}"));
+            let expected = people.people.clone();
+            let bytes = std::fs::read(&people.path).unwrap();
+            let temporary = people.path.with_file_name("people.json.repair.new");
+            let retained = match kind {
+                "file" => temporary.clone(),
+                "link" => {
+                    let target = people.path.with_file_name("unrelated");
+                    symlink(&target, &temporary).unwrap();
+                    target
+                }
+                "directory" => {
+                    std::fs::create_dir(&temporary).unwrap();
+                    temporary.join("keep")
+                }
+                _ => unreachable!(),
+            };
+            std::fs::write(&retained, b"uncommitted synthetic prints").unwrap();
+            let target = people.repair_target("Fixture Target").unwrap();
+            let mut attempted_write = false;
+            assert_eq!(
+                people.replace_prints_at(target, vec![repair_print(2)], |_| {
+                    attempted_write = true;
+                    Ok(())
+                }),
+                Err(RepairError::NotWritten)
+            );
+            assert!(!attempted_write);
+            assert_eq!(people.people, expected);
+            assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+            assert_eq!(
+                std::fs::read(retained).unwrap(),
+                b"uncommitted synthetic prints"
+            );
+            assert!(std::fs::symlink_metadata(temporary).is_ok());
+        }
+    }
+
+    #[test]
+    fn repair_refuses_a_temporary_mode_changed_before_rename() {
+        use std::os::unix::fs::PermissionsExt;
+        let mut people = repair_people("repair-mode-before-rename");
+        let expected = people.people.clone();
+        let bytes = std::fs::read(&people.path).unwrap();
+        let temporary = people.path.with_file_name("people.json.repair.new");
+        let target = people.repair_target("Fixture Target").unwrap();
+        let mut checked = false;
+        assert_eq!(
+            people.replace_prints_at(target, vec![repair_print(2)], |step| {
+                if step == RepairStep::Rename {
+                    assert_eq!(
+                        std::fs::metadata(&temporary)?.permissions().mode() & 0o7777,
+                        0o600
+                    );
+                    std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o644))?;
+                    checked = true;
+                }
+                Ok(())
+            }),
+            Err(RepairError::NotWritten)
+        );
+        assert!(
+            checked,
+            "the fixed temporary was made private before the hook"
+        );
+        assert_eq!(people.people, expected);
+        assert_eq!(std::fs::read(&people.path).unwrap(), bytes);
+        assert!(std::fs::symlink_metadata(temporary).is_err());
     }
 
     /// #1997, the lead's yes: a remembered person's yes to being named to

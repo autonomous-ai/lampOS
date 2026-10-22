@@ -54,6 +54,16 @@ fn lamp(root: &Root) -> Plan {
     fs::write(root.path("memory/index.json"), b"{}").unwrap();
     fs::write(root.path("tasks/1.json"), b"{}").unwrap();
     fs::write(root.path("people.json"), b"[]").unwrap();
+    fs::write(
+        root.path("people.json.new"),
+        b"synthetic unfinished ordinary save",
+    )
+    .unwrap();
+    fs::write(
+        root.path("people.json.repair.new"),
+        b"synthetic unfinished repair",
+    )
+    .unwrap();
     fs::write(root.path("outside/keep.txt"), b"keep").unwrap();
     symlink(root.path("outside"), root.path("memory/link-to-outside")).unwrap();
     symlink(root.path("outside/keep.txt"), root.path("thread.json")).unwrap();
@@ -65,6 +75,8 @@ fn lamp(root: &Root) -> Plan {
             root.path("memory"),
             root.path("tasks"),
             root.path("people.json"),
+            root.path("people.json.new"),
+            root.path("people.json.repair.new"),
             root.path("thread.json"),
             root.path("schedule"),
         ],
@@ -112,6 +124,8 @@ fn wiped(root: &Root) {
     assert_eq!(fs::read_dir(root.path("memory")).unwrap().count(), 0);
     assert_eq!(fs::read_dir(root.path("tasks")).unwrap().count(), 0);
     assert!(!root.path("people.json").exists());
+    assert!(!root.path("people.json.new").exists());
+    assert!(!root.path("people.json.repair.new").exists());
     assert!(fs::symlink_metadata(root.path("thread.json")).is_err());
     assert_eq!(fs::read(root.path("outside/keep.txt")).unwrap(), b"keep");
     assert!(!root.path("setup/done").exists());
@@ -286,10 +300,13 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 35] = [
+const PERSON_STORES: [&str; 37] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
+    // Interrupted ordinary saves and atomic repairs contain face prints too.
+    "/var/lib/lampos-eyes/people.json.new",
+    "/var/lib/lampos-eyes/people.json.repair.new",
     // Face prints the eyes could not read and set aside, never dropped
     // (#1505): a factory reset must not leave them behind.
     "/var/lib/lampos-eyes/set-aside",
@@ -372,6 +389,47 @@ fn the_example_plan_wipes_every_store_of_the_person() {
         "{} is wiped",
         kept.display()
     );
+}
+
+#[test]
+fn current_reset_plans_wipe_people_and_both_temporaries_without_widening_the_directory() {
+    let home = Path::new("/var/lib/lampos-eyes");
+    let files = ["people.json", "people.json.new", "people.json.repair.new"];
+    for source in [
+        include_str!("../../fixtures/reset-plan-product.json"),
+        include_str!("../../fixtures/reset-plan-example.json"),
+        include_str!("../../../../deploy/lamp-06c1/reset-plan.json"),
+    ] {
+        let plan: Plan = serde_json::from_str(source).unwrap();
+        plan.check().unwrap();
+        for file in files {
+            assert!(plan.wipe.contains(&home.join(file)), "missing {file}");
+        }
+        assert!(!plan.wipe.iter().any(|path| home.starts_with(path)));
+        let root = Root::new();
+        let directory = root.0.join(home.strip_prefix("/").unwrap());
+        fs::create_dir_all(&directory).unwrap();
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+        for file in files {
+            fs::write(directory.join(file), b"synthetic private face state").unwrap();
+        }
+        let kept = directory.join("people.json.repair.new.keep");
+        fs::write(&kept, b"unrelated synthetic setting").unwrap();
+        for path in &plan.wipe {
+            reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+        }
+        for file in files {
+            assert!(
+                fs::symlink_metadata(directory.join(file)).is_err(),
+                "{file}"
+            );
+        }
+        assert_eq!(fs::read(kept).unwrap(), b"unrelated synthetic setting");
+        assert_eq!(
+            fs::metadata(directory).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
 }
 
 /// Harness's real layout under the tasks part's home (Nine on #1016, from
@@ -779,6 +837,11 @@ fn untouched(root: &Root) {
     assert!(root.path("memory/index.json").exists(), "nothing wiped");
     assert!(root.path("tasks/1.json").exists(), "nothing wiped");
     assert!(root.path("people.json").exists(), "nothing wiped");
+    assert!(root.path("people.json.new").exists(), "nothing wiped");
+    assert!(
+        root.path("people.json.repair.new").exists(),
+        "nothing wiped"
+    );
 }
 
 #[test]
@@ -792,12 +855,12 @@ fn an_unknown_kind_in_wipe_refuses_the_reset_with_nothing_wiped() {
         .push(serde_json::json!({"kind": "tree", "path": root.path("voice")}));
     assert!(matches!(
         reset::read(&serde_json::to_vec(&value).unwrap()),
-        Err(reset::Refused::Ahead(why)) if why.contains("wipe entry 6")
+        Err(reset::Refused::Ahead(why)) if why.contains("wipe entry 8")
     ));
     let out = act_on(&root, "reset-now", &value);
     assert_eq!(out.status.code(), Some(2), "{out:?}");
     let said = String::from_utf8_lossy(&out.stderr);
-    assert!(said.contains("wipe entry 6"), "{said}");
+    assert!(said.contains("wipe entry 8"), "{said}");
     assert!(said.contains("nothing is wiped"), "{said}");
     assert!(said.contains("update the lamp, then reset again"), "{said}");
     untouched(&root);

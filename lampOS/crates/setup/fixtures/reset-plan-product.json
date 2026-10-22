@@ -4,6 +4,8 @@
   "wipe": [
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
+    "/var/lib/lampos-eyes/people.json.new",
+    "/var/lib/lampos-eyes/people.json.repair.new",
     "/var/lib/lampos-eyes/set-aside",
     "/var/lib/lampos-eyes/people.json.from-photos",
     "/var/lib/lampos-eyes/seems.log",
