@@ -114,6 +114,11 @@ struct Night {
     request_sequence: u64,
     built_in_seen: Seen,
     skill_seen: Seen,
+    /// When the skills engine asked for the night's rest.
+    rests: Vec<u64>,
+    /// The skills engine hears nothing of `voice/state` (a gap in its
+    /// input, reviewer-two's second P2 on #3092).
+    voice_unheard: bool,
 }
 
 impl Night {
@@ -150,6 +155,8 @@ impl Night {
             request_sequence: 0,
             built_in_seen: Seen::default(),
             skill_seen: Seen::default(),
+            rests: Vec::new(),
+            voice_unheard: false,
         };
         let stamp = night.stamp();
         night.send(Input::Light {
@@ -159,6 +166,12 @@ impl Night {
         night.daytime();
         night.parts();
         night
+    }
+
+    /// The skills engine with `LAMP_REST_THROUGH_SOUNDS=on` (#1672).
+    fn through_sounds(mut self) -> Self {
+        self.skills = self.skills.take().map(Skills::resting_through_sounds);
+        self
     }
 
     fn stamp(&mut self) -> ClockStamp {
@@ -248,6 +261,7 @@ impl Night {
             for call in run.calls {
                 match call {
                     Call::Rest(rest) if rest.op == Op::Rest => {
+                        self.rests.push(self.now);
                         self.during = rest.during;
                         self.rest(true);
                     }
@@ -306,7 +320,9 @@ impl Night {
         }
         if since.is_multiple_of(SECOND) {
             let voice = self.voice;
-            self.observe("voice/state", &serde_json::json!({ "state": voice }), None);
+            if !self.voice_unheard {
+                self.observe("voice/state", &serde_json::json!({ "state": voice }), None);
+            }
             if self.resting {
                 let receipt = self.skill_route.rest_state(self.now).unwrap();
                 if receipt.phase == Phase::Resting {
@@ -704,4 +720,250 @@ fn the_skill_and_the_product_catalogue_name_the_same_night() {
     assert_eq!(night, window);
     assert_eq!(skill["trigger"][0]["for"].as_str(), Some("15m"));
     assert_eq!(sleep["nobody_us"].as_u64(), Some(15 * MINUTE));
+}
+
+/// #1672 on a real lamp, 23:26 to 23:41: small room sounds the voice heard
+/// as no words, each listening a second or two. Someone at the desk until
+/// 23:20, then nobody; the 15 minutes are up at 23:35.
+const SOUNDS: [(u64, u64); 6] = [(23, 22), (23, 24), (23, 25), (23, 28), (23, 30), (23, 33)];
+
+/// A night with someone at the desk until 23:20, and the time the 15
+/// minutes of nobody after it are up.
+fn gone_at_twenty_past(through: bool) -> Night {
+    let mut night = Night::new(Some(claim(true)), true);
+    if through {
+        night = night.through_sounds();
+    }
+    night.faces = vec![face()];
+    night.until(23, 20);
+    night.faces = Vec::new();
+    night
+}
+
+/// The local time of the night's first rest, if it came.
+fn first_rest(night: &Night) -> Option<String> {
+    night.rests.first().map(|at| clock(*at))
+}
+
+/// A sound heard as no words: the voice listening two seconds, then
+/// resting. One of them is said on `voice/heard` with no letter in it.
+fn sounds(night: &mut Night) {
+    for (index, (hour, minute)) in SOUNDS.into_iter().enumerate() {
+        night.until(hour, minute);
+        night.set_voice(Voice::Listening);
+        if index == 2 {
+            night.observe(
+                "voice/heard",
+                &serde_json::json!({"text": " ... ", "finished": true}),
+                None,
+            );
+        }
+        night.run(2 * SECOND);
+        night.set_voice(Voice::Resting);
+    }
+}
+
+/// Switch on: the six sounds are slept through, and the rest comes at the
+/// 15 minutes, within one look of the eyes and the voice's next second.
+#[test]
+fn with_the_switch_a_sound_heard_as_no_words_is_slept_through() {
+    let mut night = gone_at_twenty_past(true);
+    sounds(&mut night);
+    night.until(23, 37);
+    let at = night.rests.first().copied().expect("no rest by 23:37");
+    let due = START + (23 * 60 + 35 - START_MINUTE) * MINUTE;
+    assert!(
+        (due..=due + LOOK + SECOND).contains(&at),
+        "rested at {}",
+        clock(at)
+    );
+}
+
+/// Switch off: as today, each sound begins the 15 minutes again, so there
+/// is no rest until 15 minutes after the last one (23:33).
+#[test]
+fn without_the_switch_each_sound_begins_the_fifteen_minutes_again() {
+    let mut night = gone_at_twenty_past(false);
+    sounds(&mut night);
+    night.until(23, 48);
+    assert_eq!(first_rest(&night), None);
+    night.until(23, 50);
+    assert!(
+        first_rest(&night).is_some_and(|at| at.as_str() >= "23:48:02.0"),
+        "{:?}",
+        first_rest(&night)
+    );
+}
+
+/// What begins it again with the switch on, at 23:28: no rest at 23:35,
+/// and one once 15 minutes have passed since.
+fn begun_again_at_twenty_eight(what: impl FnOnce(&mut Night)) {
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    what(&mut night);
+    night.until(23, 43);
+    assert_eq!(first_rest(&night), None);
+    night.until(23, 45);
+    assert!(
+        first_rest(&night).is_some_and(|at| at.as_str() >= "23:43:00.0"),
+        "{:?}",
+        first_rest(&night)
+    );
+}
+
+/// A line with words.
+#[test]
+fn with_the_switch_words_heard_begin_the_fifteen_minutes_again() {
+    begun_again_at_twenty_eight(|night| {
+        night.set_voice(Voice::Listening);
+        night.run(SECOND);
+        night.observe(
+            "voice/heard",
+            &serde_json::json!({"text": "hey lamp", "finished": true}),
+            None,
+        );
+        night.run(SECOND);
+        night.set_voice(Voice::Resting);
+    });
+}
+
+/// Words written down only after the voice is back to resting (a late
+/// transcript, El's P3 on #3092).
+#[test]
+fn with_the_switch_words_heard_after_the_voice_rests_begin_it_again() {
+    begun_again_at_twenty_eight(|night| {
+        night.set_voice(Voice::Listening);
+        night.run(SECOND);
+        night.set_voice(Voice::Resting);
+        night.run(SECOND);
+        night.observe(
+            "voice/heard",
+            &serde_json::json!({"text": "hey lamp", "finished": true}),
+            None,
+        );
+    });
+}
+
+/// The lamp's name heard with no words written down ("Hey Lamp" from out
+/// of view): El's and reviewer-two's P2 on #3092.
+#[test]
+fn with_the_switch_the_name_heard_with_no_words_begins_it_again() {
+    begun_again_at_twenty_eight(|night| {
+        night.set_voice(Voice::Listening);
+        night.run(SECOND);
+        night.observe(
+            "name/heard",
+            &serde_json::json!({"score": 0.97, "ago_ms": 400}),
+            None,
+        );
+        night.run(SECOND);
+        night.set_voice(Voice::Resting);
+    });
+}
+
+/// A spell of thinking alone, with no words, is slept through too (El's P3
+/// on #3092): the rest comes at 23:35, as with no sound.
+#[test]
+fn with_the_switch_a_spell_of_thinking_alone_is_slept_through() {
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    night.set_voice(Voice::Thinking);
+    night.run(2 * SECOND);
+    night.set_voice(Voice::Resting);
+    night.until(23, 37);
+    let at = night.rests.first().copied().expect("no rest by 23:37");
+    assert!(clock(at).as_str() < "23:36:00.0", "rested at {}", clock(at));
+}
+
+/// A gap in what the skills engine hears of the voice, from a listening
+/// spell at 23:28 to resting again at 23:36, is not carried through: the 15
+/// minutes begin again at 23:36, as with the switch off (reviewer-two's
+/// second P2 on #3092).
+#[test]
+fn with_the_switch_a_gap_in_the_voice_begins_the_fifteen_minutes_again() {
+    for through in [false, true] {
+        let mut night = gone_at_twenty_past(through);
+        night.until(23, 28);
+        night.set_voice(Voice::Listening);
+        night.run(SECOND);
+        night.voice_unheard = true;
+        night.until(23, 36);
+        night.voice_unheard = false;
+        night.set_voice(Voice::Resting);
+        night.until(23, 50);
+        assert_eq!(first_rest(&night), None, "through {through}");
+        night.until(23, 53);
+        assert!(
+            first_rest(&night).is_some_and(|at| at.as_str() >= "23:51:00.0"),
+            "through {through}: {:?}",
+            first_rest(&night)
+        );
+    }
+}
+
+/// A touch the controls say is on begins it again (a tap on an awake lamp,
+/// reviewer-two on #3092); one they say is off does not.
+#[test]
+fn with_the_switch_a_touch_begins_the_fifteen_minutes_again_and_one_off_does_not() {
+    let touch = |enabled: bool| {
+        serde_json::to_value(lamp_msgs::TouchEvent {
+            stamp: lamp_msgs::ClockStamp {
+                clock_id: "boot".into(),
+                at_us: 1_100_000,
+                sequence: 1,
+            },
+            session_id: "controls".into(),
+            reader_session_id: "gpio".into(),
+            enabled,
+            source: lamp_msgs::TouchSource::Head,
+            name: "head".into(),
+            contact_id: 1,
+            gesture: lamp_msgs::TouchGesture::Touch,
+            when_speaking: lamp_msgs::TouchIntent::Stop,
+            when_quiet: lamp_msgs::TouchIntent::Notice,
+            when_asleep: None,
+            began_us: 1_000_000,
+            observed_us: 1_100_000,
+            released_us: None,
+            active_mask: 3,
+            active_names: vec!["pad37".into(), "pad96".into()],
+            position: None,
+            toward_pad: None,
+            distance: 0.0,
+            speed: 0.0,
+        })
+        .unwrap()
+    };
+    begun_again_at_twenty_eight(|night| night.observe("controls/touch", &touch(true), None));
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    night.observe("controls/touch", &touch(false), None);
+    night.until(23, 37);
+    let at = night.rests.first().copied().expect("no rest by 23:37");
+    assert!(clock(at).as_str() < "23:36:00.0", "rested at {}", clock(at));
+}
+
+/// The lamp's own speech: it is not resting.
+#[test]
+fn with_the_switch_the_lamp_speaking_begins_the_fifteen_minutes_again() {
+    begun_again_at_twenty_eight(|night| {
+        night.set_voice(Voice::Thinking);
+        night.run(SECOND);
+        night.set_voice(Voice::Speaking);
+        night.run(2 * SECOND);
+        night.set_voice(Voice::Resting);
+    });
+}
+
+/// A push begins it again; the body saying no hand does not.
+#[test]
+fn with_the_switch_a_push_begins_the_fifteen_minutes_again_and_no_push_does_not() {
+    let hand = |pushed: bool| serde_json::json!({"pushed": pushed, "since_us": u64::from(pushed)});
+    begun_again_at_twenty_eight(|night| night.observe("body/hand", &hand(true), None));
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    night.observe("body/hand", &hand(false), None);
+    night.until(23, 37);
+    let at = night.rests.first().copied().expect("no rest by 23:37");
+    assert!(clock(at).as_str() < "23:36:00.0", "rested at {}", clock(at));
 }
