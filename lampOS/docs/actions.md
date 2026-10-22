@@ -200,9 +200,10 @@ volume call that changed the lamp is answered with what was established and
 words and not the same each time. Answer anything else they asked as you
 would."` (`lamp_actions::SHORT_NEXT`), and the call's own words, `"say"`
 (`lamp_actions::short_say`: "Brighter.", "Dimmer.", "Warmer.", "Cooler.",
-"Louder.", "Quieter.", else "Done."; at most two words, #2877). With the switch, the voice's second route says
-that line itself and asks the model nothing more when every call of the
-turn is so answered (second-voice.md). The change itself is the answer: on
+"Louder.", "Quieter.", else "Done."; at most two words, #2877). With the
+switch, the voice's second route says that line itself when every call of
+the turn is so answered and the model's next round adds nothing
+(second-voice.md). The change itself is the answer: on
 lamp-4ace on 17–18 October a light turn's model reached its call at a median
 0.88 s and our part took 0.06 s, so the change lands at about 0.94 s, while
 the model's sentence about it after our answer took another 0.80 s median to
