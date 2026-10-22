@@ -1188,3 +1188,80 @@ async fn with_name_or_follow_up_two_faces_make_the_room_busy_and_a_face_alone_is
         assert_eq!((answered, now), (played, room), "the switch {on}");
     }
 }
+
+/// `LAMP_NAME_OR_FOLLOW_UP` through the worker's own loop, with the
+/// same-voice check and the eyes on this module's bus: after a call in one
+/// voice, answered, a line in another voice with someone turned to the lamp
+/// makes the room busy before its own verdict, and is held, since there a
+/// face lets nothing out alone (a reviewer's P2 on #2967, the second route's
+/// case on Live). Without the switch the face lets it out and the room is
+/// not made busy.
+#[tokio::test(start_paused = true)]
+async fn with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own_verdict() {
+    use lamp_msgs::{Face, Faces};
+    use std::sync::atomic::Ordering::Relaxed;
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    // Held through every case, and let go only once the bus and its looks
+    // are gone (`root`, dropped first).
+    let _one = super::one_thread();
+    let root = Root::new();
+    let mut eyes = lamp_bus::Bus::new(&root.0)
+        .unwrap()
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    // The pre-roll, the end silence and 1.5 s of speech, in 10 ms blocks:
+    // long enough for a print.
+    const BLOCKS: u64 = 30 + 60 + 150;
+    for (on, held, room) in [
+        (true, true, crate::room_told::Room::Busy),
+        (false, false, crate::room_told::Room::Unknown),
+    ] {
+        let _room = super::spoken_to::OwnRoom::fresh();
+        let before = name_or_follow_up().swap(on, Relaxed);
+        let mut options = Options {
+            attention: Some(attention_now),
+            spoken_to: true,
+            ..in_a_busy_room()
+        };
+        options.voices = Some(Box::new(super::spoken_to::TwoVoices(Default::default())));
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        eyes.publish_json(
+            monotonic_us(),
+            &Faces {
+                faces: vec![Face {
+                    id: "at-the-desk".into(),
+                    xmin: 0.4,
+                    ymin: 0.0,
+                    xmax: 0.7,
+                    ymax: 0.3,
+                    confidence: 0.9,
+                    yaw: None,
+                    facing: Some(true),
+                    speaking: None,
+                }],
+            },
+        )
+        .unwrap();
+        let call = "Hey Lamp, what is the weather like in Hanoi today?";
+        assert!(
+            super::spoken_to::voice_line(&mut rig, &mut dial, false, 1, BLOCKS, call, true).await,
+            "the call was not answered"
+        );
+        let played = super::spoken_to::voice_line(
+            &mut rig,
+            &mut dial,
+            false,
+            -1,
+            BLOCKS,
+            "And what about tomorrow?",
+            true,
+        )
+        .await;
+        let now = crate::room_told::room().lock().unwrap().at(monotonic_us());
+        rig.stop().await;
+        name_or_follow_up().store(before, Relaxed);
+        assert_eq!((!played, now), (held, room), "the switch {on}");
+    }
+}

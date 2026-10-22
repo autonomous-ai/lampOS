@@ -5289,6 +5289,25 @@ impl Heeding {
         let turned = signs.turned.filter(|_| self.strict);
         let (going_on, other_voice, same_voice, likeness) =
             self.voice_going_on_in(request, signs.going_on, busy);
+        // `LAMP_NAME_OR_FOLLOW_UP`: a line in another voice than the
+        // conversation's is a second person at the lamp, so the room is busy
+        // now, for this line's verdict as well as the next ones'.
+        let room = if self.name_or_follow_up && other_voice {
+            if self.keeps_room
+                && let Ok(mut told) = crate::room_told::room().lock()
+                && told.two_people(monotonic_us())
+            {
+                eprintln!(
+                    "lamp-voice second: request {request}: another voice than the conversation's: the room is busy (LAMP_NAME_OR_FOLLOW_UP)"
+                );
+            }
+            crate::room_told::Room::Busy
+        } else {
+            signs.room
+        };
+        let busy = room == crate::room_told::Room::Busy;
+        self.attention
+            .narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
         if self.spoke.len() == SPOKE_KEPT {
             self.spoke.pop_front();
@@ -5296,7 +5315,7 @@ impl Heeding {
         self.spoke.push_back((request, speakers.clone()));
         let attention = &mut self.attention;
         let seen = Seen {
-            room: signs.room,
+            room,
             going_on,
             other_voice,
             same_voice,
@@ -5321,7 +5340,7 @@ impl Heeding {
             policy.take();
             if let Some(says) = policy.says(request) {
                 attention.policy_said(request, Some(says));
-            } else if attention.waits_for_policy(request, signs.room, signs.going_on, turned) {
+            } else if attention.waits_for_policy(request, room, signs.going_on, turned) {
                 eprintln!(
                     "lamp-voice second: request {request}: its answer waits for the Policy's decision: a conversation with the lamp is going on, in a busy room"
                 );
@@ -7143,6 +7162,122 @@ mod tests {
             );
         }
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// `LAMP_NAME_OR_FOLLOW_UP` on this route: a line the same-voice check
+    /// reads in another voice than the conversation's, ready at its verdict,
+    /// is a second person at the lamp, and the room is busy for that line's
+    /// own verdict, so a face turned to the lamp doesn't let it out (a
+    /// reviewer's P2 on #2967: it was played as "someone is turned to the
+    /// lamp" in the room it made busy). As (held, room): another voice with a
+    /// face, held, busy; with no face, held, busy; with the name, played,
+    /// busy; the conversation's own voice with a face, played, unknown; and
+    /// without the switch another voice with a face is played and the room
+    /// stays unknown.
+    #[test]
+    fn with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own_verdict() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lnv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let mut look = |turned: bool| {
+            let faces = lamp_msgs::Faces {
+                faces: vec![lamp_msgs::Face {
+                    id: "at-the-desk".into(),
+                    xmin: 0.4,
+                    ymin: 0.0,
+                    xmax: 0.7,
+                    ymax: 0.3,
+                    confidence: 0.9,
+                    yaw: None,
+                    facing: Some(turned),
+                    speaking: None,
+                }],
+            };
+            eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
+        };
+        let said = (10_000_000, 11_000_000);
+        let line = |heeding: &mut Heeding, request: u64, voice: i16, words: &str| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            let held = heeding.heed(request, said, words, None);
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, Instant::now());
+            if held.is_none() {
+                thread.lamp(request, "Sure.", Instant::now());
+            }
+            held.is_some()
+        };
+        let mut judged = |on: bool, voice: i16, words: &str, turned: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+                room.count_held_talk(on);
+            }
+            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            heeding.as_the_only_voice(false, true, false);
+            if on {
+                heeding.needing_name_or_follow_up();
+            }
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            // A calls the lamp, facing it: A's voice is the conversation's.
+            look(true);
+            assert!(!line(&mut heeding, 1, 1, "Lamp, what time is it?"));
+            look(turned);
+            let held = line(&mut heeding, 2, voice, words);
+            let room = crate::room_told::room().lock().unwrap().at(monotonic_us());
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            (held, room)
+        };
+        let follow_up = "And what about tomorrow?";
+        assert_eq!(judged(true, -1, follow_up, true), (true, Room::Busy));
+        assert_eq!(judged(true, -1, follow_up, false), (true, Room::Busy));
+        assert_eq!(
+            judged(true, -1, "Lamp, and what about tomorrow?", true),
+            (false, Room::Busy)
+        );
+        assert_eq!(judged(true, 1, follow_up, true), (false, Room::Unknown));
+        assert_eq!(judged(false, -1, follow_up, true), (false, Room::Unknown));
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// `LAMP_NAME_OR_FOLLOW_UP`'s known limit on this route, as built: the
