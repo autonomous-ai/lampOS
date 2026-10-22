@@ -1457,6 +1457,11 @@ struct Marks {
     /// Whether its words are back, and, when the line after it began first
     /// and waits for them, where they go ([`NameWords::Coming`]).
     words_back: Mutex<(bool, Option<tokio::sync::oneshot::Sender<Option<NameSaid>>>)>,
+    /// Said by the lamp's name before it ([`said_by_the_name`],
+    /// `LAMP_SECOND_NAME_CARRIES`): its words are two lines in a chain. It
+    /// goes on only from the name, never from a line before the name, often
+    /// the end of other talk (reviewer-three's P2, 23 Oct).
+    name_carried: AtomicBool,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -2890,9 +2895,13 @@ impl Engine {
                 // The line before, cut short after its words came back but
                 // before it was asked, and not folded into this one: its
                 // words go on in the chain (`LAMP_JOIN_CUT_WORDS`).
+                // The lamp's name waiting for this line is carried by its
+                // own rule, never chained ([`said_by_the_name`]).
+                let name_waiting = name_of.as_ref().map(|name| name.request);
                 if !folded
                     && !after_stop
                     && let Some((of, words)) = heard_before
+                    && name_waiting != Some(of)
                     && let Some((before, before_link, before_began)) = before_link
                     && of == before
                 {
@@ -2915,6 +2924,7 @@ impl Engine {
                     name_of: Mutex::new(name_of),
                     ended_at: Mutex::new(None),
                     words_back: Mutex::default(),
+                    name_carried: AtomicBool::new(false),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -3457,6 +3467,19 @@ impl Engine {
                 .ok()
                 .is_some_and(|last| last.is_some_and(|last| last >= of));
         if self.shared.same_speaker.is_none() || words.trim().is_empty() || held {
+            return;
+        }
+        // Not in a busy room: there a line cut while its verdict waits (the
+        // Policy's, up to 2 s) is as likely talk to someone else
+        // (reviewer-three, 23 Oct: "…after lunch." then "Lamp, what's on my
+        // calendar?" was asked as one line).
+        let busy_now = crate::room_told::room()
+            .lock()
+            .is_ok_and(|mut room| room.at(monotonic_us()) == crate::room_told::Room::Busy);
+        if self.shared.busy(of) || busy_now {
+            eprintln!(
+                "lamp-voice second: request {of}: cut short before it was asked, in a busy room: its words are not chained (LAMP_JOIN_CUT_WORDS)"
+            );
             return;
         }
         // A stop or "never mind" withdraws the chain before it, as it does
@@ -4231,6 +4254,9 @@ async fn spoken(
         None => None,
     };
     let wordless = text.trim().is_empty();
+    if name_of.is_some() {
+        marks.name_carried.store(true, Ordering::Release);
+    }
     let (text, called) = match &name_of {
         Some(name) if wordless && name_first(&name.words) => (
             name.words.clone(),
@@ -4893,7 +4919,7 @@ fn own_part(request: u64, text: &str, marks: &Marks) -> Part {
         request,
         text: text.to_owned(),
         at: marks.began.unwrap_or_else(Instant::now),
-        lines: if marks.folded { 2 } else { 1 },
+        lines: 1 + u16::from(marks.folded) + u16::from(marks.name_carried.load(Ordering::Acquire)),
     }
 }
 
