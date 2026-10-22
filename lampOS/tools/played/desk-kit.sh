@@ -77,7 +77,7 @@ DESK_KIT_TAR=${DESK_KIT_TAR:-desk-kit-1}
 DESK_KIT_SHA256=${DESK_KIT_SHA256:-e9f826f6d6284c08e0c86699c4d64d37780f0d84c70fe0c5100be5c66d658691}
 if [[ $DESK_KIT_TAR != none && ! -f $PLAYED_OUT/$DESK_KIT_TAR/README.md ]]; then
   mkdir -p "$PLAYED_OUT"; tar_at=$PLAYED_OUT/$DESK_KIT_TAR.tar
-  curl -fsSL -o "$tar_at" "https://storage.googleapis.com/s3-autonomous-upgrade-3/os/test-kits/$DESK_KIT_TAR.tar" ||
+  curl -fsSL -o "$tar_at" "https://cdn.autonomous.ai/os/test-kits/$DESK_KIT_TAR.tar" ||
     gsutil -q cp "gs://s3-autonomous-upgrade-3/os/test-kits/$DESK_KIT_TAR.tar" "$tar_at" ||
     { echo "desk-kit.sh: could not fetch $DESK_KIT_TAR.tar" >&2; exit 7; }
   [[ $(shasum -a 256 "$tar_at" | cut -d' ' -f1) == "$DESK_KIT_SHA256" ]] ||

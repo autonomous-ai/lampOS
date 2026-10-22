@@ -166,8 +166,8 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
   `say` voices talk about work. AMI audio stays on your Mac, outside the
   repo: never commit it.
 - **The kit's audio** is one versioned tar, `desk-kit-1.tar`, fetched once
-  into `$PLAYED_OUT` from
-  `gs://s3-autonomous-upgrade-3/os/test-kits/desk-kit-1.tar` and refused
+  into `$PLAYED_OUT` from https://cdn.autonomous.ai/os/test-kits/desk-kit-1.tar
+  (`gs://s3-autonomous-upgrade-3/os/test-kits/`) and refused
   unless its sha256 is `DESK_KIT_SHA256` (`e9f826f6…`), so every Mac plays
   the same audio. It holds 52 AMI clips (meetings EN2002a, EN2002b,
   EN2002d and ES2004b, individual headsets, from the corpus owners' copy at
