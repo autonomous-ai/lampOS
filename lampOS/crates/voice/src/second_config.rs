@@ -1235,6 +1235,13 @@ mod tests {
             ..Default::default()
         };
         assert!(crate::second_provider::worker::relay_routable(&route, deepseek, None).chat);
+        // Its key is the relay's, with no deepseek.key (El's P3).
+        assert_eq!(
+            crate::second_provider::worker::deepseek_key(&route, None)
+                .unwrap()
+                .expose(),
+            "relay-secret"
+        );
         // The product unit, which no longer gives the variable.
         let unit = include_str!("../../../deploy/product/lamp-voice.service");
         assert!(
