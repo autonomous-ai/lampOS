@@ -6334,6 +6334,36 @@ Ready for lamp-voice: no (#2899 fresh native/P2 reread; retry-boundary piece not
   follow-up and correction work alone. Raw audit
   `/private/tmp/fourth-retry-followup-audit-20261022/`.
 
+## 2026-10-22 15:09 ICT: onboarding carried; retry tests published; photo activation claimed
+
+Ready for lamp-voice: #2899 source/native ready, now carried by Reviewer-lead as #2941; #2936 draft for ARM64; #2856 not ready.
+
+- #2899 head381d98732 passed ARM6439740468348: 10,319/0/66,
+  all12 new regressions, four doctests,12 process checks,relay; one
+  unchanged same-voice leaky pass. Clippy39740468329 passed. No rerun.
+  Lead6335375026 cleared the consent P2, no new P1/P2. Three disclosed
+  P3 limits remain. Ready6335571604. Lead carried the unchanged patch
+  to #2941 de78f9038 (range-diff=), with final merge on x86Clippy per
+  Lead6335903914. Fourth has not merged. Authorised52e6 same-steps walk
+  remains open under #2824; no device actions.
+- #2936 published at3bbbb6cbc82ff8914ea278fb2c6d90fb8d8e6290 on
+  ae80e1c5d, one clean tests/verification-only commit. Twelve worker,
+  six client, three callback, one fixture and five census checks:
+  27/0/0 unique. Formatting, strict workspaceClippy and build pass.
+  Additional changed-test loader-counter proof passes; not added to27.
+  Shared300ms retry observed301.590ms, asserted280-400ms. API/synthetic
+  boundaries and source-only production wiring are explicit. Native
+  ARM6439744314100 pending; Clippy39744313022 green. Queue6335854477.
+- #2856 claimed6335952379, sessioncodex-20261022-photo-product,
+  no lamp; first claim verified. Prerequisites #2867 (2854) and #2876
+  (2855) are merged. Next work is real product on/off tool census and
+  cross-unit photo configuration consistency. Read-only audit predicts
+  31 baseline tools plus two photo tools exceeds32; no silent search
+  or action cuts and no global admission-policy change are authorised
+  by this activation issue. Obtain concrete harness results before a
+  budget/scope decision. The app/lamp-0c89 acceptance belongs to an
+  authorised operator; installable-skill scope question6334168716 remains.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
