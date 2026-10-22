@@ -482,7 +482,8 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   the chat models take more, DeepSeek's API up to 128), cut
   in the order `worker::chat_cut` declares: the fetch, the time elsewhere,
   `reports_state` with `LAMP_REPORTS=on`, the skills' functions not a core
-  skill's (the last first), then the search, and never a core skill's
+  skill's (the last first), the weather with `LAMP_SECOND_WEATHER=on`, then
+  the search, and never a core skill's
   function, `use_skill`, `reports_stop` or the actions part's (#2614,
   #2644, `worker::chat_tools`). What is cut is said once, on a plain
   journal line (`past the bound of 48, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
@@ -2798,26 +2799,47 @@ the model's first round does, which took 0.74 to 0.92 s to its first
 event on lamp-4ace on 19 Oct; the search test's first audio was 2.6 to
 4.4 s.
 
-**The weather, asked ahead** (`LAMP_SECOND_WEATHER=on`, off unless set;
-the first builder on #1712, 15:18). The lamp's place (`LAMP_PLACE`, or else
-the place its zone names) is looked up once by its first part at
-Open-Meteo's geocoding (`geocoding-api.open-meteo.com`), then the weather
-now and for 7 days is asked of `api.open-meteo.com` every 15 minutes,
-with no key (`net::weather`). While it is under an hour old the model is
-told it beside the time: "The weather where you are, as of N minutes ago:
-In Hanoi now: 31°C, partly cloudy, feels like 36°C, humidity 70%. Today
-26 to 33°C, … Tomorrow …. Thursday 25 to 32°C, overcast. … Use it when
-someone asks about the weather here; never bring it up unasked." The days
-after tomorrow go by their weekday names, worked out from the forecast's
-own dates, and today and tomorrow carry theirs too ("Today, Tuesday, 25 to
-33°C"), so a note fetched before midnight still reads right after it
-(#2185: it was today and tomorrow only, so "this weekend" on a Tuesday
-couldn't be answered). So "what's the weather" and "will it rain
-this weekend" need no search. Only the place's
-name and its coordinates leave the lamp. The journal: `the weather in
-Hanoi, Vietnam is asked of Open-Meteo every 15 minutes`, `the weather in
-… came in N ms` on the first and after a failure, and a failure once until
-the next success. It reaches the second route's worker alone
+**The weather, asked when asked** (`LAMP_SECOND_WEATHER=on`, off unless
+set; from the owner on 22 Oct). Spoken turns are given a function of
+their own, `weather`, with two optional words: `place`, the place asked
+about as it was said, and `day`, `today`, `tomorrow` or a weekday's name
+(`net::weather::declaration`). Its description asks the model to call it
+for every question about the weather, the temperature or rain, for any
+place or day, and to say which place it is answering for. A call with no
+place is for the lamp's own (`LAMP_PLACE`, or else the place its zone
+names); one with no day, or one it can't read, answers now and every day
+of the week ahead by name. Only when it is called is the place looked up
+by its first part at Open-Meteo's geocoding
+(`geocoding-api.open-meteo.com`), then its forecast fetched from
+`api.open-meteo.com`, now and for 7 days, with no key; the two together
+within the search's 3 s (`net::weather::WITHIN`). It answers in words the
+model can say: `{"place": "Hanoi, Vietnam", "weather": "In Hanoi,
+Vietnam: Tomorrow, Friday, 24 to 30°C, light rain, 60% chance of
+rain."}`; for now and for today the temperature, the sky, the feeling and
+the humidity now come first ("In Hanoi, Vietnam now: 31°C, partly cloudy,
+feels like 36°C, humidity 70%."). Today and tomorrow carry their weekday
+too, worked out from the forecast's own dates (#2185). A place not found
+answers `{"error": "I couldn't find that place"}`, and a failed lookup or
+fetch says the weather couldn't be reached: never another place's
+weather, nor any older than it is kept. Each place's forecast is kept 10
+minutes, so a follow-up ("and Saturday?") is answered at once, with at
+most 16 places kept, the oldest out (`net::weather::Weather`). Nothing
+is fetched ahead, no task runs, and the model's notes carry no weather.
+Before, the forecast of the lamp's own place was fetched every 15
+minutes and told in every request, so "what's the weather in Hanoi
+tomorrow?" was answered with Ho Chi Minh City's (the owner, 22 Oct 16:0x:
+"a really dumb approach, both fetching weather every 15 minutes and only
+one location"). The function is answered before the route's runners
+(`worker::answering_weather`), given at once with
+`LAMP_SECOND_FEW_TOOLS=on`, never held by the Policy, and cut at the
+bound after the skills' and before the search (`worker::chat_cut`). Texts
+from the app are not given it. Only the place's name and its coordinates
+leave the lamp. The journal: `the model may ask for the weather of any
+place and day, … here is Hanoi, Vietnam (LAMP_SECOND_WEATHER)` at start,
+and for each call `request N asked for weather for a place named,
+tomorrow; answered in N ms, fetched` (or `from what was kept`, `no such
+place`, `the weather was not fetched: …`), never the place's name or any
+other word said. It reaches the second route's worker alone
 (`process.rs`).
 
 **A dated search.** The search function's description (`net::search::DESCRIPTION`)

@@ -588,7 +588,7 @@ never the one cut (the owner's rule, on #2614): the tools file names core
 skills' tools in `core` beside `tools` (`lamp_skills::tools_file`), and
 the voice cuts the other skills' functions, the last first, after the
 second route's fetch and time elsewhere and `reports_state` (with
-`LAMP_REPORTS=on`) and before its search (`tools::uncut`,
+`LAMP_REPORTS=on`) and before its weather and its search (`tools::uncut`,
 `worker::chat_cut`). With `LAMP_USE_SKILL=on`, `use_skill` carries the
 core skills and is never cut either (#2644). The lamp's own and core skills'
 functions alone past 32 are an error line naming what was left out
