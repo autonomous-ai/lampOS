@@ -1939,8 +1939,9 @@ impl Engine {
         self.memory.as_ref().map(|(worker, cache)| {
             // A heard line with the camera allowed, its turn told and kept
             // by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`): admitted as
-            // the room's before the face cache's first answer (after a
-            // restart, a privacy change or a face remembered), its keeper is
+            // the room's while the face cache is cold (after a restart, a
+            // privacy change, a face remembered or a known-file change, for
+            // up to `COLD_FOR` with no face named), its keeper is
             // decided at its end (#2807, `ScopeLease::face_at_end`); a warm
             // cache that named nobody arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();

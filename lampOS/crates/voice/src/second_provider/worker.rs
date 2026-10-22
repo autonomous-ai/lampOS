@@ -2024,6 +2024,9 @@ pub fn serve(
         _ => {}
     }
     let face_cache = Arc::new(crate::memory_scope::FaceCache::holding_gaps(face_gap));
+    // Cold from the voice's start (#2807): a room's line looks later for
+    // its keeper until a face is named or `COLD_FOR` passes.
+    face_cache.went_cold(Instant::now());
     let scoped_settings = tools.clone();
     let skill_settings = tools.clone();
     let days = crate::remember::days_from_environment();
@@ -3196,17 +3199,31 @@ pub fn serve(
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
                     interval.tick().await;
-                    let token = face_cache.begin_refresh();
+                    let mut token = face_cache.begin_refresh();
                     let path = path.clone();
                     let bus = faces_bus.clone();
-                    let (observation, in_view) = tokio::task::spawn_blocking(move || {
+                    // The known file's mark first: a change read here, by
+                    // whoever wrote it, makes the cache cold (#2807), and
+                    // this refresh's observation, read after, may end it.
+                    let read = tokio::task::spawn_blocking(move || {
+                        let mark = crate::known_faces::KnownMark::read(&path);
+                        let at = Instant::now();
                         (
+                            (mark, at),
                             crate::known_faces::FaceObservation::read(&path),
                             bus.as_deref().and_then(crate::known_faces::faces_in_view),
                         )
                     })
-                    .await
-                    .unwrap_or((None, None));
+                    .await;
+                    let Ok(((mark, at), observation, in_view)) = read else {
+                        face_cache.replace_seen(token, None, None);
+                        continue;
+                    };
+                    if face_cache.known_file_read(&mut token, mark, at) {
+                        eprintln!(
+                            "lamp-voice second: the eyes' known file changed: the face cache is cold"
+                        );
+                    }
                     face_cache.replace_seen(token, observation, in_view);
                 }
             })
