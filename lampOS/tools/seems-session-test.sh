@@ -76,8 +76,25 @@ check "off: Mood stopped, as it was" 'tail -2 "$T/calls" | grep -qx "stop lamp-m
 env_on env MOOD_WAS=active "$SCRIPT" on 2>/dev/null
 env_on env MOOD_WAS=active "$SCRIPT" off 2>/dev/null
 check "off: Mood running again, as it was" 'tail -1 "$T/calls" | grep -qx "restart lamp-mood.service"'
-FERPLUS= env_on env FERPLUS= "$SCRIPT" on >/dev/null 2>&1
-check "on refuses with no FER+ model" '[ $? != 0 ]'
+# With no FER+ model (it isn't shipped), Blendshape alone.
+env_on env FERPLUS= "$SCRIPT" on 2>/dev/null
+check "no FER+: on runs, Blendshape alone" \
+  '[ $? = 0 ] && grep -qx "ExecStart=/opt/lampOS/lamp-eyes/current/lamp-eyes --own-flag --mouth-model $T/models/mesh.onnx --seems-blendshapes $T/models/blend.onnx --seems-log $T/seems.log" "$T/dropins/lamp-eyes.service.d/zz-seems-session.conf"'
+printf '{"t":1001,"kind":"positive","confidence":0.9,"from":"blendshapes"}\n' >"$T/seems.log"
+printf 'smiling\t1000\t1010\n' >"$T/stretches1.tsv"
+printf '{"t": 1001, "says": "positive"}\n' >"$T/labels1"
+cat >"$T/bin/measure" <<'SH'
+#!/usr/bin/env bash
+rm -f "$1" "$2"
+printf 'reader\tat\tjudged\twrong\trate\tunder the bar\nfer_plus\t0.5\t0\t0\t0.000\ttoo few\nblendshapes\t0.5\t1\t0\t0.000\ttoo few\n'
+SH
+chmod +x "$T/bin/measure"
+CALLS="$T/calls" DIR="$T/run" SEEMS_LOG="$T/seems.log" MEASURE="$T/bin/measure" \
+  "$SCRIPT" read "$T/labels1" "$T/stretches1.tsv" >"$T/read1" 2>&1
+code=$?
+check "no FER+: read prints Blendshape's rows only" \
+  '[ $code = 0 ] && grep -qx "smiling	blendshapes	1	0	0	0	0" "$T/read1" && grep -q "^blendshapes	0.5" "$T/read1" && ! grep -q fer_plus "$T/read1" && [ ! -e "$T/run/no-fer-plus" ]'
+env_on env FERPLUS= "$SCRIPT" off 2>/dev/null
 
 # read: each stretch's reads by reader and kind, Mood's smiles and quiets,
 # then the measure with --delete; nothing of the session left.

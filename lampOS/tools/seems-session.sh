@@ -13,7 +13,8 @@
 #   lampOS/tools/seems-session.sh off                   # on the lamp, as root
 #
 # on: lamp-eyes from its own unit with `--seems FERPLUS --mouth-model MESH
-# --seems-blendshapes BLEND --seems-log` and `LAMP_SEEMS_BROW_LOW=on`, and
+# --seems-blendshapes BLEND --seems-log` and `LAMP_SEEMS_BROW_LOW=on` (with
+# FERPLUS unset, Blendshape alone: no `--seems`), and
 # lamp-mood with `LAMP_MOOD=on` and `LAMP_MOOD_SEEMS=on`, each from a `/run`
 # drop-in that only adds to the unit's own command line, so a reboot undoes
 # it. `mood/state` is kept in /run/seems-session (0600) for `read`. A timer
@@ -37,13 +38,15 @@
 # `mood/state`: warmth up for a smile, energy down for a quiet), then
 # `lamp-seems-measure SEEMS_LOG LABELS --delete`: for each
 # reader and confidence, the reads judged and wrong, and whether each is
-# under the bar (wrong at most 1 in 10). The measure removes the reads and
+# under the bar (wrong at most 1 in 10). A session `on` without FERPLUS
+# prints Blendshape's rows only. The measure removes the reads and
 # the labels; the copy read here and Mood's state go too. Counts only.
 #
 # off: the drop-ins and the tap removed, the units back on their own
 # command lines, and anything of the session's left removed.
 #
-# Environment: FERPLUS (FER+'s model, required for on: it isn't shipped),
+# Environment: FERPLUS (FER+'s model, optional: it isn't shipped; without it
+# `on` runs Blendshape alone),
 # MESH and BLEND (/opt/lampOS/eyes/models/face_mesh_v2.onnx and
 # face_blendshapes.onnx), BUS (lamp-bus), MEASURE (lamp-seems-measure),
 # STRETCH (180), STRETCHES (stretches.tsv), SEEMS_LOG
@@ -73,15 +76,17 @@ dropin() { # $1: unit, $2: extra arguments, $3: environment (KEY=value ...)
 }
 
 on() {
-  : "${FERPLUS:?seems-session: FERPLUS is FER+'s model (it isn't shipped)}"
-  local model
-  for model in "$FERPLUS" "$MESH" "$BLEND"; do
+  local model fer=
+  for model in ${FERPLUS:+"$FERPLUS"} "$MESH" "$BLEND"; do
     [ -r "$model" ] || { echo "seems-session: cannot read $model" >&2; exit 2; }
   done
   install -d -m 0700 "$DIR"
+  # Without FER+ (not shipped, #811), Blendshape alone; `read` then prints
+  # its rows only.
+  if [ -n "${FERPLUS:-}" ]; then fer="--seems $FERPLUS "; rm -f "$DIR/no-fer-plus"; else : >"$DIR/no-fer-plus"; fi
   "$SYSTEMCTL" is-active lamp-mood.service >"$DIR/mood-was" || true
   install -d "$DROPINS/lamp-eyes.service.d" "$DROPINS/lamp-mood.service.d"
-  dropin lamp-eyes.service "--seems $FERPLUS --mouth-model $MESH --seems-blendshapes $BLEND --seems-log $SEEMS_LOG" \
+  dropin lamp-eyes.service "$fer--mouth-model $MESH --seems-blendshapes $BLEND --seems-log $SEEMS_LOG" \
     "LAMP_SEEMS_BROW_LOW=on" >"$DROPINS/lamp-eyes.service.d/zz-seems-session.conf"
   dropin lamp-mood.service "" "LAMP_MOOD=on LAMP_MOOD_SEEMS=on" \
     >"$DROPINS/lamp-mood.service.d/zz-seems-session.conf"
@@ -148,15 +153,16 @@ LIST
 }
 
 read_session() {
-  local labels=$1 stretches=${2:-$STRETCHES}
+  local labels=$1 stretches=${2:-$STRETCHES} readers=fer_plus,blendshapes
+  [ ! -e "$DIR/no-fer-plus" ] || readers=blendshapes
   for file in "$labels" "$SEEMS_LOG"; do
     [ -r "$file" ] || { echo "seems-session: cannot read $file" >&2; exit 2; }
   done
   install -d -m 0700 "$DIR"
   cp "$SEEMS_LOG" "$DIR/reads.jsonl"
-  python3 -I - "$DIR/reads.jsonl" "$DIR/mood.txt" "$stretches" <<'PY'
+  python3 -I - "$DIR/reads.jsonl" "$DIR/mood.txt" "$stretches" "$readers" <<'PY'
 import json, os, sys
-reads_path, mood_path, stretches_path = sys.argv[1:4]
+reads_path, mood_path, stretches_path, readers = sys.argv[1:5]
 reads = []
 for line in open(reads_path, encoding="utf-8", errors="replace"):
     try:
@@ -196,12 +202,18 @@ for name, begun, ended in stretches:
     for (energy_was, warmth_was), (energy, warmth) in zip(within, within[1:]):
         smiles += warmth - warmth_was >= 0.02
         quiets += energy_was - energy >= 0.05
-    for reader in ("fer_plus", "blendshapes"):
+    for reader in readers.split(","):
         kinds = [kind for t, by, kind in reads if by == reader and isinstance(t, (int, float)) and begun <= t <= ended]
         print(f"{name}\t{reader}\t{kinds.count('positive')}\t{kinds.count('negative')}\t{kinds.count('unsure')}\t{smiles}\t{quiets}")
 PY
-  rm -f "$DIR/reads.jsonl" "$DIR/mood.txt"
-  "$MEASURE" "$SEEMS_LOG" "$labels" --delete
+  rm -f "$DIR/reads.jsonl" "$DIR/mood.txt" "$DIR/no-fer-plus"
+  # The measure always prints both readers; FER+'s rows are dropped when it
+  # didn't run.
+  if [ "$readers" = blendshapes ]; then
+    "$MEASURE" "$SEEMS_LOG" "$labels" --delete | grep -v '^fer_plus'
+  else
+    "$MEASURE" "$SEEMS_LOG" "$labels" --delete
+  fi
 }
 
 case "${1:-}" in
