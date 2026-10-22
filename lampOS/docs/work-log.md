@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-22 07:41 +07, failed-unit reports ready; Music rebase and installer checks active
+
+**Ready for lamp-voice: yes (#2764, `99d920738`).** ARM64 **39698837988**
+passed **9917 tests (1 leaky), 0 failed, 63 skipped**, plus four doc tests,
+relay and twelve custom-harness tests. Linux Clippy **39698837995** passed
+with zero Rust warnings. All three new Cloud tests passed. The verified
+merge parents, exact results, warnings, skips and artifact metadata are in
+[the native receipt](verification/report-failed-units-native-20261022/README.md).
+Mac **177/0/1/0** and the expected-failure control are already in the PR.
+First or its assigned reader merges; no device result is claimed.
+
+**Music #1757:** pushed `6208a602b` passed ARM64 **39698425178**
+(**10071 passed, 0 failed, 63 skipped; one leaky pass**) and Linux Clippy
+**39698425278**. Newer `lamp-voice` commits conflict again, so that successful
+head is historical evidence while the rebase onto `fc800db6f` is resolved.
+The earlier [range-diff](verification/requested-audio-rebase-20261022/range-diff.txt)
+and all receipts remain intact. The new head will get its own native gates.
+
+**Exit-note installation:** `second/install-exit-notes` passed the Update and
+Cloud Mac gate, **471 passed / 0 failed / 3 ignored / 0 filtered out**, plus
+fmt and strict Clippy. Its clean rebase onto `fc800db6f` is getting focused
+integration checks. Initial failures, the directory-aware fixture repair,
+controls and the unchanged Cloud timing observation remain in its evidence.
+The PR follows these checks. No full local workspace or local ARM64 gate.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 07:15 +07, Music rebased and pushed; failed-unit gate running
 
 **Ready for lamp-voice: no (#1757, fresh native gates running).**
