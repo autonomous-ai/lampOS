@@ -1011,7 +1011,9 @@ fn serve(
     let mut seen = None;
     let mut looked: Option<Instant> = None;
     // Night sleep's live claim (#940), with routines on: said at each
-    // reload and every minute, so Expression knows the night is a skill's.
+    // reload, every minute and when its rest path goes down or comes back,
+    // so Expression knows the night is a skill's. Its third part is why the
+    // skill cannot rest, as last said: no claim then (#2744).
     let mut claim = if options.routines {
         Some((
             bus.publisher_declared(
@@ -1020,6 +1022,7 @@ fn serve(
                 lamp_msgs::ExpressionSleepClaim::SOURCE,
             )?,
             None::<u64>,
+            None::<String>,
         ))
     } else {
         None
@@ -1123,7 +1126,7 @@ fn serve(
                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
                 eprintln!("lamp-skills: loaded {names:?}");
                 // A changed folder may change night sleep's claim: said now.
-                if let Some((_, said)) = &mut claim {
+                if let Some((_, said, _)) = &mut claim {
                     *said = None;
                 }
                 if let Some(manager) = &mut routines {
@@ -1209,20 +1212,6 @@ fn serve(
             }
             let _ = out.alive();
         }
-        if let Some((publisher, said)) = &mut claim {
-            let at = lamp_ipc::monotonic_us();
-            if said.is_none_or(|said| {
-                at.saturating_sub(said) >= lamp_msgs::EXPRESSION_SLEEP_CLAIM_EVERY_US
-            }) {
-                *said = Some(at);
-                let stopped = engine.stopped(lamp_skills::routine::NIGHT_SLEEP, clock::now_us());
-                if let Some(night) = lamp_skills::routine::sleep_claim(dir, stopped)
-                    && let Err(error) = publisher.publish_json(at, &night)
-                {
-                    eprintln!("lamp-skills: night sleep's claim not said: {error}");
-                }
-            }
-        }
         let now_us = clock::now_us();
         // Anchor the wall sample before reading it or checking trust. Slow
         // clock/zone work must not move a routine's window deadline later.
@@ -1237,6 +1226,37 @@ fn serve(
             );
             // Whether the lamp rested last night, for a `yields_to` (#1672).
             engine.rested(manager.rested_day());
+        }
+        // After the manager's tick, so the claim reads this tick's receipt.
+        if let Some((publisher, said, down)) = &mut claim {
+            let at = lamp_ipc::monotonic_us();
+            let now_down = routines
+                .as_ref()
+                .and_then(|manager| manager.cannot_rest(lamp_skills::routine::NIGHT_SLEEP));
+            let changed = now_down != *down;
+            if changed {
+                match &now_down {
+                    Some(why) => eprintln!(
+                        "lamp-skills: night sleep cannot rest ({why}): its claim is not said, so Expression's own sleep takes the night once the last one goes stale"
+                    ),
+                    None => eprintln!("lamp-skills: night sleep can rest again: its claim is said"),
+                }
+                *down = now_down;
+            }
+            if changed
+                || said.is_none_or(|said| {
+                    at.saturating_sub(said) >= lamp_msgs::EXPRESSION_SLEEP_CLAIM_EVERY_US
+                })
+            {
+                *said = Some(at);
+                let stopped = engine.stopped(lamp_skills::routine::NIGHT_SLEEP, clock::now_us());
+                if let Some(night) =
+                    lamp_skills::routine::sleep_claim(dir, stopped, down.as_deref())
+                    && let Err(error) = publisher.publish_json(at, &night)
+                {
+                    eprintln!("lamp-skills: night sleep's claim not said: {error}");
+                }
+            }
         }
         let made = engine.clock_tick(now_us);
         say_dropped(&mut engine);

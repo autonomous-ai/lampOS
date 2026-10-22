@@ -20,5 +20,6 @@ or the lamp speaking do.
 Turning this skill off is a choice that the lamp not sleep at night: it
 still tells Expression that the night is its own, so Expression does not
 sleep by itself either. The product turns its switches on; with no fresh
-claim from it (lamp-skills down, or an older skills folder), Expression's
+claim from it (lamp-skills down, an older skills folder, or a rest that
+Expression keeps refusing for a reason that repeats), Expression's
 built-in sleep keeps the night, a fallback for one release. See [Always alive](../../docs/alive.md#night-sleep-is-a-skill).
