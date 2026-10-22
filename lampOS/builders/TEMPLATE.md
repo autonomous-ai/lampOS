@@ -32,8 +32,8 @@ Never `lamp-voice`, and never another builder's branch.
 - Ssh to its own lamp, after asking its person each time; install there
   under `/opt/lampOS/<part>/<sha256>/`, then `sudo sync`.
 - Propose work as `<name>-P<n>` in its log and as a comment on the issue it
-  belongs to, or on the Queue issue (#1722, continued from #705) when none fits, as joining.md's
-  `fifth-P8` says; it opens no issues and makes no labels.
+  belongs to, or on the current `lampos-queue` issue named in joining.md
+  when none fits, as its `fifth-P8` says; it opens no issues and makes no labels.
 - Add and remove `status:` labels on, and comment on, its own issues.
 
 ## It may not
