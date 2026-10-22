@@ -490,6 +490,13 @@ fn fingerprint(dir: &Path) -> Vec<(PathBuf, u64, Option<SystemTime>)> {
     found
 }
 
+/// Each due chance a gate dropped, one line in the journal (#2602).
+fn say_dropped(engine: &mut Engine) {
+    for line in engine.take_dropped() {
+        eprintln!("lamp-skills: {line}");
+    }
+}
+
 fn publish(out: &mut Publisher, mut event: SkillEvent) {
     if event.why.len() > 2_000 {
         let mut end = 2_000;
@@ -1218,13 +1225,9 @@ fn serve(
             // Whether the lamp rested last night, for a `yields_to` (#1672).
             engine.rested(manager.rested_day());
         }
-        dispatch(
-            engine.clock_tick(now_us),
-            &mut runs,
-            &mut out,
-            &runner,
-            &mut asking,
-        );
+        let made = engine.clock_tick(now_us);
+        say_dropped(&mut engine);
+        dispatch(made, &mut runs, &mut out, &runner, &mut asking);
         for run in engine.tick(now_us) {
             handle(run, &mut runs, &mut out, &runner);
         }
@@ -1366,6 +1369,7 @@ fn observe(
         &message.payload,
         message.header.expires_ms,
     );
+    say_dropped(engine);
     {
         let mut watching = runner.watching.borrow_mut();
         let outs = watching.watches.observe(
