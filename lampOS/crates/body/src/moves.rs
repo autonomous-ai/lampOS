@@ -104,6 +104,10 @@ pub fn ended(by: Priority) -> &'static str {
     }
 }
 
+/// Why a skill's or idle gesture playing was ended for a hand that came
+/// on the lamp as it played: an unprompted gesture gives way to a hand.
+pub const ENDED_BY_HAND: &str = "ended: by a hand";
+
 /// An asker's name as its datagram gave it (`skill:dance`), kept in place
 /// so the motor loop never allocates for it, to say who lost the body and
 /// to whom on `body/gesture` (#940). At most [`Source::MOST`] bytes and

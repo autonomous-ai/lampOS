@@ -3947,8 +3947,8 @@ fn run_on<P: PortIo, R: Runtime>(
     // gesture is given.
     let mut playing: Option<(&'static Clip, Duration)> = None;
     let mut pending: Option<(&'static Clip, Duration)> = None;
-    // Under `Limits::arbitration`: who asked for the gesture playing and
-    // the one waiting, each priority with the name its asker gave (the
+    // Who asked for the gesture playing and the one waiting (weighed
+    // against each other only under `Limits::arbitration`), each priority with the name its asker gave (the
     // body's own turn to a call is the conversation's, and names nobody),
     // and whether one ended for another still eases out.
     let (mut playing_by, mut pending_by): ((Priority, Option<Source>), (Priority, Option<Source>)) = (
@@ -3997,6 +3997,9 @@ fn run_on<P: PortIo, R: Runtime>(
     let mut heard: Option<(Mood, u8, Duration)> = None;
     // Under `Limits::look_at_name`: when the last call was taken.
     let mut called_at: Option<Duration> = None;
+    // The last step's mood was a conversation's (listening, thinking or
+    // speaking): one beginning ends an unprompted gesture.
+    let mut talked = false;
     let mut over_load = [0u8; 3];
     let mut off_track = [0u8; 3];
     // With `--wake on`: the goal and the position a joint short of its goal
@@ -4231,6 +4234,53 @@ fn run_on<P: PortIo, R: Runtime>(
         }
         // A hand holds a joint where it gave way: a gesture is not begun.
         let in_hand_now = easing.iter().any(|left| *left > 0);
+        // An unprompted gesture, a skill's or idle life's, is an invitation:
+        // whatever `--arbitration`, it ends the moment a conversation begins
+        // or a hand comes on the lamp, and eases out as one ended for a
+        // higher ask does. One of the conversation's, a person's or
+        // safety's plays on; one such waiting to begin is dropped.
+        let talking = matches!(mood, Mood::Listening | Mood::Thinking | Mood::Speaking);
+        let spoken_to = talking && !talked;
+        talked = talking;
+        let unprompted = |clip: &Clip, by: Priority| from_outside(clip) && by <= Priority::Skill;
+        let ends = if in_hand_now {
+            Some(crate::moves::ENDED_BY_HAND)
+        } else {
+            spoken_to.then(|| crate::moves::ended(Priority::Conversation))
+        };
+        if let Some(why) = ends {
+            if let Some((old, _)) = playing.filter(|(old, _)| unprompted(old, playing_by.0)) {
+                gesture_fates.push_told(
+                    (old.name, why),
+                    Told {
+                        source: playing_by.1,
+                        by: None,
+                    },
+                );
+                playing = None;
+                yielding = true;
+                easing_out = Some((0, gesture_now, gesture_moved));
+            }
+            // One still waiting goes too, so it never begins after the ease
+            // out only to end a step later under the same hand.
+            if let Some((old, _)) = pending.filter(|(old, _)| unprompted(old, pending_by.0)) {
+                let why = if !in_hand_now {
+                    crate::moves::busy(Priority::Conversation)
+                } else if limits.arbitration {
+                    "dropped: held by a hand"
+                } else {
+                    "dropped: a hand holds it"
+                };
+                gesture_fates.push_told(
+                    (old.name, why),
+                    Told {
+                        source: pending_by.1,
+                        by: None,
+                    },
+                );
+                pending = None;
+            }
+        }
         // A gesture asked of a folded lamp stands it up first, as any
         // mood but rest does (#1011); not a lamp that is stopping, held,
         // slumped or paused.

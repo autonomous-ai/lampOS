@@ -10432,6 +10432,255 @@ fn a_speaking_lean_and_an_arbitration_ease_out_never_step_past_the_arm() {
     }
 }
 
+/// A lamp at rest asked for one gesture at 1 s, at this priority, and
+/// spoken to (`listening`) from `spoken_at` on, if ever: what was said
+/// of the gesture, and each step.
+fn spoken_to_run(
+    arbitration: bool,
+    clip: &'static Clip,
+    by: Priority,
+    spoken_at: Option<Duration>,
+) -> (BodyReport, Vec<(&'static str, &'static str)>, Vec<Step>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(16));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        arbitration,
+        ..gesture_limits()
+    };
+    let (time, mood_time, seen_at) = (clock.time.clone(), clock.time.clone(), clock.time.clone());
+    let mut asked = false;
+    let (mut fates, mut seen) = (Vec::new(), Vec::new());
+    let report = run_arbitrated(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || match spoken_at {
+            Some(at) if mood_time.get() >= at => Some((Mood::Listening, 60)),
+            _ => Some((Mood::Resting, 0)),
+        },
+        move || {
+            let due = !asked && time.get() >= Duration::from_secs(1);
+            asked |= due;
+            let asked = Asked {
+                gesture: due.then_some(clip),
+                ..Asked::default()
+            };
+            (asked, by)
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.arm_goals,
+            ));
+        },
+    );
+    (report, fates, seen)
+}
+
+/// The joys' stretch (lamp-4ace, 21 October): a skill's `stretching`
+/// played on for 3 s after the person spoke. An unprompted gesture, a
+/// skill's or idle life's, ends the moment a conversation begins, with
+/// the switch on or off, and eases out as one ended for a higher ask
+/// does; the conversation's own gesture plays on.
+#[test]
+fn a_skill_or_idle_gesture_playing_ends_when_a_conversation_begins_and_eases_out() {
+    let spoken = Duration::from_secs(8);
+    for arbitration in [true, false] {
+        for by in [Priority::Skill, Priority::Idle] {
+            let stretch = &crate::clips::STRETCHING;
+            let (report, fates, seen) = spoken_to_run(arbitration, stretch, by, Some(spoken));
+            assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+            assert_eq!(
+                fates,
+                [
+                    ("stretching", "taken: it was folded and stood up for it"),
+                    ("stretching", "ended: by conversation"),
+                ],
+                "{arbitration} {by:?}"
+            );
+            // It played until the word and not a step after.
+            let ended = seen.iter().position(|step| step.0 >= spoken).unwrap();
+            assert_eq!(seen[ended - 1].1, Some("stretching"));
+            assert!(seen[ended..].iter().all(|step| step.1.is_none()));
+            // Eased out, not snapped back: the arm's change a step grows and
+            // shrinks by a few counts and never jumps.
+            for joint in 0..2 {
+                let change: Vec<f32> = seen[ended - 2..ended + 20]
+                    .windows(2)
+                    .map(|pair| f32::from(pair[1].3[joint]) - f32::from(pair[0].3[joint]))
+                    .collect();
+                for pair in change.windows(2) {
+                    assert!((pair[1] - pair[0]).abs() <= 4.0, "{joint}: {change:?}");
+                }
+            }
+            // Never spoken to, it plays out.
+            let (_, fates, _) = spoken_to_run(arbitration, stretch, by, None);
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it was folded and stood up for it")],
+                "{arbitration} {by:?}"
+            );
+        }
+        // The conversation's own nod, a person's or safety's, plays on.
+        for by in [Priority::Conversation, Priority::Safety, Priority::Person] {
+            let stretch = &crate::clips::STRETCHING;
+            let (_, fates, seen) = spoken_to_run(arbitration, stretch, by, Some(spoken));
+            assert_eq!(
+                fates,
+                [("stretching", "taken: it was folded and stood up for it")],
+                "{arbitration} {by:?}"
+            );
+            assert!(seen.iter().any(|step| step.0 > spoken && step.1.is_some()));
+        }
+    }
+}
+
+/// No wait between the word and the ease: the step that reads `listening`
+/// is the stretch's first eased one, so the lamp stops within a motor step
+/// of the mood (the owner's 300 ms from "Lamp," to the stretch giving way).
+#[test]
+fn a_skill_gesture_eases_out_on_the_very_step_the_listening_mood_is_read() {
+    let spoken = Duration::from_secs(8);
+    let stretch = &crate::clips::STRETCHING;
+    let (_, _, played) = spoken_to_run(false, stretch, Priority::Skill, None);
+    let (_, _, seen) = spoken_to_run(false, stretch, Priority::Skill, Some(spoken));
+    let read = seen.iter().position(|step| step.0 >= spoken).unwrap();
+    assert_eq!(seen[..read], played[..read], "the same until the word");
+    assert_eq!((seen[read - 1].1, seen[read].1), (Some("stretching"), None));
+    // The arm, which only the stretch moves, already leaves the stretch's
+    // path on that step.
+    assert_ne!(seen[read].3, played[read].3);
+}
+
+/// A conversation's nod playing when the person speaks is not ended.
+#[test]
+fn a_conversation_nod_playing_when_a_conversation_begins_plays_on() {
+    let nod = &crate::clips::NOD;
+    let (_, played, _) = spoken_to_run(true, nod, Priority::Conversation, None);
+    let (_, fates, seen) = spoken_to_run(
+        true,
+        nod,
+        Priority::Conversation,
+        Some(Duration::from_millis(5_500)),
+    );
+    assert_eq!(fates, played);
+    assert!(!fates.iter().any(|(_, why)| why.starts_with("ended")));
+    assert!(
+        seen.iter()
+            .any(|step| step.0 > Duration::from_millis(5_500) && step.1 == Some("nod"))
+    );
+}
+
+/// A skill's stretch playing when a hand comes on the head ends, named for
+/// the hand, with the switch on or off; one of the conversation's plays on.
+#[test]
+fn a_skill_gesture_playing_ends_when_a_hand_comes_on_the_lamp() {
+    let ms = Duration::from_millis;
+    let cases = [true, false].into_iter().flat_map(|arbitration| {
+        [(Priority::Skill, true), (Priority::Conversation, false)]
+            .map(|(by, ended)| (arbitration, by, ended))
+    });
+    for (arbitration, by, ended) in cases {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        // A hand takes the head a second into the stretch and holds it.
+        lamp.hand = Some((ms(6_000), ms(10_000), PITCH, 1_950.0));
+        lamp.strains = vec![(ms(6_000), ms(10_000), PITCH, 400)];
+        let time = clock.time.clone();
+        let mut asked = false;
+        let mut fates = Vec::new();
+        let report = run_arbitrated(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                give_way: Some(GiveWay::Return),
+                arbitration,
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Resting, 0)),
+            move || {
+                let due = !asked && time.get() >= ms(1_000);
+                asked |= due;
+                let asked = Asked {
+                    gesture: due.then_some(&crate::clips::STRETCHING),
+                    ..Asked::default()
+                };
+                (asked, by)
+            },
+            |glimpse| fates.extend(glimpse.gesture_fates),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(report.gestures, 1, "{fates:?}");
+        assert_eq!(
+            fates.contains(&("stretching", crate::moves::ENDED_BY_HAND)),
+            ended,
+            "{arbitration} {by:?} {fates:?}"
+        );
+    }
+}
+
+/// A skill's stretch still waiting for the lamp to stand when a hand comes
+/// on the head is dropped for the hand, with the switch on or off.
+#[test]
+fn a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp() {
+    let ms = Duration::from_millis;
+    for arbitration in [true, false] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        // Asked of the folded lamp at a second, the stretch waits the 4 s
+        // rise; a hand takes the head halfway up and holds it.
+        lamp.hand = Some((ms(3_000), ms(10_000), PITCH, 1_950.0));
+        lamp.strains = vec![(ms(3_000), ms(10_000), PITCH, 400)];
+        let time = clock.time.clone();
+        let mut asked = false;
+        let mut fates = Vec::new();
+        let report = run_arbitrated(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                give_way: Some(GiveWay::Return),
+                arbitration,
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Resting, 0)),
+            move || {
+                let due = !asked && time.get() >= ms(1_000);
+                asked |= due;
+                let asked = Asked {
+                    gesture: due.then_some(&crate::clips::STRETCHING),
+                    ..Asked::default()
+                };
+                (asked, Priority::Skill)
+            },
+            |glimpse| fates.extend(glimpse.gesture_fates),
+        );
+        let dropped = if arbitration {
+            "dropped: held by a hand"
+        } else {
+            "dropped: a hand holds it"
+        };
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        // It never begins, even once the hand has gone.
+        assert_eq!(report.gestures, 0, "{arbitration} {fates:?}");
+        assert_eq!(fates, [("stretching", dropped)], "{arbitration}");
+    }
+}
+
 /// A skill's move asked while a hand holds the lamp is dropped, naming
 /// the hand.
 #[test]
