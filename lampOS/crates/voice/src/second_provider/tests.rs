@@ -11545,3 +11545,72 @@ async fn carried_music_after_unclear_handoff_cancels_pending_call_without_anothe
     assert_eq!(ordinary.load(Ordering::Relaxed), 1);
     assert!(legacy.lock().unwrap().is_empty());
 }
+
+/// `LAMP_SECOND_SPEECH_TAGS` (#2901): the voice is given one listed tag a
+/// reply, none when it reads none, and the lamp's words never carry one; a
+/// tag cut across the chat's pieces is said whole. Off, a reply is said and
+/// written as the chat wrote it, as before the switch.
+#[test]
+fn speech_tags_reach_only_the_voice_and_only_with_the_switch() {
+    for (tags, voice, words) in [
+        (
+            Some(true),
+            vec!["[laughs] Ha, good one.", "Ok then."],
+            vec!["said:Ha, good one.", "said: Ok then."],
+        ),
+        (
+            Some(false),
+            vec!["Ha, good one.", "Ok then."],
+            vec!["said:Ha, good one.", "said: Ok then."],
+        ),
+        (
+            None,
+            vec!["[laughs] Ha, good one.", "[sighs] [hums] Ok then."],
+            vec![
+                "said:[laughs] Ha, good one.",
+                "said: [sighs] [hums] Ok then.",
+            ],
+        ),
+    ] {
+        let (ready, mut spoken) = mpsc::unbounded_channel();
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [vec![
+                    text("[lau"),
+                    text("ghs] Ha, good one. [sighs] [hums] Ok then."),
+                    Ok(ChatEvent::Done),
+                ]]
+                .into(),
+            ),
+            speech_ready: Some(ready),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false).speaking_tags(tags);
+        let labels = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(written(1, "Tell me a joke."));
+                turn(&mut engine).await
+            });
+        let said: Vec<&str> = labels
+            .iter()
+            .map(String::as_str)
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert_eq!(said, words, "{tags:?}");
+        let mut given = Vec::new();
+        while let Ok(text) = spoken.try_recv() {
+            given.push(text);
+        }
+        assert_eq!(given, voice, "{tags:?}");
+        let lamp_said = engine.shared.lamp_said.lock().unwrap().1.clone();
+        assert_eq!(
+            lamp_said.contains('['),
+            tags.is_none(),
+            "{tags:?} {lamp_said}"
+        );
+    }
+}

@@ -1773,6 +1773,16 @@ pub fn serve(
     // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
+    // A few emotion tags, given to the voice only when it reads them
+    // (ElevenLabs), with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
+    let speech_tags = (std::env::var(crate::second_provider::SPEECH_TAGS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on"))
+    .then(|| {
+        route.voice_provider(config.tts_provider)
+            == Some(crate::second_config::TtsProvider::ElevenLabs)
+    });
     let net = services(
         config,
         &provider,
@@ -1874,6 +1884,11 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
+    let character = if speech_tags.is_some() {
+        format!("{character}{}", crate::second_provider::speech_tags::NOTE)
+    } else {
+        character
+    };
     let reopen_quiet =
         days && std::env::var(REOPEN_QUIET_ENVIRONMENT).ok().as_deref() == Some("on");
     if reopen_quiet {
@@ -2454,6 +2469,17 @@ pub fn serve(
         );
     }
     engine = engine.saying_once(said_once);
+    if let Some(voiced) = speech_tags {
+        eprintln!(
+            "lamp-voice second: the chat is told a few speech tags; the voice is given {} (LAMP_SECOND_SPEECH_TAGS)",
+            if voiced {
+                "one listed tag a reply at most"
+            } else {
+                "none, it reads none"
+            }
+        );
+    }
+    engine = engine.speaking_tags(speech_tags);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
