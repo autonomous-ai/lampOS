@@ -168,6 +168,19 @@ pub struct Net {
     /// `LAMP_RELAY_ROUTES=on`: the relay's near addresses, for the services
     /// [`Routable`] lets them take (#2882).
     near: Option<Arc<Near>>,
+    /// The Gemini the route calls, for a near one made later (#2882): its
+    /// key, and its chat's model or its voice's model and voice, as
+    /// [`Self::chatting_with_gemini`] and [`Self::speaking_with_gemini`]
+    /// were given them.
+    gemini: GeminiParts,
+}
+
+/// [`Net::gemini`].
+#[derive(Default)]
+struct GeminiParts {
+    key: Option<String>,
+    chat_model: Option<String>,
+    speech: Option<(String, String)>,
 }
 
 /// Which services the relay's near addresses may take (#2882): the voice
@@ -178,6 +191,8 @@ pub struct Routable {
     pub chat: bool,
     pub speech: bool,
     pub listening: bool,
+    /// The second route's own Gemini, its chat and its voice, never Live's.
+    pub gemini: bool,
 }
 
 /// The relay's routes as the services use them: those last read, the
@@ -198,6 +213,8 @@ struct Near {
     chat: Mutex<Option<(String, Arc<Chat>)>>,
     tts: Mutex<Option<(String, Arc<Tts>)>>,
     hearing: Mutex<Option<(String, Arc<SecondConfig>)>>,
+    gemini_chat: Mutex<Option<(String, Arc<Chat>)>>,
+    gemini_tts: Mutex<Option<(String, Arc<GeminiTts>)>>,
 }
 
 /// A service the relay may route.
@@ -205,6 +222,7 @@ struct Near {
 enum Service {
     Chat,
     Speech,
+    Gemini,
 }
 
 /// A near address taken for the turn [`Near::turn`] settled.
@@ -227,6 +245,7 @@ impl Taken {
             match service {
                 Service::Chat => turn.1.chat = None,
                 Service::Speech => turn.1.speech = None,
+                Service::Gemini => turn.1.gemini = None,
             }
         }
         let name = service.name();
@@ -241,6 +260,7 @@ impl Service {
         match self {
             Self::Chat => "chat",
             Self::Speech => "speech",
+            Self::Gemini => "gemini",
         }
     }
 }
@@ -252,6 +272,7 @@ impl Near {
         let url = match service {
             Service::Chat => turn.1.chat.clone(),
             Service::Speech => turn.1.speech.clone(),
+            Service::Gemini => turn.1.gemini.clone(),
         }?;
         Some((
             url.clone(),
@@ -340,6 +361,7 @@ impl Net {
             force: None,
             narrow: None,
             near: None,
+            gemini: GeminiParts::default(),
             config: Arc::new(config),
         })
     }
@@ -413,6 +435,8 @@ impl Net {
             chat: Mutex::default(),
             tts: Mutex::default(),
             hearing: Mutex::default(),
+            gemini_chat: Mutex::default(),
+            gemini_tts: Mutex::default(),
         }));
         self
     }
@@ -429,9 +453,24 @@ impl Net {
     }
 
     /// The turn's near chat, if its chat is near: DeepSeek's at that
-    /// address with the relay's key, forced and narrowed as the chat is.
-    fn near_chat(&self) -> Option<(Arc<Chat>, Taken)> {
+    /// address with the relay's key, or the route's Gemini at the relay's
+    /// near Gemini, forced and narrowed as the chat is; and which it is.
+    fn near_chat(&self) -> Option<(Arc<Chat>, Taken, Service)> {
         let near = self.near.as_ref()?;
+        if let (Some(model), Some(key)) = (&self.gemini.chat_model, &self.gemini.key) {
+            let (url, taken) = near.turn(Service::Gemini)?;
+            let chat = Near::client(&near.gemini_chat, &url, || {
+                let chat = Chat::gemini(&url, model, key, self.declare.clone()).ok()?;
+                if let Some(force) = &self.force {
+                    chat.forcing(force.clone());
+                }
+                if let Some(narrow) = &self.narrow {
+                    chat.narrowing(narrow.clone());
+                }
+                Some(chat)
+            })?;
+            return Some((chat, taken, Service::Gemini));
+        }
         let (url, taken) = near.turn(Service::Chat)?;
         let chat = Near::client(&near.chat, &url, || {
             let chat = Chat::deepseek_at(
@@ -450,7 +489,20 @@ impl Net {
             }
             Some(chat)
         })?;
-        Some((chat, taken))
+        Some((chat, taken, Service::Chat))
+    }
+
+    /// The turn's near Gemini voice, if the route speaks in Gemini's and
+    /// its Gemini is near.
+    fn near_gemini_tts(&self) -> Option<(Arc<GeminiTts>, Taken)> {
+        let near = self.near.as_ref()?;
+        let (model, voice) = self.gemini.speech.as_ref()?;
+        let key = self.gemini.key.as_ref()?;
+        let (url, taken) = near.turn(Service::Gemini)?;
+        let tts = Near::client(&near.gemini_tts, &url, || {
+            GeminiTts::new(&url, model, key, voice).ok()
+        })?;
+        Some((tts, taken))
     }
 
     /// The turn's near voice, if its speech is near: the configured voice
@@ -518,6 +570,8 @@ impl Net {
             gemini.key,
             self.declare.clone(),
         )?);
+        self.gemini.key = Some(gemini.key.to_owned());
+        self.gemini.chat_model = Some(gemini.model.to_owned());
         Ok(self)
     }
 
@@ -565,10 +619,10 @@ impl Net {
         stream::once(async move {
             // Near, unless it fails on the link: then the same request goes
             // to the chat's own address (#2882).
-            if let Some((near_chat, taken)) = near {
+            if let Some((near_chat, taken, service)) = near {
                 let answer = near_chat.send_only(&messages, only).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(Service::Chat, &why),
+                    Some(why) => taken.fell(service, &why),
                     None => return answer,
                 }
             }
@@ -603,6 +657,8 @@ impl Net {
             gemini.key,
             voice,
         )?));
+        self.gemini.key = Some(gemini.key.to_owned());
+        self.gemini.speech = Some((gemini.model.to_owned(), voice.to_owned()));
         Ok(self)
     }
 }
@@ -688,7 +744,7 @@ fn in_one_voice(
 /// speaks in; it is asked as any sentence is.
 fn in_one_voice_near(
     voice: Voice,
-    own: Option<(Voice, Taken)>,
+    own: Option<(Voice, Taken, Service)>,
     text: String,
     turn: Option<net::Turn>,
 ) -> BoxStream<'static, net::Result<Vec<i16>>> {
@@ -708,8 +764,8 @@ fn in_one_voice_near(
         let mut voice = voice;
         let mut tried = first(&voice).await;
         let why = tried.as_ref().err().and_then(routes::fallback_why);
-        if let (Some(why), Some((own, taken))) = (why, own) {
-            taken.fell(Service::Speech, &why);
+        if let (Some(why), Some((own, taken, service))) = (why, own) {
+            taken.fell(service, &why);
             voice = own;
             tried = first(&voice).await;
         }
@@ -748,11 +804,17 @@ impl Net {
 
     /// The turn's voice, and the same at its own address when that one is
     /// near (#2882).
-    fn turn_voice(&self) -> (Voice, Option<(Voice, Taken)>) {
+    fn turn_voice(&self) -> (Voice, Option<(Voice, Taken, Service)>) {
+        if let Some((gemini, taken)) = self.near_gemini_tts() {
+            return (
+                Voice::Gemini(gemini),
+                Some((self.voice(), taken, Service::Gemini)),
+            );
+        }
         match self.near_tts() {
             Some((tts, taken)) if self.gemini_tts.is_none() => (
                 Voice::Configured(tts, self.config.tts_provider.name()),
-                Some((self.voice(), taken)),
+                Some((self.voice(), taken, Service::Speech)),
             ),
             _ => (self.voice(), None),
         }
@@ -810,10 +872,10 @@ impl Services for Net {
         let chat = self.chat.clone();
         let near = self.near_chat();
         stream::once(async move {
-            if let Some((near_chat, taken)) = near {
+            if let Some((near_chat, taken, service)) = near {
                 let answer = near_chat.send_without(&messages, None, without).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(Service::Chat, &why),
+                    Some(why) => taken.fell(service, &why),
                     None => return answer,
                 }
             }
@@ -889,6 +951,9 @@ impl Services for Net {
                         .speech
                         .filter(|url| near.routable.speech && !near.kept.held("speech", url)),
                     listening: None,
+                    gemini: latest
+                        .gemini
+                        .filter(|url| near.routable.gemini && !near.kept.held("gemini", url)),
                 },
             );
         }
@@ -901,11 +966,14 @@ impl Services for Net {
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
-        let gemini = self.gemini_tts.clone();
         // The turn's chat and voice, near or their own (#2882).
+        let gemini = self
+            .near_gemini_tts()
+            .map(|(tts, _)| tts)
+            .or_else(|| self.gemini_tts.clone());
         let chat = self.warm_chat.then(|| {
             self.near_chat()
-                .map_or_else(|| self.chat.clone(), |(chat, _)| chat)
+                .map_or_else(|| self.chat.clone(), |(chat, _, _)| chat)
         });
         // The configured voice only when it is the lamp's one voice.
         let configured = (self.warm_speech && gemini.is_none()).then(|| self.turn_tts());
@@ -1407,6 +1475,12 @@ mod tests {
         chat: true,
         speech: true,
         listening: true,
+        gemini: true,
+    };
+    /// DeepSeek's chat, the configured voice and the relay's listening.
+    const THREE: Routable = Routable {
+        gemini: false,
+        ..EVERY
     };
 
     fn routed(config: SecondConfig, routable: Routable) -> Net {
@@ -1477,6 +1551,75 @@ mod tests {
         task.abort();
     }
 
+    /// #2882: the route's own Gemini chat (`LAMP_SECOND_CHAT=gemini`) goes
+    /// to the relay's near Gemini from the turn after the routes say so, at
+    /// the path its own takes (`/openai/chat/completions` under the base),
+    /// and back to its own for the turn when the near one answers a 503.
+    #[tokio::test]
+    async fn the_routes_gemini_chat_goes_near_and_falls_back() {
+        const GEMINI: &str = "/google-search/v1beta";
+        let near = stub("k-routes-gemini", vec![(CHAT, answered("near gemini"))]).await;
+        let relay = stub("k-routes-gemini", vec![(CHAT, answered("own gemini"))]).await;
+        let own = format!("{}{BASE}{GEMINI}", relay.url);
+        let net = Net::new(
+            config_at("gemini", "k-routes-gemini", &relay.url, &relay.url),
+            Arc::new(Vec::new),
+        )
+        .unwrap()
+        .chatting_with_gemini(&GeminiCall {
+            base_url: &own,
+            key: "k-routes-gemini",
+            model: "gemini-test",
+        })
+        .unwrap()
+        .routing_through_the_relay(EVERY);
+        kept(&net).set(Routes {
+            gemini: Some(format!("{}{BASE}{GEMINI}", near.url)),
+            ..Routes::default()
+        });
+        assert_eq!(words(&net).await, "own gemini");
+        net.turn_begins();
+        assert_eq!(words(&net).await, "near gemini");
+        assert_eq!(
+            near.seen(),
+            ["POST /api/v1/ai/v1/google-search/v1beta/openai/chat/completions HTTP/1.1"]
+        );
+        // Not routable: its own.
+        let kept_own = Net::new(
+            config_at("gemini-own", "k-routes-gemini", &relay.url, &relay.url),
+            Arc::new(Vec::new),
+        )
+        .unwrap()
+        .chatting_with_gemini(&GeminiCall {
+            base_url: &own,
+            key: "k-routes-gemini",
+            model: "gemini-test",
+        })
+        .unwrap()
+        .routing_through_the_relay(THREE);
+        kept(&kept_own).set(Routes {
+            gemini: Some(format!("{}{BASE}{GEMINI}", near.url)),
+            ..Routes::default()
+        });
+        kept_own.turn_begins();
+        assert_eq!(words(&kept_own).await, "own gemini");
+        assert_eq!(near.asked(CHAT), 1);
+        // A near Gemini that answers a 503: its own, for the rest of the turn.
+        let down = stub(
+            "k-routes-gemini",
+            vec![(CHAT, Some((UNAVAILABLE, Vec::new())))],
+        )
+        .await;
+        kept(&net).set(Routes {
+            gemini: Some(format!("{}{BASE}{GEMINI}", down.url)),
+            ..Routes::default()
+        });
+        net.turn_begins();
+        assert_eq!(words(&net).await, "own gemini");
+        assert_eq!(words(&net).await, "own gemini");
+        assert_eq!(down.asked(CHAT), 1);
+    }
+
     /// #2882 (c), (d): a route null is the chat's own address, and so is
     /// one for a service the route may not route.
     #[tokio::test]
@@ -1515,47 +1658,78 @@ mod tests {
             chat: Some(ChatRoute::DeepSeek),
             ..RouteFlags::default()
         };
-        assert!(!relay_routable(&config, own_api).chat);
+        assert!(!relay_routable(&config, own_api, None).chat);
         config.hosted.deepseek_base_url =
             Some("https://relay.example.invalid/api/v1/ai/v1/deepseek".into());
         let deepseek = RouteFlags {
             chat: Some(ChatRoute::DeepSeek),
             ..RouteFlags::default()
         };
-        assert_eq!(relay_routable(&config, deepseek), EVERY);
-        assert!(!relay_routable(&config, RouteFlags::default()).chat);
+        assert_eq!(relay_routable(&config, deepseek, None), THREE);
+        assert!(!relay_routable(&config, RouteFlags::default(), None).chat);
         let gemini = RouteFlags {
             speech: Some(SpeechRoute::Gemini),
             ..deepseek
         };
-        assert!(!relay_routable(&config, gemini).speech);
+        assert!(!relay_routable(&config, gemini, None).speech);
         config.pinned = crate::second_config::Pinned {
+            gemini: true,
             chat: true,
             speech: true,
             listening: true,
         };
-        assert_eq!(relay_routable(&config, deepseek), Routable::default());
+        assert_eq!(relay_routable(&config, deepseek, None), Routable::default());
         config.pinned = crate::second_config::Pinned::default();
         // Speech or listening with another service's key, not the relay's.
         let relay_key = config.llm_key.clone();
         let other = crate::second_config::Key::for_test("k-another-service");
         config.tts_key = other.clone();
-        assert!(!relay_routable(&config, deepseek).speech);
+        assert!(!relay_routable(&config, deepseek, None).speech);
         config.tts_key = relay_key.clone();
         if let Stt::Autonomous { key, .. } = &mut config.stt {
             *key = other;
         }
-        assert!(!relay_routable(&config, deepseek).listening);
+        assert!(!relay_routable(&config, deepseek, None).listening);
         if let Stt::Autonomous { key, .. } = &mut config.stt {
             *key = relay_key;
         }
-        assert_eq!(relay_routable(&config, deepseek), EVERY);
+        assert_eq!(relay_routable(&config, deepseek, None), THREE);
         config.hosted.own_deepseek = config.tts_key.clone().into();
-        assert!(!relay_routable(&config, deepseek).chat);
+        assert!(!relay_routable(&config, deepseek, None).chat);
         config.stt = Stt::Deepgram {
             key: config.tts_key.clone(),
         };
-        assert!(!relay_routable(&config, deepseek).listening);
+        assert!(!relay_routable(&config, deepseek, None).listening);
+    }
+
+    /// #2882: the route's own Gemini, chat or voice, is routed only when it
+    /// already goes to the relay with the relay's key: never with a Google
+    /// key, at Google's own address, or at an address the unit gave.
+    #[test]
+    fn the_routes_gemini_is_routed_only_through_the_relay_with_its_key() {
+        use super::super::worker::{ChatRoute, RouteFlags, SpeechRoute, relay_routable};
+        let mut config = config_at("routable-gemini", "k-gemini", "http://127.0.0.1:9", "x");
+        config.gemini.base_url = "https://relay.example.invalid/v1/google-search/v1beta".into();
+        let relay_key = config.llm_key.clone();
+        let chat = RouteFlags {
+            chat: Some(ChatRoute::Gemini),
+            ..RouteFlags::default()
+        };
+        let speech = RouteFlags {
+            speech: Some(SpeechRoute::Gemini),
+            ..RouteFlags::default()
+        };
+        assert!(relay_routable(&config, chat, Some(&relay_key)).gemini);
+        assert!(relay_routable(&config, speech, Some(&relay_key)).gemini);
+        assert!(!relay_routable(&config, RouteFlags::default(), Some(&relay_key)).gemini);
+        let google = crate::second_config::Key::for_test("k-a-google-key");
+        assert!(!relay_routable(&config, chat, Some(&google)).gemini);
+        assert!(!relay_routable(&config, chat, None).gemini);
+        config.pinned.gemini = true;
+        assert!(!relay_routable(&config, chat, Some(&relay_key)).gemini);
+        config.pinned.gemini = false;
+        config.gemini.base_url = crate::second_config::GEMINI_BASE_URL.into();
+        assert!(!relay_routable(&config, chat, Some(&relay_key)).gemini);
     }
 
     /// #2882 (e): a near chat that refuses the connection, answers 503 or

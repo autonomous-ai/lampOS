@@ -242,10 +242,11 @@ pub struct SecondConfig {
     pub pinned: Pinned,
 }
 
-/// Which of [`DEEPSEEK_BASE_URL_ENV`], [`SPEECH_BASE_URL_ENV`] and
-/// [`LISTENING_BASE_URL_ENV`] were given ([`SecondConfig::with_environment`]).
+/// Which of [`GEMINI_BASE_URL_ENV`], [`DEEPSEEK_BASE_URL_ENV`],
+/// [`SPEECH_BASE_URL_ENV`] and [`LISTENING_BASE_URL_ENV`] were given ([`SecondConfig::with_environment`]).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Pinned {
+    pub gemini: bool,
     pub chat: bool,
     pub speech: bool,
     pub listening: bool,
@@ -704,6 +705,7 @@ impl SecondConfig {
         }
         if let Some(url) = given(GEMINI_BASE_URL_ENV)? {
             self.gemini.base_url = checked_url(url).map_err(named(GEMINI_BASE_URL_ENV))?;
+            self.pinned.gemini = true;
         }
         if let Some(url) = given(DEEPSEEK_BASE_URL_ENV)? {
             self.hosted.deepseek_base_url =
@@ -1082,6 +1084,13 @@ mod tests {
         let empty = route().with_environment(|_| Some("".into())).unwrap();
         assert_eq!(empty.pinned, Pinned::default());
         for (name, pinned) in [
+            (
+                GEMINI_BASE_URL_ENV,
+                Pinned {
+                    gemini: true,
+                    ..Pinned::default()
+                },
+            ),
             (
                 DEEPSEEK_BASE_URL_ENV,
                 Pinned {
