@@ -2337,16 +2337,19 @@ pub fn serve(
             "lamp-voice second: a session that opens with only a greeting from someone offered a dated follow-up is told to ask about it now; one that opens with a request takes the offer back ({})",
             crate::remember::EVENTS_ENVIRONMENT
         );
-        engine = engine.asking_after_events(Arc::new(move |request, heard, lease| {
-            let person = hits_whose(
-                request,
-                lease,
-                &event_sessions,
-                event_who.as_deref(),
-                Instant::now(),
-            )?;
-            crate::remember::event_turn_note(person.as_deref(), heard)
-        }));
+        engine = engine.asking_after_events(
+            Arc::new(move |request, heard, lease| {
+                let person = hits_whose(
+                    request,
+                    lease,
+                    &event_sessions,
+                    event_who.as_deref(),
+                    Instant::now(),
+                )?;
+                crate::remember::event_turn_note(person.as_deref(), heard)
+            }),
+            Arc::new(crate::remember::event_withheld),
+        );
     }
     // Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`, the first
     // builder on #1722, 00:08): the eyes' faces, read every 100 ms on their
