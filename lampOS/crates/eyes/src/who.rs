@@ -1716,6 +1716,18 @@ fn write_set_aside(path: &Path, why: &str, bytes: &[u8]) -> io::Result<PathBuf> 
     Ok(kept)
 }
 
+/// Whether a set-aside file's JSON holds nothing that could be a person:
+/// `null`, a yes or no, a number, or an empty object or list (#2850). A
+/// string, or an object or list with anything in it, might.
+fn holds_nothing(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => true,
+        serde_json::Value::String(_) => false,
+        serde_json::Value::Array(list) => list.is_empty(),
+        serde_json::Value::Object(fields) => fields.is_empty(),
+    }
+}
+
 /// The entries that `matches`, by their name and when they were kept (none
 /// when they say no time), taken out of every set-aside file with a list of
 /// people: the file rewritten 0600, or removed once nothing is left.
@@ -1748,14 +1760,25 @@ fn forget_set_aside(
         File::open(&file)?
             .take(MOST_FILE_BYTES + 1)
             .read_to_end(&mut bytes)?;
-        let Some(mut value) = serde_json::from_slice::<serde_json::Value>(&bytes)
-            .ok()
-            .filter(|value| value.get("people").is_some_and(serde_json::Value::is_array))
+        let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+            unsearched += 1;
+            continue;
+        };
+        // JSON that holds nothing at all (`{}`, `[]`, a number) holds
+        // nobody: searched, so it never keeps every forget waiting (#2850:
+        // a 2-byte `people-not-a-list-of-people-….json` did on lamp-c0a4).
+        // Anything else with no list of people might be a newer build's
+        // shape, and still waits (#1586).
+        if holds_nothing(&value) {
+            continue;
+        }
+        let Some(list) = value
+            .get_mut("people")
+            .and_then(serde_json::Value::as_array_mut)
         else {
             unsearched += 1;
             continue;
         };
-        let list = value["people"].as_array_mut().expect("a list");
         // A record whose name is not a plain string cannot be told apart
         // by name: it might be this person (the reviewer on #1558).
         if list
@@ -2948,6 +2971,51 @@ mod tests {
             1,
             "kept: nothing can be told about it"
         );
+    }
+
+    /// #2850 (lamp-c0a4, 22 October): a 2-byte set-aside
+    /// `people-not-a-list-of-people-….json`, `{}`, made every forget wait.
+    /// JSON that holds nothing (`{}`, `[]`, a number, `null`) holds nobody,
+    /// so it is searched and a forget finishes; one that can't be read, or
+    /// an object with something in it but no list of people (a newer build's
+    /// shape), still keeps it waiting (#1586).
+    #[test]
+    fn a_set_aside_file_that_holds_nothing_never_keeps_a_forget_waiting() {
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        let fay = format!(
+            r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":1}}]}}"#
+        );
+        for (name, text, unsearched) in [
+            ("empty-object", "{}", 0),
+            ("empty-list", "[]", 0),
+            ("number", "7", 0),
+            ("null", "null", 0),
+            ("garbled", "{\"peo", 1),
+            ("newer-shape", r#"{"version":3,"faces":{"Fay":[1]}}"#, 1),
+            ("a-name", r#""Fay""#, 1),
+        ] {
+            let path = file(&format!("aside-holds-{name}"));
+            let folder = path.parent().unwrap().join(SET_ASIDE);
+            std::fs::create_dir(&folder).unwrap();
+            let aside = folder.join("people-not-a-list-of-people-0000.json");
+            std::fs::write(&aside, text).unwrap();
+            std::fs::write(&path, &fay).unwrap();
+            let mut people = People::open(path.clone()).unwrap();
+            assert_eq!(
+                people.forget("Fay").unwrap(),
+                Forgot {
+                    forgot: true,
+                    unsearched
+                },
+                "{name}"
+            );
+            assert_eq!(
+                folder.join(PENDING_FORGETS).exists(),
+                unsearched > 0,
+                "{name}: a forget waits only on a file that might hold her"
+            );
+            assert!(aside.exists(), "{name}: never removed");
+        }
     }
 
     /// #1680's rule for the forgets that wait (#2052's audit): a file from a

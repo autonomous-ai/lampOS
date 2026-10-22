@@ -341,7 +341,9 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   `forgotten` only when each was done, else `kept` with a `reason`: memory
   not reached, refused, or not given to lamp-cloud (no
   `LAMP_MEMORY_FORGET_SOCKET`), so the app never says gone when it isn't.
-  "Forget my face" at the lamp stays the face only (eyes.md).
+  "Forget my face" at the lamp stays the face only (eyes.md), but with
+  `LAMP_MEMORY_FORGET_ALL=on`, which takes the known person's memory
+  too (#2850).
 - **`entirely`** (agreed with the mobile app): `true`, or left out as
   before, is the eyes and then memory; `false` is the eyes' forget only,
   and the answer carries `"memory": "not asked"`; any other value is
