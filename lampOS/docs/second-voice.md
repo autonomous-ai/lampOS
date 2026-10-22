@@ -626,6 +626,28 @@ order is kept. A written turn is the same from the chat on.
   light. The journal says `speech tags: K given to the voice, D dropped`
   per reply, counts only. Off, a reply is said and written as the chat
   wrote it.
+- **With `LAMP_SHORT_DONE=on` a light or volume ask that worked is
+  answered with the call's own short line** (off unless set; #2877). On
+  lamp-52e6 (Fifth's row 24, 22 Oct) the model still spoke about ten words
+  after a light or volume call lamp-actions answered short, a median of 10
+  off and 10 on: it didn't keep the short answer's instruction. With the
+  switch, when every call of a turn's first calling round is answered with
+  lamp-actions' short mark (`"next"`) and its own words (`"say"`:
+  "Brighter.", "Dimmer.", "Warmer.", "Cooler.", "Louder.", "Quieter.", else
+  "Done."; `lamp_actions::short_say`), the voice says that line and asks the
+  chat no further round. Two calls are one line: theirs when they agree,
+  "Done." when they differ (`second_provider::short_done_line`). The turn
+  goes on as without the switch when any call was refused, failed, held or
+  changed nothing ("already", which carries no `"say"`), when any call is
+  anyone else's, when an earlier round called anything or a held forget ran
+  before it, and when the model said any word beside its calls: words
+  beyond the ask, a call written as words included. The worker gets the
+  switch in its environment and says so at start: `a turn whose every call
+  is a light or volume change answered short is said with the calls' own
+  line, no further round (LAMP_SHORT_DONE)`; each such turn's journal says
+  `every call answered short; said "Brighter.", no further round`. The
+  check is Fifth's row 24 on lamp-52e6: the reply after "make it brighter"
+  at most 2 words on, against about 10 off, the light changed in both.
 - **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
   functions first** (off unless set; #1712, the first builder at 18:56:
   "light, volume, timer, search, look, tasks"). The others are behind one,

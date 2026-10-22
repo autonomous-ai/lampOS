@@ -10,6 +10,7 @@ mod music_warm_name;
 mod name_carries;
 mod name_near;
 mod not_for_me_words;
+mod short_done;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;

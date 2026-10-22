@@ -224,7 +224,8 @@ fn with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes() 
         ),
         json!({"ok":true,"result":{
             "result":"My volume is now 70 out of 100; it was 50.",
-            "next":lamp_actions::SHORT_NEXT
+            "next":lamp_actions::SHORT_NEXT,
+            "say":"Louder."
         }})
     );
     assert_eq!(level.load(Ordering::Acquire), 70);
