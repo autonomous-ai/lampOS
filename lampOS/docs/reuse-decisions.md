@@ -26,10 +26,16 @@ account-generation/ticket binding, an exact boot-qualified candidate,
 original frame acquisition times and a consumed completion. Its
 `ConsentProof` trusts ingress that is not yet implemented; it does not
 verify a speaker or activate a capability. Keep frame-delivery rejection,
-but give trusted runtime privacy/account changes their own `invalidate(now)`
-entry point: they must drop pending RAM without depending on another camera
-frame or an old account ticket. A consumed write stays `Committing` until
-its real completion; the API registers no RPC or app/model route.
+but require trusted runtime privacy/account changes and forget entry to call
+`invalidate(now)`: they must drop pending RAM without depending on another camera
+frame or an old account ticket. The future forget adapter must call
+`invalidate(now)` first, before potentially slow store I/O, including when that
+I/O later fails. The store's revision guard refuses a
+stale replacement but does not release the controller's separate target snapshot
+and captured prints. The actual-forget control covers that ordering; no adapter
+is added here. A consumed write stays `Committing` until
+its real completion, with forget ordered and reconciled by the exclusive writer;
+invalidation makes no rollback promise. The API registers no RPC or app/model route.
 Proposed source time bounds and
 the unmeasured under-1-ms host target are documented separately from any
 first-builder decision or device result. No V1 consent parity, runtime
