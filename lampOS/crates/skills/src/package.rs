@@ -842,6 +842,25 @@ pub fn install_made(
     sha256: &str,
     wait: Duration,
 ) -> Result<String, String> {
+    let now_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    install_made_at(skills, made, sha256, wait, now_unix_ms)
+}
+
+/// [`install_made`] at `now_unix_ms`: only the made skill the lamp asked
+/// about last, within `lamp_voice::made_skill::PUT_ON_WITHIN` and not yet
+/// on, as the voice's own `put_on` (the first builder on #2602, 22 Oct
+/// 10:1x). A kept SHA-256 asked for later, or one not asked about at all,
+/// puts nothing on, whoever asks. The time is the helper's, never the
+/// asker's.
+pub fn install_made_at(
+    skills: &Path,
+    made: &Path,
+    sha256: &str,
+    wait: Duration,
+    now_unix_ms: u64,
+) -> Result<String, String> {
     if sha256.len() != 64
         || !sha256
             .bytes()
@@ -863,6 +882,14 @@ pub fn install_made(
     else {
         return Err("not installed: no made skill is kept with that SHA-256".into());
     };
+    if lamp_voice::made_skill::waiting(made, now_unix_ms).map(|(_, asked)| asked)
+        != Some(sha256.to_owned())
+    {
+        return Err(format!(
+            "not installed: the lamp didn't ask about that made skill last, within {} s",
+            lamp_voice::made_skill::PUT_ON_WITHIN.as_secs()
+        ));
+    }
     let path = made.join(file);
     let meta =
         fs::symlink_metadata(&path).map_err(|error| format!("not installed: {file}: {error}"))?;
