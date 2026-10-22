@@ -14,7 +14,9 @@
 #              without it no face is shown); FACE_SIZE its window, default 1728,1117; CHROME the browser to show it
 #   LOAN_NAME  who holds the lamp, for the loans line (default: this Mac's user); LOANS the file on the lamp the
 #              line goes to (default ~/loans.txt; LOANS= writes none)
-#   DESK_KIT_AMI  the AMI clips folder on this Mac, outside the repo (default ~/lamp-played/ami)
+#   DESK_KIT_AMI  the AMI clips folder on this Mac, outside the repo (default: the kit's audio below, its ami/)
+# The kit's audio (AMI clips, pre-made `say` wavs; README.md "The desk kit") is one versioned tar, fetched once
+# into $PLAYED_OUT and checked against DESK_KIT_SHA256 before use; DESK_KIT_TAR=none uses what is on this Mac.
 # It plays sound in the room: the Mac about 1 m from the lamp, where a person sits, its volume 50. About 7 minutes a
 # scene, 1.5 minutes a restart and 70 s of quiet between scenes. Not between 12:00 and 14:00 on weekdays.
 set -uo pipefail
@@ -69,6 +71,24 @@ LABEL=${1:-}
 if [[ $(date +%u) -le 5 && $(date +%H) -ge 12 && $(date +%H) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
   echo "desk-kit.sh: not between 12:00 and 14:00 local, when the office rests" >&2
   exit 2
+fi
+# The kit's audio, fetched once and checked: the same clips and asks on every Mac.
+DESK_KIT_TAR=${DESK_KIT_TAR:-desk-kit-1}
+DESK_KIT_SHA256=${DESK_KIT_SHA256:-e9f826f6d6284c08e0c86699c4d64d37780f0d84c70fe0c5100be5c66d658691}
+if [[ $DESK_KIT_TAR != none && ! -f $PLAYED_OUT/$DESK_KIT_TAR/README.md ]]; then
+  mkdir -p "$PLAYED_OUT"; tar_at=$PLAYED_OUT/$DESK_KIT_TAR.tar
+  curl -fsSL -o "$tar_at" "https://storage.googleapis.com/s3-autonomous-upgrade-3/os/test-kits/$DESK_KIT_TAR.tar" ||
+    gsutil -q cp "gs://s3-autonomous-upgrade-3/os/test-kits/$DESK_KIT_TAR.tar" "$tar_at" ||
+    { echo "desk-kit.sh: could not fetch $DESK_KIT_TAR.tar" >&2; exit 7; }
+  [[ $(shasum -a 256 "$tar_at" | cut -d' ' -f1) == "$DESK_KIT_SHA256" ]] ||
+    { echo "desk-kit.sh: $DESK_KIT_TAR.tar is not the kit's (sha256 differs); not using it" >&2; rm -f "$tar_at"; exit 7; }
+  tar -xf "$tar_at" -C "$PLAYED_OUT" && rm -f "$tar_at"
+fi
+if [[ $DESK_KIT_TAR != none ]]; then
+  # Its asks are the cached `say` wavs desk_kit.py looks up by voice, rate and text, so this Mac's voices aren't used.
+  mkdir -p "$PLAYED_OUT/prompts/generated"
+  cp -n "$PLAYED_OUT/$DESK_KIT_TAR"/prompts/generated/*.wav "$PLAYED_OUT/prompts/generated/" 2>/dev/null
+  export DESK_KIT_AMI=${DESK_KIT_AMI:-$PLAYED_OUT/$DESK_KIT_TAR/ami}
 fi
 LAMP_SSH=${LAMP_SSH:-$HERE/lamp_ssh}
 OUT=$PLAYED_OUT/scenarios
