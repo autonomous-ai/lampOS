@@ -667,9 +667,6 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     /// A camera that failed while open is tried again after this.
     const RETRY: Duration = lamp_eyes::reopen::RETRY;
     const REPORT_EVERY: Duration = Duration::from_secs(10);
-    /// Whose the near face is, asked at most this often: a print takes a
-    /// tenth of a second or more on the lamp.
-    const RECOGNISE_EVERY: Duration = Duration::from_secs(2);
     /// Who was at the lamp is said for this long after the last look.
     const KNOWN_FOR: Duration = Duration::from_secs(3);
 
@@ -1540,6 +1537,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             taking.apart,
                         ),
                     };
+                    lamp_eyes::who::after_remembering(&mut who.looked_for, kept.is_ok());
                     let reply = kept_reply(kept, who.visits, who.people.names().len());
                     answer(&mut stream, reply);
                     if let Some(known) = &arguments.known_file {
@@ -2080,10 +2078,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         // Whose the near face is, when it is time to ask or
                         // someone is being remembered.
                         if let Some(who) = who.as_mut()
-                            && (who.taking.is_some()
-                                || who
-                                    .looked_for
-                                    .is_none_or(|at| at.elapsed() >= RECOGNISE_EVERY))
+                            && lamp_eyes::who::recognise_due(
+                                who.looked_for,
+                                who.taking.is_some(),
+                                Instant::now(),
+                            )
                         {
                             who.looked_for = Some(Instant::now());
                             let tall = picture.filled.1.max(1) as f32;

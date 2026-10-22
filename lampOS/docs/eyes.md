@@ -757,7 +757,10 @@ this room" until someone asks to be recognised.
 - **When.** Only for the largest face that is at the lamp: at least a tenth
   of the picture's height (people at lamp-4ace's desk were 0.12 to 0.27).
   At most every two seconds, or at every look while someone is being
-  remembered. The camera gives 320 by 240, so a face at the desk is 35 to
+  remembered, and at the first look after someone is remembered at the
+  lamp, so the known file names them within one look, not two seconds
+  later (#3108; `who::recognise_due`). A face from a photo is not: it is
+  named only on its person's yes. The camera gives 320 by 240, so a face at the desk is 35 to
   65 pixels tall. Whether that is enough is to be measured with people
   (the camera can give 640 by 480 if not).
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
