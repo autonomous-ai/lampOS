@@ -2087,7 +2087,10 @@ impl DaysClient {
                     context.says(Some(person), id, content_words(text));
                 }
                 if until_asked {
-                    context.offered(person, id, content_words(text));
+                    // Dated only with its day (`"on"`): an undated thread
+                    // is asked about only by its own subject ([`asks_about`]).
+                    let dated = found["on"].is_string();
+                    context.offered(person, id, content_words(text), dated);
                 }
                 said
             }
@@ -2358,8 +2361,9 @@ struct DaysContext {
     /// who is at the lamp, as the memory holds it unmarked that long: a
     /// later reply to them that asks still marks it. At most
     /// [`ASKING_MOST`] people, the oldest offer dropped first (offered
-    /// again on a later day, at most its cap).
-    asking: Vec<(String, u64, Vec<String>)>,
+    /// again on a later day, at most its cap). The last is whether it is
+    /// dated, as [`asks_about`] is stricter for an undated thread.
+    asking: Vec<(String, u64, Vec<String>, bool)>,
 }
 
 /// Why memory's journal stopped until a fresh worker (#2176): said in the
@@ -2500,14 +2504,14 @@ impl DaysContext {
         }
     }
 
-    /// `person` was offered follow-up `id`, dated or not, whose key words are
-    /// `words`, held until the lamp asks: theirs replaces only theirs.
-    fn offered(&mut self, person: &str, id: u64, words: Vec<String>) {
-        self.asking.retain(|(whose, _, _)| whose != person);
+    /// `person` was offered follow-up `id`, `dated` or not, whose key words
+    /// are `words`, held until the lamp asks: theirs replaces only theirs.
+    fn offered(&mut self, person: &str, id: u64, words: Vec<String>, dated: bool) {
+        self.asking.retain(|(whose, _, _, _)| whose != person);
         if self.asking.len() == ASKING_MOST {
             self.asking.remove(0);
         }
-        self.asking.push((person.to_owned(), id, words));
+        self.asking.push((person.to_owned(), id, words, dated));
     }
 
     /// Kept thing `id` of this person's was shown as `text` (#2510).
@@ -2711,28 +2715,36 @@ fn content_words(text: &str) -> Vec<String> {
         // 3 on #2251).
         .map(|word| word.strip_suffix("'s").unwrap_or(word))
         .filter(|word| word.chars().count() >= 3 && !SMALL_WORDS.contains(word))
-        .map(|word| {
-            word.strip_suffix('s')
-                .filter(|stem| stem.chars().count() >= 3)
-                .unwrap_or(word)
-                .to_owned()
-        })
+        .map(|word| plural_off(word).to_owned())
         .collect();
     words.sort();
     words.dedup();
     words
 }
 
-/// Whether the lamp's own reply `said` asks about a dated follow-up whose
-/// key words ([`content_words`]) are `event` (#1693, the first builder on
+/// A word as [`content_words`] gives it: a plural's `s` taken off.
+fn plural_off(word: &str) -> &str {
+    word.strip_suffix('s')
+        .filter(|stem| stem.chars().count() >= 3)
+        .unwrap_or(word)
+}
+
+/// Whether the lamp's own reply `said` asks about a follow-up whose key
+/// words ([`content_words`]) are `event` (#1693, the first builder on
 /// #2602, 22 Oct 09:4x; reviewer-two's P2 on #2894): one sentence of it is
-/// itself a question, ending in `?` or `？`, and that sentence holds two of
-/// the event's key words, or one that is the event's own ([`WHEN_WORDS`]
-/// excluded: a weekday, a month, a time word, or a word with a digit).
-/// "How was your sister's wedding?" and "Did the wedding go well?" ask;
-/// "Saturday should be sunny. Anything else I can help with?" does not,
-/// as its question and the event's day are in different sentences.
-/// Deterministic, on the reply alone. Its limits: a paraphrase with none
+/// itself a question, ending in `?` or `？`, and that sentence holds, for a
+/// `dated` one, two of the event's key words, or one that is the event's
+/// own ([`WHEN_WORDS`] excluded: a weekday, a month, a time word, or a word
+/// with a digit). For an undated thread (reviewer-two's P2 on #3000) a word
+/// a greeting has ([`GREETING_WORDS`]) or a [`WHEN_WORDS`] one never
+/// counts: the question holds one of its other key words, or, for a
+/// thread of one key word, that word. "Morning! Anything new?" does not
+/// ask about "Starting a new job"; "How's the new job going?" does.
+/// "Morning! Any plans for tomorrow?" does not ask about "Exam tomorrow";
+/// "How did the exam go?" does. "How was your sister's wedding?" and "Did the wedding go
+/// well?" ask; "Saturday should be sunny. Anything else I can help with?"
+/// does not, as its question and the event's day are in different
+/// sentences. Deterministic, on the reply alone. Its limits: a paraphrase with none
 /// of the event's own words ("how did the big day go?") or a question by
 /// its day alone ("how was Saturday?") is not seen, and the memory offers
 /// it again on a later day, at most its cap; a question about something
@@ -2740,7 +2752,7 @@ fn content_words(text: &str) -> Vec<String> {
 /// counts; a statement without a question mark ("your
 /// sister's wedding sounds lovely") does not; a reply in another language
 /// than the event's words is not seen.
-fn asks_about(said: &str, event: &[String]) -> bool {
+fn asks_about(said: &str, event: &[String], dated: bool) -> bool {
     let mut start = 0;
     for (at, mark) in said.char_indices() {
         if !matches!(mark, '.' | '!' | '?' | '\u{ff1f}' | '\u{3002}' | '\n') {
@@ -2755,11 +2767,96 @@ fn asks_about(said: &str, event: &[String]) -> bool {
             .into_iter()
             .filter(|word| event.contains(word))
             .collect();
-        if shared.len() >= 2 || shared.iter().any(|word| !is_when_word(word)) {
+        let asks = if dated {
+            shared.len() >= 2 || shared.iter().any(|word| !is_when_word(word))
+        } else {
+            shared
+                .iter()
+                .any(|word| !is_greeting_word(word) && !is_when_word(word))
+                || (event.len() == 1 && shared.len() == 1)
+        };
+        if asks {
             return true;
         }
     }
     false
+}
+
+/// Words a greeting or "anything new?" has, which never alone make a
+/// question about an undated thread ([`asks_about`]; reviewer-two's P2 on
+/// #3000): the memory's common words (`lamp-memory`'s `search::COMMON`)
+/// of three letters or more that [`SMALL_WORDS`] leaves in, and the words
+/// of asking how someone is, English and Vietnamese. As [`content_words`]
+/// compares them: lower-cased, a plural's `s` off ([`is_greeting_word`]).
+const GREETING_WORDS: &[&str] = &[
+    // The memory's COMMON.
+    "been",
+    "should",
+    "told",
+    "của",
+    "tôi",
+    "không",
+    "này",
+    "thì",
+    "những",
+    "các",
+    "một",
+    "cho",
+    "với",
+    "được",
+    "nào",
+    // Asking how someone is.
+    "new",
+    "news",
+    "good",
+    "anything",
+    "something",
+    "everything",
+    "nothing",
+    "thing",
+    "things",
+    "doing",
+    "done",
+    "lately",
+    "recently",
+    "else",
+    "much",
+    "fine",
+    "great",
+    "nice",
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "day",
+    "week",
+    "weekend",
+    "happening",
+    "happened",
+    "life",
+    "stuff",
+    "mới",
+    "thế",
+    "sao",
+    "bạn",
+    "hôm",
+    "nay",
+    "dạo",
+    "khỏe",
+    "khoẻ",
+    "vui",
+    "tốt",
+    "chuyện",
+    "việc",
+    "sáng",
+    "chiều",
+    "tối",
+];
+
+/// Whether `word`, as [`content_words`] gives it, is one of
+/// [`GREETING_WORDS`].
+fn is_greeting_word(word: &str) -> bool {
+    GREETING_WORDS.iter().any(|known| plural_off(known) == word)
 }
 
 /// Words that say when, not what: a key word of the event that is one of
@@ -4189,12 +4286,12 @@ impl DaysClient {
         let Ok(mut context) = self.context.lock() else {
             return;
         };
-        let at = context.asking.iter().position(|(whose, _, words)| {
-            Some(whose.as_str()) == person && asks_about(said, words)
+        let at = context.asking.iter().position(|(whose, _, words, dated)| {
+            Some(whose.as_str()) == person && asks_about(said, words, *dated)
         });
         let asked = at.map(|at| context.asking.remove(at));
         drop(context);
-        if let Some((whose, id, _)) = asked {
+        if let Some((whose, id, _, _)) = asked {
             let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
         }
     }
@@ -7325,7 +7422,7 @@ mod tests {
             "I'll remember that. How was your sister's wedding?",
             "Oh! Was Saturday's wedding fun? Tell me.",
         ] {
-            assert!(asks_about(asks, &event), "{asks}");
+            assert!(asks_about(asks, &event, true), "{asks}");
         }
         for not in [
             "Saturday should be sunny. Anything else I can help with?",
@@ -7338,9 +7435,9 @@ mod tests {
             "How was your sister's wedding",
             "",
         ] {
-            assert!(!asks_about(not, &event), "{not}");
+            assert!(!asks_about(not, &event, true), "{not}");
         }
-        assert!(!asks_about("How was your sister's wedding?", &[]));
+        assert!(!asks_about("How was your sister's wedding?", &[], true));
     }
 
     /// A test client whose jobs are read back, with no memory behind it.
@@ -7385,6 +7482,7 @@ mod tests {
             MINH,
             12,
             content_words("Sister's wedding is on Saturday"),
+            true,
         );
         let asked = |work: &std::sync::mpsc::Receiver<DaysJob>| {
             let mut marks = vec![];
@@ -7459,6 +7557,7 @@ mod tests {
             MINH,
             12,
             content_words("Sister's wedding is on Saturday"),
+            true,
         );
         // A request no other test names, kept out as a remember's is.
         let request = u64::MAX - 75;
@@ -7496,16 +7595,22 @@ mod tests {
         let (client, work) = asking_client();
         {
             let mut context = client.context.lock().unwrap();
-            context.offered(A, 12, content_words("Sister's wedding is on Saturday"));
+            context.offered(
+                A,
+                12,
+                content_words("Sister's wedding is on Saturday"),
+                true,
+            );
             context.session = Some("voice-test-1".into());
             context.session_person = Some(A.into());
         }
         client.close_open_session(Duration::from_millis(20));
-        client
-            .context
-            .lock()
-            .unwrap()
-            .offered(B, 20, content_words("Job interview on Thursday"));
+        client.context.lock().unwrap().offered(
+            B,
+            20,
+            content_words("Job interview on Thursday"),
+            true,
+        );
         let done = |request: u64, said: &str, whose: &str| {
             vec![FinishedExchange {
                 request,
@@ -7534,12 +7639,12 @@ mod tests {
             .context
             .lock()
             .unwrap()
-            .offered(A, 14, content_words("Dentist on Friday"));
+            .offered(A, 14, content_words("Dentist on Friday"), true);
         client
             .context
             .lock()
             .unwrap()
-            .offered(A, 15, content_words("Concert on Sunday"));
+            .offered(A, 15, content_words("Concert on Sunday"), true);
         hand_on_days(
             done(u64::MAX - 82, "How did the interview go?", B),
             NOW,
@@ -7611,6 +7716,7 @@ mod tests {
             &a,
             12,
             content_words("Sister's wedding is on Saturday"),
+            true,
         );
         let jobs_of = |work: &std::sync::mpsc::Receiver<DaysJob>| {
             let (mut marks, mut heard) = (vec![], vec![]);
@@ -7664,8 +7770,8 @@ mod tests {
     }
 
     /// The session's note with events: a dated one the memory gives
-    /// `until_asked` is held to be marked; one given without it (marked
-    /// when given) is not.
+    /// `until_asked` is held to be marked, dated by its `"on"` (El's P3 on
+    /// #3025); one given without it (marked when given) is not.
     #[test]
     fn with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask() {
         const MINH: &str = "p-be9688998f085098";
@@ -7692,7 +7798,9 @@ mod tests {
             let asking = client.context.lock().unwrap().asking.clone();
             drop(client);
             std::fs::remove_file(&socket).unwrap();
-            asking.first().map(|(whose, id, _)| (whose.clone(), *id))
+            asking
+                .first()
+                .map(|(whose, id, _, dated)| (whose.clone(), *id, *dated))
         };
         assert_eq!(
             held("events-held", |request| match request["op"].as_str() {
@@ -7700,7 +7808,7 @@ mod tests {
                     json!({"ok":true,"follow_up":{"id":12,"category":"thread","text":"Sister's wedding is on Saturday","on":"2026-10-24","until_asked":true}}),
                 _ => opened(request),
             }),
-            Some((MINH.to_owned(), 12))
+            Some((MINH.to_owned(), 12, true))
         );
         assert_eq!(
             held("events-last", |request| match request["op"].as_str() {
@@ -7716,7 +7824,8 @@ mod tests {
     /// an undated thread told at "good morning" was spent, never asked):
     /// with threads and without events, an undated thread the memory gives
     /// `until_asked` is told the thread's sentence and held to be marked,
-    /// the same as a dated one; given without it, it is not held.
+    /// the same as a dated one but not dated, as it has no `"on"`; given
+    /// without it, it is not held.
     #[test]
     fn an_undated_thread_held_until_asked_is_waited_on_without_events() {
         const MINH: &str = "p-be9688998f085098";
@@ -7746,7 +7855,9 @@ mod tests {
             let asking = client.context.lock().unwrap().asking.clone();
             drop(client);
             std::fs::remove_file(&socket).unwrap();
-            asking.first().map(|(whose, id, _)| (whose.clone(), *id))
+            asking
+                .first()
+                .map(|(whose, id, _, dated)| (whose.clone(), *id, *dated))
         };
         assert_eq!(
             held("thread-held", |request| match request["op"].as_str() {
@@ -7754,7 +7865,7 @@ mod tests {
                     json!({"ok":true,"follow_up":{"id":12,"category":"thread","text":"Tired of the commute","until_asked":true}}),
                 _ => opened(request),
             }),
-            Some((MINH.to_owned(), 12))
+            Some((MINH.to_owned(), 12, false))
         );
         assert_eq!(
             held("thread-last", |request| match request["op"].as_str() {
@@ -7764,31 +7875,104 @@ mod tests {
             }),
             None
         );
-        // Held, the lamp's own question about it marks it, once.
+        // Held, the lamp's own question about it marks it, once, with
+        // events off (reviewer-two's P2 on #3000): a greeting's "Anything
+        // new?" never takes "Starting a new job"; a question about the job
+        // does.
         let (client, work) = asking_client();
-        client
-            .context
-            .lock()
-            .unwrap()
-            .offered(MINH, 12, content_words("Tired of the commute"));
-        hand_on_days(
-            vec![FinishedExchange {
-                request: u64::MAX - 76,
-                age: Duration::from_secs(1),
-                heard: "good morning".to_owned(),
-                said: "Morning! Was the commute any better today?".to_owned(),
-                whose: Some(MINH.to_owned()),
-            }],
-            NOW,
-            &client,
-        );
-        let marks: Vec<_> = std::iter::from_fn(|| work.try_recv().ok())
-            .filter_map(|job| match job {
-                DaysJob::Asked { person, id } => Some((person, id)),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(marks, vec![(MINH.to_owned(), 12)]);
+        client.events.store(false, Ordering::Release);
+        let marks = || -> Vec<_> {
+            std::iter::from_fn(|| work.try_recv().ok())
+                .filter_map(|job| match job {
+                    DaysJob::Asked { person, id } => Some((person, id)),
+                    _ => None,
+                })
+                .collect()
+        };
+        let reply = |request: u64, said: &str| {
+            hand_on_days(
+                vec![FinishedExchange {
+                    request,
+                    age: Duration::from_secs(1),
+                    heard: "good morning".to_owned(),
+                    said: said.to_owned(),
+                    whose: Some(MINH.to_owned()),
+                }],
+                NOW,
+                &client,
+            );
+        };
+        let offer = |id: u64, text: &str| {
+            client
+                .context
+                .lock()
+                .unwrap()
+                .offered(MINH, id, content_words(text), false);
+        };
+        offer(12, "Tired of the commute");
+        reply(u64::MAX - 76, "Morning! Was the commute any better today?");
+        assert_eq!(marks(), vec![(MINH.to_owned(), 12)]);
+        offer(13, "Starting a new job");
+        reply(u64::MAX - 77, "Morning! Anything new?");
+        assert_eq!(marks(), vec![]);
+        assert_eq!(client.context.lock().unwrap().asking.len(), 1);
+        reply(u64::MAX - 78, "How's the new job going?");
+        assert_eq!(marks(), vec![(MINH.to_owned(), 13)]);
+    }
+
+    /// reviewer-two's P2 on #3000: an undated thread is asked about only by
+    /// a key word of its own that is not a greeting's, or by all of them;
+    /// a dated one keeps its rule, so "new" alone still asks about a
+    /// "new car on Friday".
+    #[test]
+    fn an_undated_thread_is_asked_about_by_its_subject_not_a_greeting() {
+        let job = content_words("Starting a new job");
+        for not in [
+            "Morning! Anything new?",
+            "Anything new with you?",
+            "Good morning! How's everything going today?",
+            "Anything good happening this week?",
+        ] {
+            assert!(!asks_about(not, &job, false), "{not}");
+        }
+        for asks in [
+            "How's the new job going?",
+            "Morning! How's the job?",
+            "Did you start yet? How is the new job?",
+        ] {
+            assert!(asks_about(asks, &job, false), "{asks}");
+        }
+        let viec = content_words("Bắt đầu công việc mới");
+        assert!(!asks_about("Có gì mới không?", &viec, false));
+        assert!(!asks_about(
+            "Chào buổi sáng! Hôm nay có việc gì mới không?",
+            &viec,
+            false
+        ));
+        assert!(asks_about("Công việc mới thế nào?", &viec, false));
+        // Two greeting words are never asked by both (El's P3 on #3025:
+        // "việc" is both "job" and "thing"); one is asked by its word.
+        let moi = content_words("Có việc mới");
+        assert!(!asks_about("Có việc gì mới không?", &moi, false));
+        let life = content_words("Life");
+        assert!(!asks_about("Anything good?", &life, false));
+        assert!(asks_about("How's life?", &life, false));
+        // A when word never asks either (El's P2 on #3025), nor a day
+        // with events off, where the memory sends no "on".
+        let exam = content_words("Exam tomorrow");
+        assert!(!asks_about(
+            "Morning! Any plans for tomorrow?",
+            &exam,
+            false
+        ));
+        assert!(asks_about("How did the exam go?", &exam, false));
+        let wedding = content_words("Sister's wedding is on Saturday");
+        assert!(!asks_about("How was your Saturday?", &wedding, false));
+        assert!(asks_about("How was the wedding?", &wedding, false));
+        // Dated: as before.
+        let car = content_words("New car on Friday");
+        assert!(asks_about("Anything new?", &car, true));
+        assert!(!asks_about("Anything new?", &car, false));
     }
 
     /// The mark goes to the memory as `follow_up_asked`, once; an older

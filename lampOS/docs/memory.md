@@ -1065,7 +1065,17 @@ the unchanged legacy client, used unless the new Days client is selected.
   well?" (`remember::asks_about`), it sends `follow_up_asked` once and
   the memory never gives it again (reviewer-two's P2 on #2894:
   "Saturday should be sunny. Anything else I can help with?" has the
-  day and the question in different sentences, and does not count). The
+  day and the question in different sentences, and does not count). An
+  undated thread is stricter (reviewer-two's P2 on #3000): a word a
+  greeting has (the memory's common words, and "new", "good",
+  "anything", "doing", "mới", "việc" and the like,
+  `remember::GREETING_WORDS`) or a when word never counts, so the
+  question holds one of its other key words, or, for a thread of one key
+  word, that word: "Morning! Anything new?" and "Có gì mới không?" leave
+  "Starting a new job" offered, "How's the new job going?" and "Công
+  việc mới thế nào?" mark it; "Morning! Any plans for tomorrow?" leaves
+  "Exam tomorrow" offered, and "Có việc gì mới không?" leaves "Có việc
+  mới". The
   mark is apart from the journal: a remember or forget turn's reply,
   kept out of the journal, still marks it ("I'll remember that. How was
   your sister's wedding?"), but a reply in a request admitted held only
@@ -1100,6 +1110,7 @@ the unchanged legacy client, used unless the new Days client is selected.
   `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`,
   `remember::tests::with_events_a_dated_follow_up_is_told_with_its_day`,
   `remember::tests::a_reply_asks_about_an_event_by_its_words`,
+  `remember::tests::an_undated_thread_is_asked_about_by_its_subject_not_a_greeting`,
   `remember::tests::the_lamp_asking_about_a_dated_follow_up_sends_the_mark_once`,
   `remember::tests::with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask`,
   `remember::tests::the_writer_sends_the_mark_as_follow_up_asked`,
