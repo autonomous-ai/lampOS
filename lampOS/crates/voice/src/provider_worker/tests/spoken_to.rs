@@ -769,6 +769,52 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
     assert!(after_lines_left_alone(&BETWEEN[..1]).await);
 }
 
+/// `LAMP_NAME_OR_FOLLOW_UP` on Live, through the worker's own loop with the
+/// room and the conversation as it keeps them (`attention_now`): after "Hey
+/// Lamp, how much is one hundred dollars in euros?" was answered, a
+/// follow-up said 5 s after the lamp's words ended is answered as the
+/// conversation going on, and one said 12 s after, without the name, is
+/// held, inside the thread's 45 s; with the name it is answered. Without the
+/// switch the 12 s one is answered too.
+#[tokio::test]
+async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
+    let follow_up = "And what about tomorrow?";
+    for (on, ago_s, line, answered) in [
+        (true, 5, follow_up, true),
+        (true, 12, follow_up, false),
+        (true, 12, "Hey Lamp, and what about tomorrow?", true),
+        (false, 12, follow_up, true),
+    ] {
+        assert_eq!(
+            after_the_lamps_words(on, ago_s, line).await,
+            answered,
+            "{on} {ago_s} s: {line}"
+        );
+    }
+}
+
+/// Whether `line`, said `ago_s` s after the lamp's words to the euros
+/// question ended, was answered, with `LAMP_NAME_OR_FOLLOW_UP` `on` or not.
+async fn after_the_lamps_words(on: bool, ago_s: u64, line: &str) -> bool {
+    use std::sync::atomic::Ordering::Relaxed;
+    let _mark = OwnMark::kept();
+    let _room = OwnRoom::fresh();
+    let before = name_or_follow_up().swap(on, Relaxed);
+    let (mut rig, mut dial) = in_conversation(options(
+        true,
+        attention_now,
+        crate::tools::Settings::default(),
+    ))
+    .await;
+    // The words the worker counted ended `ago_s` s ago.
+    said_until_us().store(monotonic_us().saturating_sub(ago_s * 1_000_000), Relaxed);
+    let played = played(&mut rig, &mut dial, line).await;
+    rig.stop().await;
+    name_or_follow_up().store(before, Relaxed);
+    said_until_us().store(0, Relaxed);
+    played
+}
+
 /// Voice prints made at once from the line's sound: one voice says 1s,
 /// another -1s.
 struct TwoVoices(std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>);
