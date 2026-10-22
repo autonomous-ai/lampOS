@@ -2338,7 +2338,7 @@ after a take-over, but now for every turn:
     review of #2620: 0.70 is 0.01 over the office set's highest two-person
     pair, and a family's voices may be closer). Prints under 0.30 are two
     people whatever the eyes saw, and a print still to come is waited for
-    up to 300 ms (`JOIN_WAIT`). Nothing to tell is two people. A camera
+    up to 300 ms (`JOIN_WAIT`). A camera
     closed or a mute forgets the lines' faces, as it does the caller's. Why: on lamp-4ace on 21 Oct cut-short words were let go 31
     times, most in two-person scenes, where answering the second person
     alone is right; Eighth's long request with a pause lost its first half
@@ -2348,6 +2348,43 @@ after a take-over, but now for every turn:
     after a line with no chat begun, fell into the person's pause, so the
     second half began over the lamp's sound and was never printed; the
     eyes are then the join's only sign.
+  - **No sign of a second person** (the same switch; the owner's test on
+    lamp-4ace on 22 Oct, 19:04-19:08). lamp-4ace runs no same-voice model
+    and its eyes saw nobody speaking, so nothing joined, and 5 of 28 lines
+    went the same way: a pause mid-request, or a follow-up before the
+    answer, and only the second half was answered. So, after the
+    two-person rules, the voices and one face above, a line **let out** is
+    joined when nothing shows a second person (`Joined::NoSecond`): the
+    eyes' newest look as each line was judged holds at most one face
+    (`bus_out::faces_in_view`); no other voice was heard and no two faces
+    were seen speaking in the conversation (#829's other voice, a print
+    under 0.30, or a line two faces were seen speaking, kept until a line
+    is judged with no conversation going on); and the two lines' faces
+    are not another's. With no face in view, or no eyes at all (the
+    camera closed, the eyes not running), the room is the one sign left,
+    so it joins only when neither line was judged in a busy room: most
+    two-person scenes are busy rooms, and in a quiet one the person still
+    talking is most likely the one going on. Its why is counts only: `no
+    sign of a second person: 1 face in view at request N's end, 1 face in
+    view at request M's, no other voice heard and no two faces seen
+    speaking in the conversation`; refused, the faces in view, `another
+    voice or two faces speaking in the conversation (request K)`, `…, in a
+    busy room`, or `nothing kept of the room at request N` (a privacy
+    change since, which forgets how the room was too). A **held** line is
+    not joined on it: it was held as perhaps not said to the lamp, and the
+    cut words are answered in its place alone, as before; only the voices
+    or one face join its words. The gap the engine measures (the cut
+    line's End to the new line's Start) includes the coordinator's hold of
+    a sound said while an answer is awaited (`LAMP_WAIT_KEEPS_ANSWER`, up
+    to 1 s after its trigger), so it is about the person's pause less the
+    silence that ended the line (0.6 s by default), plus that hold. The owner's lost
+    lines, from the journal's times (it has no clock, so each is a bound):
+    24 to 25 began 1.45-2.45 s after the first's end, 37 to 38
+    1.59-2.13 s, 42 to 43 1.66-1.96 s, inside `JOIN_WITHIN`; 35 to 36 at
+    least 2.14 s, near 2.6 s by the wait sound it began over (1.79 s after
+    35's end, cut 0.81 s into it), just past it. Risk: a second person off
+    camera, in a quiet room or beside one face in view, saying a line let
+    out within 2.5 s, is joined to the first person's words.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
