@@ -40,3 +40,6 @@ lamp-skills = { path = "../skills" }
 lamp-policy = { path = "../policy" }
 # The head's breath and the ring's, held to one (tests/it/one_breath.rs, #1670).
 lamp-expression = { path = "../expression" }
+# `examples/same_voice_pairs.rs`: the voice's CAM++ print in the example's
+# own process, so its bars can be read on labelled clips without a lamp (#829).
+lamp-same-voice = { path = "../same-voice" }
