@@ -6994,6 +6994,17 @@ async fn a_line_let_out_with_no_sign_of_a_second_person_is_asked_with_the_words_
         "let out: one line"
     );
     assert_eq!(
+        asked_after_a_cut(
+            lines,
+            Duration::from_millis(2_600),
+            Some(none_seen.clone()),
+            false
+        )
+        .await,
+        Message::user("What's the weather like in Saigon this weekend?"),
+        "about 2.6 s, as request 36 began after 35 there: inside the 3 s"
+    );
+    assert_eq!(
         asked_after_a_cut(lines, soon, Some(none_seen.clone()), true).await,
         Message::user("What's the weather like"),
         "held: the cut words alone, in its place, as before"
