@@ -2825,6 +2825,25 @@ after a take-over, but now for every turn:
     now. Risk: a second person off camera, in a quiet room or beside one
     face in view, saying a line let out within 3 s, is joined to the first
     person's words.
+  - **A joined line's answer is not history** (the same switch; the first
+    builder on Queue #2602, 23 Oct 02:43). On lamp-4ace "Hey Lamp, what
+    time is it in London right now?" got the text "Twenty past eight in…",
+    which was never played, and "And in Saigon?" was joined to it. The
+    worker keeps an answer's words in the thread as they are sent, before
+    their sound, so the unplayed text went into the next chat's history as
+    the lamp's words. The model took London as answered and said only
+    Saigon's time. A line is joined only while none of its answer was
+    heard: its words stop being carried at its answer's first sound. So
+    each line joined into a later one is taken out of the thread
+    (`Engine::unsaying_joined`, `thread::unsay`): its question and answer
+    leave the history, and its question leads the joined line's words in
+    the thread. The model is asked both questions once, with no partial
+    answer. The journal says `request M: K lines joined into it had none
+    of their answers played; those answers are not kept as the lamp's
+    words`. An answer that began playing is never joined, and the thread
+    keeps it as before. Without the switch nothing changes, and a cut line
+    not joined keeps its exchange: with `LAMP_SAID_AS_HEARD` its part is
+    "—", so the person's words are not lost.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
