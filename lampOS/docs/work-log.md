@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-23 00:20 +07, updater process-death and CLI checkers merged
+
+#3012 was carried unchanged as `3d1de9ba0` through First's train #3078,
+ending at `b8a9148bd`. The authored/carried `git range-diff` is `=`.
+[Combined native receipt](verification/updater-cli-regression-20261022/merged-train.json):
+ARM64 **39818015000**, **10,583 passed / 0 failed / 67 skipped**, one
+existing leaky pass; real CLI **0.153 s**, seven persisted process cuts
+**3.798 s**. Linux Clippy **39818014953** passed. First closed the source
+PR as carried. This is a merged automated result, not a physical power-cut
+or downloaded-artifact qualification.
+
+#3085 remains a separate diagnostic follow-up at `f5f78c35c`, with local
+**307 / 0 / 2 ignored** and official checks running. Its original consumer
+failure remains unwaived. First retains #2810's attended unplug and device
+observer qualification, then #1812's real-key internet/quiet/bad-release and
+attended Body run. Second is auditing the current release-preparation delta
+and has asked for the next no-lamp code piece; no unowned current Update
+issue was available in the open-issue scan. No SSH or real-key action.
+
+---
+
 ## Current checkpoint: 2026-10-23 00:15 +07, Update fixture diagnostics pushed
 
 Ready for lamp-voice: no (#3085, official Linux checks and team read pending)
