@@ -317,7 +317,10 @@ mod tests {
         ));
         // Its question heard back over its own voice is still its echo.
         assert!(matches!(
-            judge(&line("shall I start the timer", 9_000_000, true), Some(&asked)),
+            judge(
+                &line("shall I start the timer", 9_000_000, true),
+                Some(&asked)
+            ),
             Echo::Held(_)
         ));
     }
