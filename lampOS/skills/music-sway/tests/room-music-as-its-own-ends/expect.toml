@@ -1,0 +1,9 @@
+# The lamp's own music for 40 s, then music in the room goes on: the chance
+# held back at 20 s is kept (wait = "1m") and taken once its own music ends.
+clock = "10:00"
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "body.move"
+args = { move = "sway" }

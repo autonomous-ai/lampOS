@@ -19,6 +19,10 @@ waits for the turn to end, up to a minute, and comes then only if the music
 still plays. A short clip (a ringtone, a
 video) is not music that goes on, and a quiet bar does not end it.
 
+It never sways to music it plays itself: a window the ears mark as the
+lamp's own sound (`own_voice` `present`) holds it back, and room music
+still sways it once the lamp's own music ends.
+
 It hears music by the ears' room sound scores (`ears/classes`, with
 `LAMP_EARS_CLASSES=on` in lamp-ears): a score from 0 to 1 the lamp works out
 on the lamp itself, from the room microphone, keeping no sound. Without them
