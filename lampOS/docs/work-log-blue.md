@@ -476,3 +476,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - The played greeting now comes only while no new ask has been said. The stand-in models the news gate, and a `FAKE_FACE` case checks that no greeting is played.
   - `skills.made` refuses a non-string or bad `request_id` before it asks lamp-voice.
   - Rebased onto lamp-voice `e9b0a46fb` and pushed as `07324d094`. The lamp-cloud gate (fmt, clippy, tests) is ok and the stand-in suite passed. Waiting on reviewer-two and El.
+- **17:55, reviewer-two on #2889:** P1 none, P2 none at `07324d094`, and asked for a rebase onto the latest base. Rebased at 17:56 onto `fe49ed3c4`, now `d09034e1a` (range-diff `=`). lamp-cloud's tests and clippy pass.
