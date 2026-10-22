@@ -65,6 +65,12 @@ Diễn ra như sau:
    - giọng nói chỉ gửi cho helper quản lý SHA-256 của kỹ năng đó
      (`{"install_made": SHA256}`), helper chỉ cài đúng các byte đó và kiểm
      lại giới hạn;
+   - helper cũng tự kiểm tra lời hỏi theo đồng hồ của chính nó
+     (`made_skill::waiting`): chỉ kỹ năng được hỏi gần nhất, trong vòng 120
+     giây và chưa được cài, mới được cài, nên một SHA-256 đã lưu không bao
+     giờ được cài về sau bằng bất kỳ đường nào; lời hỏi mới nhất được xét
+     trước: khi nó đã được cài hoặc đồng hồ lùi về trước nó thì không có gì
+     chờ, và một lời hỏi cũ hơn không bao giờ thế chỗ;
    - không có helper thì người dùng nghe là không cài được; helper không
      trả lời trong 8 giây thì nghe là đang cài;
    - không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.

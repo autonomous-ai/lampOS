@@ -666,24 +666,25 @@ pub fn asked(directory: &Path, key: &str, now_unix_ms: u64) -> io::Result<()> {
 }
 
 /// The made skill the lamp asked about within [`PUT_ON_WITHIN`] before
-/// `now_unix_ms` and not yet on: its name and SHA-256.
-fn waiting(directory: &Path, now_unix_ms: u64) -> Option<(String, String)> {
+/// `now_unix_ms` and not yet on: its name and SHA-256. The newest ask
+/// alone: once it is on, or out of its time, none. lamp-skills' manage
+/// helper holds `install_made` to it too, by its own clock, so a kept
+/// SHA-256 is never put on later by any path.
+pub fn waiting(directory: &Path, now_unix_ms: u64) -> Option<(String, String)> {
     let within = PUT_ON_WITHIN.as_millis() as u64;
-    index(directory)
+    // The newest ask first, whatever became of it: once it is on, or with
+    // the clock before it, nothing waits, and an older ask never stands in
+    // for it (reviewer-two's P2 on #2874).
+    let (at, entry) = index(directory)
         .into_iter()
-        .filter(|entry| entry["on"] != true)
-        .filter_map(|entry| {
-            let at = entry["offered_at_unix_ms"].as_u64()?;
-            (at <= now_unix_ms && now_unix_ms - at <= within).then(|| {
-                (
-                    at,
-                    entry["name"].as_str().unwrap_or_default().to_owned(),
-                    entry["sha256"].as_str().unwrap_or_default().to_owned(),
-                )
-            })
-        })
-        .max_by_key(|(at, _, _)| *at)
-        .map(|(_, name, sha256)| (name, sha256))
+        .filter_map(|entry| Some((entry["offered_at_unix_ms"].as_u64()?, entry)))
+        .max_by_key(|(at, _)| *at)?;
+    (entry["on"] != true && at <= now_unix_ms && now_unix_ms - at <= within).then(|| {
+        (
+            entry["name"].as_str().unwrap_or_default().to_owned(),
+            entry["sha256"].as_str().unwrap_or_default().to_owned(),
+        )
+    })
 }
 
 /// The note a request is given while a made skill waits for its yes (the

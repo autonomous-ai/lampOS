@@ -2,8 +2,8 @@
 //! real `lamp-skills pack`, the checker an install uses (#1698): what passes
 //! is packed and kept in a 0700 folder with its SHA-256, at most five;
 //! what does more than it declares, or more than a made skill may, is not.
-use lamp_skills::package::{self, asked as asked_helper, install_made};
-use lamp_voice::made_skill::{KEPT_MOST, Keeping, Made, Refused, keep};
+use lamp_skills::package::{self, asked as asked_helper, install_made, install_made_at};
+use lamp_voice::made_skill::{KEPT_MOST, Keeping, Made, PUT_ON_WITHIN, Refused, keep, offered};
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
@@ -50,6 +50,19 @@ fn keeping(dir: &Path) -> Keeping {
         directory: dir.join("made"),
         program: env!("CARGO_BIN_EXE_lamp-skills").into(),
     }
+}
+
+/// Now, as the manage helper reads its clock.
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
+
+/// The lamp has just asked to put on the made skill `sha256`.
+fn offer(keeping: &Keeping, sha256: &str) {
+    offered(&keeping.directory, sha256, now_ms()).unwrap();
 }
 
 fn tars(dir: &Path) -> Vec<String> {
@@ -161,6 +174,7 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    offer(&keeping, &made.sha256);
     let wait = std::time::Duration::from_millis(200);
     // Another hash puts nothing on.
     let other = "0".repeat(64);
@@ -211,6 +225,7 @@ fn a_made_skill_whose_package_changed_does_not_go_on() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    offer(&keeping, &made.sha256);
     let mut bytes = fs::read(&made.package).unwrap();
     bytes.push(0);
     fs::write(&made.package, &bytes).unwrap();
@@ -265,6 +280,7 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
             "package": packed.file_name().unwrap().to_str().unwrap(),
         }));
         fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+        offer(&keeping, &sha256);
         let refused = install_made(
             &skills,
             &keeping.directory,
@@ -293,6 +309,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     fs::write(store.join("SKILL.md"), card("evening-dim")).unwrap();
     package::install(&skills, &store).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    offer(&keeping, &made.sha256);
     let wait = std::time::Duration::from_millis(200);
     let refused = install_made(&skills, &keeping.directory, &made.sha256, wait).unwrap_err();
     assert!(
@@ -315,6 +332,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
         &keeping,
     )
     .unwrap();
+    offer(&keeping, &again.sha256);
     let replaced = install_made(&skills, &keeping.directory, &again.sha256, wait).unwrap();
     assert!(
         replaced.starts_with("replaced evening-dim 1.0.0 with 1.0.1"),
@@ -336,7 +354,8 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", 1_000).unwrap();
+    let now = now_ms();
+    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", now).unwrap();
     let socket = dir.path().join("manage.sock");
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     let (served, helper_made) = (skills.clone(), keeping.directory.clone());
@@ -357,10 +376,161 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
         &keeping.directory,
         &socket,
         Some("Yes, please."),
-        2_000,
+        now + 1_000,
         std::time::Duration::from_secs(60),
     );
     assert!(helper.join().unwrap(), "the helper put it on");
     assert_eq!(told["put_on"], "evening-dim", "{told}");
     assert!(skills.join("evening-dim").join("skill.toml").is_file());
+}
+
+/// The manage helper puts a made skill on only as the voice's own `put_on`
+/// would (the first builder on #2602, 22 Oct 10:1x): the newest the lamp
+/// asked about, within `PUT_ON_WITHIN`, by the helper's clock. A kept one
+/// never asked about, one asked about too long ago, or an older one after
+/// another was asked about, puts nothing on, whoever asks.
+#[test]
+fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let wait = std::time::Duration::from_millis(200);
+    let first = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let second = keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
+    let not_asked = |refused: String| {
+        assert!(
+            refused.contains("didn't ask about that made skill last"),
+            "{refused}"
+        );
+    };
+    // Kept, never asked about.
+    not_asked(
+        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 10_000).unwrap_err(),
+    );
+    // Asked about, then too long ago.
+    offered(&keeping.directory, &first.sha256, 10_000).unwrap();
+    let within = PUT_ON_WITHIN.as_millis() as u64;
+    not_asked(
+        install_made_at(
+            &skills,
+            &keeping.directory,
+            &first.sha256,
+            wait,
+            10_000 + within + 1,
+        )
+        .unwrap_err(),
+    );
+    // Another asked about since: only the newest.
+    offered(&keeping.directory, &second.sha256, 20_000).unwrap();
+    not_asked(
+        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 20_001).unwrap_err(),
+    );
+    assert!(!skills.join("evening-dim").exists());
+    let done = install_made_at(&skills, &keeping.directory, &second.sha256, wait, 20_001).unwrap();
+    assert!(done.contains("morning-glow"), "{done}");
+    // Put on, as the voice marks it after the helper's done: the older ask
+    // never stands in for it (reviewer-two's P2 on #2874).
+    let index = keeping.directory.join(lamp_voice::made_skill::INDEX);
+    let mut entries: Vec<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&index).unwrap()).unwrap();
+    for entry in &mut entries {
+        if entry["sha256"] == second.sha256.as_str() {
+            entry["on"] = serde_json::json!(true);
+        }
+    }
+    fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+    not_asked(
+        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 20_002).unwrap_err(),
+    );
+    // Two asks and a clock gone back between them: neither, never the
+    // older one in the newer's place.
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = self::keeping(dir.path());
+    let older = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let newer = keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
+    offered(&keeping.directory, &older.sha256, 10_000).unwrap();
+    offered(&keeping.directory, &newer.sha256, 20_000).unwrap();
+    for made in [&older, &newer] {
+        not_asked(
+            install_made_at(&skills, &keeping.directory, &made.sha256, wait, 19_999).unwrap_err(),
+        );
+    }
+    // A clock that went back before the ask counts as no ask.
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = self::keeping(dir.path());
+    let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    offered(&keeping.directory, &made.sha256, 30_000).unwrap();
+    not_asked(
+        install_made_at(&skills, &keeping.directory, &made.sha256, wait, 29_999).unwrap_err(),
+    );
+}
+
+/// The real sequence (reviewer-two's P2 on #2874): two asks, the newest put
+/// on by a spoken yes through the voice's `put_on` and the real helper,
+/// which marks it on; then the older one is put on by nobody, neither by
+/// the helper asked for it nor by another spoken yes.
+#[test]
+fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let older = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
+    let now = now_ms();
+    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", now - 2_000).unwrap();
+    lamp_voice::made_skill::asked(&keeping.directory, "s1:8:1", now - 1_000).unwrap();
+    let socket = dir.path().join("manage.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let (served, helper_made) = (skills.clone(), keeping.directory.clone());
+    let helper = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        asked_helper(
+            &served,
+            &helper_made,
+            &served.join("no-state"),
+            std::time::Duration::from_secs(2),
+            None,
+            &stream,
+            &stream,
+        )
+        .unwrap()
+    });
+    let told = lamp_voice::made_skill::put_on_within(
+        &keeping.directory,
+        &socket,
+        Some("Yes, please."),
+        now,
+        std::time::Duration::from_secs(60),
+    );
+    assert!(helper.join().unwrap(), "the helper put it on");
+    assert_eq!(told["put_on"], "morning-glow", "{told}");
+    let refused = install_made(
+        &skills,
+        &keeping.directory,
+        &older.sha256,
+        std::time::Duration::from_millis(200),
+    )
+    .unwrap_err();
+    assert!(
+        refused.contains("didn't ask about that made skill last"),
+        "{refused}"
+    );
+    assert!(!skills.join("evening-dim").exists());
+    let again = lamp_voice::made_skill::put_on_within(
+        &keeping.directory,
+        &socket,
+        Some("Yes, please."),
+        now + 1,
+        std::time::Duration::from_secs(1),
+    );
+    assert!(
+        again["error"].as_str().unwrap().contains("nothing waiting")
+            || again["error"]
+                .as_str()
+                .unwrap()
+                .contains("no skill made here"),
+        "{again}"
+    );
 }

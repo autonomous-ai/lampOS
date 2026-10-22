@@ -1242,7 +1242,16 @@ for it.
   (`package::install_made`). The helper finds the package the voice's
   made-skills folder (`/var/lib/lampOS/voice/made-skills`, root's, 0700,
   read by the helper as its owner) names with that hash in its
-  `made.json`. It reads its bytes once and hashes them, and a package
+  `made.json`. Only the made skill the lamp asked about last, within
+  120 s (`PUT_ON_WITHIN`) and not yet on, goes on: the voice's own
+  `made_skill::waiting`, read by the helper's clock, never the asker's (the
+  first builder on #2602, 22 Oct 10:1x). The newest ask is taken first,
+  whatever became of it: once it is on, or with the clock before it,
+  nothing waits, and an older ask never stands in for it (reviewer-two's P2
+  on #2874). A kept one never asked about, one asked about too long ago, or
+  an older one after another was asked about, is refused (`the lamp didn't ask about that made skill last, within
+  120 s`), so a kept SHA-256 is never put on later by any path. It reads
+  its bytes once and hashes them, and a package
   whose hash has changed is refused (`its SHA-256 has changed`). Then it
   reads those same bytes as the package, so nothing is read twice. Its
   `skill.toml` is held again to a made skill's cap
@@ -1260,7 +1269,9 @@ for it.
   Tests: `made::a_made_skill_goes_on_by_its_sha256_and_only_by_it`,
   `…never_takes_the_place_of_one_put_on_another_way`,
   `…whose_package_changed_does_not_go_on`,
-  `…past_the_cap_or_not_made_here_does_not_go_on`.
+  `…past_the_cap_or_not_made_here_does_not_go_on`,
+  `…goes_on_only_within_its_ask_and_only_the_newest`,
+  `…once_the_newest_is_on_an_older_ask_puts_nothing_on`.
 - **Why this and not the others** (the least new surface):
   - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
     as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
