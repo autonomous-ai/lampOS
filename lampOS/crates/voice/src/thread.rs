@@ -158,7 +158,14 @@ pub struct Thread {
     count_only: Option<u64>,
     /// An add-on's quoted line, the newest ([`Self::quoted`]).
     quoted: Option<u64>,
+    /// Each request's own line, as its route held it when the request was
+    /// made or its first call came ([`Self::line_of`], #3113): the newest
+    /// [`LINES`]. A later line never takes its place.
+    lines: VecDeque<(u64, String)>,
 }
+
+/// How many requests' own lines are held ([`Thread::line_of`]).
+const LINES: usize = 8;
 
 /// One exchange as it is kept in the file: when, by the wall clock, since
 /// the process that reads it back has another `Instant`.
@@ -260,6 +267,7 @@ impl Thread {
             held: None,
             count_only: None,
             quoted: None,
+            lines: VecDeque::new(),
         }
     }
 
@@ -567,21 +575,59 @@ impl Thread {
     /// knows them: its exchange's, once the lamp has begun answering it,
     /// else what has been heard since the last answer, within the time an
     /// answer counts as asked. `None` for nothing heard (#2176, row 10).
+    ///
+    /// A line held for the request ([`Self::line_of`]) is its words first:
+    /// the next line heard replaces what is pending, so a forget asked by
+    /// one person never runs on another's next words (#3113, El's P2 on
+    /// #3127).
     pub fn heard_for(&self, request: u64, now: Instant) -> Option<String> {
-        let heard = match self.exchanges.iter().rev().find(|e| e.request == request) {
-            Some(exchange) => exchange.person.trim(),
-            None if self
-                .heard_at
-                .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN) =>
+        let held = self
+            .lines
+            .iter()
+            .rev()
+            .find(|(held, _)| *held == request)
+            .map(|(_, line)| line.trim());
+        let exchange = self.exchanges.iter().rev().find(|e| e.request == request);
+        let heard = match (held, exchange) {
+            (Some(held), _) => held,
+            (None, Some(exchange)) => exchange.person.trim(),
+            (None, None)
+                if self
+                    .heard_at
+                    .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN) =>
             {
                 self.heard.trim()
             }
-            None => "",
+            (None, None) => "",
         };
         heard
             .chars()
             .any(char::is_alphanumeric)
             .then(|| heard.to_owned())
+    }
+
+    /// `request`'s own line is `words` (#3113), held for [`Self::heard_for`]
+    /// whatever is heard next; the first held for a request stays.
+    pub fn line_of(&mut self, request: u64, words: &str) {
+        if self.lines.iter().any(|(held, _)| *held == request) {
+            return;
+        }
+        let words = crate::sign_in::scrub(words);
+        let mut line = String::new();
+        add(&mut line, &words, PERSON_BYTES);
+        if self.lines.len() == LINES {
+            self.lines.pop_front();
+        }
+        self.lines.push_back((request, line));
+    }
+
+    /// [`Self::line_of`] with what the thread gives for `request` now, if it
+    /// gives words: for a route whose lines come without their request (the
+    /// Live route), at its first call, before anything else is heard.
+    pub fn hold_line(&mut self, request: u64, now: Instant) {
+        if let Some(words) = self.heard_for(request, now) {
+            self.line_of(request, &words);
+        }
     }
 
     /// The note of written request `request`: kept with the answer to that
@@ -800,6 +846,7 @@ impl Thread {
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
         self.exchanges.clear();
+        self.lines.clear();
         self.note = None;
         self.heard.clear();
         self.heard_at = None;

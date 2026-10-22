@@ -1409,6 +1409,19 @@ fn run_call_with_scope(
     let deadline = ASK_DEADLINE;
     let result = match route {
         Route::Memory(socket) => {
+            // A `forget` whose heard line names what to forget is that
+            // thing's, of the asker's own scope, never the last kept thing's
+            // (#3113), on every switch.
+            let said = (heard && call.name == crate::remember::FORGET)
+                .then(|| {
+                    crate::thread::THREAD
+                        .lock()
+                        .ok()?
+                        .heard_for(request, std::time::Instant::now())
+                })
+                .flatten();
+            let named = crate::remember::named_forget(call, said.as_deref(), lease);
+            let call = named.as_ref().unwrap_or(call);
             // With `LAMP_MEMORY_KEEP_HEARD`, a `remember` whose sentence has
             // words the line did not keeps that line instead (#2176).
             // With `LAMP_MEMORY_EVENTS`, a `remember`'s `on` is kept only

@@ -532,7 +532,11 @@ pub async fn answer(
             {
                 serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET})
             } else {
-                tools(request, false, call.name.clone(), call.args.clone()).await
+                // A forget the text names a thing for is that thing's
+                // (#3113), never the last kept thing's.
+                let args = crate::remember::named_forget_typed(&call.name, &call.args, &text.text)
+                    .unwrap_or_else(|| call.args.clone());
+                tools(request, false, call.name.clone(), args).await
             };
             messages.push(Message::tool(call.id, result.to_string()));
         }

@@ -306,7 +306,9 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
 
 - `append`, `remember`: `{"ok":true,"id":3}`. `heard` or `said` may be left out.
 - `kept`: `entries` of `{id, at_unix_ms, text}`, the newest that fit in
-  `max_bytes` of text, oldest first.
+  `max_bytes` of text, oldest first. With `"observations":true` (the Days
+  store's, #3113) the person's current observations are listed too, by the
+  same ids, for a forget by name; the legacy store ignores it.
 - `recall`: `entries` of `{"kind":"exchange", id, at_unix_ms, heard, said}` or
   `{"kind":"kept", id, at_unix_ms, text}`, oldest first. With `day`
   (`YYYY-MM-DD`): that local day's exchanges. With `query`: what in the kept
@@ -570,9 +572,118 @@ the unchanged legacy client, used unless the new Days client is selected.
 - **What the model is given from a recall** is how long ago in words
   ("yesterday", "2 weeks ago"), never a date or a time of day: a person
   does not say "on 3 October at 14:02".
-- **`forget` is not yet all of forgetting.** It removes the last kept
-  thing, clears the note and the conversation thread, and that is what the
-  lamp says ("it is off my list"). A later conversation in which the thing
+- **A forget that names a thing removes only what matches** (#3113, the
+  Days client, on every switch: the product's unit has
+  `LAMP_MEMORY_FORGET_ABOUT` off).
+  - **Why:** on lamp-c0a4 (23 Oct, second route, observe, threads, events
+    and forget-all on), the lamp noticed a person's favourite colour (an
+    observation), then kept their sister's wedding. "Lamp, please forget my
+    favourite colour." called `forget {}`, which sent `forget_last`: the
+    wedding went, and the colour stayed.
+  - **The one picker:** `remember::pick_forget` decides what every
+    `forget` removes, from the call, the words heard in its line (a typed
+    text's own words) and what the session did just before (`Recent`):
+    `AsCalled` (a recalled `source_id` with `LAMP_MEMORY_FORGET_ALL`, the
+    model's own `about` with `LAMP_MEMORY_FORGET_ABOUT`), `Named(words)`
+    or `Last`. The guard (`remember::named_forget`, run in
+    `tools::run_call_with_scope` for spoken turns and in `messages` for
+    texts) sends a `Named` pick as `forget {about, heard_named}`.
+  - **What names a thing** (`remember::named_subject`): the last sentence
+    that asks to forget, its words after the first forget word ("forget",
+    "delete", "quên", "xóa" …), without the words that name nothing: the
+    `forget {about}` stop words below, the module's small words, and
+    "that", "it", "just", "last", "thing", "said", "told", "never", "mind",
+    "please", "lamp" and the Vietnamese "cái", "điều", "vừa", "nói", "nó",
+    "giúp", "mình", "nhé", "đèn" and the like. "Lamp, please forget my
+    favourite colour." names "favourite colour"; "quên màu yêu thích của
+    tôi" names "màu yêu thích"; "forget that", "forget what I just said",
+    "never mind", "quên cái đó đi" and "quên điều vừa nói" name nothing.
+    With nothing heard, the model's own `about`, if it gave one, names it.
+  - **What is removed:** what the asker's own scope keeps and what was
+    noticed of them (`kept` with `observations`) that has every one of
+    those words, as `forget {about}` matches below, each by `forget {id}`,
+    so its replacement chain and the exchanges linked to it go with it.
+    Only the asker's own: never another person's, and for someone known
+    never the room's (no fallback to the room's, unlike the model's own
+    `about`); with nobody known, the room's, only what this conversation
+    had.
+  - **"Forget my favourite colour and my address"** names two subjects
+    (split at "and" or "và"), each matched by its own words; "forget where
+    I work" names "work", which finds "Works at a bakery". One found and
+    one not: the found one goes, and the answer has `missed` with "I
+    couldn't find anything about …".
+  - **None matching removes nothing,** never the last kept thing instead,
+    and the model is told: `{"forgotten":false,"about":"favourite colour",
+    "note":"I couldn't find anything about favourite colour, so I forgot
+    nothing … such as \"I couldn't find anything about favourite
+    colour.\""}`, never "I don't have": the words may not be the kept ones.
+    And nothing more of the conversation is journalled or noticed, as after
+    a forget (`DaysClient::forgotten`): a colour said earlier and not yet
+    noticed isn't noticed by the end-of-talk pass after it (El's P2 on
+    #3127). A word too many costs a repeat; a guess cost what the person
+    kept.
+  - **The asker's own line:** the words are those of the forget's own
+    request (`Thread::line_of`), never the thread's pending words, which
+    the next line heard replaces. The second route holds its request's
+    words as it makes the request; the Live route, whose lines come without
+    their request, holds what was heard for it at its first call
+    (`Thread::hold_line`). So A's "forget my favourite colour" never runs
+    on B's "don't forget the wedding cake" heard just after (El's P2 on
+    #3127).
+  - **`forget_last` stays only for a bare forget:** "forget that" right
+    after a keep removes that keep. A bare forget within 60 s of a named one
+    in the same scope ("Yes, please forget it.") is that name again; a
+    `remember` since ends that. #2808 adds its case to `pick_forget`: a
+    bare forget just after a follow-up was asked.
+  - **The legacy memory**, which can forget only the last kept thing,
+    forgets nothing for a named forget and says so. A Days lamp-memory
+    older than this build refuses `kept`'s `observations`
+    (`deny_unknown_fields`: `{"ok":false,"error":"bad_request","message":
+    "invalid fields for this operation"}`). The voice then removes nothing,
+    never sends `forget_last` instead, and tells the model to say plainly
+    "I couldn't forget that just now", until both are updated. No switch:
+    the product's units ship voice and memory together; this covers a part
+    updated before the other.
+  - **What the model is told:** `forget`'s description says a named thing
+    is forgotten by naming it, that it forgets the last kept thing only for
+    "forget that" or "what I just said", and never to forget something
+    else instead, on every switch.
+  - **Probe** (deepseek-flash through the relay, thinking off, the
+    product's memory switches with observe and threads: a wedding kept in
+    the session, a colour noticed, then "Lamp, please forget my favourite
+    colour." / "Đèn ơi, quên màu yêu thích của tôi đi."): the model called
+    `forget {}` 10/10 and 10/10. Without the guard the wedding went 20/20
+    and the colour 0/20; with it the wedding 0/20 and the colour 20/20.
+  - **Tests:** in `remember::tests`,
+    `a_forget_names_a_subject_only_with_words_beyond_that_or_what_i_just_said`,
+    `pick_forget_names_the_subject_and_leaves_the_last_kept_thing_to_that`,
+    `a_forget_that_names_a_thing_forgets_only_it_observations_included`,
+    `forget_that_right_after_a_keep_forgets_that_keep`,
+    `a_named_forget_with_no_match_removes_nothing_and_says_so`,
+    `a_named_forget_never_reaches_another_persons_matching_thing`,
+    `a_named_forget_in_the_room_reaches_only_what_this_session_had`,
+    `forget_it_just_after_a_named_forget_is_that_thing_again`,
+    `a_named_forget_with_the_legacy_memory_forgets_nothing`,
+    `a_named_forget_with_an_older_days_memory_removes_nothing_and_says_so`,
+    `a_named_forget_finds_a_plural_and_each_of_two_things`,
+    `forget_subjects_split_at_and_and_a_plural_is_its_one`,
+    `a_forget_runs_on_its_own_lines_words_never_the_next_line` and
+    `the_forget_function_says_a_named_thing_is_forgotten_by_its_name`;
+    `days_protocol::tests::kept_with_observations_lists_the_persons_current_observations_too`;
+    `crates/memory/tests/voice_forget_named.rs`, the guard and the
+    client against the real store on the product's switches (Twelve's case
+    in English and Vietnamese, another person's and the room's colour
+    untouched, "forget that" after a keep);
+    `voice_forget::forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation`,
+    Twelve's case with `LAMP_MEMORY_FORGET_ALL` on; and
+    `crates/memory/tests/forget_shared_exchange.rs`, the store with
+    `FORGET_ALL`'s sources: the colour and the wedding share an exchange,
+    and forgetting either leaves the other (the third reviewer's probe on
+    #3127).
+
+- **`forget` is not yet all of forgetting.** A bare `forget` removes the
+  last kept thing, clears the note and the conversation thread, and that is
+  what the lamp says ("it is off my list"). A later conversation in which the thing
   came up is still in the journal until it is 30 days old. Forgetting that
   reaches everything derived from a thing needs each entry to say what it
   came from. The opt-in store supports those links and transitive deletion;
@@ -588,7 +699,9 @@ the unchanged legacy client, used unless the new Days client is selected.
     `forget {id}` removes it with its replacement chain, everything linked
     from it (later exchanges in which it was shown, observations), and for
     an observation the exchanges it was taken from: one step back, never
-    what those were shown (#2003).
+    what those were shown (#2003), and never what else derives from those
+    exchanges, such as a kept thing remembered in the same conversation
+    (#3113).
   - `forget_everything {}`, asked once and said yes to, is for **someone
     known only**: it sends `forget_all` for their own scope (never `null`,
     which would be everyone's), and for their rules' scope (`r-<person>`)
@@ -831,7 +944,7 @@ the unchanged legacy client, used unless the new Days client is selected.
     wins when both are given. It is told to say what is gone as "I've
     forgotten the two things about your bicycle", without repeating them.
   - **What is sent:** one `kept` listing (`max_bytes` 16,384, the store's
-    most) of one scope: the person's own when someone known is at the lamp,
+    most, with `observations`, #3113) of one scope: the person's own when someone known is at the lamp,
     else the room's. The voice matches locally, so no match is left out of
     a ranked top few. The store keeps at most 200 kept things of a person,
     each at most 300 bytes, and lists newest first until the next does not
@@ -855,7 +968,8 @@ the unchanged legacy client, used unless the new Days client is selected.
     #1723. The rest stay, and the model is told how many (`left`, with a
     note that they were not from this conversation). A known person's own
     scope keeps the rule as it was: all their own kept things.
-  - **What matches:** kept things only, never exchanges or observations.
+  - **What matches:** kept things and, since #3113, observations; never
+    exchanges.
     The key words of `about` are its words of two or more letters or
     digits, without a few that name no topic. English: my, the, a, an,
     our, your, his, her, their, its, this, that, these, those, i, me, we,
@@ -868,11 +982,18 @@ the unchanged legacy client, used unless the new Days client is selected.
     "có" is not "cỏ", "cho" is not "chó", and "đỏ" stays a key word. Then
     both sides are folded as the memory's search folds them
     (`crates/memory/src/search.rs`: NFC, lower-cased, `đ` as `d`, accents
-    removed), so "xe đạp" matches "Xe dap mau do". A kept thing matches
-    when it has every key word. It matches words, not synonyms or plurals:
-    "my bicycle" matches "Their bicycle is red" (as lamp-06c1's second
-    route wrote it) and "Ossa's bicycle is red", not "The bike is blue"
-    and not "My coffee is black". No key word left, as in "my the",
+    removed), so "xe đạp" matches "Xe dap mau do". `about` is split at
+    "and", "và" and commas into subjects (#3113): "favourite colour and
+    address" is two, and a kept thing matches when it has every key word of
+    one of them. A word matches itself or its English plural ("work" and
+    "works", "key" and "keys", "glass" and "glasses", "story" and
+    "stories"; a word of three letters or fewer, or ending in "ss", "us"
+    or "is", only itself), never a synonym or a near word: "my bicycle"
+    matches "Their bicycle is red" (as lamp-06c1's second route wrote it)
+    and "Ossa's bicycle is red", not "The bike is blue" and not "My coffee
+    is black". Every word of a subject, never any one: "favourite colour"
+    by any word would take "Favourite food is pho", the wrong-thing loss
+    #3113 fixes. No key word left, as in "my the",
     forgets nothing, and the model is told so.
   - **What the model is told:** `{"forgotten":true,"count":2,"about":"bicycle"}`:
     how many went and the person's own `about`. The kept texts are never
@@ -901,8 +1022,10 @@ the unchanged legacy client, used unless the new Days client is selected.
     conversation's ids and ends the writer's conversation, as `forget`
     does. The context lock is held only to count, to check the session's
     sources and to record, never across a request.
-  - **Off:** every function the model is told of is the same as before, and
-    an `about` sent anyway is passed over: `forget` sends `forget_last`.
+  - **Off:** `forget` takes no `about` (its words say a named thing is
+    forgotten by naming it, #3113), and an `about` sent anyway is the
+    lamp's guard's to read: with nothing heard it names the thing, else the
+    heard words do; a bare forget sends `forget_last`.
   - **Tests:** in `remember::tests`,
     `with_the_about_switch_forget_removes_the_kept_things_it_is_about`
     (requests, scopes, no match, stop words alone, too many, journalling),
