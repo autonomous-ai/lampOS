@@ -51,6 +51,12 @@ pub trait Lamp {
     /// again, without keeping it (`light/request`), until the person asks
     /// for a light at the lamp.
     fn preview_light(&mut self, light: &Light) -> Result<(), String>;
+    /// Whether setup's hotspot opens by itself when the saved network is
+    /// gone (#3020, `LAMP_WIFI_RECOVERY=on`), so the app may name it. False:
+    /// no field, read as before.
+    fn recovery(&self) -> bool {
+        false
+    }
     /// Whether texts from the app are taken (`LAMP_MESSAGES=on`,
     /// `crate::chat`). Off unless a lamp says so.
     fn texting(&self) -> bool {
@@ -252,12 +258,18 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // is read as before.
         "system.info" => {
             let can = can(lamp);
-            some(json!({
+            let mut info = json!({
                 "versions": lamp.versions(),
                 "network": lamp.network(),
                 "host": lamp.host(),
                 "can": can,
-            }))
+            });
+            // `recovery` (#3020): only when it's on, so the app names the
+            // hotspot only to a lamp that will open one.
+            if lamp.recovery() {
+                info["recovery"] = json!(true);
+            }
+            some(info)
         }
         "system.version" => some(lamp.versions()),
         "system.network" => some(lamp.network()),
@@ -470,9 +482,14 @@ pub mod tests {
         pub make_skill: Option<std::path::PathBuf>,
         pub update_page: bool,
         pub restart: bool,
+        /// What `recovery` says (#3020).
+        pub recovery: bool,
     }
 
     impl Lamp for Fake {
+        fn recovery(&self) -> bool {
+            self.recovery
+        }
         fn versions(&mut self) -> Value {
             json!({"lamp-voice": "0.1.0+abc"})
         }
@@ -606,6 +623,16 @@ pub mod tests {
         assert_eq!(info["host"]["hostname"], "lamp-7f72");
         assert_eq!(info["versions"]["lamp-voice"], "0.1.0+abc");
         assert_eq!(info["network"]["interface"], "wlan0");
+        // #3020: `recovery` only while it's on.
+        assert!(info.get("recovery").is_none(), "{info}");
+        let mut recovering = Fake {
+            recovery: true,
+            ..Fake::default()
+        };
+        let told = answer(&mut recovering, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["recovery"], true);
         assert_eq!(
             answer(&mut lamp, "system.network", &Value::Null).unwrap(),
             Some(json!({"private_ip": "192.168.1.42", "interface": "wlan0"}))

@@ -326,6 +326,103 @@ fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
     );
 }
 
+/// #3020, El's P1 on #3024: a recovery run takes the app's one full setup
+/// request and joins its network, and saves nothing else: no key, name,
+/// zone, backend link, reports answer or own key; the marker is there, and
+/// the status keeps saying what the owner kept. The control: the same
+/// request at a first setup saves every one of them (reviewer-two's P3).
+#[test]
+fn a_recovery_run_joins_the_network_and_saves_nothing_else() {
+    let mut body = app_body();
+    body["share_reports"] = json!(true);
+    body["deepseek_api_key"] = json!("sk-own-3024-cccccccccccc");
+    let accepted = check(&request(body), &Root::new().config(false)).unwrap();
+    let first = || Owning {
+        saved: Saved::default(),
+        on: true,
+        verdict: lamp_setup::keys::Verdict::Works,
+    };
+
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut control = first();
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut control,
+        || Some("192.168.1.23".into()),
+    );
+    let called: Vec<&str> = control
+        .saved
+        .calls
+        .iter()
+        .map(|call| call.split('=').next().unwrap())
+        .collect();
+    assert_eq!(
+        called,
+        [
+            "name",
+            "timezone",
+            "backend",
+            "reports",
+            "credential",
+            "own_key",
+            "marker"
+        ]
+    );
+    let status = status.lock().unwrap().clone();
+    assert!(status.share_reports && !status.own_keys.is_empty());
+
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    // The owner's kept no, which the request's yes leaves as it is.
+    status.lock().unwrap().share_reports = false;
+    let mut saved = first();
+    let mut lamp = Lamp::new(true);
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut lamp,
+        &mut lamp_setup::serve::NetworkOnly(&mut saved),
+        || Some("192.168.1.23".into()),
+    );
+    let status = status.lock().unwrap().clone();
+    assert_eq!(status.phase, Phase::Connected);
+    assert!(lamp.joined_at.is_some(), "the network is joined");
+    assert!(saved.saved.calls.is_empty(), "{:?}", saved.saved.calls);
+    assert!(!status.share_reports && status.own_keys.is_empty());
+}
+
+/// The status of a recovery's hotspot says the answer on reports the owner
+/// kept: a yes only where the file says so.
+#[test]
+fn the_kept_answer_on_reports_is_read_as_kept() {
+    let root = Root::new();
+    let path = root.config(false).reports;
+    assert!(!lamp_setup::serve::kept_share_reports(&path), "missing");
+    for (kept, yes) in [
+        (
+            lamp_setup::serve::reports_record(true, std::time::SystemTime::now()),
+            true,
+        ),
+        (
+            lamp_setup::serve::reports_record(false, std::time::SystemTime::now()),
+            false,
+        ),
+        (json!({"share": "true", "asked": 1}), false),
+        (json!({"share": true}), false),
+        (json!({"share": true, "asked": 2}), false),
+        (json!({"share": true, "asked": 1, "by": "app"}), false),
+    ] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, kept.to_string()).unwrap();
+        assert_eq!(lamp_setup::serve::kept_share_reports(&path), yes, "{kept}");
+    }
+    fs::write(&path, "not json").unwrap();
+    assert!(!lamp_setup::serve::kept_share_reports(&path));
+}
+
 #[test]
 fn a_wrong_password_saves_nothing_and_names_the_reason() {
     let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
@@ -1434,6 +1531,9 @@ impl Save for Owning {
     }
     fn marker(&mut self) -> io::Result<()> {
         self.saved.marker()
+    }
+    fn reports(&mut self, share: bool) -> io::Result<()> {
+        self.saved.record("reports", &share.to_string())
     }
     fn own_keys_on(&self) -> bool {
         self.on

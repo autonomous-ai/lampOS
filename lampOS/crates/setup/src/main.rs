@@ -20,6 +20,12 @@ const NAME: &str = lamp_setup::SUBSCRIBER;
 
 const USAGE: &str = "\
 usage: lamp-setup COMMAND [OPTIONS]
+  recover --config FILE [--enable]
+      With LAMP_WIFI_RECOVERY=on (#3020), on a set-up lamp: 90 s off every
+      known network, and not joining one, opens setup's hotspot and page as
+      a fresh lamp's, its marker and the person's data kept; the saved
+      network is tried every 2 min with no phone on it; back on a network,
+      recovery ends. Off, it says so and exits 0.
   serve --config FILE --plan FILE [--seconds N] [--enable]
       The lamp's first boot, started by the keeper when the setup marker is
       missing: finish an interrupted reset, bring up the lamp's hotspot and
@@ -277,7 +283,199 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             }
             serve(config, plan, seconds)
         }
+        "recover" => {
+            let config_path =
+                PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+            if !options.is_empty() {
+                return Err("recover takes --config and --enable".into());
+            }
+            let config = serve_config(&config_path)?;
+            if !enabled {
+                println!(
+                    "{}",
+                    serde_json::json!({"enabled": false, "reason": "--enable was not set"})
+                );
+                return Ok(true);
+            }
+            recover(config)
+        }
         _ => Err(format!("unknown command {command}").into()),
+    }
+}
+
+/// Setup's page on the hotspot while recovery has it open: its stop, the
+/// thread serving, and the status the page answers with.
+struct Recovering {
+    stop: tokio::sync::watch::Sender<bool>,
+    serving: std::thread::JoinHandle<()>,
+    status: Arc<Mutex<Status>>,
+}
+
+impl Recovering {
+    /// Opens the hotspot and serves setup's page, as `serve` does, with
+    /// the marker kept and no light (the ring is the voice's).
+    fn open(config: &lamp_setup::serve::Config) -> Self {
+        let (stop, stopped) = tokio::sync::watch::channel(false);
+        let status = Arc::new(Mutex::new(Status::new(String::new())));
+        let serving = std::thread::spawn({
+            let config = config.clone();
+            let status = Arc::clone(&status);
+            move || {
+                let served = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(Box::<dyn std::error::Error>::from)
+                    .and_then(|runtime| answer(config, None, status, None, runtime, stopped, true));
+                if let Err(error) = served {
+                    eprintln!("lamp-setup: recover: serving setup's page: {error}");
+                }
+            }
+        });
+        Self {
+            stop,
+            serving,
+            status,
+        }
+    }
+
+    /// A setup run in progress on the page: never cut by a retry.
+    fn running(&self) -> bool {
+        self.status.lock().unwrap().phase == lamp_setup::serve::Phase::Connecting
+    }
+
+    fn close(self) {
+        let _ = self.stop.send(true);
+        let _ = self.serving.join();
+    }
+}
+
+/// Phones on the hotspot, from `iw dev IF station dump`: None when it can't
+/// be read, which the policy counts as some.
+fn phones(interface: &str) -> Option<u16> {
+    let output = std::process::Command::new("iw")
+        .args(["dev", interface, "station", "dump"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())?;
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| line.starts_with("Station "))
+            .count()
+            .try_into()
+            .unwrap_or(u16::MAX),
+    )
+}
+
+/// `recover` (#3020): a set-up lamp whose saved network is gone opens
+/// setup's hotspot after 90 s, only with its switch on. One look every 5 s.
+fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::recover::{Act, Recovery, SWITCH, Seen, on};
+    use lamp_setup::wifi::{Host, ImageHost};
+    if !on(std::env::var(SWITCH).ok().as_deref()) {
+        eprintln!("lamp-setup: recover: off ({SWITCH} is not on)");
+        return Ok(true);
+    }
+    if !config.marker.exists() {
+        eprintln!("lamp-setup: recover: this lamp is not set up; setup itself serves");
+        return Ok(true);
+    }
+    // For lamp-cloud's `recovery`; the runtime folder goes with the unit.
+    if let Err(error) = std::fs::write(lamp_setup::recover::ON_FILE, "") {
+        eprintln!(
+            "lamp-setup: recover: {}: {error}",
+            lamp_setup::recover::ON_FILE
+        );
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let (stop, mut stopped) = tokio::sync::watch::channel(false);
+    stop_on_terminate(&runtime, stop)?;
+    let begun = std::time::Instant::now();
+    let mut policy = Recovery::default();
+    let mut open: Option<Recovering> = None;
+    eprintln!("lamp-setup: recover: watching {}", config.interface);
+    loop {
+        if runtime.block_on(async {
+            tokio::time::timeout(Duration::from_secs(5), stopped.wait_for(|stop| *stop))
+                .await
+                .is_ok()
+        }) {
+            if let Some(open) = open.take() {
+                open.close();
+            }
+            return Ok(true);
+        }
+        // A 5 s reset removes the marker before its stop and reboot (El's
+        // P3 on #3024): setup's own then serves, not this.
+        if !config.marker.exists() {
+            eprintln!("lamp-setup: recover: the marker is gone (a reset): setup itself serves");
+            if let Some(open) = open.take() {
+                open.close();
+            }
+            return Ok(true);
+        }
+        let mut host = ImageHost::new();
+        let online =
+            lamp_setup::serve::station_ip(&config.interface, &config.hotspot_address).is_some();
+        let seen = Seen {
+            online,
+            associated: !online && host.wpa_state() == "COMPLETED",
+            busy: open.as_ref().is_some_and(Recovering::running)
+                || System
+                    .run(&[
+                        "/usr/bin/systemctl".into(),
+                        "is-active".into(),
+                        "--quiet".into(),
+                        "lamp-setup.service".into(),
+                    ])
+                    .is_ok()
+                || lamp_setup::wifi_change::ImageRejoin::new()
+                    .previous
+                    .exists(),
+            phones: if open.is_some() {
+                phones(&config.interface)
+            } else {
+                Some(0)
+            },
+        };
+        let was = policy.recovering();
+        let now_ms = u64::try_from(begun.elapsed().as_millis()).unwrap_or(u64::MAX);
+        match policy.step(now_ms, seen) {
+            Some(Act::OpenHotspot) => {
+                eprintln!(
+                    "lamp-setup: recover: off every known network for {} s and not joining one: opening setup's hotspot",
+                    lamp_setup::recover::LOSS_GRACE_MS / 1000
+                );
+                if let Some(open) = open.take() {
+                    open.close();
+                }
+                open = Some(Recovering::open(&config));
+            }
+            Some(Act::Rejoin) => {
+                eprintln!("lamp-setup: recover: no phone on the hotspot: trying the saved network");
+                if let Some(open) = open.take() {
+                    open.close();
+                }
+                if let Err(error) = host.station() {
+                    eprintln!("lamp-setup: recover: the station could not start: {error}");
+                }
+            }
+            None => {}
+        }
+        if was && !policy.recovering() {
+            if seen.online {
+                eprintln!("lamp-setup: recover: back on a network; recovery ends");
+            } else {
+                eprintln!(
+                    "lamp-setup: recover: the try is waiting for an address, or the radio is busy: lost afresh, the hotspot after 90 s more without a network"
+                );
+            }
+            if let Some(open) = open.take() {
+                open.close();
+            }
+        }
     }
 }
 
@@ -614,15 +812,21 @@ fn serve(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    let stopped = {
-        let _inside = runtime.enter();
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?
-    };
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    stop_on_terminate(&runtime, stop)?;
     // The setup light from here to the marker (`lamp_setup::light`): the
     // voice is not running, and a dark, silent lamp looks broken.
     let status = Arc::new(Mutex::new(Status::new(String::new())));
     let light = setup_light(config.light, &status).map(Arc::new);
-    let served = answer(config, seconds, status, light.clone(), runtime, stopped);
+    let served = answer(
+        config,
+        seconds,
+        status,
+        light.clone(),
+        runtime,
+        stopped,
+        false,
+    );
     if let Some(light) = &light {
         light.stop();
     }
@@ -697,7 +901,8 @@ fn answer(
     status: Arc<Mutex<Status>>,
     light: Option<Arc<Light>>,
     runtime: tokio::runtime::Runtime,
-    mut stopped: tokio::signal::unix::Signal,
+    mut stopped: tokio::sync::watch::Receiver<bool>,
+    recovering: bool,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     use lamp_setup::{
         http::{Shared, router},
@@ -743,6 +948,14 @@ fn answer(
         return Ok(true);
     };
     *status.lock().unwrap() = started;
+    // Recovery's (#3020): the lamp is set up, its network gone; the page
+    // says so, and setting a new network keeps everything else.
+    if recovering {
+        let mut status = status.lock().unwrap();
+        status.runtime_phase = lamp_setup::recover::RECOVERING.into();
+        // What the owner kept, which a recovery request never changes.
+        status.share_reports = lamp_setup::serve::kept_share_reports(&config.reports);
+    }
     eprintln!(
         "lamp-setup: the lamp's hotspot is up; answering on {}",
         config.listen
@@ -763,18 +976,32 @@ fn answer(
                     std::thread::sleep(Duration::from_secs(2));
                     let interface = config.interface.clone();
                     let hotspot = config.hotspot_address.clone();
-                    lamp_setup::serve::run(
-                        &status,
-                        &accepted,
-                        &config.country,
-                        &mut ImageHost::new(),
-                        // The ring let go just before the marker starts the lamp.
-                        &mut ReleasingSave {
-                            save: Files(&config),
-                            light: light.as_deref(),
-                        },
-                        move || lamp_setup::serve::station_ip(&interface, &hotspot),
-                    );
+                    let station = move || lamp_setup::serve::station_ip(&interface, &hotspot);
+                    if recovering {
+                        // A set-up lamp's: the network only, every other
+                        // field ignored (El's P1 on #3024).
+                        lamp_setup::serve::run(
+                            &status,
+                            &accepted,
+                            &config.country,
+                            &mut ImageHost::new(),
+                            &mut lamp_setup::serve::NetworkOnly(Files(&config)),
+                            station,
+                        );
+                    } else {
+                        lamp_setup::serve::run(
+                            &status,
+                            &accepted,
+                            &config.country,
+                            &mut ImageHost::new(),
+                            // The ring let go just before the marker starts the lamp.
+                            &mut ReleasingSave {
+                                save: Files(&config),
+                                light: light.as_deref(),
+                            },
+                            station,
+                        );
+                    }
                     let now = status.lock().unwrap().clone();
                     eprintln!(
                         "lamp-setup: run {} ended {:?}{}",
@@ -811,7 +1038,7 @@ fn answer(
             let mut completed_at = None;
             loop {
                 tokio::select! {
-                    _ = stopped.recv() => {
+                    _ = stopped.wait_for(|stop| *stop) => {
                         eprintln!("lamp-setup: asked to stop");
                         return;
                     }
@@ -844,13 +1071,28 @@ fn answer(
 /// signal that came while it was not running.
 fn asked_to_stop(
     runtime: &tokio::runtime::Runtime,
-    stopped: &mut tokio::signal::unix::Signal,
+    stopped: &mut tokio::sync::watch::Receiver<bool>,
 ) -> bool {
     runtime.block_on(async {
-        tokio::time::timeout(Duration::from_millis(20), stopped.recv())
+        tokio::time::timeout(Duration::from_millis(20), stopped.wait_for(|stop| *stop))
             .await
-            .is_ok()
+            .is_ok_and(|seen| seen.is_ok())
     })
+}
+
+/// A stop (`systemctl stop`, a shutdown) told on `stop`, from now on: it
+/// is heard while the runtime runs, which is whenever serving waits.
+fn stop_on_terminate(
+    runtime: &tokio::runtime::Runtime,
+    stop: tokio::sync::watch::Sender<bool>,
+) -> std::io::Result<()> {
+    let _inside = runtime.enter();
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    runtime.spawn(async move {
+        terminate.recv().await;
+        let _ = stop.send(true);
+    });
+    Ok(())
 }
 
 fn main() -> ExitCode {
