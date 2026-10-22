@@ -26,7 +26,7 @@ say = { from = "onboarding" }
 
 # The walk reads this checked data once when Voice starts. Physical proof stays in Voice.
 [onboarding]
-order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "giving_way", "room_sounds", "preferences"]
+order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "giving_way", "room_sounds", "face_expressions", "preferences"]
 reoffer_after_s = 86400
 
 [onboarding.steps.where_you_sit]
@@ -59,6 +59,10 @@ reoffer = "(Nobody has spoken. Tell them in a few words that your head gives way
 [onboarding.steps.room_sounds]
 first = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
 reoffer = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+
+[onboarding.steps.face_expressions]
+first = "(Nobody has spoken. Ask them once, in a few words, whether you may notice from their face how they seem, so you can answer more warmly, and say just this about it: you never say it aloud, and nothing of their face is kept. Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+reoffer = "(Nobody has spoken. Ask them once, in a few words, whether you may notice from their face how they seem, so you can answer more warmly, and say just this about it: you never say it aloud, and nothing of their face is kept. Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
 
 [onboarding.steps.preferences]
 first = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)"

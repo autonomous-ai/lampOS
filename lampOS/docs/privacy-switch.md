@@ -265,11 +265,15 @@ over 4096 bytes or anything else is no: no face is read and nothing goes on
 a face is near, so a removed yes stops the reads within that and the one read
 already running. The journal says once each time the yes comes or goes. The
 eyes still look: the camera, the gaze, presence, who is there and the
-speaking read are unchanged. **Nothing on the lamp writes this file yet**:
-the voice's onboarding asks only the room sounds' question, so until a
-face-expressions step is added there (with its forget, redo and the reset
-plan's removal, as `room-sounds.json` has), no product lamp reads a face,
-and a test lamp's yes is written by hand, as root:
+speaking read are unchanged. The voice's
+onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
+whether the lamp may notice from the person's face how they seem, to answer
+more warmly (never said aloud, nothing of the face kept), and keeps only a
+yes; a no or silence leaves no file, as never asked does. `redo_setup`, a
+forget of everything and the reset plan remove it, as `room-sounds.json`
+([onboarding.md](onboarding.md), "Face expressions"). Without the ask (the
+product's unit doesn't set it yet), a test lamp's yes is written by hand, as
+root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
 `chown root:lampos` and `chmod 0640` it, and remove it after.
 
