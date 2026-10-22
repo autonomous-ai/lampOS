@@ -603,6 +603,8 @@ fn a_short_line_begun_with_the_name_is_told_apart() {
         "Lamp, what's the",
         "OK lamp, um, so",
         "Lamp?",
+        "Lamp. So.",
+        "Lamp, thanks.",
     ] {
         assert!(name_first(short), "{short}");
     }
@@ -615,7 +617,79 @@ fn a_short_line_begun_with_the_name_is_told_apart() {
         "Lamp, what time is it?",
         "Hey Lamp, what's the time?",
         "I need the lamp.",
+        "Lamp, stop.",
+        "Lamp, wait",
+        "Hey Lamp, never mind",
+        "Lamp, lights off.",
+        "Lamp, what?",
+        "Lamp, music on!",
     ] {
         assert!(!name_first(not), "{not}");
+    }
+}
+
+/// El's P2: a whole short command begun with the name is answered at once,
+/// never held 2.5 s for a line after it: a stop ("Lamp, stop."), with the
+/// coordinator's `Called` too, and a sentence ended past the name ("Lamp,
+/// lights off."). "Lamp. So" still waits. (A stop is done by the stop
+/// words before any of this; a line marked a short sound that isn't one
+/// of the short words is held as before.)
+#[tokio::test(start_paused = true)]
+async fn a_whole_short_command_is_answered_at_once() {
+    for (heard, called) in [
+        ("Lamp, stop.", false),
+        ("Lamp, stop.", true),
+        ("Lamp, lights off.", false),
+    ] {
+        let at_once = script(&[heard]);
+        let judged = Judged::default();
+        let (mut engine, _) = lamp(&at_once, true, &judged);
+        say_the_name(&mut engine, called, false);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let asked = asked(&at_once);
+        assert_eq!(asked.len(), 1, "{heard} {called}: asked at once");
+        assert_eq!(last_words(&asked[0]), Some(&Message::user(heard)));
+        turn(&mut engine).await;
+    }
+    let waits = script(&["Lamp. So"]);
+    let judged = Judged::default();
+    let (mut engine, _) = lamp(&waits, true, &judged);
+    say_the_name(&mut engine, false, true);
+    tokio::time::sleep(Duration::from_millis(2_400)).await;
+    assert!(asked(&waits).is_empty(), "\"Lamp. So\" still waits");
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(asked(&waits).len(), 1);
+}
+
+/// El's P3: the name's words, waiting as words cut short because the line
+/// after it was not shown to be its person's, are never joined to that
+/// line, even when the join itself sees no sign of a second person: the
+/// line let out is asked with its own words alone, as it is when it is
+/// said by the name and begins with it already.
+#[tokio::test(start_paused = true)]
+async fn a_refused_names_words_are_never_joined_to_the_line() {
+    let line = "Lamp, what's the weather in Hanoi tomorrow?";
+    for refused in [true, false] {
+        let played = script(&["Lamp. So", line]);
+        let judged = Judged::default();
+        let said = if refused {
+            Joined::Not("one face in view at each, but not both in a quiet room".to_owned())
+        } else {
+            ONE_FACE
+        };
+        let (engine, now) = lamp_said(&played, true, &judged, Some(said), &Kept::default());
+        let mut engine = engine.joining_cut_words(Arc::new(|_, _| {
+            Joined::NoSecond("no sign of a second person: 1 face in view at each".to_owned())
+        }));
+        say_the_name(&mut engine, false, true);
+        say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let asked = asked(&played);
+        assert_eq!(asked.len(), 1, "{refused}");
+        assert_eq!(
+            last_words(&asked[0]),
+            Some(&Message::user(line)),
+            "{refused}"
+        );
     }
 }
