@@ -13181,31 +13181,40 @@ mod tests {
     /// people as much as one beside it. One face in view at each of three
     /// lines, a quiet room; X seen saying the first, nobody the short middle
     /// one, Y the last: each link alone passes, but the first and the last
-    /// are two faces, so the chain breaks before the middle piece. The same
-    /// face at both ends, all three are asked as one. Through the rule's own
-    /// judgement.
+    /// are two faces, and then only a piece Y was seen saying is kept
+    /// (reviewer-three's P2): the last line alone. Y seen saying the middle
+    /// one too, it goes with it. The same face at both ends, all three are
+    /// asked as one. Through the rule's own judgement.
     #[tokio::test]
     async fn a_chain_with_two_faces_seen_speaking_in_it_breaks_before_the_second() {
         use crate::room_told::Room::Quiet;
         use crate::second_provider::net::Message;
         use crate::second_provider::tests::asked_after_pieces;
         let pieces = ["I want the", "um, and", "weather in Saigon this weekend?"];
-        let rule = |name: &str, last: &str| -> crate::second_provider::SameSpeaker {
-            let mut heeding = judged_lines(name, &[Some(1), Some(1), Some(1)], Quiet);
-            heeding.spoke.push_back((1, vec!["x".to_owned()]));
-            heeding.spoke.push_back((2, Vec::new()));
-            heeding.spoke.push_back((3, vec![last.to_owned()]));
-            let heeding = Arc::new(Mutex::new(heeding));
-            Arc::new(move |cut, request| heeding.lock().unwrap().same_speaker(cut, request))
-        };
+        let rule =
+            |name: &str, middle: &[&str], last: &str| -> crate::second_provider::SameSpeaker {
+                let mut heeding = judged_lines(name, &[Some(1), Some(1), Some(1)], Quiet);
+                heeding.spoke.push_back((1, vec!["x".to_owned()]));
+                heeding
+                    .spoke
+                    .push_back((2, middle.iter().map(|face| (*face).to_owned()).collect()));
+                heeding.spoke.push_back((3, vec![last.to_owned()]));
+                let heeding = Arc::new(Mutex::new(heeding));
+                Arc::new(move |cut, request| heeding.lock().unwrap().same_speaker(cut, request))
+            };
         let soon = Duration::from_millis(1_500);
         assert_eq!(
-            asked_after_pieces(&pieces, soon, rule("f1", "y"), |_, _| {}).await,
-            Message::user("um, and weather in Saigon this weekend?"),
+            asked_after_pieces(&pieces, soon, rule("f1", &[], "y"), |_, _| {}).await,
+            Message::user("weather in Saigon this weekend?"),
             "X then nobody then Y"
         );
         assert_eq!(
-            asked_after_pieces(&pieces, soon, rule("f2", "x"), |_, _| {}).await,
+            asked_after_pieces(&pieces, soon, rule("f3", &["y"], "y"), |_, _| {}).await,
+            Message::user("um, and weather in Saigon this weekend?"),
+            "X then Y then Y"
+        );
+        assert_eq!(
+            asked_after_pieces(&pieces, soon, rule("f2", &[], "x"), |_, _| {}).await,
             Message::user("I want the um, and weather in Saigon this weekend?"),
             "X then nobody then X"
         );
