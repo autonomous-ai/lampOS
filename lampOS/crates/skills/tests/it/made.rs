@@ -209,6 +209,11 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
         "{done}"
     );
     assert!(skills.join("evening-dim").join("skill.toml").is_file());
+    // It keeps the SHA-256 its person said yes to, as any package's.
+    assert_eq!(
+        package::installed_from(&skills.join("evening-dim")).map(|kept| kept.sha256),
+        Some(made.sha256.clone())
+    );
     assert!(
         fs::read_to_string(skills.join("evening-dim").join("SKILL.md"))
             .unwrap()

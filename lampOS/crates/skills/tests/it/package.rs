@@ -519,6 +519,82 @@ fn an_installable_skill_is_replaced_by_its_next_version_and_removed_whole() {
 }
 
 #[test]
+fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_folder_none() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir(&skills).unwrap();
+    let installed = skills.join("desk-tutor");
+    // The catalogue's sha256 is the package's own bytes'.
+    let first = package::pack(&tutor(&dir.path().join("one"), "1.0.0"), dir.path()).unwrap();
+    package::install(&skills, &first).unwrap();
+    let kept = package::installed_from(&installed).unwrap();
+    assert_eq!(kept.sha256, sha256_hex(&fs::read(&first).unwrap()));
+    assert_eq!(kept.manifest, read_package(&first).unwrap().manifest);
+    assert_eq!(kept.manifest.version, "1.0.0");
+    // Kept in the folder, hidden: not one of the skill's files, so it is
+    // never packed again, and the skill loads as before.
+    assert!(installed.join(package::INSTALLED_FROM).is_file());
+    assert!(
+        !read_folder(&installed)
+            .unwrap()
+            .contains_key(package::INSTALLED_FROM)
+    );
+    assert!(load(&installed).is_ok());
+    let mode = fs::metadata(installed.join(package::INSTALLED_FROM))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o644);
+
+    // The next version replaces it, with the new package's.
+    let next = package::pack(&tutor(&dir.path().join("two"), "1.1.0"), dir.path()).unwrap();
+    package::install(&skills, &next).unwrap();
+    let kept = package::installed_from(&installed).unwrap();
+    assert_eq!(kept.sha256, sha256_hex(&fs::read(&next).unwrap()));
+    assert_ne!(kept.sha256, sha256_hex(&fs::read(&first).unwrap()));
+    assert_eq!(kept.manifest.version, "1.1.0");
+
+    // Its version changed by hand: no longer that package.
+    let toml = fs::read_to_string(installed.join("skill.toml")).unwrap();
+    fs::write(
+        installed.join("skill.toml"),
+        toml.replacen("version = \"1.1.0\"", "version = \"1.2.0\"", 1),
+    )
+    .unwrap();
+    assert_eq!(package::installed_from(&installed), None);
+
+    // Put on from a folder, even the installed one's copy: none.
+    let copy = dir.path().join("copy").join("desk-tutor");
+    fs::create_dir_all(copy.parent().unwrap()).unwrap();
+    fs::rename(&installed, &copy).unwrap();
+    package::install(&skills, &copy).unwrap();
+    assert!(!installed.join(package::INSTALLED_FROM).exists());
+    assert_eq!(package::installed_from(&installed), None);
+
+    // Removed: gone with the skill.
+    package::install(&skills, &next).unwrap();
+    assert!(package::installed_from(&installed).is_some());
+    package::remove(&skills, "desk-tutor").unwrap();
+    assert!(left(&skills).is_empty());
+
+    // A package can't carry a record of its own: a hidden path is refused.
+    let files = tutor_files(&dir.path().join("src"));
+    let mut forged = files.clone();
+    forged.push((package::INSTALLED_FROM.into(), b"{}".to_vec()));
+    let path = package_of(
+        &dir.path().join("forged"),
+        manifest("desk-tutor", "1.0.0", &forged),
+        &forged,
+        &[],
+    );
+    let why = package::install(&skills, &path).unwrap_err();
+    assert!(why.contains("none beginning with a dot"), "{why}");
+
+    // A core skill, as it comes with the lamp, has none.
+    assert_eq!(package::installed_from(&skills_root().join("dance")), None);
+}
+
+#[test]
 fn a_core_skill_is_never_installed_replaced_or_removed() {
     let dir = tempfile::tempdir().unwrap();
     let skills = dir.path().join("skills");
