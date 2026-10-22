@@ -1,0 +1,158 @@
+diff --git a/lampOS/crates/voice/src/second_provider/services.rs b/lampOS/crates/voice/src/second_provider/services.rs
+index 133f3a6b3..f2028d4ea 100644
+--- a/lampOS/crates/voice/src/second_provider/services.rs
++++ b/lampOS/crates/voice/src/second_provider/services.rs
+@@ -1567,6 +1567,30 @@ mod tests {
+             .concat()
+     }
+ 
++    #[tokio::test]
++    async fn second_review_hedge_keeps_the_own_key_refusal_relay() {
++        let own = stub("k-second-refused", vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
++        let relay = stub("k-second-refused", vec![(CHAT, answered("via relay"))]).await;
++        let told: Arc<Mutex<Vec<u16>>> = Arc::default();
++        let observed = told.clone();
++        let net = Net::new(
++            config_at("second-hedge-refusal", "k-second-refused", &own.url, &own.url),
++            Arc::new(Vec::new),
++        )
++        .unwrap()
++        .falling_back_to_the_relay(&relay.url, Arc::new(move |status| observed.lock().unwrap().push(status)))
++        .unwrap();
++        assert_eq!(words(&net).await, "via relay", "the ordinary request keeps its configured fallback");
++        assert_eq!(*told.lock().unwrap(), vec![401]);
++        assert_eq!(relay.asked(CHAT), 1);
++        let mut hedged = net.chat_again(vec![Message::user("hello")], None, &[]);
++        let next = tokio::time::timeout(std::time::Duration::from_secs(2), hedged.next()).await.unwrap();
++        assert!(matches!(&next, Some(Ok(ChatEvent::Text(text))) if text == "via relay"),
++            "the fresh request must preserve the same configured fallback; got {next:?}");
++        assert_eq!(*told.lock().unwrap(), vec![401, 401]);
++        assert_eq!(relay.asked(CHAT), 2);
++    }
++
+     /// #2882 (b): the routes are read in the background, with the relay's
+     /// key, and a turn begun after goes to the near chat they name.
+     #[tokio::test]
+diff --git a/lampOS/crates/voice/src/second_provider/tests.rs b/lampOS/crates/voice/src/second_provider/tests.rs
+index 80c45d7f3..01dd7dff7 100644
+--- a/lampOS/crates/voice/src/second_provider/tests.rs
++++ b/lampOS/crates/voice/src/second_provider/tests.rs
+@@ -4338,6 +4338,118 @@ async fn with_its_switch_a_chat_not_begun_in_two_and_a_half_seconds_is_asked_aga
+     assert_eq!(off.again, 0);
+ }
+ 
++/// A camera change revokes personal context without retiring the microphone
++/// owner. A delayed hedge is a new RPC and must recheck that context first.
++#[tokio::test(start_paused = true)]
++async fn second_review_delayed_chat_hedge_does_not_resend_camera_revoked_personal_context() {
++    use crate::memory_scope::{FaceCache, ScopeLease};
++
++    const PERSONAL_NOTE: &str = "SYNTHETIC PERSONAL CONTEXT FOR THIS REQUEST";
++    for revoke_camera in [false, true] {
++        let began = Arc::new(tokio::sync::Notify::new());
++        let script = Arc::new(Script {
++            heard: Mutex::new([Ok("Lamp, what is the weather like?".to_owned())].into()),
++            chats: Mutex::new([vec![Ok(ChatEvent::Done)], vec![Ok(ChatEvent::Done)]].into()),
++            chat_after: Mutex::new([Duration::from_secs(60); 2].into()),
++            chat_began: Some(began.clone()),
++            ..Script::default()
++        });
++        let cache = Arc::new(FaceCache::default());
++        let (engine, _, _) = scripted(script.clone());
++        let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _: ScopeLease| {
++            Box::pin(async { panic!("this fixture never calls a tool") })
++        });
++        let mut engine = engine
++            .with_memory_scope(
++                lamp_turn_owner::BootId::new([31; 16]).unwrap(),
++                cache.clone(),
++                runner,
++                Some(Arc::new(|lease: &ScopeLease| {
++                    assert_eq!(
++                        lease.scope().unwrap().person(),
++                        Some(crate::remember::person_id("fixture-person").as_str())
++                    );
++                    Told::from(PERSONAL_NOTE.to_owned())
++                })),
++            )
++            .announcing(false)
++            .chatting_again(true);
++        engine.memory_camera(true, 1);
++        // The existing memory-scope fixture's real observation path. Remove
++        // the file after parsing; the admitted cache owns its observation.
++        let path = std::env::temp_dir().join(format!(
++            "chat-hedge-camera-{}-{:?}",
++            std::process::id(),
++            std::thread::current().id()
++        ));
++        std::fs::write(&path, "fixture-person").unwrap();
++        cache.replace(
++            cache.begin_refresh(),
++            crate::known_faces::FaceObservation::read(&path),
++        );
++        std::fs::remove_file(&path).unwrap();
++        engine.submit(start(1));
++        let lease = engine.memory_lease().expect("an admitted scope");
++        assert!(lease.is_current());
++        assert!(lease.scope().unwrap().person().is_some());
++        engine.submit(audio(1, 1));
++        engine.submit(end(1));
++        tokio::time::timeout(Duration::from_secs(1), began.notified())
++            .await
++            .expect("the first request was actually handed to Services");
++        {
++            let asked = script.asked.lock().unwrap();
++            assert_eq!(asked.len(), 1);
++            assert!(asked[0].contains(&Message::system(PERSONAL_NOTE)));
++        }
++
++        // Paused runtime time, not a wall-clock sleep. The original stream
++        // remains pending, and the 2.5-second hedge has not begun yet.
++        tokio::time::sleep(Duration::from_secs(2)).await;
++        assert_eq!(script.asked_again.load(Ordering::Relaxed), 0);
++        if revoke_camera {
++            // The same call Gate::install makes for a camera close, while
++            // the existing microphone owner is still request 1. Do not
++            // retire the turn: that would hide the missing RPC scope check.
++            engine.memory_camera(false, 2);
++        }
++        assert_eq!(lease.is_current(), !revoke_camera);
++        assert_eq!(engine.turn.as_ref().unwrap().request, 1);
++        assert_eq!(engine.retired_through, 0);
++        assert!(!engine.turn.as_ref().unwrap().task.is_finished());
++
++        // Await the real turn's existing first-event deadline, so the hedge
++        // timer must actually be polled; a single yield is not evidence.
++        // Drain its bounded output queue while waiting for completion.
++        let task = &mut engine.turn.as_mut().unwrap().task;
++        let output = &mut engine.output;
++        tokio::time::timeout(Duration::from_secs(2), async {
++            loop {
++                tokio::select! {
++                    result = &mut *task => break result,
++                    event = output.recv() => assert!(event.is_some()),
++                }
++            }
++        })
++        .await
++        .expect("the existing first-event bound ends the stalled turn")
++        .expect("the turn task did not panic");
++        let expected_hedges = usize::from(!revoke_camera);
++        assert_eq!(
++            script.asked_again.load(Ordering::Relaxed),
++            expected_hedges,
++            "camera revoked {revoke_camera}: a new request needs current scope"
++        );
++        let asked = script.asked.lock().unwrap();
++        assert_eq!(asked.len(), 1 + expected_hedges);
++        assert!(
++            asked
++                .iter()
++                .all(|messages| messages.contains(&Message::system(PERSONAL_NOTE)))
++        );
++    }
++}
++
+ /// The first builder, 21:25: a look's first round may take 5 s, not 3 s;
+ /// past it the lamp says it could not look rather than nothing. A refused
+ /// picture's retry stays inside the same 5 s (Second on #1154).

@@ -1,0 +1,34 @@
+{
+  "head": "b1b8ab445ff431d96d70c91fc2a4ad37c31a82ff",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "second_review_",
+    "--",
+    "--nocapture"
+  ],
+  "exit": 101,
+  "seconds": 52.093,
+  "source_files": 6503,
+  "source_unchanged": true,
+  "log_bytes": 2348,
+  "log_sha256": "197eefa4e351470ccad20558c5a65d4846b6a526696e7f81249bf1dcd0132121",
+  "lines": [
+    "thread 'second_provider::tests::second_review_delayed_chat_hedge_does_not_resend_camera_revoked_personal_context' (65295134) panicked at crates/voice/src/second_provider/tests.rs:4438:9:",
+    "assertion `left == right` failed: camera revoked true: a new request needs current scope",
+    "  left: 1",
+    " right: 0",
+    "thread 'second_provider::services::tests::second_review_hedge_keeps_the_own_key_refusal_relay' (65295133) panicked at crates/voice/src/second_provider/services.rs:1588:9:",
+    "the fresh request must preserve the same configured fallback; got Some(Err(Status(401)))",
+    "second_provider::tests::second_review_delayed_chat_hedge_does_not_resend_camera_revoked_personal_context --- FAILED",
+    "second_provider::services::tests::second_review_hedge_keeps_the_own_key_refusal_relay --- FAILED",
+    "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3464 filtered out; finished in 0.02s",
+    "error: test failed, to rerun pass `-p lamp-voice --lib`"
+  ]
+}

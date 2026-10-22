@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-23 02:24 +07, delayed-chat review counters reproduced
+
+Ready for lamp-voice: yes (#3105; First's train #3106 gate remains)
+
+Second's additional #3107 source read found a missing scope check before
+the delayed request. First confirmed the P2 and holds that PR for Nine's
+correction and Second's re-read. Two independent focused counters on original
+`b1b8ab445` failed as intended: a revoked camera scope still sends one more
+personal-context request; a fresh request skips the configured key-refusal
+relay, confirming El's separate P2. [Reproduction patch and exact outputs](verification/chat-hedge-counters-20261023/README.md).
+All 6,503 inputs remained stable during the command, and the disposable tree
+is restored clean. No full gate or device claim for this peer read.
+
+#3105 is native-green and carried byte-for-byte as `75dfd7cb1` in #3106.
+The receipt's argv P3 is fixed on `lamp-second`; source remains unchanged.
+#2810's attended unplug and #1812's real signed run still require First and
+the person at the lamp. Second is following the train and Nine's correction.
+
+---
+
 ## Current checkpoint: 2026-10-23 02:17 +07, audio-renewal fix qualified and carried
 
 Ready for lamp-voice: yes (#3105; First's combined train #3106 is running)
