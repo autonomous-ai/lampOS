@@ -1,8 +1,9 @@
 # lampOS body: the first stand of a lamp moved from V1, confirmed at the lamp (#2396; the first
 # builder on #1711, 21 Oct). Its body runs seated (lamp-body-measure.service) until a person beside
 # it says yes. Once someone is near, the lamp asks through the voice's say service: "I'd like to
-# stretch for the first time. Touch the top of my head when you're ready." A touch on the head or a
-# button held a second is the yes. lamp-body is then stopped, the arm stood at 30% and 100% as the
+# stretch for the first time. Rest your hand on my head, or just say yes, when you're ready." A touch
+# on the head or a button held a second is the yes, or a short spoken yes heard after the ask, with a
+# face near (voice/heard). lamp-body is then stopped, the arm stood at 30% and 100% as the
 # factory's steps stand it, this arm's stand written into /etc/lampOS/body/lamp.env, and lamp-body
 # started again on it. A second touch while it moves stops it, and nothing is written. Nothing moves
 # without the yes: two asks at most, ten minutes apart; then a person asks again by removing
