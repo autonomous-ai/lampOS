@@ -47,11 +47,11 @@ refused (unknown fields are refused).
 | `llm_base_url` | yes | OpenAI-compatible base URL of the text model |
 | `llm_model` | yes | model name, not empty |
 | `llm_credential_file` | yes | file holding the text model's key |
-| `stt_base_url` | no | the company's speech-to-text proxy; empty or absent: `llm_base_url` |
+| `stt_base_url` | no | the company's speech-to-text proxy; empty or absent: `llm_base_url`. The voice unit's `LAMP_SECOND_LISTENING_BASE_URL` goes over it (#2882) |
 | `stt_credential_file` | no | its key; empty or absent: `llm_credential_file` |
 | `stt_language` | no | sent as `language`; absent: `en` |
 | `deepgram_credential_file` | no | when set, speech to text goes straight to Deepgram with this key, and the two `stt_*` above are not used |
-| `tts_base_url` | no | empty or absent: `llm_base_url` |
+| `tts_base_url` | no | empty or absent: `llm_base_url`. The voice unit's `LAMP_SECOND_SPEECH_BASE_URL` goes over it (#2882) |
 | `tts_credential_file` | no | empty or absent: `llm_credential_file` |
 | `tts_provider` | no | `openai` (the default) or `elevenlabs`; anything else is refused |
 | `tts_voice` | no | the voice; absent: OpenAI `nova`, ElevenLabs `Rachel` |
