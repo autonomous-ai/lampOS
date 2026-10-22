@@ -234,7 +234,8 @@ lamp looks up, sways or droops with them, or by itself when no ask came,
 in the skill's own words either way: it reads `[news.words]` and
 `[reminder.words]` from the installed `skill.toml` each time (#940), and
 says its built-in words, with a journal line, for this release only, when
-the installed file has none. Each skill asks once, and an ask is gone 20 s
+the installed file is missing, has none, can't be read, or has words that
+fail the check (`or_built_in`). Each skill asks once, and an ask is gone 20 s
 later (`say::FROM_LIVES_US`), so the two are timed to meet (the reviewer's
 P2 on #1667). Reminders asks only while the voice rests (`voice/state`),
 keeping a reminder due during a talk until the talk ends (`wait`), when
