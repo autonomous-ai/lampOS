@@ -1,0 +1,63 @@
+{
+  "base": "464438fc549e528f1d812e25c14c459e4d609379",
+  "branch": "tests/1806-addon-drop-events",
+  "case": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+  "selection": {
+    "arm64_workflow_run": 39804008782,
+    "run_number": 6055,
+    "source": "16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+    "binary": "lamp-skills::it",
+    "summed_case_seconds": 97.352,
+    "case_seconds": 5.632,
+    "metric": "Sum of unique nextest case durations, excludes compilation and duplicate post-summary output."
+  },
+  "pause": {
+    "seconds_after_positive_ready_marker": 2,
+    "boundary": "First valid drop message read by addon_says, before monotonic time read, Proposals mutex acquisition, Limits::dropped, or saying removal. Trigger reader remains live.",
+    "scope": "Only the child spawned by a_fifth_say(true), via per-invocation environment path and recorded PID; no global process searches or pause signals.",
+    "scratch_only": true
+  },
+  "schedule": [
+    "before-clean x3",
+    "before-pause x3",
+    "after-pause x3",
+    "after-clean x3",
+    "refund-disabled after x1",
+    "hold-disabled after x1",
+    "hold-disabled original x1",
+    "hour-cap-bypassed after x1"
+  ],
+  "expected_failures": {
+    "before-pause": "Original first assertion: fifth add-on must propose after refunds.",
+    "refund-disabled": "Original first assertion.",
+    "hold-disabled": "New bounded positive barrier cannot observe a real 300-second drop hold.",
+    "original-hold-disabled": "Original second assertion: journal must contain the 300-second drop refusal.",
+    "hour-cap-bypassed": "Original third assertion: undecided four must prevent a fifth proposal."
+  },
+  "preserved": [
+    "All bytes outside a_fifth_say in the integration fixture.",
+    "All three original outer assertions.",
+    "Exact proposals.recv(Duration::from_secs(3)) absence observation.",
+    "Production ten-second per-addon interval, four-per-hour budget, and 300-second post-drop hold."
+  ],
+  "runner_sha256": "0e16acf4e0221f245557ef8e20af49df194a4c737523bb311e90903cb5fd4b9c",
+  "fmt": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 127,
+      "kind": "PATH infrastructure miss; cargo not invoked",
+      "log": "initial-fmt.txt"
+    },
+    {
+      "command": "/Users/autonomous/.cargo/bin/cargo fmt --all --check",
+      "exit": 1,
+      "kind": "Single fixture Vec-collection wrapping correction",
+      "log": "initial-fmt-with-cargo-path.txt"
+    },
+    {
+      "command": "/Users/autonomous/.cargo/bin/cargo fmt --all --check",
+      "exit": 0,
+      "log": "candidate-fmt.txt"
+    }
+  ]
+}

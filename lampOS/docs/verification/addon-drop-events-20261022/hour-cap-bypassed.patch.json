@@ -1,0 +1,5 @@
+{
+  "bytes": 488,
+  "sha256": "c71d730965da893293a0c8b300b202dc98e896265f6131b31b6eb768fac80746",
+  "utf8": "--- a/lampOS/crates/skills/src/addon.rs\n+++ b/lampOS/crates/skills/src/addon.rs\n@@ -69,7 +69,7 @@\n                 \"not proposed: {AN_HOUR} proposals an hour an add-on\"\n             ));\n         }\n-        if proposal.act == \"say\" && self.says.len() >= SAYS_AN_HOUR {\n+        if proposal.act == \"say\" && self.says.len() >= SAYS_AN_HOUR && false {\n             return Err(format!(\n                 \"not proposed: {SAYS_AN_HOUR} say proposals an hour between all add-ons\"\n             ));\n"
+}
