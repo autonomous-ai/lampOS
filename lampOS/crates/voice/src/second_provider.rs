@@ -944,8 +944,10 @@ struct SaidBy {
 }
 
 /// lamp-name's best near hearing (`name/near`, `LAMP_NAME_NEAR`) around a
-/// line's start, by its first sound's read time (`worker::Heeding::near_name`).
-pub type NameNear = Arc<dyn Fn(u64) -> Option<f32> + Send + Sync>;
+/// line's start, by its first sound's read time (`worker::Heeding::near_name`),
+/// and whether a face is turned to the lamp now, as the eyes' newest look
+/// says (`worker::Heeding::turned_to_the_lamp`).
+pub type NameNear = Arc<dyn Fn(u64) -> (Option<f32>, bool) + Send + Sync>;
 
 /// The least near score that, beside a first word set off and sounding
 /// like the name, makes it the name (`LAMP_NAME_NEAR`): lamp-name's own
@@ -966,21 +968,31 @@ const NAMES_OF_ITS_SHAPE: [&str; 15] = [
     "lien", "leanne", "lorne",
 ];
 
-/// Whether a word sounds like the lamp's name (`LAMP_NAME_NEAR`): one of
-/// [`HEARD_FOR_THE_NAME`], or one syllable from an L to an M, P or N
-/// ("Lump", "Loom", "Lean", "Line"; "-mb" as "Lamb" is an M), never a
-/// person's name of that shape ([`NAMES_OF_ITS_SHAPE`]). Never a word
-/// with an apostrophe, nor alone a call.
-fn sounds_like_the_name(word: &str) -> bool {
+/// How a word sounds beside the lamp's name (`LAMP_NAME_NEAR`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LikeTheName {
+    /// One of [`HEARD_FOR_THE_NAME`]: the name as the speech to text wrote
+    /// it on lamp-4ace, no word a colleague is called by.
+    AsHeard,
+    /// Only its shape: one syllable from an L to an M, P or N ("Lump",
+    /// "Loom", "Leon"), which people's names have too, so it counts only
+    /// with a face turned to the lamp ([`named_near`]).
+    Shape,
+    Not,
+}
+
+/// How `word` sounds beside the lamp's name: as it was heard for it
+/// ([`HEARD_FOR_THE_NAME`]), or by its shape, one syllable from an L to an
+/// M, P or N ("-mb" as "Lamb" is an M), never a person's name of that
+/// shape on [`NAMES_OF_ITS_SHAPE`], compared after a silent "e" is let go
+/// ("Lynne", "Lane"). Never a word with an apostrophe.
+fn like_the_name(word: &str) -> LikeTheName {
     let word = word.to_ascii_lowercase();
-    if !word.chars().all(|c| c.is_ascii_alphabetic())
-        || word.is_empty()
-        || NAMES_OF_ITS_SHAPE.contains(&word.as_str())
-    {
-        return false;
+    if !word.chars().all(|c| c.is_ascii_alphabetic()) || word.is_empty() {
+        return LikeTheName::Not;
     }
     if HEARD_FOR_THE_NAME.contains(&word.as_str()) {
-        return true;
+        return LikeTheName::AsHeard;
     }
     let vowel = |c: char| "aeiouy".contains(c);
     // A silent "e" after a consonant ends no syllable: "line", "lane".
@@ -991,12 +1003,25 @@ fn sounds_like_the_name(word: &str) -> bool {
     let spoken = spoken
         .strip_suffix("mb")
         .map_or(spoken.to_owned(), |stem| format!("{stem}m"));
+    if NAMES_OF_ITS_SHAPE.contains(&spoken.as_str()) {
+        return LikeTheName::Not;
+    }
     let syllables = spoken
         .chars()
         .zip(std::iter::once(' ').chain(spoken.chars()))
         .filter(|(c, before)| vowel(*c) && !vowel(*before))
         .count();
-    spoken.starts_with('l') && syllables == 1 && spoken.ends_with(['m', 'p', 'n'])
+    if spoken.starts_with('l') && syllables == 1 && spoken.ends_with(['m', 'p', 'n']) {
+        LikeTheName::Shape
+    } else {
+        LikeTheName::Not
+    }
+}
+
+/// Whether a word sounds like the lamp's name at all ([`like_the_name`]).
+#[cfg(test)]
+fn sounds_like_the_name(word: &str) -> bool {
+    like_the_name(word) != LikeTheName::Not
 }
 
 /// Where a line's first word lies, when it is set off as a name is: past
@@ -1024,9 +1049,12 @@ fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
 /// `LAMP_NAME_NEAR`: `text`'s first word, set off and sounding like the
 /// lamp's name, is the name when lamp-name heard it near
 /// ([`NAME_NEAR_LEAST`] or more) within 1.3 s of the line's first sound
-/// (`began_us`): it is put in the word's place, so the rule and the model
-/// read the call. Either sign alone changes nothing, and the journal says
-/// which held, counts only.
+/// (`began_us`), and, when only its shape is the name's
+/// ([`LikeTheName::Shape`]: "Leon, pass me that" is a colleague called),
+/// a face is turned to the lamp (reviewer-three's P2 on 194accd24). It is
+/// put in the word's place, so the rule and the model read the call. Any
+/// sign missing changes nothing, and the journal says which held, counts
+/// only.
 fn named_near(request: u64, text: String, began_us: u64, near: &NameNear) -> String {
     let Some((start, end)) = first_word_set_off(&text) else {
         return text;
@@ -1035,32 +1063,47 @@ fn named_near(request: u64, text: String, began_us: u64, near: &NameNear) -> Str
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
         return text;
     }
-    let sounds = sounds_like_the_name(word);
-    let heard = near(began_us);
+    let like = like_the_name(word);
+    let (heard, turned) = near(began_us);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
-    match (sounds, near_enough) {
-        (true, Some(score)) => {
+    let named = match (like, near_enough) {
+        (LikeTheName::AsHeard, Some(score)) => Some(format!(
+            "its first word, set off, is one written for the lamp's name, and lamp-name heard it near, at {score:.2}, by the line's start"
+        )),
+        (LikeTheName::Shape, Some(score)) if turned => Some(format!(
+            "its first word, set off, has the lamp's name's shape, lamp-name heard it near, at {score:.2}, by the line's start, and a face is turned to the lamp"
+        )),
+        (LikeTheName::Shape, Some(score)) => {
             eprintln!(
-                "lamp-voice second: request {request}: its first word, set off and sounding like the lamp's name, is the name: lamp-name heard it near, at {score:.2}, by the line's start (LAMP_NAME_NEAR)"
+                "lamp-voice second: request {request}: its first word, set off, has the lamp's name's shape, and lamp-name heard it near, at {score:.2}, but no face is turned to the lamp: not the name (LAMP_NAME_NEAR)"
             );
-            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+            None
         }
-        (true, None) => {
+        (LikeTheName::AsHeard | LikeTheName::Shape, None) => {
             eprintln!(
                 "lamp-voice second: request {request}: its first word, set off, sounds like the lamp's name, but lamp-name heard it near by the line's start {}: not the name (LAMP_NAME_NEAR)",
                 heard.map_or("not at all".to_owned(), |score| format!(
                     "only at {score:.2}"
                 ))
             );
-            text
+            None
         }
-        (false, Some(score)) => {
+        (LikeTheName::Not, Some(score)) => {
             eprintln!(
                 "lamp-voice second: request {request}: lamp-name heard the name near, at {score:.2}, by the line's start, but its first word, set off, doesn't sound like it: not the name (LAMP_NAME_NEAR)"
             );
-            text
+            None
         }
-        (false, None) => text,
+        (LikeTheName::Not, None) => None,
+    };
+    match named {
+        Some(signs) => {
+            eprintln!(
+                "lamp-voice second: request {request}: {signs}: it is the name (LAMP_NAME_NEAR)"
+            );
+            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+        }
+        None => text,
     }
 }
 
@@ -4123,6 +4166,9 @@ async fn spoken(
     turn.captured &= !text.trim().is_empty();
     // What was heard in this request is told as heard; the model is asked
     // with the words of the one it goes on from before them.
+    let went_on = before
+        .as_ref()
+        .is_some_and(|before| !before.trim().is_empty());
     let text = match before {
         Some(before) if !before.trim().is_empty() => {
             eprintln!(
@@ -4147,10 +4193,14 @@ async fn spoken(
     };
     // A first word set off and sounding like the lamp's name, which
     // lamp-name heard near at the line's start, is the name
-    // (`LAMP_NAME_NEAR`): both signs, never one.
+    // (`LAMP_NAME_NEAR`): both signs, never one. Not when the line begins
+    // with an earlier piece's words, whose start is not this line's
+    // (reviewer-three's P3 on 194accd24).
     let text = match &shared.name_near {
-        Some(near) => named_near(request, text, said.lock().map_or(0, |said| said.0), near),
-        None => text,
+        Some(near) if !went_on => {
+            named_near(request, text, said.lock().map_or(0, |said| said.0), near)
+        }
+        _ => text,
     };
     // Said by the lamp's name just before, whose request this line dropped
     // (`LAMP_SECOND_NAME_CARRIES`), when one person said both: the name's

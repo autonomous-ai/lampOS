@@ -10,11 +10,21 @@ use super::*;
 /// When the line's first sound was read, by this process's clock.
 const READ_US: u64 = 5_000_000;
 
-/// One line heard as `heard`, its first sound read at [`READ_US`], with
-/// lamp-name's near hearing `near` (none: the switch off, no hook); what it
-/// was asked as, if it was, and the line start each near question was
-/// asked of. The rule holds a line whose words don't begin with the name.
+/// [`asked_with`], nobody turned to the lamp.
 async fn asked_as(heard: &str, near: Option<Option<f32>>) -> (Option<String>, Vec<u64>) {
+    asked_with(heard, near, false).await
+}
+
+/// One line heard as `heard`, its first sound read at [`READ_US`], with
+/// lamp-name's near hearing `near` (none: the switch off, no hook) and a
+/// face `turned` to the lamp or not; what it was asked as, if it was, and
+/// the line start each near question was asked of. The rule holds a line
+/// whose words don't begin with the name.
+async fn asked_with(
+    heard: &str,
+    near: Option<Option<f32>>,
+    turned: bool,
+) -> (Option<String>, Vec<u64>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
@@ -29,7 +39,7 @@ async fn asked_as(heard: &str, near: Option<Option<f32>>) -> (Option<String>, Ve
         let seen = asked_of.clone();
         engine = engine.hearing_the_name_near(Arc::new(move |began_us| {
             seen.lock().unwrap().push(began_us);
-            near
+            (near, turned)
         }));
     }
     engine.submit(start(1));
@@ -77,8 +87,42 @@ async fn a_first_word_like_the_name_is_it_only_with_lamp_names_near_hearing() {
         Some("Hey Lamp, what time is it?")
     );
     assert_eq!(
-        asked_as("Lump.", Some(Some(0.5))).await.0.as_deref(),
+        asked_as(line, Some(Some(0.6))).await.0.as_deref(),
+        Some("Lamp, I want to start reading more."),
+        "a word written for the name needs no face"
+    );
+    // The shape alone is a call only with a face turned to the lamp
+    // (reviewer-three's P2 on 194accd24): people's names have it too.
+    assert_eq!(
+        asked_with("Lump.", Some(Some(0.5)), true)
+            .await
+            .0
+            .as_deref(),
         Some("Lamp.")
+    );
+    assert_eq!(
+        asked_with("Leon, pass me that", Some(Some(0.6)), true)
+            .await
+            .0
+            .as_deref(),
+        Some("Lamp, pass me that")
+    );
+    for name in [
+        "Leon", "Lynne", "Leann", "Laine", "Lyon", "Lon", "Lum", "Lem",
+    ] {
+        let heard = format!("{name}, pass me that");
+        assert_eq!(
+            asked_as(&heard, Some(Some(0.6))).await.0,
+            None,
+            "{heard}: no face turned to the lamp"
+        );
+    }
+    assert_eq!(
+        asked_with("Lynn, pass me that", Some(Some(0.6)), true)
+            .await
+            .0,
+        None,
+        "a name on the list, even turned to the lamp"
     );
     for (heard, near) in [
         (line, Some(None)),
@@ -102,14 +146,18 @@ async fn a_first_word_like_the_name_is_it_only_with_lamp_names_near_hearing() {
 fn a_word_sounds_like_the_name_by_its_shape_or_as_heard_for_it() {
     use super::super::sounds_like_the_name;
     for like in [
-        "Louvre", "Month", "Life", "Light", "Length", "line", "LUMP", "loom", "Lean", "Learn",
-        "lawn", "Lamb", "lip",
+        "Louvre", "Month", "Life", "Light", "Length", "LUMP", "loom", "Lean", "Learn", "lawn",
+        "lip",
     ] {
         assert!(sounds_like_the_name(like), "{like}");
     }
     for not in [
         "Thanks", "Right", "Like", "Look", "Land", "Listen", "Lemon", "Lamps", "Lane's", "Mike",
-        "Lynn", "Lane", "Lan", "Lin", "Liam", "Lam", "Loan", "What", "No", "", "1",
+        "Lynn", "Lane", "Lan", "Lin", "Liam", "Lam", "Loan",
+        // Compared after its silent "e", "line" is "Lin", a name; "Lamb",
+        // its "-mb" an M, is "Lam" (the rule reads "Lamb" as the lamp's
+        // name already).
+        "line", "Lamb", "What", "No", "", "1",
     ] {
         assert!(!sounds_like_the_name(not), "{not}");
     }
@@ -131,4 +179,74 @@ fn a_first_word_is_set_off_by_a_comma_a_stop_or_the_lines_end() {
     assert_eq!(word("Louvre is a museum"), None);
     assert_eq!(word("Hey"), None);
     assert_eq!(word(""), None);
+}
+
+/// Reviewer-three's P3 on 194accd24: a line that begins with an earlier
+/// piece's words ("Louvre," given up, then "I need a gift for my sister.")
+/// is never rewritten by a near hearing asked of its own start, which is
+/// not that word's.
+#[tokio::test]
+async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Louvre,".to_owned()),
+                Ok("I need a gift for my sister.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Yes?"), Ok(ChatEvent::Done)],
+                vec![text("Sure."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, now) = scripted(script.clone());
+    let mut engine = engine
+        .heeding(Arc::new(|_, _, words, _| {
+            (!crate::attention::begins_with_the_name(words))
+                .then_some(crate::attention::NOT_SPOKEN_TO)
+        }))
+        .hearing_the_name_near(Arc::new(|_| (Some(0.6), true)));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    *now.lock().unwrap() += Duration::from_secs(2);
+    engine.submit(ProviderInput::Start {
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        continues: true,
+        continues_cut_off: true,
+        over_the_lamp: false,
+        after_stop: false,
+        follows_on: false,
+        over_the_lamps_voice: false,
+        heard_of_cut: None,
+    });
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let asked: Vec<String> = script
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|messages| {
+            messages
+                .last()?
+                .content
+                .as_ref()?
+                .as_str()
+                .map(str::to_owned)
+        })
+        .collect();
+    assert!(
+        !asked.iter().any(|words| words.contains("gift")),
+        "the two pieces are judged as they came, not named: {asked:?}"
+    );
 }
