@@ -5676,6 +5676,8 @@ Ready for lamp-voice: no (#2684 and #2691 are being rebased and requalified).
 
 ## 2026-10-22 07:18: rebased heads pushed; memory-row plan accepted
 
+Ready for lamp-voice: no (native gates and the memory recovery work continue).
+
 - #2684 is `e61152871d7e30715e9b7faa46c83620d7f42cb3`; #2691 is
   `ae92661c3` (full head on its PR), both rebased without conflicts onto
   `e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe`. Both patches have unchanged
@@ -5697,11 +5699,36 @@ Ready for lamp-voice: no (#2684 and #2691 are being rebased and requalified).
   regressions pass; final worker, mutation, and full host gates continue.
   Raw checks live in `/private/tmp/fourth-memory-note-retry-checks/`.
 - The accepted plan has a 30 s minimum retry interval; First's later “next
-  turn” wording is clarified in comment 6329422808 before finalizing it.
+  turn” wording is queried in comment 6329422808; that reply is pending.
   No new switch or background worker. The 300 ms total note budget stays.
 - Seventh is running #2540 on lamp-52e6 (comment 6329423518); First withdrew
   the duplicate 4ace run (comment 6329453244). Fourth has no lamp loan and
   will link Seventh's counts/times, never the words.
+
+## 2026-10-22 07:38: both reviewed PRs merged; recovery host gate running
+
+Ready for lamp-voice: no (the new memory recovery PR is still being qualified).
+
+- #2684 and #2691 are both merged with their qualified heads. Fresh ARM64
+  counts: 9,926 passed / 0 failed / 63 skipped and 6,342 passed / 0 failed /
+  28 skipped, respectively. Both have the unchanged same_voice leaky test,
+  four passing doctests, relay and 12 passing process checks. Both Clippy
+  gates passed. Step completion is Queue comment 6329666398.
+- The recovery work rebased cleanly with its edits preserved onto
+  `a503d70f034990c72abe10ed55239372b7de8f23`, including the newly merged
+  source-linking memory changes. Workspace formatting, Clippy with
+  warnings denied, and build pass. All 15 focused tests pass; the full Voice
+  and five dependent-crate tests are running. Earlier Clippy found four
+  unnecessary closure borrows in the new test; those are fixed.
+- The negative control disabling retries failed the history-evicted name
+  test as intended on the previous base; source restored byte-for-byte.
+  On the new base, first/refused/recovery reads took 0.560/0.104/0.270 ms;
+  cached lookup 0.001 ms. Held room and room-plus-person calls returned in
+  300.192/300.434 ms against the shared 300 ms I/O budget. The small measured
+  host overhead and the 100 ms test scheduling allowance are explicit in
+  the evidence README; no acoustic or lamp latency claim.
+- Seventh's #2540 lamp result and First's retry-timing clarification are
+  still awaited while the code gate runs. The row stays 0.40.
 
 ## Not shown
 
