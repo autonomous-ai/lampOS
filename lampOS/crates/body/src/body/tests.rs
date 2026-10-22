@@ -3235,6 +3235,14 @@ const GLANCE_UNTIL: Duration = Duration::from_millis(11_000);
 fn rest_glance(
     set: impl FnOnce(&mut Lamp, &mut Limits),
 ) -> (BodyReport, Vec<(Duration, u16, u16)>) {
+    rest_glances(set, vec![(GLANCE_FROM, GLANCE_UNTIL, 40.0)])
+}
+
+/// The same with these glances: from, until and the pitch asked.
+fn rest_glances(
+    set: impl FnOnce(&mut Lamp, &mut Limits),
+    glances: Vec<(Duration, Duration, f32)>,
+) -> (BodyReport, Vec<(Duration, u16, u16)>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(16));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
@@ -3275,8 +3283,10 @@ fn rest_glance(
             toward: None,
             seen: None,
             gesture: None,
-            expression: (time.get() >= GLANCE_FROM && time.get() < GLANCE_UNTIL)
-                .then_some([40.0, 0.0, 0.0]),
+            expression: glances
+                .iter()
+                .find(|(from, until, _)| (*from..*until).contains(&time.get()))
+                .map(|(_, _, pitch)| [*pitch, 0.0, 0.0]),
             called: false,
             still: false,
             paused: false,
@@ -3430,6 +3440,36 @@ fn a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead() {
         .unwrap();
     assert!(lowest >= before + 36, "dipped from {before} to {lowest}");
     let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
+/// The self-test's moves come before a lamp that has just stood up has
+/// rested a second, and each next one before it rests again: still at
+/// rest, its head is led back up from the dip all the same, not left where
+/// it stopped short. On lamp-52e6 it rested 17 below after the factory's
+/// self-test, and no lead began (#2818).
+#[test]
+fn a_head_dipped_before_its_rest_has_lasted_is_led_back_up() {
+    let ms = Duration::from_millis;
+    let dip = (ms(1_800), ms(2_800));
+    let (report, seen) = rest_glances(
+        |lamp, _| lamp.heavy = Some((PITCH, 0.0, 26.0, 25)),
+        vec![(ms(400), ms(1_200), -40.0), (dip.0, dip.1, 40.0)],
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(dip.0);
+    let lowest = seen
+        .iter()
+        .filter(|step| (dip.0..dip.1).contains(&step.0))
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 30, "dipped from {before} to {lowest}");
+    let after = at(dip.1 + Duration::from_secs(3));
     assert!(
         after.abs_diff(before) <= 12,
         "back at {after}, rested at {before}"

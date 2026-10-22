@@ -4116,6 +4116,8 @@ fn run_on<P: PortIo, R: Runtime>(
     // glance took the head out of rest. The glance is laid on that, and
     // the head goes back to it; the base is left as it is.
     let mut glance_from: Option<[f32; 3]> = None;
+    // Whether Expression asked a glance on the last step.
+    let mut glanced = false;
     // Steps the head has been led up while below its way without coming
     // closer, and the closest to its way it has been read since it fell
     // below it.
@@ -4286,12 +4288,20 @@ fn run_on<P: PortIo, R: Runtime>(
             && leaving.is_none()
             && asked_now.expression.is_some();
         if glance {
-            if relaxed {
+            // Where it rests: a rest that has lasted, or, as a glance
+            // begins, a head already still at rest that has not relaxed yet
+            // (just stood up, or between the self-test's moves). Without it
+            // a head that lags lifting back was not led, and arrived where
+            // it stopped short: lamp-52e6 rested 17 below after the
+            // factory's self-test (#2818).
+            let still = !glanced && velocity.iter().all(|speed| speed.abs() < 3.0);
+            if relaxed || still {
                 glance_from.get_or_insert(commanded);
             }
             resting_steps = 0;
             asleep = [false; 3];
         }
+        glanced = glance;
         if mood != Mood::Resting || leaving.is_some() {
             glance_from = None;
         }
