@@ -534,29 +534,35 @@ impl ReminderWords {
         // Each note with its data at the most a reminder has (the
         // reviewer's P3 on #2819; empty data let words pass that no real
         // reminder fits): a text of the 300 bytes Schedule and the voice
-        // allow, and for `late` the longest `late_by` line at 60, as a
-        // delay of an hour or more is said as `earlier`, with none. A `"`
-        // or `\` in the text is two bytes in its JSON, which is not counted.
+        // allow, and for `late` the longest note of every `late_by` line at
+        // 60, each filled and serialized, as a `"` or `\` in a shorter line
+        // can make longer JSON (reviewer-two's P2 on #2890); a delay of an
+        // hour or more is said as `earlier`, with none. A `"` or `\` in the
+        // text is two bytes in its JSON, which is not counted.
         let text = "t".repeat(lamp_schedule::engine::MAX_TEXT_BYTES);
-        let late_by = fill(
-            &longest(&[
-                &self.minute,
-                &self.minutes,
-                &self.hour,
-                &self.hours,
-                &self.day,
-                &self.days,
-            ]),
-            &[("count", "60")],
-        );
+        let late = [
+            &self.minute,
+            &self.minutes,
+            &self.hour,
+            &self.hours,
+            &self.day,
+            &self.days,
+        ]
+        .map(|line| {
+            let late_by = fill(line, &[("count", "60")]);
+            let data = serde_json::json!({"text": text, "late": true, "late_by": late_by});
+            self.note(&self.late, &data.to_string())
+        })
+        .into_iter()
+        .max_by_key(String::len)
+        .unwrap_or_default();
         let on_time = serde_json::json!({"text": text, "late": false});
-        let late = serde_json::json!({"text": text, "late": true, "late_by": late_by});
         let earlier = serde_json::json!({"text": text, "earlier": true});
         joined_fit(
             "[reminder.words]",
             &[
                 ("on_time", self.note(&self.on_time, &on_time.to_string())),
-                ("late", self.note(&self.late, &late.to_string())),
+                ("late", late),
                 ("earlier", self.note(&self.earlier, &earlier.to_string())),
             ],
         )?;
