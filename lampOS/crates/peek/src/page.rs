@@ -4,7 +4,7 @@
 //! made here, with everything a message, a record or a unit carries
 //! escaped; the page's few lines of script only put it in its place.
 use crate::{
-    turns::{Step, Turn},
+    turns::{ReadFailure, ReadStatus, Snapshot, Step, Turn},
     units::UnitRow,
     view::{self, escape},
     watch::{BodyReport, plain},
@@ -33,7 +33,7 @@ pub struct Glance<'a> {
     /// The camera open, or what the page says instead.
     pub camera: &'a Result<(), String>,
     pub health: Option<&'a Message>,
-    pub turns: &'a [Turn],
+    pub turns: &'a Snapshot,
     pub units: &'a [UnitRow],
 }
 
@@ -156,8 +156,9 @@ pub fn overview(glance: &Glance) -> String {
         None => "not known".to_owned(),
     };
     rows.push(("health".into(), health));
-    let first = glance.turns.iter().find_map(Turn::first_audio_ms);
+    let first = glance.turns.turns.iter().find_map(Turn::first_audio_ms);
     let ten: Vec<u64> = glance
+        .turns
         .turns
         .iter()
         .filter_map(Turn::first_audio_ms)
@@ -165,12 +166,16 @@ pub fn overview(glance: &Glance) -> String {
         .collect();
     rows.push((
         "first audio".into(),
-        format!(
-            "newest {}, median of the last {} {}",
-            ms(first),
-            ten.len(),
-            ms(median(ten.clone()))
-        ),
+        if glance.turns.status == ReadStatus::Current {
+            format!(
+                "newest {}, median of the last {} {}",
+                ms(first),
+                ten.len(),
+                ms(median(ten.clone()))
+            )
+        } else {
+            read_notice(glance.turns.status)
+        },
     ));
     let differs: Vec<String> = glance
         .units
@@ -219,16 +224,20 @@ fn step_name(step: Step) -> &'static str {
 /// The turns, newest first: each one's steps from the end of speech, the
 /// slowest marked, and how it ended or what held it. Numbers and kinds
 /// only.
-pub fn turns(turns: &[Turn]) -> String {
-    if turns.is_empty() {
-        return "<p>No turn in the newest session yet.</p>".into();
+pub fn turns(snapshot: &Snapshot) -> String {
+    let mut html = read_notice(snapshot.status);
+    if snapshot.turns.is_empty() {
+        if snapshot.status == ReadStatus::Current {
+            html.push_str("<p>No turn in the newest session yet.</p>");
+        }
+        return html;
     }
-    let mut html = String::from(
+    html.push_str(
         "<p class=\"small\">Each from the end of speech; a step's own time in brackets. \
          The slowest step is marked.</p><table><tr><th>turn</th><th>taken as</th>\
          <th>final words</th><th>first token</th><th>first audio</th><th>ended</th></tr>",
     );
-    for turn in turns {
+    for turn in &snapshot.turns {
         let slowest = turn.slowest();
         let mut cells = String::new();
         for ((step, own), at) in
@@ -269,6 +278,27 @@ pub fn turns(turns: &[Turn]) -> String {
     }
     html.push_str("</table>");
     html
+}
+
+/// Fixed wording only: a failed read must never send a private path or
+/// an OS error containing one to the browser.
+fn read_notice(status: ReadStatus) -> String {
+    let why = match status {
+        ReadStatus::Current => return String::new(),
+        ReadStatus::Pending => return "<p>Reading the voice's sessions.</p>".into(),
+        ReadStatus::Unavailable(why) | ReadStatus::Stale(why) => why,
+    };
+    let message = match why {
+        ReadFailure::Permission => "Can't read the voice's sessions: permission.",
+        ReadFailure::Missing => "The voice's sessions are not available yet.",
+        ReadFailure::Other => "Can't read the voice's sessions: read failed.",
+    };
+    let stale = if matches!(status, ReadStatus::Stale(_)) {
+        " Last read is stale."
+    } else {
+        ""
+    };
+    format!("<p class=\"warn\">{message}{stale}</p>")
 }
 
 /// The camera's frame, as `/cam.svg` draws it.
