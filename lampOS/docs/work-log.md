@@ -1,3 +1,46 @@
+## Current checkpoint: 2026-10-22 18:56 +07, #2810 process-death PR pushed
+
+Ready for lamp-voice: no — official PR qualification pending
+
+[#3012](https://github.com/autonomous-ai/lampOS/pull/3012), head
+`33a43cdd245146bf674127b4792f28b3576de879`, is on latest integration
+`8e274b5e394b09ef5e5f18cb0d2382fbaddec95a`. One Linux nextest-compatible
+checker executes seven actual SIGKILL cuts at completed directory fsync exits,
+requires signal 9, and recovers in another process with no reinstall or pending
+reconstruction. Runtime updater source, defaults and quiet/health timings are
+unchanged. Own task worktree is clean; root worktree remains untouched.
+
+[Committed evidence](https://github.com/autonomous-ai/lampOS/blob/33a43cdd245146bf674127b4792f28b3576de879/lampOS/docs/verification/updater-process-cuts-20261022/README.md)
+binds the final local gates to their actual base f012 and source hashes:
+fmt and strict all-target Update Clippy passed; **306 passed / 0 failed /
+3 ignored / 0 filtered**. ARM64 Podman checker **1 passed / 0 failed**, all
+seven internal cuts; Linux Clippy passed. Restored nextest **1 passed /
+0 skipped**, seven cuts. Sixteen intended compiled control failures include
+seven removals of every fixture updater executable (old, new, selected target,
+fixed fallback). These are fixture/checker mutants, not production ordering
+mutations. The original Clippy failure, unqualified T1 timeout and classifier
+correction are preserved. Thirty-four bound files still match after publication
+rebases; older-base results do not qualify the newer dependency integration.
+
+Official ARM64 [39774177876](https://github.com/autonomous-ai/lampOS/actions/runs/39774177876)
+and Clippy [39774177794](https://github.com/autonomous-ai/lampOS/actions/runs/39774177794)
+are running on the PR head. The reviewer merges, not Second.
+
+Steps/results are posted on #2810 and Queue #2602. **Physical unplug has not
+happened.** First was asked for the lamp, attending person/window, qualified
+candidate and exact trial/observer setup. Second's role has no lamp; no SSH,
+deployment or power action was taken. The committed attended-run preparation
+marks its observer unimplemented and all device results blank. #2810 stays open.
+
+#1812 follows the attended phase. Read-only preparation found zero repository
+Actions variables, and the publish-environment metadata endpoints returned 404
+(which alone cannot distinguish absence from insufficient access). No real key
+was read/generated, publication enabled or release sent. First/owner must supply
+the real-key provisioning, isolated signed bad-release route and attended Body
+window; ordinary production publication must never carry the deliberate bad build.
+
+---
+
 ## Current checkpoint: 2026-10-22 18:09 +07, #2810 resumed for real process-kill cuts
 
 Ready for lamp-voice: no
