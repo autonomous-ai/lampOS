@@ -1,0 +1,1 @@
+1:  27ab70a2c = 1:  0b125f49b lampOS: report currently failed product units

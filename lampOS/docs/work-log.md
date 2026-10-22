@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 15:02 +07, merged work confirmed; installer prose corrected
+
+#2764 merged at authored head `0b125f49b`. Its [final Mac/range receipt](verification/report-failed-units-rebase-140e7-20261022/README.md)
+records 178/0/1; [native receipt](verification/report-failed-units-rebase-140e7-native-20261022/README.md)
+records 10,192 passed / 0 failed / 63 skipped on its exact tested merge.
+#2879 is merged. #2871's Kind was corrected to default-active loader refusal
+diagnostics with playback still opt-in; First carried/merged it as #2903,
+`01887391d26a79b50267b7111021b63b4cd90052`.
+
+#2885's requested rebase `82651436f` passed [fresh Mac Update298/0/2](verification/updater-cut-rebase-22061-mac-20261022/README.md)
+and [native10,195/0/63](verification/updater-cut-rebase-22061-native-20261022/README.md).
+Reviewer carried/merged it as #2908, `172f9c94c1b3b3be00877e8c62f4e8634ba67c7d`.
+The native counts each include one leaky pass and separate 4 doc tests,
+12 custom-harness tests and relay success. They qualify their authored heads,
+not the later carries. #2810's stronger all-updater-copy acceptance remains
+First's decision; the controls leave the independent fallback.
+
+#2767 received a no-P1/P2 source read. Its two stale-documentation P3s are
+[corrected and pushed](verification/install-exit-notes-doc-correction-20261022/README.md)
+at `daa23b283`. Rust/tests/unit directives are unchanged; docs explicitly
+retain the unmeasured restart cost. Fresh ARM6439744451280 and
+Clippy39744451308 run; First owns merge. No new queue item or device work.
+
+---
+
 ## Current checkpoint: 2026-10-22 11:16 +07, current work finished for review
 
 Music #1757 is merged. All five remaining PRs have passed their required
