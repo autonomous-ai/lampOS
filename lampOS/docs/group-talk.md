@@ -626,7 +626,9 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   worker counting cut-ins toward its busy room.
 - **With the switch,** while one of the lamp's own lines (the same lines as
   above: a skill's say, a reminder, news, its hello, a setup line) is
-  sounding, talk over it is let go and the line goes on
+  sounding (it has reached the speaker: its playback started or samples
+  were handed to it, so a line paused for a yield still counts; provider
+  audio still queued short of a speaker block does not), talk over it is let go and the line goes on
   (`while_own_line_waits`, `why` `busy_room`) when all of these hold:
   - the room was busy as the line began
     (`body_link::Attention::busy_lately`: busy now, or within the last
@@ -659,7 +661,8 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   on lamp-52e6 in the lamp run.
 - **Tested:** `talk_over_the_lamps_own_line_in_a_busy_room_is_let_go` (the
   table: name, face, stop word, a room not busy, an answer to a person, not
-  yet sounding); `a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy`
+  yet sounding, audio queued but never handed to the speaker, a line that
+  sounded and paused); `a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy`
   (30 s and 181 s); and on the loop,
   `talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch`: the say ends
   `spoken` with the switch in a busy room, and `dropped` without it or in a
