@@ -16,7 +16,7 @@
 //! The qualification, the shortest tap and the gap are settings
 //! ([`HeadTiming`]), to be sized from a recording of the lamp's own pads.
 use crate::{
-    base::strip::{StripDirection, StripEffectKind, StripError, StripRecognizer},
+    base::strip::{StripDirection, StripEffectKind, StripError, StripRecognizer, StripTiming},
     input::{InputError, Level, check_name},
 };
 use lamp_msgs::{
@@ -100,6 +100,15 @@ pub struct TouchConfig {
     pub head_tap_min_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_gap_ms: Option<u64>,
+    /// The strip's timing; each absent value is its default ([`StripTiming`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_qualify_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_release_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_stroke_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_sleep_ms: Option<u64>,
     /// The head pads read by their pulses, not their level, as each lamp's
     /// factory step measured them (the pins file's `head_rest`); the others
     /// read their level, as before.
@@ -142,6 +151,17 @@ impl TouchConfig {
         if let Some(pads) = &self.strip_pads {
             StripRecognizer::new(pads).map_err(strip_error)?;
         }
+        let strip = self.strip_timing();
+        if !(10_000..=200_000).contains(&strip.qualify_us)
+            || !(10_000..=500_000).contains(&strip.release_us)
+            || !(100_000..=2_000_000).contains(&strip.stroke_us)
+            || !(1_000_000..=5_000_000).contains(&strip.sleep_us)
+        {
+            return Err(error(
+                ControlFault::Invalid,
+                "strip timing: qualify 10..200 ms, release 10..500 ms, stroke 100..2000 ms, sleep 1000..5000 ms",
+            ));
+        }
         if names.is_empty() && self.strip_pads.is_none() {
             return Err(error(
                 ControlFault::Missing,
@@ -167,6 +187,16 @@ impl TouchConfig {
             qualify_us: us(self.head_qualify_ms, default.qualify_us),
             tap_min_us: us(self.head_tap_min_ms, default.tap_min_us),
             gap_us: us(self.head_gap_ms, default.gap_us),
+        }
+    }
+    pub fn strip_timing(&self) -> StripTiming {
+        let default = StripTiming::default();
+        let us = |ms: Option<u64>, or: u64| ms.map_or(or, |ms| ms.saturating_mul(1_000));
+        StripTiming {
+            qualify_us: us(self.strip_qualify_ms, default.qualify_us),
+            release_us: us(self.strip_release_ms, default.release_us),
+            stroke_us: us(self.strip_stroke_ms, default.stroke_us),
+            sleep_us: us(self.strip_sleep_ms, default.sleep_us),
         }
     }
     fn has_gpio(&self) -> bool {
@@ -657,7 +687,9 @@ impl TouchEngine {
         let strip = config
             .strip_pads
             .as_ref()
-            .map(|pads| StripRecognizer::new(pads).map_err(strip_error))
+            .map(|pads| {
+                StripRecognizer::with_timing(pads, config.strip_timing()).map_err(strip_error)
+            })
             .transpose()?;
         let strip_selected_mask = config
             .strip_pads
@@ -922,8 +954,11 @@ impl TouchEngine {
                 .accept(now, &sample.stamp, &sample.session_id, &self.clock_id);
         if previous != self.strip_fence.session && previous.is_some() {
             self.strip = Some(
-                StripRecognizer::new(self.config.strip_pads.as_ref().expect("configured strip"))
-                    .map_err(strip_error)?,
+                StripRecognizer::with_timing(
+                    self.config.strip_pads.as_ref().expect("configured strip"),
+                    self.config.strip_timing(),
+                )
+                .map_err(strip_error)?,
             );
         }
         accepted?;

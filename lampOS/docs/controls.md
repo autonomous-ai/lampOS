@@ -48,6 +48,29 @@ the button and the reset are unchanged.
   judges the head and the button ([selftest.md](selftest.md)).
 - **Kept:** the strip's code, its tests, `calibrate-touch` and every tuning
   value below, so it can come back.
+- **Its levels are the board's (#2858).** The electrical levels (touch and
+  release thresholds, chip debounce) are the pins file's `base` profile,
+  written per lamp by `calibrate-touch`. The strip's timing is four optional
+  pins-file settings beside it; a board that gives none keeps the defaults,
+  so nothing is set per lamp in code (`StripTiming`, `TouchConfig::strip_timing`):
+
+  | Setting | Default | Bounds | What it does |
+  |---|---|---|---|
+  | `strip_qualify_ms` | 10 | 10..200 | A three-pad chord held this long qualifies a touch |
+  | `strip_release_ms` | 30 | 10..500 | A contact let go this long ends |
+  | `strip_stroke_ms` | 300 | 100..2000 | Slow movement this long is a Stroke |
+  | `strip_sleep_ms` | 2000 | 1000..5000 | A still contact held this long is Sleep |
+
+  Values for lamp-52e6 follow from tuning with a hand (#2858). With the
+  switch off they are read and checked, and nothing uses them.
+- **Who reads the strip:** only Controls, which alone publishes its events
+  on `controls/touch` and its source on `controls/touch_state`. Their
+  readers (Voice's hand controls, onboarding and bus out, Expression,
+  `lamp-setup`, the self-test's touch by hand, cloud skills' `touch`
+  trigger) see no strip event while the switch is off. Tests:
+  `tests/it/touch_runtime.rs`
+  (`the_strip_switch_off_means_no_strip_event_with_a_hand_on_it`,
+  `the_strip_timing_is_the_boards_and_defaults_without_it`).
 - **To turn it back on** for one lamp: a drop-in,
   `/etc/systemd/system/lamp-controls.service.d/strip.conf`, with
   `[Service]` and `Environment=LAMP_CONTROLS_STRIP=on`; a pins file with

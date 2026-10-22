@@ -117,6 +117,10 @@ fn wiring() -> TouchPinsConfig {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        strip_qualify_ms: None,
+        strip_release_ms: None,
+        strip_stroke_ms: None,
+        strip_sleep_ms: None,
         head_rest: None,
         legacy_head: false,
     }
@@ -1377,5 +1381,85 @@ fn controls_runs_at_real_time_priority_above_the_voice() {
         assert!(priority(controls) > priority(voice));
         // Niceness means nothing at real-time priority.
         assert_eq!(setting(controls, "Nice="), None);
+    }
+}
+
+/// The first strip Touch from a hand laid on three pads at 40 ms, read every
+/// 10 ms until `until`, and how many strip events were seen.
+fn strip_touch(rig: &mut Rig, until: u64) -> (Option<u64>, usize) {
+    let (mut first, mut events) = (None, 0);
+    for at in (0..=until).step_by(10_000) {
+        rig.gpio(at, false, false, false);
+        rig.strip(at, if at >= 40_000 { 7 } else { 0 });
+        for event in rig.step(at).events {
+            if event.source == TouchSource::Strip {
+                events += 1;
+                if event.gesture == TouchGesture::Touch {
+                    first.get_or_insert(at);
+                }
+            }
+        }
+    }
+    (first, events)
+}
+
+/// #2858: with its switch off, a hand on the strip is no event at all, even
+/// with its reader giving touched readings; on, the same hand is a Touch.
+#[test]
+fn the_strip_switch_off_means_no_strip_event_with_a_hand_on_it() {
+    use lamp_controls::touch_pins::serving;
+    for switch in [None, Some("off")] {
+        let (served, config, _) = serving(wiring(), config(true), switch);
+        let mut rig = Rig::with_config(config, served);
+        assert_eq!(strip_touch(&mut rig, 300_000), (None, 0), "{switch:?}");
+    }
+    let (served, config, _) = serving(wiring(), config(true), Some("on"));
+    let mut rig = Rig::with_config(config, served);
+    assert!(strip_touch(&mut rig, 300_000).0.is_some());
+}
+
+/// #2858: the strip's timing is the board's pins file's; a board that gives
+/// none keeps the defaults; a value out of bounds is refused.
+#[test]
+fn the_strip_timing_is_the_boards_and_defaults_without_it() {
+    use lamp_controls::base::strip::StripTiming;
+    let touch = wiring().check(&config(true)).unwrap();
+    assert_eq!(touch.strip_timing(), StripTiming::default());
+    let tuned = TouchPinsConfig {
+        strip_qualify_ms: Some(150),
+        strip_release_ms: Some(60),
+        strip_stroke_ms: Some(500),
+        strip_sleep_ms: Some(3_000),
+        ..wiring()
+    };
+    let touch = tuned.check(&config(true)).unwrap();
+    assert_eq!(
+        touch.strip_timing(),
+        StripTiming {
+            qualify_us: 150_000,
+            release_us: 60_000,
+            stroke_us: 500_000,
+            sleep_us: 3_000_000,
+        }
+    );
+    // The board's qualify is what the strip waits for.
+    let (default_at, _) = strip_touch(&mut Rig::new(true), 400_000);
+    let (tuned_at, _) = strip_touch(&mut Rig::with(true, tuned), 400_000);
+    let (default_at, tuned_at) = (default_at.unwrap(), tuned_at.unwrap());
+    assert!(
+        tuned_at >= default_at + 130_000,
+        "{default_at} then {tuned_at}"
+    );
+    for wrong in [
+        TouchPinsConfig {
+            strip_qualify_ms: Some(5),
+            ..wiring()
+        },
+        TouchPinsConfig {
+            strip_sleep_ms: Some(60_000),
+            ..wiring()
+        },
+    ] {
+        assert!(wrong.check(&config(true)).is_err());
     }
 }

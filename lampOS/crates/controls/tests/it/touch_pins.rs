@@ -55,6 +55,10 @@ fn wiring() -> TouchPinsConfig {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        strip_qualify_ms: None,
+        strip_release_ms: None,
+        strip_stroke_ms: None,
+        strip_sleep_ms: None,
         head_rest: None,
         legacy_head: false,
     }
@@ -711,6 +715,10 @@ fn empty_configuration_does_not_claim_a_functional_touch_source() {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        strip_qualify_ms: None,
+        strip_release_ms: None,
+        strip_stroke_ms: None,
+        strip_sleep_ms: None,
         head_rest: None,
         legacy_head: false,
     };
