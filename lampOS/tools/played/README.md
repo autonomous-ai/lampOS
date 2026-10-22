@@ -83,6 +83,20 @@ These you can run on their own:
   and the story stops within about 1 s (`$PLAYED_OUT/scenarios/cut-in-keeps-LABEL.txt`).
   Its stand-in test is `cut-in-keeps-test.sh`.
 
+- `cutin.sh LABEL [IDLE_STORIES] [ROUNDS]`, about 25 minutes with the
+  defaults (3 and 1; #2602 "Cutting in", the measurement before any bound
+  changes): long stories with nobody talking, counting false yields per
+  minute of reply heard; then "Hmm, interesting." (an aside) and "Wait,
+  what was the keeper's name?" (a cut-in), each 3, 8, 15 and 25 s into a
+  fresh story. Per episode it prints onset to yield, yield to commit or
+  resume, and for a commit end of words to the answer's first audio,
+  accepted PCM and the microphone's proxy for acoustic output apart, with
+  the build and flags, the per-block hearing from the yield's onset run to
+  its decision, stop-word results and discontinuities with their sequence
+  numbers (`$PLAYED_OUT/scenarios/cutin-LABEL.txt`). It changes nothing on
+  the lamp unless `CUTIN_ENV` names switches for the run, which ride on a
+  `/run` drop-in removed on exit. Its stand-in test is `cutin-test.sh`.
+
 - `calendar.sh LABEL FIXTURE`, about 4 minutes (#751, "Email, calendar
   and other connectors, through hand-overs"): "Hey Lamp, what's on my
   calendar today?" is handed over to the computer's agent, which is the
