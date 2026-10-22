@@ -5268,6 +5268,81 @@ impl Engine {
             })
     }
 
+    /// Which `[[while]]` condition of `skill` does not hold, for the journal:
+    /// its topic, field and the last value it said (`voice/state state was
+    /// listening`). Only a number, a yes or no, or a one-word value is shown,
+    /// never a person's words: anything else is named by its kind (#2861).
+    fn held_back(
+        latest: &HashMap<String, (Value, u64, Option<u64>)>,
+        holding: &HashMap<(String, usize), u64>,
+        skill: &Skill,
+        now_us: u64,
+    ) -> String {
+        fn shown(value: &Value) -> String {
+            match value {
+                Value::Null => "nothing".into(),
+                Value::Bool(_) | Value::Number(_) => value.to_string(),
+                Value::String(word)
+                    if !word.is_empty()
+                        && word.len() <= 32
+                        && word
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') =>
+                {
+                    word.clone()
+                }
+                Value::String(_) => "a text".into(),
+                Value::Array(items) => format!("a list of {}", items.len()),
+                Value::Object(_) => "an object".into(),
+            }
+        }
+        if skill.is_routine() && !Self::routine_voice_fresh(latest, now_us) {
+            return format!("{} not resting just now", VoiceState::TOPIC);
+        }
+        let held = skill
+            .conditions
+            .iter()
+            .enumerate()
+            .find(|(index, condition)| {
+                !Self::condition_holds(
+                    latest,
+                    condition,
+                    holding.get(&(skill.name.clone(), *index)),
+                    now_us,
+                )
+            });
+        let Some((index, condition)) = held else {
+            return "a condition".into();
+        };
+        let topic = &condition.topic;
+        let (field, value) = match &condition.test {
+            Test::Faces(_) | Test::NoFaces => ("faces", None),
+            Test::Equals(field, _)
+            | Test::NotEquals(field, _)
+            | Test::Above(field, _)
+            | Test::Below(field, _)
+            | Test::Number(field) => (field.as_str(), Some(field)),
+        };
+        let Some((last, _, _)) = latest.get(topic) else {
+            return format!("{topic} {field}: nothing said yet");
+        };
+        let was = match value {
+            Some(path) => shown(at(last, path)),
+            None => format!("{} faces", last["faces"].as_array().map_or(0, Vec::len)),
+        };
+        if Self::fresh(latest, topic, now_us).is_none() {
+            return format!("{topic} {field} was {was}, and that ran out");
+        }
+        match holding.get(&(skill.name.clone(), index)) {
+            Some(since) if condition.test.holds(last) => format!(
+                "{topic} {field} was {was} for {} s of its {} s",
+                now_us.saturating_sub(*since) / 1_000_000,
+                condition.for_us / 1_000_000
+            ),
+            _ => format!("{topic} {field} was {was}"),
+        }
+    }
+
     fn routine_voice_fresh(
         latest: &HashMap<String, (Value, u64, Option<u64>)>,
         now_us: u64,
@@ -5812,34 +5887,47 @@ impl Engine {
                     if waited < trigger.wait_us {
                         watch.spent = false;
                         watch.disarmed = false;
-                    } else if once && trigger.once_per_day {
-                        if let (Some(name), Some(day)) = (
-                            &trigger.name,
-                            moment.as_ref().and_then(|moment| {
-                                trigger
-                                    .during
-                                    .as_ref()?
-                                    .occurrence_day(moment.day, moment.minute)
-                            }),
-                        ) {
+                    } else if once && (trigger.once_per_day || trigger.wait_us > 0) {
+                        if trigger.once_per_day
+                            && let (Some(name), Some(day)) = (
+                                &trigger.name,
+                                moment.as_ref().and_then(|moment| {
+                                    trigger
+                                        .during
+                                        .as_ref()?
+                                        .occurrence_day(moment.day, moment.minute)
+                                }),
+                            )
+                        {
                             self.judged
                                 .insert((skill.name.clone(), name.clone()), (day, None));
                         }
-                        // A daily chance let go says so, once: on lamp-06c1
+                        // A chance let go says so, once: on lamp-06c1
                         // bedtime matured 2 s before the voice had rested
                         // its 30 s, and nothing said why it never came
-                        // (#1672).
+                        // (#1672). Welcome back's arrivals after a say that
+                        // expired were let go in silence, so any trigger's
+                        // drop says it too, with the condition that held it
+                        // (#2861); a daily one's line is as it was. Without a
+                        // `wait` a chance held back is spent, as before.
+                        let mut why = format!(
+                            "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
+                            trigger.name.as_deref().unwrap_or("trigger"),
+                            trigger.wait_us / 1_000_000
+                        );
+                        if !trigger.once_per_day {
+                            why = format!(
+                                "{why} (held by {})",
+                                Self::held_back(&self.latest, &self.holding, skill, now_us)
+                            );
+                        }
                         runs.push(Run {
                             generation: None,
                             skill: skill.name.clone(),
                             events: vec![event(
                                 &skill.name,
                                 SkillStage::Answered,
-                                format!(
-                                    "{} chance dropped: it held, but the skill's conditions did not hold within its wait of {} s; it comes again only once the trigger ends and holds again",
-                                    trigger.name.as_deref().unwrap_or("trigger"),
-                                    trigger.wait_us / 1_000_000
-                                ),
+                                why,
                                 Some(false),
                             )],
                             calls: Vec::new(),

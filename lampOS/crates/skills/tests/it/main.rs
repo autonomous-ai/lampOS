@@ -10,6 +10,7 @@ mod package;
 mod routine_service;
 mod skills;
 mod store;
+mod welcome_stuck;
 
 /// The daily journal at `path`, opened as the next process would. A test
 /// that drops a journal and opens its folder's again, as a restart does, can
