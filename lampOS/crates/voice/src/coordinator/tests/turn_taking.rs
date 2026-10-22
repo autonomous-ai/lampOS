@@ -2245,9 +2245,11 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
             WhileOwnLineWaits::AsBefore,
         ),
     ];
+    // Judged once the name could have been said (see the test after this).
+    let past = trigger + OWN_LINE_NAME_LAG_US;
     for (case, wait, then) in table {
         assert_eq!(
-            while_own_line_waits(wait, h.reply.as_ref(), &candidate, trigger),
+            while_own_line_waits(wait, h.reply.as_ref(), &candidate, past),
             then,
             "{case}"
         );
@@ -2279,7 +2281,7 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
     // its rest queued) is still sounding for the room.
     h.reply.as_mut().unwrap().sounded = true;
     assert_eq!(
-        while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        while_own_line_waits(busy, h.reply.as_ref(), &candidate, past),
         WhileOwnLineWaits::LetGo("busy_room")
     );
     // Not yet sounding: only `LAMP_OWN_LINE_KEEPS` waits, as before.
@@ -2305,6 +2307,99 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_is_let_go() {
     }
     assert_eq!(
         while_own_line_waits(busy, h.reply.as_ref(), &candidate, trigger),
+        WhileOwnLineWaits::AsBefore
+    );
+}
+
+/// lamp-52e6 on 22 Oct (`LAMP_OWN_LINE_OVER_TALK=on`): "Lamp, wait." said
+/// over a skill's say in a busy room. `lamp-name` says a name once it is
+/// over (there 482 ms after it began), and the talk had been let go as
+/// `busy_room` on its first blocks: the say went on `spoken`. Now talk with
+/// no name yet stays pending (`ForName`), the line playing on, until
+/// `OWN_LINE_NAME_LAG_US` after its trigger: a name said late in it still
+/// takes it as before, and with none it is let go then. Before its decision
+/// deadline in any case.
+#[test]
+fn a_name_said_late_in_talk_over_the_lamps_own_line_in_a_busy_room_still_stops_it() {
+    let mut h = Harness::new(TurnTaking::Duplex);
+    let trigger = h.base + 300_000;
+    let first_read = trigger - 60_000;
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: 6,
+        trigger_read_at_us: trigger,
+        first_read_at_us: first_read,
+        decision_deadline_us: trigger + 1_200_000,
+    };
+    let (ticket, _answered) = crate::say::ticket_for_test("stretch");
+    {
+        let reply = h.reply.as_mut().unwrap();
+        reply.input_sequence = 0;
+        reply.say = Some(ticket);
+        reply.had_audio = true;
+        reply.handed = 240;
+        reply.sounded = true;
+    }
+    let busy = OwnLineWait {
+        heard: true,
+        busy: true,
+        ..OwnLineWait::default()
+    };
+    let judge = |wait, at_us| while_own_line_waits(wait, h.reply.as_ref(), &candidate, at_us);
+    // Its first blocks: no name yet, and none could have been said.
+    assert_eq!(judge(busy, trigger), WhileOwnLineWaits::ForName);
+    assert_eq!(
+        judge(busy, first_read + 500_000),
+        WhileOwnLineWaits::ForName
+    );
+    // The name began with the talk and is said 600 ms after: as before.
+    let named = OwnLineWait {
+        name_began_us: Some(first_read),
+        ..busy
+    };
+    assert_eq!(
+        judge(named, first_read + 600_000),
+        WhileOwnLineWaits::AsBefore
+    );
+    // A stop word said late, the same.
+    let stopped = OwnLineWait {
+        stop_began_us: Some(first_read),
+        ..busy
+    };
+    assert_eq!(
+        judge(stopped, first_read + 600_000),
+        WhileOwnLineWaits::AsBefore
+    );
+    // With `LAMP_OWN_LINE_KEEPS` too.
+    assert_eq!(
+        judge(OwnLineWait { on: true, ..busy }, trigger),
+        WhileOwnLineWaits::ForName
+    );
+    // No name by then: the room's.
+    assert_eq!(
+        judge(busy, trigger + OWN_LINE_NAME_LAG_US),
+        WhileOwnLineWaits::LetGo("busy_room")
+    );
+    // A short hold's deadline comes first: let go before it.
+    let short = crate::admission::Candidate {
+        decision_deadline_us: trigger + 200_000,
+        ..candidate
+    };
+    assert_eq!(
+        while_own_line_waits(busy, h.reply.as_ref(), &short, trigger + 100_000),
+        WhileOwnLineWaits::LetGo("busy_room")
+    );
+    // A room not busy, or the switch off: as before, at once.
+    assert_eq!(
+        judge(
+            OwnLineWait {
+                busy: false,
+                ..busy
+            },
+            trigger
+        ),
         WhileOwnLineWaits::AsBefore
     );
 }
