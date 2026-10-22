@@ -1,0 +1,22 @@
+# lampOS eyes' camera helper socket (lampOS/docs/eyes.md, "The camera's helper"; #2892): the one way
+# lamp-eyes, which runs as lampos, has a stuck camera's USB device re-authorized, as an unplug and a
+# plug would. Its own reset needs the device's node under /dev/bus/usb, root's, and is refused.
+# systemd holds the socket and starts lamp-eyes-camera@.service as root for each connection; nothing
+# listens between asks. Only root and the group lampos may connect. Whoever connects says nothing the
+# helper reads: the device is the one its unit names.
+# In lamp-update's install list (install::PRODUCT): the socket enabled, the template never.
+[Unit]
+Description=lampOS eyes' camera helper socket
+
+[Socket]
+ListenStream=/run/lampos-eyes-camera/camera.sock
+Accept=yes
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+# One ask at a time; the helper does its thing at most once a minute anyway.
+MaxConnections=1
+
+[Install]
+WantedBy=sockets.target
