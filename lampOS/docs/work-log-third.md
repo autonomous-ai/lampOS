@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 00:53 — documentation landed; wake carry verified
+
+Ready for lamp-voice: yes (#3087 in First's train 3; #3088 read for the next train).
+
+- #3083 landed through merged train #3086 at `28f796223`. Its source
+  `99395e226` and carried commit `d168ed528` compare equal in range-diff.
+  First's closure comment records the carry; Third closed no issue.
+- #3087 is in train #3090: `b6d7377b5` to `b819200d5`, range-diff equal,
+  on the latest `28f796223` base. The combined head is `2a27a6278`.
+  Its ARM64 and Clippy checks are running; no combined result is claimed.
+  First owns the train and its merge. The qualified source head is fixed.
+- Reviewer-two completed #3088 `5b6409c77` at 00:40, P1/P2 none, against
+  the actual guard and tap paths. The read is linked on the Queue and in
+  the PR; Fifth is also assigned a read for the hand trial. The README
+  still makes no device measurement or product activation claim.
+- The log branch now includes `28f796223`; all 109 prior patches compare
+  equal. Historical verification records remain. Local AGENTS.md matches
+  the fetched integration version, including the builder protocol and
+  self-review checklist. #2948 remains draft for the coherent attended try.
+
 ## 2026-10-23 00:39 — wake native gates pass; qualified for train 3
 
 Ready for lamp-voice: yes (#3087; First's current-base train carry and combined gate).
