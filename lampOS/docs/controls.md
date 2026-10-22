@@ -59,7 +59,7 @@ the button and the reset are unchanged.
   | `strip_qualify_ms` | 10 | 10..200 | A three-pad chord held this long qualifies a touch |
   | `strip_release_ms` | 30 | 10..500 | A contact let go this long ends |
   | `strip_stroke_ms` | 300 | 100..2000 | Slow movement this long is a Stroke |
-  | `strip_sleep_ms` | 2000 | 1000..5000 | A still contact held this long is Sleep |
+  | `strip_sleep_ms` | 2000 | 2000..5000 | A still contact held this long is Sleep; not below the 2 s a strip Hold must be old enough for |
 
   Values for lamp-52e6 follow from tuning with a hand (#2858). With the
   switch off they are read and checked, and nothing uses them.
