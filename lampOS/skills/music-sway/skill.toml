@@ -37,8 +37,9 @@ unknown = "holds"         # a body that says nothing of hands still drops a move
 topic = "voice/state"
 field = "state"
 equals = "resting"
+for = "2s"                # never to the lamp's own music (#2833): a requested recording (#1757) plays while the voice listens, and the ears' windows (about 1 s) still hold its last second once the voice rests
 
-[[while]]                 # never to the lamp's own music (#2833): what it plays itself is not music in the room
+[[while]]                 # never to the lamp's own voice: a window with a block heard while it spoke
 topic = "ears/classes"
 field = "own_voice"
 not_equals = "present"    # "unknown" (no evidence yet) and "clear" pass

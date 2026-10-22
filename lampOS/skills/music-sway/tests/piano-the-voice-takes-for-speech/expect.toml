@@ -1,7 +1,7 @@
 clock = "10:35"
 
 [[expect]]
-at = "59s"
+at = "61s"
 within = "1s"
 call = "body.move"
 args = { move = "sway" }

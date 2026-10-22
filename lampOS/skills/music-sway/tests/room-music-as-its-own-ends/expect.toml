@@ -1,9 +1,11 @@
-# The lamp's own music for 40 s, then music in the room goes on: the chance
-# held back at 20 s is kept (wait = "1m") and taken once its own music ends.
+# The lamp's own music (#1757, the voice listening) to 66 s, and music in the
+# room goes on after it, the voice resting: one sway once the voice has rested
+# 2 s. The chance held back at 26.5 s is kept (wait = "1m"); its 20 s were
+# counted while the lamp's own music played.
 clock = "10:00"
 
 [[expect]]
-at = "40s"
+at = "68s"
 within = "1s"
 call = "body.move"
 args = { move = "sway" }

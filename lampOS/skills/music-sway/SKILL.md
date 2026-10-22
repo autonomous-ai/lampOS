@@ -19,9 +19,16 @@ waits for the turn to end, up to a minute, and comes then only if the music
 still plays. A short clip (a ringtone, a
 video) is not music that goes on, and a quiet bar does not end it.
 
-It never sways to music it plays itself: a window the ears mark as the
-lamp's own sound (`own_voice` `present`) holds it back, and room music
-still sways it once the lamp's own music ends.
+It never sways to music it plays itself (#2833). A recording someone asks
+for (#1757) plays while the voice is listening, for "stop", so the
+resting condition holds the sway back while it plays; and the voice must
+have rested 2 s, since the ears' last window (about a second) still hears
+the lamp's music once the voice rests. A window the ears mark as the lamp's
+own voice (`own_voice` `present`, only while it speaks) holds it back too.
+Room music that goes on after the lamp's own music still sways it, 2 s after
+the voice rests: its twenty seconds were counted while the lamp's music
+played, even if the room's music began later. The resting condition also
+puts the sway that waited for a turn 2 s after the turn ends.
 
 It hears music by the ears' room sound scores (`ears/classes`, with
 `LAMP_EARS_CLASSES=on` in lamp-ears): a score from 0 to 1 the lamp works out
