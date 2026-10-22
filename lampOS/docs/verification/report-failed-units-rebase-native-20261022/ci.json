@@ -1,0 +1,1062 @@
+{
+  "schema_version": 1,
+  "pull_request": 2764,
+  "head": "1299399e1dd6390361ff44cccf9145a9f8b9eb7f",
+  "tested_base": "bf8c3f2e18695179bd70973821368f01d6a2d9e3",
+  "tested_merge": "edccd3fe3b25382a9223f087c7758b4ae1587dd4",
+  "recorded_at": "2026-10-22T01:23:13.586377+00:00",
+  "runs": {
+    "arm64": {
+      "run_id": 39703359459,
+      "run_attempt": 1,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39703359459",
+      "head": "1299399e1dd6390361ff44cccf9145a9f8b9eb7f",
+      "tested_merge": "edccd3fe3b25382a9223f087c7758b4ae1587dd4",
+      "tested_merge_parents": [
+        "bf8c3f2e18695179bd70973821368f01d6a2d9e3",
+        "1299399e1dd6390361ff44cccf9145a9f8b9eb7f"
+      ],
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "jobs": [
+        {
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Run taiki-e/install-action@v2",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "build (release, the lamps' binaries)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "which crates a pull request tests",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "SHA-256 of each binary",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 30,
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 31,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "name": "report-full-run-failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ],
+      "checkout_log_line": 292,
+      "log_labels": {
+        "UNKNOWN STEP": 11325
+      },
+      "warnings": [
+        {
+          "line": 135,
+          "kind": "certificate_rehash",
+          "message": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 356,
+          "kind": "node_deprecation",
+          "message": "(node:8834) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 359,
+          "kind": "node_deprecation",
+          "message": "(node:8834) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 441,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost\n|\n= note: the example target `replay_cost` in package `lamp-expression v0.1.0 (RUNNER/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (RUNNER/lampOS/crates/controls)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 446,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost.dwp\n|\n= note: the example target `replay_cost` in package `lamp-expression v0.1.0 (RUNNER/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (RUNNER/lampOS/crates/controls)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 451,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost\n|\n= note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (RUNNER/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (RUNNER/lampOS/crates/policy)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 456,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost.dwp\n|\n= note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (RUNNER/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (RUNNER/lampOS/crates/policy)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 492,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost\n|\n= note: the example target `replay_cost` in package `lamp-expression v0.1.0 (RUNNER/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (RUNNER/lampOS/crates/controls)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 497,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/replay_cost.dwp\n|\n= note: the example target `replay_cost` in package `lamp-expression v0.1.0 (RUNNER/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (RUNNER/lampOS/crates/controls)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 502,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost\n|\n= note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (RUNNER/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (RUNNER/lampOS/crates/policy)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 507,
+          "kind": "cargo_output_collision",
+          "message": "warning: output filename collision at RUNNER/lampOS/target/release/examples/progress_cost.dwp\n|\n= note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (RUNNER/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (RUNNER/lampOS/crates/policy)`\n= note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n= help: consider changing their names to be unique or compiling them separately"
+        },
+        {
+          "line": 11283,
+          "kind": "node_deprecation",
+          "message": "(node:45540) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 11289,
+          "kind": "node_deprecation",
+          "message": "(node:45540) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 11325,
+          "kind": "runner_annotation",
+          "message": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "warning_counts": {
+        "certificate_rehash": 1,
+        "node_deprecation": 4,
+        "cargo_output_collision": 8,
+        "runner_annotation": 1
+      },
+      "nested_action_skips": [
+        {
+          "line": 436,
+          "message": "##[end-action id=__taiki-e_install-action.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]"
+        }
+      ],
+      "log": {
+        "name": "arm64.log",
+        "bytes": 2360994,
+        "sha256": "e20f9190dcda3dbbb105f3c8399879ef40ea075090448e6788f56ce5e7a4809c"
+      }
+    },
+    "clippy": {
+      "run_id": 39703359401,
+      "run_attempt": 1,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39703359401",
+      "head": "1299399e1dd6390361ff44cccf9145a9f8b9eb7f",
+      "tested_merge": "edccd3fe3b25382a9223f087c7758b4ae1587dd4",
+      "tested_merge_parents": [
+        "bf8c3f2e18695179bd70973821368f01d6a2d9e3",
+        "1299399e1dd6390361ff44cccf9145a9f8b9eb7f"
+      ],
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "jobs": [
+        {
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "clippy (every crate and target, warnings as errors)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 16,
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 17,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "checkout_log_line": 310,
+      "log_labels": {
+        "Set up job": 34,
+        "system packages": 187,
+        "Run actions/checkout@v4": 89,
+        "Rust 1.96.0": 49,
+        "restore the cache": 40,
+        "unchanged source files get the cached build's times back": 5,
+        "clippy (every crate and target, warnings as errors)": 39,
+        "Post Run actions/checkout@v4": 14,
+        "Complete job": 2
+      },
+      "warnings": [
+        {
+          "line": 176,
+          "kind": "certificate_rehash",
+          "message": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 373,
+          "kind": "node_deprecation",
+          "message": "(node:8270) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 376,
+          "kind": "node_deprecation",
+          "message": "(node:8270) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 459,
+          "kind": "runner_annotation",
+          "message": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "warning_counts": {
+        "certificate_rehash": 1,
+        "node_deprecation": 2,
+        "runner_annotation": 1
+      },
+      "nested_action_skips": [],
+      "log": {
+        "name": "clippy.log",
+        "bytes": 71255,
+        "sha256": "e2c73984b8d7164651141e5e1166ae7b5ef9c389042db6e8dc88972707ccabad"
+      }
+    }
+  },
+  "qualification_errors": [],
+  "raw_evidence": [
+    {
+      "name": "arm64.run.json",
+      "bytes": 3797,
+      "sha256": "32cf6fc2c25902ebacec7b05986063e56b954d663bf5598162a7a71d2341d326"
+    },
+    {
+      "name": "arm64.api.json",
+      "bytes": 12685,
+      "sha256": "3853bba8b11cbd304a2b16c86552b87ec7e95557a98487fb540de071da3c556f"
+    },
+    {
+      "name": "arm64.merge.json",
+      "bytes": 43844,
+      "sha256": "9aa76d9186ba3c0212601b5566f46f263707e2c724aaa614d2761d2a1f2116d6"
+    },
+    {
+      "name": "arm64.log",
+      "bytes": 2360994,
+      "sha256": "e20f9190dcda3dbbb105f3c8399879ef40ea075090448e6788f56ce5e7a4809c"
+    },
+    {
+      "name": "clippy.run.json",
+      "bytes": 2235,
+      "sha256": "e94c3f61a447249107e3f7e387f821a4337d5d76b9f97990a8e4f950c9f19dd5"
+    },
+    {
+      "name": "clippy.api.json",
+      "bytes": 12684,
+      "sha256": "ee135180b0955c91d2507fbe2df885c3168272791bfcef0553032fc80d3db33d"
+    },
+    {
+      "name": "clippy.merge.json",
+      "bytes": 43844,
+      "sha256": "9aa76d9186ba3c0212601b5566f46f263707e2c724aaa614d2761d2a1f2116d6"
+    },
+    {
+      "name": "clippy.log",
+      "bytes": 71255,
+      "sha256": "e2c73984b8d7164651141e5e1166ae7b5ef9c389042db6e8dc88972707ccabad"
+    },
+    {
+      "name": "artifacts.json",
+      "bytes": 778,
+      "sha256": "f19e33c5f1bc7f72c34bab20eb3b5270d1d8d2ce0fb5dbe93eb695fd95ec6d8f"
+    }
+  ],
+  "log_method": "Original gh logs retain UNKNOWN STEP labels. Checkout and test command/output markers are parsed in order; API step conclusions are recorded separately, without inventing log step names.",
+  "test_scope": {
+    "profile": "pr",
+    "whole_workspace_decision": [
+      {
+        "line": 476,
+        "decision": "The whole workspace: `lampOS/docs/verification/report-failed-units-20261022/control.json` (lampOS/docs, read by tests this can't see)."
+      }
+    ],
+    "partition": "hash:1/1",
+    "selected_binaries": 159,
+    "skipped_tests": 63,
+    "skipped_binaries": 2,
+    "excluded_nextest_harnesses": [
+      "lamp-ipc::relay_signals",
+      "lamp-turn-end-wire::process"
+    ],
+    "skip_identity_limit": "The log gives the 63-test skip total but no individual SKIP rows. Individual names/reasons cannot be reconstructed from these inputs. Both explicitly excluded harnesses ran separately below.",
+    "realtime_profile_limit": "This is the PR profile, whose test step omits the realtime group; not full/nightly qualification."
+  },
+  "nextest": {
+    "summary_line": 10487,
+    "summary": "Summary [ 171.446s] 9964 tests run: 9964 passed (1 leaky), 63 skipped",
+    "seconds": 171.446,
+    "tests_run": 9964,
+    "passed": 9964,
+    "failed": 0,
+    "skipped": 63,
+    "leaky_passes": 1,
+    "verified_primary_result_rows": 9964,
+    "primary_status_counts": {
+      "PASS": 9963,
+      "LEAK": 1
+    },
+    "primary_results_sha256": "ebfca52fb7c5b1bcf8b1f372db132d26fb21e4f0c7108e595e75f1001202db32",
+    "row_accounting": "Only the primary rows before the summary are counted. Later slow-test output repeats already counted PASS rows.",
+    "nonpassing_rows": [
+      {
+        "line": 8634,
+        "status": "LEAK",
+        "elapsed": "0.232s",
+        "ordinal": 8113,
+        "total": 9964,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      }
+    ]
+  },
+  "new_cloud_tests": [
+    {
+      "line": 1718,
+      "status": "PASS",
+      "elapsed": "0.004s",
+      "ordinal": 1197,
+      "total": 9964,
+      "binary": "lamp-cloud",
+      "test": "reports::tests::failed_units_are_current_allowlisted_and_unambiguous"
+    },
+    {
+      "line": 1720,
+      "status": "PASS",
+      "elapsed": "0.040s",
+      "ordinal": 1199,
+      "total": 9964,
+      "binary": "lamp-cloud",
+      "test": "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery"
+    },
+    {
+      "line": 1796,
+      "status": "PASS",
+      "elapsed": "0.005s",
+      "ordinal": 1275,
+      "total": 9964,
+      "binary": "lamp-cloud::it",
+      "test": "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit"
+    }
+  ],
+  "doc_tests": {
+    "command": "cargo test --locked --release --workspace --doc -- --test-threads=1",
+    "targets": 46,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0,
+    "results": [
+      {
+        "target": "lamp_actions",
+        "line": 10917,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_addons",
+        "line": 10923,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_air",
+        "line": 10929,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_audio",
+        "line": 10935,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_body",
+        "line": 10941,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_bus",
+        "line": 10949,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_camera",
+        "line": 10956,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_cloud",
+        "line": 10962,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_controls",
+        "line": 10968,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ears",
+        "line": 10974,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_environment",
+        "line": 10980,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_expression",
+        "line": 10986,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_eyes",
+        "line": 10992,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_gemini",
+        "line": 10998,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_health",
+        "line": 11004,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ipc",
+        "line": 11011,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_keeper",
+        "line": 11018,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_lean",
+        "line": 11024,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_local_time",
+        "line": 11030,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_memory",
+        "line": 11036,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_mood",
+        "line": 11042,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_msgs",
+        "line": 11049,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_name",
+        "line": 11056,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_near_call",
+        "line": 11062,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_observer",
+        "line": 11068,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_peek",
+        "line": 11074,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_policy",
+        "line": 11080,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_records",
+        "line": 11086,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_ring",
+        "line": 11092,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_same_voice",
+        "line": 11098,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_schedule",
+        "line": 11104,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_selftest",
+        "line": 11110,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_settings",
+        "line": 11116,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_setup",
+        "line": 11122,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_skills",
+        "line": 11128,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_sound_fixtures",
+        "line": 11134,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_station",
+        "line": 11140,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_surround",
+        "line": 11146,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_tasks",
+        "line": 11152,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_end",
+        "line": 11158,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_end_wire",
+        "line": 11164,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_turn_owner",
+        "line": 11170,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_update",
+        "line": 11176,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice",
+        "line": 11182,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice_eval",
+        "line": 11188,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "target": "lamp_voice_processes",
+        "line": 11194,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0,
+        "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ]
+  },
+  "own_harness": {
+    "command": "cargo test --locked --release -p lamp-turn-end-wire --test process",
+    "passed": 12,
+    "failed": 0,
+    "summary_line": 11215,
+    "summary": "test result: 12 passed; 0 failed",
+    "results": [
+      {
+        "line": 11202,
+        "result": "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2026 ms)"
+      },
+      {
+        "line": 11203,
+        "result": "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)"
+      },
+      {
+        "line": 11204,
+        "result": "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)"
+      },
+      {
+        "line": 11205,
+        "result": "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)"
+      },
+      {
+        "line": 11206,
+        "result": "test missing_model_is_final_and_never_restarted ... ok (162 ms)"
+      },
+      {
+        "line": 11207,
+        "result": "test missing_executable_fails_at_once ... ok (2 ms)"
+      },
+      {
+        "line": 11208,
+        "result": "test startup_failures_are_final ... ok (411 ms)"
+      },
+      {
+        "line": 11209,
+        "result": "test serving_failures_are_replaced_within_budget ... ok (513 ms)"
+      },
+      {
+        "line": 11210,
+        "result": "test protocol_violations_are_replaced ... ok (177 ms)"
+      },
+      {
+        "line": 11211,
+        "result": "test cancelled_answers_are_never_delivered ... ok (155 ms)"
+      },
+      {
+        "line": 11212,
+        "result": "test close_during_inference_never_waits ... ok (233 ms)"
+      },
+      {
+        "line": 11214,
+        "result": "test sustained_requests_stay_bounded ... ok (691 ms)"
+      }
+    ]
+  },
+  "relay_signals": {
+    "command": "cargo test --locked --release -p lamp-ipc --test relay_signals",
+    "successful_invocations": 1,
+    "failed_invocations": 0,
+    "results": [
+      {
+        "line": 11198,
+        "result": "relay_signals: ok"
+      }
+    ],
+    "count_note": "One custom harness success marker; not an additional nextest result."
+  },
+  "clippy": {
+    "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "rust_or_cargo_warnings": 0,
+    "conclusion": "success"
+  },
+  "artifacts": [
+    {
+      "id": 12393099606,
+      "name": "lampos-arm64-1299399e1dd6390361ff44cccf9145a9f8b9eb7f",
+      "size_in_bytes": 112969340,
+      "expired": false,
+      "digest": "sha256:4465a08344d43968f7cd732f6ec3c0e615f702b1c665384e894845428ff88b83",
+      "created_at": "2026-10-22T01:13:40Z",
+      "expires_at": "2026-10-29T01:13:33Z"
+    }
+  ],
+  "artifact_verification": {
+    "metadata_and_upload_log_agree": true,
+    "payload_downloaded": false,
+    "payload_verified": false,
+    "inventory_or_checksums_independently_verified": false
+  },
+  "limitations": [
+    "PR-profile Linux CI only; realtime tests and 63 skipped tests are not qualified as passing.",
+    "The one leaky result is included in nextest's passed total and is recorded separately.",
+    "Artifact size and digest are reported by GitHub/API/upload logs; the payload was not read or independently checked.",
+    "No device, physical lamp, live broker, target latency or acoustic acceptance was tested by this offline qualification.",
+    "Earlier-head receipts remain separate; this receipt binds only the current head and tested merge above."
+  ],
+  "qualification_helper": {
+    "name": "qualify.py",
+    "bytes": 18731,
+    "sha256": "9cd91054d1d7e85beca6e2cfd89de97855477ab12b9c33b0f0528d40e0b3a98b"
+  },
+  "qualified": true
+}

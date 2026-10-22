@@ -1,3 +1,43 @@
+## Current checkpoint: 2026-10-22 08:26 +07, all three requested PRs qualified
+
+**Ready for lamp-voice: yes, all three current heads.** Each has green native
+ARM64 and strict Linux Clippy. Counts below are copied from the exact-head
+CI output; each includes one leaky pass and 63 skipped tests. All three also
+passed four doc tests, twelve custom-harness tests and the relay harness.
+
+- **#1757**, `bd1d79a5ad1c4ce1fcd4f6674702265cc879b8b0`: **10118 passed /
+  0 failed / 63 skipped**, ARM64 **39702508957**, Clippy **39702508955**.
+  All twelve selected Music regressions passed. [Native receipt](verification/requested-audio-rebase-fc800-native-20261022/README.md)
+  verifies the tested merge and both parents. [Reviewed-head range-diff](verification/requested-audio-rebase-fc800-20261022/from-reviewed-range-diff.txt)
+  is posted on #2602. Reviewer-lead's read of this head has no new finding;
+  **First owns the merge**.
+- **#2764**, `1299399e1dd6390361ff44cccf9145a9f8b9eb7f`: **9964 passed /
+  0 failed / 63 skipped**, ARM64 **39703359459**, Clippy **39703359401**.
+  All three new Cloud tests passed. [Native receipt](verification/report-failed-units-rebase-native-20261022/README.md)
+  verifies the tested merge and both parents. Reviewer-two verified the plain
+  rebase, equal range-diff and unchanged Cloud tree, **P1/P2 none**;
+  **Reviewer-two owns the merge**.
+- **#2767**, `19d1a46d952d8301871a69caf48c04d5c21c0bfa`: **9951 passed /
+  0 failed / 63 skipped**, ARM64 **39701589308**, Clippy **39701589363**.
+  All six added fixtures passed. [Native receipt](verification/install-exit-notes-native-20261022/README.md)
+  is already published. Its default installation path is reserved for
+  **First's source read and merge**; the scope handoff is not a source verdict.
+
+The receipts retain warnings, skips, hashes and artifact metadata. Artifact
+payloads were not downloaded or independently verified. Prior Mac gates,
+negative controls and failures remain separate below. No device action or
+local ARM64 gate was performed.
+
+**#2462 is closed and refiled as #2771, now merged by Reviewer-lead** as
+`efff7c4a5d794703d8782fc193efba93cfb4ee7c`. Its replacement had green PR CI.
+Second did not modify the reviewer's branch. The authorized second-P8 metadata
+diagnostics and P3 Voice-state regression follow-ups remain blocked on
+#1757 merging; their preparation is retained without duplicating its source.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 08:08 +07, installer ready; failed-unit rebase pushed
 
 **Ready for lamp-voice: yes (#2767, `19d1a46d9`).** ARM64 **39701589308**
