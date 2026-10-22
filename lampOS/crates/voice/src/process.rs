@@ -1437,6 +1437,7 @@ fn second_route_worker_environment(
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
@@ -1511,6 +1512,7 @@ mod tests {
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -2041,6 +2043,7 @@ mod tests {
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
@@ -2187,6 +2190,7 @@ mod tests {
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_SPEECH_SOCKET=on",
                     "LAMP_SECOND_SPEECH_SOCKET_MODEL=eleven_flash_v2_5",
+                    "LAMP_SECOND_SPEECH_TAGS=on",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_STT_WARM=on",

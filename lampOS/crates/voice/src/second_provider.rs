@@ -66,6 +66,7 @@ pub mod net;
 pub mod policy;
 pub mod probe;
 mod services;
+pub mod speech_tags;
 pub mod worker;
 
 pub use services::{
@@ -376,6 +377,11 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
+/// Where the worker reads whether the chat is told a few emotion tags its
+/// voice may read ([`speech_tags`], [`Engine::speaking_tags`]): `on`, and
+/// nothing else (#2901; the lead's proposal on #1711, 22 Oct 12:4x).
+pub const SPEECH_TAGS_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_TAGS";
+
 /// Where the worker reads whether the lamp's name heard only in the room's
 /// sound needs a second sign to count: a face turned to the lamp, said close
 /// to it, or its words calling it (`on`, and nothing else; at any score).
@@ -649,6 +655,10 @@ struct Shared {
     /// [`Engine::saying_once`]: a round that said words before its calls
     /// tells the next one so ([`said_once_note`]).
     said_once: bool,
+    /// [`Engine::speaking_tags`]: each piece of a reply is cut into what
+    /// the voice is given and the lamp's words; `Some(true)` when the voice
+    /// reads tags.
+    speech_tags: Option<bool>,
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
@@ -1173,6 +1183,7 @@ impl Engine {
                 note_looks: false,
                 walk_looks: false,
                 said_once: false,
+                speech_tags: None,
                 written_wait: false,
                 resend: None,
                 hearing: None,
@@ -1644,6 +1655,18 @@ impl Engine {
     pub fn saying_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.said_once = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_SPEECH_TAGS=on` ([`SPEECH_TAGS_ENVIRONMENT`]): `Some`, each
+    /// piece of a reply goes through [`speech_tags::Tags`]: the voice is given
+    /// one listed tag a reply at most, only when it reads them (`true`), and
+    /// the lamp's words none. `None`, pieces are as written. Before any
+    /// turn only.
+    pub fn speaking_tags(mut self, voiced: Option<bool>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.speech_tags = voiced;
         }
         self
     }
@@ -4963,6 +4986,7 @@ async fn answer(
         started: false,
         request,
         heard_at,
+        tags: shared.speech_tags.map(speech_tags::Tags::new),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -5945,6 +5969,23 @@ struct Queue<'a> {
     /// about 0.3 s, but the first answer audio 1.4 to 3.9 s after the words).
     request: u64,
     heard_at: Instant,
+    /// The reply's tags (`LAMP_SECOND_SPEECH_TAGS`); `None`, pieces as
+    /// written.
+    tags: Option<speech_tags::Tags>,
+}
+impl Drop for Queue<'_> {
+    /// The reply's tags in the journal, counts only, once it said something.
+    fn drop(&mut self) {
+        if let Some(tags) = &mut self.tags
+            && self.started
+        {
+            tags.finish();
+            eprintln!(
+                "lamp-voice second: request {} speech tags: {} given to the voice, {} dropped (LAMP_SECOND_SPEECH_TAGS)",
+                self.request, tags.kept, tags.dropped
+            );
+        }
+    }
 }
 impl Queue<'_> {
     async fn announce(&mut self) -> Result<(), Stop> {
@@ -5955,6 +5996,12 @@ impl Queue<'_> {
     }
 
     async fn push(&mut self, text: String) -> Result<(), Stop> {
+        // With tags (`LAMP_SECOND_SPEECH_TAGS`), the voice is given `spoken`
+        // and everything else the lamp's words, which carry none.
+        let (spoken, text) = match &mut self.tags {
+            Some(tags) => tags.piece(&text),
+            None => (text.clone(), text),
+        };
         // A "sentence" with no word in it is not said: as the first words
         // of an answer, the coordinator would take it for silence.
         if !text.chars().any(char::is_alphanumeric) {
@@ -5990,7 +6037,7 @@ impl Queue<'_> {
             request: self.request,
             heard_at: self.heard_at,
         };
-        let packets = start_speech(self.shared, self.speech, text.clone(), turn);
+        let packets = start_speech(self.shared, self.speech, spoken, turn);
         self.send(text, packets).await
     }
 
