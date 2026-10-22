@@ -893,13 +893,13 @@ impl Turns {
         let client = Arc::new(DaysClient::new(memory.socket.clone()).unwrap());
         let sessions = Arc::new(Mutex::new(Sessions::default()));
         let reading = client.clone();
-        let ahead = super::Ahead {
-            sessions: sessions.clone(),
-            who: None,
-            ask: Arc::new(move |session, person, within, follow_up| {
+        let ahead = super::Ahead::asking(
+            sessions.clone(),
+            None,
+            Arc::new(move |session, person, within, follow_up| {
                 reading.read_note_within(session, person, false, within, (true, follow_up))
             }),
-        };
+        );
         Self {
             sessions,
             ahead,
