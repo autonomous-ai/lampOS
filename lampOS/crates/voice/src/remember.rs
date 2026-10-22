@@ -1482,6 +1482,13 @@ static JOBS: OnceLock<SyncSender<Job>> = OnceLock::new();
 static NOTE: Mutex<String> = Mutex::new(String::new());
 /// Requests in which the lamp was asked to keep or forget something.
 static KEPT_OUT: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
+/// Requests admitted held only by a known face's gap
+/// (`LAMP_FACE_GAP_HOLD`, [`held_by_gap`]): their line may be someone
+/// else's, so their reply never marks a dated follow-up (reviewer-two on
+/// #2894). Apart from [`KEPT_OUT`], which a remember or forget also sets
+/// and which must not stop a mark. The newest [`GAP_HELD_MOST`].
+static GAP_HELD: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
+const GAP_HELD_MOST: usize = 64;
 
 /// Begin journalling to the memory on this socket, and keeping the note
 /// for new sessions; `known` is the eyes' known file, when the lamp knows
@@ -1595,6 +1602,31 @@ pub fn keep_out(request: u64) {
     }
 }
 
+/// The request was admitted held only by a known face's gap
+/// (`LAMP_FACE_GAP_HOLD`): kept out of the journal ([`keep_out`]), and its
+/// admission is not its person's own, so its reply never marks their
+/// dated follow-up (reviewer-two on #2894: a line in the gap may be B's,
+/// and must not spend A's event). The lamp's reply in a request admitted
+/// with the face seen marks it.
+pub fn held_by_gap(request: u64) {
+    keep_out(request);
+    if let Ok(mut held) = GAP_HELD.lock() {
+        if held.contains(&request) {
+            return;
+        }
+        if held.len() == GAP_HELD_MOST {
+            held.pop_front();
+        }
+        held.push_back(request);
+    }
+}
+
+/// Whether `request` was admitted held only by a face's gap
+/// ([`held_by_gap`]); unknown is held, so nothing marks on a poisoned lock.
+fn gap_held(request: u64) -> bool {
+    GAP_HELD.lock().map_or(true, |held| held.contains(&request))
+}
+
 /// Whether `request` is kept out of the journal ([`keep_out`]).
 #[cfg(test)]
 pub(crate) fn kept_out(request: u64) -> bool {
@@ -1660,7 +1692,9 @@ fn hand_on_days(done: Vec<FinishedExchange>, wall: u64, client: &DaysClient) {
     // remember turn is kept out of the journal, never out of the mark. Only
     // the exchanges the thread hands on as finished, the same the journal
     // is given before its keep-out: nothing the thread holds back is here.
-    for exchange in &done {
+    // A request admitted held only by a face's gap never marks: its line
+    // may be someone else's (reviewer-two on #2894).
+    for exchange in done.iter().filter(|exchange| !gap_held(exchange.request)) {
         client.mark_if_asked(&exchange.said, exchange.whose.as_deref());
     }
     for exchange in journalable(done) {
@@ -1992,7 +2026,7 @@ impl DaysClient {
                     context.says(Some(person), id, content_words(text));
                 }
                 if until_asked {
-                    context.asking = Some((person.to_owned(), id, content_words(text)));
+                    context.offered(person, id, content_words(text));
                 }
                 said
             }
@@ -2063,6 +2097,9 @@ pub fn clear_forgotten_thread(thread: &mut crate::thread::Thread) {
 }
 
 const SOURCE_IDS: usize = 64;
+/// At most this many people's dated follow-ups wait for the lamp to ask
+/// ([`DaysContext::asking`]).
+const ASKING_MOST: usize = 16;
 /// What the store says of the room's snapshot, of a person's, and what a
 /// recall for someone known says of its two parts.
 const ROOM_SCOPE: &str = "said in this room; speaker unknown";
@@ -2253,8 +2290,14 @@ struct DaysContext {
     /// holds until the lamp asks (`"until_asked"`): whose, its id and its
     /// key words ([`content_words`]). Taken when one of that person's
     /// exchanges asks about it ([`asks_about`]), and the memory told
-    /// (`follow_up_asked`); replaced by the next one offered. One at most.
-    asking: Option<(String, u64, Vec<String>)>,
+    /// (`follow_up_asked`). One for each person (El's P3 on #2894): a
+    /// person's next offer replaces only theirs, so another's session
+    /// between never takes it. Kept across session closes and changes of
+    /// who is at the lamp, as the memory holds it unmarked that long: a
+    /// later reply to them that asks still marks it. At most
+    /// [`ASKING_MOST`] people, the oldest offer dropped first (offered
+    /// again on a later day, at most its cap).
+    asking: Vec<(String, u64, Vec<String>)>,
 }
 
 /// Why memory's journal stopped until a fresh worker (#2176): said in the
@@ -2393,6 +2436,16 @@ impl DaysContext {
             }
             self.hits.push(hit);
         }
+    }
+
+    /// `person` was offered dated follow-up `id`, whose key words are
+    /// `words`, held until the lamp asks: theirs replaces only theirs.
+    fn offered(&mut self, person: &str, id: u64, words: Vec<String>) {
+        self.asking.retain(|(whose, _, _)| whose != person);
+        if self.asking.len() == ASKING_MOST {
+            self.asking.remove(0);
+        }
+        self.asking.push((person.to_owned(), id, words));
     }
 
     /// Kept thing `id` of this person's was shown as `text` (#2510).
@@ -4074,9 +4127,10 @@ impl DaysClient {
         let Ok(mut context) = self.context.lock() else {
             return;
         };
-        let asked = context
-            .asking
-            .take_if(|(whose, _, words)| Some(whose.as_str()) == person && asks_about(said, words));
+        let at = context.asking.iter().position(|(whose, _, words)| {
+            Some(whose.as_str()) == person && asks_about(said, words)
+        });
+        let asked = at.map(|at| context.asking.remove(at));
         drop(context);
         if let Some((whose, id, _)) = asked {
             let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
@@ -7230,11 +7284,11 @@ mod tests {
     fn the_lamp_asking_about_a_dated_follow_up_sends_the_mark_once() {
         const MINH: &str = "p-be9688998f085098";
         let (client, work) = asking_client();
-        client.context.lock().unwrap().asking = Some((
-            MINH.to_owned(),
+        client.context.lock().unwrap().offered(
+            MINH,
             12,
             content_words("Sister's wedding is on Saturday"),
-        ));
+        );
         let asked = |work: &std::sync::mpsc::Receiver<DaysJob>| {
             let mut marks = vec![];
             while let Ok(job) = work.try_recv() {
@@ -7294,7 +7348,7 @@ mod tests {
             &client,
         );
         assert!(asked(&work).is_empty(), "once");
-        assert!(client.context.lock().unwrap().asking.is_none());
+        assert!(client.context.lock().unwrap().asking.is_empty());
     }
 
     /// Reviewer-two's P2 on #2894: a remember turn's reply is kept out of
@@ -7304,11 +7358,11 @@ mod tests {
     fn a_question_in_a_remember_turn_marks_the_follow_up_but_is_not_journalled() {
         const MINH: &str = "p-be9688998f085098";
         let (client, work) = asking_client();
-        client.context.lock().unwrap().asking = Some((
-            MINH.to_owned(),
+        client.context.lock().unwrap().offered(
+            MINH,
             12,
             content_words("Sister's wedding is on Saturday"),
-        ));
+        );
         // A request no other test names, kept out as a remember's is.
         let request = u64::MAX - 75;
         keep_out(request);
@@ -7333,6 +7387,183 @@ mod tests {
         }
         assert_eq!(marks, vec![(MINH.to_owned(), 12)]);
         assert_eq!(exchanges, 0, "kept out of the journal");
+    }
+
+    /// El's P3 on #2894: one dated follow-up waits for each person. B's
+    /// offer between never takes A's; a session's close and another person
+    /// at the lamp keep it; A's next offer replaces only A's.
+    #[test]
+    fn each_person_s_dated_follow_up_waits_for_them() {
+        const A: &str = "p-be9688998f085098";
+        const B: &str = "p-0b0c4a6f3e2d1a99";
+        let (client, work) = asking_client();
+        {
+            let mut context = client.context.lock().unwrap();
+            context.offered(A, 12, content_words("Sister's wedding is on Saturday"));
+            context.session = Some("voice-test-1".into());
+            context.session_person = Some(A.into());
+        }
+        client.close_open_session(Duration::from_millis(20));
+        client
+            .context
+            .lock()
+            .unwrap()
+            .offered(B, 20, content_words("Job interview on Thursday"));
+        let done = |request: u64, said: &str, whose: &str| {
+            vec![FinishedExchange {
+                request,
+                age: Duration::from_secs(1),
+                heard: "hi".to_owned(),
+                said: said.to_owned(),
+                whose: Some(whose.to_owned()),
+            }]
+        };
+        let asked = |work: &std::sync::mpsc::Receiver<DaysJob>| {
+            let mut marks = vec![];
+            while let Ok(job) = work.try_recv() {
+                if let DaysJob::Asked { person, id } = job {
+                    marks.push((person, id));
+                }
+            }
+            marks
+        };
+        // B is asked about A's event: not B's to mark, and A's stays.
+        hand_on_days(done(u64::MAX - 80, "How was the wedding?", B), NOW, &client);
+        assert!(asked(&work).is_empty());
+        hand_on_days(done(u64::MAX - 81, "How was the wedding?", A), NOW, &client);
+        assert_eq!(asked(&work), vec![(A.to_owned(), 12)]);
+        // A's next offer replaces only A's; B's waits.
+        client
+            .context
+            .lock()
+            .unwrap()
+            .offered(A, 14, content_words("Dentist on Friday"));
+        client
+            .context
+            .lock()
+            .unwrap()
+            .offered(A, 15, content_words("Concert on Sunday"));
+        hand_on_days(
+            done(u64::MAX - 82, "How did the interview go?", B),
+            NOW,
+            &client,
+        );
+        hand_on_days(
+            done(u64::MAX - 83, "Was the dentist okay?", A),
+            NOW,
+            &client,
+        );
+        hand_on_days(done(u64::MAX - 84, "How was the concert?", A), NOW, &client);
+        assert_eq!(asked(&work), vec![(B.to_owned(), 20), (A.to_owned(), 15)]);
+        assert!(client.context.lock().unwrap().asking.is_empty());
+    }
+
+    /// Reviewer-two on #2894 (`LAMP_FACE_GAP_HOLD`): A is offered their
+    /// wedding and leaves view; a line in the gap, admitted held as A's,
+    /// gets a reply asking about it: no mark and no journal exchange, as it
+    /// may be B's. A seen again and asked marks it, once.
+    #[test]
+    fn a_reply_in_a_face_s_gap_never_marks_their_follow_up() {
+        use crate::memory_scope::{FaceCache, GAP, RequestKey, RequestScope};
+        use crate::provider_worker::ProviderOutput;
+        let _one = crate::provider_worker::tests::one_thread();
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let known = std::env::temp_dir().join(format!("asked-held-{}", std::process::id()));
+        std::fs::write(&known, "A").unwrap();
+        let cache = FaceCache::holding_gaps(Some(GAP));
+        let a = person_id("A");
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.at_lamp(Some(a.clone()));
+            thread.seen_now(Some(a.clone()));
+            thread.opening(Instant::now());
+        }
+        let first = u64::MAX - 520;
+        let line = |request: u64, words: &str, reply: &str, held: bool| {
+            let scope = RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([23; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                cache.snapshot(Instant::now()),
+            );
+            let lease = scope.lease();
+            assert_eq!(lease.scope().unwrap().held(), held, "{words}");
+            assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
+            for event in [
+                ProviderOutput::Transcript {
+                    request: None,
+                    text: words.into(),
+                    finished: true,
+                },
+                ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: reply.into(),
+                    finished: true,
+                },
+            ] {
+                crate::second_provider::worker::keep_admitted(&event, &lease);
+            }
+            cache.answered(lease.scope().unwrap(), Instant::now());
+        };
+        let seen = || crate::known_faces::FaceObservation::read(&known);
+        let (jobs, work) = sync_channel(16);
+        let client = held_test_client(jobs);
+        client.context.lock().unwrap().offered(
+            &a,
+            12,
+            content_words("Sister's wedding is on Saturday"),
+        );
+        let jobs_of = |work: &std::sync::mpsc::Receiver<DaysJob>| {
+            let (mut marks, mut heard) = (vec![], vec![]);
+            while let Ok(job) = work.try_recv() {
+                match job {
+                    DaysJob::Asked { person, id } => marks.push((person, id)),
+                    DaysJob::Exchange { heard: words, .. } => heard.push(words),
+                    _ => {}
+                }
+            }
+            (marks, heard)
+        };
+        cache.replace_seen(cache.begin_refresh(), seen(), Some(1));
+        line(first, "Hello.", "Hi there.", false);
+        // A leaves view: the next line is held as A's.
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        line(
+            first + 1,
+            "Fine thanks.",
+            "How was your sister's wedding?",
+            true,
+        );
+        let done = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .finished(first + 1, Instant::now());
+        assert_eq!(done.len(), 2);
+        hand_on_days(done, NOW, &client);
+        let (marks, heard) = jobs_of(&work);
+        assert!(marks.is_empty(), "{marks:?}");
+        assert_eq!(heard, ["Hello."], "the held line is not journalled");
+        // A is seen again and asked: marked, once.
+        cache.replace_seen(cache.begin_refresh(), seen(), Some(1));
+        line(
+            first + 2,
+            "I'm back.",
+            "How was your sister's wedding?",
+            false,
+        );
+        line(first + 3, "Lovely.", "Was the wedding big?", false);
+        let done = crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .finished(first + 3, Instant::now());
+        *crate::thread::THREAD.lock().unwrap() = kept;
+        std::fs::remove_file(known).unwrap();
+        hand_on_days(done, NOW, &client);
+        let (marks, heard) = jobs_of(&work);
+        assert_eq!(marks, vec![(a.clone(), 12)]);
+        assert_eq!(heard, ["I'm back.", "Lovely."]);
     }
 
     /// The session's note with events: a dated one the memory gives
@@ -7364,7 +7595,7 @@ mod tests {
             let asking = client.context.lock().unwrap().asking.clone();
             drop(client);
             std::fs::remove_file(&socket).unwrap();
-            asking.map(|(whose, id, _)| (whose, id))
+            asking.first().map(|(whose, id, _)| (whose.clone(), *id))
         };
         assert_eq!(
             held("events-held", |request| match request["op"].as_str() {

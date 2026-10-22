@@ -1939,6 +1939,95 @@ fn the_follow_up_asked_request_marks_and_a_forget_takes_the_offer() {
     assert_eq!(offer_rows(&scratch), 0);
 }
 
+/// #2894 (a read): a kept thing said again for a later day (`once`) loses
+/// its offers with its day, so the new day is offered afresh, the full
+/// `FOLLOW_UP_OFFERS` times; kept, a third offer would be its last.
+#[test]
+fn a_re_dated_event_is_offered_afresh() {
+    let scratch = Scratch::new("event-redated-offers");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    store.maintain(MONDAY).unwrap();
+    let (id, _) = store
+        .remember_on(
+            &minh,
+            MONDAY,
+            "Dentist on Friday",
+            &[],
+            true,
+            Some("2026-10-23"),
+        )
+        .unwrap();
+    for day in [5, 6] {
+        store.maintain(MONDAY + day * DAY).unwrap();
+        let given = store
+            .follow_up_until_asked(&minh, true, true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (given["id"].as_u64(), &given["until_asked"]),
+            (Some(id), &json!(true))
+        );
+    }
+    store.maintain(MONDAY + 6 * DAY + 3_600_000).unwrap();
+    let (again, existing) = store
+        .remember_on(
+            &minh,
+            MONDAY + 6 * DAY + 3_600_000,
+            "Dentist on Friday",
+            &[],
+            true,
+            Some("2026-10-30"),
+        )
+        .unwrap();
+    assert_eq!((again, existing), (id, true));
+    assert_eq!(offer_rows(&scratch), 0);
+    store.maintain(MONDAY + 12 * DAY).unwrap();
+    let given = store
+        .follow_up_until_asked(&minh, true, true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(given["on"], "2026-10-30");
+    assert_eq!(given["until_asked"], true, "offered afresh");
+}
+
+/// #2894 (a read): an offer adopted with its entry is the new person's:
+/// theirs to mark, never the room's.
+#[test]
+fn an_adopted_offer_is_the_new_persons_to_mark() {
+    let scratch = Scratch::new("event-adopted-offer");
+    let mut store = scratch.open(30, NOW);
+    let (room, minh) = (Person::everyone(), person("p-minh"));
+    store.maintain(MONDAY).unwrap();
+    let (id, _) = store
+        .remember_on(
+            &room,
+            MONDAY,
+            "Dentist on Friday",
+            &[],
+            false,
+            Some("2026-10-23"),
+        )
+        .unwrap();
+    // The room is never offered one; an offer is written here to see it move.
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .execute(
+            "INSERT INTO follow_up_offers(rid,person,offers,offered_unix_ms) SELECT rid,'everyone',1,?2 FROM entries WHERE person='everyone' AND id=?1",
+            rusqlite::params![id, MONDAY],
+        )
+        .unwrap();
+    let moved = store.adopt(&room, &minh, &[id]).unwrap();
+    let new = moved.iter().find(|(old, _)| *old == id).unwrap().1;
+    let whose: String = Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row("SELECT person FROM follow_up_offers", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(whose, "p-minh");
+    assert!(!store.follow_up_asked(&room, id).unwrap());
+    assert!(store.follow_up_asked(&minh, new).unwrap());
+}
+
 /// The event day kept for observation `id` of `person`'s, if any; `None`
 /// also when there is no such observation, so callers check it is kept.
 fn event_day_of(scratch: &Scratch, person: &Person, id: u64) -> Option<String> {
