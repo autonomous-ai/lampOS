@@ -5794,6 +5794,36 @@ Ready for lamp-voice: no (#2774's ARM64 is running; callback regression is in it
 - Friday's #2673 has merged at `75bddc520`; its P2 was Friday's work.
   #2762's switch census remains open with Friday. The row stays at 0.40.
 
+## 2026-10-22 08:58 ICT: native retry blocked on follows-face fixture
+
+Ready for lamp-voice: no (#2774 waits for Friday's deterministic fixture correction; callback checks continue).
+
+- #2774 head `b18ff0bc6`: Clippy run 39705015774 passed. ARM64 run
+  39705015937 attempts 1 and 2 failed the same follows-face test, each
+  with 7,877 passed, 1 failed, 63 skipped and 2,131 unrun after fail-fast.
+  Release builds passed; later harnesses and artifact upload were skipped.
+  No further rerun on this head. Both attempts remain in the PR evidence.
+- The failing test, helper and writer/follow/adopt path are byte-identical
+  to base `6bb802490` and bypass the changed note/context path. The exact
+  base run 39704488712 passed 9,994 tests, 63 skipped (one leaky), including
+  that test in 0.805 s. Its print and forget use independently scheduled
+  400 ms boundaries. Friday accepted the deterministic fixture correction;
+  Fourth will rebase once it lands, then require fresh native gates.
+- The callback regression's restored focused tests passed 3/0/0 in four
+  fresh child processes. Disabling the production keep-marker consumption
+  fails both Days cases while the legacy control passes. Source was
+  restored byte-exact. Formatting, strict workspace Clippy and build pass;
+  the complete Voice group is 3,391/0/14 and Memory is 288/0/6. Other
+  dependent groups are running; these are partial host counts, not ready.
+- Seventh's corrected Days-on run, 08:28–08:40 on `403b444d4`, had one keep
+  and one next-turn refresh marker at 08:31:49. The final recall was not
+  observed in the 14 s capture. Putback then replaced the worker, so that
+  session cannot be extended. Seventh queued a complete six-minute repeat
+  for about 09:20, Days/Rules on, 60 s final capture, with MainPID and
+  InvocationID checked at each end. No words or raw journal copied.
+- Queue: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330815606.
+  The memory row remains 0.40 and Fourth has no lamp loan.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
