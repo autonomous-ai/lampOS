@@ -5915,6 +5915,30 @@ Ready for lamp-voice: yes (#2782).
   read-only source/ownership audit is preparing a concrete scope for First
   to assign; no code, permission change or lamp access is claimed.
 
+## 2026-10-22 09:55 ICT: peek follow-up claimed; the lamp retention run accepted
+
+Ready for lamp-voice: no (#2789 is starting; #2774 waits for Friday's fixture). #2782 remains ready in review.
+
+- First accepted the full #2540 lamp-52e6 name-retention run and row 16's
+  corrected cue run at 09:45. This closes the requested six-minute lamp
+  case, not the whole memory quality row's proposed 0.90 matrix.
+  https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331423960
+- First assigned #2789, four ordered pieces from the peek audit. Claimed
+  with `status:taken`, session `codex-20261022-memory`, no lamp, before
+  code. Memory PRs keep priority. The first piece makes denied session
+  reads visible through typed status, stale state and recovery, including
+  denied-folder/file and SSE regressions. The permission contract then
+  needs Voice and Records agreement before the separate unit and lamp
+  checks; the closed #2141 is not reused.
+- The read-only audit found that a deploy ACL alone conflicts with the
+  producers' 0700/0600 creation and Records' exact private-mode checks.
+  Only session traversal/read may change; unrelated private state stays
+  private. Fourth has no lamp and will not install or change its ACLs.
+- Friday rebased #2780 to `2060c8dc180cdd13b79cb2f87257249446e9d419`;
+  fresh ARM64 39713491159 is running and Clippy 39713491113 passed.
+  #2774 will rebase after that fixture merges. #2782's reviewer is reading
+  its independently green `64282e440` head.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
