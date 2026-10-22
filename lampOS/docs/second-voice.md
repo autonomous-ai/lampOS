@@ -68,6 +68,32 @@ refused (unknown fields are refused).
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
 | `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
 
+With `LAMP_RELAY_ROUTES=on` (#2882) the second worker asks the relay which
+of its services this lamp should reach at a nearer address:
+`GET` of `relay/routes` under `llm_base_url`'s API base (`…/api/v1/ai/v1/relay/routes`
+on the company relay) with the route's key, answered
+`{"status":1,"data":{"chat":…,"speech":…,"listening":…,"gemini":…,"ttl_seconds":600}}`.
+Each address is what the matching variable takes (`chat` as
+`LAMP_SECOND_DEEPSEEK_BASE_URL`, ending `/deepseek`; `speech` as
+`LAMP_SECOND_SPEECH_BASE_URL`; `listening` as
+`LAMP_SECOND_LISTENING_BASE_URL`) and is checked as the file's URLs are; a
+route on a host other than the company's is a complete API base, as those
+settings are (`/v1` is added only to `campaign-api.autonomous.ai`'s `/ai`).
+`null`, an address not to use, or a 404 is the service's own address; a
+401 or any other failure keeps what was last read. It is asked at start,
+every `ttl_seconds` (60 to 3600) and as the link comes back, in the
+background: a turn never waits for it. A turn's chat and speech take the
+routes as they stood when it began and keep them to its end; listening
+takes the latest at each utterance. The unit's own address wins: a service
+whose variable is given is never routed, nor a chat that is not DeepSeek
+with the relay's key, Gemini's voice, Deepgram's own listening, or a voice
+or listening with another service's key from `second.json`. A near
+service that fails on the link, times out, answers a 5xx or a 401 goes to
+its own address for the rest of the turn (the chat's request sent again
+there, the sentence said in the voice at its own, listening opened once
+more at its own), journaled `route=fallback service=… why=…`; the journal
+names which services are near, never an address.
+
 A person's own DeepSeek endpoint and key and Deepgram key, with
 `LAMP_OWN_KEYS=on`, go over the relay and over `deepgram_credential_file`
 at start: the voice unit's credentials `own_deepseek.key`,

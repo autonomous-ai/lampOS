@@ -1431,6 +1431,8 @@ fn second_route_worker_environment(
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
+        // Read by the second worker's services (#2882).
+        crate::second_provider::RELAY_ROUTES_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
@@ -2034,6 +2036,7 @@ mod tests {
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
+                    || name == crate::second_provider::RELAY_ROUTES_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
@@ -2157,6 +2160,7 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
+                    "LAMP_RELAY_ROUTES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",

@@ -69,8 +69,8 @@ mod services;
 pub mod worker;
 
 pub use services::{
-    CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_SOCKET_ENVIRONMENT,
-    SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
+    CHAT_WARM_ENVIRONMENT, Listener, Net, RELAY_ROUTES_ENVIRONMENT, Routable,
+    SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
 };
 
 #[cfg(test)]
@@ -2646,6 +2646,10 @@ impl Engine {
         }
         self.cut_short(request - 1);
         self.turn = None;
+        // The relay's routes this turn's chat and speech keep to its end are
+        // settled now, for every turn begun, spoken, written or a reminder,
+        // before it is warmed or asked (#2882, reviewer-two's P2 on #2919).
+        self.shared.services.turn_begins();
         self.begun_last = Some((request, session));
         if let Ok(mut begun) = self.shared.begun.lock() {
             *begun = Some((request, session));
