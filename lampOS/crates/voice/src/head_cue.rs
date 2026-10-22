@@ -228,6 +228,18 @@ pub struct Now {
     pub last_hum_us: Option<u64>,
 }
 
+/// A wake cue may wait only this long from its conversation's original start.
+pub(crate) const WAKE_WITHIN_US: u64 = 1_500_000;
+
+/// Whether a hand's wake may hum now. Expiry is checked before readiness so
+/// a loop first reaching a ready state after the deadline cannot play late.
+pub(crate) fn may_wake_hum(now: &Now, conversation_began_us: u64) -> Result<(), &'static str> {
+    if now.at_us.saturating_sub(conversation_began_us) >= WAKE_WITHIN_US {
+        return Err("wake_window_expired");
+    }
+    may_hum(now)
+}
+
 /// Whether the hum plays for this tap, or why not.
 pub fn may_hum(now: &Now) -> Result<(), &'static str> {
     if !now.allowed {
@@ -327,6 +339,49 @@ mod tests {
             last_said_us: Some(90_000_000),
             last_hum_us: Some(60_000_000),
         }
+    }
+
+    #[test]
+    fn a_wake_hum_expires_before_accepting_readiness_at_its_deadline() {
+        let start = 100_000_000;
+        for (elapsed, expected) in [
+            (WAKE_WITHIN_US - 1, Ok(())),
+            (WAKE_WITHIN_US, Err("wake_window_expired")),
+            (WAKE_WITHIN_US + 1, Err("wake_window_expired")),
+        ] {
+            let now = Now {
+                at_us: start + elapsed,
+                ..ready()
+            };
+            assert_eq!(may_wake_hum(&now, start), expected, "{elapsed}");
+        }
+    }
+
+    #[test]
+    fn waiting_for_microphone_permission_does_not_restart_the_wake_window() {
+        let start = 100_000_000;
+        let waiting = Now {
+            at_us: start + WAKE_WITHIN_US - 1,
+            allowed: false,
+            ..ready()
+        };
+        assert_eq!(may_wake_hum(&waiting, start), Err("microphone_not_allowed"));
+        let ready_late = Now {
+            at_us: start + WAKE_WITHIN_US,
+            allowed: true,
+            ..waiting
+        };
+        assert_eq!(may_wake_hum(&ready_late, start), Err("wake_window_expired"));
+        assert_eq!(
+            may_wake_hum(
+                &Now {
+                    allowed: false,
+                    ..ready_late
+                },
+                start
+            ),
+            Err("wake_window_expired")
+        );
     }
 
     #[test]

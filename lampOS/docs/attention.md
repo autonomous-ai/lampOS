@@ -1035,9 +1035,20 @@ chime, never a beep:
   (`HandControls::take_woken`, fresh for 2 s). The conversation the wake
   opens says this same rising "hm?" first, as its own turn
   (`admission_basis: head_wake_cue`), once it is quiet and listening is
-  ready, within 1.5 s of its start or not at all. It is not held to the
-  tap's 30 s, since the person asked for it. The ring shows the listening
-  face with it. The trace row is `head_wake_cue`, with `acquired_at_us` (the
+  ready, strictly before 1.5 s from that conversation's original start or
+  not at all. This is a conversation-start limit, not the tap's deadline:
+  the wake marker may already be up to 2 s old when consumed. The existing
+  bounds therefore permit a decision to play almost 3.5 s after the hand; the
+  acquisition-to-first-write target remains 500 ms, to be measured on a lamp.
+  Startup's microphone permission may still be stabilizing for 60 ms;
+  this refusal waits alongside quiet and listening readiness, without
+  restarting the window or permitting any sound while denied. At or after
+  the deadline even a newly ready loop drops it (`wake_window_expired`).
+  A physical mute, a new hand sleep or an error cancels it with the
+  conversation, recording one refused `head_wake_cue` with
+  `why: conversation_ended` if no decision has yet been made.
+  It is not held to the tap's 30 s, since the person asked for it. The ring
+  shows the listening face with it. The trace row is `head_wake_cue`, with `acquired_at_us` (the
   waking input), `plays` and `why`. No sound comes for a mute the restart
   guard left, or for the person's own mute: only for a sleep a hand chose.
   Expression's night sleep is not the voice's, so neither sound plays for it.
