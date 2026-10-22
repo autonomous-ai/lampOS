@@ -1,5 +1,50 @@
 # Tests work log
 
+## 2026-10-22 12:10:45 +0700 — final requested Skills and row 72 rebases green
+
+Ready for lamp-voice: yes (#2776). #2693 has green refreshed native checks but is draft pending the reviewer-required coordinated ancestry refresh. #2625 is merged; Reviewer-lead closed its pause P3 at 09:04.
+
+Both reviewer-requested refreshes use base `219f93c31`. Every original
+added/removed patch line is preserved. Skills docs conflicted only where
+the merged guard paragraph meets the add-on paragraph; both are retained,
+including the 500 ms light-on silence and 300 ms post-visit checks. Its
+range-diff differs only in hunk context. Row 72 is a plain equivalent patch.
+
+#2693 at `3053eb929`: [ARM64 39724265265](https://github.com/autonomous-ai/lampOS/actions/runs/39724265265)
+passed: **Summary [ 173.657s] 10189 tests run: 10189 passed (1 leaky), 63 skipped**. [Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39724265282) passed.
+Native checkout: `c3b9ccb Merge 3053eb9293ea1d7d96b409d34797e135dbe2f33f into 22061b427805e4f6131cd5b15f2f1f287107fdf2`.
+
+#2776 at `a43bf35e8`: [ARM64 39725173950](https://github.com/autonomous-ai/lampOS/actions/runs/39725173950)
+passed: **Summary [ 174.442s] 10189 tests run: 10189 passed (1 leaky), 63 skipped**. [Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39725173901) passed.
+Native checkout: `727dc69 Merge a43bf35e8fd8d32f704867d87a50e71fea0dedf7 into 22061b427805e4f6131cd5b15f2f1f287107fdf2`.
+
+Fresh local gates passed on native x86_64 macOS: Skills **463 passed,
+zero failed/ignored**; full serial Voice **3,499 passed, zero failed,
+14 existing ignored**; Gemini capture-clock **12 passed**. Both worktrees
+also passed formatting, strict affected-package all-target Clippy, workspace
+build and whitespace checks. Source contents were identical through build-input
+mtime refreshes and all gate stages. No control was silently rerun or reassigned
+to this newer base; the historical three-before/three-after row 72 reproduction
+and its original-incident evidence limit remain as previously documented.
+
+The managed sandbox first denied local Unix socket binds: Skills stopped
+at 123 library passes and 19 permission failures; restricted Voice was stopped
+incomplete. Those outputs remain in `/private/tmp/tests-codex-final-refresh-20261022/`.
+The affected test stages then ran with local socket permission and passed;
+formatting and Clippy were not repeated. The failed/incomplete attempts are
+not counted as passes. No product fault is inferred from those permission errors.
+
+Both current heads, native receipts and range-diffs are posted on #2602
+and handed back to Reviewer-two. At 12:03 the new #2693 read again found
+no P1/P2, but required parent ancestry after the pending #2885 window.
+Its native merge contained 22061b427 while the authored parent is 219f93c31.
+By 12:08 the target had advanced again to 66e577e40; #2885 was still open.
+First/Reviewer-two were asked for the post-#2885 base and merge window, and
+#2693 returned to draft until that coordinated refresh. This is an open
+ancestry requirement, not a completed merge or a source finding. All task code and evidence is pushed, with
+one-line commits and no attribution. No ARM64 build on the Mac, device access
+or own PR merge. The open items wait on the existing reviewers’ reads/merges and First/Reviewer-two’s post-#2885 window.
+
 ## 2026-10-22 09:02:19 +0700 — all ordered heads green; waiting for their reviewers
 
 Ready for lamp-voice: yes (#2625, #2637, #2647, #2653, #2693, #2776).
