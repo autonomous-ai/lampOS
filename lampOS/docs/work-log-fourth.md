@@ -6666,6 +6666,44 @@ Ready for lamp-voice: no
   wrongfirstparent and is superseded. Proposal is not a testednewhead;
   branch/artifact remainfrozenb78 forMobile's exactheadgate.
 
+## 22 October, 18:52: photo source reread; known-name product draft resumed
+
+Ready for lamp-voice: no
+
+- Photo #2988 stays frozen at b78fc2e858f3d7aa92c14f86c4b092449384b051
+  for Mobile build 5870's person check. Focused source/test reread found
+  no P1/P2 issue in the required pinned-No/Yes revocation, plain/untrusted
+  name, and bounded startup cleanup corrections. No tests rerun by that
+  read; injected filesystem races/errors, device latency and spoken/model
+  attribution remain unproved. PR6340011444, Queue6340012577.
+- Remaining disjoint host consumers now pass: Memory296/0/6,
+  Keeper37/0/1, Skills488/0/1, Setup162/0/1, Voice-Eval623/0/0;
+  Cloud doctests0/0/0. Update continues in root33427, including its
+  468.80-second install stage77/0/0. Voice3340/1/14 and Cloud196/1/2
+  full-stage failures remain separate and are not erased. Tests6339620598
+  recorded TaskNews separately; this is not a waiver or proven cause.
+- Resumed own #2539 product preparation, claim6339786910 and
+  Queue6339788307 before code, session codex-20261022-memory-row,
+  no lamp. New own branch fourth/face-name-product-20261022 at
+  f012c47259ec302138d8ee4f91860889eef6619a. Feature#2573 already
+  merged; Friday6339634098 identified its off product switch as the
+  next memory-row dependency. One product FACE_NAME flag, existing-test
+  first/repeated local helper timing and accurate English docs prepared.
+  No runtime change, new function, extra core-memory setting or device action.
+- Known-name sockets and scoped/speaking settings already exist. Source
+  speaking_faces.rs leaves scope unchanged with no detected speaker;
+  off-camera voice can inherit the visible person's name even with both
+  switches. Draft explicitly records this unresolved boundary and the
+  three-second just-forgotten known-file window. First's lamp-4ace
+  person on/off/look-away/return/room/off-camera run and review must
+  precede product activation. Host target under5ms is helper entry to
+  return on a freshly written synthetic file, not cold storage, provider
+  or acoustic latency. Cargo waits for shared target release.
+- Latest photo integration is now conflicted; keep the exact qualified
+  artifact until Mobile's check. Future carry must preserve upstream full
+  look and remeasure actual product declarations. No score increase:
+  memory build row remains0.40 pending First's product acceptance.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
