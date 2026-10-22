@@ -2319,6 +2319,123 @@ fn a_kept_day_is_given_only_to_the_person_who_kept_it() {
     assert_eq!(store.follow_up_with(&mai, true).unwrap(), None);
 }
 
+/// What the room's scope holds: entries, event days and follow-up rows.
+fn room_rows(scratch: &Scratch) -> (u64, u64, u64) {
+    let connection = Connection::open(scratch.0.join(DATABASE)).unwrap();
+    let count = |sql: &str| -> u64 { connection.query_row(sql, [], |r| r.get(0)).unwrap() };
+    (
+        count("SELECT count(*) FROM entries WHERE person='everyone'"),
+        count(
+            "SELECT count(*) FROM event_days d JOIN entries e ON e.rid=d.rid WHERE e.person='everyone'",
+        ),
+        count("SELECT count(*) FROM follow_ups WHERE person='everyone'"),
+    )
+}
+
+/// `person`'s follow-up rows: the things they were asked about.
+fn follow_up_rows(scratch: &Scratch, person: &str) -> u64 {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM follow_ups WHERE person=?1",
+            [person],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
+
+/// #2807, the lamp run without a lamp: two remembered faces, A tells a
+/// dated event. After its day B talks first: B's note and follow-up have
+/// nothing of it, asking B marks nothing, and the room's scope holds none
+/// of it. Then A is asked once, and never again, nor is B.
+#[test]
+fn after_its_day_another_face_talking_first_is_never_asked_and_the_teller_is_once() {
+    let scratch = Scratch::new("event-teller");
+    let mut store = scratch.open(30, NOW);
+    let (a, b) = (person("p-minh"), person("p-mai"));
+    store.remember(&b, NOW, "Tea, no sugar").unwrap();
+    let id = wedding(&mut store, &a);
+    assert_eq!(room_rows(&scratch), (0, 0, 0), "told by A, kept as A's");
+    // Sunday, the day after: B talks first, more than once.
+    let sunday = MONDAY + 6 * DAY;
+    store.maintain(sunday).unwrap();
+    let theirs = store.session_open(&b, "b-sunday", NOTE_BYTES).unwrap();
+    assert!(theirs.note.contains("Tea, no sugar"), "{}", theirs.note);
+    assert!(!theirs.note.contains("wedding"), "{}", theirs.note);
+    for _ in 0..3 {
+        assert_eq!(store.follow_up_with(&b, true).unwrap(), None);
+    }
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-mai","events":true}),
+        sunday,
+    );
+    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
+    assert_eq!(
+        follow_up_rows(&scratch, "p-mai"),
+        0,
+        "asking B marks nothing"
+    );
+    assert_eq!(follow_up_rows(&scratch, "p-minh"), 0, "still owed to A");
+    // The room's scope has none of it, in its rows or its note.
+    let room = store
+        .session_open(&Person::everyone(), "room-sunday", NOTE_BYTES)
+        .unwrap();
+    assert!(!room.note.contains("wedding"), "{}", room.note);
+    assert_eq!(room_rows(&scratch), (0, 0, 0));
+    // Then A: asked once, with its day.
+    assert_eq!(
+        store.follow_up_with(&a, true).unwrap(),
+        Some(
+            json!({"id":id,"category":"thread","text":"Sister's wedding is on Saturday","on":"2026-10-24"})
+        )
+    );
+    assert_eq!(follow_up_rows(&scratch, "p-minh"), 1);
+    // The same day, the next, and the last of its window: never again.
+    for at in [sunday + 3_600_000, sunday + DAY, MONDAY + 19 * DAY] {
+        store.maintain(at).unwrap();
+        assert_eq!(store.follow_up_with(&a, true).unwrap(), None, "{at}");
+        assert_eq!(store.follow_up_with(&b, true).unwrap(), None, "{at}");
+    }
+    assert_eq!(room_rows(&scratch), (0, 0, 0));
+}
+
+/// #2807 with #2176's early words: a dated thing kept in the room's scope
+/// before A's face was known, then adopted by A, takes its day with it.
+/// After the day the room keeps nothing of it, B is never asked, A once.
+#[test]
+fn a_dated_thing_adopted_from_the_room_is_asked_only_of_its_teller() {
+    let scratch = Scratch::new("event-adopted");
+    let mut store = scratch.open(30, MONDAY);
+    let (a, b) = (person("p-minh"), person("p-mai"));
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","at_unix_ms":MONDAY,"text":KEPT_WEDDING,"on":"2026-10-24"}),
+        MONDAY,
+    );
+    let early = answer["id"].as_u64().unwrap();
+    assert_eq!(room_rows(&scratch), (1, 1, 0));
+    let moved = store.adopt(&Person::everyone(), &a, &[early]).unwrap();
+    assert_eq!(moved.len(), 1);
+    let id = moved[0].1;
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-24")
+    );
+    assert_eq!(room_rows(&scratch), (0, 0, 0), "adopted with its day");
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&b, true).unwrap(), None);
+    assert_eq!(follow_up_rows(&scratch, "p-mai"), 0);
+    assert_eq!(
+        store.follow_up_with(&a, true).unwrap(),
+        Some(json!({"id":id,"category":"kept","text":KEPT_WEDDING,"on":"2026-10-24"}))
+    );
+    store.maintain(MONDAY + 8 * DAY).unwrap();
+    assert_eq!(store.follow_up_with(&a, true).unwrap(), None);
+    assert_eq!(store.follow_up_with(&b, true).unwrap(), None);
+    assert_eq!(room_rows(&scratch), (0, 0, 0));
+}
+
 /// A store made before `event_days` gets it on open, and its threads are
 /// asked about as undated ones.
 #[test]
