@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 20:44 +07, fifth required gate green; corrected-base merge slot next
+
+Ready for lamp-voice: no — latest-base guard awaits the preceding merge slots
+
+Kind: tests/docs only. Current #3012 head `6c4088120` completed required ARM64
+and Clippy checks. ARM64: **10,477 passed / 0 failed / 67 skipped**, one leaky
+Voice pass, checker PASS4.922s, four doctests, twelve process tests and relay
+success. [Native proof](verification/updater-process-cuts-native-20261022/README.md)
+preserves the exact job, tested merge/base and API-only artifact metadata.
+The overall workflow status is stale in_progress; no aggregate success is claimed.
+
+The final latest-base guard found `f481f7454`. First reports a formatting fault
+on integration until #3044 lands. Reviewer-lead's order is #3044, #3042, then
+#3012. The unchanged updater patch will rebase and qualify on that corrected
+head; no prior green transfers to a replacement. This merge lane belongs to
+Reviewer-lead. No failed gate has been hidden or rerun for green.
+
+Five [observer controls](verification/updater-observer-controls-20261022/README.md)
+passed under ARM64 Podman. The real #2810 attended unplug remains unexecuted,
+awaiting First's lamp/person/window and persistent trial setup. #1812 follows,
+with owner/key/publication and attended Body inputs still missing. No device
+connection, installation, physical interruption or publication occurred.
+
+---
+
 ## Current checkpoint: 2026-10-22 20:32 +07, observer controls complete; fifth native gate running
 
 Ready for lamp-voice: no — exact-head ARM64 gate pending

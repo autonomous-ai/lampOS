@@ -105,3 +105,20 @@ passed using the verified authored artifact's `--help` only. This is debugger
 preparation, not an installed self-switch or physical power-cut result. Its
 Podman VM was stopped after capturing the results. Actual lamp/person/trial
 inputs and #1812 publication prerequisites remain with First/owner.
+
+## Completed required checks, 20:44 +07
+
+[rebase-6c40.json](rebase-6c40.json) records head `6c4088120` tested as merge
+`b26032a` with base `b1b9174f8`: **10,477 passed / 0 failed / 67 skipped**,
+one leaky Voice pass, explicit process-cut checker PASS **4.922 s**, four
+doctests, twelve process tests and relay success. The ARM64 job119848843550
+and Clippy job119848844430 are both SUCCESS. Workflow39785883299's aggregate
+status remained in_progress even though all jobs were success or skipped;
+this receipt claims the completed required checks, not a completed aggregate.
+Artifact12429233152 is API metadata only, not an independently verified download.
+
+The latest integration guard then found `f481f7454`, so the PR remains draft.
+First reports that integration needs #3044's fmt correction. Reviewer-lead's
+merge order puts that and #3042 ahead of #3012. The next rebase is deliberately
+waiting for those merges, rather than running a gate on the known fmt-broken
+base. This is a merge-order dependency, not a failure in the updater patch.
