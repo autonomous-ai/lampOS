@@ -6955,6 +6955,32 @@ Ready for lamp-voice: no
 - Posted current-base results and next work on #2602 at 00:06. No PR is offered
   for a train. No lamp, model call or physical acceptance is claimed.
 
+## 2026-10-23, 00:39: reset correction published and private regressions pass
+
+Ready for lamp-voice: no
+
+- #3072 is pushed at `f6affe231`, fixing the reset P2 and private-mode P3.
+  Mac formatting, strict workspace clippy/build pass. Eyes who 48/0/1 plus
+  binary 8/0/0, full Setup 178/0/1 and full Update 307/0/2 give 541 passed,
+  zero failed, four existing ignores. Failed fixture-index/formatting attempts
+  are retained. El and reviewer-two have the corrected-head re-read request.
+- Exact-head Linux clippy 39822682504 passed; ARM64 39822682481 is running.
+  Prior head/read/native results do not qualify this correction. Answered
+  First's reader question: no completed corrected-head read yet; reviewer-two
+  announced this re-read next at 00:35. Current main must remain in any train.
+- #3064 passes 20 Engine regressions, one credited IPC control, 20 scope
+  controls, 12 speaking-source controls and 10 Eyes binary tests. Full Voice
+  library run is active. Two package-feature-dependent test macros were
+  replaced with standard polling, preserving the Pending assertions. The
+  failed compile log is retained. One callback filter selected zero tests;
+  the corrected module-specific run is required before publication.
+- Controller branch `e616b7621` includes the exact qualified store P2 tree.
+  Its 17 authored tests and six dirty core paths are unchanged and unrun;
+  no active runtime, RPC or product capability is added by that core.
+- Recreated the vanished temporary log checkout from the fully pushed branch
+  `b7aacc716`; code trees and running checks were unaffected. No lamp, model
+  call, physical memory-row acceptance or score increase is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
