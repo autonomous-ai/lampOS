@@ -808,6 +808,9 @@ struct Shared {
     /// Whether one person said the name and the line after it, and where
     /// a line not judged yet is kept for that ([`Engine::telling_one_speaker`]).
     one_speaker: Option<(SameSpeaker, LineKept)>,
+    /// lamp-name's near hearings, for a line's first word
+    /// ([`Engine::hearing_the_name_near`]).
+    name_near: Option<NameNear>,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -922,6 +925,116 @@ struct SaidBy {
     said_from: u64,
     words: String,
     called: bool,
+}
+
+/// lamp-name's best near hearing (`name/near`, `LAMP_NAME_NEAR`) around a
+/// line's start, by its first sound's read time (`worker::Heeding::near_name`).
+pub type NameNear = Arc<dyn Fn(u64) -> Option<f32> + Send + Sync>;
+
+/// The least near score that, beside a first word set off and sounding
+/// like the name, makes it the name (`LAMP_NAME_NEAR`): lamp-name's own
+/// near bar. In the clean files of 22 Oct's played lines, a line with no
+/// name reached it in 1 of 24, mid-line.
+pub const NAME_NEAR_LEAST: f32 = 0.5;
+
+/// Words the speech to text wrote for "Lamp" at a line's start on
+/// lamp-4ace in 22 Oct's played rounds that the shape in
+/// [`sounds_like_the_name`] misses (`LAMP_NAME_NEAR`).
+const HEARD_FOR_THE_NAME: [&str; 7] =
+    ["louvre", "month", "life", "light", "length", "lane", "lynn"];
+
+/// Whether a word sounds like the lamp's name (`LAMP_NAME_NEAR`): one of
+/// [`HEARD_FOR_THE_NAME`], or one syllable from an L to an M, P or N
+/// ("Lan", "Lin", "Lump", "Loom", "Lean"; "-mb" as "Lamb" is an M).
+/// Never a word with an apostrophe, nor alone a call.
+fn sounds_like_the_name(word: &str) -> bool {
+    let word = word.to_ascii_lowercase();
+    if !word.chars().all(|c| c.is_ascii_alphabetic()) || word.is_empty() {
+        return false;
+    }
+    if HEARD_FOR_THE_NAME.contains(&word.as_str()) {
+        return true;
+    }
+    let vowel = |c: char| "aeiouy".contains(c);
+    // A silent "e" after a consonant ends no syllable: "line", "lane".
+    let spoken = match word.strip_suffix('e') {
+        Some(stem) if stem.chars().last().is_some_and(|c| !vowel(c)) => stem,
+        _ => word.as_str(),
+    };
+    let spoken = spoken
+        .strip_suffix("mb")
+        .map_or(spoken.to_owned(), |stem| format!("{stem}m"));
+    let syllables = spoken
+        .chars()
+        .zip(std::iter::once(' ').chain(spoken.chars()))
+        .filter(|(c, before)| vowel(*c) && !vowel(*before))
+        .count();
+    spoken.starts_with('l') && syllables == 1 && spoken.ends_with(['m', 'p', 'n'])
+}
+
+/// Where a line's first word lies, when it is set off as a name is: past
+/// a greeting at most ("Hey"), followed by a comma or a stop, or the whole
+/// line, its own piece. Its byte range in `text`.
+fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
+    let word_at = |from: usize| {
+        let start = from + text[from..].find(|c: char| c.is_alphanumeric() || c == '\'')?;
+        let len = text[start..]
+            .find(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .unwrap_or(text.len() - start);
+        Some((start, start + len))
+    };
+    let (mut start, mut end) = word_at(0)?;
+    if ["hey", "ok", "okay", "hi"]
+        .iter()
+        .any(|greeting| text[start..end].eq_ignore_ascii_case(greeting))
+    {
+        (start, end) = word_at(end)?;
+    }
+    let after = text[end..].trim_start();
+    (after.is_empty() || after.starts_with([',', '.', '!', '?', ';', ':'])).then_some((start, end))
+}
+
+/// `LAMP_NAME_NEAR`: `text`'s first word, set off and sounding like the
+/// lamp's name, is the name when lamp-name heard it near
+/// ([`NAME_NEAR_LEAST`] or more) within 1.3 s of the line's first sound
+/// (`began_us`): it is put in the word's place, so the rule and the model
+/// read the call. Either sign alone changes nothing, and the journal says
+/// which held, counts only.
+fn named_near(request: u64, text: String, began_us: u64, near: &NameNear) -> String {
+    let Some((start, end)) = first_word_set_off(&text) else {
+        return text;
+    };
+    let word = &text[start..end];
+    if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
+        return text;
+    }
+    let sounds = sounds_like_the_name(word);
+    let heard = near(began_us);
+    let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
+    match (sounds, near_enough) {
+        (true, Some(score)) => {
+            eprintln!(
+                "lamp-voice second: request {request}: its first word, set off and sounding like the lamp's name, is the name: lamp-name heard it near, at {score:.2}, by the line's start (LAMP_NAME_NEAR)"
+            );
+            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+        }
+        (true, None) => {
+            eprintln!(
+                "lamp-voice second: request {request}: its first word, set off, sounds like the lamp's name, but lamp-name heard it near by the line's start {}: not the name (LAMP_NAME_NEAR)",
+                heard.map_or("not at all".to_owned(), |score| format!(
+                    "only at {score:.2}"
+                ))
+            );
+            text
+        }
+        (false, Some(score)) => {
+            eprintln!(
+                "lamp-voice second: request {request}: lamp-name heard the name near, at {score:.2}, by the line's start, but its first word, set off, doesn't sound like it: not the name (LAMP_NAME_NEAR)"
+            );
+            text
+        }
+        (false, None) => text,
+    }
 }
 
 /// Told how the room was, and who spoke, as a line the rule has not judged
@@ -1424,6 +1537,7 @@ impl Engine {
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
                 one_speaker: None,
+                name_near: None,
                 own_echo: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
@@ -1829,6 +1943,18 @@ impl Engine {
     pub fn telling_one_speaker(mut self, same: SameSpeaker, kept: LineKept) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.one_speaker = Some((same, kept));
+        }
+        self
+    }
+
+    /// `LAMP_NAME_NEAR=on`: a spoken line's first word, set off and
+    /// sounding like the lamp's name, is the name when `near` says
+    /// lamp-name heard it near, [`NAME_NEAR_LEAST`] or more, within 1.3 s
+    /// of the line's start ([`named_near`]). Without it, as before. Before
+    /// any turn only.
+    pub fn hearing_the_name_near(mut self, near: NameNear) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_near = Some(near);
         }
         self
     }
@@ -3800,6 +3926,13 @@ async fn spoken(
         CALLED_WORDS.to_owned()
     } else {
         text
+    };
+    // A first word set off and sounding like the lamp's name, which
+    // lamp-name heard near at the line's start, is the name
+    // (`LAMP_NAME_NEAR`): both signs, never one.
+    let text = match &shared.name_near {
+        Some(near) => named_near(request, text, said.lock().map_or(0, |said| said.0), near),
+        None => text,
     };
     // Said by the lamp's name just before, whose request this line dropped
     // (`LAMP_SECOND_NAME_CARRIES`), when one person said both: the name's
