@@ -9368,6 +9368,57 @@ async fn a_push_mid_search_holds_its_looks_until_the_person_asks_again() {
     }
 }
 
+/// El's P2 on #2990: a walked search's look turns are the coordinator's,
+/// never a look this route asked, so a search whose last own look is more
+/// than two minutes old still goes on while its turns come: each search
+/// turn taken counts as its newest, and a push then still ends it.
+#[tokio::test]
+async fn a_walked_search_past_two_minutes_since_its_own_look_still_takes_a_push() {
+    for search in [true, false] {
+        let script = Arc::new(Script {
+            chats: Mutex::new(vec![vec![text("Not there."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({}) }));
+        let pushed = Arc::new(Mutex::new(crate::search_pushed::SearchPushed::default()));
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .looking_by_call()
+        .looking_for_skills(Arc::new(|name| name == "look_for"))
+        .looking(Arc::new(|| Ok(vec![0xFF, 0xD8, 0xFF])))
+        .stopping_searches_by_hand(pushed.clone());
+        // The search's one own look, longer ago than a search is held.
+        let long_ago = monotonic_us().saturating_sub(
+            crate::search_pushed::SEARCH_HELD_US + Duration::from_secs(10).as_micros() as u64,
+        );
+        pushed
+            .lock()
+            .unwrap()
+            .looked(1, "look_for", &json!({"place": "desk"}), long_ago);
+        // A walk step's look turn, which the coordinator asked itself.
+        engine.submit(ProviderInput::Written {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::speak_up::LOOK_FULL_NOTE.into(),
+            look: true,
+            search,
+            quoted: false,
+        });
+        let (_, said) = look_and_words(&mut engine).await;
+        assert_eq!(said, ["Not there."]);
+        assert_eq!(
+            pushed.lock().unwrap().hand(monotonic_us()),
+            search,
+            "search turn {search}: the push ends the search"
+        );
+    }
+}
+
 /// `LAMP_SECOND_LOOK_NOTE` (look-for-things, step 2): a look's turn whose
 /// answer called nothing in any round tells the coordinator so
 /// (`LookNoCall`, for its session, before its `TurnComplete`). One whose

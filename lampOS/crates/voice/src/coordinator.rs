@@ -6394,8 +6394,53 @@ fn conversation_with_gate(
         // #1555).
         let stop_heard = playback_mask.take_stop_committed() && speaking;
         let spoken_stop = waited || heard_over || stop_heard;
+        // A push on the body ends a skill's search for the voice too, as
+        // lamp-skills ends it for the body (#2904): its held look's picture
+        // never goes to the model, and no note or walk step follows. The
+        // search's turn in hand (the answer to a look's picture, or "Let me
+        // look on the left") is cut as a spoken stop cuts it, and what its
+        // request still sends is fenced, so no answer to the pushed look
+        // plays and no second round speaks (El's P2 on #2990). The second
+        // route holds its further looks itself (`search_pushed`).
+        let mut body_pushed = false;
+        if let Some(hand) = hand_in.as_mut()
+            && hand.pushed(clock)
+            && let Some((held, its_turn)) =
+                look_note.pushed(reply.as_ref().map(|current| current.owner.turn()))
         {
-            if stop || muted || gap_cut || head_stop || spoken_stop {
+            let dropped = look_wanted
+                .map(|(turn, _)| turn)
+                .filter(|turn| held == Some(*turn));
+            if let Some(turn) = dropped {
+                look_wanted = None;
+                look_held = None;
+                record(
+                    trace,
+                    json!({"kind":"look_dropped","turn":turn,"by":"tool","why":crate::search_pushed::WHY,"at_us":clock}),
+                )?;
+            }
+            body_pushed = its_turn;
+            record(
+                trace,
+                json!({"kind":"search_pushed","look_dropped":dropped,"turn_cut":its_turn,"at_us":clock}),
+            )?;
+            eprintln!(
+                "lamp-voice: {}: the search ended{}{}",
+                crate::search_pushed::WHY,
+                if dropped.is_some() {
+                    "; its look's picture is dropped"
+                } else {
+                    ""
+                },
+                if its_turn {
+                    "; its turn in hand is cut"
+                } else {
+                    ""
+                }
+            );
+        }
+        {
+            if stop || muted || gap_cut || head_stop || spoken_stop || body_pushed {
                 let observed_at_us = monotonic_us();
                 let cancellation = hand::cancel(
                     owner,
@@ -6459,7 +6504,7 @@ fn conversation_with_gate(
                 if let Some(words) = wait_words.as_mut() {
                     words.close();
                 }
-                if gap_cut && !stop && !head_stop && !spoken_stop && !muted {
+                if gap_cut && !stop && !head_stop && !spoken_stop && !body_pushed && !muted {
                     // Admission keeps nothing of it: its capture lineage
                     // ends with the gap. After the gap, what is still said
                     // of it is dropped until a pause, not a new question.
@@ -6502,7 +6547,8 @@ fn conversation_with_gate(
                 asked_in_busy_room = None;
                 busy_answer_since = None;
                 use crate::receipt_history::{
-                    CAPTURE_GAP, HAND_STOP, HEAD_SLEEP, HEAD_STOP, SOFTWARE_MUTED, SPOKEN_STOP,
+                    BODY_PUSHED, CAPTURE_GAP, HAND_STOP, HEAD_SLEEP, HEAD_STOP, SOFTWARE_MUTED,
+                    SPOKEN_STOP,
                 };
                 // Only a Stop that cut the lamp's speech: after an idle
                 // Stop, "Lamp?" or "Hi." is taken as always (Second on
@@ -6519,7 +6565,8 @@ fn conversation_with_gate(
                 }
                 // A stop word said over the lamp's speech ends its words too
                 // (`LAMP_STOP_WORDS`, the reviewer's optional P3 on #1278).
-                if spoken_stop && !muted {
+                // So does a push that cut the search's turn (#2904).
+                if (spoken_stop || body_pushed) && !muted {
                     lamp_words_ended_us = None;
                 }
                 let reason = if asleep {
@@ -6532,6 +6579,8 @@ fn conversation_with_gate(
                     HEAD_STOP
                 } else if spoken_stop {
                     SPOKEN_STOP
+                } else if body_pushed {
+                    BODY_PUSHED
                 } else {
                     CAPTURE_GAP
                 };
@@ -9852,39 +9901,6 @@ fn conversation_with_gate(
             last_turn_us = clock;
         }
         last_turn_us = last_turn_us.max(last_speech_us);
-        // A push on the body ends a skill's search for the voice too, as
-        // lamp-skills ends it for the body (#2904): its held look's picture
-        // never goes to the model, and no note or walk step follows. The
-        // second route holds its further looks itself (`search_pushed`).
-        if let Some(hand) = hand_in.as_mut()
-            && hand.pushed(clock)
-            && let Some(held) = look_note.pushed()
-        {
-            let dropped = look_wanted
-                .map(|(turn, _)| turn)
-                .filter(|turn| held == Some(*turn));
-            if let Some(turn) = dropped {
-                look_wanted = None;
-                look_held = None;
-                record(
-                    trace,
-                    json!({"kind":"look_dropped","turn":turn,"by":"tool","why":crate::search_pushed::WHY,"at_us":clock}),
-                )?;
-            }
-            record(
-                trace,
-                json!({"kind":"search_pushed","look_dropped":dropped,"at_us":clock}),
-            )?;
-            eprintln!(
-                "lamp-voice: {}: the search ended{}",
-                crate::search_pushed::WHY,
-                if dropped.is_some() {
-                    "; its look's picture is dropped"
-                } else {
-                    ""
-                }
-            );
-        }
         // The look the lamp said it would take, as soon as it has finished
         // saying so. Someone speaking first takes the turn and the look is
         // dropped; so is one that could not begin within fifteen seconds of being asked for.
