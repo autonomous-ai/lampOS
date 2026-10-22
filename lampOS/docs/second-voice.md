@@ -2277,13 +2277,19 @@ after a take-over, but now for every turn:
     its link judged at the next line's verdict (`Engine::chain_heard`,
     `request N: cut short after its words came back, before it was asked;
     they wait for request M's verdict, a chain of K lines`); a held line's
-    never. A link judged two people's there breaks the chain, and the
-    pieces before it are let go (`the chain cut short breaks between
-    requests A and B: WHY; its K earlier pieces are let go`); a held line
-    answering a chain in its place judges those links by the voices or one
-    face only. At most 60 words (`CHAIN_MOST_WORDS`) and 20 s from its
-    oldest piece (`CHAIN_MOST_FOR`): past either the oldest pieces are let
-    go. The join's line gives the count: `K lines are asked as one`, with
+    never, nor one that says stop or "never mind", which lets the chain
+    before it go. A link judged two people's there breaks the chain, and
+    the pieces before it are let go (`the chain cut short breaks between
+    requests A and B: WHY; its K earlier pieces are let go`); so does any
+    older piece against the line joining it, not only its neighbour: a
+    face or a voice two pieces apart is two people as much as one beside it
+    (a reviewer's P2, 22 Oct: X seen saying the first piece, nobody the
+    short middle one, Y the last, passed link by link). These later
+    judgements wait for a print still to come as a join does (`JOIN_WAIT`).
+    A held line answering a chain in its place judges its pieces against
+    the newest by the voices or one face only. At most 60 words
+    (`CHAIN_MOST_WORDS`) and 20 s from its oldest piece's start
+    (`CHAIN_MOST_FOR`): past either the oldest pieces are let go. The join's line gives the count: `K lines are asked as one`, with
     `its N oldest pieces let go past 60 words or 20 s` when cut. The rule
     keeps each line's faces and room for the last 8 lines (`SPOKE_KEPT`),
     so a 4-piece chain and the line after are judged link by link.
