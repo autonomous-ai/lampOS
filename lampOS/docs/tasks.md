@@ -238,6 +238,19 @@ the task was started on. The `@<id>` form before it is refused ("Name the
 machine with --machine <id>."), so a `lamp-tasks` build from before that
 change fails every launch with `new_failed`.
 
+A target's folder must already be on the computer: Harness never makes it.
+`new` into a folder that isn't there is refused before anything is made
+(`{"ok":false,"error":"CWD_NOT_FOUND"}`, openharness `core/agents/create.ts`;
+`INVALID_CWD`'s "That folder does not exist on the machine." alike). Found
+on lamp-75c9 on 22 October, when a new target's folder was missing from the
+laptop. **`serve --folder-missing`** (#2840, off unless set): such a task
+ends `not_sent` with `folder_missing`, and the voice tells it with Task
+news' `failed_folder` words: the work didn't start, as the folder it works
+in isn't on their computer (by its name with `LAMP_TASKS_MACHINE_NAMES`),
+and has to be made there first. Without it, and for every other failed
+`new`, the task stays `uncertain` with `new_failed`, and the lamp says the
+work may not have started.
+
 The engine allowlist is `codex`, `claude`, `opencode`, `devin` or
 `devin-cloud` (OpenCode since task 41: Harness 0.4.2's `harness new --help`
 names it, and its ask mode passes OpenCode no flag; see "Who gets the work";
@@ -689,7 +702,8 @@ are off:
     bytes (`MacBook Air` is `macbook-air`), `computer` with nothing left,
     and `-2`, `-3` … where two would be the same;
   - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
-    (lamp-4ace's today; Harness makes it the first time) and `ENGINE`
+    (lamp-4ace's today; Harness never makes it, so a computer without it
+    refuses each hand-over: see `--folder-missing`) and `ENGINE`
     (`claude`, `codex` or `opencode`), until Harness says which engines a
     machine has (openharness#1410's question 2).
 

@@ -1252,10 +1252,13 @@ fn read_once_with(
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
                 let key = format!("{store}:{id}:hand-over");
+                // The computer has no such folder: lamp-tasks says so only
+                // with `serve --folder-missing` (#2840).
+                let folder = item["dispatch"]["code"] == "folder_missing";
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
-                    && let Some(note) = note_failed(&words, &task, failed)
+                    && let Some(note) = note_failed(&words, &task, failed, folder)
                 {
                     news.push(News {
                         key,
@@ -1407,17 +1410,35 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         .then_some(unsure)
 }
 
-fn note_failed(words: &NewsWords, task: &Value, unsure: bool) -> Option<String> {
+/// A hand-over that did not reach its agent, fitted to one written turn
+/// like other news ([`fitted`]): the task's words are cut first
+/// (reviewer-two's P2 on #2875). A missing folder's note with a computer
+/// name that leaves no room says "their computer"; still over, it is told
+/// as a plain failure.
+fn note_failed(words: &NewsWords, task: &Value, unsure: bool, folder: bool) -> Option<String> {
     let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+    let who = who(task);
+    let say = |line: &str, computer: &str| {
+        fitted(&asked, "", false, |asked, _, _| {
+            unprompted(&fill(
+                line,
+                &[("asked", asked), ("who", who), ("computer", computer)],
+            ))
+        })
+    };
+    if folder && !unsure {
+        let note = say(&words.failed_folder, &their_computer(task))
+            .or_else(|| say(&words.failed_folder, "their computer"));
+        if note.is_some() {
+            return note;
+        }
+    }
     let line = if unsure {
         &words.failed_unsure
     } else {
         &words.failed
     };
-    Some(unprompted(&fill(
-        line,
-        &[("asked", &asked), ("who", who(task))],
-    )))
+    say(line, "")
 }
 
 /// News said unprompted, as the voice frames it: "(Nobody has spoken. "
@@ -2325,7 +2346,7 @@ mod tests {
                 }
                 for unsure in [false, true] {
                     said(
-                        note_failed(&words, &task, unsure),
+                        note_failed(&words, &task, unsure, false),
                         before::note_failed(&task, unsure),
                     );
                 }
@@ -3165,16 +3186,73 @@ mod tests {
             failed_hand_over(&item("accepted", true, "boot-a", NOW), &now()),
             None
         );
-        let told = note_failed(&own(), &task("claude", json!([])), false).unwrap();
+        let told = note_failed(&own(), &task("claude", json!([])), false, false).unwrap();
         assert!(
             told.contains("did not reach Claude Code") && told.contains("offer to try again"),
             "{told}"
         );
         assert!(
-            note_failed(&own(), &task("codex", json!([])), true)
+            note_failed(&own(), &task("codex", json!([])), true, false)
                 .unwrap()
                 .contains("may not have reached Codex")
         );
+    }
+
+    /// `serve --folder-missing` (#2840): a hand-over Harness refused for a
+    /// folder that isn't on the computer is told as that, in plain words,
+    /// naming the computer; only a sure failure is.
+    #[test]
+    fn a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer() {
+        let told = note_failed(&own(), &task("claude", json!([])), false, true).unwrap();
+        assert!(
+            told.contains("did not reach Claude Code")
+                && told.contains("the folder it works in isn't on their computer")
+                && told.contains("no technical words or paths")
+                && !told.contains("lamp-tasks"),
+            "{told}"
+        );
+        // Not sure it didn't start: told as before.
+        assert_eq!(
+            note_failed(&own(), &task("claude", json!([])), true, true),
+            note_failed(&own(), &task("claude", json!([])), true, false)
+        );
+    }
+
+    /// Reviewer-two's P2 on #2875: a valid task of 250 three-byte
+    /// characters made a missing folder's note of 1,043 bytes, which Live
+    /// refuses after the news is marked told. Each failed note fits one
+    /// written turn, cut on whole characters, and keeps its explanation,
+    /// with the shipped words and with the longest a skill may give.
+    #[test]
+    fn a_failed_hand_over_note_fits_one_written_turn_whatever_the_task() {
+        let most = lamp_gemini::wire::MAX_NOTE_BYTES;
+        let mut long = task("claude", json!([]));
+        long["text"] = json!("界".repeat(250));
+        let mut longest = own();
+        longest.failed_folder = format!(
+            "{} \"{{asked}}\" {{who}} {{computer}}: the folder isn't there.",
+            "x".repeat(840)
+        );
+        assert!(longest.failed_folder.len() <= 900);
+        // The longest words leave no room for the task's: they are cut away.
+        for (words, kept) in [(own(), true), (longest, false)] {
+            for (unsure, folder) in [(false, true), (false, false), (true, false)] {
+                let told = note_failed(&words, &long, unsure, folder).unwrap();
+                assert!(told.len() <= most, "{} bytes", told.len());
+                assert!(told.ends_with(')'), "{told}");
+                assert_eq!(told.contains('界'), kept || !folder, "{told}");
+                if folder {
+                    assert!(told.contains("their computer"), "{told}");
+                    assert!(
+                        told.contains("isn't on") || told.contains("the folder isn't there"),
+                        "{told}"
+                    );
+                }
+            }
+        }
+        // A short one is as before: nothing cut.
+        let short = note_failed(&own(), &task("claude", json!([])), false, true).unwrap();
+        assert!(short.contains("Suggest three 'friendly' names for a desk lamp"));
     }
 
     /// #560, V1's third lesson: Harness accepted work and its agent never
