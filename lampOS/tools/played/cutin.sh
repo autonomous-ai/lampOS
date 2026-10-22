@@ -24,6 +24,12 @@
 #   (speaker_first_write). "Acoustic" is a proxy: the first block after it that the lamp's microphone heard as its own
 #   voice (duplex_hearing 3, about 10 ms a block, the trail's time counted back); "unmeasured" when there is none.
 #   No event times the acoustic output itself.
+# - Attribution: a yield's decision is the commit or resume its own duplex_yield_end names (started_at_us and owner
+#   the yield's); a yield that ended otherwise (hearing_expired, owner_changed, ...) is reported as that, with no
+#   decision, even when another yield later commits or resumes. The acoustic proxy counts only the answer's own
+#   blocks: before its turn finished, another turn's audio began, or the stop line.
+# - Exit: 1 when any episode's scene, journal read or report failed (the rest still run; the failure is in the
+#   report), 6 when putting lamp-voice back failed after an otherwise clean run; an earlier failure's code is kept.
 #
 # CUTIN_ENV, optional: space-separated NAME=VALUE pairs for lamp-voice (for example LAMP_CUT_IN_COUNTS_REAL=on), put
 # on through a /run drop-in (zz-cutin-check.conf) and the voice restarted; on any exit the drop-in is removed and the
@@ -77,12 +83,19 @@ bin=$(sed -n 's/.*ExecStart={ path=\([^ ;]*\).*/\1/p' <<<"$unit" | head -n 1)
 mkdir -p "$OUT"
 work=$(mktemp -d)
 changed=no
-put_back() {
+failed=0 # set by any episode whose scene, journal or report failed: the run then exits 1, never as a clean measurement
+put_back() { # on every exit: keeps the exit's own failure, and a failed put-back makes a clean exit 6
+  local rc=$?
   rm -rf "$work"
-  [[ $changed == yes ]] || return 0
-  lamp "sudo -n rm -f $DROPIN && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice" \
-    && echo "cutin.sh: drop-in removed, lamp-voice restarted without it" \
-    || echo "cutin.sh: putting lamp-voice back FAILED: remove $DROPIN, daemon-reload and restart lamp-voice by hand" >&2
+  if [[ $changed == yes ]]; then
+    if lamp "sudo -n rm -f $DROPIN && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice"; then
+      echo "cutin.sh: drop-in removed, lamp-voice restarted without it"
+    else
+      echo "cutin.sh: putting lamp-voice back FAILED: remove $DROPIN, daemon-reload and restart lamp-voice by hand" >&2
+      ((rc)) || rc=6
+    fi
+  fi
+  exit "$rc"
 }
 trap put_back EXIT
 trap 'exit 130' INT TERM HUP
@@ -120,14 +133,22 @@ quiet() { # until the lamp has heard and said nothing for 45 s (a voice just res
 READ='S=$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); sudo -n sh -c "cat /var/lib/lampOS/voice/sessions/$S/metadata/events-*.jsonl"'
 
 episode() { # episode MODE OFFSET NAME LINE...: play the scene, read the events, report one line or block
-  local mode=$1 offset=$2 name=$3 scene
+  local mode=$1 offset=$2 name=$3 scene old rc
   shift 3
   quiet
-  "$SCENARIO" "$name" "$@" >/dev/null 2>&1
   # shellcheck disable=SC2012 # the kit names its own scene files: no odd characters
-  scene=$(ls -t "$OUT"/*-"$name".txt 2>/dev/null | head -n 1)
-  lamp "$READ" >"$work/events.jsonl"
-  python3 - "$mode" "$offset" "$name" "${scene:-}" "$work/events.jsonl" "$tally" "$GEN" "${LAMP_SAY_RATE:-185}" <<'PY' | tee -a "$report"
+  old=$(ls "$OUT"/*-"$name".txt 2>/dev/null)
+  "$SCENARIO" "$name" "$@" >/dev/null 2>&1
+  rc=$?
+  ((rc == 0)) || { echo "$name: the scene failed (exit $rc); not measured" | tee -a "$report" >&2; failed=1; sleep 5; return; }
+  # Only a scene this run wrote: a same-label scene from before is never read as this one.
+  # shellcheck disable=SC2012
+  scene=$(ls -t "$OUT"/*-"$name".txt 2>/dev/null | grep -vxF -- "$old" | head -n 1)
+  [[ -n $scene ]] || { echo "$name: the scene wrote no file; not measured" | tee -a "$report" >&2; failed=1; sleep 5; return; }
+  lamp "$READ" >"$work/events.jsonl" \
+    || { echo "$name: the lamp's journal could not be read; not measured" | tee -a "$report" >&2; failed=1; sleep 5; return; }
+  python3 - "$mode" "$offset" "$name" "$scene" "$work/events.jsonl" "$tally" "$GEN" "${LAMP_SAY_RATE:-185}" <<'PY' | tee -a "$report" \
+    || { echo "$name: its report failed" >&2; failed=1; }
 import hashlib, json, sys, wave
 mode, offset, name, scene, events, tally, gen, rate = sys.argv[1:9]
 CLASSES = {'0': 'still', '1': 'clear', '2': 'under', '3': 'own', '4': 'over', '5': 'unknown', '-': 'unjudged', '.': 'absent'}
@@ -176,14 +197,26 @@ def lost(a, b):
     return out
 def stop_words(a, b):
     return ['%s stop=%s words=%s' % (r['kind'], r.get('stop'), r.get('words')) for r in kinds(a, b, 'stop_words', 'stop_heard')]
-def window(y, decision):
-    """The bounded window: from the first block of the over (4) run that ended on the yield's block, to the
-    decision's block (or 110 blocks, the resume deadline, past the yield)."""
+def ended(y):
+    """The yield's own end: the duplex_yield_end its interval opened (started_at_us is the yield's at_us, same
+    owner), and for a commit or resume that decision's own record, at the end's time. Returns (end, decision, how):
+    a yield lost another way (hearing_expired, owner_changed, ...) has no decision, and a later unrelated yield's
+    commit or resume is never its."""
+    e = next((r for r in rows if r.get('kind') == 'duplex_yield_end' and r.get('started_at_us') == y.get('at_us')
+              and r.get('owner') == y.get('owner')), None)
+    if e is None: return None, None, 'unended'
+    kind = {'commit_decision': 'duplex_commit', 'resumed': 'duplex_resume'}.get(e.get('outcome'))
+    d = next((r for r in rows if kind and r.get('kind') == kind and r.get('at_us') == e.get('at_us')
+              and r.get('owner') == y.get('owner')), None)
+    return e, d, kind[7:] if d else str(e.get('outcome'))
+def window(y, e):
+    """The bounded window: from the first block of the over (4) run that ended on the yield's block, to the block
+    its interval ended on (or 110 blocks, the resume deadline, past the yield)."""
     f = y.get('frame_sequence')
     if f is None: return None
     start = f
     while heard.get(start - 1, ('.',))[0] == '4': start -= 1
-    end = decision.get('frame_sequence') if decision and decision.get('frame_sequence') else f + 110
+    end = e and (e.get('ending_frame_sequence') or e.get('last_frame_sequence')) or f + 110
     return start, f, end
 policy = [r for r in rows if r.get('kind') == 'duplex_policy' and r.get('at_us', 0) <= (plays[0][0] if plays else 0)]
 if policy:
@@ -207,12 +240,12 @@ if mode == 'idle':
     print('%s: idle %.2f min of reply heard (%d blocks), %d false yields, %d commits, %d resumes' % (
         name, minutes, len(span), len(ys), len(kinds(a, stop_at, 'duplex_commit')), len(kinds(a, stop_at, 'duplex_resume'))))
     for y in ys:
-        d = next(iter(kinds(y['at_us'], stop_at + 1, 'duplex_commit', 'duplex_resume')), None)
-        w = window(y, d)
+        e, d, how = ended(y)
+        w = window(y, e)
         cls = blocks(w[0], w[2]) if w else ''
         print('  yield at %s, frame %s, %s after %s; window frames %s..%s: %s [%s]' % (
-            s(y['at_us'] - first['at_us']), y.get('frame_sequence'), d['kind'][7:] if d else 'no decision',
-            s(d['at_us'] - y['at_us']) if d else '-', w[0] if w else '?', w[2] if w else '?', cls, counts(cls)))
+            s(y['at_us'] - first['at_us']), y.get('frame_sequence'), how if d else 'no decision (%s)' % how,
+            s(e['at_us'] - y['at_us']) if e else '-', w[0] if w else '?', w[2] if w else '?', cls, counts(cls)))
     for x in lost(a, stop_at): print('  discontinuity: %s' % x)
     for x in stop_words(a, stop_at): print('  stop words: %s' % x)
     tsv(mode, offset, 'yes', len(span), len(ys))
@@ -233,25 +266,30 @@ if y is None:
     for x in lost(line_at, stop_at): print('  discontinuity: %s' % x)
     tsv(mode, offset, 'yes', '', '', 'none', '', '')
     sys.exit()
-d = next(iter(kinds(y['at_us'], stop_at, 'duplex_commit', 'duplex_resume')), None)
-w = window(y, d)
+e, d, decision = ended(y)
+w = window(y, e)
 cls = blocks(w[0], w[2]) if w else ''
-decision = d['kind'][7:] if d else 'none'
 onset_yield = y['at_us'] - line_at
 yield_decision = d['at_us'] - y['at_us'] if d else None
 print('%s; onset->yield %s, yield->%s %s; %d false yields before it; words "%s"' % (
-    head, s(onset_yield), decision, s(yield_decision) if d else '-', len(before), heard_words[:60]))
-print('  hearing, frames %s..%s (yield at %s, decision at %s): %s [%s]' % (
-    w[0] if w else '?', w[2] if w else '?', y.get('frame_sequence'), d.get('frame_sequence') if d else '-', cls, counts(cls)))
+    head, s(onset_yield), decision if d else '%s, no decision' % decision,
+    s(e['at_us'] - y['at_us']) if e else '-', len(before), heard_words[:60]))
+print('  hearing, frames %s..%s (yield at %s, ended at %s): %s [%s]' % (
+    w[0] if w else '?', w[2] if w else '?', y.get('frame_sequence'), w[2] if e and w else '-', cls, counts(cls)))
 accepted = acoustic = ''
-if decision == 'commit':
-    answer = next((r for r in kinds(d['at_us'], stop_at, 'speaker_first_write')
-                   if (r.get('owner') or {}).get('turn', r.get('turn')) != story), None)
+def turn_of(r): return (r.get('owner') or {}).get('turn', r.get('turn'))
+if d and decision == 'commit':
+    answer = next((r for r in kinds(d['at_us'], stop_at, 'speaker_first_write') if turn_of(r) != story), None)
     if answer is None or end_words is None:
         print('  answer: %s' % ('no answer audio before the stop line' if end_words else 'clip length unknown'))
     else:
         accepted = answer['at_us'] - end_words
-        own = sorted(at for f, (c, at) in heard.items() if c == '3' and at >= answer['at_us'])
+        # The answer's own voice only: before its turn finished, another turn's audio began, or the stop line.
+        bound = min([stop_at] + [r['at_us'] for r in kinds(answer['at_us'], stop_at, 'turn_finished')
+                                 if r.get('turn') == turn_of(answer)]
+                    + [r['at_us'] for r in kinds(answer['at_us'] + 1, stop_at, 'speaker_first_write')
+                       if turn_of(r) != turn_of(answer)])
+        own = sorted(at for f, (c, at) in heard.items() if c == '3' and answer['at_us'] <= at < bound)
         acoustic = own[0] - end_words if own else ''
         print('  end of words->first answer audio: accepted PCM %s; acoustic (mic heard own voice) %s' % (
             s(accepted), s(acoustic) if own else 'unmeasured'))
@@ -274,7 +312,7 @@ for r in $(seq 1 "$ROUNDS"); do
   done
 done
 
-python3 - "$tally" <<'PY' | tee -a "$report"
+python3 - "$tally" <<'PY' | tee -a "$report" || { echo "cutin.sh: the summary failed" >&2; failed=1; }
 import sys
 rows = [l.rstrip('\n').split('\t') for l in open(sys.argv[1]) if l.strip()]
 idle = [r for r in rows if r[0] == 'idle' and r[2] == 'yes']
@@ -291,3 +329,4 @@ for mode in ('aside', 'cutin'):
                 r[5], ms(r[3]), ms(r[4]), ms(r[6]), ms(r[7])) for r in mine)))
 PY
 echo "cutin.sh: the report is $report; each scene in full beside it"
+((failed == 0)) || { echo "cutin.sh: some episodes failed (above); not a clean measurement" | tee -a "$report" >&2; exit 1; }
