@@ -1257,6 +1257,50 @@ impl Days {
         Ok(marked > 0)
     }
 
+    /// The session follow-up `id` was offered in had no greeting to ask it
+    /// at: the person's first line asked for something (the voice's
+    /// `LAMP_MEMORY_EVENTS`, the first builder on #2602, 22 Oct 22:17), so
+    /// it was never put to the model to ask and waits for a later session.
+    /// That offer is taken back: one fewer counted (`follow_up_offers`),
+    /// and when it was its last, recorded as given in its transaction
+    /// (`follow_ups` at the offer's own time), that record goes, so it is
+    /// offered again. The time of the offer stays: one a day as ever, so the
+    /// next offer is on a later day. Only one of this person's, offered and
+    /// not taken back past none; anything else (another's, unknown, never
+    /// offered, already asked) changes nothing and is `false`.
+    pub fn follow_up_unoffered(&mut self, person: &Person, id: u64) -> Result<bool> {
+        let tx = self.db.transaction()?;
+        let offer: Option<(i64, u64)> = tx
+            .query_row(
+                "SELECT o.rid,o.offered_unix_ms FROM follow_up_offers o JOIN entries e ON e.rid=o.rid WHERE e.person=?1 AND e.id=?2 AND o.person=?1 AND o.offers>0",
+                params![person.as_str(), id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        let Some((rid, offered)) = offer else {
+            return Ok(false);
+        };
+        // Asked about since (`follow_up_asked`, a later time): kept.
+        let asked: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM follow_ups WHERE rid=?1 AND asked_unix_ms<>?2)",
+            params![rid, offered],
+            |r| r.get(0),
+        )?;
+        if asked {
+            return Ok(false);
+        }
+        tx.execute(
+            "DELETE FROM follow_ups WHERE rid=?1 AND asked_unix_ms=?2",
+            params![rid, offered],
+        )?;
+        tx.execute(
+            "UPDATE follow_up_offers SET offers=offers-1 WHERE rid=?1",
+            [rid],
+        )?;
+        tx.commit()?;
+        Ok(true)
+    }
+
     pub fn session_close(&mut self, person: &Person, session: &str) -> Result<()> {
         identifier(session)?;
         self.db.execute(
