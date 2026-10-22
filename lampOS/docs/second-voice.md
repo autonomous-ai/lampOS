@@ -634,20 +634,36 @@ order is kept. A written turn is the same from the chat on.
   switch, when every call of a turn's first calling round is answered with
   lamp-actions' short mark (`"next"`) and its own words (`"say"`:
   "Brighter.", "Dimmer.", "Warmer.", "Cooler.", "Louder.", "Quieter.", else
-  "Done."; `lamp_actions::short_say`), the voice says that line and asks the
-  chat no further round. Two calls are one line: theirs when they agree,
-  "Done." when they differ (`second_provider::short_done_line`). The turn
-  goes on as without the switch when any call was refused, failed, held or
-  changed nothing ("already", which carries no `"say"`), when any call is
-  anyone else's, when an earlier round called anything or a held forget ran
+  "Done."; `lamp_actions::short_say`), the voice keeps that line and asks
+  the next round anyway, told after the results that the lamp itself says
+  the line, to answer only what else was asked, or nothing at all
+  (`second_provider::short_done_note`). A request can hold more than its
+  calls: "dim the light and tell me a joke" is `light_dimmer` alone in
+  round 1, and the joke comes in round 2 (the Reviewer-lead's P2 on #2930).
+  So the line is said only when that round gives no words and no calls;
+  words or calls go on as without the switch, the line unsaid. Judging the
+  heard words as light-or-volume-only was not taken: "and", "also", a
+  question after the ask, any language, is a guess, and the model already
+  read them. The cost is that round's wait: the line comes when the round
+  ends empty, about a chat round's first event later (0.80 s median on
+  lamp-4ace for the sentence after a light change), not at once; the light
+  or volume change itself, the answer seen or heard, is not delayed. Two
+  calls are one line: theirs when they agree, "Done." when they differ
+  (`second_provider::short_done_line`). The turn goes on as without the
+  switch, with no note, when any call was refused, failed, held or changed
+  nothing ("already", which carries no `"say"`), when any call is anyone
+  else's, when an earlier round called anything or a held forget ran
   before it, and when the model said any word beside its calls: words
   beyond the ask, a call written as words included. The worker gets the
   switch in its environment and says so at start: `a turn whose every call
   is a light or volume change answered short is said with the calls' own
-  line, no further round (LAMP_SHORT_DONE)`; each such turn's journal says
-  `every call answered short; said "Brighter.", no further round`. The
-  check is Fifth's row 24 on lamp-52e6: the reply after "make it brighter"
-  at most 2 words on, against about 10 off, the light changed in both.
+  line when the next round adds nothing (LAMP_SHORT_DONE)`; each such turn's journal says
+  `every call answered short; "Brighter." kept while the next round says
+  whether more was asked`, then `added nothing to the calls answered
+  short; said "Brighter."`. The check is Fifth's row 24 on lamp-52e6: the
+  reply after "make it brighter" at most 2 words on, against about 10 off,
+  the light changed in both; it now rests on the model keeping the note's
+  "nothing at all", which the row measures.
 - **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
   functions first** (off unless set; #1712, the first builder at 18:56:
   "light, volume, timer, search, look, tasks"). The others are behind one,
