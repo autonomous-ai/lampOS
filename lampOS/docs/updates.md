@@ -1396,9 +1396,13 @@ which Schedule's code keeps in a store of its own); memory across days (its data
 as SQL); the eyes (their known people); lamp-update (its own state and
 journal); the voice (its thread file, which outlives a restart in
 `/run/lampos-voice`); and lamp-cloud's reports (setup's answer, the person's
-own choice, the queue and the exit note a crash came from); and lamp-records
-(a voice session folder, taken as a session with nothing refused). The other
-parts follow, by harm.
+own choice, the queue and the exit note a crash came from, and the login a
+ping rotated, `rotated.json`); the controls (`controls.json`, the product's
+pins file, read with `--touch`, and the pins file prepare gives a lamp moved
+from V1, read without it); the skills turned off (`off`, read by lamp-skills at
+a start and by lamp-cloud for the app); and lamp-records (a voice session
+folder, taken as a session with nothing refused). The other parts follow, by
+harm.
 
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
