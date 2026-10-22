@@ -948,6 +948,9 @@ struct Shared {
     /// Whether one person said a line cut short and the line that cut it
     /// ([`Engine::joining_cut_words`]).
     same_speaker: Option<SameSpeaker>,
+    /// Takes a request whose answer was never played out of the thread, when
+    /// its words are joined into a later line ([`Engine::unsaying_joined`]).
+    unsay_joined: Option<Arc<dyn Fn(u64) + Send + Sync>>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
@@ -1797,6 +1800,7 @@ impl Engine {
                 held_last: Mutex::new(None),
                 asked_last: Mutex::new(None),
                 same_speaker: None,
+                unsay_joined: None,
                 first_words: None,
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
@@ -2384,6 +2388,22 @@ impl Engine {
     pub fn joining_cut_words(mut self, same: SameSpeaker) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.same_speaker = Some(same);
+        }
+        self
+    }
+
+    /// With [`Self::joining_cut_words`]: a line cut short is joined only
+    /// while none of its answer was heard, so any of that answer's words the
+    /// thread kept were never played. Each request whose words are joined
+    /// into a later line is given to `unsay` (`crate::thread::unsay` in the
+    /// worker): its unplayed answer is not the lamp's words in the history,
+    /// and its question goes with the joined line, asked once with both
+    /// (the first builder on #2602, 23 Oct 02:43: lamp-4ace's "Twenty past
+    /// eight in…", never played, kept as said, and only Saigon answered).
+    /// Before any turn only.
+    pub fn unsaying_joined(mut self, unsay: Arc<dyn Fn(u64) + Send + Sync>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.unsay_joined = Some(unsay);
         }
         self
     }
@@ -5379,6 +5399,24 @@ async fn joined_with_cut(
             String::new()
         }
     );
+    // The pieces asked again had none of their answers heard: those answers
+    // leave the thread, newest first so the oldest question leads the
+    // joined line's words there.
+    if let Some(unsay) = shared.unsay_joined.as_ref() {
+        let unsaid: Vec<u64> = parts
+            .iter()
+            .rev()
+            .map(|part| part.request)
+            .filter(|piece| *piece != request)
+            .collect();
+        for piece in &unsaid {
+            unsay(*piece);
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: {} lines joined into it had none of their answers played; those answers are not kept as the lamp's words (LAMP_JOIN_CUT_WORDS)",
+            unsaid.len()
+        );
+    }
     (words_of(&parts), None, parts)
 }
 
