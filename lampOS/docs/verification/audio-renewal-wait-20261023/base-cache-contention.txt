@@ -1,0 +1,18 @@
+
+running 1 test
+
+thread 'requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant' (64984047) panicked at crates/voice/src/requested_audio/runtime.rs:1552:17:
+assertion `left == right` failed: controlled cache contention before Renew
+  left: AudioFinish { offer: RequestedAudioOffer { skills_boot: "skills-fixture", definition_generation: 1, offer_id: 1, context: RequestedAudioContext { worker_boot: "voice-fixture", provider_session: 1, request: 1, privacy_generation: 1, call_id: "call-1", issued_us: 671088512049 }, skill: "recording", asset: "/var/folders/4c/lq3h60sn5l53hs3s21nzpqzw0000gn/T/lamp-ra-44181-1/recording.wav", sha256: "b39856220a732e59c6087a01ed41e4897b29a3393bdb9326047e0b53af4a566f", frames: 480, issued_us: 671088512049, start_before_us: 671098512049, finish_before_us: 671158512049 }, outcome: Cancelled }
+ right: AudioAuthorize { offer: RequestedAudioOffer { skills_boot: "skills-fixture", definition_generation: 1, offer_id: 1, context: RequestedAudioContext { worker_boot: "voice-fixture", provider_session: 1, request: 1, privacy_generation: 1, call_id: "call-1", issued_us: 671088512049 }, skill: "recording", asset: "/var/folders/4c/lq3h60sn5l53hs3s21nzpqzw0000gn/T/lamp-ra-44181-1/recording.wav", sha256: "b39856220a732e59c6087a01ed41e4897b29a3393bdb9326047e0b53af4a566f", frames: 480, issued_us: 671088512049, start_before_us: 671098512049, finish_before_us: 671158512049 }, phase: Renew }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant --- FAILED
+
+failures:
+
+failures:
+    requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3460 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

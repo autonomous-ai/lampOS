@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/requested_audio/runtime.rs
++++ b/lampOS/crates/voice/src/requested_audio/runtime.rs
+@@ -1539,7 +1539,7 @@
+             if mismatch {
+                 offered.sha256 = "0".repeat(64);
+             }
+-            peer.deny_renew.store(true, Ordering::Release);
++            peer.deny_renew.store(false, Ordering::Release);
+             let mut ticket = fixture(steps.now(), steps.now(), false);
+             Arc::get_mut(&mut ticket.shared).unwrap().offer = offered.clone();
+             let shared = ticket.shared.clone();

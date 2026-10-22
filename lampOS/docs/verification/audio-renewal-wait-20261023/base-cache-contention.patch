@@ -1,0 +1,23 @@
+--- a/lampOS/crates/voice/src/requested_audio/runtime.rs
++++ b/lampOS/crates/voice/src/requested_audio/runtime.rs
+@@ -1546,13 +1546,13 @@
+             if !mismatch {
+                 assert!(ticket.wait_ready(Duration::from_secs(2)));
+                 assert!(ticket.started(lamp_ipc::monotonic_us()));
+-                assert!(matches!(
+-                    peer.next(),
+-                    RequestedAudioOperation::AudioAuthorize {
+-                        phase: RequestedAudioPhase::Renew,
+-                        ..
+-                    }
+-                ));
++                let held = ticket.shared.speaker.cache.lock().unwrap();
++                let operation = peer.next();
++                drop(held);
++                assert_eq!(operation, RequestedAudioOperation::AudioAuthorize {
++                    offer: ticket.shared.offer.clone(),
++                    phase: RequestedAudioPhase::Renew,
++                }, "controlled cache contention before Renew");
+             }
+             assert!(matches!(
+                 peer.next(),

@@ -1,0 +1,48 @@
+{
+  "candidate_sha256": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+  "restored": true,
+  "results": [
+    {
+      "control": "base-cache-contention",
+      "command": [
+        "cargo +1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--offline",
+        "requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit": 101,
+      "seconds": 40.252,
+      "source_sha256": "322037ce7fd96ed01a99bd9b846adcbe1a5062d2b3498789e6a05de7b5ea377b",
+      "log_bytes": 1929,
+      "log_sha256": "dfe43eb72f97d9b4b1bbca63415ce52d4523b91c5c51f194c3c64ca56bfa1bf7"
+    },
+    {
+      "control": "candidate-renewal-accepted",
+      "command": [
+        "cargo +1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--offline",
+        "requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit": 101,
+      "seconds": 44.232,
+      "source_sha256": "b43aad5a8e4f3752c8907284df01b352bc2d9a3bbc00089faac00eff970f7ee0",
+      "log_bytes": 864,
+      "log_sha256": "980946ff40921b9fe0cc6b926c4b091699e7721157349f01106c8a218c8b1f9f"
+    }
+  ]
+}
