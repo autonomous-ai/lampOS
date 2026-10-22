@@ -288,7 +288,7 @@ fn misjudged(check: &Check, revision: &str, entry: &CheckResult) -> Option<Strin
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{
         inputs::Measurement,
@@ -297,7 +297,7 @@ mod tests {
     };
 
     /// The small matrix, approved.
-    fn matrix() -> Matrix {
+    pub(crate) fn matrix() -> Matrix {
         Matrix::parse(&SMALL.replace("approved = false", "approved = true")).unwrap()
     }
 
@@ -323,7 +323,7 @@ mod tests {
 
     /// A routine run of `matrix` on `lamp-4ace` in which every routine
     /// check passed, as the station tool records it.
-    fn passed(matrix: &Matrix) -> Record {
+    pub(crate) fn passed(matrix: &Matrix) -> Record {
         Record {
             format: FORMAT,
             run_id: "20261019T080000Z-station-01-lamp-4ace".into(),

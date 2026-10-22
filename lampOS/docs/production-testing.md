@@ -164,11 +164,56 @@ lamp-station --matrix production/matrix-v0.toml --answers answers.json \
 
 `--occasion` is `routine`, `retest` (with `--retest-of`) or
 `qualification`. It prints each failure and each unfinished check, then
-`run <run id> <verdict>`, and keeps the record in `--out`.
+`run <run id> <verdict>`, and keeps the record in `--out`. With
+`--records PLACE` (off unless given; #2794) it also keeps it in the
+records' place, in the lamp's own folder, `PLACE/<device id>/<run id>.json`,
+written whole and never over another record, as in `--out`.
 
 Exit status: 0 the run passed, 1 it failed, 3 it is incomplete, 2 no record
 was made (an argument or an input was refused, or the record could not be
-written).
+written). A record kept in `--out` but refused by the place also exits 2,
+and says so with the `--out` path to copy there by hand once the place can
+take it, since the same run can't be made again:
+- one already there;
+- a device id that can't be a folder of its own there: one starting with a
+  dot, such as `..`, or with an upper-case letter, since a share may not
+  tell `Lamp-4ACE` from `lamp-4ace`;
+- a lamp folder that is a link to elsewhere, which is never followed;
+- a place that can't make hard links. A record is put in place by a hard
+  link from a part file, so it's never half there and never replaces
+  another, and many shares (SMB, most FUSE and NAS mounts) don't make them.
+  The place must.
+
+More than one station may write to the place at once. Each writer's part
+file is its own, made new, so a second station keeping the same run never
+changes the record the first kept (reviewer-two on #3054).
+
+What the place holds and who reads it: every field of each record, the
+one-line `reason`s and repair details among them, which the operator types
+and which could hold a person's name if one is typed there. Nothing heard,
+no face, still or key is in a record. Files and folders take the station's
+umask (`0644` and `0755` by default), so whoever can read the place reads
+every record. Nothing is ever removed: records stay until someone with the
+right to the place removes them.
+
+### One lamp's records
+
+```sh
+lamp-station records --records PLACE --device lamp-4ace [--matrix production/matrix-v0.toml]
+```
+
+lists the lamp's records in the place, oldest first (a run id begins with
+its start): `<run id> <verdict> matrix v<version> tool <commit>`. A file in
+the lamp's folder that isn't a record of that lamp under its own run's name
+is listed as `not a record of <lamp>` with why, never left out. With
+`--matrix`, each record is also judged for completeness against that matrix
+version (#2795): `complete: <verdict>`, or `not complete:` and each gap, so
+a run with a mandatory check left out never reads as passed. A lamp stands
+by its latest run: a failed run retested and passed stands passed, and every
+run is still listed. Exit status: 0 the latest run passed (and is complete,
+with `--matrix`) and every file in the lamp's folder is its record, 1 not, 3
+the lamp has no records there, 2 an argument was refused or the place could
+not be read.
 
 ### The record, field by field
 
@@ -268,8 +313,10 @@ from a fault; the operator's workflow (deliverable 3) has to.
 
 **Outside this public repository.** Where the fleet record lives is still
 open with the hardware lead (#1700, 19 Oct 08:55, "Still needed from the
-hardware lead"), so no destination is chosen here. The tool writes only to
-the station's own `--out` folder and sends nothing anywhere. Records are
+hardware lead"), so no destination is chosen here. The tool writes to the
+station's own `--out` folder and, when it is given one, to the records'
+place (`--records`, a folder: a share the hardware lead chooses can be
+mounted there), and sends nothing anywhere. Records are
 never committed to this repository; the tests' inputs are made up.
 
 ## Open for the hardware lead
