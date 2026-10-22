@@ -2157,6 +2157,11 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // The first line after a stop: what was stopped is never
+                // asked again, in its place or joined to it.
+                if after_stop {
+                    self.let_go_cut(&format!("request {request} is the first line after a stop"));
+                }
                 room(|room| {
                     room.heard(request, monotonic_us());
                     if over_the_lamps_voice {
@@ -2770,6 +2775,42 @@ impl Engine {
             .retain(|event| output_request(event).is_none_or(|r| r > retired));
     }
 
+    /// Requests up to `through` were stopped, not cut by a newer line: the
+    /// authority holds no owner (a hand or head stop, a spoken stop, the
+    /// mute, a gap, or their turn over). As [`Self::retire_through`], but
+    /// the words of one still being answered are let go, not kept for the
+    /// next line, and so are words cut short before and not yet taken:
+    /// stopped words never come back in a later line's place or joined to
+    /// it (a reviewer's P2 on the join, 22 Oct: "Lamp, play some jazz", a
+    /// hand stop, then "what time is it?" was asked as one line).
+    pub fn stop_through(&mut self, through: u64) {
+        let stopped = self
+            .shared
+            .in_flight
+            .lock()
+            .ok()
+            .and_then(|mut in_flight| in_flight.take_if(|carried| carried.request <= through));
+        if let Some(stopped) = stopped {
+            eprintln!(
+                "lamp-voice second: request {}: stopped before its answer: its words are let go, not kept for the next line",
+                stopped.request
+            );
+        }
+        self.let_go_cut("a stop came after it");
+        self.retire_through(through);
+    }
+
+    /// Words cut short and not yet taken are let go, and the journal says
+    /// `why`.
+    fn let_go_cut(&self, why: &str) {
+        if let Some(cut) = self.shared.cut.lock().ok().and_then(|mut cut| cut.take()) {
+            eprintln!(
+                "lamp-voice second: request {}'s words, cut short, are let go: {why}",
+                cut.request
+            );
+        }
+    }
+
     /// A spoken request up to `through` still being answered, none of its
     /// answer heard, is cut short: its words are kept for the next line, and
     /// the journal says so (#1712: on lamp-4ace on 19 Oct the weather and a
@@ -3362,7 +3403,19 @@ async fn spoken(
         .lock()
         .ok()
         .and_then(|mut cut| cut.take())
-        .filter(|carried| carried.request < request && carried.at.elapsed() <= CARRY_WITHIN);
+        .filter(|carried| carried.request < request && carried.at.elapsed() <= CARRY_WITHIN)
+        // A stop or "never mind" withdraws them: never asked again, in its
+        // place or joined to it.
+        .filter(|carried| {
+            let stop = says_stop(&text);
+            if stop {
+                eprintln!(
+                    "lamp-voice second: request {}'s words, cut short, are let go: request {request} says stop or never mind",
+                    carried.request
+                );
+            }
+            !stop
+        });
     // The turn's verdict, as the journal says it above (#1155): only for a
     // turn something judged, and never for one with nothing heard.
     if let Some(told) = shared.verdicts.as_ref().filter(|_| !empty) {
@@ -3706,6 +3759,20 @@ pub const STT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_STT_WARM";
 /// lines come seconds apart, and after this the lamp keeps nothing open
 /// (#1712, the first builder at 00:31: "at most a few minutes").
 pub const KEPT_FOR: Duration = Duration::from_secs(180);
+
+/// Whether a line's words are a stop, not a request going on: "never mind"
+/// anywhere in them, or a stop word or pair of the stop words' one list
+/// ([`crate::stop_words::stop_phrase`]: "Stop.", "Lamp, hold on.") in a
+/// line of three words or fewer. The words it cut short are then let go,
+/// held or let out (a reviewer's P2 on the join, 22 Oct).
+fn says_stop(text: &str) -> bool {
+    let words = crate::not_speech::plain_words(text);
+    words
+        .windows(2)
+        .any(|pair| pair[0] == "never" && pair[1] == "mind")
+        || words.iter().any(|word| word == "nevermind")
+        || (words.len() <= 3 && crate::stop_words::stop_phrase(text))
+}
 
 /// With `LAMP_JOIN_CUT_WORDS`, the words a line holds while its join waits
 /// for a print, put in flight before the wait: a third line begun during
