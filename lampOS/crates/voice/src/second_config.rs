@@ -323,13 +323,25 @@ fn place_if_missing(
     Ok(true)
 }
 
+/// The second route's file as the coordinator's own listeners take it (the
+/// stop words', the wait words'), with the unit's key terms
+/// ([`KEY_TERMS_ENV`]) over the file's, as the worker reads them. Without
+/// them those streams asked with the lamp's name alone (#2602: the relay's
+/// 1-term sessions beside the worker's 10-term ones).
 pub fn load_from_env() -> io::Result<Option<SecondConfig>> {
-    from_setting(std::env::var_os(SECOND_CONFIG_ENV))
+    from_setting(std::env::var_os(SECOND_CONFIG_ENV), |name| {
+        std::env::var_os(name)
+    })
 }
 
-fn from_setting(value: Option<OsString>) -> io::Result<Option<SecondConfig>> {
+pub(crate) fn from_setting(
+    value: Option<OsString>,
+    var: impl Fn(&str) -> Option<OsString>,
+) -> io::Result<Option<SecondConfig>> {
     match value {
-        Some(path) if !path.is_empty() => load_from_path(Path::new(&path)).map(Some),
+        Some(path) if !path.is_empty() => load_from_path(Path::new(&path))?
+            .with_key_terms_from(var)
+            .map(Some),
         _ => Ok(None),
     }
 }
@@ -731,10 +743,27 @@ impl SecondConfig {
             self.gemini.speech_model = model.clone();
             self.tts_model = Some(model);
         }
-        if let Some(terms) = given(KEY_TERMS_ENV)? {
-            self.stt_key_terms = key_terms(&terms).map_err(named(KEY_TERMS_ENV))?;
-        }
+        self = self.with_key_terms_from(&var)?;
         self.stt_flux = var(FLUX_ENV).is_some_and(|value| value == "on");
+        Ok(self)
+    }
+}
+
+impl SecondConfig {
+    /// [`KEY_TERMS_ENV`] as `var` gives it, over the file's; unset or empty,
+    /// the file's stay. Refused naming the variable.
+    fn with_key_terms_from(mut self, var: impl Fn(&str) -> Option<OsString>) -> io::Result<Self> {
+        if let Some(terms) = var(KEY_TERMS_ENV).filter(|value| !value.is_empty()) {
+            let terms = terms.into_string().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("{KEY_TERMS_ENV} is not Unicode"),
+                )
+            })?;
+            self.stt_key_terms = key_terms(&terms).map_err(|error| {
+                io::Error::new(error.kind(), format!("{KEY_TERMS_ENV}: {error}"))
+            })?;
+        }
         Ok(self)
     }
 }
@@ -792,8 +821,12 @@ mod tests {
 
     #[test]
     fn an_unset_or_empty_variable_leaves_the_route_off() {
-        assert!(from_setting(None).unwrap().is_none());
-        assert!(from_setting(Some(OsString::new())).unwrap().is_none());
+        assert!(from_setting(None, |_| None).unwrap().is_none());
+        assert!(
+            from_setting(Some(OsString::new()), |_| None)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

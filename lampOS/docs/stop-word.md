@@ -951,6 +951,16 @@ It is to be decided again before home lamps ship.
   file the configuration names. It is the same service the second voice
   uses when it answers, so with this switch it also hears yields while
   Gemini is the active route.
+- **Key terms:** the stream asks with the lamp's name, then (with
+  `LAMP_STOP_WORDS_KEYTERM=on`) the stop words, then the unit's own
+  (`LAMP_SECOND_KEY_TERMS`, read over the file as the second worker reads
+  them), each once: the stop words and the unit's own are at most 20
+  together (`MOST_KEY_TERMS`), so with the switch the unit's 15th and later
+  are left out. Before #2602's fix the
+  coordinator read the file alone, so the stream asked with the lamp's
+  name only: the relay counted 1-term sessions beside the worker's
+  10-term ones. The wait words' stream (`RelayEars::for_waits`) is read
+  the same way.
 - **When the stream is open:** from the start of each reply to its end. It
   is opened before it's needed (connecting takes 0.6 to 0.7 s) and carries
   no audio until a yield.
