@@ -724,6 +724,37 @@ order is kept. A written turn is the same from the chat on.
   replay of the line before; the lamp's own as an echo of its answer; few
   of either as someone speaking. The route keeps the words of its latest
   answer sent to the voice, with its request, for this (`lamp_said`).
+- **With `LAMP_SECOND_OWN_ECHO=on`, the lamp's own words heard back are
+  held as its echo** (off unless set; #2997; `second_provider/own_echo.rs`).
+  On lamp-4ace on 22 Oct (14:40–16:45) 8 of 214 lines were mostly the
+  lamp's own words by the count above, and 5 of those 8 were answered. With
+  the switch, a line begun while the lamp's answer could be heard (`Start`'s
+  `over_the_lamps_voice`), or within 1.5 s (`TAIL_US`) after its words sent
+  would have played to their end (the end the conversation goes on from,
+  `Did::Said`), is judged against that answer with the same word matching,
+  before the attention rule:
+  - **mostly its own words** (K ≥ W/2, and at least 3 of them, `HELD_LEAST`): its answer is held back, and the
+    journal says `request N: its answer is held back: the lamp's own echo:
+    of its W words, K in the lamp's answer to request A, begun over the
+    lamp's voice` (or `within 1.5 s of the lamp's words`). Its verdict is
+    held back; it gets no hum or ask-again, and words it cut short are
+    answered in its place, as for any held line.
+  - **fewer, all one run at the line's start or end, at least 2 words**
+    (`STRIP_RUN`): that run is taken out of what the model is sent, and the
+    journal says `request N: K of its W words, the lamp's own answer to
+    request A at its start` (or `end`) `, are taken out of what the model
+    is sent`. Its own words anywhere else, or one alone ("so", "no"), leave
+    the line as heard. The heard line is still told as heard.
+  - **A person repeating the lamp is never held, nor cut:** a line begun
+    later than the 1.5 s, one with the lamp's name
+    (`attention::called_by_name_on`, or only the name called), a question
+    of its own (`remarks::questions`, a `?` or a question word first, with
+    at least one word not the lamp's: "Did you say five o'clock?"), or one
+    begun after the lamp's words when they ended on a question ("Yes, start
+    it." after "Shall I start it?") is the person's and sent as heard. When
+    such a line is mostly the lamp's words, the journal says `…, but it has
+    the lamp's name: answered as the person's` (or the guard that kept it).
+  Counts only, never words. Without the switch nothing of this runs.
 - **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
   (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
   socket, the next is opened in the background and kept with `KeepAlive`

@@ -2513,6 +2513,18 @@ pub fn serve(
         );
         engine = engine.waiting_for_a_name(true);
     }
+    // The lamp's own words heard back are held as its echo, or taken out
+    // of a mixed line's start or end (#2997).
+    if std::env::var(crate::second_provider::OWN_ECHO_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a line begun over the lamp's answer or within 1.5 s after it, mostly of its own words, is held as its echo; its own words at a line's start or end are taken out (LAMP_SECOND_OWN_ECHO)"
+        );
+        engine = engine.holding_own_echo(true);
+    }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)
         .ok()
