@@ -497,6 +497,19 @@ fn turned_in(message: &lamp_bus::Message) -> Option<bool> {
     Some(faces.faces.iter().any(|face| face.facing == Some(true)))
 }
 
+/// How many faces the eyes see now (`humans/faces/tracked`), turned to the
+/// lamp or not: in their newest look, nothing when they have said nothing
+/// still fresh, as [`someone_turned_to_lamp`] reads them. Two or more is
+/// people together at the lamp: a line cut short is then not joined with
+/// the next on no other sign (`LAMP_JOIN_CUT_WORDS`).
+pub fn faces_in_view(bus: &Bus) -> Option<usize> {
+    let message = bus.latest(lamp_msgs::Faces::TOPIC).ok()??;
+    if message.expired {
+        return None;
+    }
+    Some(message.parse::<lamp_msgs::Faces>().ok()?.faces.len())
+}
+
 /// The link to the speech service may be down this long before the voice
 /// says anything is the matter. It is down for a second or two each time
 /// the voice starts and each time the service renews its session, which
@@ -1769,6 +1782,46 @@ mod tests {
         // A look older than its life says nothing.
         std::thread::sleep(Duration::from_millis(400));
         assert_eq!(someone_turned_to_lamp(&bus), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// `LAMP_JOIN_CUT_WORDS`: the faces in the eyes' newest fresh look,
+    /// turned to the lamp or not, are counted; none fresh, none known.
+    #[test]
+    fn the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look() {
+        use lamp_msgs::{Face, Faces};
+        let (bus, root) = bus("faces-counted");
+        assert_eq!(faces_in_view(&bus), None);
+        let mut eyes = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        eyes.expires_after(Some(Duration::from_millis(300)));
+        let face = |id: &str, facing: Option<bool>| Face {
+            speaking: None,
+            id: id.into(),
+            xmin: 0.4,
+            ymin: 0.3,
+            xmax: 0.6,
+            ymax: 0.6,
+            confidence: 1.0,
+            yaw: facing.map(|_| 0.1),
+            facing,
+        };
+        let say = |eyes: &mut lamp_bus::Publisher, faces: Vec<Face>| {
+            eyes.publish_json(lamp_ipc::monotonic_us(), &Faces { faces })
+                .unwrap();
+        };
+        say(&mut eyes, vec![]);
+        assert_eq!(faces_in_view(&bus), Some(0));
+        say(&mut eyes, vec![face("f1", Some(true))]);
+        assert_eq!(faces_in_view(&bus), Some(1));
+        say(
+            &mut eyes,
+            vec![face("f1", Some(true)), face("f2", Some(false))],
+        );
+        assert_eq!(faces_in_view(&bus), Some(2));
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(faces_in_view(&bus), None);
         std::fs::remove_dir_all(root).unwrap();
     }
 
