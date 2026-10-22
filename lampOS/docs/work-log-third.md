@@ -5,6 +5,38 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 19:36 — wake native gates green; hand try with Fifth
+
+Ready for lamp-voice: yes (#3021; Reviewer-lead's read/merge lane).
+
+- Exact head `4fb3a95a21e295ab0807703cfe743bc31c654b6b` passed native
+  [ARM64 39776981243](https://github.com/autonomous-ai/lampOS/actions/runs/39776981243),
+  tested as merge `1a2441a` into `d7492ca74`: **6,788 passed (one leaky),
+  31 skipped**, four doc tests, `relay_signals` and all 12 own-harness process
+  checks passed. Release/package/provenance/publication regressions, isolated
+  examples, checksums and artifact upload passed. Artifact ID `12425977265`,
+  named `lampos-arm64-4fb3a95a21e295ab0807703cfe743bc31c654b6b`.
+  The leak was the existing same-voice journal test, not a failed test.
+- [Linux Clippy 39776972400](https://github.com/autonomous-ai/lampOS/actions/runs/39776972400)
+  passed all workspace crates/targets with warnings denied on the exact head.
+  All PR checks passed; expected signing/publication jobs were skipped for PR.
+  PR body updated and marked ready. Queue #2602 has head/range/receipts.
+- First's [19:21 routing](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6340605411)
+  puts #3021 with the Reviewer-lead. Integration advanced during CI only to
+  `6f1123f69` (skills opportunity journaling), with no drift in any task file.
+  The Reviewer-lead owns the final current-base rebase/serial merge; First
+  then carries the fix into #2948. No other builder's branch touched.
+- Fifth's [hand-test handoff](https://github.com/autonomous-ai/lampOS/issues/2857#issuecomment-6340598191)
+  is on #2857. #2948 stays draft for the required real-hand tap, 3 s sleep/fold
+  from standing, wake hm, quiet tap hm with rarity spacing, listening-process
+  kill then one tap opens, and hands-away observation. One coherent build,
+  second route, build/flags and acquisition-to-first-write timing; check the
+  first spoken words are retained. No device result is claimed by Third.
+- Both temporary task stashes removed after verified push. No active local
+  compiler before cleanup; `cargo clean` completed: 102,167 files, 32.4 GiB.
+  Source tree clean. Remaining work is with Reviewer-lead (read/merge),
+  First (#2948 rebase) and Fifth/person (52e6 hand try). No CI remains pending.
+
 ## 2026-10-22 19:18 — wake hum fix pushed as #3021
 
 Ready for lamp-voice: no (current-head native gates pending).
