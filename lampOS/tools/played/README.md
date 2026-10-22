@@ -95,7 +95,11 @@ These you can run on their own:
   its decision, stop-word results and discontinuities with their sequence
   numbers (`$PLAYED_OUT/scenarios/cutin-LABEL.txt`). It changes nothing on
   the lamp unless `CUTIN_ENV` names switches for the run, which ride on a
-  `/run` drop-in removed on exit. Its stand-in test is `cutin-test.sh`.
+  `/run` drop-in removed on exit. A yield's decision is only the one its
+  own `duplex_yield_end` names, and the acoustic proxy only that answer's
+  own blocks. It exits non-zero when a scene, journal read or report
+  failed, or the drop-in could not be taken off. Its stand-in test is
+  `cutin-test.sh`.
 
 - `calendar.sh LABEL FIXTURE`, about 4 minutes (#751, "Email, calendar
   and other connectors, through hand-overs"): "Hey Lamp, what's on my
