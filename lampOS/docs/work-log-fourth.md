@@ -7273,6 +7273,38 @@ Ready for lamp-voice: no (common, Name, Photo; writer awaits native/read)
 - Queue/own PRs read through 03:34. No lamp/model call, memory score change
   or physical acceptance. First owns the final combined train and person row.
 
+## 2026-10-23, 04:01: writer ready; denied-reader retry counter retained
+
+Ready for lamp-voice: yes (#3121); no (#3064, #3014, #2988)
+
+- Inactive writer #3121 is Ready at `5c34dbf0c`. Official ARM64
+  39850008282 passed 1,415/0/9 skipped in its selected PR crates, plus
+  four workspace doctests, twelve separate process checks and relay.
+  Linux clippy 39850008270 passed. The tested merge includes main
+  `c5450ea97`. Artifact 12457800956 digest is
+  `aec034d2f9ff077a9f214f46765acc2c138867c2433d8e1684f464afaac8fdb1`.
+  Source read found no P1/P2. The two future adapter P3s are recorded:
+  explicit account/privacy cancellation before rename, and terminal forget
+  receipt draining independent of client lifetime. First owns the latest-
+  main train and merge; there is no runtime activation.
+- Common's first corrected-source strict gate stopped before tests on a
+  test-helper u64/u8 mismatch. That helper alone is fixed; the failure is
+  retained, not a gate pass. An independent read found a retry-ordering P2:
+  a ready waiter holds its own answer Arc, so reference count alone cannot
+  distinguish that waiter from an unfinished denied reader.
+- A new actual-reader regression ran RED: 0/1, exit 101, 0.01 s. The new
+  request was already waiting before the old reader denied and finished;
+  it failed to receive its freshly proved note. The correction uses the
+  denied reader's explicit done receipt, preserving one reader and the
+  original absolute deadline. Exact regression rerun and source audit run
+  now; full corrected gates remain required. The raw red log was accidentally
+  reused by the rerun script; its complete observed result is recorded as
+  such in red-observed-before-fix.json, not claimed as an original raw log.
+- Root is clean on current main `7d929b92e`; local AGENTS matches upstream.
+  Queue and own PR comments read through 04:00. Name and Photo still await
+  qualified final Common source. No lamp/model call, physical acceptance,
+  memory score increase or corrected-source gate success is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
