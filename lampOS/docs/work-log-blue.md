@@ -454,3 +454,12 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **10:53, reviewer-two on #2874:** P2. `waiting` filtered out installed and future offers before picking the newest, so an older offer came back once the newest was on, in the voice's `put_on` too. Fixed by taking the newest offer first, then refusing; added the real put-on sequence and a clock-rollback test; both fail on the old selection. Rebased to `f9203992a`.
 - **11:0x, #2768:** P1/P2 none and ARM64 green at `14a44727e`. Rebased to `ef3206c23` for reviewer-two's current-base rule.
 - **#2813, lamp-voice half:** committed on `blue/app-make-skill` (`app_make.rs`, `agent_tasks::hand_over`, docs). The lamp-cloud half (`skills.make` and `skills.made`) comes next.
+- **11:2x, the first builder on #2811:** (a). They run `make-skill.sh … both` on lamp-4ace after 14:00 and post the PASS/FAIL lines; lamp-4ace's key stays with its holder.
+- **#2874 and #2768:** both clean in review, rebased onto latest lamp-voice for merge (`6767514c2` and `1a121964b`). #2874 needed one test-only line for the base's new `asked` argument.
+- **11:53, reviewer-two on #2887, three P2s, fixed:**
+  - `app.json`'s writers now share one `flock` transaction; a 100-round overlap test fails without it;
+  - the task-news reader settles the app's ask when work wasn't sent, failed or stopped (uncertain stays `making`); tested through the real reader;
+  - the socket group defaults to `lampos`, and nothing starts if it's missing.
+  #2887 is now stacked on #2874, so `asked` is the offer a spoken yes would put on now. `make-skill.sh` gained `MAKE_FROM=app` for #2813's lamp check, with stand-in arms.
+- **Fourteen:** #2814's screen merged (ecm-sds-mobile#38, plus #39 fixing two wire names). #2813 waits only on its lamp check.
+- **Note:** the screen-person script and media tool are under `/tmp/claude-1000/lamp-helper/` (my helper, 22 Oct).
