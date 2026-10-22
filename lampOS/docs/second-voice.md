@@ -2833,11 +2833,19 @@ after a take-over, but now for every turn:
     their sound, so the unplayed text went into the next chat's history as
     the lamp's words. The model took London as answered and said only
     Saigon's time. A line is joined only while none of its answer was
-    heard: its words stop being carried at its answer's first sound. So
-    each line joined into a later one is taken out of the thread
-    (`Engine::unsaying_joined`, `thread::unsay`): its question and answer
-    leave the history, and its question leads the joined line's words in
-    the thread. The model is asked both questions once, with no partial
+    heard: its words stop being carried as its answer's first sound is
+    handed on, before that send's wait, so a newer line's cut can't carry
+    words whose first sound already went (El's and Fourteen's P3 on
+    #3129). So each line joined into a later one is taken out of the
+    thread (`Engine::unsaying_joined`, `thread::unsay`): its question and
+    answer leave the history, and its question leads the joined line's
+    words in the thread. This happens only once the joined line is asked,
+    checked under the lock a newer line's cut takes the words with
+    (`asked_unsaying`): a join whose chain a newer line took in its print
+    wait unsays nothing, so when that line isn't joined the cut exchange
+    stays and the person's question isn't lost (El's P2 on #3129). A piece
+    let go past the chain's 60 words or 20 s isn't asked, so it keeps its
+    exchange. The model is asked both questions once, with no partial
     answer. The journal says `request M: K lines joined into it had none
     of their answers played; those answers are not kept as the lamp's
     words`. Words cut short and answered in a held line's place, not

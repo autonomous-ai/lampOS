@@ -2397,7 +2397,7 @@ impl Engine {
     /// while none of its answer was heard, so any of that answer's words the
     /// thread kept were never played. Each request whose words are joined
     /// into a later line is given to `unsay` (`crate::thread::unsay` in the
-    /// worker): its unplayed answer is not the lamp's words in the history,
+    /// worker) once that line is asked ([`asked_unsaying`]): its unplayed answer is not the lamp's words in the history,
     /// and its question goes with the joined line, asked once with both
     /// (the first builder on #2602, 23 Oct 02:43: lamp-4ace's "Twenty past
     /// eight in…", never played, kept as said, and only Saigon answered).
@@ -4720,7 +4720,7 @@ async fn spoken(
                     text.clone(),
                 )
                 .await;
-                if joining && !still_holding(&shared, request) {
+                if !asked_unsaying(&shared, (request, joining), &joined.2) {
                     return;
                 }
                 match joined {
@@ -4823,7 +4823,7 @@ async fn spoken(
             let bound = tokio::time::Instant::now() + JOIN_WAIT;
             let joined =
                 joined_with_cut(&shared, (request, true, bound), &marks, carried, text).await;
-            if joining && !still_holding(&shared, request) {
+            if !asked_unsaying(&shared, (request, joining), &joined.2) {
                 return;
             }
             joined
@@ -5083,6 +5083,49 @@ fn still_holding(shared: &Shared, request: u64) -> bool {
             .as_ref()
             .is_some_and(|held| held.request == request)
     })
+}
+
+/// Whether `request`'s line is asked after its join: with `joining`, only
+/// while it still holds its words ([`still_holding`]). Then the pieces
+/// joined into it (`parts`, but its own) had none of their answers heard,
+/// and with [`Engine::unsaying_joined`] those answers leave the thread,
+/// newest first so the oldest question leads the joined line's words
+/// there. Checked and unsaid under the lock a newer line's cut takes the
+/// words with, so a line whose chain is taken unsays nothing: its cut
+/// exchanges stay, and the person's question is not lost (El's P2 on
+/// #3129, #2145's P2). `false`: the line stops, its words the newer line's.
+fn asked_unsaying(shared: &Shared, (request, joining): (u64, bool), parts: &[Part]) -> bool {
+    let Ok(in_flight) = shared.in_flight.lock() else {
+        return !joining;
+    };
+    if joining
+        && !in_flight
+            .as_ref()
+            .is_some_and(|held| held.request == request)
+    {
+        return false;
+    }
+    let Some(unsay) = shared.unsay_joined.as_ref() else {
+        return true;
+    };
+    let unsaid: Vec<u64> = parts
+        .iter()
+        .rev()
+        .map(|part| part.request)
+        .filter(|piece| *piece != request)
+        .collect();
+    if unsaid.is_empty() {
+        return true;
+    }
+    for piece in &unsaid {
+        unsay(*piece);
+    }
+    drop(in_flight);
+    eprintln!(
+        "lamp-voice second: request {request}: {} lines joined into it had none of their answers played; those answers are not kept as the lamp's words (LAMP_JOIN_CUT_WORDS)",
+        unsaid.len()
+    );
+    true
 }
 
 /// `request`'s own words in a chain: two lines when its sound or words
@@ -5406,24 +5449,6 @@ async fn joined_with_cut(
             String::new()
         }
     );
-    // The pieces asked again had none of their answers heard: those answers
-    // leave the thread, newest first so the oldest question leads the
-    // joined line's words there.
-    if let Some(unsay) = shared.unsay_joined.as_ref() {
-        let unsaid: Vec<u64> = parts
-            .iter()
-            .rev()
-            .map(|part| part.request)
-            .filter(|piece| *piece != request)
-            .collect();
-        for piece in &unsaid {
-            unsay(*piece);
-        }
-        eprintln!(
-            "lamp-voice second: request {request}: {} lines joined into it had none of their answers played; those answers are not kept as the lamp's words (LAMP_JOIN_CUT_WORDS)",
-            unsaid.len()
-        );
-    }
     (words_of(&parts), None, parts)
 }
 
@@ -7707,6 +7732,17 @@ async fn answer(
                         source_offset: 0,
                         samples: part.to_vec(),
                     };
+                    // Its answer's first sound is handed on now: its words
+                    // are no longer carried, before the await a newer line's
+                    // cut could take them in, so words carried, joined and
+                    // unsaid never had a sample at the speaker (El's and
+                    // Fourteen's P3 on #3129).
+                    if answering
+                        && !answered.load(Ordering::Relaxed)
+                        && let Ok(mut in_flight) = shared.in_flight.lock()
+                    {
+                        in_flight.take_if(|carried| carried.request == request);
+                    }
                     if !shared.emit(audio).await {
                         return Err(Stop::Gone);
                     }
@@ -7724,10 +7760,6 @@ async fn answer(
                         }
                         if let Some((_, heard)) = &shared.seems {
                             heard(request);
-                        }
-                        // Some of its answer heard: no longer to be carried.
-                        if let Ok(mut in_flight) = shared.in_flight.lock() {
-                            in_flight.take_if(|carried| carried.request == request);
                         }
                         // An answer to someone, or the lamp's own turn or a
                         // reminder, which is no answer.
