@@ -1,0 +1,17 @@
+{
+  "head": "baacc2746b86f45e3d3c282ddb94e7cd60bb4370",
+  "integration_base": "17167b1ba34b519eaac0aaf8ff8c418f0507263d",
+  "local_gate_base": "464438fc549e528f1d812e25c14c459e4d609379",
+  "bound_inputs": 36,
+  "all_bound_sources_equal": true,
+  "one_commit": true,
+  "runtime_updater_unchanged": true,
+  "agents_matches_integration": true,
+  "subject": "lampOS: test updater process death and CLI self-handover",
+  "message": "lampOS: test updater process death and CLI self-handover",
+  "arm64_run": 39810342673,
+  "clippy_run": 39810342675,
+  "official_status": "in_progress, not qualified",
+  "range_diff_sha256": "3929aac2e2ed749245b18d63a22f8fb68191420e992b5e1f5227c0a489db88a3",
+  "note": "Equal original seven-cut rebase followed by the reviewed CLI regression extension; final formatting passes and all36 bound Update/workspace inputs match the complete local307/0/4 gate. Transitive combined head requires its fresh official CI."
+}
