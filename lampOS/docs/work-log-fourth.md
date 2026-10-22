@@ -7226,6 +7226,53 @@ Ready for lamp-voice: no (common, Name, Photo and inactive writer)
 - Name/Photo still wait for qualified common source. First owns the person
   and physical acceptance rows; no lamp/model call or score change claimed.
 
+## 2026-10-23, 03:38: inactive writer published; both read-boundary counters red
+
+Ready for lamp-voice: no (common, Name, Photo; writer awaits native/read)
+
+- Published inactive writer #3121 as one commit `5c34dbf0c`, six paths
+  on landed main `7b3e6aef8`. Mac fmt, strict workspace/all-target clippy
+  and workspace build passed. Writer controls 16/0, controller 19/0 and
+  Who 51/0/1 ignored are overlapping focused results. Full Eyes library
+  remains 275/1/5 ignored: sole unchanged /dev/full test fails on this Mac.
+  Separate binary 8/0, recorded-look integration 1/0, docs 0/0 and full
+  Cloud 195/0/2 ignored passed. A test-only nested-if lint correction and
+  its failed attempt are retained, without assertion/production changes.
+- At the real store's held directory-sync checkpoint, host first status
+  took 3,713 ns, repeated maximum (100 calls) 443 ns, and forget admission
+  15,688 ns, including bounded explicit-contention retry helpers. This is
+  not cold filesystem, actual blocked kernel I/O or device latency. A
+  subsequent source-comment/docs-only update records those measurements;
+  executable implementation remains byte-exact to the local gate.
+- The optional broader serial Update consumer run exceeded 18 minutes;
+  stopped only its own process group with TERM, terminal 143, and verified
+  that group exited. Completed stages and partial round target remain
+  retained, not a package pass. VoiceEval/Setup in that script never ran.
+  Exact-head native ARM64 39850008282 and Linux clippy 39850008270 run;
+  source review requested from First. No live ingress/activation exists.
+- Common checkpoint `77bdd4c95` failed Linux clippy 39846110039 and ARM64
+  39846101929 at two Linux-only unsafe blocks, before tests. Safe APIs from
+  already-pinned rustix now replace statfs/geteuid locally, preserving
+  tmpfs/owner/mode policy. Both failed logs are retained, not qualified.
+- Actual main7b integration exposed two additional composed-source paths.
+  Both counters executed RED, each 0/1, exit 101, 0.01 s. After a delayed
+  Room reply lost fresh proof while its lease stayed current, one private
+  session-open was still sent: actual total/private (2,1), expected (1,0).
+  Separately, restoring the source after ready observed denial let the
+  same lease adopt private data. All 1,554 source hashes stayed unchanged.
+  Receipts: `/private/tmp/fourth-note-boundary-red-20261023/`.
+- Correction in progress: disclosure-only monotone state on the existing
+  request lease, plus the same fresh permission at actual memory
+  subrequests. Initial unproved/Room behavior, speaker/tool/write authority
+  and valid cached-data reuse by a new proved request remain separate.
+  Full corrected source/native/read gates still required before Ready.
+- Root clean tree is current main `c5450ea97`. Name/Photo carry runners now
+  take an explicit final public qualified Common and actual main, verify
+  exact source parity/scope, and preserve failure history. Only scratch
+  syntax/static checks ran; no product carry or gate is claimed.
+- Queue/own PRs read through 03:34. No lamp/model call, memory score change
+  or physical acceptance. First owns the final combined train and person row.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
