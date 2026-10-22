@@ -153,14 +153,25 @@ pub struct Use {
 }
 
 /// What a skill may use, by machine name, in the order the page shows it.
-pub const USES: [Use; 14] = [
+pub const USES: [Use; 17] = [
     use_of("speak", "speaks, or plays a short sound", false),
     use_of("light", "changes the light", false),
     use_of("body", "moves the lamp", false),
+    use_of(
+        "output_limits",
+        "caps the light and the volume at set hours",
+        false,
+    ),
+    use_of("messages", "sends a short message to your phone", false),
     use_of("camera", "uses the camera when it runs", true),
     use_of(
         "faces",
         "notices faces in front of it, with the camera",
+        true,
+    ),
+    use_of(
+        "known_faces",
+        "knows whether a face is one it has met, never whose",
         true,
     ),
     use_of(
@@ -219,7 +230,10 @@ pub fn may_use(permissions: &Permissions) -> Vec<Use> {
         ("speak", permissions.speak),
         ("light", permissions.light),
         ("body", permissions.body),
+        ("output_limits", permissions.output_limits),
+        ("messages", permissions.messages),
         ("camera", permissions.look),
+        ("known_faces", permissions.known_faces),
     ] {
         if given {
             named.insert(name);
@@ -860,6 +874,9 @@ pub mod tests {
             speak: true,
             light: true,
             look: true,
+            messages: true,
+            known_faces: true,
+            output_limits: true,
             ..Permissions::default()
         };
         let said: Vec<(&str, &str, Option<&str>)> = may_use(&permissions)
@@ -872,6 +889,12 @@ pub mod tests {
                 ("speak", "speaks, or plays a short sound", None),
                 ("light", "changes the light", None),
                 (
+                    "output_limits",
+                    "caps the light and the volume at set hours",
+                    None
+                ),
+                ("messages", "sends a short message to your phone", None),
+                (
                     "camera",
                     "uses the camera when it runs",
                     Some("the privacy switch stops it")
@@ -879,6 +902,11 @@ pub mod tests {
                 (
                     "faces",
                     "notices faces in front of it, with the camera",
+                    Some("the privacy switch stops it")
+                ),
+                (
+                    "known_faces",
+                    "knows whether a face is one it has met, never whose",
                     Some("the privacy switch stops it")
                 ),
                 (
