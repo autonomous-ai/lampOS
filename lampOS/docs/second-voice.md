@@ -1481,7 +1481,8 @@ order is kept. A written turn is the same from the chat on.
     `worker::kept_name_callback` (an abandoned refresh's keep reaching the
     next turns, voided before or after its read ends, and a resume read
     rejected after a forget never bringing the forgotten note back:
-    reviewer-two's reproductions and their controls),
+    reviewer-two's reproductions and their controls, each step waiting on
+    the read's own done mark or the store's open, never on a time),
     `remember::tests::a_forget_during_a_note_read_keeps_it_from_being_told`
     and, against the real store, `lamp-memory`'s
     `voice_note_ahead::a_note_read_ahead_spends_the_last_follow_up_offer_only_when_a_turn_takes_it`;

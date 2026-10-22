@@ -20,6 +20,10 @@ const CHILD: &str = "LAMP_KEPT_NAME_CALLBACK_TEST_CHILD";
 const OWNER: &str = "Synthetic owner";
 const OLD: &str = "The synthetic name is Pippa.";
 const NEW: &str = "The synthetic name is Tavi.";
+/// The longest a note-ahead test here waits on an event (a read's done
+/// mark, an open reaching the store): a bound for a faulty client only,
+/// never a pace, so a loaded machine changes nothing.
+const WAIT: Duration = Duration::from_secs(10);
 
 fn child(name: &str, mode: &str, markers: usize) -> bool {
     if std::env::var(CHILD).ok().as_deref() == Some(mode) {
@@ -74,25 +78,12 @@ struct Store {
     requests: Vec<Value>,
     // A repeated session name must retain its original snapshot, like Days.
     snapshots: BTreeMap<(String, Option<String>), Value>,
-    /// Snapshot opens, by their count from 0, answered only after a wait.
-    slow_opens: Option<(std::ops::RangeInclusive<usize>, Duration)>,
     /// The snapshot open, by its count from 0, held until a `release`, and
     /// where it is said that it came ([`Memory::hold_open`]).
     hold_open: Option<(usize, std::sync::mpsc::Sender<()>)>,
 }
 
 impl Store {
-    /// How long `request` waits before its answer ([`Store::slow_opens`]).
-    fn delay(&self, request: &Value) -> Option<Duration> {
-        let (opens, delay) = self.slow_opens.clone()?;
-        let count = self
-            .requests
-            .iter()
-            .filter(|request| request["op"] == "session_open")
-            .count();
-        (request["op"] == "session_open" && opens.contains(&count)).then_some(delay)
-    }
-
     /// Whether `request` is the open to hold: said as it comes.
     fn holds(&mut self, request: &Value) -> bool {
         let count = self
@@ -200,11 +191,6 @@ impl Memory {
                     }
                     writeln!(stream, "{}", json!({"ok":true})).unwrap();
                     continue;
-                }
-                // Waited without the store held, so nothing else waits on it.
-                let delay = serving.lock().unwrap().delay(&request);
-                if let Some(delay) = delay {
-                    std::thread::sleep(delay);
                 }
                 let holds = serving.lock().unwrap().holds(&request);
                 let answer = serving.lock().unwrap().answer(request);
@@ -371,7 +357,9 @@ fn context(
 
 /// The second route's turns as the engine drives them, each step its own: a
 /// line begins (`super::Ahead::begin`), and only an answered one is waited
-/// for and told; a line cancelled before its context is never told.
+/// for and told; a line cancelled before its context is never told. Each
+/// read, and each turn's wait for it, may take up to [`WAIT`]: a turn waits
+/// on the read's own done mark, never on the lamp's 300 ms.
 struct Lines {
     ahead: super::Ahead,
     context: Context,
@@ -383,7 +371,15 @@ type Context = Box<dyn Fn(Option<&crate::memory_scope::ScopeLease>) -> Told + Se
 impl Lines {
     fn new(socket: PathBuf) -> Self {
         let sessions = Arc::new(Mutex::new(Sessions::default()));
-        let ahead = super::Ahead::reading(sessions.clone(), None, socket.clone());
+        let reading = socket.clone();
+        let ahead = super::Ahead::asking(
+            sessions.clone(),
+            None,
+            Arc::new(move |session, person, _, follow_up| {
+                crate::remember::fresh_note_read(&reading, session, person, WAIT, follow_up)
+            }),
+        )
+        .waiting_up_to(WAIT);
         let context = Box::new(memory_context(
             sessions,
             Some(socket),
@@ -408,11 +404,7 @@ impl Lines {
 
     /// The line answered: `(contains NEW, contains OLD)` of what it is told.
     fn answered(&self, scope: &RequestScope) -> (bool, bool) {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(self.ahead.clone().ready(Some(scope.lease())));
+        runtime().block_on(self.ahead.clone().ready(Some(scope.lease())));
         let told = payload((self.context)(Some(&scope.lease())));
         (told.contains(NEW), told.contains(OLD))
     }
@@ -428,22 +420,37 @@ impl Lines {
             .is_some_and(super::NoteAsk::reading)
     }
 
-    /// Waits, at most 2 s, until no read is going on.
+    /// Waits until the read asked last has ended, on its own done mark: its
+    /// thread has handed the read over and let go of it.
     fn read_done(&self) {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while self
+        let mut done = self
             .ahead
             .sessions
             .lock()
             .unwrap()
             .asked
             .as_ref()
-            .is_some_and(super::NoteAsk::reading)
-        {
-            assert!(Instant::now() < deadline, "the read never ended");
-            std::thread::sleep(Duration::from_millis(5));
-        }
+            .expect("a read was asked")
+            .done
+            .clone();
+        runtime()
+            .block_on(async {
+                tokio::time::timeout(WAIT, done.wait_for(|done| *done))
+                    .await
+                    .map(|said| said.map(|_| ()))
+            })
+            .expect("the read never ended")
+            .expect("its thread said it was done");
+        assert!(!self.reading());
     }
+}
+
+/// A runtime for one step of [`Lines`].
+fn runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
 }
 
 /// Reviewer-two's reproduction on #3016 (19:19), with the actual keep, the
@@ -506,7 +513,6 @@ fn a_refresh_read_on_past_its_cancelled_line_is_the_next_lines() {
     }
     let memory = Memory::new(Some(crate::remember::person_id(OWNER)));
     crate::remember::start(memory.socket.clone(), None);
-    memory.state.lock().unwrap().slow_opens = Some((2..=3, Duration::from_millis(100)));
     let lines = Lines::new(memory.socket.clone());
     let first = scope(1, ScopeSnapshot::of(OWNER));
     lines.begins(&first);
@@ -515,15 +521,21 @@ fn a_refresh_read_on_past_its_cancelled_line_is_the_next_lines() {
         keep(&memory, &scope(2, ScopeSnapshot::of(OWNER)), NEW)["remembered"],
         true
     );
+    // The refresh's room open is held at the store until the next line has
+    // begun: it is read on past its cancelled line, whatever the timing.
+    let came = memory.hold_open(2);
     let cancelled = scope(3, ScopeSnapshot::of(OWNER));
     lines.begins(&cancelled);
     cancelled.revoke();
+    came.recv_timeout(WAIT)
+        .expect("the refresh's open reached the store");
     let next = scope(4, ScopeSnapshot::of(OWNER));
     lines.begins(&next);
     assert!(
         memory.count("session_open") < 4,
         "the refresh is still read as the next line begins"
     );
+    memory.release();
     assert_eq!(lines.answered(&next), (true, false));
     let after = scope(5, ScopeSnapshot::of(OWNER));
     lines.begins(&after);
@@ -582,7 +594,6 @@ fn review_keep_survives_privacy_void_while_the_refresh_is_reading() {
     }
     let memory = Memory::new(Some(crate::remember::person_id(OWNER)));
     crate::remember::start(memory.socket.clone(), None);
-    memory.state.lock().unwrap().slow_opens = Some((2..=3, Duration::from_millis(100)));
     let lines = Lines::new(memory.socket.clone());
     let first = scope(1, ScopeSnapshot::of(OWNER));
     lines.begins(&first);
@@ -591,11 +602,17 @@ fn review_keep_survives_privacy_void_while_the_refresh_is_reading() {
         keep(&memory, &scope(2, ScopeSnapshot::of(OWNER)), NEW)["remembered"],
         true
     );
+    // The refresh's room open is held at the store until the privacy
+    // change has voided it.
+    let came = memory.hold_open(2);
     let cancelled = scope(3, ScopeSnapshot::of(OWNER));
     lines.begins(&cancelled);
     cancelled.revoke();
+    came.recv_timeout(WAIT)
+        .expect("the refresh's open reached the store");
     assert!(lines.reading(), "the refresh is still read");
     lines.ahead.forget();
+    memory.release();
     lines.read_done();
     let next: Vec<(bool, bool)> = (4..=5)
         .map(|request| {
@@ -647,7 +664,7 @@ fn review_an_invalid_resume_read_never_returns_the_forgotten_cached_note() {
     let came = memory.hold_open(2);
     let reading = scope(3, ScopeSnapshot::of(OWNER));
     lines.begins(&reading);
-    came.recv_timeout(Duration::from_secs(2))
+    came.recv_timeout(WAIT)
         .expect("the read's open reached the store");
     assert!(lines.reading(), "a read is in flight");
     // Its send alone changes what a read may hold.
