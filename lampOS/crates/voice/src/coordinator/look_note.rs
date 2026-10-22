@@ -9,30 +9,32 @@
 //! asks once.
 //!
 //! The walk: the coordinator calls the search's skill itself, as the model
-//! called it, with the next place in [`WALK_ORDER`] it has not asked, on a
-//! thread of its own through the voice's own call path
+//! called it, with the next place in its skill's walk it has not asked, on
+//! a thread of its own through the voice's own call path
 //! (`crate::tools::run_call`), so nothing waits on it. A look in its answer
 //! is taken as a skill's look is, and goes as the search's next look turn,
 //! naming the place, so the finding is still the model's. The skill's
 //! refusal past its looks (its `give_up`) goes once as a written turn, and
 //! the search is over. The person speaking, another turn, a session change
 //! or a stop by hand ends it at once.
+//!
+//! The note, the walk's places in order and the words for where each look
+//! was taken are the skill's own, in its file's `[search]` (`note`, `walk`,
+//! `looked`; look-for-things' `skill.toml`), as lamp-skills gives them in
+//! its tools file (`tools::search_walk`): a search whose skill gives no
+//! note gets none, and is not walked.
 
 use super::{
     BootId, Controller, PlayoutStart, ProviderInput, Reply, Result, SessionState, Snapshot,
     VecDeque, commit_written_turn, holding, json, record,
 };
 use crate::provider_worker::SearchCall;
+use crate::tools::SearchWalk;
 use serde_json::Value;
 use std::{
     io,
     sync::{Arc, mpsc},
 };
-
-/// The note, written to the second route as the person's turn. It says
-/// what to do whether the thing was seen or not, so it holds once a found
-/// place is added to `look_for` too.
-pub(super) const NOTE: &str = "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop.";
 
 /// The most looks one search takes, its first included: past them its look
 /// turns are no longer its own, so a look asked there is dropped as in any
@@ -42,12 +44,6 @@ pub(super) const NOTE: &str = "Not found yet? Call look_for with the next place:
 /// lamp-skills, or a skill answering `"look": true` with no `[search]`,
 /// that would otherwise chain pictures with nobody speaking.
 pub(super) const SEARCH_LOOKS_AT_MOST: u32 = 8;
-
-/// The places the walk goes on to, in look-for-things' order (its note's
-/// and its `say`'s), each once a search: a place already looked at is
-/// skipped. The desk comes last, for a search the person began at a place
-/// they named; one begun at the desk has already looked there.
-pub(super) const WALK_ORDER: [&str; 5] = ["left", "right", "far_left", "far_right", "desk"];
 
 /// The moment is gone if the note cannot begin within this window after the
 /// look's answer finished playing, as for the holding answer's.
@@ -82,6 +78,53 @@ pub(super) fn skills_caller() -> SkillCaller {
     })
 }
 
+/// The note and walk of the search a tool starts, as its skill's file says
+/// them (`crate::tools::search_walk`), or none.
+pub(super) type SearchWalks = Arc<dyn Fn(&str) -> Option<SearchWalk> + Send + Sync>;
+
+/// The skills' notes and walks, read from their folders' tools files as
+/// the worker is told the folders, when a search begins: a skill put on or
+/// taken off since is read as it is then. A small local file.
+pub(super) fn skills_walks() -> SearchWalks {
+    let settings = crate::tools::take(&crate::tools::arguments_from_environment())
+        .map(|(settings, _)| settings)
+        .unwrap_or_default();
+    Arc::new(move |tool| crate::tools::search_walk(&settings, tool))
+}
+
+/// Look-for-things' note and walk as its own file says them: what
+/// lamp-skills gives the voice for `look_for`, for the tests.
+#[cfg(test)]
+pub(super) fn look_for_things() -> SearchWalk {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../skills/look-for-things/skill.toml"
+    );
+    let file: toml::Table = toml::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut walk: SearchWalk = file["search"].clone().try_into().unwrap();
+    walk.default = file["choice"]["default"].as_str().map(str::to_owned);
+    walk
+}
+
+/// The tests' skills: look-for-things alone, as its tools file names it.
+#[cfg(test)]
+pub(super) fn look_for_things_walks() -> SearchWalks {
+    Arc::new(|tool| (tool == "look_for").then(look_for_things))
+}
+
+/// The tool a search's call starts: its own name, or the skill
+/// `use_skill` names.
+fn tool_of(call: &SearchCall) -> &str {
+    if call.name == crate::use_skill::NAME {
+        call.args
+            .get("skill")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+    } else {
+        &call.name
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Promise {
     request: u64,
@@ -107,6 +150,8 @@ struct Search {
     /// The skill's call that began it, as the model made it: the walk
     /// calls it again with the next place.
     call: Option<SearchCall>,
+    /// Its skill's note and walk, from the skill's file.
+    walk: Option<SearchWalk>,
     /// The places asked in it, by the model or by the walk, in order.
     places: Vec<String>,
     /// The note's turn, whose answer left with no call walks on too.
@@ -172,6 +217,8 @@ pub(super) struct LookNote {
     step: Option<Step>,
     /// The walk's line for its look turn, by the turn it was asked for.
     walk_line: Option<(u64, String)>,
+    /// The skills' notes and walks, read as a search begins.
+    walks: Option<SearchWalks>,
 }
 
 impl LookNote {
@@ -188,6 +235,12 @@ impl LookNote {
         self
     }
 
+    /// Where a search's note and walk are read ([`skills_walks`]).
+    pub fn with_walks(mut self, walks: SearchWalks) -> Self {
+        self.walks = Some(walks);
+        self
+    }
+
     /// The second route asked a skill's look for `turn` and it is held. A
     /// turn the person spoke begins a new search, which may have its own
     /// note; a look in the lamp's own turn (a look's or the note's answer
@@ -196,15 +249,23 @@ impl LookNote {
     pub fn asked(&mut self, turn: u64, heard: bool, call: Option<SearchCall>) {
         self.held = Some(turn);
         if heard {
+            // Read only with the note on: a search is followed without it.
+            let walk = call
+                .as_ref()
+                .zip(self.walks.as_ref().filter(|_| self.enabled))
+                .and_then(|(call, walks)| walks(tool_of(call)));
             self.search = Some(Search {
-                places: vec![place_of(call.as_ref())],
+                places: place_of(call.as_ref(), walk.as_ref()).into_iter().collect(),
                 call,
+                walk,
                 ..Search::default()
             });
             self.pending = None;
             self.step = None;
         } else if let (Some(search), Some(call)) = (self.search.as_mut(), call) {
-            search.places.push(place_of(Some(&call)));
+            search
+                .places
+                .extend(place_of(Some(&call), search.walk.as_ref()));
         }
     }
 
@@ -256,6 +317,9 @@ impl LookNote {
         // No next place to call for: the search has taken its looks.
         if search.looks >= SEARCH_LOOKS_AT_MOST {
             return Err("the search took its looks");
+        }
+        if search.walk.is_none() {
+            return Err("its skill gives no note");
         }
         let walk = search.noted;
         if walk && !self.walking {
@@ -387,7 +451,7 @@ impl LookNote {
     }
 
     /// The walk's next call: the search's own call with the next place in
-    /// [`WALK_ORDER`] not yet asked, or, with none left, once more with its
+    /// its skill's walk not yet asked, or, with none left, once more with its
     /// newest place, which past the skill's looks answers its give-up line.
     /// Why not, otherwise. The place is counted as asked.
     fn next_call(&mut self) -> std::result::Result<(SearchCall, String), &'static str> {
@@ -397,18 +461,22 @@ impl LookNote {
         let Some(call) = search.call.clone() else {
             return Err("its skill's call is not known");
         };
-        let next = WALK_ORDER
+        // A note with no walk: the note alone.
+        let Some(walk) = search.walk.as_ref().filter(|walk| !walk.walk.is_empty()) else {
+            return Err("its skill gives no walk");
+        };
+        let next = walk
+            .walk
             .iter()
-            .find(|place| !search.places.iter().any(|asked| asked == *place));
+            .find(|place| !search.places.contains(place));
         let place = match next {
-            Some(place) => (*place).to_owned(),
+            Some(place) => place.clone(),
             None if !search.closing => {
+                let Some(place) = search.places.last().or(walk.default.as_ref()).cloned() else {
+                    return Err("its places are all looked at");
+                };
                 search.closing = true;
-                search
-                    .places
-                    .last()
-                    .cloned()
-                    .unwrap_or_else(|| "desk".into())
+                place
             }
             None => return Err("its places are all looked at"),
         };
@@ -494,12 +562,21 @@ impl LookNote {
             if told["look"] == true {
                 let session = step.session;
                 self.step = None;
-                let place = self
+                // Where its skill says the place is, or, for a place it
+                // gives no words for, its default's.
+                let toward = self
                     .search
                     .as_ref()
-                    .and_then(|search| search.places.last().cloned())
+                    .and_then(|search| {
+                        let walk = search.walk.as_ref()?;
+                        let place = search.places.last()?;
+                        walk.looked
+                            .get(place)
+                            .or_else(|| walk.default.as_ref().and_then(|at| walk.looked.get(at)))
+                            .cloned()
+                    })
                     .unwrap_or_default();
-                self.walk_line = Some((turn, walk_line(&place, &told)));
+                self.walk_line = Some((turn, walk_line(&toward, &told)));
                 return Some(Answer::Look { turn, session });
             }
             let Some(error) = told["error"].as_str() else {
@@ -544,16 +621,16 @@ pub(super) fn kind(walk: bool) -> &'static str {
 }
 
 /// The place a search's call asked: its `place` (or `use_skill`'s
-/// `choice`), or the desk, look-for-things' default.
-fn place_of(call: Option<&SearchCall>) -> String {
+/// `choice`), or its skill's default (look-for-things' desk).
+fn place_of(call: Option<&SearchCall>, walk: Option<&SearchWalk>) -> Option<String> {
     call.and_then(|call| {
         call.args
             .get("place")
             .or_else(|| call.args.get("choice"))
             .and_then(Value::as_str)
     })
-    .unwrap_or("desk")
-    .to_owned()
+    .map(str::to_owned)
+    .or_else(|| walk.and_then(|walk| walk.default.clone()))
 }
 
 /// The search's call with another place: in its `place`, or, called
@@ -575,17 +652,10 @@ fn with_place(call: &SearchCall, place: &str) -> SearchCall {
     }
 }
 
-/// What the walk's look turn adds after the look's question: the place it
-/// looked, and the skill's note for its picture, as the second route adds
-/// it to a look the model asked for.
-fn walk_line(place: &str, told: &Value) -> String {
-    let toward = match place {
-        "left" => "to the left",
-        "right" => "to the right",
-        "far_left" => "far to the left",
-        "far_right" => "far to the right",
-        _ => "at the desk",
-    };
+/// What the walk's look turn adds after the look's question: where it
+/// looked, in its skill's words (`looked`), and the skill's note for its
+/// picture, as the second route adds it to a look the model asked for.
+fn walk_line(toward: &str, told: &Value) -> String {
     let mut line = format!("\n\n(You looked {toward}; the picture is that look.)");
     if let Some(note) = crate::second_provider::picture_note(told) {
         line.push_str(crate::second_provider::PICTURE_NOTE_BEFORE);
@@ -717,11 +787,23 @@ pub(super) fn start(
             Ok(Started::Nothing)
         }
         Due::Go { request, session } => {
+            let Some(note) = state
+                .search
+                .as_ref()
+                .and_then(|search| search.walk.as_ref())
+                .map(|walk| walk.note.clone())
+            else {
+                record(
+                    trace,
+                    json!({"kind":kind(false),"turn":request,"why":"its skill gives no note","at_us":gates.at_us}),
+                )?;
+                return Ok(Started::Nothing);
+            };
             let snapshot = commit_written_turn(
                 owner,
                 reply,
                 queue,
-                NOTE,
+                &note,
                 false,
                 "look_note",
                 session,
@@ -756,11 +838,16 @@ mod tests {
         BootId::new([1; 16]).unwrap()
     }
 
+    /// The note on, with look-for-things' own note and walk.
+    fn note_on() -> LookNote {
+        LookNote::new(true).with_walks(look_for_things_walks())
+    }
+
     /// A search begun by turn 1, its look's turn 2 answered with nothing
     /// called and played through at 2 s.
     fn owed() -> LookNote {
-        let mut state = LookNote::new(true);
-        state.asked(1, true, None);
+        let mut state = note_on();
+        state.asked(1, true, Some(look_for(json!({}))));
         state.looked(1, 2);
         assert_eq!(state.answered(2, 7, worker()), Ok(()));
         assert_eq!(state.settled(2, true, 2_000_000), None);
@@ -769,8 +856,8 @@ mod tests {
 
     #[test]
     fn one_note_a_search_after_its_look_s_answer_has_played() {
-        let mut state = LookNote::new(true);
-        state.asked(1, true, None);
+        let mut state = note_on();
+        state.asked(1, true, Some(look_for(json!({}))));
         state.looked(1, 2);
         assert_eq!(state.answered(2, 7, worker()), Ok(()));
         // Still playing: not yet.
@@ -804,7 +891,7 @@ mod tests {
             Due::Wait
         );
         // A new search, asked by the person: its own one note.
-        state.asked(5, true, None);
+        state.asked(5, true, Some(look_for(json!({}))));
         state.looked(5, 6);
         assert_eq!(state.answered(6, 7, worker()), Ok(()));
         state.settled(6, true, 5_000_000);
@@ -829,14 +916,14 @@ mod tests {
             Due::Wait
         );
         // A look no skill asked (`take_a_look`) is no search's.
-        let mut state = LookNote::new(true);
+        let mut state = note_on();
         assert_eq!(
             state.answered(2, 7, worker()),
             Err("not a skill's search's look")
         );
         // Cut short: dropped, and not owed again.
-        let mut state = LookNote::new(true);
-        state.asked(1, true, None);
+        let mut state = note_on();
+        state.asked(1, true, Some(look_for(json!({}))));
         state.looked(1, 2);
         assert_eq!(state.answered(2, 7, worker()), Ok(()));
         assert_eq!(
@@ -906,7 +993,7 @@ mod tests {
 
     #[test]
     fn the_walk_goes_on_to_places_not_yet_asked_and_asks_once_past_them() {
-        let mut state = LookNote::new(true).with_walk(true);
+        let mut state = note_on().with_walk(true);
         state.asked(1, true, Some(look_for(json!({"place": "left"}))));
         let mut places = Vec::new();
         while let Ok((call, place)) = state.next_call() {
@@ -918,7 +1005,7 @@ mod tests {
         assert_eq!(places, ["right", "far_left", "far_right", "desk", "desk"]);
         assert_eq!(state.next_call(), Err("its places are all looked at"));
         // Begun at the desk (no place named), through `use_skill`.
-        let mut state = LookNote::new(true).with_walk(true);
+        let mut state = note_on().with_walk(true);
         state.asked(
             1,
             true,
@@ -939,7 +1026,7 @@ mod tests {
     #[test]
     fn a_walk_step_s_give_up_goes_once_and_speech_drops_it() {
         let give_up = |answer: Value| {
-            let mut state = LookNote::new(true).with_walk(true);
+            let mut state = note_on().with_walk(true);
             state.asked(1, true, Some(look_for(json!({}))));
             state.looked(1, 2);
             // Its note has gone: a look left now walks on.

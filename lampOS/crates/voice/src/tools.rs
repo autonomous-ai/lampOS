@@ -1176,10 +1176,53 @@ pub fn core_skills(settings: &Settings) -> BTreeSet<String> {
     named_beside(settings, "core")
 }
 
+/// A search's note and walk on the second route, as its skill's file says
+/// them (`[search]`'s `note`, `walk` and `looked`, and its choice's
+/// `default`) and its skills folder's tools file gives them beside its
+/// tools (`searches`, `lamp_skills::tools_file`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+pub struct SearchWalk {
+    /// What the model is told, once a search, of a look it left.
+    pub note: String,
+    /// The places the walk goes on to after the note, in order.
+    #[serde(default)]
+    pub walk: Vec<String>,
+    /// By place, where a walked look's turn says it looked.
+    #[serde(default)]
+    pub looked: std::collections::BTreeMap<String, String>,
+    /// The place a call naming none looks at.
+    #[serde(default)]
+    pub default: Option<String>,
+}
+
+/// The note and walk of the search `tool` starts, from the first skills
+/// folder whose tools file gives them ([`SearchWalk`]): none from an older
+/// file, or for a tool with no search.
+pub fn search_walk(settings: &Settings, tool: &str) -> Option<SearchWalk> {
+    tools_files(settings)
+        .into_iter()
+        .find_map(|file| serde_json::from_value(file["searches"][tool].clone()).ok())
+}
+
 /// The names each skills folder's tools file lists under `key` beside its
 /// tools.
 fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
     let mut named = BTreeSet::new();
+    for file in tools_files(settings) {
+        if let Some(names) = file[key].as_array() {
+            named.extend(
+                names
+                    .iter()
+                    .filter_map(|name| name.as_str().map(str::to_owned)),
+            );
+        }
+    }
+    named
+}
+
+/// Each skills folder's tools file that can be read, in order.
+fn tools_files(settings: &Settings) -> Vec<Value> {
+    let mut files = Vec::new();
     for folder in skills_folders(settings) {
         let Ok(file) = std::fs::File::open(folder.join(CATALOG_FILE)) else {
             continue;
@@ -1193,17 +1236,11 @@ fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
         {
             continue;
         }
-        if let Ok(file) = serde_json::from_str::<serde_json::Value>(&text)
-            && let Some(names) = file[key].as_array()
-        {
-            named.extend(
-                names
-                    .iter()
-                    .filter_map(|name| name.as_str().map(str::to_owned)),
-            );
+        if let Ok(file) = serde_json::from_str::<Value>(&text) {
+            files.push(file);
         }
     }
-    named
+    files
 }
 
 /// The context is forwarded only through a verified Skills socket. Translating
@@ -3975,6 +4012,32 @@ mod tests {
     /// for the body, by its own name or through `use_skill`, and its socket
     /// is never asked. A text runs one that doesn't, and a spoken call runs
     /// the moving one as before, with requested audio switched off or on.
+    #[test]
+    fn a_searchs_note_and_walk_are_read_from_the_tools_file() {
+        let dir = directory("sw");
+        let own = dir.join("own");
+        std::fs::create_dir_all(&own).unwrap();
+        std::fs::write(
+            own.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"look_for","description":"Look."}],
+            "searches":{"look_for":{"note":"Look on.","walk":["left","desk"],
+            "looked":{"left":"to the left","desk":"at the desk"},"default":"desk"}}}"#,
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(own),
+            ..Default::default()
+        };
+        let walk = search_walk(&settings, "look_for").unwrap();
+        assert_eq!(walk.note, "Look on.");
+        assert_eq!(walk.walk, ["left", "desk"]);
+        assert_eq!(walk.looked["left"], "to the left");
+        assert_eq!(walk.default.as_deref(), Some("desk"));
+        // A tool with no search, or an older file, gives none.
+        assert_eq!(search_walk(&settings, "glow"), None);
+        assert_eq!(search_walk(&Settings::default(), "look_for"), None);
+    }
+
     #[test]
     fn a_text_never_runs_a_skill_that_moves_the_body() {
         for requested_audio in [false, true] {

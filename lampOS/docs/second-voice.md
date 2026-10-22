@@ -2539,10 +2539,13 @@ after a take-over, but now for every turn:
   lamp's own turn goes on with it, and the search's newest `lamp_looks`
   turn is the one a `LookNoCall` may be for. Then, once a search, after the
   answer has played whole and a second of fresh quiet (the holding answer's
-  gates), it sends one written turn on the same session:
-  "Not found yet? Call look_for with the next place: left, right,
-  far_left, then far_right. If you can see it, say where and stop."
-  (`look_note::NOTE`), recorded as `look_note_sent`. It never goes if the
+  gates), it sends one written turn on the same session, the skill's own
+  note from its file (`[search]` `note`, as lamp-skills' tools file gives
+  it under `searches`, read as the search begins: `tools::search_walk`;
+  look-for-things': "Not found yet? Call look_for with the next place:
+  left, right, far_left, then far_right. If you can see it, say where and
+  stop."), recorded as `look_note_sent`; a search whose skill gives no
+  note gets none (`look_note_dropped`, "its skill gives no note"). It never goes if the
   person speaks or another turn begins first, the answer was cut short,
   the session changed, or 3 s pass without quiet; nor for a later look of
   a search that had its note, nor for an answer that called anything
@@ -2561,17 +2564,19 @@ after a take-over, but now for every turn:
   coordinator (`coordinator::look_note`), under the note's gates (the
   answer played whole, a second of fresh quiet), calls the search's skill
   itself, with the call the model made (`LookAsked`'s `call`: its name, the
-  skill's own or `use_skill`, and its arguments) and the next place in
-  `look_note::WALK_ORDER`: left, right, far_left, far_right, then the desk,
-  each skipped if the search already asked it (its first look's place is
-  the call's `place`, or the desk). The call goes on a thread of its own
+  skill's own or `use_skill`, and its arguments) and the next place in its
+  skill's `walk` (`[search]` in its file; look-for-things': left, right,
+  far_left, far_right, then the desk), each skipped if the search already
+  asked it (its first look's place is the call's `place`, or the choice's
+  `default`, the desk). The call goes on a thread of its own
   through the voice's own call path (`tools::run_call`, to lamp-skills'
   `call.sock`, at most 1.5 s), so nothing waits on it and the lamp's speech
   is never delayed. A picture cannot come back as a call's result on this
   route, so a look in the skill's answer is taken as a skill's look is
   (the eyes asked at once, as nothing is playing) and goes as the search's
   next `lamp_looks` turn, marked as the search's, with "(You looked to the
-  left; the picture is that look.)" and the skill's "When the picture
+  left; the picture is that look.)" (the place in the skill's `looked`
+  words) and the skill's "When the picture
   comes:" note after the look's question: the finding stays the model's.
   The skill's refusal past its looks (look-for-things' `[search]`
   `give_up`, an error) goes once as a written turn, `look_walk_gave_up`,

@@ -7377,6 +7377,76 @@ fn a_search_is_held_to_its_rules_and_its_looks_are_counted() {
     }
 }
 
+/// #2823: a search's note and walk on the second voice route are its
+/// skill's file's, as the tools file gives them to the voice: look-for-
+/// things' places in its order, and where each look's turn says it looked.
+/// A walk is held to its choice's places, each once, with a note and words
+/// for each of its places and its default.
+#[test]
+fn a_searchs_note_and_walk_are_its_files_and_go_in_the_tools_file() {
+    let look = load(&skills_root().join("look-for-things")).unwrap();
+    let file = tools_file(std::slice::from_ref(&look));
+    let search = &file["searches"]["look_for"];
+    assert_eq!(
+        search["walk"],
+        serde_json::json!(["left", "right", "far_left", "far_right", "desk"])
+    );
+    assert_eq!(search["default"], "desk");
+    assert_eq!(search["looked"]["far_left"], "far to the left");
+    assert_eq!(search["looked"]["desk"], "at the desk");
+    assert!(
+        search["note"]
+            .as_str()
+            .unwrap()
+            .starts_with("Not found yet? Call look_for with the next place")
+    );
+    // A search with no note gives the voice nothing to read.
+    let dir = tempfile::tempdir().unwrap();
+    let plain = load(&skill_with(dir.path(), "plain", SEARCH)).unwrap();
+    assert!(
+        tools_file(std::slice::from_ref(&plain))
+            .get("searches")
+            .is_none()
+    );
+    let walked = SEARCH.replace(
+        "give_up = \"Say kindly you can't see it from here.\"\n",
+        "give_up = \"Say kindly you can't see it from here.\"\nnote = \"Look on.\"\nwalk = [\"left\", \"right\"]\nlooked = { desk = \"at the desk\", left = \"to the left\", right = \"to the right\" }\n",
+    );
+    load(&skill_with(dir.path(), "walked", &walked)).unwrap();
+    for (number, (from, to, why)) in [
+        ("note = \"Look on.\"\n", "", "a note with it"),
+        (
+            "note = \"Look on.\"",
+            "note = \" \"",
+            "note is what the model is told",
+        ),
+        (
+            "[\"left\", \"right\"]",
+            "[\"left\", \"left\"]",
+            "each place once",
+        ),
+        (
+            "[\"left\", \"right\"]",
+            "[\"left\", \"up\"]",
+            "each place once",
+        ),
+        ("desk = \"at the desk\", ", "", "its walk and its default"),
+        (
+            "right = \"to the right\"",
+            "right = \"\"",
+            "looked says a place",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = walked.replace(from, to);
+        assert_ne!(toml, walked, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("walk{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+}
+
 /// #1685: a look made late in a search holds its pose past the run's own
 /// end; someone speaking then still lets it go within a fifth of a second,
 /// by the pose's own look at the voice.
