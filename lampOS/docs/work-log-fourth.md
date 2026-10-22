@@ -6023,6 +6023,29 @@ Ready for lamp-voice: no (#2782 and #2870 await their current native gates; #277
   permission contract still needs the requested Voice and bus/keeper
   owner decisions. No account, group, unit or device change was made.
 
+## 2026-10-22 10:43 ICT: peek read status ready after native checks
+
+Ready for lamp-voice: yes (#2870 only; #2789 remains open for its other three pieces).
+
+- #2870 is ready at `7f6a6afe4ec8b1d24d644c7370bf180e919cafa5`.
+  ARM64 39716259731 passed 1,114 nextest cases, zero failed, three
+  skipped, including all 26 Peek checks. Four workspace doctests,
+  12 separate turn-end-wire process checks and relay signals also passed.
+  Clippy 39716259849 passed on the same head; no rerun was used.
+- CI checked merge `24d257b298ca3bccdbc09f8a350555c15b182c13` against
+  base `5c8b03a2eb2f7755262397c46216be2af41b4a95`. Artifact 12398974542
+  has SHA-256 `ad2526d25d9136479b7ed06d0b14f203afa61bdfbc9db311b505f95a56337b67`.
+  The four selected crates were Peek, Cloud, Update and Voice-eval;
+  excluded crates are not counted as tested by nextest.
+- Native proof and readiness are posted on #2870 and Queue #2602:
+  https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6332134457.
+  Raw logs and receipt: `/private/tmp/fourth-peek-read-status-ci-20261022/`.
+  No production file permission, account, group, unit or lamp was changed.
+- #2782's new strict Clippy passed; its ARM64 run remains active.
+  #2774 still waits for the #2780 fixture merge before its rebase.
+  #2789's remaining group/bus decisions and authorized lamp proof are
+  still awaiting their owners; the proposal has no reply yet.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
