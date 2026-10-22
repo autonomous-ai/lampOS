@@ -21,8 +21,20 @@ pub(super) struct FailureNotices {
     /// The Wi-Fi helper's line with no network (#1959): played only when
     /// asked through the say service ([`crate::say::Recordings`]).
     wifi_lost: std::result::Result<Arc<Recording>, Missing>,
+    /// With a notices folder configured, what a failed line plays when its
+    /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
+    /// here, so a lamp whose files are missing never meets a question it
+    /// can't answer with silence. None with no folder configured, which
+    /// stays silent as before.
+    fallback: Option<Arc<Recording>>,
     language: Option<String>,
 }
+
+/// How loud the fallback sigh is, as RMS over its loudest tenth of a
+/// second: under the lamp's speech (about -20 dBFS), as the head tap's
+/// sounds are, but louder than they are (-35), since it stands in for a
+/// line the person waits for. Not yet measured against a lamp's speech.
+pub(super) const FALLBACK_DBFS: f64 = -26.0;
 pub(super) struct Recording {
     /// The provisioned notice; none for a sound made here (the head tap's
     /// "hm?"), which says nothing.
@@ -58,6 +70,10 @@ impl FailureNotices {
             back_online: get(NoticeKind::BackOnline),
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
+            fallback: Some(Arc::new(Recording {
+                info: None,
+                samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
+            })),
             language: Some(options.language().to_owned()),
         }
     }
@@ -68,6 +84,7 @@ impl FailureNotices {
             back_online: Err(Missing::NoDirectory),
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
+            fallback: None,
             language: None,
         }
     }
@@ -82,6 +99,8 @@ impl FailureNotices {
         };
         // The offline pair (#830), only where a directory is configured.
         if self.language.is_some() {
+            // What stands in for a missing line (#2943 part 3).
+            capability["fallback"] = json!(self.fallback.as_ref().map(|_| "sigh"));
             let state = |selected: &std::result::Result<Arc<Recording>, Missing>| match selected {
                 Ok(recording) => json!({"available":recording.info}),
                 Err(reason) => json!({"missing":reason}),
@@ -462,29 +481,41 @@ pub(super) fn select_failure_notice_in(
     }
     // A local-only turn says the offline line, once an outage and only for
     // speech; any other try gets no words, only the ring's offline breath.
-    let selected = match current.local_only {
-        None => &catalog.selected,
-        Some(local) if local.back => &catalog.back_online,
-        Some(local) if local.speech && !outage.said && local.service => &catalog.service_down,
-        Some(local) if local.speech && !outage.said => &catalog.offline,
+    let (selected, stands_in) = match current.local_only {
+        None => (&catalog.selected, true),
+        // "Back online" is never stood in for: nothing failed.
+        Some(local) if local.back => (&catalog.back_online, false),
+        Some(local) if local.speech && !outage.said && local.service => {
+            (&catalog.service_down, true)
+        }
+        Some(local) if local.speech && !outage.said => (&catalog.offline, true),
         Some(_) => return Ok(()),
     };
-    current.notice = match selected {
-        Ok(recording) => NoticeDelivery::Selected {
-            origin: SpeechOrigin::FailureNotice,
-            recording: Arc::clone(recording),
-            cursor: 0,
-            attempted_at_us: None,
-            retired_at_us: None,
-            final_acceptance: None,
-            gaps: 0,
-        },
-        Err(reason) => NoticeDelivery::Skipped(*reason),
+    let selected_recording = |recording: &Arc<Recording>| NoticeDelivery::Selected {
+        origin: SpeechOrigin::FailureNotice,
+        recording: Arc::clone(recording),
+        cursor: 0,
+        attempted_at_us: None,
+        retired_at_us: None,
+        final_acceptance: None,
+        gaps: 0,
+    };
+    // A line that can't be loaded, with a folder configured: the lamp's own
+    // sigh in its place, and why, in the evidence (#2943 part 3).
+    let mut stood_in_for = None;
+    current.notice = match (selected, &catalog.fallback) {
+        (Ok(recording), _) => selected_recording(recording),
+        (Err(reason), Some(sigh)) if stands_in => {
+            stood_in_for = Some(*reason);
+            selected_recording(sigh)
+        }
+        (Err(reason), _) => NoticeDelivery::Skipped(*reason),
     };
     record(
         trace,
         json!({"kind":"failure_notice_selected","at_us":monotonic_us(),
         "owner":current.owner,"turn":current.owner.turn(),"notice":current.notice.evidence(),
+        "fallback_for":stood_in_for,
         "provider_outcome":current.cloud.outcome,"output_authority_granted":false}),
     )
 }
@@ -513,6 +544,15 @@ impl FailureNotices {
         catalog
     }
 
+    /// A folder configured that isn't there (#2943 part 3): every line
+    /// missing, the lamp's own sigh to stand in.
+    pub(super) fn missing_with_sigh() -> Self {
+        let gone = std::env::temp_dir().join("lamp-notice-test-never-made-2943");
+        Self::load(Some(
+            &crate::options::NoticeOptions::new(gone, "en-US".into()).unwrap(),
+        ))
+    }
+
     pub(super) fn synthetic() -> Self {
         // Test-only PCM. No manifest or production approval is created.
         let samples = vec![321_i16; 7_200].into_boxed_slice();
@@ -536,6 +576,8 @@ impl FailureNotices {
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
+            // The other tests' catalog stays silent on a missing line.
+            fallback: None,
             language: Some("en-US".into()),
         }
     }
@@ -590,6 +632,28 @@ mod loading_tests {
             wav,
         )
     }
+    /// #2943 part 3: a configured folder that isn't there leaves every line
+    /// missing, with the lamp's own sigh to stand in, said in its
+    /// capability; with no folder configured nothing stands in, as before.
+    #[test]
+    fn a_missing_folder_stands_the_sigh_in_and_no_folder_stays_silent() {
+        let gone = std::env::temp_dir().join("lamp-notice-test-never-made-2943");
+        let options = crate::options::NoticeOptions::new(gone, "en-US".into()).unwrap();
+        let missing = FailureNotices::load(Some(&options));
+        assert!(matches!(missing.selected, Err(Missing::NoDirectory)));
+        let sigh = missing.fallback.as_ref().unwrap();
+        assert!(sigh.info.is_none());
+        assert_eq!(
+            &sigh.samples[..],
+            &crate::head_cue::breath(FALLBACK_DBFS)[..]
+        );
+        assert_eq!(missing.capability()["fallback"], "sigh");
+        assert_eq!(missing.capability()["missing"], "no_directory");
+        let unset = FailureNotices::load(None);
+        assert!(unset.fallback.is_none());
+        assert!(unset.capability().get("fallback").is_none());
+    }
+
     /// #1959: the say service is handed the Wi-Fi line's samples when it
     /// loaded, and the loader's reason when it did not.
     #[test]
