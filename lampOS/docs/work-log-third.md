@@ -5,6 +5,47 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 21:56 — wake review fixes pushed
+
+Ready for lamp-voice: no (#3021; replacement native checks pending).
+
+- Pushed `c579d1a4f6bc4eca58c342531ff06dead1b8004a` on Third's own
+  `third/wake-hum-permission`, based on `0766811ad`. One amended one-line
+  commit, exactly four modified files staged, seven task files in the
+  complete commit, no attribution. Working tree clean. PR remains draft;
+  Reviewer-lead owns the read/current-base merge, and must read this head
+  and all later comments before a carry. Old `4fb3a95a2` receipts are historical.
+- Both of El's P3s and the wording nit are fixed. A pending consumed wake
+  records one refused decision when its conversation ends, including a
+  privacy-worker error. The original result/restart token survives when
+  the existing bounded recorder accepts the event; recorder failure stays
+  fatal. New loop coverage proves expiry while permission remains Unknown,
+  then later real permission/capture cannot revive the cue. No privacy or
+  timing bound changed; the 2 s marker age and 1.5 s conversation window
+  are now distinguished from the unchanged 500 ms lamp target.
+- Full local 12-crate command in the verification README, on `2297f0f3d`
+  plus this review correction: **6,760 passed, zero failed, 29 ignored**.
+  Strict workspace Clippy and workspace build passed. The long updater
+  groups completed normally. The initial fmt failure was only the inherited
+  own_echo test call assigned to #3044; no unowned file was edited.
+- After the full run, rebased through merged #3044 onto `0766811ad`.
+  Original commit range equal; review patch equal ignoring diff indices
+  and hunk offsets. Upstream body-push and skill-journal changes retained.
+  Rebased formatting, strict workspace Clippy and workspace build passed;
+  **103 hand-controls tests / zero failed / three ignored** and **20 wake
+  tests / zero failed or ignored** passed. Scenario times remain permission
+  60 ms, capture 60 ms, decision 62 ms, first speaker send 64 ms. These are
+  software-clock boundaries, not acoustic/device measurements.
+- [ARM64 39799976091](https://github.com/autonomous-ai/lampOS/actions/runs/39799976091)
+  and [Linux Clippy 39799976038](https://github.com/autonomous-ai/lampOS/actions/runs/39799976038)
+  are pending on the exact head. No local Cargo job remains. No ARM64 link
+  on the Mac, device access, install or played round occurred.
+- All Queue comments and own-PR discussion/review comments since the last
+  post were read; no additional Third request was found. Review answers and
+  head/next-action posts are on #3021 and #2602 under the new protocol.
+  Next: watch replacement native gates, then hand the qualified head to
+  Reviewer-lead/First. #2948 stays draft; Fifth/person owns its 52e6 try.
+
 ## 2026-10-22 20:56 — wake review corrections taken
 
 Ready for lamp-voice: no (#3021 held and returned to draft).
