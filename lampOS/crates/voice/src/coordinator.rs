@@ -5598,6 +5598,10 @@ fn conversation_with_gate(
     // A person who tries again over a reply fallen back is still heard
     // (#2602, `LAMP_CUT_IN_KEEPS_LISTENING=on`). Off unless set.
     let keeps_listening = duplex && crate::turn_taking::cut_in_keeps_listening();
+    // A resume counts as fruitless only when its yield's evidence window
+    // points at the lamp's own voice (#2602, `LAMP_CUT_IN_COUNTS_REAL=on`).
+    // Off unless set.
+    let counts_real = duplex && crate::turn_taking::cut_in_counts_real();
     detector.keep_first_words(first_words);
     let hold = match (duplex, first_words) {
         (true, true) => Hold::DUPLEX.keeping_first_words(),
@@ -5738,6 +5742,7 @@ fn conversation_with_gate(
             "fruitless_yields_before_fallback":FRUITLESS_YIELDS,
             "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
             "keeps_listening":keeps_listening.then_some(json!({"over_blocks":crate::turn_taking::KEEPS_TRYING_BLOCKS,"more_fruitless_yields":crate::turn_taking::KEEPS_TRYING_YIELDS})),
+            "fruitless_counts_own_voice_only":counts_real.then_some(json!({"window":"onset run through the settling block","own":"own, or over not plain","person":"plain over, or clear"})),
             "decision_budget_us":hold.decision_budget_us,
             "first_words_kept_blocks":first_words.then_some(crate::activity::REACH_BACK_BLOCKS),
             "reply_end_reach_within_blocks":reply_end_reach.then_some(lamp_audio::evidence::QUIET_BLOCKS_CEILING),
@@ -5760,6 +5765,9 @@ fn conversation_with_gate(
         }
         if keeps_listening {
             mask.keep_listening();
+        }
+        if counts_real {
+            mask.count_real_cut_ins();
         }
         // A sound that waits holds its pre-roll and up to the hold's 1.2 s:
         // more than the mask's usual memory, which would reject it as

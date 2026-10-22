@@ -75,6 +75,65 @@ pub fn cut_in_keeps_listening() -> bool {
         .as_deref()
         == Some("on")
 }
+/// With `LAMP_CUT_IN_COUNTS_REAL=on`, resumes whose window did not point at
+/// the lamp's own voice ([`YieldEvidence`]) before the mask stops yielding
+/// for the rest of the reply, as [`FRUITLESS_YIELDS`] does, until
+/// [`FORGIVE_FRUITLESS_US`] gives one back. Two real asides leave a third
+/// line heard; a television, a radio or someone else's short words pause a
+/// story at most three times in 20 s (the Reviewer-lead's P2 on #2779).
+pub const OTHER_FRUITLESS_YIELDS: u8 = 3;
+/// The voice's environment switch, with `on`, for counting a resume toward
+/// [`FRUITLESS_YIELDS`] only when its yield's evidence window points at the
+/// lamp's own voice ([`YieldEvidence`], #2602 "Cutting in"); off unless set.
+pub const CUT_IN_COUNTS_REAL_ENVIRONMENT: &str = "LAMP_CUT_IN_COUNTS_REAL";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_COUNTS_REAL_ENVIRONMENT`].
+pub fn cut_in_counts_real() -> bool {
+    std::env::var(CUT_IN_COUNTS_REAL_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
+/// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
+/// The window is bounded: the consecutive `Over` blocks that made the yield
+/// (its onset run, 7 or 10 blocks) and every block heard while the yield is
+/// in force, through the block that settles it; at most 10 + 110 blocks
+/// (the resume deadline), 1.2 s.
+///
+/// - The lamp's own voice: a block heard `Own`, or `Over` and not plain
+///   (the render explains more than `plain_percent` of it, as it did of the
+///   lamp's own voice misjudged on lamp-4ace).
+/// - A person: a block heard `Over` and plain, or `Clear`.
+/// - Nothing either way: `Unknown`, `Under`, `Still` and a block without
+///   evidence. `Unknown` says nothing about who spoke, and words that never
+///   came are no evidence either (Third on #2602, 08:13).
+///
+/// A resume counts as fruitless only when the lamp's own voice outnumbers a
+/// person in the window. A yield with no evidence either way, or a tie, is
+/// not one: nothing in it showed the lamp's own voice made it yield. Such a
+/// resume counts on a bound of its own instead ([`OTHER_FRUITLESS_YIELDS`]),
+/// so a sound that is never a line still can't pause a reply without limit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct YieldEvidence {
+    own: u16,
+    person: u16,
+}
+impl YieldEvidence {
+    fn add(&mut self, heard: Heard, plain: bool) {
+        match heard {
+            Heard::Own => self.own = self.own.saturating_add(1),
+            Heard::Over if !plain => self.own = self.own.saturating_add(1),
+            Heard::Over | Heard::Clear => self.person = self.person.saturating_add(1),
+            Heard::Still | Heard::Under | Heard::Unknown => {}
+        }
+    }
+    fn own_voice(&self) -> bool {
+        self.own > self.person
+    }
+}
+
 /// Blocks of the lamp's own sound that the render must have explained, since
 /// the lamp last had nothing to say or last went on after a pause, before a
 /// block can be a person over it. The evidence takes the start of every
@@ -178,6 +237,9 @@ struct Duplex {
     /// Yields since the reply began that ended in a resume, less those
     /// forgiven ([`FORGIVE_FRUITLESS_US`]).
     fruitless: u8,
+    /// With `LAMP_CUT_IN_COUNTS_REAL=on`, resumes that did not count in
+    /// [`Self::fruitless`], less those forgiven ([`OTHER_FRUITLESS_YIELDS`]).
+    other_fruitless: u8,
     /// When the latest yield began, or the latest fruitless yield was
     /// forgiven: the next is forgiven [`FORGIVE_FRUITLESS_US`] after it.
     last_yield_at_us: Option<u64>,
@@ -195,6 +257,20 @@ struct Duplex {
     /// Blocks in a row heard as a person over the lamp while it speaks,
     /// whether or not it may yield.
     over_run: u16,
+    /// `LAMP_CUT_IN_COUNTS_REAL=on`: see [`YieldEvidence`].
+    counts_real: bool,
+    /// The onset run so far, while no yield is in force.
+    onset: YieldEvidence,
+    /// The window of the yield in force, or of the last one.
+    window: YieldEvidence,
+}
+
+impl Duplex {
+    /// Fallen back for the rest of the reply: no yield, unless one is given
+    /// back ([`FORGIVE_FRUITLESS_US`]).
+    fn fallen(&self) -> bool {
+        self.fruitless >= FRUITLESS_YIELDS || self.other_fruitless >= OTHER_FRUITLESS_YIELDS
+    }
 }
 
 /// One capture block as the duplex mask heard it.
@@ -273,6 +349,7 @@ impl PlaybackMask {
                 last_yield: None,
                 blind: true,
                 fruitless: 0,
+                other_fruitless: 0,
                 last_yield_at_us: None,
                 forgiven: 0,
                 stop_committed: false,
@@ -280,6 +357,9 @@ impl PlaybackMask {
                 listened_at_us: 0,
                 keeps_listening: false,
                 over_run: 0,
+                counts_real: false,
+                onset: YieldEvidence::default(),
+                window: YieldEvidence::default(),
             }),
             ..Self::new(TurnTaking::V1Baseline)
         }
@@ -327,6 +407,14 @@ impl PlaybackMask {
     pub fn keep_listening(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.keeps_listening = true;
+        }
+    }
+    /// `LAMP_CUT_IN_COUNTS_REAL=on`: a resume counts toward
+    /// [`FRUITLESS_YIELDS`] only when its yield's window points at the
+    /// lamp's own voice ([`YieldEvidence`]). Only with ears.
+    pub fn count_real_cut_ins(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.counts_real = true;
         }
     }
     /// Remember enough hearing for a yield's first words (#828): every
@@ -413,12 +501,13 @@ impl PlaybackMask {
         duplex.listened_at_us = at_us;
         // A fruitless yield is forgiven after a spell of the reply with no
         // yield, so a long story is never deaf for its rest.
-        let forgiven = duplex.fruitless > 0
+        let forgiven = (duplex.fruitless > 0 || duplex.other_fruitless > 0)
             && duplex
                 .last_yield_at_us
                 .is_some_and(|at| at_us.saturating_sub(at) >= FORGIVE_FRUITLESS_US);
         if forgiven {
-            duplex.fruitless -= 1;
+            duplex.fruitless = duplex.fruitless.saturating_sub(1);
+            duplex.other_fruitless = duplex.other_fruitless.saturating_sub(1);
             duplex.forgiven = duplex.forgiven.saturating_add(1);
             duplex.last_yield_at_us = Some(at_us);
         }
@@ -435,11 +524,17 @@ impl PlaybackMask {
             duplex.heard.clear();
             duplex.interruption.clear();
             duplex.last_yield = None;
+            duplex.onset = YieldEvidence::default();
         }
         let Some(evidence) = evidence else {
             duplex.blind = true;
             // A yield in force still runs to its deadline.
             let step = duplex.interruption.block(Heard::Unknown, speaking);
+            // No evidence either way, and the end of any onset run.
+            duplex.onset = YieldEvidence::default();
+            if step == Step::Yield {
+                duplex.window = YieldEvidence::default();
+            }
             Self::settle(duplex, sequence, step);
             return Ok(Listened {
                 step,
@@ -467,19 +562,33 @@ impl PlaybackMask {
         } else {
             0
         };
-        let fallen = duplex.fruitless >= FRUITLESS_YIELDS;
+        let fallen = duplex.fallen();
         // With the switch, a voice that keeps going over a reply fallen
         // back is still a person trying to cut in, a few times more.
         let keeps_trying = duplex.keeps_listening
             && fallen
             && duplex.fruitless < FRUITLESS_YIELDS.saturating_add(KEEPS_TRYING_YIELDS)
+            && duplex.other_fruitless < OTHER_FRUITLESS_YIELDS.saturating_add(KEEPS_TRYING_YIELDS)
             && duplex.over_run > KEEPS_TRYING_BLOCKS;
         // A reply that keeps yielding to nothing stops yielding.
         // A stop heard by its own listener yields however many did not.
         let may_yield =
             speaking && (!fallen || keeps_trying || duplex.interruption.force_pending());
         let plain = duplex.hearing.plain(heard, evidence);
+        let was_yielded = duplex.interruption.yielded();
         let step = duplex.interruption.observe(heard, plain, may_yield);
+        // The yield's evidence window: its onset run, then every block
+        // heard while it is in force, through the one that settles it.
+        if was_yielded {
+            duplex.window.add(heard, plain);
+        } else if may_yield && heard == Heard::Over {
+            duplex.onset.add(heard, plain);
+        } else {
+            duplex.onset = YieldEvidence::default();
+        }
+        if step == Step::Yield {
+            duplex.window = std::mem::take(&mut duplex.onset);
+        }
         if duplex.heard.len() >= duplex.max_heard {
             duplex.heard.pop_front();
         }
@@ -538,6 +647,7 @@ impl PlaybackMask {
                     *state = Yielded::Committed;
                 }
                 duplex.fruitless = 0;
+                duplex.other_fruitless = 0;
                 duplex.stop_committed |= duplex.interruption.yield_was_forced();
             }
             Step::Resume => {
@@ -546,8 +656,15 @@ impl PlaybackMask {
                 }
                 // A forced yield that resumes is a false hearing of the
                 // stop listener, not the lamp yielding to its own voice.
+                // With `LAMP_CUT_IN_COUNTS_REAL=on`, nor is one whose window
+                // did not point at the lamp's own voice ([`YieldEvidence`]):
+                // that counts on its own bound ([`OTHER_FRUITLESS_YIELDS`]).
                 if !duplex.interruption.yield_was_forced() {
-                    duplex.fruitless = duplex.fruitless.saturating_add(1);
+                    if !duplex.counts_real || duplex.window.own_voice() {
+                        duplex.fruitless = duplex.fruitless.saturating_add(1);
+                    } else {
+                        duplex.other_fruitless = duplex.other_fruitless.saturating_add(1);
+                    }
                 }
                 // What plays next starts like a reply does.
                 duplex.matched = 0;
@@ -590,6 +707,7 @@ impl PlaybackMask {
     pub fn reply_closed(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.fruitless = 0;
+            duplex.other_fruitless = 0;
             duplex.last_yield_at_us = None;
             duplex.stop_committed = false;
         }
@@ -610,12 +728,9 @@ impl PlaybackMask {
     /// Yields, commits and resumes so far, and whether this reply has fallen
     /// back to the conservative mask.
     pub fn duplex_summary(&self) -> Option<((u32, u32, u32), bool)> {
-        self.duplex.as_ref().map(|duplex| {
-            (
-                duplex.interruption.counts(),
-                duplex.fruitless >= FRUITLESS_YIELDS,
-            )
-        })
+        self.duplex
+            .as_ref()
+            .map(|duplex| (duplex.interruption.counts(), duplex.fallen()))
     }
     /// Fruitless yields forgiven since hearing began
     /// ([`FORGIVE_FRUITLESS_US`]): `fallen_back_at_end` says only whether the
@@ -1143,6 +1258,23 @@ fn invalid(message: &'static str) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// A tie is not the lamp's own voice, and `Clear` is a person
+    /// (the Reviewer-lead's minor on #2779).
+    #[test]
+    fn a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice() {
+        let mut window = YieldEvidence::default();
+        window.add(Heard::Own, false);
+        window.add(Heard::Clear, false);
+        assert!(!window.own_voice(), "a tie");
+        window.add(Heard::Over, false);
+        assert!(window.own_voice(), "not-plain over is the lamp's own voice");
+        window.add(Heard::Over, true);
+        window.add(Heard::Unknown, false);
+        assert!(
+            !window.own_voice(),
+            "plain over is a person; unknown is neither"
+        );
+    }
     use lamp_turn_owner::{
         AdmissionState, AdmittedInput, BootId, CaptureState, Controller, MonoTime, Permission,
     };
