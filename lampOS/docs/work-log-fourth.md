@@ -7425,18 +7425,18 @@ now also accepts NotConnected; all semantic/privacy assertions are unchanged,
 and the complete callback group then passed 24/0.
 
 Focused overlap passed: seven continuation/actual Engine/HTTP/credit tests,
-one 15-case short-line Engine test, retries 25, private context 26, scope25,
-Services24, name carry15/near4, gaps2, credited output1 and source13.
+one 15-case short-line Engine test, retries 25, private context 26, scope 25,
+Services 24, name carry 15/near 4, gaps 2, credited output 1 and source 13.
 All 6,520 source hashes stayed unchanged. Warm synthetic name-helper
-first/repeat279/59us (prior236/55us, no statistical claim); typed matcher
-initial/NoDetection continuation411/87us, target under5ms. No cold-file,
+first/repeat 279/59 us (prior 236/55 us, no statistical claim); typed matcher
+initial/NoDetection continuation 411/87 us, target under 5 ms. No cold-file,
 model, camera, acoustic, lamp or whole-turn timing is claimed. Commands,
 exits, raw retained attempts and manifests live in
 `/private/tmp/fourth-speaker-foundation-checks-20261022/lookaway-shortline-20261023/`.
 
-Exact-head ARM6439867711888 and Linuxclippy39867711870 are running; #3064
+Exact-head ARM64 39867711888 and Linux clippy 39867711870 are running; #3064
 stays draft pending those and First/El's policy/source decision. Name's
-five-path and Photo's31-path object previews are refreshed against this
+five-path and Photo's 31-path object previews are refreshed against this
 exact Common tree, with all outside-scope blobs/types/modes identical and
 all new guards retained; actual product branches remain unchanged and no
 preview count is qualification. First owns the combined latest-main train,
@@ -7444,8 +7444,8 @@ merge and physical acceptance. Nine follows the same guarded dependency.
 Writer core is already delivered in main; runtime activation stays separate.
 
 #2540 is already closed on the historical lamp-52e6 retention observation:
-1 keep,1 next-turn refresh marker, correct request49 after377seconds on
-`403b444d4` (22 October09:08–09:21). That older observation does not qualify
+1 keep, 1 next-turn refresh marker, correct request 49 after 377 seconds on
+`403b444d4` (22 October 09:08–09:21). That older observation does not qualify
 this corrected name/privacy source. No lamp access, device install, model
-spend or quality-row increase; the row stays0.40 for First's decision.
+spend or quality-row increase; the row stays 0.40 for First's decision.
 Queue status/review requests use #3126 after #2602 hit its comment limit.
