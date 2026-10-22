@@ -1,0 +1,76 @@
+{
+  "all_copy_controls_restored": true,
+  "control_patch_roundtrip_count": 17,
+  "corrected_map": {
+    "canonical_map_sha256": "de166f2f1bfc845b4d96299e70bfe69b622098e898929dec3cd1e8f3cdaa1fb2",
+    "file_count": 34
+  },
+  "corrected_to_e223_changes": {
+    "lampOS/crates/update/tests/self_process_cuts.rs": {
+      "after": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+      "before": "79632be13580fa08162281b6d6df2d4aa18781b9e876b8762c107cfd234d077d"
+    }
+  },
+  "current_5e51_full_integration_qualified": false,
+  "current_5e51_updater_map_matches_tested_f012": true,
+  "current_base_limit": "Parent reports upstream Voice/Skills/Msgs/Policy/deploy changes after f012. The 34 bound Update/workspace files match f012, but no local full 5e51 dependency qualification is claimed; PR CI remains required.",
+  "current_checkout_base": "5e51ac016c914cbb8464609a0907072755eca8fd",
+  "current_checkout_map": {
+    "canonical_map_sha256": "678a6fb0c7b44e083580db0de5df9211315b6aab4d749eff054766cdb506e65a",
+    "file_count": 34
+  },
+  "current_focused_hashes": {
+    "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/crates/update/Cargo.toml": "94da09ea98009c355f9b0086620103c25aa80065ef596f99c1c10b3b468044ba",
+    "lampOS/crates/update/tests/round.rs": "23b7fae1244704753731fc56b2f0b4e691cfda8f72061ae920e848a59a70cdd7",
+    "lampOS/crates/update/tests/round/process_cuts.rs": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+    "lampOS/crates/update/tests/self_process_cuts.rs": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+  },
+  "e223_to_f012_upstream_changes": {
+    "lampOS/crates/update/src/install.rs": {
+      "after": "b993118ec50acd520ac8d39fb7c2fc870d161ea0173767b015be79f8c2400d7c",
+      "before": "5a459e89f2f3e151d4eceec35031bce8714f192015aaa5415a3122de2db076d1"
+    },
+    "lampOS/crates/update/tests/functions.rs": {
+      "after": "3448d8f0896888a5f424a82756818abc2f08b8ee2a05697e27392d3b2d15b5d5",
+      "before": "d92e371251df8b47b5058608a1c63f5ed05677893102b5f3279677459210d165"
+    },
+    "lampOS/crates/update/tests/install.rs": {
+      "after": "bb89dd6334d22360c663ec631a3d10514495511974f56f44e2876564e42e8e12",
+      "before": "83bd6f3c5d0bf2d460520ed721c9416370a934a5383d55e73b6d0792626487fd"
+    }
+  },
+  "harness_files_match_completed_gate": true,
+  "initial_map": {
+    "canonical_map_sha256": "1bc99a9792c0ed5e1226dca883bed50875468763fef8ed44d4e087ad24c4c998",
+    "file_count": 34
+  },
+  "initial_to_corrected_changes": {
+    "lampOS/crates/update/tests/round/process_cuts.rs": {
+      "after": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+      "before": "c3ea8fd45140a51390ca48de339163619759c7d6d44d034dff6396860af74bea"
+    }
+  },
+  "publication_rebase": {
+    "all_34_bound_files_match_completed_f012_mac": true,
+    "base": "8e274b5e394b09ef5e5f18cb0d2382fbaddec95a",
+    "qualification": "pending PR ARM64 CI; local results remain attributed to f012",
+    "upstream_changes_since_5e51": "Voice source and docs only"
+  },
+  "qualification_identity": "Uncommitted test-source content is bound by hashes; the base commit alone does not contain the new harness.",
+  "recorded_f012_source_map_qualified_by_completed_receipts": true,
+  "restored_nextest_passed": true,
+  "runtime_hashes_unchanged_initial_through_e223": true,
+  "schema_version": 1,
+  "serialization": "Canonical map digest: SHA-256 of UTF-8 JSON with sorted keys, compact separators and ensure_ascii=false; raw receipt source paths/hashes are unchanged.",
+  "tested_base": "f012c47259ec302138d8ee4f91860889eef6619a",
+  "tested_e223_map": {
+    "canonical_map_sha256": "283a9eba5f8ecbf2438ab86192075e9b261e21c8d5d725cfcc9ea19c3e446c4a",
+    "file_count": 34
+  },
+  "tested_f012_map": {
+    "canonical_map_sha256": "678a6fb0c7b44e083580db0de5df9211315b6aab4d749eff054766cdb506e65a",
+    "file_count": 34
+  }
+}

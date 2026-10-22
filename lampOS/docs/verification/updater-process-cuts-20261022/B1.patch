@@ -1,0 +1,11 @@
+--- a/lampOS/crates/update/tests/round/process_cuts.rs
++++ b/lampOS/crates/update/tests/round/process_cuts.rs
+@@ -270,7 +270,7 @@
+         match info.op {
+             1 => {
+                 assert!(available >= 80);
+-                fsync_fd = (info.data[0] == libc::SYS_fsync as u64)
++                fsync_fd = (info.data[0] == u64::MAX)
+                     .then(|| i32::try_from(info.data[1]).expect("fsync fd"));
+             }
+             2 => {

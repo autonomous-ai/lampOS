@@ -1,0 +1,13 @@
+--- a/lampOS/crates/update/tests/round/process_cuts.rs
++++ b/lampOS/crates/update/tests/round/process_cuts.rs
+@@ -405,6 +405,10 @@
+         ));
+     }
+     let path = cut(&mut lamp, case);
++    if case == 6 {
++        // Negative input: lose only the selected updater after this cut.
++        fs::remove_file(lamp.config.on(own::CURRENT).join(own::BINARY)).unwrap();
++    }
+     assert!(prefix(&lamp, case));
+     runnable(&lamp, if matches!(case, 2 | 3) { NEW } else { OLD });
+     let mut restarted = fork(&mut lamp, case, true);

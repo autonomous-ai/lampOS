@@ -808,6 +808,48 @@ prefix. These are logical filesystem-prefix checks, not physical power-loss
 or fsync durability proof, and the stubs do not exercise the daemon's `exec`
 handover.
 
+**Unclean process death at the write boundaries** (#2810). The separate
+Linux `self-process-cuts` test uses the same signed install/round fixture in
+a single-threaded driver. Its parent traces an owned child, stops immediately
+after a successful directory `fsync`, checks the exact pending/link/refusal
+prefix while the child is stopped, sends SIGKILL and requires signal 9 when
+reaping it. There is no Rust unwinding or reconstructed pending file at a
+cut. Seven stops cover the synced candidate (before its `made` record),
+pending before link replacement, the new link, confirmation cleanup, the
+restored old link, the refusal before pending cleanup, and put-back cleanup.
+Another process then recovers from the same files and completes the next
+round. The selected, retained old/new and fixed fallback executables are
+checked separately. No runtime hook, quiet-window change or retry shortcut is
+added. The record lock must be released by process death itself.
+
+Run `cargo test -p lamp-update --test self-process-cuts -- --nocapture` on
+Linux 5.3 or newer, little-endian ARM64 or x86-64, with ptrace permitted for
+owned children (Podman needs its tracing capability/seccomp allowance).
+The custom driver exposes one libtest-compatible named case to nextest and
+runs before creating any threads; the Mac reports it ignored. Each traced
+operation/recovery is bounded by 120 seconds, cleanup by five seconds. A
+missing cut, unexpected signal, timeout or failed executable is a failure.
+This checks the real library in killed processes with executable fixtures,
+not installed-daemon exec, real systemd recovery, lost kernel caches or
+physical flash durability. The attended unplug remains separate evidence.
+
+**The real CLI exec and confirmation** (#2810). The Linux `self-cli-exec`
+checker runs the built updater executable against a private signed local
+channel. Distinct trailers outside its ELF segments give old/new identities
+of the same implementation. The parent observes the old exec and then its
+same-PID candidate exec, verifies executable hashes, start identity, argv,
+environment and the real persisted pending/current/state prefix, then detaches.
+The candidate's actual main must confirm exactly once; its next ordinary
+round must remain at the installed sequence. A self-switch-off control exits
+successfully at that same sequence but must be rejected for missing candidate
+exec. One named nextest case contains both paths; Mac reports it ignored.
+Run `cargo test -p lamp-update --test self-cli-exec -- --nocapture` on Linux
+ARM64 or x86-64 with owned-child ptrace permitted. Child waits are bounded
+by 30 seconds within a 120-second case budget, and failure cleanup by five
+seconds. Systemctl is an exact fixture, not a real service. This does not
+test distinct release versions, fixed-path fallback, timer expiry, production
+quiet/health timing, cold boot or physical power loss.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
