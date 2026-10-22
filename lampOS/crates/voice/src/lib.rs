@@ -81,6 +81,7 @@ pub mod scoped_session;
 pub mod sign_in;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;
+pub mod name_or_follow_up;
 pub mod not_speech;
 pub mod onboarding;
 pub mod options;
