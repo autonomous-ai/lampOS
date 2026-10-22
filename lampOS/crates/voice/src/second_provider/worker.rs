@@ -1935,98 +1935,58 @@ pub fn serve(
             "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
         );
     }
-    // With a lease, the turn is told for its admitted scope alone: that
-    // person's (or the room's) Days note and exchanges, never those of the
-    // person the eyes or the sticky session name when its chat begins.
-    let tell = move |sessions: &mut Sessions,
-                     scope: Option<&crate::memory_scope::ScopeSnapshot>| {
-        let now = Instant::now();
-        // Counted at every ask, before anything can return early: a turn's
-        // second ask (its prepared chat, then its rounds) is never quiet.
-        let quiet = sessions.quiet_long_enough(now);
-        let (opened, person) = sessions.open(who.as_deref(), now);
-        let (changed, person) = match scope {
-            None => (opened, person),
-            Some(scope) => {
-                let person = scope.person().map(str::to_owned);
-                (sessions.told_for(&person), person)
+    let told_for = memory_context(
+        sessions,
+        socket,
+        who.clone(),
+        days,
+        move |now, person, memory| {
+            let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
+                .unwrap_or_default();
+            let room = room_bus.as_ref().map(crate::bus_out::room_now);
+            let skills = if skills_told.use_skill {
+                crate::use_skill::section(crate::use_skill::offered(&crate::tools::skill_tools(
+                    &skills_told,
+                )))
+            } else {
+                String::new()
+            };
+            // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
+            // and the weather there while it is fresh.
+            let time = with_place(
+                crate::local_time::told_asked_here(clock, places),
+                crate::local_time::place_told(place.as_deref()),
+            );
+            let time = with_place(
+                time,
+                weather_told(
+                    weather_now.lock().ok().and_then(|weather| weather.clone()),
+                    Instant::now(),
+                ),
+            );
+            let time = crate::agent_tasks::noted(time, tasks.as_ref());
+            let facts = facts(session_fact && !going_on, room)
+                + &health_fact(health.as_deref())
+                + &known_name_told(known_name, who.as_deref(), person.as_deref());
+            if steady_first {
+                steady_first_message(
+                    format!("{character}{skills}"),
+                    &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
+                    file.as_deref(),
+                    person.as_deref(),
+                )
+            } else {
+                system_message(
+                    &character,
+                    time.as_deref(),
+                    &(memory + &facts + &skills),
+                    file.as_deref(),
+                    person.as_deref(),
+                )
             }
-        };
-        // A line held only by a known face's gap is told no one's memory
-        // note: it may not be theirs (the reviewer's P2 on #2449). Its
-        // exchanges, the conversation as it stood, are told as before.
-        let held = scope.is_some_and(crate::memory_scope::ScopeSnapshot::held);
-        let memory = match &socket {
-            _ if held => String::new(),
-            // Every request here is built afresh from the thread and the
-            // session's snapshot: a new session is a fresh context (#2176
-            // row 1b).
-            // After a stop, the next turn opens one, so journalling can go on
-            // (Friday's P1 on #2226). After a quiet, the same synchronous ask
-            // a person change makes, within the note's 300 ms
-            // (`remember::told_for_fresh_session`). After something kept,
-            // the same ask, so it's in the run's next turns (#2540).
-            Some(socket) if days => {
-                let kept = crate::remember::kept_since_note();
-                if kept {
-                    eprintln!(
-                        "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
-                    );
-                }
-                sessions.frozen(opens_anew(changed) || quiet || kept, now, |session| {
-                    crate::remember::fresh_session_note(socket, session, person.as_deref(), true)
-                })
-            }
-            Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
-            None => crate::remember::told(),
-        };
-        let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
-            .unwrap_or_default();
-        let room = room_bus.as_ref().map(crate::bus_out::room_now);
-        let skills = if skills_told.use_skill {
-            crate::use_skill::section(crate::use_skill::offered(&crate::tools::skill_tools(
-                &skills_told,
-            )))
-        } else {
-            String::new()
-        };
-        // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
-        // and the weather there while it is fresh.
-        let time = with_place(
-            crate::local_time::told_asked_here(clock, places),
-            crate::local_time::place_told(place.as_deref()),
-        );
-        let time = with_place(
-            time,
-            weather_told(
-                weather_now.lock().ok().and_then(|weather| weather.clone()),
-                Instant::now(),
-            ),
-        );
-        let time = crate::agent_tasks::noted(time, tasks.as_ref());
-        let facts = facts(session_fact && !going_on, room)
-            + &health_fact(health.as_deref())
-            + &known_name_told(known_name, who.as_deref(), person.as_deref());
-        if steady_first {
-            steady_first_message(
-                format!("{character}{skills}"),
-                &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
-                file.as_deref(),
-                person.as_deref(),
-            )
-        } else {
-            system_message(
-                &character,
-                time.as_deref(),
-                &(memory + &facts + &skills),
-                file.as_deref(),
-                person.as_deref(),
-            )
-        }
-    };
-    let told_for = Arc::new(move |lease: Option<&crate::memory_scope::ScopeLease>| {
-        told_while_scope_holds(&sessions, lease, &tell)
-    });
+        },
+    );
+    let told_for = Arc::new(told_for);
     let scoped_system = scoped_context_from_environment().then(|| {
         let told_for = told_for.clone();
         Arc::new(move |lease: &crate::memory_scope::ScopeLease| told_for(Some(lease)))
@@ -5540,6 +5500,63 @@ fn spoken_by_the_caller_alone(
     caller_faces: &crate::speaking_faces::Speakers,
 ) -> bool {
     matches!((speakers.as_slice(), caller_faces.as_slice()), ([face], [caller]) if face == caller)
+}
+
+/// The worker's memory-bearing context callback, shared with its integration
+/// tests. Selection and composition run inside the same post-wait/post-read
+/// scope guard as the production callback; retries keep the parent's policy.
+fn memory_context(
+    sessions: Arc<Mutex<Sessions>>,
+    socket: Option<PathBuf>,
+    who: Option<PathBuf>,
+    days: bool,
+    tell: impl Fn(Instant, Option<String>, String) -> Told + Send + Sync,
+) -> impl Fn(Option<&crate::memory_scope::ScopeLease>) -> Told + Send + Sync {
+    let compose = move |sessions: &mut Sessions,
+                        scope: Option<&crate::memory_scope::ScopeSnapshot>| {
+        let now = Instant::now();
+        // Counted at every ask, before anything can return early: a turn's
+        // second ask (its prepared chat, then its rounds) is never quiet.
+        let quiet = sessions.quiet_long_enough(now);
+        let (opened, person) = sessions.open(who.as_deref(), now);
+        let (changed, person) = match scope {
+            None => (opened, person),
+            Some(scope) => {
+                let person = scope.person().map(str::to_owned);
+                (sessions.told_for(&person), person)
+            }
+        };
+        // A line held only by a known face's gap is told no one's memory
+        // note: it may not be theirs (the reviewer's P2 on #2449). Its
+        // exchanges, the conversation as it stood, are told as before.
+        let held = scope.is_some_and(crate::memory_scope::ScopeSnapshot::held);
+        let memory = match &socket {
+            _ if held => String::new(),
+            // Every request here is built afresh from the thread and the
+            // session's snapshot: a new session is a fresh context (#2176
+            // row 1b).
+            // After a stop, the next turn opens one, so journalling can go on
+            // (Friday's P1 on #2226). After a quiet, the same synchronous ask
+            // a person change makes, within the note's 300 ms
+            // (`remember::told_for_fresh_session`). After something kept,
+            // the same ask, so it's in the run's next turns (#2540).
+            Some(socket) if days => {
+                let kept = crate::remember::kept_since_note();
+                if kept {
+                    eprintln!(
+                        "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
+                    );
+                }
+                sessions.frozen(opens_anew(changed) || quiet || kept, now, |session| {
+                    crate::remember::fresh_session_note(socket, session, person.as_deref(), true)
+                })
+            }
+            Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
+            None => crate::remember::told(),
+        };
+        tell(now, person, memory)
+    };
+    move |lease| told_while_scope_holds(&sessions, lease, &compose)
 }
 
 /// Do not hand a context to a prepared or ordinary chat if its authority
@@ -14169,3 +14186,7 @@ mod memory_observer {
         crate::agent_tasks::tests::forget_staff();
     }
 }
+
+#[cfg(test)]
+#[path = "worker/kept_name_callback_tests.rs"]
+mod kept_name_callback;

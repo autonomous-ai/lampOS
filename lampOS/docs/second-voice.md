@@ -1096,6 +1096,34 @@ order is kept. A written turn is the same from the chat on.
     and the replay table in `memory/tests/it/voice_name.rs`, where a name
     kept with `remember` and asked a minute later in the same run is now in
     the note.
+  - **Worker callback regression:**
+    `worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories`
+    starts the process's real memory client, dispatches `remember` through
+    the scoped tool runner, and invokes the same `memory_context` callback
+    that the worker installs. A refused keep does not refresh; held and
+    revoked contexts leave a confirmed keep for the next admitted context.
+    That context opens a new snapshot once, and its provider-facing messages
+    still carry the synthetic name after nine exchanges over 368 simulated
+    seconds have evicted it from both the six-exchange/300 s history and
+    eight-exchange thread recap. The companion
+    `a_room_keep_reaches_the_next_context_without_a_person_change` keeps
+    every operation in room scope, so a person change cannot cause the
+    refresh or mask a missing keep marker. The local socket fixture freezes
+    each session's snapshot and returns only the new name after the keep: this
+    proves callback propagation, not production-store ordering of conflicting
+    names or a model choosing the right name aloud. The tests record first,
+    refreshed and cached callback plus message-serialization times; the note
+    read retains its 300 ms budget, with a host target below 1 ms for the
+    cached callback plus serialization. A complete production callback also
+    performs its existing time, facts and thread work.
+    `legacy_keeps_update_the_callback_without_a_days_marker` checks the
+    separate queued `kept` refresh when `LAMP_MEMORY_DAYS` is unset or `ON`:
+    a memory socket alone does not enable Days, and no #2540 marker is expected
+    there. The 22 October 07:56–08:07 lamp-52e6 run was confirmed to have Days
+    off, so its absent marker is expected and that run does not qualify the
+    Days refresh. These tests guard the integration before a correctly
+    configured lamp run; neither uses a provider, establishes lamp latency,
+    or explains the wrong spoken recall on that legacy run.
 - **Each turn is logged** as "lamp-voice second: request N ...": the words
   heard and how long after the line, the state of the words at the line's
   end (above), each chat round's first event (the first text or tool
