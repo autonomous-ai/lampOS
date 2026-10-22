@@ -1332,10 +1332,13 @@ impl Recalling {
     /// not once the person at the lamp has changed, nor for a session
     /// renewed for a changed catalog, which is opened fresh because
     /// Google's resumption with other functions is not tested (#1472). The
-    /// renewal's flag is taken here, once.
+    /// renewal's flag is taken here, once. Nor for one renewed because it
+    /// holds the typed name and a line it may not have comes (#2602,
+    /// `crate::person::open_fresh_live`).
     fn presents_handle(&mut self) -> bool {
         let renewed = self.given.as_ref().is_some_and(|given| given.take_fresh());
-        !renewed && !self.fresh_only
+        let for_the_name = crate::person::take_fresh_live();
+        !renewed && !for_the_name && !self.fresh_only
     }
 }
 
@@ -1675,6 +1678,10 @@ mod tests {
         .given(given.clone());
         assert!(recalling.presents_handle());
         given.open_fresh();
+        assert!(!recalling.presents_handle());
+        assert!(recalling.presents_handle());
+        // Renewed because it holds the typed name (#2602): once, too.
+        crate::person::open_fresh_live();
         assert!(!recalling.presents_handle());
         assert!(recalling.presents_handle());
         recalling.fresh_only = true;

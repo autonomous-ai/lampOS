@@ -114,6 +114,66 @@ without the name: `the person's name from /etc/lampOS/person/name is used
 (12 characters)`. The first five minutes (#841) run in the same session, so
 their notes come after the same instruction.
 
+**Owner only (#2602, `LAMP_PERSON_NAME_OWNER_ONLY=on`, off unless set).**
+Told in the instruction, the name reached unknown faces: in Friday's probe
+on #3014 the model put it to a stranger asking "what's my name?" in 60 of
+80 runs, mostly as "are you …?". With the switch the instruction has no
+name, and a line is told the same words (`person::told`) only when it is
+the owner's (`person::may_tell`):
+
+| Who the line is with | Told the typed name |
+|---|---|
+| The owner's known face, the face the eyes keep under the typed name, the line's person by its memory scope lease, alone in view (or held through a short gap, `LAMP_FACE_GAP_HOLD`) | yes |
+| Nobody in view, the room quiet or not | no |
+| An unknown face | no |
+| Another known face | no |
+| Two faces or more, the owner's among them or not | no |
+| No look at all | no |
+
+Nobody in view is not the owner: a visitor beside the lamp, turned away or
+in a dark room is nobody to the camera too (the reviewer-lead on #3050).
+Just after setup no face is kept, so the owner is an unknown face until
+they ask the lamp to remember their face under the typed name. A line
+found to be someone else's (a face seen speaking that isn't the known
+person's) is narrowed to the room's, and the room is never told the name.
+A lone known face kept under another name is counted in the journal, with
+no name: if it is the owner's, they never hear their typed name. The
+second route judges every turn on that line's own lease, with or without
+`LAMP_SECOND_SCOPED_CONTEXT`: never on the person its session is counted
+for, which stays the owner's for 30 s after they go (the reviewer's P2 on
+#3050), and a turn with no lease is told none. It tells it right after the
+character, where the instruction had it (told after the exchanges instead, the
+owner's English "what's my name?" got it a third as often in the #2602
+probe).
+
+The Live route tells it as a note on the open line, and a Live
+conversation keeps what it was told, in that session and in any
+connection resumed from it (the reviewer's two P2s on #3050):
+
+- A note is only written as its line is committed; a line given up before
+  its End never writes it. So the name counts as told in a session only
+  once the service answers the line it went with, and until then each of
+  the owner's lines is offered it again (`person::live_answered`).
+- From the moment it is offered, the session counts as holding it
+  (`person::live_holds`), until that line is known to be given up before
+  its End, or a fresh connection opens. Between turns, twice a second, the
+  next line is judged as it would begin now: if it may not have the name
+  (the owner gone and an unknown face come, say), the session is renewed
+  fresh at once, with no resumption handle (`person::open_fresh_live`). A
+  line that begins in such a session before that is not sent, and fails
+  as not delivered, as a line for someone else known does with
+  `LAMP_LIVE_SCOPED_SESSION`.
+- Cost, on the Mac's scripted service: the renewal is ready 1 to 5 ms
+  after it is asked, 16 to 552 ms after the face changes (the eyes are
+  read twice a second). A visitor who speaks after that waits nothing more;
+  one who speaks first loses that line and is answered from the next. A
+  real Live connection takes longer to open.
+
+Without a memory the Live route has no lease of a person, so it never
+tells the name. Welcome back's "by name if you know it" has the typed name
+only where a line was told it; a known face's own name is told as before
+(`person::at_the_lamp`).
+
 Tried on lamp-4ace through its relay with `lamp-voice provider-check CONFIG
 --written NOTE`, which opens a session, sends the one request and plays
 nothing: with a note much like this the model answered "Hey! There you are.

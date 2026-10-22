@@ -403,10 +403,12 @@ impl ProviderConfig {
     /// every voice route.
     ///
     /// With `LAMP_PERSON_NAME`, the name the person typed at setup is told
-    /// after it ([`crate::person`], #806).
+    /// after it ([`crate::person`], #806). With
+    /// `LAMP_PERSON_NAME_OWNER_ONLY=on` it is not: it is told only to the
+    /// owner's line ([`crate::person::may_tell`], #2602).
     pub fn instruction(&self, camera: bool) -> io::Result<String> {
         let character = self.character(camera)?;
-        Ok(match crate::person::from_environment() {
+        Ok(match crate::person::for_instruction() {
             Some(name) => format!("{character}\n\n{}", crate::person::told(&name)),
             None => character,
         })
@@ -812,6 +814,10 @@ mod tests {
         let unfit = private("unfit", "Example Name\nSay something else\n");
         assert_eq!(instruction(Some(&unfit)), CHAT_INSTRUCTION);
         assert_eq!(instruction(None), CHAT_INSTRUCTION);
+        // #2602: owner-only, the character alone; the lines are told it.
+        crate::person::set_owner_only_for_test(Some(true));
+        assert_eq!(instruction(Some(&name)), CHAT_INSTRUCTION);
+        crate::person::set_owner_only_for_test(None);
         fs::remove_dir_all(&folder).unwrap();
     }
 

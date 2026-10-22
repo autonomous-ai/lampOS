@@ -736,6 +736,9 @@ struct Shared {
     requested_audio: Option<(String, RequestedAudioRunner)>,
     system: System,
     scoped_system: Option<ScopedSystem>,
+    /// Without scoped context, the turn's `system` given its line's lease,
+    /// read only for the typed name (#2602, [`Engine::reading_the_lease_for_the_name`]).
+    lease_system: Option<ScopedSystem>,
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
@@ -1722,6 +1725,7 @@ impl Engine {
                 requested_audio: None,
                 system,
                 scoped_system: None,
+                lease_system: None,
                 clock,
                 answered_at: Mutex::new(None),
                 said_until_us: AtomicU64::new(0),
@@ -1863,6 +1867,16 @@ impl Engine {
         shared.scoped_tools = Some(runner);
         shared.scoped_system = system;
         self.memory = Some((boot, cache));
+        self
+    }
+
+    /// Without scoped context, a turn is still told for the person counted
+    /// at the lamp, but through `system`, which reads the line's own lease
+    /// for the typed name alone (#2602, the reviewer's P2 on #3050): the
+    /// counted person stays the owner's for 30 s after they go.
+    pub fn reading_the_lease_for_the_name(mut self, system: Option<ScopedSystem>) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.lease_system = system;
         self
     }
 
@@ -5896,8 +5910,8 @@ fn told(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Tol
 /// scope when this route scopes context ([`Engine::with_memory_scope`]),
 /// as before otherwise.
 fn told_whole(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Told {
-    match (&shared.scoped_system, scope) {
-        (Some(system), Some(lease)) => system(lease),
+    match (&shared.scoped_system, &shared.lease_system, scope) {
+        (Some(system), _, Some(lease)) | (None, Some(system), Some(lease)) => system(lease),
         _ => (shared.system)(),
     }
 }

@@ -1031,6 +1031,10 @@ fn worker_command(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
         ))
+        .envs(person_name_owner_only_worker_environment(
+            role,
+            var(crate::person::OWNER_ONLY_ENVIRONMENT).as_deref(),
+        ))
         .envs(tasks_told_worker_environment(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
@@ -1372,6 +1376,17 @@ fn person_name_worker_environment(
     value
         .filter(|path| matches!(role, "provider" | "second") && Path::new(path).is_absolute())
         .map(|path| (crate::person::ENVIRONMENT, path.to_owned()))
+}
+
+// The typed name told only to the owner's line (#2602), to the same two
+// workers as the name's file: only the exact value `on`.
+fn person_name_owner_only_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    value
+        .filter(|value| matches!(role, "provider" | "second") && *value == "on")
+        .map(|_| (crate::person::OWNER_ONLY_ENVIRONMENT, "on"))
 }
 
 // The file of task news already told (#2762), to the two workers that read
@@ -1967,6 +1982,37 @@ mod tests {
         }
     }
 
+    /// #2602: the owner-only switch goes to the provider and second workers
+    /// only, and only as `on`.
+    #[test]
+    fn the_owner_only_switch_reaches_only_the_workers_that_tell_the_model() {
+        let on = std::ffi::OsStr::new("on");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                person_name_owner_only_worker_environment(role, Some(on)),
+                Some((crate::person::OWNER_ONLY_ENVIRONMENT, "on"))
+            );
+            assert_eq!(person_name_owner_only_worker_environment(role, None), None);
+            for unfit in ["off", "", "ON", "on "] {
+                assert_eq!(
+                    person_name_owner_only_worker_environment(
+                        role,
+                        Some(std::ffi::OsStr::new(unfit))
+                    ),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert_eq!(
+                person_name_owner_only_worker_environment(role, Some(on)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
     /// The reviewer on #1158: the switches reach a worker through the real
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
@@ -2015,6 +2061,7 @@ mod tests {
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
+                    crate::person::OWNER_ONLY_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -2146,6 +2193,7 @@ mod tests {
                     "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_PERSON_NAME_OWNER_ONLY=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                 ],
             ),
@@ -2185,6 +2233,7 @@ mod tests {
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_PERSON_NAME_OWNER_ONLY=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
