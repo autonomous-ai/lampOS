@@ -1940,7 +1940,7 @@ impl Engine {
             // A heard line with the camera allowed, its turn told and kept
             // by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`): admitted as
             // the room's only because no known face was cached yet, its
-            // keeps look again (#2807, `ScopeLease::keeper_within`).
+            // keeper is decided at its end (#2807, `ScopeLease::face_at_end`).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
@@ -4304,6 +4304,44 @@ async fn spoken(
                 );
             }
         }
+    }
+    // A line admitted as the room's only because no known face was cached
+    // yet (#2807): its keeper is the known face the cache names as of its
+    // end, waiting at most `KEEPER_WAIT` past it, and only if no other face
+    // was seen speaking it (the same evidence and rule as the guard above,
+    // Eighth's P1 on #3108). Decided beside the turn, never delaying it, and
+    // recorded for the keep (`ScopeLease::keeper_within`).
+    if let Some(lease) = scope.as_ref().filter(|scope| scope.looks_later()) {
+        let lease = lease.clone();
+        let speaking = shared.speaking.clone();
+        tokio::spawn(async move {
+            let ends = lease.clone();
+            let found = tokio::task::spawn_blocking(move || ends.face_at_end(finishing))
+                .await
+                .ok()
+                .flatten();
+            let keeper = match (found, speaking) {
+                (Some(person), Some((eyes, known))) => {
+                    let speakers = eyes.speakers(begun, finishing);
+                    let pair = tokio::task::spawn_blocking(move || {
+                        crate::speaking_faces::known_with_face(&known)
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+                    if crate::speaking_faces::someone_elses(&speakers, &person, pair) {
+                        eprintln!(
+                            "lamp-voice second: request {request}: a face not the known face's was seen speaking it: its keep stays the room's"
+                        );
+                        None
+                    } else {
+                        Some(person)
+                    }
+                }
+                (found, _) => found,
+            };
+            lease.record_keeper(keeper);
+        });
     }
     // Who the eyes saw saying this line, with the known person and their
     // face as they were when it was heard: for a forget held for a yes
