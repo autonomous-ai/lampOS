@@ -27,8 +27,9 @@
 # - Attribution: a yield's decision is the commit or resume its own duplex_yield_end names (started_at_us and owner
 #   the yield's); a yield that ended otherwise (hearing_expired, owner_changed, ...) is reported as that, with no
 #   decision, even when another yield later commits or resumes. A commit's answer is the first write of the cut-in's
-#   own turn (the first input admitted from heard speech after the line), before that turn finished and the stop
-#   line; a turn that ended without audio is unmeasured, never timed by a later turn. The acoustic proxy counts only
+#   own turn (the input whose captured audio began within the line's words), before that turn finished and the stop
+#   line; a line not submitted, matched by no or several turns, or a turn that ended without audio is unmeasured,
+#   never timed by a later turn. The acoustic proxy counts only
 #   the answer's own blocks: before its turn finished, another turn's audio began, or the stop line.
 # - Exit: 1 when any episode's scene, journal read or report failed (the rest still run; the failure is in the
 #   report), 6 when putting lamp-voice back failed after an otherwise clean run; an earlier failure's code is kept.
@@ -281,19 +282,25 @@ print('  hearing, frames %s..%s (yield at %s, ended at %s): %s [%s]' % (
 accepted = acoustic = ''
 def turn_of(r): return (r.get('owner') or {}).get('turn', r.get('turn'))
 if d and decision == 'commit':
-    # The cut-in's own turn: the first input admitted from heard speech (it has prefix_first_host_read_us; a written
-    # turn such as task news has none) after the line began. Its answer is that turn's first write, before that turn
-    # finished and before the stop line; any other turn's audio is never this cut-in's answer.
-    said = next((r for r in kinds(line_at, stop_at, 'input_admitted')
-                 if 'prefix_first_host_read_us' in r and turn_of(r) != story), None)
+    # The cut-in's own input: the admission (or input_not_submitted) whose captured audio began within the line's own
+    # words (prefix_first_host_read_us from 0.5 s before the clip to 0.5 s past its end; a written turn such as task
+    # news has none). Not submitted, ambiguous or absent: unmeasured, never a later spoken turn. Its answer is that
+    # turn's first write, before that turn finished and before the stop line.
+    mine = [r for r in kinds(line_at, stop_at, 'input_admitted', 'input_not_submitted')
+            if end_words and r.get('prefix_first_host_read_us') is not None and turn_of(r) != story
+            and line_at - 500_000 <= r['prefix_first_host_read_us'] <= end_words + 500_000]
+    turns = {turn_of(r) for r in mine if r['kind'] == 'input_admitted'}
+    why = ('clip length unknown' if end_words is None else 'no input from the line admitted' if not mine
+           else 'the line was not submitted (%s)' % mine[0].get('reason') if mine[0]['kind'] == 'input_not_submitted'
+           else 'ambiguous: turns %s took the line' % sorted(turns) if len(turns) > 1 else None)
+    said = None if why else mine[0]
     said_end = said and next((r for r in kinds(said['at_us'], stop_at, 'turn_finished') if r.get('turn') == turn_of(said)), None)
     answer = said and next((r for r in kinds(said['at_us'], said_end['at_us'] if said_end else stop_at, 'speaker_first_write')
                             if turn_of(r) == turn_of(said)), None)
-    if answer is None or end_words is None:
+    if answer is None:
         print('  answer: %s; unmeasured' % (
-            'clip length unknown' if end_words is None else 'no input admitted from the cut-in' if said is None
-            else 'turn %s ended %s with no audio' % (turn_of(said), said_end.get('outcome')) if said_end
-            else 'turn %s had no audio before the stop line' % turn_of(said)))
+            why or ('turn %s ended %s with no audio' % (turn_of(said), said_end.get('outcome')) if said_end
+                    else 'turn %s had no audio before the stop line' % turn_of(said))))
     else:
         accepted = answer['at_us'] - end_words
         # The answer's own voice only: before its turn finished, another turn's audio began, or the stop line.

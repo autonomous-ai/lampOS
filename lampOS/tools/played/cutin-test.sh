@@ -29,7 +29,9 @@ EOF
 # yield's hearing expires 0.1 s in, and a separate yield at 8.5 s resumes at 9 s. FAKE_CASE=laterstop: the answer
 # finishes at 15 s with no block of its own voice heard; only the stop's answer, at 31.4 s, is heard, from 31.51 s.
 # FAKE_CASE=silent: the cut-in's turn 6 ends no_audio_answer at 9 s with no audio; task news, a written turn 7, is
-# admitted at 25 s, writes at 26 s, is heard from 26.11 s and finishes at 27 s.
+# admitted at 25 s, writes at 26 s, is heard from 26.11 s and finishes at 27 s. FAKE_CASE=unsubmitted: the cut-in is
+# not submitted (provider pending) at 7.3 s; a different spoken line, captured from 24.7 s, is admitted as turn 7
+# at 25 s, writes at 26 s, is heard from 26.11 s and finishes at 27 s.
 # FAKE_SCENE_FAIL: the scene exits 77; FAKE_NO_SCENE: it exits 0 and writes no scene.
 cat >"$T/scenario.py" <<'EOF'
 #!/usr/bin/env python3
@@ -60,6 +62,13 @@ if case == 'laterstop':
     ev[-2] = {"kind": "duplex_hearing", "at_us": 32_000_000, "first_frame_sequence": 5000, "heard": '3' * 50}
     ev += [{"kind": "turn_finished", "turn": 6, "at_us": 15_000_000, "outcome": "completed"},
            {"kind": "speaker_first_write", "at_us": 31_400_000, "owner": {"turn": 7}}]
+if case == 'unsubmitted':
+    ev[-2] = {"kind": "duplex_hearing", "at_us": 26_600_000, "first_frame_sequence": 3000, "heard": '3' * 50}
+    ev += [{"kind": "input_not_submitted", "at_us": 7_300_000, "candidate": 3, "prefix_first_host_read_us": 7_000_000,
+            "reason": "provider_unavailable_or_pending_control"},
+           {"kind": "input_admitted", "turn": 7, "at_us": 25_000_000, "prefix_first_host_read_us": 24_700_000},
+           {"kind": "speaker_first_write", "at_us": 26_000_000, "owner": {"turn": 7}},
+           {"kind": "turn_finished", "turn": 7, "at_us": 27_000_000, "outcome": "completed"}]
 if case == 'silent':
     ev[-2] = {"kind": "duplex_hearing", "at_us": 26_600_000, "first_frame_sequence": 3000, "heard": '3' * 50}
     ev += [{"kind": "turn_finished", "turn": 6, "at_us": 9_000_000, "outcome": "no_audio_answer"},
@@ -80,8 +89,9 @@ elif '-cutin-' in name:
            {"kind": "stop_words", "stop": False, "words": 6, "at_us": yat + 400_000},
            {"kind": "turn_finished", "turn": 5, "at_us": yat + 120_000, "outcome": "user_interrupted"},
            {"kind": "transcript", "at_us": 8_500_000, "role": "input", "text": "Wait, what was the keeper's name?"},
-           {"kind": "input_admitted", "turn": 6, "at_us": 8_300_000, "prefix_first_host_read_us": 7_000_000}]
-    if case != 'silent': ev.append({"kind": "speaker_first_write", "at_us": 9_400_000, "owner": {"turn": 6}})
+]
+    if case != 'unsubmitted': ev.append({"kind": "input_admitted", "turn": 6, "at_us": 8_300_000, "prefix_first_host_read_us": 7_000_000})
+    if case not in ('silent', 'unsubmitted'): ev.append({"kind": "speaker_first_write", "at_us": 9_400_000, "owner": {"turn": 6}})
 else:
     ev += [{"kind": "duplex_resume", "at_us": yat + 500_000, "frame_sequence": 1064},
            {"kind": "duplex_yield_end", "started_at_us": yat, "at_us": yat + 500_000, "outcome": "resumed",
@@ -165,6 +175,11 @@ grep -qF '23.51' <<<"$out" && { echo "FAIL laterstop: the stop's answer timed th
 FAKE_CASE=silent run silent 0 'answer: turn 6 ended no_audio_answer with no audio; unmeasured' \
   'cutin 25 s: commit (onset->yield 150 ms, ->decision 100 ms, answer accepted - / acoustic - ms)'
 grep -qF '18.00' <<<"$out" && { echo "FAIL silent: the later task news timed this cut-in's answer"; fail=1; }
+# A cut-in never submitted is unmeasured, not timed by a later, different spoken line's answer.
+FAKE_CASE=unsubmitted run unsubmitted 0 \
+  'answer: the line was not submitted (provider_unavailable_or_pending_control); unmeasured' \
+  'cutin 25 s: commit (onset->yield 150 ms, ->decision 100 ms, answer accepted - / acoustic - ms)'
+grep -qF '18.00' <<<"$out" && { echo "FAIL unsubmitted: a later spoken turn timed this cut-in's answer"; fail=1; }
 
 # Not duplex: nothing changed. No LAMP_HOST: nothing at all.
 FAKE_TT=v1-baseline run baseline 3 "not on --turn-taking duplex"

@@ -96,8 +96,10 @@ These you can run on their own:
   numbers (`$PLAYED_OUT/scenarios/cutin-LABEL.txt`). It changes nothing on
   the lamp unless `CUTIN_ENV` names switches for the run, which ride on a
   `/run` drop-in removed on exit. A yield's decision is only the one its
-  own `duplex_yield_end` names, a cut-in's answer only its own admitted
-  turn's first write (unmeasured if that turn had no audio), and the
+  own `duplex_yield_end` names, a cut-in's answer only the first write of
+  the turn whose captured audio began within the line's words
+  (unmeasured if the line was not submitted, matched no or several turns,
+  or its turn had no audio), and the
   acoustic proxy only that answer's own blocks. It exits non-zero when a scene, journal read or report
   failed, or the drop-in could not be taken off. Its stand-in test is
   `cutin-test.sh`.
