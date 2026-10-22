@@ -2100,12 +2100,29 @@ pub fn serve(
             "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
         );
     }
+    // The typed name, told only to the owner's line, with
+    // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
+    // judged each turn on its own person and the faces in view.
+    let setup_name = crate::person::for_lines();
+    let setup_bus = setup_name
+        .as_ref()
+        .and(files.bus_root.as_deref())
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
+    match (&setup_name, &setup_bus) {
+        (Some(_), Some(_)) => eprintln!(
+            "lamp-voice second: the typed name is told only to the owner's own known face (LAMP_PERSON_NAME_OWNER_ONLY)"
+        ),
+        (Some(_), None) => eprintln!(
+            "lamp-voice second: LAMP_PERSON_NAME_OWNER_ONLY is on but there is no bus to read the faces from, so the typed name is never told"
+        ),
+        _ => {}
+    }
     let told_for = memory_context(
         sessions,
         socket,
         who.clone(),
         days,
-        move |now, person, memory| {
+        move |now, person, line: Option<Option<String>>, memory| {
             let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
                 .unwrap_or_default();
             let room = room_bus.as_ref().map(crate::bus_out::room_now);
@@ -2127,16 +2144,31 @@ pub fn serve(
             let facts = facts(session_fact && !going_on, room)
                 + &health_fact(health.as_deref())
                 + &known_name_told(known_name, who.as_deref(), person.as_deref());
+            // Beside the character, where the instruction had it: told after
+            // the exchanges, the model used it for the owner a third as
+            // often (EN, the #2602 probe).
+            // The typed name follows this line's own lease only, never the
+            // person the session is counted for (the reviewer's P2 on #3050:
+            // the owner's sticky presence for 30 s after they go), and no
+            // lease is no name.
+            let told = |character: String| {
+                with_typed_name(
+                    character,
+                    setup_name.as_deref(),
+                    setup_bus.as_ref(),
+                    line.as_ref().map(Option::as_deref),
+                )
+            };
             if steady_first {
                 steady_first_message(
-                    format!("{character}{skills}"),
+                    told(format!("{character}{skills}")),
                     &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
                     file.as_deref(),
                     person.as_deref(),
                 )
             } else {
                 system_message(
-                    &character,
+                    &told(character.clone()),
                     time.as_deref(),
                     &(memory + &facts + &skills),
                     file.as_deref(),
@@ -2146,12 +2178,22 @@ pub fn serve(
         },
     );
     let told_for = Arc::new(told_for);
-    let scoped_system = scoped_context_from_environment().then(|| {
+    let scoped = scoped_context_from_environment();
+    let scoped_system = scoped.then(|| {
         let told_for = told_for.clone();
-        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told_for(Some(lease)))
-            as crate::second_provider::ScopedSystem
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| {
+            told_for(Some(lease), Chosen::ByLease)
+        }) as crate::second_provider::ScopedSystem
     });
-    let system = move || told_for(None);
+    // Without scoped context a turn is still told for the person counted
+    // at the lamp, its lease read only for the typed name (#2602).
+    let lease_system = (!scoped).then(|| {
+        let told_for = told_for.clone();
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| {
+            told_for(Some(lease), Chosen::ByPresence)
+        }) as crate::second_provider::ScopedSystem
+    });
+    let system = move || told_for(None, Chosen::ByPresence);
     // When the wait sound comes, with LAMP_SECOND_CUE_AFTER_MS (#2602): said
     // once here, and a value it can't take is said and left at 1.5 s.
     let cue_after = match crate::second_provider::cue_after(
@@ -2237,6 +2279,7 @@ pub fn serve(
         runner.clone(),
     )
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
+    .reading_the_lease_for_the_name(lease_system)
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
     .holding_hand_on(files.said_as_heard)
@@ -6462,10 +6505,11 @@ fn memory_context(
     socket: Option<PathBuf>,
     who: Option<PathBuf>,
     days: bool,
-    tell: impl Fn(Instant, Option<String>, String) -> Told + Send + Sync,
-) -> impl Fn(Option<&crate::memory_scope::ScopeLease>) -> Told + Send + Sync {
+    tell: impl Fn(Instant, Option<String>, Option<Option<String>>, String) -> Told + Send + Sync,
+) -> impl Fn(Option<&crate::memory_scope::ScopeLease>, Chosen) -> Told + Send + Sync {
     let compose = move |sessions: &mut Sessions,
-                        scope: Option<&crate::memory_scope::ScopeSnapshot>| {
+                        scope: Option<&crate::memory_scope::ScopeSnapshot>,
+                        line: Option<Option<String>>| {
         let now = Instant::now();
         // Counted at every ask, before anything can return early: a turn's
         // second ask (its prepared chat, then its rounds) is never quiet.
@@ -6502,9 +6546,33 @@ fn memory_context(
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
         };
-        tell(now, person, memory)
+        tell(now, person, line, memory)
     };
-    move |lease| told_while_scope_holds(&sessions, lease, &compose)
+    move |lease, chosen| match chosen {
+        Chosen::ByLease => told_while_scope_holds(&sessions, lease, |sessions, scope| {
+            let line = scope.map(|scope| scope.person().map(str::to_owned));
+            compose(sessions, scope, line)
+        }),
+        // Whose the turn is as before; the line's own person, read once
+        // here, only for the typed name.
+        Chosen::ByPresence => {
+            let line = lease
+                .and_then(crate::memory_scope::ScopeLease::scope)
+                .map(|scope| scope.person().map(str::to_owned));
+            told_while_scope_holds(&sessions, None, |sessions, _| compose(sessions, None, line))
+        }
+    }
+}
+
+/// How a second-route turn's context is chosen: by its line's own lease
+/// (`LAMP_SECOND_SCOPED_CONTEXT=on`), or by the person counted at the lamp,
+/// the line's lease then read only for the typed name (#2602). Either way,
+/// the line's own person alone decides the typed name, and no lease is no
+/// name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Chosen {
+    ByLease,
+    ByPresence,
 }
 
 /// Do not hand a context to a prepared or ordinary chat if its authority
@@ -7310,7 +7378,7 @@ pub(super) fn reading_ahead(
     )
     .waiting_up_to(within);
     let socket = Some(PathBuf::from("/unused/the note is asked ahead"));
-    let told = memory_context(sessions, socket, None, true, |_, person, note| {
+    let told = memory_context(sessions, socket, None, true, |_, person, _, note| {
         system_message(
             "Synthetic character.\n",
             None,
@@ -7321,7 +7389,7 @@ pub(super) fn reading_ahead(
     });
     (
         ahead.told_as(),
-        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told(Some(lease))),
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told(Some(lease), Chosen::ByLease)),
     )
 }
 
@@ -7343,6 +7411,22 @@ pub(crate) fn opens_anew(changed: bool) -> bool {
 /// from the thread under the same lock as the recall, after the thread's
 /// forgetting and reload, so a forgotten exchange is never given back.
 /// Only `whose` exchanges are given: a person's memory id, or none for the room.
+/// The character and, right after it, the typed name when this turn's
+/// line may be told it (#2602, `crate::person::told_from_bus`): judged on
+/// the line's own person (`line`, from its lease), and nothing when the
+/// line has no lease.
+fn with_typed_name(
+    character: String,
+    name: Option<&str>,
+    bus: Option<&lamp_bus::Bus>,
+    line: Option<Option<&str>>,
+) -> String {
+    match line {
+        Some(person) => character + &crate::person::told_from_bus(name, bus, person),
+        None => character,
+    }
+}
+
 pub(crate) fn system_message(
     character: &str,
     time: Option<&str>,
@@ -7890,6 +7974,191 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// The reviewer's P2 on #3050: with scoped context off, the owner's
+    /// turn, then the known file gone and one unknown face in view. The
+    /// session is still counted for the owner (their sticky presence, 30 s),
+    /// but the typed name follows the visitor's own lease, the room's, so
+    /// the visitor's request carries none; with scoped context on, the
+    /// same. The owner's own lease is told it either way, and a turn with
+    /// no lease is told none.
+    #[test]
+    fn reviewer_second_owner_name_does_not_follow_sticky_person_to_unknown_face() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        use std::sync::{Arc, Mutex};
+        let _one = crate::provider_worker::tests::one_thread();
+        let root = std::path::PathBuf::from(format!("/tmp/lpk-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let mut one_face = || {
+            eyes.publish_json(
+                crate::scenario_clock::monotonic_us(),
+                &lamp_msgs::Faces {
+                    faces: vec![lamp_msgs::Face {
+                        id: "f".into(),
+                        xmin: 0.4,
+                        ymin: 0.0,
+                        xmax: 0.7,
+                        ymax: 0.3,
+                        confidence: 0.9,
+                        yaw: None,
+                        facing: None,
+                        speaking: None,
+                    }],
+                },
+            )
+            .unwrap();
+        };
+        let name = "Example Name";
+        let who = root.join("who.sock");
+        let known = crate::known_faces::known_file_of(&who);
+        let told_for = super::memory_context(
+            Arc::new(Mutex::new(super::Sessions::default())),
+            None,
+            Some(who),
+            false,
+            move |_, person, line, memory| {
+                super::system_message(
+                    &super::with_typed_name(
+                        "You are a lamp.".into(),
+                        Some(name),
+                        Some(&bus),
+                        line.as_ref().map(Option::as_deref),
+                    ),
+                    None,
+                    &memory,
+                    None,
+                    person.as_deref(),
+                )
+            },
+        );
+        let scope = |request: u64, snapshot: ScopeSnapshot| {
+            RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                snapshot,
+            )
+        };
+        let modes = [super::Chosen::ByPresence, super::Chosen::ByLease];
+        // The owner's turn: their known face, alone in view.
+        std::fs::write(&known, name).unwrap();
+        one_face();
+        let owner = scope(1, ScopeSnapshot::of(name));
+        for mode in modes {
+            let told = told_for(Some(&owner.lease()), mode).text;
+            assert!(told.contains(name), "the owner, {mode:?}: {told}");
+        }
+        // They go; a face the lamp doesn't know is in view, within 30 s.
+        std::fs::remove_file(&known).unwrap();
+        one_face();
+        let visitor = scope(2, ScopeSnapshot::room());
+        for mode in modes {
+            let told = told_for(Some(&visitor.lease()), mode).text;
+            assert!(!told.contains(name), "the visitor, {mode:?}: {told}");
+        }
+        // No lease at all: no name.
+        let told = told_for(None, super::Chosen::ByPresence).text;
+        assert!(!told.contains(name), "no lease: {told}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// El's P2 on #3050, the second route's counterpart of the Live one:
+    /// an empty quiet room's turn, then an unknown face's on the same room
+    /// thread. Neither request carries the typed name, so no reply in the
+    /// room's thread can carry it either; the owner's own face, alone in
+    /// view, is told it (the control).
+    #[test]
+    fn an_empty_rooms_turn_then_an_unknown_faces_carry_no_typed_name() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let root = std::path::PathBuf::from(format!("/tmp/lps-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let mut room = crate::bus_out::RoomOut::on(&root).unwrap();
+        room.tell(crate::room_told::Room::Quiet, 1_000_000);
+        let mut look = |faces: usize| {
+            eyes.publish_json(
+                crate::scenario_clock::monotonic_us(),
+                &lamp_msgs::Faces {
+                    faces: (0..faces)
+                        .map(|_| lamp_msgs::Face {
+                            id: "f".into(),
+                            xmin: 0.4,
+                            ymin: 0.0,
+                            xmax: 0.7,
+                            ymax: 0.3,
+                            confidence: 0.9,
+                            yaw: None,
+                            facing: None,
+                            speaking: None,
+                        })
+                        .collect(),
+                },
+            )
+            .unwrap();
+        };
+        let name = "Example Name";
+        let owner = crate::known_faces::memory_person(name);
+        let turn = |person: Option<&str>| {
+            let told = super::system_message(
+                &super::with_typed_name(
+                    "You are a lamp.".into(),
+                    Some(name),
+                    Some(&bus),
+                    Some(person),
+                ),
+                None,
+                "",
+                None,
+                person,
+            );
+            let steady = super::steady_first_message(
+                super::with_typed_name(
+                    "You are a lamp.".into(),
+                    Some(name),
+                    Some(&bus),
+                    Some(person),
+                ),
+                "",
+                None,
+                person,
+            );
+            format!(
+                "{}{:?}{}{:?}",
+                told.text, told.history, steady.text, steady.after
+            )
+        };
+        // Nobody in view, the room quiet: the room's turn.
+        look(0);
+        let empty = turn(None);
+        assert!(!empty.contains(name), "{empty}");
+        // Then a face the lamp doesn't know, still the room's.
+        look(1);
+        let visitor = turn(None);
+        assert!(!visitor.contains(name), "{visitor}");
+        // The owner's own face: told.
+        let owners = turn(Some(&owner));
+        assert!(owners.contains(name), "{owners}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     /// The reviewer on #2218 (P3 2): a skill's look is taken only with the
     /// switch exactly `on` and a full look; nothing else turns it on.
     #[test]

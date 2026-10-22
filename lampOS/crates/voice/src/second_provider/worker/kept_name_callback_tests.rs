@@ -333,7 +333,7 @@ fn context(
     let sessions = Arc::new(Mutex::new(Sessions::default()));
     let days = crate::remember::days_from_environment();
     let ahead = days.then(|| super::Ahead::reading(sessions.clone(), None, socket.clone()));
-    let told = memory_context(sessions, Some(socket), None, days, |_, person, note| {
+    let told = memory_context(sessions, Some(socket), None, days, |_, person, _, note| {
         system_message(
             "Synthetic character.\n",
             None,
@@ -351,7 +351,7 @@ fn context(
                 .unwrap()
                 .block_on(ahead.clone().ready(lease.cloned()));
         }
-        told(lease)
+        told(lease, super::Chosen::ByLease)
     }
 }
 
@@ -380,21 +380,16 @@ impl Lines {
             }),
         )
         .waiting_up_to(WAIT);
-        let context = Box::new(memory_context(
-            sessions,
-            Some(socket),
-            None,
-            true,
-            |_, person, note| {
-                system_message(
-                    "Synthetic character.\n",
-                    None,
-                    &note,
-                    None,
-                    person.as_deref(),
-                )
-            },
-        ));
+        let told_for = memory_context(sessions, Some(socket), None, true, |_, person, _, note| {
+            system_message(
+                "Synthetic character.\n",
+                None,
+                &note,
+                None,
+                person.as_deref(),
+            )
+        });
+        let context: Context = Box::new(move |lease| told_for(lease, super::Chosen::ByLease));
         Self { ahead, context }
     }
 

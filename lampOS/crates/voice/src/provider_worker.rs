@@ -1758,6 +1758,34 @@ async fn serve_with_visual<C: Connect>(
         .map(crate::known_faces::known_file_of);
     let mut known_read_at: Option<Instant> = None;
     let mut known_told: Option<(SessionId, String)> = None;
+    // The typed name, with LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of
+    // the instruction, and told a session once, only while its open line
+    // is the owner's (`crate::person::may_tell`). A session that may hold
+    // it is renewed fresh before a line that may not have it
+    // (`crate::person::live_holds`).
+    let setup_name = crate::person::for_lines();
+    let setup_root = crate::person::bus_root(BUS_ROOT.get().map(std::path::PathBuf::as_path))
+        .filter(|_| setup_name.is_some());
+    let setup_bus = setup_root
+        .as_deref()
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
+    intake.handoff.setup = setup_name.clone().zip(
+        setup_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok()),
+    );
+    let mut setup_renewal: Option<(SessionId, Instant)> = None;
+    if setup_name.is_some() {
+        eprintln!(
+            "lamp-voice provider: the typed name is told only to the owner's own known face (LAMP_PERSON_NAME_OWNER_ONLY){}",
+            if setup_bus.is_some() {
+                ""
+            } else {
+                "; there is no bus, so it is never told"
+            }
+        );
+    }
+    let mut setup_read_at: Option<Instant> = None;
     // With a memory too, each session is one person's (#764): whose it is
     // counted from the same file, and a new one opened between turns when
     // that changes. Without both, nothing of this runs.
@@ -2433,6 +2461,73 @@ async fn serve_with_visual<C: Connect>(
                         );
                     }
                 }
+                // The typed name (#2602): judged on the open line's own
+                // lease and the faces in view, twice a second
+                // until an answer shows it told in this session. A line given
+                // up before its End never wrote its note, so the next one is
+                // offered it again (the reviewer's first P2 on #3050).
+                if let Some(request) = crate::person::live_open_offer() {
+                    if intake.handoff.ended.is_some_and(|(ended, _)| ended >= request) {
+                        crate::person::live_line_closed(request, true);
+                    } else if intake.handoff.retired(request) {
+                        crate::person::live_line_closed(request, false);
+                    }
+                }
+                if let Some(name) = setup_name.as_deref()
+                    && setup_read_at.is_none_or(|at| at.elapsed() >= Duration::from_millis(500))
+                    && let Some(live) = provider.live_session()
+                {
+                    setup_read_at = Some(Instant::now());
+                    let open = intake.handoff.visual_turn();
+                    if let Some(open) = open.filter(|open| open.session == live) {
+                        if crate::person::live_may_offer(live.get(), open.request.get())
+                            && let Some(person) = intake.handoff.line_person(open.request)
+                        {
+                            let told = crate::person::told_from_bus(Some(name), setup_bus.as_ref(), person.as_deref());
+                            if !told.is_empty()
+                                && add_note(&provider, &mut intake.handoff.noted, open.request, told.trim_start()).is_ok()
+                            {
+                                crate::person::live_offered(live.get(), open.request.get());
+                                eprintln!(
+                                    "lamp-voice provider: request {}: told the session the typed name, the line being the owner's",
+                                    open.request.get()
+                                );
+                            }
+                        }
+                    } else if open.is_none()
+                        && crate::person::live_holds(live.get())
+                        && setup_renewal.is_none_or(|(asked, _)| asked != live)
+                        && output.is_empty()
+                        && !look_owed(look_owed_until)
+                    {
+                        // Between turns, in a session that may hold the
+                        // name: the next line is judged as it would begin
+                        // now, by the face the eyes name, and a line that
+                        // may not have it gets a fresh session
+                        // first (the reviewer's second P2 on #3050): the
+                        // owner gone and an unknown face come.
+                        let person = intake.handoff.memory_face.snapshot(Instant::now());
+                        if !crate::person::may_tell_now(name, setup_bus.as_ref(), person.person())
+                            && provider.renew_when_idle()
+                        {
+                            crate::person::open_fresh_live();
+                            setup_renewal = Some((live, Instant::now()));
+                            renewed_at = Instant::now();
+                            eprintln!(
+                                "lamp-voice provider: the session holds the typed name and whoever is at the lamp now may not have it; a fresh session is opened between turns"
+                            );
+                        }
+                    }
+                }
+                if let Some((asked, at)) = setup_renewal
+                    && provider.live_session().is_some_and(|live| live != asked)
+                {
+                    setup_renewal = None;
+                    eprintln!(
+                        "lamp-voice provider: the fresh session for the typed name is ready, {} ms after it was asked",
+                        at.elapsed().as_millis()
+                    );
+                }
                 // Whose session it is: the person at the lamp changed (gone
                 // 30 s, or someone else known for 10 s), so a new session is opened
                 // for them, told only their thread and kept things. Asked
@@ -2647,6 +2742,13 @@ async fn serve_with_visual<C: Connect>(
             // output waits for the Policy's decision (#1522), as while the
             // output is full.
             notice=next_or_let_go(&mut provider, &mut let_go, coordinated), if !upstream_ended && output.len() < OUTPUT_HIGH_WATER && kept_for_policy.is_none()=>{
+                // An answer to a line told the typed name: its note was
+                // written with it (#2602).
+                if let Ok(notice) = &notice
+                    && let Some(lineage) = answered(notice)
+                {
+                    crate::person::live_answered(lineage.session.get(), lineage.request.get());
+                }
                 // Count even silent or withheld functions before any policy
                 // can consume them. A kept notice may repeat this mark safely.
                 if let (Some(answer), Ok(Notice::Event(Event::ToolCall { lineage, .. }))) =
@@ -4355,6 +4457,24 @@ fn forward_reminder(
     forward_origin(event, output, output_sequence, discards, false)
 }
 
+/// The request a notice answers: only a committed one is answered, so
+/// what was kept beside it until its commit has been written (#2602).
+fn answered(notice: &Notice) -> Option<lamp_gemini::Lineage> {
+    match notice {
+        Notice::Settled { lineage, .. }
+        | Notice::Event(
+            Event::Audio { lineage, .. }
+            | Event::OutputTranscript { lineage, .. }
+            | Event::ModelText { lineage, .. }
+            | Event::GenerationComplete { lineage }
+            | Event::ToolCall { lineage, .. }
+            | Event::TurnComplete { lineage, .. }
+            | Event::Unanswered { lineage, .. },
+        ) => Some(*lineage),
+        _ => None,
+    }
+}
+
 /// A Live connection made: one resumed goes on with the same conversation,
 /// and so keeps a sign-in's code and account if the one before it heard
 /// them; a fresh one heard nothing (the reviewer's P2 on #2137: a GoAway
@@ -4362,6 +4482,8 @@ fn forward_reminder(
 fn sign_in_connected(session: SessionId, context: Context) {
     let resumed = matches!(context, Context::Resumed | Context::ResumedBeforeLatest);
     crate::sign_in::connected(session.get(), resumed);
+    // So does the typed name told to it (#2602).
+    crate::person::live_connected(session.get(), resumed);
 }
 
 fn forward_origin(
@@ -5008,6 +5130,10 @@ struct InputHandoff {
     /// A line goes only into its admitted person's session
     /// ([`crate::scoped_session`]).
     scoped_session: bool,
+    /// The typed name and the bus its lines are judged on, with
+    /// `LAMP_PERSON_NAME_OWNER_ONLY=on` (#2602): a line that may not have
+    /// it is not put into a session that may hold it.
+    setup: Option<(String, lamp_bus::Bus)>,
     /// Whether a misheard cut-in's next request is told so
     /// ([`crate::misheard_hum`]); when the newest such cut-in was held; and
     /// the request to tell, until the model has been told.
@@ -5228,6 +5354,18 @@ impl InputHandoff {
                 snapshot,
             )
         });
+    }
+
+    /// The open line's memory person by its own lease, as memory reads it
+    /// (#2602): `Some(None)` is the room's (every line's without a memory,
+    /// whose face cache is never filled); `None` while the line has no
+    /// current lease of its own.
+    fn line_person(&self, request: RequestId) -> Option<Option<String>> {
+        let lease = self.memory_scope.as_ref()?.lease();
+        if lease.key().request != request.get() || self.retired(request.get()) {
+            return None;
+        }
+        lease.scope().map(|scope| scope.person().map(str::to_owned))
     }
 
     fn memory_lease(
@@ -5874,6 +6012,22 @@ impl InputHandoff {
                 {
                     eprintln!(
                         "lamp-voice provider: a line was said by someone the session is not for; it is not sent, and a new session is opened for them between turns"
+                    );
+                    return self
+                        .refused_start(request, StartRefusal::SessionMismatch { live: expected });
+                }
+                // A session that may hold the typed name, and a line that
+                // may not have it: not sent, and a fresh session is opened
+                // between turns (#2602, the reviewer's second P2 on #3050).
+                // Mostly that session was renewed already, as the line's
+                // face came, before it spoke.
+                if self.tolerate_outage
+                    && let Some((name, bus)) = self.setup.as_ref()
+                    && crate::person::live_holds(expected.get())
+                    && !crate::person::may_tell_now(name, Some(bus), memory_snapshot.person())
+                {
+                    eprintln!(
+                        "lamp-voice provider: a line that may not have the typed name began in a session that may hold it; it is not sent, and a fresh session is opened between turns"
                     );
                     return self
                         .refused_start(request, StartRefusal::SessionMismatch { live: expected });
@@ -15665,6 +15819,9 @@ pub(crate) mod tests {
     mod held_consent;
     /// A name told is a name kept (`LAMP_NAMES=checked`): tests only.
     mod names;
+    /// The typed name told only to the owner's line on the Live route
+    /// (#2602, #3050): tests only.
+    mod person_name;
     /// The Policy holds the lamp's actions (#800): tests only.
     mod policy_holds;
     /// The lamp speaks when spoken to (#829, step 2): tests only.
