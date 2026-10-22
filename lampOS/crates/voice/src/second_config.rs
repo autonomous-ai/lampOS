@@ -94,6 +94,30 @@ pub const OPENROUTER_SECOND_MODEL: &str = "google/gemini-3.6-flash";
 /// and 06:00 to 10:00 UTC on weekdays, cost double (DeepSeek's pricing page,
 /// 19 Oct); there is no switch for them.
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+/// The company relay's host: a route whose `llm_base_url` is on it reaches
+/// DeepSeek through it too, with no `deepseek_base_url` ([`relay_deepseek`]).
+const COMPANY_RELAY_HOST: &str = "campaign-api.autonomous.ai";
+
+/// DeepSeek through the relay `llm_base_url` names, when it is the
+/// company's: `…/api/v1/ai` gives `…/api/v1/ai/v1/deepseek`, as `/v1` is
+/// added to its other services (`net::openai_base`). Lamps carry no provider
+/// keys (the lead, #1711), so such a route with no `deepseek_base_url` and
+/// no `LAMP_SECOND_DEEPSEEK_BASE_URL` reaches DeepSeek there, not DeepSeek's
+/// own API with a `deepseek.key` it doesn't have. That keeps a `second.json`
+/// an update round kept from before the product unit dropped the variable
+/// working (El's P1 on #2978). None for any other host.
+fn relay_deepseek(llm_base_url: &str) -> Option<String> {
+    let host = llm_base_url.strip_prefix("https://")?.split('/').next()?;
+    if host != COMPANY_RELAY_HOST {
+        return None;
+    }
+    let base = llm_base_url.trim_end_matches('/');
+    Some(if base.ends_with("/ai") {
+        format!("{base}/v1/deepseek")
+    } else {
+        format!("{base}/deepseek")
+    })
+}
 /// DeepSeek's name for DeepSeek-V4.1-Flash-1017 (images and tools in;
 /// DeepSeek's docs, 19 Oct: the dated name is not given as a model name).
 /// Asked with thinking off.
@@ -459,7 +483,10 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         openrouter_model,
         openrouter_effort,
         deepseek_model: slug(raw.deepseek_model, DEEPSEEK_MODEL)?,
-        deepseek_base_url: given(raw.deepseek_base_url).map(checked_url).transpose()?,
+        deepseek_base_url: given(raw.deepseek_base_url)
+            .map(checked_url)
+            .transpose()?
+            .or_else(|| relay_deepseek(&llm_base_url)),
         own_deepseek: None,
         relay_deepseek_base_url: None,
     };
@@ -1165,6 +1192,91 @@ mod tests {
     /// #2094: the person's keys, absent, present and removed, give the
     /// relay, their own and the relay again; off, they are never read; one
     /// that can't be read is passed over; no line holds a key or the URL.
+    /// El's P1 on #2978: the product's own `second.json`, as `lamp-update`
+    /// places it (the file a round keeps from an older updater is the same),
+    /// reaches DeepSeek through the company relay with no
+    /// `LAMP_SECOND_DEEPSEEK_BASE_URL`, and its chat may be routed near
+    /// (#2882). An own key over it keeps the relay to fall back to (El's
+    /// P2). Another host gets nothing; a `deepseek_base_url` or the
+    /// variable goes over the default.
+    #[test]
+    fn the_company_relay_reaches_deepseek_through_itself() {
+        const RELAY: &str = "https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek";
+        assert_eq!(
+            relay_deepseek("https://campaign-api.autonomous.ai/api/v1/ai").as_deref(),
+            Some(RELAY)
+        );
+        assert_eq!(
+            relay_deepseek("https://campaign-api.autonomous.ai/api/v1/ai/").as_deref(),
+            Some(RELAY)
+        );
+        assert_eq!(relay_deepseek("https://llm.example.invalid/v1"), None);
+        assert_eq!(
+            relay_deepseek("http://campaign-api.autonomous.ai/api/v1/ai"),
+            None
+        );
+        assert_eq!(
+            relay_deepseek("https://campaign-api.autonomous.ai.example.invalid/ai"),
+            None
+        );
+        // The product's file, its key at a test path.
+        let folder = directory("product-relay-deepseek");
+        let llm = folder.join("credential");
+        private(&llm, "relay-secret\n");
+        let product = include_str!("../../../deploy/product/settings/second.json")
+            .replace("/etc/lampOS/voice/credential", &llm.display().to_string());
+        let file = folder.join("second.json");
+        private(&file, &product);
+        let route = load_from_path(&file).unwrap();
+        assert_eq!(route.hosted.deepseek_base_url.as_deref(), Some(RELAY));
+        assert_eq!(route.pinned, Pinned::default());
+        let deepseek = crate::second_provider::worker::RouteFlags {
+            chat: Some(crate::second_provider::worker::ChatRoute::DeepSeek),
+            ..Default::default()
+        };
+        assert!(crate::second_provider::worker::relay_routable(&route, deepseek, None).chat);
+        // The product unit, which no longer gives the variable.
+        let unit = include_str!("../../../deploy/product/lamp-voice.service");
+        assert!(
+            !unit.contains(&format!("{DEEPSEEK_BASE_URL_ENV}=")),
+            "{unit}"
+        );
+        // An own key over it: the relay to fall back to.
+        let units = directory("product-relay-own");
+        private(&units.join(OWN_DEEPSEEK_KEY), "sk-own-2978-000000000000\n");
+        let (own, _) = route.clone().with_own_keys(true, Some(units.as_os_str()));
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some(DEEPSEEK_BASE_URL)
+        );
+        assert_eq!(own.hosted.relay_deepseek_base_url.as_deref(), Some(RELAY));
+        // A file's own address, or the variable, goes over the default.
+        let named = product.replace(
+            "\"tts_provider\"",
+            "\"deepseek_base_url\":\"https://other.example.invalid/deepseek\",\"tts_provider\"",
+        );
+        private(&file, &named);
+        assert_eq!(
+            load_from_path(&file)
+                .unwrap()
+                .hosted
+                .deepseek_base_url
+                .as_deref(),
+            Some("https://other.example.invalid/deepseek")
+        );
+        let pinned = route
+            .with_environment(|name| {
+                (name == DEEPSEEK_BASE_URL_ENV)
+                    .then(|| "https://pinned.example.invalid/deepseek".into())
+            })
+            .unwrap();
+        assert_eq!(
+            pinned.hosted.deepseek_base_url.as_deref(),
+            Some("https://pinned.example.invalid/deepseek")
+        );
+        assert!(pinned.pinned.chat);
+    }
+
     #[test]
     fn the_persons_own_keys_are_used_only_with_the_switch_and_never_shown() {
         let planted = "sk-planted-2094-0000000000000000";

@@ -66,7 +66,7 @@ refused (unknown fields are refused).
 | `openrouter_model` | no | the slug `LAMP_SECOND_CHAT=openrouter` asks, from OpenRouter's public model list; absent: `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_reasoning_effort` | no | `none`, `minimal`, `low`, `medium` or `high`; absent: `minimal` for a `google/` model, `none` for any other |
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
-| `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
+| `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: the company relay's own DeepSeek (`llm_base_url` on `campaign-api.autonomous.ai` gives `…/api/v1/ai/v1/deepseek`, #2978) when `llm_base_url` is on the company relay, else DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it. The product unit no longer sets that variable, so the relay's routes (`LAMP_RELAY_ROUTES`) may take the chat to a nearer address (#2882) |
 
 With `LAMP_RELAY_ROUTES=on` (#2882) the second worker asks the relay which
 of its services this lamp should reach at a nearer address:
@@ -1723,9 +1723,12 @@ Live stays a per-lamp setting: a drop-in with `LAMP_VOICE_ROUTE=gemini`.
 and 21:14). Every service goes through the Autonomous relay with the one key
 the lamp already has:
 - DeepSeek's chat and search go through the relay
-  (`LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
-  #1939), with second.json's `llm_credential_file`, so the unit loads no
-  credential.
+  (`https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`, #1939), with
+  second.json's `llm_credential_file`, so the unit loads no credential.
+  Since #2978 the voice takes that address itself from `llm_base_url` on the
+  company relay, so the product unit no longer sets
+  `LAMP_SECOND_DEEPSEEK_BASE_URL`, and the relay's routes may route the chat
+  (#2882).
 - Speech to text and the voice fall back to the text model's base and key,
   as on V1.
 
@@ -3554,8 +3557,8 @@ lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
 - **The arms**, on `hosted.deepseek_model`, thinking off, reached as the
   live second route reaches it (#2176, `deepseek_route`): through the relay
   with its credential (`llm_credential_file`) when `deepseek_base_url` or
-  `LAMP_SECOND_DEEPSEEK_BASE_URL` is set, else DeepSeek's own API with the
-  unit's `deepseek.key`:
+  `LAMP_SECOND_DEEPSEEK_BASE_URL` is set, or `llm_base_url` is the company
+  relay's, else DeepSeek's own API with the unit's `deepseek.key`:
   - `today`: every function;
   - `few`: narrowed as `LAMP_SECOND_FEW_TOOLS=on` narrows a spoken turn's;
   - `note`: today's, with one sentence after the changing part (`NOTE`):
