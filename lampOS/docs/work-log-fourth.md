@@ -7078,6 +7078,51 @@ Ready for lamp-voice: no new head until its native gate; First owns merging
   overwrite whole source files. Name activation hold and Photo isolation stay.
 - No lamp, model call, physical acceptance or memory score increase is claimed.
 
+## 2026-10-23, 02:10: controller rebased; full speaker failure retained
+
+Ready for lamp-voice: yes (#3072); no (#3097, #3064, #3014, #2988)
+
+- #3072 at `69d0e6815` is out of draft. Fresh ARM64 39831178139 passed
+  10,641/0/67 skipped (one leaky pass), four Rust doctests, twelve separate
+  process checks and relay. Linux clippy 39831178067 passed. El,
+  reviewer-two and reviewer-three read the scoped resolution/privacy paths
+  clean. First owns latest-base train qualification and merging.
+- #3097 is force-with-lease rebased to `421bb5b2a` on `398921996`.
+  Production core/store bytes are unchanged; final test/doc P3s make future
+  forget-entry invalidation explicit and prove replacement print absence
+  before as well as after actual forget. The range-diff preserves upstream
+  help, reset census 37, combined reset hash and both historical hashes.
+  Fresh Mac fmt, strict workspace/all-target clippy, workspace build and
+  262/0/2 ignored pass: core 19, who 51/0/1, Eyes bin 8, Setup 178/0/1,
+  VoiceEval switches integration 2, Update install plan 4. Receipts:
+  `/private/tmp/fourth-face-repair-controller-checks-20261022/rebase-398-final/`.
+  Fresh ARM64 39837000048 and Linux clippy 39837000132 are running;
+  final resolution reads requested. No runtime or activation is added.
+- Independent old-head `d5cb90240` accounting is 1,378/1/10 across
+  25 suites, not a full passing gate. The unchanged Mac Eyes `/dev/full`
+  failure remains retained on #1569. Full Setup, Update and VoiceEval
+  passed there. Its native run 39832338419 also passed, but does not
+  qualify the later rebase.
+- The full current-source common Voice gate failed 3,488/2/14 ignored.
+  Both held-gap fixtures lacked positive speaker evidence for their first
+  private turn. The correction uses actual nonempty microphone packets,
+  positive Eyes looks, the atomic known source and actual worker matcher;
+  all original gap/count assertions remain. Production code is unchanged
+  for this fixture correction. Failure logs stay in `final-current-piece/`;
+  fresh exact-two and full-suite reruns are running in `final-held-gap/`
+  beneath `/private/tmp/fourth-speaker-foundation-checks-20261022/`.
+- First accepted the all-off local-service repair boundary and one queued
+  priority forget. The source audit found that a deadline after rename
+  cannot prove NotWritten or allow another writer while fsync blocks.
+  Queue clarification proposes bounded response wait with truthful
+  Committing/unknown, then forget next on the same returning writer. No
+  bounded deletion promise or runtime implementation before that decision.
+- The clean root branch matched `398921996` at fetch; the current upstream
+  coordination rules are in use. Missing builder labels on the two repair
+  PRs were restored. Name and Photo await the exact qualified common commit,
+  preserving their separate activation values and acceptance holds.
+- No lamp, model call, physical acceptance or memory score increase is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
