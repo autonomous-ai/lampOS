@@ -316,7 +316,9 @@ The product unit, `deploy/product/lamp-mood.service` (#1670), runs
 `lamp-mood serve --zone system --bus-root /run/lampos-bus` as `lampos`, after
 setup, and is off unless a drop-in sets `Environment=LAMP_MOOD=on`. Off, it
 prints its disabled result, exits 0 and stays inactive, with nothing on the
-bus touched. A test runs the binary with each value of the switch, and on
+bus touched. The unit sets `LAMP_MOOD_SEEMS=on` (#2799), so once Mood is on
+it takes how the near face seems from the product eyes' Blendshape V2 reader
+(FER+ is never in the product). A test runs the binary with each value of the switch, and on
 Linux with `--zone system`.
 
 The runtime separates one state owner from one bus worker. Both use a 5 ms

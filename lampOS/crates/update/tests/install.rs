@@ -1774,9 +1774,9 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         include_str!("../../../deploy/product/lamp-name.service")
             .contains("--models /opt/lampOS/name/models")
     );
-    // The mesh and Blendshape V2 (#1671): placed beside YuNet and SFace at
-    // the eyes' own pins, and not passed by the product's unit, so how a
-    // face seems stays off until `--seems` is turned on.
+    // The mesh and Blendshape V2 (#1671, #2799): placed beside YuNet and
+    // SFace at the eyes' own pins, and passed by the product's unit, so how
+    // a face seems is read by Blendshape V2 on every lamp.
     for (name, pin) in [
         ("face_mesh_v2.onnx", include_str!("../../eyes/src/mesh.rs")),
         (
@@ -1787,10 +1787,28 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         let model = find(name);
         assert_eq!(model.path, format!("/opt/lampOS/eyes/models/{name}"));
         assert!(pin.contains(&model.sha256), "{name}");
-        assert!(!eyes.contains(name), "{name}");
     }
+    assert!(eyes.contains(
+        "--mouth-model /opt/lampOS/eyes/models/face_mesh_v2.onnx --seems-blendshapes /opt/lampOS/eyes/models/face_blendshapes.onnx"
+    ));
     assert_eq!(find("face_mesh_v2.onnx").bytes, 4_915_552);
     assert_eq!(find("face_blendshapes.onnx").bytes, 1_882_583);
+    // FER+ stays out of the product (#2799): its training pictures are for
+    // research only, so no lamp is given it or runs it, and the measure's
+    // log is never on in the product.
+    assert!(all.iter().all(|model| !model.path.contains("ferplus")));
+    let start = eyes
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    for absent in ["--seems ", "--seems-log", "ferplus"] {
+        assert!(!start.contains(absent), "{absent}");
+    }
+    assert!(
+        include_str!("../../../deploy/product/lamp-mood.service")
+            .lines()
+            .any(|line| line == "Environment=LAMP_MOOD_SEEMS=on")
+    );
 }
 
 /// Where the product's voice finds its recorded lines (#1844).

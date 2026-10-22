@@ -1477,7 +1477,8 @@ newest, whichever reader that was.
   Install places it at `/opt/lampOS/eyes/models/face_blendshapes.onnx`,
   with the mesh at `face_mesh_v2.onnx` beside it, from the models release
   (`deploy/product/models.json`, 22 Oct). The product's unit passes
-  neither, so both stay off until `--seems` is turned on.
+  both, `--mouth-model` and `--seems-blendshapes` (#2799), and never
+  `--seems` or `--seems-log`: FER+ isn't installed on any lamp.
 - **The brows' long face (`LAMP_SEEMS_BROW_LOW=on`, #2132; off unless
   set).** With it, a face is also `negative` with the brows drawn down
   (`browDown`, left and right's mean) at or over 0.80 and the smiles under
@@ -1735,7 +1736,8 @@ is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
 **Measuring the mouth with Face Mesh V2 (`--mouth-model PATH`, none unless
 given, #720).** Install places the pinned model at
 `/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
-and the product's unit doesn't pass it. With it, the largest face in each look is cut out of the
+and the product's unit passes it, for Blendshape V2 (#2799), so with
+`LAMP_EYES_SPEAKING=on` the product's speaking read takes the mesh. With it, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and the journal says
