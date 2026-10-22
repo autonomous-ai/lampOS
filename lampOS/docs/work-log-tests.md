@@ -1,5 +1,29 @@
 # Tests work log
 
+## 2026-10-22 22:55 +0700 — search/push unchanged-head probe completed
+
+No fix or PR: First's two #3046 watchdog reports were not reproduced; cause
+remains unproven. [Receipts](verification/search-head-probe-20261022/) preserve
+the earlier serial failure and the exact unchanged head `16b1a2a15` on
+`tests/1569-search-head-probe-20261022`.
+
+Native x86_64 Mac: each named case ran once in its own exact process, **2/0**,
+4.14 s and 3.85 s of libtest time. Native ARM64
+[#6055](https://github.com/autonomous-ai/lampOS/actions/runs/39804008782): both
+passed once, 0.941 s and 2.240 s, within the existing full four-shard serial
+nextest run. Full nextest **10,495/0/67** is calculated from the common 10,562
+inventory and disjoint executed rows; one unrelated passing leaky is retained.
+All four shard jobs and direct checks are terminal SUCCESS. Mac and ARM share
+the same direct commit, with no synthetic merge. All 1,380 scoped build inputs
+match that commit and remain unchanged; SMALL is released.
+
+The original full Mac failure is preserved, including the watchdog/child-exit
+wording and its uncommitted speaker-proof context. Passing isolated runs do
+not establish load causation, an inherited fault or a confirmed flake. No
+assertion, bound, source or workflow changed; no repeat, device action, local
+ARM64 build or manual issue/Queue/PR post was made by this probe. Issue
+registration and Queue follow-up remain after this receipt is reviewed.
+
 ## 2026-10-22 22:47 +0700 — Skills add-on current rebase native gate recorded
 
 Ready for lamp-voice: no; #2693 awaits fresh Linux checks and reviewer/base guard.

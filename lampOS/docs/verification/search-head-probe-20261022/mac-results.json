@@ -1,0 +1,13 @@
+{
+  "platform": {"system":"Darwin","node":"m0.local","release":"25.6.0","version":"Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64","machine":"x86_64","processor":"i386"},
+  "environment": {"CARGO_TARGET_DIR":"/private/tmp/tests-codex-small-native-20261022","CARGO_BUILD_JOBS":"2","CARGO_PROFILE_DEV_DEBUG":"0","CARGO_PROFILE_TEST_DEBUG":"0","CARGO_INCREMENTAL":"0","CARGO_NET_OFFLINE":"true","CARGO_TERM_COLOR":"never","RUST_BACKTRACE":"0"},
+  "unset_environment": ["CARGO_BUILD_TARGET","RUST_TEST_THREADS"],
+  "scope": "Each named test once, in its own native x86_64 Mac process; unchanged source.",
+  "artifact": {"path":"/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-2b7c1b6c7e6d4274","sha256":"47b2080646da1680da759a450846d97a12af53acec8501e3fe620f569d6d7b05","fresh":false},
+  "observations": [{"test":"coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture","command_label":"test-1","exit":0,"timed_out":false,"wall_seconds":6.120607,"summaries":[["ok","1","0","0","0","3390","4.14"]],"scenario_watchdog":false,"child_exit_timeout":false,"well_formed_named_result":true},{"test":"coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer","command_label":"test-2","exit":0,"timed_out":false,"wall_seconds":3.933973,"summaries":[["ok","1","0","0","0","3390","3.85"]],"scenario_watchdog":false,"child_exit_timeout":false,"well_formed_named_result":true}],
+  "concurrent_work": {"concurrent_background_work":"Root Update-round filesystem target running on MAIN /private/tmp/tests-codex-1569-target; TLS gates finished; no other SMALL target use.","causal_limit":"Recorded scheduling context only; no claim that concurrent work caused an outcome."},
+  "compile_seconds": 208.402971,
+  "source_change_count": 0,
+  "target_released": true,
+  "limits": "No full Mac suite was run by this probe. Native target was released after these two executions; its current binary may have since been replaced by another authorized build."
+}

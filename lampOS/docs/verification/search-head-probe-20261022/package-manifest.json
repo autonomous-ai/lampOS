@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5403,
+      "sha256": "fac95ab548526e7728411b54830769fec40c785ad783d4b038a1be5abcdb2f09"
+    },
+    {
+      "file": "arm64-results.json",
+      "bytes": 17547,
+      "sha256": "fd82d2a9c737cdd30f1e97675c45248d0f0aae6ec22228edba8910379f71b3b0"
+    },
+    {
+      "file": "arm64-selected-output.txt.json",
+      "bytes": 11990,
+      "sha256": "4b259644a234f00926b7067d0b32db1f9bcd3c86b3c1d2d75e8ede9c16d65031"
+    },
+    {
+      "file": "commands.json",
+      "bytes": 10148,
+      "sha256": "4a3f1c73753b392d4259f5e40d1d9f459268efe49a3b5c73fc01ad988bc4121c"
+    },
+    {
+      "file": "external-records.json",
+      "bytes": 3742,
+      "sha256": "c12b96146937f3a16ae0916aab9c745e3bf04202b5ff139daa58c46a16a25dca"
+    },
+    {
+      "file": "fourth-original-output.txt.json",
+      "bytes": 12718,
+      "sha256": "95288a3daf75b05429c4227973372b37bebeb9b21180d05009abc8bfe772ff5a"
+    },
+    {
+      "file": "mac-output.txt.json",
+      "bytes": 12942,
+      "sha256": "da85a8a7c0497f5c8b9bd8d3360357e5c82856cea334dc2402b7a5e9f35e0ffd"
+    },
+    {
+      "file": "mac-results.json",
+      "bytes": 2052,
+      "sha256": "d9674616bf6619449972612dbcc7cdab9eeca9b76cf7f2bc5d167e13db277391"
+    },
+    {
+      "file": "source-audit.md",
+      "bytes": 4504,
+      "sha256": "4c25c8afa7d1de1359a1727bd228949d9e449b805c2946133a9cfe926e997a2a"
+    },
+    {
+      "file": "source-identity.json",
+      "bytes": 3665,
+      "sha256": "4a547fd327f5117e95f7c67da574e1494094a7c7aab6208a3fe3187db2c891cd"
+    }
+  ],
+  "validation": {
+    "json_parsed": true,
+    "markdown_local_links_exist": true,
+    "new_file_whitespace_clean": true,
+    "mac_and_original_failure_raw_bytes_identical": true,
+    "selected_arm_lines_original_and_hashes_verified": true,
+    "four_direct_checks_completed_success_at_pinned_head": true,
+    "two_target_rows_once_each": true,
+    "external_hashes_verified": true
+  },
+  "packaging_tests": "No Cargo or new test execution; evidence and source inspection only."
+}
