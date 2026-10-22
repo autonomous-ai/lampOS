@@ -1,6 +1,6 @@
 ---
 name: guard-mode
-description: Keeps an eye on the desk while the person is out and texts them once if someone comes to it. Call keep_watch with turn on only when the person at the lamp asks you out loud ("keep an eye on things while I'm out", "watch my desk"), never on your own and never for a typed message; call it with turn off when they ask you to stop or tell you they're back. While it's on, the ring shows a faint blue mark. It says who came only as someone they've introduced you to or someone you don't know, never a name, and it never records, takes or sends a picture or a sound.
+description: Keeps an eye on the desk while the person is out and texts them once if someone comes to it. Call keep_watch with turn on only when the person at the lamp asks you out loud ("keep an eye on things while I'm out", "watch my desk"), never on your own and never for a typed message; call it with turn off when they ask you to stop or tell you they're back. While it's on, the ring shows a faint blue mark. It says who came only as someone they've introduced you to or someone you don't know, and by name only where the lamp allows it and only for someone whose face it knows who said yes to being named; it never records, takes or sends a picture or a sound.
 ---
 
 # Guard mode
@@ -26,8 +26,11 @@ off from the app; the mark shows all the same.
 
 **What it says.** Only when someone came, about when and for how long. Who
 it was is said only as "someone you've introduced me to" or "someone I
-don't know", never a name: in a shared home, a name would tell you whom
-another person visited.
+don't know": in a shared home, a name would tell you whom another person
+visited. Where the lamp allows names, someone whose face it knows and who
+said yes to being named is named: "Minh and someone the lamp knows came in
+at 18:10". Nobody is ever named from their voice, and someone who takes
+back their yes isn't named again, not even in a text still to go.
 
 **Someone coming in.** Where the lamp allows it, a door or footsteps count
 as someone coming in, but only when a face or a voice follows within half

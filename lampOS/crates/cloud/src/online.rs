@@ -12,7 +12,7 @@ use rumqttc::Outgoing;
 use rumqttc::v5::mqttbytes::QoS;
 use rumqttc::v5::mqttbytes::v5::{ConnectProperties, LastWill, LastWillProperties, Packet};
 use rumqttc::v5::{AsyncClient, Event, MqttOptions};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
@@ -185,6 +185,10 @@ pub fn rfc3339(at: SystemTime) -> String {
 struct Handed {
     in_order: VecDeque<Tagged>,
     by_packet: HashMap<u16, Tagged>,
+    /// Every publish the client sent and the broker has not acknowledged,
+    /// by packet, whatever it was: with [`Self::in_order`], what of
+    /// lamp-cloud's own is ahead of a new publish on the session (#2562).
+    unacked: HashSet<u16>,
     /// The skills' lines for the phone the broker acknowledged, by skill,
     /// for the journal.
     unasked_acked: Vec<String>,
@@ -249,8 +253,17 @@ impl Handed {
         handed
     }
 
+    /// Whether anything of lamp-cloud's own is handed to the client and not
+    /// yet acknowledged, so a publish handed now may wait behind it in the
+    /// client (a broker's receive maximum): a named text then goes unnamed
+    /// (#2562).
+    fn busy(&self) -> bool {
+        !self.in_order.is_empty() || !self.unacked.is_empty()
+    }
+
     /// The client sent the next one as packet `pkid`.
     fn sent(&mut self, pkid: u16) {
+        self.unacked.insert(pkid);
         match self.in_order.pop_front() {
             Some(Tagged::Other) | None => {}
             Some(tag) => {
@@ -266,6 +279,7 @@ impl Handed {
     /// The report the broker acknowledged as `pkid`, if it was one; a
     /// change's result acknowledged is done with.
     fn acked(&mut self, pkid: u16) -> Option<u64> {
+        self.unacked.remove(&pkid);
         match self.by_packet.remove(&pkid) {
             Some(Tagged::Report(seq)) => Some(seq),
             Some(Tagged::Unasked(piece)) => {
@@ -288,6 +302,7 @@ impl Handed {
     /// acknowledged (a clean start), so the lamp sends it again. The
     /// changes' results among it are handed back, oldest first.
     fn lost(&mut self) -> Vec<crate::settings::Outcome> {
+        self.unacked.clear();
         let mut by_packet: Vec<_> = self.by_packet.drain().collect();
         by_packet.sort_by_key(|(pkid, _)| *pkid);
         let journal = &mut self.journal;
@@ -504,10 +519,16 @@ async fn session(
                                 say.line(&line);
                             }
                             let mut owed = Vec::new();
-                            for piece in heard.due {
+                            for mut piece in heard.due {
                                 if !owed.is_empty() {
                                     owed.push(piece);
                                     continue;
+                                }
+                                // Named only straight to the wire: behind a
+                                // publish not yet acknowledged it may wait in
+                                // the client past the eyes' word (#2562).
+                                if handed.busy() && piece.hold() {
+                                    say.line(crate::unasked::UNACKED_AHEAD);
                                 }
                                 let event = me
                                     .data(&now(), "chat.event", &Ok(Some(piece.data.clone())))
@@ -688,7 +709,8 @@ mod tests {
     use crate::answer::tests::Fake;
     use bytes::BytesMut;
     use rumqttc::v5::mqttbytes::v5::{
-        ConnAck, ConnectReturnCode, PingResp, PubAck, Publish, SubAck, SubscribeReasonCode,
+        ConnAck, ConnAckProperties, ConnectReturnCode, PingResp, PubAck, Publish, SubAck,
+        SubscribeReasonCode,
     };
     use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -738,7 +760,16 @@ mod tests {
         /// Sends `commands` on the first connection and closes it after its
         /// second reply; later ones are refused until [`GATE`] opens.
         DropsThenGated,
+        /// Takes every connection with a receive maximum of 1 in its
+        /// CONNACK, and holds back the PUBACK of each connection's first
+        /// publish (`info`) for [`HELD_ACK`], so the client keeps any
+        /// publish after it in its queue meanwhile (#2562, the reviewer's
+        /// correction read on #2769).
+        HoldsFirstAck,
     }
+
+    /// How long [`Broker::HoldsFirstAck`] holds the first PUBACK back.
+    const HELD_ACK: Duration = Duration::from_millis(700);
 
     /// When the tests' brokers saw each CONNECT, by port.
     static CONNECTS: Mutex<Vec<(u16, std::time::Instant)>> = Mutex::new(Vec::new());
@@ -823,10 +854,30 @@ mod tests {
                             } else {
                                 ConnectReturnCode::Success
                             };
+                            let properties =
+                                (behaves == Broker::HoldsFirstAck).then(|| ConnAckProperties {
+                                    session_expiry_interval: None,
+                                    receive_max: Some(1),
+                                    max_qos: None,
+                                    retain_available: None,
+                                    max_packet_size: None,
+                                    assigned_client_identifier: None,
+                                    topic_alias_max: None,
+                                    reason_string: None,
+                                    user_properties: Vec::new(),
+                                    wildcard_subscription_available: None,
+                                    subscription_identifiers_available: None,
+                                    shared_subscription_available: None,
+                                    server_keep_alive: None,
+                                    response_information: None,
+                                    server_reference: None,
+                                    authentication_method: None,
+                                    authentication_data: None,
+                                });
                             Packet::ConnAck(ConnAck {
                                 session_present: false,
                                 code,
-                                properties: None,
+                                properties,
                             })
                             .write(&mut out, None)
                             .unwrap();
@@ -894,6 +945,9 @@ mod tests {
                                 String::from_utf8_lossy(&publish.topic).into_owned(),
                                 payload,
                             ));
+                            if behaves == Broker::HoldsFirstAck && replies == 0 {
+                                tokio::time::sleep(HELD_ACK).await;
+                            }
                             Packet::PubAck(PubAck::new(publish.pkid, None))
                                 .write(&mut out, None)
                                 .unwrap();
@@ -1786,6 +1840,8 @@ mod tests {
             let out = lamp_msgs::MessageOut {
                 from: "skill:guard-mode".into(),
                 text: text.into(),
+                unnamed: None,
+                named: Vec::new(),
             };
             let at = 1_792_296_000_000 + seq * 1_000;
             let taken = lamp.unasked.take(("skills", "b1", seq), &out, at, |text| {
@@ -1872,6 +1928,54 @@ mod tests {
         assert!(lines.contains(&sent));
         for line in &lines {
             assert!(!line.contains("desk") && !line.contains("14:31"), "{line}");
+        }
+    }
+
+    /// #2562 (the reviewer's correction read on #2769), at the real session:
+    /// the pinned client and its event loop against a broker whose CONNACK
+    /// says a receive maximum of 1. With `info`'s PUBACK held back, a named
+    /// text handed then would wait in the client past the eyes' word, so it
+    /// goes unnamed, summary and detail, with the journal's line once; with
+    /// nothing unacknowledged ahead it goes named.
+    #[tokio::test]
+    async fn a_named_text_behind_an_unacknowledged_publish_goes_unnamed() {
+        const NAMED: &str = "Minh came in at 18:10 and was here for about 2 minutes.";
+        const UNNAMED: &str =
+            "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.";
+        for (behaves, named) in [(Broker::Takes, true), (Broker::HoldsFirstAck, false)] {
+            let mut lamp = Fake {
+                texting: true,
+                // After the connection's `info` is handed, within its held
+                // PUBACK.
+                unasked_from: Some(std::time::Instant::now() + Duration::from_millis(250)),
+                ..Fake::default()
+            };
+            let out = lamp_msgs::MessageOut {
+                from: "skill:guard-mode".into(),
+                text: NAMED.into(),
+                unnamed: Some(UNNAMED.into()),
+                named: vec![lamp_msgs::known::person_id("Minh")],
+            };
+            let mut stream = crate::chat::Stream::default();
+            let at = 1_792_296_000_000;
+            let taken = lamp.unasked.take(("skills", "b1", 1), &out, at, |text| {
+                stream.unasked(text, at)
+            });
+            assert_eq!(taken, crate::unasked::Taken::Kept);
+            let sent = crate::unasked::sent_line("guard-mode", 1);
+            let (seen, lines) = lines_against(behaves, lamp, |lines| lines.contains(&sent)).await;
+            let events = chat_events(&seen);
+            assert_eq!(events.len(), 1, "{events:?}");
+            let event = &events[0].1["data"]["event"];
+            let want = if named { NAMED } else { UNNAMED };
+            assert_eq!(event["summary"], want, "{event}");
+            assert_eq!(event["detail"]["message"], want, "{event}");
+            let held = lines
+                .iter()
+                .filter(|line| *line == crate::unasked::UNACKED_AHEAD)
+                .count();
+            assert_eq!(held, usize::from(!named), "{lines:?}");
+            assert!(lines.contains(&sent), "{lines:?}");
         }
     }
 

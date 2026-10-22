@@ -114,7 +114,15 @@ pub struct Texts {
     /// listened for from the start, and those waiting to go.
     unasked: Option<Subscriber>,
     outbox: crate::unasked::Outbox,
+    /// The eyes' known file (`LAMP_CLOUD_KNOWN_FILE`): beside it, their
+    /// `tellable`, read as a named text goes (#2562). None: no text goes
+    /// named.
+    known_file: Option<PathBuf>,
 }
+
+/// Where the eyes' known file is read from, for guard mode's named texts
+/// (#2562): the same file as `lamp-skills`' `LAMP_SKILLS_KNOWN_FILE`.
+pub const KNOWN_FILE_ENVIRONMENT: &str = "LAMP_CLOUD_KNOWN_FILE";
 
 impl Texts {
     /// Taken, or not, as `LAMP_MESSAGES` says.
@@ -123,6 +131,13 @@ impl Texts {
             on,
             ..Self::default()
         }
+    }
+
+    /// The eyes' known file, beside which their `tellable` is read as a
+    /// named text goes.
+    pub fn knowing(mut self, known_file: Option<PathBuf>) -> Self {
+        self.known_file = known_file;
+        self
     }
 }
 
@@ -678,8 +693,19 @@ impl Lamp for Real {
             }
         }
         if give {
-            heard.due = texts.outbox.due();
+            // Read now, as it goes on to the broker: a yes taken back while
+            // the text waited on the bus names nobody (#2562).
+            let known = texts.known_file.as_deref();
+            heard.due = texts
+                .outbox
+                .due_checked(|named| lamp_msgs::known::still_tellable(known, named));
+        } else {
+            // The broker is away: what waits is held, with no name (#2562).
+            texts.outbox.hold();
         }
+        heard
+            .lines
+            .extend(texts.outbox.held_lines().into_iter().map(str::to_owned));
         heard
     }
 

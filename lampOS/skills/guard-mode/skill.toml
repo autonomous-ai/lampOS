@@ -45,8 +45,9 @@ if_heard = ["keep an eye", "keep watch", "watch my desk", "watch the desk", "gua
 most = "12h"                            # it ends by itself twelve hours after it was asked, with one text: "I'm off guard"
 mark = { colour = "blue", level = 1 }   # the faint mark while it is on, so nobody is watched without a sign; while the ring shows something else over it, it counts nothing
 
-# What it says (#940): its own words. {who}, {at}, {long}, {time} and
-# {minutes} are filled in; each line has only its own slots, each once.
+# What it says (#940): its own words. {who}, {at}, {long}, {time},
+# {minutes}, {names} and {name} are filled in; each line has only its own
+# slots, each once.
 [watch.words]
 on = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk."
 on_unknown = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk. You don't know their face, so ask them to tell you to stop when they're back."
@@ -69,6 +70,12 @@ came_in = "{who} came in{at} and was here {long}."
 known = "Someone you've introduced me to"
 unknown = "Someone I don't know"
 someone = "Someone"
+# With LAMP_GUARD_NAMES=on (#2562): {who} by name, only for a known face
+# whose person said yes to being named (the eyes' tellable, read as the
+# text goes). Someone known who didn't stays known, beside the names...
+named_and_known = "{names} and someone the lamp knows"
+# ...and two or more names are the rest, then the last.
+and = "{names} and {name}"
 at = " at {time}"
 under_a_minute = "for under a minute"
 a_minute = "for about a minute"
