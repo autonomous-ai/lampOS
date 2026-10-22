@@ -1136,7 +1136,12 @@ order is kept. A written turn is the same from the chat on.
     seen silent through the line is nobody (the P3); with the eyes
     reading speaking (`LAMP_EYES_SPEAKING`), one turned to it must be seen
     speaking the line too, so the listener's face never carries a
-    colleague's "Leon, can you…" (reviewer-three's P3). People's names
+    colleague's "Leon, can you…" (reviewer-three's P3). Without speaking
+    faces read, the face turned to the lamp may be another's than the
+    speaker's: a close listener facing the lamp while a close colleague,
+    turned away, says "Leon, pass that" lets the name carry. It is the
+    same limit `--addressed` has, and only `LAMP_EYES_SPEAKING` closes it
+    (Sixth's P3 on c0890e8db). People's names
     have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
     them always trails (reviewer-three's P2 on 194accd24); the words
     written for "Lamp" need the near hearing alone. A line that begins
