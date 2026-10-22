@@ -1,0 +1,1 @@
+{"device_id":"d-42","mqtt_endpoint":"broker-2.test","mqtt_port":8883,"mqtt_username":"lamp-2","mqtt_password":"n3w-test-pw","fa_channel":"fa/d-42","fd_channel":"fd/d-42","llm_base_url":"https://api.test/v1"}

@@ -25,3 +25,12 @@ made up.
 - **Never edit or delete one.** Each records what a lamp may still hold.
 - **When a record's shape changes,** write the new day's folder with both
   writers, add it to the test's list, and keep the old ones.
+
+Each `rotated-<day>.json` is the login a ping rotated
+(`STATE_DIRECTORY/rotated.json`, `/var/lib/lampos-cloud`), as the build of its
+day kept it with `account::keep`: setup's made-up account with a made-up
+reply's broker, through `Account::rotated`. It is written by
+`src/account.rs`'s ignored `write_a_rotated_fixture`
+(`LAMP_CLOUD_ROTATED_FIXTURE`). Every later build must read it as it was kept
+and take it for the same device, as `each_kept_rotated_login_reads_as_it_was_kept`
+checks. The broker, login and password are made up, never a lamp's.
