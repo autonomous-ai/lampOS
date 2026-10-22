@@ -145,6 +145,25 @@ pub const GUARD: &str = "guard-mode";
 /// main loop: never a tool's name, which has no `.`.
 pub const APP_ON: &str = "guard.on";
 pub const APP_OFF: &str = "guard.off";
+/// `on` gives guard mode's tool [`WORDS_V2_DESCRIPTION`] and
+/// [`WORDS_V2_TURN`] in `tools.json`, in place of its `SKILL.md`
+/// description and its `[choice]` `about`; off unless set (#2827). On
+/// lamp-06c1 (22 Oct 09:14) "I'm back. You can stop keeping an eye on
+/// things." was called `{"turn":"on"}`: the old words put on first and
+/// name "keep an eye" for it, so a return that says those words read as on.
+pub const WORDS_ENVIRONMENT: &str = "LAMP_GUARD_WORDS_V2";
+/// Whether [`WORDS_ENVIRONMENT`]'s value turns the new words on: `on` only.
+pub fn words_v2(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+/// `keep_watch`'s description with [`WORDS_ENVIRONMENT`] on: off first,
+/// with the very lines that were read as on, and "even when their words
+/// name keeping an eye or watching"; on only for a request to start. The
+/// rest is `SKILL.md`'s.
+pub const WORDS_V2_DESCRIPTION: &str = "Keeps an eye on the desk while the person is out and texts them once if someone comes to it. Call keep_watch with turn off when they tell you they're back or here now, thank you for watching, or say you can stop or there's no need, even when their words name keeping an eye or watching: \"I'm back, you can stop keeping an eye on things\", \"thanks, I'm here now\" and \"no need to keep watch\" are all off. Call it with turn on only when the person at the lamp asks you out loud to start keeping an eye on things while they go out (\"keep an eye on things while I'm out\", \"watch my desk\"), never on your own and never for a typed message. While it's on, the ring shows a faint blue mark. It says who came only as someone they've introduced you to or someone you don't know, never a name, and it never records, takes or sends a picture or a sound.";
+/// The `turn` choice's description with [`WORDS_ENVIRONMENT`] on, off
+/// first; at most 256 bytes, as a `[choice]` `about` is.
+pub const WORDS_V2_TURN: &str = "off: they're back or here now, thanked you for watching, or said stop or no need, even with \"keep an eye\" or \"watch\" in it; on: they asked you out loud to start keeping an eye on things while they're out";
 /// A door or footsteps scored at least this is a sound someone may have
 /// come in by, and speech at least this, with the lamp's own voice clear,
 /// is someone speaking. Not yet measured on a lamp.
