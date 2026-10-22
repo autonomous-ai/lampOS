@@ -498,7 +498,7 @@ pub enum RepairError {
 /// Before each actual I/O operation. The private hook lets tests fail these
 /// boundaries without replacing the filesystem or changing ordinary saves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RepairStep {
+pub(crate) enum RepairStep {
     Write,
     SyncFile,
     Rename,
@@ -752,7 +752,7 @@ impl People {
         self.replace_prints_at(target, prints, |_| Ok(()))
     }
 
-    fn replace_prints_at(
+    pub(crate) fn replace_prints_at(
         &mut self,
         target: RepairTarget,
         prints: Vec<Vec<f32>>,

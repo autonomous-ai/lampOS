@@ -1,5 +1,52 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Face repair writer prerequisite (2026-10-23)
+
+Read V1's `system/server/device/delivery/mqtt/face_enroll_handler.go` and
+`face_owners_handler.go` directly again for this ownership boundary. Both
+acknowledge `starting` and run HAL outside the MQTT callback under the same
+`faceEnrollMu`; removal cannot overlap enrollment. Keep truthful progress,
+validation before admission and exclusive mutation. Change the per-request
+goroutines waiting on that lock to one fixed Rust worker, one repair and one
+priority forget. Do not port the label/error logging, HAL folder deletion or
+claim that a request timeout cancels the underlying write.
+
+Reuse actual `People::replace_prints_at` checkpoints and
+`People::forget_at`, including the latter's set-aside/pending-forget behavior,
+stable-ID lookup and by-name guard. Only the checkpoint enum/method become
+crate-private for the writer; ordinary `remember`/save behavior is unchanged.
+The adapter owns the exact supplied store rather than cloning or reopening it.
+Keep actual pre-rename `NotWritten` and post-rename `Indeterminate` distinct
+from a missed response deadline. Before-rename refusal cannot promise to stop
+an already executing rename/fsync. Accepted forget survives caller loss and
+runs when that same worker returns; a permanent stall remains pending.
+
+The [inactive writer](eyes.md#face-repair-writer-prerequisite-inactive) retains
+live work and one-use completion outside its four acknowledged receipts.
+Those receipts keep only operation IDs and fixed status/counts; no plaintext
+name or private stable ID remains after acknowledgement. Match names for
+mutation retries only while live/unacknowledged. An acknowledged operation
+number is `StaleId` for mutation regardless of the supplied label; read the
+retained result through `forget_status`. The worker drops its execution name
+before publishing the result, and acknowledgement drops the live retry name.
+No hash, zeroization or physical RAM-erasure guarantee is added. Trusted
+runtime operation numbers reject conflicting/old replay but are not account
+credentials. Actual forget results preserve `unsearched`; no early
+`forgotten` or memory/rules removal is inferred from admission. Worker failure
+and restart remain unknown, with no replacement writer or fabricated rollback.
+
+This is only the already-approved store handoff. The target/`CommitWork` must
+be prepared before transferring `People`; live reservation, recognition and
+all ordinary mutators still need one ownership protocol. Trusted forget entry
+must invalidate the controller first and suppress stale publication. No
+Cloud/Voice/camera ingress, environment read, RPC, capability or activation is
+added. All 16 deterministic real-store controls passed on the development Mac;
+first/repeated-maximum status and forget admission were 3,713/443/15,688 ns
+at the held directory-sync checkpoint, within the 1 ms host target. These
+include bounded explicit-contention retries, not a cold/device measurement.
+Native/full-runtime qualification remains separate; no V1 parity, device
+latency or power-loss claim is made.
+
 ## Face repair controller core (2026-10-22)
 
 The V1 paths were checked directly in this checkout:

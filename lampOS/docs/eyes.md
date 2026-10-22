@@ -1111,8 +1111,8 @@ runtime invalidation or expiry cannot promise rollback: `invalidate` returns
 completion returns `Committed`, `Refused`, `NotWritten` or `Indeterminate`.
 For a forget after handoff, the exclusive writer must order the store operations
 and reconcile their actual outcomes; invalidation cannot retract consumed work
-or claim the pending write was cancelled. This is a future adapter requirement,
-not runtime wiring added here.
+or claim the pending write was cancelled. The inactive writer below provides
+this store ordering; no runtime caller is added here.
 At most four terminal receipts remain in RAM. Eviction or restart makes a
 ticket unknown; after a write handoff, the file may hold the complete old
 or new record. Unknown never means unchanged: reload and reconcile the
@@ -1125,6 +1125,86 @@ invalidates staged RAM
 before actual `People::forget`, checks the cancelled ticket cannot hand off or
 revive, and preserves the other person's complete record and stable ID. No model,
 hardware, power-loss or end-to-end approval flow is qualified here.
+
+### Face repair writer prerequisite (inactive)
+
+`repair_writer::Writer` accepts the exact owned `People` instance and runs one
+fixed thread. Prepare the controller's target and approved `CommitWork` before
+transferring that instance; do not borrow another writer or reopen the file to
+reserve a target. This is an inactive Rust library handoff, not a live repair
+service. A future integration must route reservation, recognition, scoring,
+ordinary remembering, photo confirmation and named-visit consent through the
+same owner. Those commands, camera/account/Voice ingress, RPCs, environment
+reads, capabilities and product activation are not added here.
+
+The adapter holds at most one repair and one priority forget. A short mutex
+protects only these in-memory records; no filesystem operation holds it.
+Admission and status use `try_lock` and return `Contended` instead of waiting.
+No callback or network receiver owns accepted work. The same worker selects
+forget next after an in-flight repair returns, including if forget arrives
+after storage returned but before its completion was polled. It also drains
+accepted work after `close` or caller loss. Close rejects new admission and
+does not join a blocked worker. Do not reopen the store until `stopped` confirms
+the old owner exited, or the old process is known to have exited.
+
+Trusted runtime must first call the controller's `invalidate(now)` at forget
+entry and suppress stale known/tellable publication. Writer admission is not
+that invalidation and proves no account authority. Internal monotonic forget
+numbers make a retry of the same name refer to the first admitted operation
+only while it is live or its result is untaken; its original timestamp and
+deadline stay fixed. Conflicting live reuse is refused and a second distinct
+pending forget returns `Busy`. After `take_forget` acknowledges the result,
+the same number returns `StaleId` for mutation regardless of the new label;
+use `forget_status` to read its retained result. An evicted old number also
+never executes again. These numbers are not an app token or model argument.
+The four acknowledged terminal receipts retain only operation IDs and fixed
+status/counts, with no plaintext name or private stable ID. The live retry
+name is dropped at acknowledgement and the worker's execution copy before
+result publication. This is ownership removal, not zeroization or physical
+RAM erasure. Only acknowledged receipts can be evicted. Live operations,
+untaken repair completions and untaken forget results stay pinned separately.
+
+Deadline status is separate from actual storage status. At the supplied
+deadline, an unfinished operation reports `deadline_exceeded` with storage
+still `Pending`: it failed to finish in time, not necessarily to write. The
+repair checks before starting and before pre-rename I/O can refuse as actual
+`NotWritten`. A forget request also latches that refusal for an older queued
+repair, even if forget runs first and fails. A check racing with rename cannot
+interrupt the system call. After rename, RAM follows the visible file and the
+real directory sync decides `Committed` or `Indeterminate`; a late success
+stays a success. The original opaque completion is taken once for
+`Controller::complete`; no fabricated timeout result settles it.
+
+Forget always uses actual `People::forget_at` under that same owner, even
+after its response deadline. Its result keeps `forgot` and `unsearched`, the
+stable ID captured before deletion, and `name_id_free` checked afterward.
+Nothing reports forgotten at queue admission. An error can follow partial
+canonical/set-aside work and does not mean unchanged; `unsearched > 0` retains
+the existing pending-forget semantics. No memory/rules removal, unconfirmed
+photo cleanup, success reply or identity publication is performed by this
+prerequisite. Those callers must wait for and reconcile the actual result.
+
+Blocking write/fsync/rename has no cancellation guarantee. A permanent stall
+leaves one worker occupied and one forget pending, not a second writer or an
+unbounded retry queue. Worker failure makes unfinished outcomes `Unknown` and
+refuses new work. RAM queue/receipt loss on restart is unknown until actual
+store reconciliation; neither replay nor a reboot rollback guarantee is added.
+Ordinary forget's existing durability is unchanged.
+
+The host target is under 1 ms for status/admission, including while a storage
+barrier is held. All 16 real-store controls passed on the development Mac.
+At the actual directory-sync checkpoint, first status took 3,713 ns, the
+maximum of 100 repeated status calls 443 ns, and priority forget admission
+15,688 ns. The measurement includes the bounded retry helper for an explicit
+`Contended` result; it is not a cold filesystem or device measurement. The
+separate held-state-lock control returns `Contended` without waiting.
+Fixtures use real temporary stores, a test clock and bounded synchronization
+at pre-rename/post-rename boundaries, checking success, indeterminate, refusal,
+duplicate/saturated admission, completion once, caller loss, actual set-aside
+results, cleanup failure and preservation of the other complete record/ID.
+They do not demonstrate a bounded kernel-I/O time, device behavior or a live
+account-to-lamp repair flow. Native ARM64 and full runtime acceptance remain
+separate gates.
 
 ### One name for one face, and only a name they said (`LAMP_NAMES=checked`)
 
