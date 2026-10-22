@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 00:12 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 01:14 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.1% over 72 rows. Quality 62.2% over 16 rows.**
+**Build 90.1% over 72 rows. Quality 61.9% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -94,7 +94,7 @@ Written by the first builder from the team's review page at 2026-10-23 00:12 (+0
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.50 | 0.75 | 21 Oct 22:5x, the speech-to-text path scored on the same two recordings, on lamp-4ace through the product’s own relay: it caught none of the ten “stop” lines. |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.55 | 0.90 | 22 Oct 19:3x, down from 0.65: in the owner’s 19:04 test 4 of their lines were held without the name, the office keeping the room busy (#2967 lets a quiet room take a turned face again). |
+| Not spoken to | 0.50 | 0.90 | 23 Oct 01:1x, down from 0.55, tonight’s played rounds read again from the lamp’s own journal (the scorer had placed its sounds by when it read them): with the night’s builds the lamp spoke on 0 to 5 of 12 desk lines a ro… |
 | Several people | 0.65 | 0.85 | 22 Oct 07:38, up from 0.6: both halves of the going-on rows on lamp-52e6 with Mac voices and screen faces (Seventh). |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
