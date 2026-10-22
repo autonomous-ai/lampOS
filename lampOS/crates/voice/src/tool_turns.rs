@@ -625,6 +625,7 @@ mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let declared: Vec<String> = crate::agent_tasks::tools(&place)
