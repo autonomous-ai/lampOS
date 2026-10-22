@@ -7186,6 +7186,46 @@ Ready for lamp-voice: yes (#3097); no (#3064, #3014, #2988, writer)
   branch, with no Cargo, RPC or runtime activation yet. No lamp/model call,
   physical acceptance or memory score increase is claimed.
 
+## 2026-10-23, 03:07: controller merged; guarded chat checkpoint published
+
+Ready for lamp-voice: no (common, Name, Photo and inactive writer)
+
+- First merged controller #3097 through train 8 #3112 as `7b3e6aef8`.
+  The root tree is clean on that main and its AGENTS matches upstream.
+  Queue/own-PR comments are read through 03:06. Coordination stays on
+  Queue/PR comments, never the old harness-send route.
+- Published common checkpoint `77bdd4c95` on #3064 contains main
+  `001a3d714` and the per-dispatch ChatPermission correction. All Engine
+  chat paths carry the same sticky permission through Services; Net checks
+  immediately before near, own and key-refusal relay sends, including
+  after the refusal callback. Function selection and the Without path's
+  existing near-to-own-only fallback remain unchanged.
+- Fresh Mac fmt, strict workspace/all-target clippy and workspace build
+  passed. Full `cargo test -q -p lamp-voice`: 3,816/0/14 ignored, comprising
+  library 3,535, binary 1, integration 270/4/6 and no doc tests. The actual
+  HTTP regression passes ten subcontrols, with four forbidden sends blocked
+  and six positive controls preserved. Services 24 and private Engine 23
+  are overlapping focused results. All 1,551 source hashes stayed fixed.
+  Warm synthetic name-helper first/repeat was 224/53 us, not lamp latency.
+  Receipts: `/private/tmp/fourth-speaker-foundation-checks-20261022/final-chat-permission/`.
+- The original red HTTP counter, cancelled main001 run (143) and package-
+  only macro-feature compile failure remain retained. The macro assertion
+  now uses standard poll_fn with identical pending assertion, no dependency
+  change. No current-head native success is claimed yet.
+- Common stays draft while actual landed main `7b3e6aef8` is combined with
+  its asynchronous note read-ahead. Private begin/adopt/worker entry and
+  follow-up must obey final sealed current-plus-carried speaker proof and
+  fresh known-speaker authority; genuinely Room reads keep their behavior.
+  This is composition of the new private prerequisite, not a standalone
+  finding against the merged read-ahead change.
+- The inactive writer rebased cleanly onto `7b3e6aef8`: all four old
+  prerequisites have exact upstream patch matches and no duplicate commit
+  remains. Six own WIP files and 16 controls stayed byte-exact. Acknowledged
+  forget receipts hold operation IDs and fixed status only, no retained name
+  or private identity. Its first Cargo gate is running, one local job only.
+- Name/Photo still wait for qualified common source. First owns the person
+  and physical acceptance rows; no lamp/model call or score change claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
