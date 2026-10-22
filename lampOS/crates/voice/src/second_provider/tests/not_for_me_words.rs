@@ -103,6 +103,8 @@ async fn not_for_me_written_as_words_alone_is_the_decline() {
         &["Not for me", " "],
         &["Not for me."],
         &["Not for me", " to answer."],
+        &["Not for me to answer"],
+        &["Not for me to ", "answer", "\u{201d}", "."],
         &["Not for me, ", "not to ", "me."],
     ] {
         let (labels, told) = answered(true, true, pieces(cut)).await;
@@ -123,21 +125,28 @@ async fn not_for_me_written_as_words_alone_is_the_decline() {
     }
 }
 
-/// "Not for me to say": the idiom opens a real answer, said on a line told
-/// it may be people's talk however it is cut, the "to" in a later piece
-/// included; and a speech tag before ordinary words leaves them said.
+/// "Not for me to say" and "Not for me to answer, but…": the idiom opens
+/// a real answer, said on a line told it may be people's talk however it
+/// is cut, the "to" or the comma in a later piece included; and a speech
+/// tag before ordinary words leaves them said.
 #[tokio::test]
 async fn not_for_me_to_say_and_a_tag_before_words_are_said() {
-    const IDIOM: &str = "Not for me to say, but it's lovely.";
-    let words: Vec<&str> = IDIOM.split_inclusive(' ').collect();
-    for cut in [
-        &[IDIOM][..],
-        &words,
-        &["Not for me", " to say, but it's lovely."],
+    for idiom in [
+        "Not for me to say, but it's lovely.",
+        "Not for me to answer, but I think it's lovely.",
     ] {
-        let (labels, told) = answered(true, true, pieces(cut)).await;
-        assert_eq!(spoken(&labels), IDIOM, "{cut:?}: {labels:?}");
-        assert!(told.is_empty(), "{cut:?}: {told:?}");
+        let words: Vec<&str> = idiom.split_inclusive(' ').collect();
+        let (head, tail) = idiom.split_at(idiom.find(',').unwrap());
+        for cut in [
+            &[idiom][..],
+            &words,
+            &["Not for me", &idiom["Not for me".len()..]],
+            &[head, tail],
+        ] {
+            let (labels, told) = answered(true, true, pieces(cut)).await;
+            assert_eq!(spoken(&labels), idiom, "{cut:?}: {labels:?}");
+            assert!(told.is_empty(), "{cut:?}: {told:?}");
+        }
     }
     let (labels, told) =
         answered_tagged(true, true, Some(false), pieces(&["[softly] Sure."])).await;
@@ -262,6 +271,7 @@ async fn the_check_costs_the_first_audio_only_the_pieces_its_opening_waits_for()
         // Answers that open with the words themselves.
         "Not for me, thanks, I'm more of a lo-fi lamp.",
         "Not for me to say, but it's lovely.",
+        "Not for me to answer, but I think it's lovely.",
         "Not for me either.",
     ] {
         // The pieces past the first that the opening waits for: up to the

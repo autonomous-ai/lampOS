@@ -380,17 +380,20 @@ fn a_call_so_far(text: &str) -> bool {
 /// get it?") got "Not for me — that's about me, not to me.", spoken. It is
 /// the refusal when "not for me", case aside, is the whole reply, or is
 /// followed straight away by the refusal's own clause (`REFUSAL_CLAUSES`:
-/// "that's about me", "not to me", "to answer"…); punctuation, quotes,
+/// "that's about me", "not to me"; "to answer" and "to reply" only at a
+/// sentence end, '.', '!', '?' or the reply's end); punctuation, quotes,
 /// dashes and whitespace between or around the words are skipped, and so
 /// are speech tags before them (`[softly]`, `LAMP_SECOND_SPEECH_TAGS`).
 /// Anything else after it is an answer: `CONVERSATION_ALONE` tells the
 /// model a follow-up to the lamp is for it, so "Not for me, thanks, I'm
-/// more of a lo-fi lamp." and "Not for me to say, but…" are said.
+/// more of a lo-fi lamp.", "Not for me to say, but…" and "Not for me to
+/// answer, but…" are said.
 /// `Some(true)`: it is; `Some(false)`: it can't be ("Nothing for me…",
 /// "Note for me", "Not for me, thanks"); `None`: not yet known, the text
 /// ending inside its words, after "not for me" with nothing but
 /// punctuation since (only its end makes that the whole reply), partway
-/// through a clause, or inside a speech tag. `ended`: no more text comes,
+/// through a clause, after "to answer" or "to reply" before what follows
+/// shows a sentence end, or inside a speech tag. `ended`: no more text comes,
 /// so a last word is whole. An apostrophe inside a word, `'` or `’`, is
 /// the word's own, so "me’s" is no "me"; single quotes enclosing the words
 /// ('Not for me', ‘Not for me’) are punctuation.
@@ -463,8 +466,13 @@ pub fn opens_not_for_me(text: &str, ended: bool) -> Option<bool> {
         if open {
             return None;
         }
-        if clauses.iter().any(|clause| clause.len() == at + 1) {
-            return Some(true);
+        if let Some(clause) = clauses.iter().find(|clause| clause.len() == at + 1) {
+            if !SENTENCE_END_CLAUSES.contains(clause) {
+                return Some(true);
+            }
+            // "Not for me to answer, but I think it's lovely." is an answer;
+            // only a sentence ending here is the refusal.
+            return sentence_ends(after, ended);
         }
         rest = after;
     }
@@ -481,6 +489,37 @@ const REFUSAL_CLAUSES: [&[&str]; 6] = [
     &["to", "answer"],
     &["to", "reply"],
 ];
+
+/// The clauses that are the refusal only at a sentence end: "Not for me to
+/// answer, but…" is the idiom, as "Not for me to say, but…" is.
+const SENTENCE_END_CLAUSES: [&[&str]; 2] = [&["to", "answer"], &["to", "reply"]];
+
+/// Whether `after`, what follows a clause's last word, ends the sentence:
+/// '.', '!' or '?', or the reply's end, past closing quotes and whole
+/// speech tags; `None` while that is not yet known.
+fn sentence_ends(after: &str, ended: bool) -> Option<bool> {
+    let mut rest = after;
+    loop {
+        rest = rest.trim_start_matches(|c: char| {
+            c.is_whitespace() || matches!(c, '"' | '\'' | '\u{201d}' | '\u{2019}' | ')')
+        });
+        let Some(tag) = rest.strip_prefix('[') else {
+            break;
+        };
+        match tag.find(']') {
+            Some(close) => rest = &tag[close + 1..],
+            None if !ended && tag.len() < crate::second_provider::speech_tags::HELD_MOST => {
+                return None;
+            }
+            None => return Some(false),
+        }
+    }
+    match rest.chars().next() {
+        None if ended => Some(true),
+        None => None,
+        Some(c) => Some(matches!(c, '.' | '!' | '?')),
+    }
+}
 
 /// What follows a function's name at the start of `text`.
 fn call_arguments(text: &str) -> Option<&str> {
@@ -898,7 +937,9 @@ mod tests {
             "Not for me: it's about me!",
             "Not for me, not to me.",
             "Not for me to answer.",
-            "\u{201c}Not for me to reply\u{201d}",
+            "\u{201c}Not for me to reply\u{201d}.",
+            "Not for me to answer!",
+            "Not for me to reply? ",
             "[softly] Not for me \u{2014} that's about me.",
         ] {
             assert_eq!(opens_not_for_me(refusal, false), Some(true), "{refusal}");
@@ -943,6 +984,8 @@ mod tests {
             "Not for me today",
             "Not for me either.",
             "Not for me to say, but it's lovely.",
+            "Not for me to answer, but I think it's lovely.",
+            "Not for me to reply \u{2014} it's lovely.",
             "not for me to judge",
             "Not for me, that's about you",
             "[softly] Sure.",
@@ -964,6 +1007,10 @@ mod tests {
             "Not for me th",
             "Not for me to",
             "Not for me to ",
+            "Not for me to answer",
+            "Not for me to answer ",
+            "\u{201c}Not for me to reply\u{201d}",
+            "Not for me to answer [sof",
             "Not for me \u{2014} that's about ",
             "Not for me\u{2019}",
             "Not. ",
@@ -983,6 +1030,15 @@ mod tests {
             "[soft",
         ] {
             assert_eq!(opens_not_for_me(ended, true), Some(false), "{ended:?}");
+        }
+        // "To answer" and "to reply" ending the reply: the refusal.
+        for ended in [
+            "Not for me to answer",
+            "Not for me to answer ",
+            "\u{201c}Not for me to reply\u{201d}",
+            "Not for me to answer [softly]",
+        ] {
+            assert_eq!(opens_not_for_me(ended, true), Some(true), "{ended:?}");
         }
     }
 
