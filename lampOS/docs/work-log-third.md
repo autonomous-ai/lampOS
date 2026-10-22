@@ -5,6 +5,34 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 00:18 — disabled wake-cue correction pushed as #3087
+
+Ready for lamp-voice: no (#3087; native gates and external read pending).
+
+- Pushed `b6d7377b5cc8e50abc7098c1a1b20ebd9e195ccb` on
+  `third/wake-cue-off-record`, based on `bad114496`. Exactly four files,
+  one single-line commit, no attribution; tree clean. A marker is still
+  consumed when no hum exists, but no pending cue or false refused row
+  remains. No deadline, product switch, privacy or sound change.
+- Full local twelve-crate gate on `a37144927` plus the correction:
+  **6,790 passed, zero failed, 29 ignored**, command exit zero. The exact
+  four-file patch compared byte for byte equal after the base update.
+  The earlier result does not cover the new base's unrelated changes.
+- Final `bad114496` base: formatting, strict workspace Clippy and workspace
+  build passed. The complete hand-controls command passed **104 tests,
+  zero failed, three ignored**. Enabled wake scenario timings remain
+  60/60/62/64 ms; the new disabled-hum regression exits at 104 ms with its
+  marker consumed and no cue row, PCM or provider input. Its unchanged
+  baseline failed on the false row. Commands and boundaries are in
+  `docs/verification/wake-hum-permission-20261022/README.md`.
+- Native ARM64 run `39821370239` and Linux Clippy `39821370289` are running
+  on the exact PR head; no result is claimed yet. The source is posted
+  for First/Reviewer-lead's read and a qualified current-base train carry.
+  No local ARM64 linking or device access. #2948 stays draft for its hand trial.
+- First included docs-only #3083 (`99395e226`) in the second train at
+  00:02. Its two-doc correction has no runtime gate. No other Third
+  issue was closed: #1798's hand trial and #2136's full comparisons remain.
+
 ## 2026-10-22 23:58 — gap-count docs pushed as #3083
 
 Ready for lamp-voice: yes (#3083; documentation review and First's merge lane).
