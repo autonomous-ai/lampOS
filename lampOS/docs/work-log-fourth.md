@@ -6436,6 +6436,34 @@ Ready for lamp-voice: #2946 evidence yes; #2936 draft for replacement native/ful
   scope explicit routing/admission before code; nothing silently changed.
   App/backend retention outside this Rust repo is not established.
 
+## 2026-10-22 15:30 ICT: photo activation scope answered; implementation starts
+
+Ready for lamp-voice: no, activation implementation begins; retry replacement native pending.
+
+- #2946 evidence checkpoint merged4ab12509ea717719559298de295fb41381fd5ce0
+  at15:26:11ICT. Its diagnostic remains8613304e4 historical evidence.
+- First's authoritative #2856 answer6336106600 (15:16:52, freshly read
+  directly after Queue6336334064 linked it) approves reuse of the existing
+  face-consent surface, adding no functions. Live/Second must retain their
+  exact baseline lists; cap32 and all existing features stay. Photo ask
+  must explicitly say it comes from a photo. If the two descriptions cannot
+  remain clear, show them before coding for First's decision.
+- Scope is unit activation, three product units plus folder/socket/0700
+  contract and on/off census; Mobile's0c89 selfie/yes remains its gate.
+  Rust-to-skill migration is explicitly a separate future piece. Work starts
+  on own fourth/photo-product-activation branch from fresh lamp-voice.
+  Existing #2856 claim6335952379 remains this session's claim.
+- Reuse requires an explicit pending-photo reply distinction preserving
+  current heard-at-lamp authority, Eyes not_here/not_asked checks, narrow
+  photo-no deletion, held-gap behavior and no fallback to live enrolment.
+  No ambient name or provider-supplied identity may replace the Eyes pending
+  context. Define that path before implementation. Consent semantics and
+  off behavior receive regressions; exact baseline lists are the gate.
+- Latency target: no new steady-turn I/O or background poll; photo answers
+  reuse the existing bounded Eyes request and do not delay immediate normal
+  face tools. Host functional/timing evidence remains distinct from Mobile's
+  authorised end-to-end lamp acceptance. No device action is authorised.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
