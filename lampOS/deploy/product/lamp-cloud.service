@@ -30,6 +30,10 @@ Environment=LAMP_CLOUD=on
 # lampos, under ProtectSystem=strict (/run/lampos-eyes is 0755, `tellable` the eyes' 0600 file
 # of the same user); missing or unreadable, the text goes unnamed.
 Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
+# The app's keys.set, keys.remove and keys.get (#2094, #2846; lampOS/docs/own-keys.md), handed to root's keys helper on
+# lamp-setup-keys.socket; lamp-cloud writes nothing. Taken only with LAMP_SETTINGS_CHANGE=on too, which the product
+# leaves off until its own lamp check: until then the app's kinds are "not on this lamp", and setup's fields are the way in.
+Environment=LAMP_OWN_KEYS=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
