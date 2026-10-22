@@ -456,7 +456,10 @@ bounds what:
 
 - Two resumes of the lamp's own voice (`FRUITLESS_YIELDS`), or three that
   were not its own voice (`OTHER_FRUITLESS_YIELDS`), make the mask fall
-  back for the rest of the reply, as before.
+  back for the rest of the reply, as before. The two counts are separate,
+  not summed: one of the lamp's own voice and two others leave neither at
+  its bound, so a fourth yield is still made, and the resume after it
+  falls back whichever count it adds to.
 - The 20 s with no yield gives one back to each count (`FORGIVE_FRUITLESS_US`),
   and a commit clears both.
 - With `LAMP_CUT_IN_KEEPS_LISTENING` too, a voice that keeps going costs at
@@ -465,7 +468,11 @@ bounds what:
 So two asides heard plainly leave a third line within 20 s heard, the
 lamp's own voice twice still falls back, and a television, a radio or
 someone else's short words pause a story at most three times in 20 s
-(with the keeps-listening switch, five). The 30/40/110-block bounds, the
+(with the keeps-listening switch, five). Mixed with the lamp's own voice,
+the two bounds together allow at most four pauses (one of its own voice,
+two others, and one more that falls back), and with the keeps-listening
+switch at most eight (three of its own voice, four others, and one more).
+The 30/40/110-block bounds, the
 own-voice cap of two and the 20 s are unchanged. `duplex_policy` gives the
 window (`fruitless_counts_own_voice_only`). It stays off until `tools/played/cutin.sh`
 has measured the false yields and the asides (#2602, piece 1).
