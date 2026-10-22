@@ -79,6 +79,11 @@ Environment=LAMP_NAME_NOTE_BUSY=face
 Environment=LAMP_CUT_KEEPS_NAME=on
 # A short word in a quiet room goes to the model, its answer held unless it was said to the lamp (#800).
 Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
+# The end-of-turn worker lowers itself to round-robin 10 and its ONNX Runtime threads don't spin while they wait,
+# so the voice's capture, playback and coordinator take a core back at once (#1608; on lamp-4ace since 19 Oct,
+# battery mon-te-0840 held 12 of 12; the first builder's yes for every lamp on #2602, 22 Oct 15:0x).
+Environment=LAMP_TURN_END_PRIORITY=10
+Environment=LAMP_TURN_END_NO_SPIN=on
 # Speech trailing under the faint floor (the voice options' --faint-floor-db) is heard 400 ms more.
 Environment=LAMP_FAINT_HOLD_MS=400
 # A short sound before the awaited answer has sounded does not cut it off (#1123).
