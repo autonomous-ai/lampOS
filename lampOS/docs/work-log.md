@@ -1,3 +1,34 @@
+## Current checkpoint: 2026-10-22 18:09 +07, #2810 resumed for real process-kill cuts
+
+Ready for lamp-voice: no
+
+Starting-a-session instructions read from the latest public lamp-voice;
+role is Second, no assigned lamp. Existing builder:second/status:taken claims
+for #2810 and #1812 are resumed in that order. All previous code pieces are
+merged. Task branch `second/updater-process-cuts` starts at
+`69f2228338a8df63a81d23087c3e55308fa125ca`.
+
+#2810 now adds real SIGKILL without unwinding at persisted filesystem sync
+boundaries in an ARM64 Podman process. Planned matrix: candidate synced;
+pending saved before link move; new link synced; confirmation cleared;
+put-back old link synced; refusal synced before pending cleanup; put-back
+cleanup synced. Every cut must be verified at its syscall stop, killed and
+reaped with signal9, followed by fresh recovery and the next round. The
+parent retains the files; no pending reconstruction counts as a cut.
+The earlier six logical-prefix tests remain historical. No new result is
+claimed yet. The default local Podman connection has a missing identity;
+an isolated ARM64 VM is prepared for these runs.
+
+An attended real unplug is the next phase after the Podman matrix. First
+was asked on #2602 to arrange its lamp owner/person; Second has no lamp
+and has not accessed or powered any device. #1812 follows afterward;
+its real key, isolated bad-release channel and attended Body run require
+First/owner coordination. The historical November deferral is recorded on
+the issue; the new assigned order is recorded here without claiming live
+publication is configured. Quality/correctness takes precedence over speed.
+
+---
+
 ## Current checkpoint: 2026-10-22 15:21 +07, all current changes merged
 
 Installer #2767 was carried with an equal range-diff into **#2945**, head
