@@ -25,6 +25,11 @@ StartLimitBurst=5
 [Service]
 Type=simple
 Environment=LAMP_CLOUD=on
+# Each connection leaves the broker a will saying the lamp `offline` on its own channel, 30 s
+# after the connection is lost (WILL_DELAY_S; the session is kept 60 s, longer, so the delay
+# holds): the lamp's record shows it gone about 30 s after a stop and within about 2 min of a
+# power cut, not 5 to 8 min later (#2636, docs/cloud.md).
+Environment=LAMP_CLOUD_OFFLINE_WILL=on
 # The eyes' known file: beside it, their `tellable`, read just before guard mode's named text
 # goes to the broker, so a yes taken back while it waited names nobody (#2562). Read only, as
 # lampos, under ProtectSystem=strict (/run/lampos-eyes is 0755, `tellable` the eyes' 0600 file

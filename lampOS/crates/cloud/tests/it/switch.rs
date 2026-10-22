@@ -133,6 +133,9 @@ fn the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts() {
         .collect();
     for line in [
         "Environment=LAMP_CLOUD=on",
+        // #2636: the lamp's will, so the app shows it offline about 30 s
+        // after its connection is lost.
+        "Environment=LAMP_CLOUD_OFFLINE_WILL=on",
         "PartOf=lampos.target",
         "WantedBy=lampos.target",
         "ConditionPathExists=/var/lib/lampos-setup/done",
