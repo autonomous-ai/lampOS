@@ -350,6 +350,72 @@ fn a_few_words_are_not_sent_to_the_model_and_end_on_the_silence_window() {
     assert_eq!(long.decision().silence_ms, 400);
 }
 
+/// The night's A/B on lamp-4ace (22 Oct), on its 600 ms window with the
+/// quick profile: `LAMP_ENDPOINT_UNFINISHED_BELOW=0.3` holds a line whose
+/// verdict is p 0.2 to the 1.5 s unfinished window, where it ended at the
+/// window before (17 of the night's 36 uncertain Ends were at p 0.2 or
+/// under); a confident p 0.95 still ends at the 400 ms commit, and p 0.5 at
+/// the window. `LAMP_ENDPOINT_UNSURE_MS=1000` makes that uncertain p 0.5
+/// wait 1 s instead, and nothing else. Without them, as before.
+#[test]
+fn with_the_nights_switches_an_unfinished_verdict_holds_and_a_confident_one_ends_as_before() {
+    let today = ConfirmPolicy::responsive();
+    let unfinished = ConfirmPolicy {
+        incomplete_probability: 0.3,
+        ..today
+    };
+    let unsure = ConfirmPolicy {
+        uncertain_blocks: 100,
+        ..unfinished
+    };
+    // The End's pause, basis and probability for a verdict `probability`
+    // on a line of 1 s of speech, asked 200 ms into its pause.
+    let ended = |policy: ConfirmPolicy, probability: f32| {
+        let mut rig = Rig::with_window(policy, Some(60));
+        rig.speak(100);
+        rig.quiet(20);
+        let tokens = rig.script.submissions();
+        assert_eq!(tokens.len(), 1);
+        rig.script.reply(tokens[0], probability);
+        rig.quiet_until_end(400).unwrap();
+        let decision = rig.decision();
+        (decision.silence_ms, decision.basis, decision.probability)
+    };
+    assert_eq!(ended(today, 0.2), (600, "model_uncertain", Some(0.2)));
+    assert_eq!(
+        ended(unfinished, 0.2),
+        (1500, "model_incomplete", Some(0.2))
+    );
+    assert_eq!(ended(unfinished, 0.95), (400, "model_complete", Some(0.95)));
+    assert_eq!(ended(unfinished, 0.5), (600, "model_uncertain", Some(0.5)));
+    assert_eq!(ended(unsure, 0.5), (1000, "model_uncertain", Some(0.5)));
+    assert_eq!(ended(unsure, 0.2), (1500, "model_incomplete", Some(0.2)));
+    assert_eq!(ended(unsure, 0.95), (400, "model_complete", Some(0.95)));
+    // Held: the rest said in the pause stays in the same line.
+    let mut rig = Rig::with_window(unfinished, Some(60));
+    rig.speak(100);
+    rig.quiet(20);
+    let token = rig.script.submissions()[0];
+    rig.script.reply(token, 0.2);
+    rig.quiet(100);
+    rig.speak(60);
+    rig.quiet(20);
+    assert_eq!(rig.script.submissions()[1].utterance, token.utterance);
+    // A window longer than the wait asked: the window, never sooner.
+    let mut rig = Rig::with_window(
+        ConfirmPolicy {
+            uncertain_blocks: 70,
+            ..ConfirmPolicy::default()
+        },
+        Some(120),
+    );
+    rig.speak(100);
+    rig.quiet(20);
+    rig.script.reply(rig.script.submissions()[0], 0.5);
+    rig.quiet_until_end(400).unwrap();
+    assert_eq!(rig.decision().silence_ms, 1200);
+}
+
 /// #2135 (`LAMP_ENDPOINT_SHORT_VERDICT`): with the floor's short lines
 /// asked, a clearly unfinished one ("Hey Lamp, my…" cut 0.66 s in on
 /// lamp-4ace) holds to the incomplete window, and the rest that comes stays
