@@ -262,7 +262,21 @@ pub struct Interruption {
     forced: bool,
     /// The yield in force, or the last one, began so.
     forced_yield: bool,
+    /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): see [`Self::hold_backchannels`].
+    holds_backchannels: bool,
+    /// Whether the words of the yield in force, or the last one, were a
+    /// backchannel; `None` until they came.
+    backchannel: Option<bool>,
+    /// Blocks the commit of the yield in force, or the last one, was held
+    /// for its words.
+    held: u16,
 }
+
+/// The longest a yield's commit is held for its words (#2939): 500 ms.
+pub const BACKCHANNEL_HOLD_BLOCKS: u16 = 50;
+/// Speech in the clear in a yield that commits it even when its words are
+/// a backchannel, and that no hold waits past: 400 ms, a sentence.
+pub const BACKCHANNEL_SPEECH_BLOCKS: u8 = 40;
 
 impl Interruption {
     pub const fn new(rule: Confirmation) -> Self {
@@ -277,7 +291,44 @@ impl Interruption {
             stop_heard: false,
             forced: false,
             forced_yield: false,
+            holds_backchannels: false,
+            backchannel: None,
+            held: 0,
         }
+    }
+
+    /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): while a yield's words are
+    /// awaited ([`Self::await_words`]), its commit is held for them, up to
+    /// [`BACKCHANNEL_HOLD_BLOCKS`], never past the yield's deadline, and
+    /// only while its speech in the clear is
+    /// under [`BACKCHANNEL_SPEECH_BLOCKS`]. Words that are a backchannel
+    /// let stillness resume it, unless that speech reaches a sentence; any
+    /// other words end the hold, and a due commit commits. A stop word and
+    /// a forced yield are never held.
+    pub fn hold_backchannels(&mut self) {
+        self.holds_backchannels = true;
+    }
+
+    /// Whether backchannels are held ([`Self::hold_backchannels`]).
+    pub fn holds_backchannels(&self) -> bool {
+        self.holds_backchannels
+    }
+
+    /// Whether the words of the yield in force, or the last one, were a
+    /// backchannel; `None` until they came.
+    pub fn backchannel(&self) -> Option<bool> {
+        self.backchannel
+    }
+
+    /// The yield in force, or the last one, was held as a backchannel: its
+    /// words were one and backchannels are held.
+    pub fn yield_was_backchannel(&self) -> bool {
+        self.holds_backchannels && self.backchannel == Some(true)
+    }
+
+    /// Blocks the commit of the yield in force, or the last one, was held.
+    pub fn held_blocks(&self) -> u16 {
+        self.held
     }
 
     /// A stop word heard by a listener of its own (`stop/heard`, #828):
@@ -315,10 +366,13 @@ impl Interruption {
 
     /// The words said in the yield in force came: a stop word commits it at
     /// its next block, and anything else lets stillness resume it as before.
-    pub fn words(&mut self, stop: bool) {
+    /// Whether they were a backchannel is kept for the record, and with
+    /// [`Self::hold_backchannels`] decides the commit held for them.
+    pub fn words(&mut self, stop: bool, backchannel: bool) {
         if self.yielded() {
             self.words_pending = false;
             self.stop_heard = stop;
+            self.backchannel = Some(backchannel);
         }
     }
 
@@ -382,6 +436,8 @@ impl Interruption {
                 };
                 self.yields += 1;
                 self.forced_yield = forced;
+                self.backchannel = None;
+                self.held = 0;
                 Step::Yield
             }
             State::Yielded {
@@ -403,10 +459,30 @@ impl Interruption {
                     Heard::Under | Heard::Own | Heard::Unknown => {}
                 }
                 let quiet = *still >= self.rule.silence_blocks.max(1);
-                if self.stop_heard
-                    || *speech >= self.rule.speech_blocks.max(1)
-                    || (quiet && *seen >= self.rule.plain_blocks.max(1))
-                {
+                let sentence = *speech >= BACKCHANNEL_SPEECH_BLOCKS;
+                // A backchannel commits only as a sentence would (#2939).
+                let due = self.stop_heard
+                    || if self.holds_backchannels && self.backchannel == Some(true) {
+                        sentence
+                    } else {
+                        *speech >= self.rule.speech_blocks.max(1)
+                            || (quiet && *seen >= self.rule.plain_blocks.max(1))
+                    };
+                // Held for its words, while they may yet be a backchannel,
+                // and never past the deadline: the request kept for the
+                // commit is kept no longer than a yield lasts.
+                let held = due
+                    && *blocks < self.rule.deadline_blocks
+                    && self.holds_backchannels
+                    && self.words_pending
+                    && !self.stop_heard
+                    && !self.forced_yield
+                    && !sentence
+                    && self.held < BACKCHANNEL_HOLD_BLOCKS;
+                if held {
+                    self.held += 1;
+                    Step::Carry
+                } else if due {
                     self.state = LISTENING;
                     self.words_pending = false;
                     self.stop_heard = false;
@@ -730,7 +806,7 @@ mod tests {
         stop.await_words();
         assert_eq!(run(&mut stop, &[(Heard::Still, 40)]), []);
         assert_eq!(stop.still_blocks(), Some(40));
-        stop.words(true);
+        stop.words(true, false);
         assert_eq!(run(&mut stop, &[(Heard::Still, 1)]), [(0, Step::Commit)]);
         assert_eq!(stop.counts(), (1, 1, 0));
         // Other words: stillness resumes it as it would have.
@@ -738,7 +814,7 @@ mod tests {
         short_word(&mut other);
         other.await_words();
         assert_eq!(run(&mut other, &[(Heard::Still, 40)]), []);
-        other.words(false);
+        other.words(false, false);
         assert_eq!(run(&mut other, &[(Heard::Still, 1)]), [(0, Step::Resume)]);
         // No words: the deadline, 110 blocks from the yield, resumes it.
         let mut none = Interruption::new(Confirmation::EVALUATED);
@@ -752,7 +828,7 @@ mod tests {
         assert_eq!(run(&mut plain, &[(Heard::Still, 40)]), [(39, Step::Resume)]);
         // Nothing without a yield in force, and nothing left behind by one.
         plain.await_words();
-        plain.words(true);
+        plain.words(true, false);
         assert_eq!(plain.still_blocks(), None);
         assert_eq!(run(&mut plain, &[(Heard::Own, 50)]), []);
         stop.await_words();
