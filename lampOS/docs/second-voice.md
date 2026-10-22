@@ -2259,6 +2259,34 @@ after a take-over, but now for every turn:
     after a line with no chat begun, fell into the person's pause, so the
     second half began over the lamp's sound and was never printed; the
     eyes are then the join's only sign.
+  - **A chain of pieces** (the same switch; the first builder's clean
+    round on lamp-4ace, 22 Oct: requests broke into 3 or 4 pieces at
+    natural pauses, "Lamp. / I've been feeling a bit tired lately. / Like,
+    every afternoon, / Why could that be?", and the join reached only the
+    piece cut last, so the tail was answered alone, "Why could what be?").
+    A line let out is asked with **all** the words cut short before it in
+    the conversation, oldest first: each piece begun within `JOIN_WITHIN`
+    of the one before's end, none of their answers heard, every link
+    judged one person's as above, and a stop still drops them all. The
+    words kept with a line in flight are its chain (`Carried::parts`), so
+    each join carries the ones before. A piece cut short before its words
+    came back, its sound carried into the next (`CARRY_AFTER_END`), passes
+    the link on: that next line goes on from the piece before it
+    (`KeptSound::link`). A piece cut after its words came back but before
+    it was asked (a Policy wait, a print's wait) goes on in the chain too,
+    its link judged at the next line's verdict (`Engine::chain_heard`,
+    `request N: cut short after its words came back, before it was asked;
+    they wait for request M's verdict, a chain of K lines`); a held line's
+    never. A link judged two people's there breaks the chain, and the
+    pieces before it are let go (`the chain cut short breaks between
+    requests A and B: WHY; its K earlier pieces are let go`); a held line
+    answering a chain in its place judges those links by the voices or one
+    face only. At most 60 words (`CHAIN_MOST_WORDS`) and 20 s from its
+    oldest piece (`CHAIN_MOST_FOR`): past either the oldest pieces are let
+    go. The join's line gives the count: `K lines are asked as one`, with
+    `its N oldest pieces let go past 60 words or 20 s` when cut. The rule
+    keeps each line's faces and room for the last 8 lines (`SPOKE_KEPT`),
+    so a 4-piece chain and the line after are judged link by link.
   - **No sign of a second person** (the same switch; the owner's test on
     lamp-4ace on 22 Oct, 19:04-19:08). lamp-4ace runs no same-voice model
     and its eyes saw nobody speaking, so nothing joined, and 5 of 28 lines

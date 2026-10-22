@@ -3805,9 +3805,12 @@ struct LineRoom {
     room: crate::room_told::Room,
 }
 
-/// Lines whose speaking faces [`Heeding`] keeps: the line cut short is the
-/// one just before the line that cut it.
-const SPOKE_KEPT: usize = 4;
+/// Lines whose speaking faces and rooms [`Heeding`] keeps: the line cut
+/// short is the one just before the line that cut it, and a chain of lines
+/// cut short (`LAMP_JOIN_CUT_WORDS`) is judged link by link, so a request
+/// that broke into 4 pieces and the line after keep theirs (lamp-4ace on
+/// 22 Oct).
+const SPOKE_KEPT: usize = 8;
 /// Why one person said two lines, by their voices
 /// (`LAMP_JOIN_CUT_WORDS`, [`crate::same_voice::SAME_FROM`]).
 pub(crate) const SAME_VOICE_JOINS: &str = "the same voice said both";
