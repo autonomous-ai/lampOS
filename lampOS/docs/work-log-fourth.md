@@ -6760,6 +6760,40 @@ Ready for lamp-voice: no
   6340386816, Queue6340388130; no code/device change for this proposal.
   Cleanup-help and no-tellable P3s recorded for that Eyes slice.
 
+## 22 October, 19:29: known-name native artifact qualified; all remaining gates need people
+
+Ready for lamp-voice: no
+
+- Draft#3014 sourcea77af5e85acffd138a2025f4cee68a6e85bb0709 stays
+  unchanged. ARM39774976573 andClippy39774976453 first-attempt green.
+  Nextest10,450/0/67, selectedunrun0,4docs/12process/relaypass,
+  oneunchangedsame-voiceleakypass,noCIrerun. ActualCIbase8e274b5e3,
+  merge63277593fc2e421d394cbf42ef785b933ef655df. Requirednative
+  known-name/installed-unit/worker-role PASS lines verified.
+- Artifact12425542033 SHA-256
+  af37f3321537a9383efb4168fb727f85cbbfc710f1b68b2e825e1b752640ca8f,
+  API/uploadlog digest and currentPR/runheads match. Local656/0/0,
+  fmt/strictworkspaceClippy/build unchanged; helper169us/43us first/repeat.
+  Durable local/CI receipts and updated verification README published
+  onlamp-fourth, preservingexactfeaturehead. First's personrow/review
+  andFriday's20-runEN/VIprobe stillawaited; no score increase.
+- Photo#2988 secondpeerP2 El6340612516: appadd_photo exposes private
+  enrollment/faceidentity via remembered/known_as before tellable consent.
+  Acknowledged6340709679; existingFirstscopeproposal6340386816 updated,
+  not a duplicateask. Uniform truthful receipt/handling result must hide
+  all recognition/state-dependent outcomes; name-only redaction is not
+  sufficient. Cloud/appcontract needs explicitcoordination. No codefixclaimed.
+- Photo's speakerP2 remains: pendingidentity plus owner-sealed request
+  speakingproof andEyesmutationrecheck needed. FirstEyes/Voice/Cloud scope
+  extension or ownerassignment pending. Mobilekeepsphotosoffuntilnexthead.
+  RepeatedNo/resend, noteprose, cleanuphelp, no-tellablepin, still/phonevideo
+  controls recorded. Visualspeakingproof is not livenessauthentication.
+- No more independent code is authorised: Peek#2789 waitsFirst/Voice/Records
+  bus/session-reader contract; mood#2800 waitsSixth#2797 personsession and
+  First#1670 productMood; onboarding#2824 waitsits authorised52e6personwalk.
+  No Fourthlamp/deviceaction. Original2665/2638/2684/2691 delivered/merged;
+  2540six-minute Daysrun accepted/closed. Memory rowremains0.40.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

@@ -1,0 +1,245 @@
+{
+  "validation_kind": "Scoped known-name product draft; lamp privacy/person acceptance remains open; not a full workspace test receipt",
+  "head": "a77af5e85acffd138a2025f4cee68a6e85bb0709",
+  "base": "8e274b5e394b09ef5e5f18cb0d2382fbaddec95a",
+  "source_sha256": {
+    "lampOS/deploy/product/lamp-voice.service": "43eec576308c5e258ebe265957e77da46364b11c487aa46e43e8ee484dd82b6d",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "956378c6e0ad6713aca6ed02f1ce6e4570605468d8a5ef01462265769e5c1c95",
+    "lampOS/crates/update/tests/install.rs": "728cc354c597ad5013e2073e3e44d4c449155b56e10f251fd9c756e7fab3eabb",
+    "lampOS/docs/second-voice.md": "378bc3d54aba7692b031a3be99601473c235a3bf9441404280463ab60c9f02bd",
+    "lampOS/docs/switches.md": "ecaa946b900ea860c1af2db856fdc64e9ab2a2650d35b8e9b161be7199de5017"
+  },
+  "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "started_utc": "2026-10-22T12:00:19.506145+00:00",
+  "unit_contract": {
+    "single_exact_settings": [
+      "LAMP_SECOND_FACE_NAME=on",
+      "LAMP_SECOND_SCOPED_CONTEXT=on",
+      "LAMP_SECOND_SPEAKING_FACE=on"
+    ],
+    "memory_socket": true,
+    "eyes_who": true
+  },
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.592,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 112.111,
+      "log_sha256": "af9e4f38135d361de6435b11451e4d81792974da26f28c15ff203b2e9b77aff8"
+    },
+    {
+      "stage": "known-name",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 148.004,
+      "log_sha256": "d519c49af6ca6063315fc78c02f165237a9d2f64e68281fc6b573f0b07cb42d3",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "timing_counts_only": [
+        "face_name_lookup calls=1 attempt=repeat elapsed_us=43 notes=1"
+      ]
+    },
+    {
+      "stage": "known-faces",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "known_faces::tests::"
+      ],
+      "exit": 0,
+      "seconds": 0.712,
+      "log_sha256": "0a9379a9cf34a262674fa11734969f8ce2c79577aa6e2c9f802e628fb454cee4",
+      "counts": {
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "speaking-faces",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "speaking_faces::tests::"
+      ],
+      "exit": 0,
+      "seconds": 0.44,
+      "log_sha256": "cbddad5a88558928f4da0b93ef46ddb4b00b05ca198b2583ca7bda889a2742d2",
+      "counts": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "second-settings",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "process::tests::the_second_routes_settings_reach_only_its_worker",
+        "--",
+        "--exact"
+      ],
+      "exit": 0,
+      "seconds": 0.468,
+      "log_sha256": "c2c19971ce09ea1fe8cb4e8b822356a0dff03e35392765ef8fb163fa452c1a2e",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "worker-roles",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_started_worker_gets_its_roles_switches_and_nothing_else"
+      ],
+      "exit": 0,
+      "seconds": 0.788,
+      "log_sha256": "5b89e054cabfc7a5a85ed83fb50003cdc38de811a9ad0f515945604a59f030a8",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "product-functions",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions"
+      ],
+      "exit": 0,
+      "seconds": 65.08,
+      "log_sha256": "799da708e6c3120afe9c4b4c2625caf5b2d928aa5100d36300ce445dddc7f8e1",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "product-speaking",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "the_product_sees_who_speaks",
+        "--",
+        "--exact"
+      ],
+      "exit": 0,
+      "seconds": 8.1,
+      "log_sha256": "d34c0822a5f3a11a71465721c6863b1e2f1073c6e8905aed597ae97c96807ee6",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "voice-eval",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice-eval"
+      ],
+      "exit": 0,
+      "seconds": 245.621,
+      "log_sha256": "d669c954b1ffd0b88b6d8693dcc5192179fc242b61c1a585b2c7cf12bb5b3ec6",
+      "counts": {
+        "passed": 623,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit": 0,
+      "seconds": 115.26,
+      "log_sha256": "f058e557ae81771708d0dec6fb3b55782d7bbccba7f7900b8473eeb02a0d6232"
+    }
+  ],
+  "finished_utc": "2026-10-22T12:12:09.887585+00:00",
+  "captured_raw_known_name_timing": [
+    {
+      "attempt": "first",
+      "elapsed_us": 169,
+      "calls": 1,
+      "notes": 1
+    },
+    {
+      "attempt": "repeat",
+      "elapsed_us": 43,
+      "calls": 1,
+      "notes": 1
+    }
+  ],
+  "timing_boundary": "Host helper entry to return; freshly written synthetic file, not cold filesystem/provider/device",
+  "unique_scoped_counts": {
+    "passed": 656,
+    "failed": 0,
+    "ignored": 0
+  }
+}

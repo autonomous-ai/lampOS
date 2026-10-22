@@ -1,0 +1,59 @@
+{
+  "head": "a77af5e85acffd138a2025f4cee68a6e85bb0709",
+  "actual_pr_head": "a77af5e85acffd138a2025f4cee68a6e85bb0709",
+  "artifact_id": 12425542033,
+  "artifact_digest": "sha256:af37f3321537a9383efb4168fb727f85cbbfc710f1b68b2e825e1b752640ca8f",
+  "artifact_name": "lampos-arm64-a77af5e85acffd138a2025f4cee68a6e85bb0709",
+  "api_and_log_digest_match": true,
+  "required_native_pass_lines": {
+    "a_turn_of_the_known_persons_own_is_told_their_name": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T12:23:24.7322238Z         PASS [   0.006s] ( 9065/10450) lamp-voice second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name"
+    ],
+    "the_product_sees_who_speaks": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T12:22:35.9833388Z         PASS [   0.004s] ( 6036/10450) lamp-update::install the_product_sees_who_speaks"
+    ],
+    "a_started_worker_gets_its_roles_switches_and_nothing_else": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T12:23:07.3461697Z         PASS [   0.011s] ( 7664/10450) lamp-voice process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else"
+    ]
+  },
+  "ci_base": "8e274b5e394b09ef5e5f18cb0d2382fbaddec95a",
+  "ci_merge": "63277593fc2e421d394cbf42ef785b933ef655df",
+  "native_counts": {
+    "run": 10450,
+    "passed": 10450,
+    "failed": 0,
+    "leaky_passed": 1,
+    "skipped": 67,
+    "unrun_selected": 0,
+    "seconds": 185.277,
+    "binaries_run": 162,
+    "binaries_skipped_by_filter": 2
+  },
+  "docs": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "process": {
+    "passed": 12,
+    "failed": 0
+  },
+  "relay": "ok",
+  "leaky": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T12:23:21.0200289Z         LEAK [   0.216s] ( 8466/10450) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "runs": {
+    "arm64": {
+      "id": 39774976573,
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774976573"
+    },
+    "clippy": {
+      "id": 39774976453,
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774976453"
+    }
+  }
+}
