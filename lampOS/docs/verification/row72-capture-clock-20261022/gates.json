@@ -1,0 +1,185 @@
+{
+  "result": {
+    "status": "passed",
+    "failure": null,
+    "final_gate_base": "1f92c96edfac69dd34ed8211b1518ca244a6dd69",
+    "control_base": "0566796d79c162077fd9b254956d66e3728adbb3",
+    "commands": 6,
+    "frozen_sources_unchanged": true
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+    "target": "/private/tmp/tests-codex-1569-target",
+    "final_gate_base": "1f92c96edfac69dd34ed8211b1518ca244a6dd69",
+    "control_base": "0566796d79c162077fd9b254956d66e3728adbb3",
+    "manifest_sha256": "9960b2f50b79e91685c2b6f0f41f2539a82e9deea7c4fec2e266829da6035f2e",
+    "runner_sha256": "bc4dbbb0331d735284ba9bd4e5c267ddfa52fc48d0f24982a1452175191726aa"
+  },
+  "source_freshness": {
+    "files": 1327,
+    "bytes_identical": true,
+    "aggregate_sha256": "b4956fb4afce83182e2468e7be0b2b36edfcebbb66ff934492a6a7ba7fcdf739"
+  },
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:09:09.610596+00:00",
+      "seconds": 10.56893486296758,
+      "exit": 0,
+      "log": "fmt.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-gemini",
+        "--all-targets",
+        "--features",
+        "lamp-gemini/fixture-clock",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:09:20.179862+00:00",
+      "seconds": 64.64972926396877,
+      "exit": 0,
+      "log": "clippy.txt",
+      "sha256": "a066396cbc7e60276ce84ad742bde8c288eb5bd5b4ffdfd619369bda740f5f04",
+      "test_summaries": []
+    },
+    {
+      "name": "voice-serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:10:24.829610+00:00",
+      "seconds": 596.5253783091903,
+      "exit": 0,
+      "log": "voice-serial.txt",
+      "sha256": "208058ae6d46774c160ea98ba259b818d0d36d4f408ade6b16196d8b84437993",
+      "test_summaries": [
+        {
+          "status": "ok",
+          "passed": 3088,
+          "failed": 0,
+          "ignored": 14
+        },
+        {
+          "status": "ok",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "status": "ok",
+          "passed": 265,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "status": "ok",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "status": "ok",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "gemini-capture-clock",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-gemini",
+        "--features",
+        "fixture-clock",
+        "--lib",
+        "--offline",
+        "session::capture_clock_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:20:21.404511+00:00",
+      "seconds": 17.266838320996612,
+      "exit": 0,
+      "log": "gemini-capture-clock.txt",
+      "sha256": "82d28e221eae26b0539daa6b5adfcff2434993a4567b6560e9ba57211ebc79e9",
+      "test_summaries": [
+        {
+          "status": "ok",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "workspace-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:20:38.671601+00:00",
+      "seconds": 56.83187774103135,
+      "exit": 0,
+      "log": "workspace-build.txt",
+      "sha256": "b5ae1e20cda49adee922fe3dd870cd1d6f38ab1da6060b9d68dfdd8e8cfd8653",
+      "test_summaries": []
+    },
+    {
+      "name": "diff-check",
+      "argv": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-early-end-20261022",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-early-end-20261022/lampOS",
+      "started": "2026-10-22T01:21:35.503215+00:00",
+      "seconds": 0.08244844805449247,
+      "exit": 0,
+      "log": "diff-check.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    }
+  ]
+}

@@ -843,6 +843,16 @@ thread:
 - what the service and the peers record (`Seen`) is stamped with
   `scenario_clock::instant()`, which is `Instant::now()` without a scope.
 
+The fixture also gives the provider's capture-time conversion and Gemini's
+scripted connector one shared acquisition clock. The scenario pump advances
+it before running the provider; reads are pure, and reconnects keep that same
+clock. Audio waiting in the sender or session actor therefore ages with its
+capture schedule, including during a host scheduling pause. The existing
+2.5 s input-age limit still applies to that elapsed acquisition time. Only
+this fixture installs the thread-local conversion guard and the connector's
+explicit capture clock; ordinary tests and production keep the system clock.
+The `fixture-clock` feature is enabled only by Voice's dev-dependency.
+
 The child processes (`sleep 60`), their start barrier, the coordinator's
 cleanup and the 12 s conversation watchdog stay on the host clock. The
 assertions, the scripts, the service's timings and every production bound

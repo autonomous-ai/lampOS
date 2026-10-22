@@ -1,0 +1,25 @@
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -5585,7 +5585,22 @@
+                     }
+                     submitted.captured = Some((read_completed_at_us, captured));
+                 }
++                #[cfg(test)]
++                if crate::scenario_clock::is_active() && request.get() == 2 && sequence == 1 {
++                    let logical_before = crate::scenario_clock::monotonic_us();
++                    let pause_began = Instant::now();
++                    eprintln!("ROW72 pause_begin request=2 sequence=1 logical_us={logical_before}");
++                    std::thread::sleep(Duration::from_secs(3));
++                    let logical_after = crate::scenario_clock::monotonic_us();
++                    let host_us = pause_began.elapsed().as_micros();
++                    eprintln!("ROW72 pause_end request=2 sequence=1 logical_us={logical_after} host_us={host_us}");
++                    assert_eq!(logical_before, logical_after, "host pause advanced capture time");
++                }
+                 if let Err(error) = input.audio(request, sequence, captured, &samples) {
++                    #[cfg(test)]
++                    if crate::scenario_clock::is_active() && request.get() == 2 && sequence == 1 {
++                        eprintln!("ROW72 pcm_refused request=2 sequence=1 error={error:?}");
++                    }
+                     if self.keeps_through_outage(request, error, input) {
+                         return Ok(());
+                     }
