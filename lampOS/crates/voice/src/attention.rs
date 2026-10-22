@@ -375,6 +375,20 @@ const TO_ANOTHER: &str = "said to someone it calls by name, not to the lamp";
 const AFTER_QUESTION: &str =
     "a busy room: a reply to a question the lamp left unanswered, not said to the lamp";
 
+/// Whether a line held for `why` was said to nobody, or to someone else:
+/// with `LAMP_NAME_OR_FOLLOW_UP`, in a room not known to be busy, it is
+/// talk between people (`room_told::RoomTold::count_held_talk`).
+pub(crate) fn said_to_nobody(why: &str) -> bool {
+    [
+        NOT_SPOKEN_TO,
+        TURNED_NOT_SPOKEN_TO,
+        ANSWERING_ANOTHER,
+        TO_ANOTHER,
+        AFTER_QUESTION,
+    ]
+    .contains(&why)
+}
+
 /// Words that open a sentence of their own before a comma, and are no
 /// one's name ("Okay, stop.", "Well, I think so.").
 const NOT_NAMES: &[&str] = &[
@@ -1094,9 +1108,11 @@ pub struct Attention {
     /// The name heard only in the room's sound counts only with a second
     /// sign (`LAMP_NAME_SECOND_SIGN=on`, [`Self::weigh_the_name`]).
     name_second_sign: bool,
-    /// A face turned to the lamp lets no line out alone
-    /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`Self::face_shows`]).
+    /// A face turned to the lamp lets no line out alone in a busy room
+    /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`Self::face_shows`]), and the room the
+    /// request in hand was judged in, for [`Self::sign`].
     name_or_follow_up: bool,
+    judged_room: Option<Room>,
 }
 
 /// The most text kept for one request.
@@ -1119,21 +1135,23 @@ impl Attention {
         self.name_second_sign = on;
     }
 
-    /// From now on a face turned to the lamp lets no line out alone; it
-    /// only confirms the lamp's name heard (`LAMP_NAME_OR_FOLLOW_UP=on`,
-    /// [`crate::name_or_follow_up`]).
+    /// From now on, in a busy room, a face turned to the lamp lets no line
+    /// out alone; it only confirms the lamp's name heard
+    /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`crate::name_or_follow_up`]).
     pub fn need_name_or_follow_up(&mut self, on: bool) {
         self.name_or_follow_up = on;
     }
 
     /// Whether a face turned to the lamp (`turned`, the eyes' newest fresh
-    /// look) shows on its own that a line was said to it: it does, but
-    /// never with [`Self::need_name_or_follow_up`]. At the owner's desk on
-    /// lamp-4ace on 22 October the owner faced the lamp's way while talking
-    /// to a colleague, and 8 of the lamp's 18 answers were let out by such
-    /// a face.
-    pub fn face_shows(&self, turned: Option<bool>) -> bool {
-        turned == Some(true) && !self.name_or_follow_up
+    /// look) shows on its own that a line said in `room` was said to it: it
+    /// does, but not in a busy room with [`Self::need_name_or_follow_up`].
+    /// At the owner's desk on lamp-4ace on 22 October the owner faced the
+    /// lamp's way while talking to a colleague, and 8 of the lamp's 18
+    /// answers were let out by such a face. A person alone with the lamp
+    /// faces it and does not say its name (the owner at 18:0x: "That's so
+    /// weird if I had to say lamp a thousand times throughout the day").
+    pub fn face_shows(&self, room: Room, turned: Option<bool>) -> bool {
+        turned == Some(true) && !(self.name_or_follow_up && room == Room::Busy)
     }
 
     /// With [`Self::ask_a_second_sign_of_the_name`]: the name heard for the
@@ -1218,7 +1236,7 @@ impl Attention {
             && !self.called_for_itself()
             && !self.after_call
             && !self.named_sure
-            && !self.face_shows(turned)
+            && !self.face_shows(room, turned)
             && !self.near
             && !self.addressed
             && !self.lamp_asked
@@ -1657,6 +1675,7 @@ impl Attention {
         }
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
+        self.judged_room = Some(room);
         self.conversation_alone = false;
         self.going_on_alone = false;
         self.went_on = false;
@@ -1711,7 +1730,7 @@ impl Attention {
                 Verdict::Play(SOUND_A_WORD)
             } else if self.near {
                 Verdict::Play(SOUND_NEAR)
-            } else if self.face_shows(turned) || turned == Some(true) && self.named {
+            } else if self.face_shows(room, turned) || turned == Some(true) && self.named {
                 // With `LAMP_NAME_OR_FOLLOW_UP`, the face counts only with
                 // the name heard in the sound.
                 Verdict::Play(SOUND_TURNED)
@@ -1802,7 +1821,7 @@ impl Attention {
             self.named,
             strict,
             turned,
-            !self.name_or_follow_up,
+            self.face_shows(room, Some(true)),
         ) {
             Verdict::Hold(_) if room == Room::Busy && self.addressed => Verdict::Play(ADDRESSED),
             verdict => verdict,
@@ -1822,7 +1841,7 @@ impl Attention {
             own || going_on
                 || called_in_text
                 || self.named
-                || self.face_shows(turned)
+                || self.face_shows(room, turned)
                 || self.addressed
         };
         self.going_on_alone = !answering_another
@@ -1831,7 +1850,7 @@ impl Attention {
                 || called_in_text
                 || self.named
                 || self.named_sure
-                || self.face_shows(turned)
+                || self.face_shows(room, turned)
                 || self.addressed
                 || self.lamp_asked);
         self.conversation_alone = self.spoken_to && self.going_on_alone;
@@ -1864,7 +1883,7 @@ impl Attention {
                     && !called_in_text
                     && !self.named
                     && !self.named_sure
-                    && !self.face_shows(turned)
+                    && !self.face_shows(room, turned)
                     && !self.near
                     && !self.addressed
                     && !self.lamp_asked
@@ -1884,7 +1903,7 @@ impl Attention {
                     && !called_in_text
                     && !self.named
                     && !self.named_sure
-                    && !self.face_shows(turned)
+                    && !self.face_shows(room, turned)
                     && !self.near
                     && !self.addressed
                     && !self.lamp_asked =>
@@ -1946,7 +1965,7 @@ impl Attention {
             Some(TAPPED)
         } else if called_in_text {
             Some(CALLED_IN_TEXT)
-        } else if self.face_shows(turned) {
+        } else if self.face_shows(self.judged_room.unwrap_or(Room::Unknown), turned) {
             Some(TURNED)
         } else if self.addressed {
             Some(ADDRESSED)
@@ -4749,32 +4768,18 @@ mod tests {
     /// `LAMP_NAME_OR_FOLLOW_UP`: at the owner's desk on lamp-4ace on 22
     /// October, the owner talked to a colleague facing the lamp's way, and 8
     /// of the lamp's 18 answers were let out as "someone is turned to the
-    /// lamp". With the switch a face turned to the lamp lets nothing out
-    /// alone: not in a room not known to be busy, not in a trusted session,
-    /// not in a busy room in either form, not as a short sound; the journal
-    /// gives it as no sign. Without the switch each is played, as before.
+    /// lamp". With the switch, in a busy room, a face turned to the lamp
+    /// lets nothing out alone: in either form, with `--spoken-to` or not, in
+    /// a trusted session, or as a short sound; the journal gives it as no
+    /// sign. In a room not known to be busy it is a reason as without the
+    /// switch (the owner at 18:0x: a person alone with the lamp does not say
+    /// its name), and given as the sign. Without the switch each is played.
     #[test]
-    fn with_name_or_follow_up_a_face_turned_to_the_lamp_lets_nothing_out_alone() {
+    fn with_name_or_follow_up_a_face_turned_to_the_lamp_lets_nothing_out_alone_in_a_busy_room() {
         let talk = "Okay yeah, sure.";
         let busy = Some(Room::Busy);
         let face = Some(true);
         for (line, held) in [
-            (
-                DeskLine {
-                    spoken_to: true,
-                    ..DeskLine::default()
-                },
-                TURNED_NOT_SPOKEN_TO,
-            ),
-            (
-                DeskLine {
-                    room: Some(Room::Unknown),
-                    spoken_to: true,
-                    trusted: true,
-                    ..DeskLine::default()
-                },
-                TURNED_NOT_SPOKEN_TO,
-            ),
             (
                 DeskLine {
                     room: busy,
@@ -4801,6 +4806,16 @@ mod tests {
             ),
             (
                 DeskLine {
+                    room: busy,
+                    spoken_to: true,
+                    trusted: true,
+                    ..DeskLine::default()
+                },
+                TURNED_NOT_SPOKEN_TO,
+            ),
+            (
+                DeskLine {
+                    room: busy,
                     sound: true,
                     ..DeskLine::default()
                 },
@@ -4813,6 +4828,27 @@ mod tests {
             let (verdict, sign) = judged_at_the_desk(false, line, talk, face);
             assert!(matches!(verdict, Verdict::Play(_)), "{held}: {verdict:?}");
             assert_eq!(sign, Some(TURNED), "{held}");
+        }
+        for line in [
+            DeskLine {
+                spoken_to: true,
+                ..DeskLine::default()
+            },
+            DeskLine {
+                room: Some(Room::Unknown),
+                spoken_to: true,
+                trusted: true,
+                ..DeskLine::default()
+            },
+            DeskLine {
+                sound: true,
+                ..DeskLine::default()
+            },
+        ] {
+            let on = judged_at_the_desk(true, line, talk, face);
+            assert!(matches!(on.0, Verdict::Play(_)), "{:?}", on.0);
+            assert_eq!(on.1, Some(TURNED));
+            assert_eq!(on, judged_at_the_desk(false, line, talk, face));
         }
     }
 
