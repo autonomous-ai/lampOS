@@ -6281,6 +6281,120 @@ async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_cal
     }
 }
 
+/// #2855 (the first builder, 22 Oct 10:1x): the person's bare "Yes." or
+/// "No." right after the lamp asked about their face from a photo is its
+/// answer, even in a busy room with the lamp spoken to only by name
+/// (`LAMP_SPOKEN_TO=on`): the lamp's own question, said to its end, makes
+/// the next line go on from it, and asked, a one-word answer isn't held as
+/// short. The same "Yes." after a lamp line that asked nothing is held, as
+/// talk in the room is. On lamp-0c89 (21 Oct, #1968) both yeses were taken.
+#[tokio::test(start_paused = true)]
+async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {
+    let photo = crate::photo_faces::note("Lan");
+    for (lamp_said, heard, called) in [
+        (
+            "Someone added your face from a photo, as Lan. Shall I remember you?",
+            "Yes.",
+            Some(crate::photo_faces::YES),
+        ),
+        (
+            "Someone added your face from a photo, as Lan. Shall I remember you?",
+            "No.",
+            Some(crate::photo_faces::NO),
+        ),
+        ("I'll keep that in mind.", "Yes.", None),
+    ] {
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            *room = crate::room_told::RoomTold::new();
+            room.count_only_talk(true);
+            for request in 201..=203 {
+                room.unanswered(request, lamp_ipc::monotonic_us());
+            }
+            assert_eq!(
+                room.at(lamp_ipc::monotonic_us()),
+                crate::room_told::Room::Busy
+            );
+        }
+        let answer = match called {
+            Some(name) => vec![
+                Ok(ChatEvent::ToolCalls(vec![call("c1", name, json!({}))])),
+                Ok(ChatEvent::Done),
+            ],
+            None => vec![text("Okay."), Ok(ChatEvent::Done)],
+        };
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text(lamp_said), Ok(ChatEvent::Done)],
+                    answer,
+                    vec![text("Okay."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script.clone());
+        let heeding = Arc::new(Mutex::new(super::worker::Heeding::new(
+            true, true, None, None,
+        )));
+        heeding
+            .lock()
+            .unwrap()
+            .as_the_only_voice(false, true, false);
+        type Verdicts = Arc<Mutex<Vec<(u64, Option<&'static str>)>>>;
+        let verdicts: Verdicts = Arc::default();
+        let (judge, kept) = (heeding.clone(), verdicts.clone());
+        let mut engine = engine.heeding(Arc::new(move |request, said, heard, from| {
+            let verdict = judge
+                .lock()
+                .ok()
+                .and_then(|mut heeding| heeding.heed(request, said, heard, from));
+            kept.lock().unwrap().push((request, verdict));
+            verdict
+        }));
+        // The lamp asks, as the coordinator has it say the photo's note.
+        let drain = async |engine: &mut Engine| {
+            while let Ok(event) = tokio::time::timeout(Duration::from_secs(3), engine.next()).await
+            {
+                super::worker::keep(&event, None);
+            }
+        };
+        engine.submit(written(1, &photo));
+        drain(&mut engine).await;
+        // Their answer, a moment after the question's end.
+        engine.submit(start(2));
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        drain(&mut engine).await;
+        let verdicts = verdicts.lock().unwrap().clone();
+        let names: Vec<String> = calls
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, _, _)| name.clone())
+            .collect();
+        match called {
+            Some(name) => {
+                assert_eq!(verdicts, [(2, None)], "{heard}: let out");
+                assert_eq!(names, [name], "{heard}");
+            }
+            None => {
+                assert_eq!(verdicts.len(), 1, "{verdicts:?}");
+                assert!(
+                    verdicts[0].1.is_some(),
+                    "a bare yes after no question: held"
+                );
+                assert!(names.is_empty(), "{names:?}");
+            }
+        }
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
 /// Every function that keeps, reads, forgets or says yes for someone, the
 /// memory's or the eyes', is withheld from a line held only by a gap; of
 /// those that take the line's person, only the eyes' refusals are left.
