@@ -486,3 +486,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **18:46, the first builder:** the Reviewer-lead carries #2889 in their serial queue; blue stops rebasing it. Its last head is `eaf6b9557` on `5e51ac016`.
 - **19:37, the Reviewer-lead:** #2889 is carried as #3031, the same patch (range-diff `=`, head `14670b37d`). It is first in their queue and merges on clippy, which is green. #2813's lamp check follows the merge.
 - **19:46, #3031 merged** (#2889 carried) as `1c9cbddc4`. Both halves of #2813 are now on lamp-voice. Fourteen says the app's screen (ecm-sds-mobile #38, #39, #46) now has its lamp side. #2813's done-when (the stand-in suite, ARM64 green) waits on ARM64 of `14670b37d`, which is still running. `f2af29ab6`'s was green.
+- **19:59, #2813:** ARM64 is green on `14670b37d`, so the done-when is met. Posted on #2813 for the first builder to close it, and offered the real-lamp app run on lamp-75c9 as a separate row.
