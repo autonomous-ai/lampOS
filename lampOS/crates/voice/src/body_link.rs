@@ -38,6 +38,8 @@ pub struct Attention {
     /// quiet room, [`crate::not_speech::sent_anyway`]): left unanswered it is
     /// not someone else's talk, and does not count toward a busy room.
     uncounted: Option<u64>,
+    /// When the room last counted as busy ([`Attention::busy_lately`]).
+    busy_at_us: Option<u64>,
 }
 
 impl Attention {
@@ -62,6 +64,9 @@ impl Attention {
         {
             self.unanswered = 0;
         }
+        if self.busy() {
+            self.busy_at_us = Some(now_us);
+        }
     }
 
     /// The turn `turn` was let through only for the model to judge: if it
@@ -80,6 +85,18 @@ impl Attention {
     /// is not to lose their answer to the next voice in the room.
     pub fn busy(&self) -> bool {
         self.unanswered >= BUSY_AFTER
+    }
+
+    /// [`Attention::busy`] now, or at any time in the last 180 s (room_told's
+    /// `BUSY_ENDS_AFTER_US`, borrowed, not measured): the lamp's own line
+    /// counts as an answer and clears `busy` as soon as it is heard, and 30 s
+    /// of quiet forget it, but the room it began in was busy all the same
+    /// (`LAMP_OWN_LINE_OVER_TALK`, #2602's design).
+    pub fn busy_lately(&self, now_us: u64) -> bool {
+        self.busy()
+            || self
+                .busy_at_us
+                .is_some_and(|at| now_us.saturating_sub(at) < crate::room_told::BUSY_ENDS_AFTER_US)
     }
 }
 
@@ -760,6 +777,23 @@ mod tests {
         assert!(room.busy());
         room.observe(None, now + FORGET_US);
         assert!(!room.busy());
+    }
+
+    #[test]
+    fn a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy() {
+        let mut room = Attention::default();
+        let mut now = 0;
+        assert!(!room.busy_lately(now));
+        for id in 1..=3 {
+            turn(&mut room, &mut now, id, false);
+        }
+        assert!(room.busy() && room.busy_lately(now));
+        let busy_at = now;
+        // The lamp's own line is heard: an answer, so no longer busy now.
+        room.observe(Some((4, true)), busy_at + 1);
+        assert!(!room.busy());
+        assert!(room.busy_lately(busy_at + 30_000_000));
+        assert!(!room.busy_lately(busy_at + 181_000_000));
     }
 
     #[test]

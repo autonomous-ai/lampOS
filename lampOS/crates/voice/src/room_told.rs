@@ -102,7 +102,7 @@ const BUSY_WITHIN_US: u64 = 60_000_000;
 const QUIET_ENDS_RUN: usize = 2;
 /// With [`RoomTold::count_only_talk`], busy ends this long after the last
 /// thing left unanswered that counts as talk.
-const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
+pub(crate) const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
 /// With [`RoomTold::end_busy_once_answered`] as well, busy ends this long
 /// after the lamp's first answer since the last talk.
 const BUSY_ENDS_ONCE_ANSWERED_US: u64 = 60_000_000;

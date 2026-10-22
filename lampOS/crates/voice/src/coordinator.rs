@@ -214,6 +214,22 @@ fn own_line_keeps_from_environment() -> bool {
     std::env::var(OWN_LINE_KEEPS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// `LAMP_OWN_LINE_OVER_TALK=on` (#2602's design, a63e on 22 Oct: a say
+/// ended `dropped` under office talk): while a line the lamp started on its
+/// own is sounding, talk over it is let go and the line goes on, when the
+/// room was busy as the line began ([`crate::body_link::Attention::busy_lately`]),
+/// the lamp's name wasn't heard in it, no face turned to the lamp spoke
+/// through it, and `lamp-name` heard no stop word in it. Needs no other
+/// switch. Off unless set: talk over the line is a cut-in, as before.
+pub const OWN_LINE_OVER_TALK_ENVIRONMENT: &str = "LAMP_OWN_LINE_OVER_TALK";
+
+fn own_line_over_talk_from_environment() -> bool {
+    std::env::var(OWN_LINE_OVER_TALK_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
 /// How long after a sound's last speech the eyes' looks still count for it
 /// ([`OwnLineWait::theirs`]): their mouth reading comes after the sound.
 const OWN_LINE_EYES_LAG_US: u64 = 300_000;
@@ -341,6 +357,11 @@ struct OwnLineWait {
     /// The candidate is a sound let go while this line waited, going on
     /// ([`LetGoSound::goes_on`]).
     let_go_goes_on: bool,
+    /// [`OWN_LINE_OVER_TALK_ENVIRONMENT`] is on and the room was busy as the
+    /// line began ([`crate::body_link::Attention::busy_lately`]).
+    busy: bool,
+    /// When `lamp-name` last heard a stop word beginning (`stop/heard`).
+    stop_began_us: Option<u64>,
 }
 
 /// Whether `current` is a line the lamp started on its own that hasn't
@@ -363,7 +384,9 @@ fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) 
 /// sound and let go again (#2602), unless the lamp's name or its person is
 /// heard in it. A sound that begins once the line sounds, or after a gap,
 /// is a cut-in over the lamp's voice, judged as before, so words said over
-/// the lamp still stop it.
+/// the lamp still stop it, unless the room was `busy` as the line began
+/// (`LAMP_OWN_LINE_OVER_TALK`): then talk with no name, no stop word and no
+/// face turned to the lamp in it is let go as the room's (`busy_room`).
 fn while_own_line_waits(
     wait: OwnLineWait,
     reply: Option<&Reply>,
@@ -378,24 +401,35 @@ fn while_own_line_waits(
         name_began_us,
         theirs,
         let_go_goes_on,
+        busy,
+        stop_began_us,
     } = wait;
-    let Some(current) = reply.filter(|current| on && own_line(current, lamp_began)) else {
+    let Some(current) = reply.filter(|current| (on || busy) && own_line(current, lamp_began))
+    else {
         return WhileOwnLineWaits::AsBefore;
     };
     if !heard {
         return WhileOwnLineWaits::AsBefore;
     }
-    let named = name_began_us.is_some_and(|began| {
-        began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
-    });
+    let in_it = |began: Option<u64>| {
+        began.is_some_and(|began| {
+            began.saturating_add(crate::activity::CALL_BEFORE_US) >= candidate.trigger_read_at_us
+        })
+    };
+    let named = in_it(name_began_us);
     if current.had_audio || current.playback.is_some() {
-        return if waited {
+        return if on && waited {
             WhileOwnLineWaits::LetGo("sounded")
-        } else if let_go_goes_on && !named && !theirs {
+        } else if on && let_go_goes_on && !named && !theirs {
             WhileOwnLineWaits::LetGo("goes_on")
+        } else if busy && !named && !theirs && !in_it(stop_began_us) {
+            WhileOwnLineWaits::LetGo("busy_room")
         } else {
             WhileOwnLineWaits::AsBefore
         };
+    }
+    if !on {
+        return WhileOwnLineWaits::AsBefore;
     }
     if named {
         return WhileOwnLineWaits::Decide;
@@ -4663,6 +4697,8 @@ thread_local! {
     /// hold, as `TEST_CAMERA_FOLLOWS_EYES`: the fixture plays no three
     /// unanswered lines.
     static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_OWN_LINE_OVER_TALK=on`, as `TEST_ROOM_BUSY`.
+    static TEST_OWN_LINE_OVER_TALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_VOICE_TONE=on`, as `TEST_CAMERA_FOLLOWS_EYES`.
     static TEST_VOICE_TONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's known person at the lamp for the voice's tone, by
@@ -5151,9 +5187,19 @@ fn conversation_with_gate(
     // its hello to someone arriving, or a line of the setup walk.
     let mut lamp_began: Option<u64> = None;
     // The eyes' faces, for the person an own line is for (#2287's
-    // follow-up): read every 100 ms off the audio path, only with the
+    // follow-up): read every 100 ms off the audio path, only with either
     // switch; passing ids and booleans, nothing kept past 30 s.
-    let own_line_eyes = own_line_keeps
+    // Talk over the lamp's own line in a busy room is let go
+    // (`LAMP_OWN_LINE_OVER_TALK=on`), and whether the room was busy as the
+    // line under way began: its turn, and that.
+    let own_line_over_talk = own_line_over_talk_from_environment();
+    #[cfg(test)]
+    let own_line_over_talk =
+        own_line_over_talk || TEST_OWN_LINE_OVER_TALK.with(std::cell::Cell::get);
+    let mut own_line_busy: Option<(u64, bool)> = None;
+    // When `lamp-name` last heard a stop word beginning, for that.
+    let mut stop_began_us: Option<u64> = None;
+    let own_line_eyes = (own_line_keeps || own_line_over_talk)
         .then(|| std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default()));
     let _own_line_reader = own_line_eyes.as_ref().and_then(|eyes| {
         let root = lamp_bus::Bus::from_environment().ok()?.root().to_path_buf();
@@ -8042,6 +8088,11 @@ fn conversation_with_gate(
                         let_go_goes_on: own_let_go.zip(reply.as_ref()).is_some_and(
                             |(sound, current)| sound.goes_on(current.owner.turn(), &candidate),
                         ),
+                        busy: own_line_over_talk
+                            && own_line_busy.zip(reply.as_ref()).is_some_and(
+                                |((turn, busy), current)| busy && turn == current.owner.turn(),
+                            ),
+                        stop_began_us,
                     };
                     let own = while_own_line_waits(own_wait, reply.as_ref(), &candidate, at_us);
                     // Decided as the line's person's: no rule after it takes
@@ -8137,15 +8188,23 @@ fn conversation_with_gate(
                                     LetGoSound::let_go(own, current.owner.turn(), last_speech_us)
                                         .or(own_let_go);
                             }
-                            eprintln!(
-                                "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
-                            );
+                            if why == "busy_room" {
+                                eprintln!(
+                                    "lamp-voice: talk over the lamp's own line in a busy room, with no name or face turned to it, was let go; the line goes on"
+                                );
+                            } else {
+                                eprintln!(
+                                    "lamp-voice: a sound while the lamp's own line waited to sound was let go ({why}); the line goes on"
+                                );
+                            }
                             record(
                                 trace,
                                 json!({"kind":"input_let_go_own_line","turn":reply.as_ref().map(|current| current.owner.turn()),
                                 "candidate":candidate.id,"why":why,"at_us":at_us,
                                 "boundary":if why == "goes_on" {
                                     "a sound let go while a line the lamp started on its own waited, going on past its first audio: the room's"
+                                } else if why == "busy_room" {
+                                    "talk over a line the lamp started on its own, sounding, in a room busy as it began, with no name, stop word or face turned to the lamp: the room's"
                                 } else {
                                     "a sound while a line the lamp started on its own had not sounded: the room's"
                                 }}),
@@ -9532,6 +9591,17 @@ fn conversation_with_gate(
             }
             floor_turn = turn_now;
         }
+        // Whether the room was busy as the line under way began, taken before
+        // its own audio counts as an answer.
+        if let Some(current) = reply.as_ref()
+            && own_line_busy.map(|(turn, _)| turn) != Some(current.owner.turn())
+        {
+            #[cfg(not(test))]
+            let busy = room.busy_lately(clock);
+            #[cfg(test)]
+            let busy = room.busy_lately(clock) || TEST_ROOM_BUSY.with(std::cell::Cell::get);
+            own_line_busy = Some((current.owner.turn(), busy));
+        }
         // For the room, a turn is answered when the lamp was heard in it:
         // an answer that arrived and was never played is not one.
         room.observe(
@@ -9961,6 +10031,7 @@ fn conversation_with_gate(
                 json!({"kind":"stop_heard","at_us":clock,"began_us":began,
                     "score":score,"sounding":sounding,"yields":yields}),
             )?;
+            stop_began_us = stop_began_us.max(Some(began));
         }
         if let Some(names) = name_in.as_mut()
             && let Some((began, score)) = names.newest_scored(clock)
