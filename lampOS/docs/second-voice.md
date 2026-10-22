@@ -2453,27 +2453,46 @@ after a take-over, but now for every turn:
   (`Attention::played_only_as_going_on`): it first read a mark only
   `LAMP_SPOKEN_TO` sets, and lamp-52e6 and lamp-4ace run without it.
 - **"Not for me" written as words, with `LAMP_NOT_FOR_ME_WORDS=on`** (off
-  unless set): on a line told `worker::CONVERSATION_ALONE`, a reply whose
-  text opens with "not for me", case, punctuation, quotes and dashes aside
-  (`not_speech::opens_not_for_me`), ends as the `not_for_me` call does
-  (`Stop::Declined`): nothing is said, no announcement, and the line is
-  told held back. On lamp-4ace, r06, request 131, "That lamp is cute,
-  where did you get it?" got "Not for me — that's about me, not to me.",
-  spoken in two pieces; the model writing those words and then calling
-  `not_for_me` (request 86) was already silent. The reply's text is held
-  from the voice only until its opening is known (its first word is not
-  "not", or a word of the three differs, or the text ends), then goes on
-  as one piece; a line with the name, a call, a turned face or an answer
-  to the lamp's own question never has that note, and nothing of it waits.
-  The journal says `its reply opens with "not for me" on a line let out
-  only as the conversation going on: taken as not_for_me, nothing said
-  (LAMP_NOT_FOR_ME_WORDS)`. Its cost to the first sound, measured on the
-  test clock with a piece every 40 ms, cut at the first clause or at four
-  words (`the_check_costs_a_typical_reply_no_time_to_its_first_sound`):
-  0 ms in each of seven typical replies, as the opening is known before
-  the first piece is cut. A reply whose first sentence is "Not." alone
-  waits one piece more. "Not for me to say, but …" alone is taken as the
-  decline too.
+  unless set): on a line told `worker::CONVERSATION_ALONE`, a reply that
+  is "not for me" (`not_speech::opens_not_for_me`) ends as the
+  `not_for_me` call does (`Stop::Declined`): nothing is said, no
+  announcement, and the line is told held back. It is "not for me" only
+  when those words are the whole reply, or are followed straight away by
+  the refusal's own clause: "that's about me", "that is about me", "it's
+  about me", "not to me", "to answer" or "to reply"
+  (`not_speech::REFUSAL_CLAUSES`). Case, punctuation, quotes (single
+  quotes enclosing the words too; an apostrophe inside one, "me’s", is no
+  "me"), dashes, whitespace and leading speech tags (`[softly]`,
+  `LAMP_SECOND_SPEECH_TAGS`) are skipped. Anything else after the words is
+  an answer and is said: `CONVERSATION_ALONE` tells the model that a
+  follow-up to the lamp is for it, so "Not for me, thanks, I'm more of a
+  lo-fi lamp." (to "do you like jazz?") and "Not for me to say, but it's
+  lovely." are spoken. On lamp-4ace, r06, request 131, "That lamp is
+  cute, where did you get it?" got "Not for me — that's about me, not to
+  me.", spoken in two pieces; the model writing those words and then
+  calling `not_for_me` (request 86) was already silent. The reply's text
+  is held from the voice until that is known, then goes on as one piece;
+  a line with the name, a call, a turned face or an answer to the lamp's
+  own question never has that note, and nothing of it waits. The hold has
+  no fixed bound: it ends at the first text that decides it (a word that
+  is not the next of "not for me" or of a clause, or a clause's last
+  word), or at the stream's end. A reply whose first word is not "not"
+  is decided at once. "Not sure, …" waits for "sure"; "Not. ", "For ",
+  "example, …" waits for "example"; "Not for me" with only punctuation
+  after it waits for the next word or the end, so "Not for me." alone is
+  held to the end of the reply; a speech tag still open waits for its
+  `]`. The journal says `its reply opens with "not for me" on a line let
+  out only as the conversation going on: taken as not_for_me, nothing
+  said (LAMP_NOT_FOR_ME_WORDS)`. Its cost to the first audio (the
+  announcement, the first `ProviderOutput::Audio`; a piece's transcript is
+  emitted before its audio), measured on the test clock with a piece (a
+  word) every 40 ms, cut at the first clause or at four words, the same
+  either way
+  (`the_check_costs_the_first_audio_only_the_pieces_its_opening_waits_for`):
+  0 ms in six of seven typical replies; 40 ms for "Not sure, maybe ask
+  the office."; 120 ms for "Not for me, thanks, I'm more of a lo-fi
+  lamp." and "Not for me either.", and 160 ms for "Not for me to say, but
+  it's lovely.", each held to the word that decides it.
 - **Said by name, or perhaps not for the lamp** (`worker::call_note`,
   `Engine::noting_whether_called`). Each spoken line gets one note beside
   its words. A line whose words or the lamp's name heard in its sound
