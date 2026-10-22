@@ -1290,7 +1290,10 @@ rule 8). Without it, a lamp at rest is not stirred, exactly as before.
   than rest, ends the glance and the lamp goes on as before.
 - **Led from below.** A head lifting from rest has its goal 40 counts
   ahead (`GLANCE_LIFT_LEAD`), never past its bounds: from below,
-  lamp-52e6's head did not start for a goal 30 ahead.
+  lamp-52e6's head did not start for a goal 30 ahead. So is a head coming
+  back up after a glance dipped it, for as long as it reads more than 6
+  counts below its way back: unled, lamp-52e6's stopped 26 short of where
+  it rested and rested there, and the factory's `head_move` failed (#2818).
 - **Judged as a gesture.** While it glances and for half a second after,
   a head that lags or strains is let go as in a gesture, and the run goes
   on. The load, warmth and wire checks stay.
@@ -1300,7 +1303,9 @@ counts up, 500 of tilt and 40 of turn for 1.5 s: the goal rose 80 to 90
 (50 and the lead), the tilt stayed within its one count, the turn did not
 move, and four seconds later every goal was within 6 of where it rested.
 Without the switch, the same run writes exactly what a run asked nothing
-writes.
+writes. Stood, with a head that stops 26 short of any goal it lifts to,
+dipped 40 for a second: back within 2 counts of where it rested in 3 s
+(26 short without the lead back).
 
 **On lamp-52e6, 2026-10-14, 18:02 to 18:11**
 ([readings](verification/rest-glance-lamp-52e6-20261014/README.md)),

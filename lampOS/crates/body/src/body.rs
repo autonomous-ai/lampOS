@@ -5139,8 +5139,15 @@ fn run_on<P: PortIo, R: Runtime>(
             } else {
                 gesture_now[index]
             };
-            // A head lifting from rest is led, never past its bounds.
-            let led = if index == 0 && glance_from.is_some() && extra[0] < 0.0 {
+            // A head lifting from rest is led, never past its bounds; and so
+            // is one coming back up after a glance dipped it, while it is
+            // still below its way: from below, lamp-52e6's head stopped 26
+            // short of where it rested and was left there (#2818).
+            let below = index == 0
+                && report.last.is_some_and(|last| {
+                    f32::from(last[COMMANDED[0].index()].position) > commanded[0] + ARRIVED_COUNTS
+                });
+            let led = if index == 0 && glance_from.is_some() && (extra[0] < 0.0 || below) {
                 (commanded[index] - GLANCE_LIFT_LEAD).max(low[index].min(commanded[index]))
             } else {
                 commanded[index]
