@@ -1,0 +1,21 @@
+--- a/lampOS/crates/update/tests/round/process_cuts.rs
++++ b/lampOS/crates/update/tests/round/process_cuts.rs
+@@ -405,6 +405,18 @@
+         ));
+     }
+     let path = cut(&mut lamp, case);
++    if case == 1 {
++        // Negative fixture: remove every updater executable, including fallback.
++        let paths = [
++            lamp.config.on(&unit::folder(own::FOLDER, &sha(OLD))).join(own::BINARY),
++            lamp.config.on(&unit::folder(own::FOLDER, &sha(NEW))).join(own::BINARY),
++            lamp.config.on(own::BACK),
++        ];
++        for path in &paths { fs::remove_file(path).unwrap(); }
++        assert!(paths.iter().all(|path| !path.exists()));
++        assert!(!lamp.config.on(own::CURRENT).join(own::BINARY).exists());
++        eprintln!("negative-control {}: zero updater executables remain", CASES[case]);
++    }
+     assert!(prefix(&lamp, case));
+     runnable(&lamp, if matches!(case, 2 | 3) { NEW } else { OLD });
+     let mut restarted = fork(&mut lamp, case, true);

@@ -1,0 +1,238 @@
+{
+  "base_head": "97ca7b3223d22a3f0bf2d53b4e416d5f5063403b",
+  "platform": "macOS ARM64",
+  "counts": {
+    "passed": 307,
+    "failed": 0,
+    "ignored": 4,
+    "filtered_out": 0
+  },
+  "gate": {
+    "status": "passed",
+    "source_before": {
+      "lampOS/crates/update/Cargo.toml": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "lampOS/crates/update/tests/self_cli_exec.rs": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+      "lampOS/crates/update/tests/self_cli_exec/linux.rs": "b7833c418d5e62fb52b43cbcad5cb01e2120917bea40225a024073f2d6bbf9b8",
+      "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64"
+    },
+    "stages": [
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 5.704,
+        "log": "fmt.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-q",
+          "--message-format=short",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 22.855,
+        "log": "clippy.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "tests",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-q",
+          "-p",
+          "lamp-update"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 253.527,
+        "log": "tests.log",
+        "log_sha256": "99091fb21ebeea0c396c42deda7677506b4f0e3d2652288adb830a58b9145933"
+      }
+    ],
+    "source_after": {
+      "lampOS/crates/update/Cargo.toml": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "lampOS/crates/update/tests/self_cli_exec.rs": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+      "lampOS/crates/update/tests/self_cli_exec/linux.rs": "b7833c418d5e62fb52b43cbcad5cb01e2120917bea40225a024073f2d6bbf9b8",
+      "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64"
+    },
+    "source_unchanged": true
+  },
+  "gate_raw_sha256": "303c17ff06bc8f5efdb78b52fa83e50e710bf340d1890f0adb332ce4acd7d490",
+  "listing_checks": [
+    {
+      "name": "list",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--test",
+        "self-cli-exec",
+        "--",
+        "--list"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.329,
+      "log": "list.log",
+      "log_sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "expected_output_found": true
+    },
+    {
+      "name": "ignored-list",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--test",
+        "self-cli-exec",
+        "--",
+        "--ignored",
+        "--list"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.16,
+      "log": "ignored-list.log",
+      "log_sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "expected_output_found": true
+    },
+    {
+      "name": "ignored-exact",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--test",
+        "self-cli-exec",
+        "--",
+        "--ignored",
+        "--exact",
+        "actual_cli_exec_confirms_before_the_next_round"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.16,
+      "log": "ignored-exact.log",
+      "log_sha256": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+      "expected_output_found": true
+    },
+    {
+      "name": "filtered",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--test",
+        "self-cli-exec",
+        "--",
+        "--exact",
+        "does_not_match"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.164,
+      "log": "filtered.log",
+      "log_sha256": "e4042b98d03b1e9e2b0a9ac3942903e4c87e3cfc5a053fa3116eeb61eeb07ba1",
+      "expected_output_found": true
+    }
+  ],
+  "listing_scope": "Discovery, ignored execution and exact filtering only; not Linux process passes.",
+  "retained_failure": {
+    "gate": {
+      "status": "failed",
+      "before": {
+        "crates/update/Cargo.toml": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+        "crates/update/tests/self_cli_exec.rs": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+        "crates/update/tests/self_cli_exec/linux.rs": "e88c28453b4103f8868f48711a98762d12bdeaa7244d72d86825c16b06ccc289",
+        "Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64"
+      },
+      "stages": [
+        {
+          "name": "fmt",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 5.426,
+          "log": "fmt.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "clippy",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--locked",
+            "--offline",
+            "-q",
+            "--message-format=short",
+            "-p",
+            "lamp-update",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 0.466,
+          "log": "clippy.log",
+          "log_sha256": "64b9e55bb839977e3ad697d706a8cf66830ee97de65b05654960020a7c205df6"
+        }
+      ],
+      "source": "CHECKOUT/lampOS",
+      "after": {
+        "crates/update/Cargo.toml": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+        "crates/update/tests/self_cli_exec.rs": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+        "crates/update/tests/self_cli_exec/linux.rs": "e88c28453b4103f8868f48711a98762d12bdeaa7244d72d86825c16b06ccc289",
+        "Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64"
+      },
+      "source_unchanged": true
+    },
+    "reason": "sandbox could not open shared Cargo cache build lock; no compiler/test execution in that failed Clippy attempt. Authorized escalation subsequently passed."
+  },
+  "limits": "The new checker and Linux process-cut checker are ignored on Mac. Does not qualify official PR ARM64 CI, latest integration, a real service, release or lamp."
+}

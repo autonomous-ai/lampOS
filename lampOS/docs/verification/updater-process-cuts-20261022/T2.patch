@@ -1,0 +1,13 @@
+--- a/lampOS/crates/update/tests/round/process_cuts.rs
++++ b/lampOS/crates/update/tests/round/process_cuts.rs
+@@ -115,7 +115,9 @@
+     }
+ 
+     fn kill_at_cut(&mut self) {
+-        self.signal();
++        // Negative control: a delivery stop for TERM is not a SIGKILL reap.
++        unsafe { libc::kill(self.pid, libc::SIGTERM); }
++        trace(libc::PTRACE_CONT, self.pid, 0, 0);
+         let status = self.wait(Instant::now() + Duration::from_secs(5));
+         assert!(
+             libc::WIFSIGNALED(status),

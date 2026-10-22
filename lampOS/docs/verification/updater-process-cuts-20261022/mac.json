@@ -1,0 +1,447 @@
+{
+  "schema_version": 1,
+  "initial_historical_gate": {
+    "status": "passed",
+    "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+    "started_at": "2026-10-22T18:14:38.174553+07:00",
+    "finished_at": "2026-10-22T18:20:43.630324+07:00",
+    "source_before": {
+      "file_count": 35,
+      "canonical_map_sha256": "387dd92f2bb36ae65da0d2ff9e77482a2f3db97cd72e127186f7e379f5a2e938"
+    },
+    "source_after_equal": true,
+    "raw_receipt": {
+      "name": "second-process-cuts-mac-20261022/gate.json",
+      "bytes": 10159,
+      "sha256": "c683544d659f5f31f0961b449dbcae1be084e0d91cc605179a7f411e03220e75"
+    },
+    "stages": [
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 5.506,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-20261022/fmt.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 19.647,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-20261022/clippy.log",
+          "bytes": 2621,
+          "sha256": "2c30d610c927fc60b932fd857640fa1bb5dc90f6c79eadaaf6d67e5c6b8d23db"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "tests",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--no-fail-fast",
+          "-p",
+          "lamp-update",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 340.298,
+        "summaries": [
+          "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.73s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+          "test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 125.85s",
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+          "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 177.37s",
+          "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ],
+        "counts": {
+          "passed": 305,
+          "failed": 0,
+          "ignored": 3,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-20261022/tests.log",
+          "bytes": 27898,
+          "sha256": "2ca5ffa7f7d9054225bb0d8bd9cbd5528d7ab0276fdc0621f74bf2155c93f25b"
+        },
+        "ignored_rows": [
+          {
+            "line": 63,
+            "text": "test fetch::tests::a_release_file_from_github ... ignored"
+          },
+          {
+            "line": 122,
+            "text": "test records::tests::write_records_fixtures ... ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+          },
+          {
+            "line": 371,
+            "text": "test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing"
+          }
+        ],
+        "diagnostics": []
+      }
+    ]
+  },
+  "completed_e223_gate": {
+    "status": "passed",
+    "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+    "started_at": "2026-10-22T18:32:03.412310+07:00",
+    "finished_at": "2026-10-22T18:37:55.364175+07:00",
+    "source_before": {
+      "file_count": 35,
+      "canonical_map_sha256": "cede1893150d8b2ead2e4070c4f0ee9be9890c5735df4b406200d0181e65accb"
+    },
+    "source_after_equal": true,
+    "raw_receipt": {
+      "name": "second-process-cuts-mac-final-20261022/gate.json",
+      "bytes": 10159,
+      "sha256": "691417068925d6e6a0e71306d35a1813aea40f274870f486f99f01b1340e96f0"
+    },
+    "stages": [
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 5.106,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-final-20261022/fmt.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 14.226,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-final-20261022/clippy.log",
+          "bytes": 374,
+          "sha256": "d8b1fa7935bfe1052264e66887532504a5916fde735e4a10155126a4433bab9f"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "tests",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--no-fail-fast",
+          "-p",
+          "lamp-update",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 332.638,
+        "summaries": [
+          "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.23s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+          "test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 127.34s",
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s",
+          "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 176.23s",
+          "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ],
+        "counts": {
+          "passed": 305,
+          "failed": 0,
+          "ignored": 3,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-final-20261022/tests.log",
+          "bytes": 25651,
+          "sha256": "9615102b305574acec4ab817a039b429b2aa68060673124ed849b09ca11f6049"
+        },
+        "ignored_rows": [
+          {
+            "line": 42,
+            "text": "test fetch::tests::a_release_file_from_github ... ignored"
+          },
+          {
+            "line": 101,
+            "text": "test records::tests::write_records_fixtures ... ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+          },
+          {
+            "line": 350,
+            "text": "test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing"
+          }
+        ],
+        "diagnostics": []
+      }
+    ]
+  },
+  "current_rebase": {
+    "base": "5e51ac016c914cbb8464609a0907072755eca8fd",
+    "status": "updater files unchanged; transitive dependency integration awaits PR CI; no new Mac run claimed"
+  },
+  "listing": {
+    "raw_receipt": {
+      "name": "tmp/second-process-cuts-mac-listing-20261022.json",
+      "bytes": 1024,
+      "sha256": "cd6470705433fd594bab476931df0b729f8519dcb189f4911ba952c1acf93b9a"
+    },
+    "platform": "macOS arm64",
+    "binary_sha256": "26c8f2bca5a9014c3ff9e08d610bda16302fbab6f80d1a8d0225a500eddeaeb9",
+    "entrypoint_sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+    "checks": [
+      {
+        "args": [
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "exit_code": 0,
+        "stdout": "persisted_self_switches_survive_sigkill: test\n",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "--list",
+          "--ignored",
+          "--format",
+          "terse"
+        ],
+        "exit_code": 0,
+        "stdout": "persisted_self_switches_survive_sigkill: test\n",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "--exact",
+          "persisted_self_switches_survive_sigkill",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "stdout": "running 1 test\ntest persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing\n\ntest result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "limit": "The Linux checker is ignored on Mac; list checks and Mac totals do not prove process cuts.",
+  "completed_f012_gate": {
+    "status": "passed",
+    "base": "f012c47259ec302138d8ee4f91860889eef6619a",
+    "started_at": "2026-10-22T18:41:59.564094+07:00",
+    "finished_at": "2026-10-22T18:47:28.345352+07:00",
+    "source_before": {
+      "file_count": 35,
+      "canonical_map_sha256": "8e35ded3447aef157dab4bb377ebd2b094a410e666f5260e0c1ec5c1a26de30f"
+    },
+    "source_after_equal": true,
+    "raw_receipt": {
+      "name": "second-process-cuts-mac-f012-20261022/gate.json",
+      "bytes": 10158,
+      "sha256": "1b6304da6b0ea53b057f83b85c543b21687e2dee23e3e96dccc95474b868f21b"
+    },
+    "stages": [
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 5.259,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-f012-20261022/fmt.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 5.124,
+        "summaries": [],
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-f012-20261022/clippy.log",
+          "bytes": 270,
+          "sha256": "97a8d400567f4c747f6e8429f0871c72de3dd2884f2e13eb011f0e2851d4ece3"
+        },
+        "ignored_rows": [],
+        "diagnostics": []
+      },
+      {
+        "name": "tests",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--no-fail-fast",
+          "-p",
+          "lamp-update",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 318.373,
+        "summaries": [
+          "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.35s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+          "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 128.19s",
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+          "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 173.90s",
+          "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ],
+        "counts": {
+          "passed": 306,
+          "failed": 0,
+          "ignored": 3,
+          "filtered out": 0
+        },
+        "raw_log": {
+          "name": "second-process-cuts-mac-f012-20261022/tests.log",
+          "bytes": 25615,
+          "sha256": "03657a3caf7c48fc7b89b91fa5f7247bf6f54daf66fd59d775f0ec6d4c72554a"
+        },
+        "ignored_rows": [
+          {
+            "line": 41,
+            "text": "test fetch::tests::a_release_file_from_github ... ignored"
+          },
+          {
+            "line": 100,
+            "text": "test records::tests::write_records_fixtures ... ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+          },
+          {
+            "line": 350,
+            "text": "test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing"
+          }
+        ],
+        "diagnostics": []
+      }
+    ]
+  }
+}

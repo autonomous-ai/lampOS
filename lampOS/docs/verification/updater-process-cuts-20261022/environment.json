@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "runtime_observations": [
+    "aarch64",
+    "6.12.13-200.fc41.aarch64",
+    "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "12.14"
+  ],
+  "image": {
+    "Id": "80bd35363303190cb8e6228cdbc981132527e1a2f40608c47bcefff77adb7fbd",
+    "Digest": "sha256:debea4431a4c957569ff54bdb0f464043789c4be5a91a8780657ee6173aa9835",
+    "Architecture": "arm64",
+    "Os": "linux",
+    "Created": "2026-10-22T11:10:17.032073847Z"
+  },
+  "image_inspect_sha256": "ee08d4f8fa1203fab6dbc1e691fa660644a4d090090cd5c496dd42ae6699c45c",
+  "runtime_sha256": "a42bfcf081db66e79070b2c918671796e313979ad64e730157c0372305071a84",
+  "container_settings": {
+    "platform": "linux/arm64",
+    "source_mount": "CHECKOUT:/work:ro",
+    "target_volume": "second-cut-target:/target",
+    "registry_volume": "second-cut-cargo:/usr/local/cargo/registry",
+    "capabilities_added": [
+      "SYS_PTRACE"
+    ],
+    "security_options": [
+      "seccomp=unconfined",
+      "label=disable"
+    ],
+    "cargo_build_jobs": 2,
+    "incremental": false,
+    "dev_debug": 0,
+    "test_debug": 0
+  },
+  "network_limit": "Container networking was not disabled; logs contain toolchain/dependency fetches. The fixture uses a fake channel/systemd. Not an entirely offline execution or a live network/device acceptance."
+}

@@ -31,6 +31,13 @@ use std::{
     time::Duration,
 };
 
+// The standalone single-threaded syscall harness reuses this fixture.
+// The ordinary libtest binary does not invoke its custom entrypoint.
+#[cfg(target_os = "linux")]
+#[allow(dead_code)]
+#[path = "round/process_cuts.rs"]
+pub(crate) mod process_cuts;
+
 #[path = "round/self_cuts.rs"]
 mod self_cuts;
 #[path = "round/self_recovery.rs"]
