@@ -232,9 +232,11 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
 
 /// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
 /// for me." answered "I've no legs to dance with" with no call, 32 tools
-/// sent): the 31 above and the search, at the bound, and Dance's `dance`
-/// among them. The bound leaves out the search's fetch, never a core
-/// skill's function.
+/// sent): the 31 above and the search, and Dance's `dance` among them.
+/// Within the second route's own bound
+/// (`lamp_voice::second_provider::MAX_TOOLS`), not Live's, nothing is left
+/// out: the search's fetch is there too (lamp-4ace, 22 Oct, where Live's
+/// bound left out the search itself).
 #[test]
 fn a_product_chat_request_offers_dance_at_the_bound() {
     let Product {
@@ -243,7 +245,15 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
         skill_tools,
         ..
     } = product_with(&[]);
-    assert_eq!(chat.len(), lamp_gemini::MAX_TOOLS, "{chat:?}");
+    assert!(
+        chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
+        "{chat:?}"
+    );
+    assert!(
+        chat.iter()
+            .any(|name| name == lamp_voice::second_provider::net::search::FETCH),
+        "{chat:?}"
+    );
     assert_eq!(skill_tools, ["dance"]);
     assert!(chat.iter().any(|name| name == "dance"), "{chat:?}");
     assert!(
@@ -263,7 +273,9 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
 /// on #2644 neither are the actions part's nor `reports_stop`: the chat
 /// request leaves out the search's fetch, the time elsewhere and
 /// `reports_state`, a Live session `reports_state` alone, with no error
-/// line, and `dance` stays in both.
+/// line, and `dance` stays in both. Since the second route's own bound
+/// (22 Oct) its chat request leaves none of them out; a Live session still
+/// leaves out `reports_state`.
 #[test]
 fn with_reports_on_dance_stays_at_the_bound() {
     let Product {
@@ -275,14 +287,16 @@ fn with_reports_on_dance_stays_at_the_bound() {
         errors,
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
     assert_eq!(skill_tools, ["dance"]);
-    assert_eq!(chat.len(), lamp_gemini::MAX_TOOLS, "{chat:?}");
+    assert!(
+        chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
+        "{chat:?}"
+    );
     assert!(chat.iter().any(|told| told == "dance"), "{chat:?}");
-    for cut in [
+    for kept in [
         lamp_voice::second_provider::net::search::FETCH,
-        lamp_voice::tools::THE_TIME,
         lamp_voice::reports_stop::STATE_NAME,
     ] {
-        assert!(!chat.iter().any(|told| told == cut), "{cut}: {chat:?}");
+        assert!(chat.iter().any(|told| told == kept), "{kept}: {chat:?}");
     }
     for name in [
         lamp_voice::reports_stop::NAME,
