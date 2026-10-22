@@ -2533,6 +2533,8 @@ after a take-over, but now for every turn:
     the link on: that next line goes on from the piece before it
     (`KeptSound::link`). A piece cut after its words came back but before
     it was asked (a Policy wait, a print's wait) goes on in the chain too,
+    only in a room that isn't busy (reviewer-three, 23 Oct: there such a
+    piece is as likely talk to someone else),
     its link judged at the next line's verdict (`Engine::chain_heard`,
     `request N: cut short after its words came back, before it was asked;
     they wait for request M's verdict, a chain of K lines`); a held line's
@@ -2556,6 +2558,14 @@ after a take-over, but now for every turn:
     `its N oldest pieces let go past 60 words or 20 s` when cut. The rule
     keeps each line's faces and room for the last 8 lines (`SPOKE_KEPT`),
     so a 4-piece chain and the line after are judged link by link.
+    With `LAMP_SECOND_NAME_CARRIES` a line said by the lamp's name goes on
+    only from the name, never from a line before it, often the end of
+    other talk (reviewer-three's P2, 23 Oct: "yeah, I'll send it after
+    lunch", "Lamp.", "what's on my calendar?" is asked "Lamp. what's on my
+    calendar?"); the pieces after it chain on it ("Lamp. / I've been tired
+    lately. / Like, every afternoon, / why?" is one named line). The name
+    waiting for its line is carried by its own rule, never chained, and a
+    refused name's words are never joined.
   - **No sign of a second person** (the same switch; the owner's test on
     lamp-4ace on 22 Oct, 19:04-19:08). lamp-4ace runs no same-voice model
     and its eyes saw nobody speaking, so nothing joined, and 5 of 28 lines
