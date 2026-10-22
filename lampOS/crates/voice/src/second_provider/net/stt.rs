@@ -1487,22 +1487,7 @@ mod tests {
     fn the_stop_stream_asks_with_the_units_key_terms() {
         let directory =
             std::env::temp_dir().join(format!("lamp-voice-stop-key-terms-{}", std::process::id()));
-        std::fs::create_dir_all(&directory).unwrap();
-        let key = directory.join("llm.key");
-        std::fs::write(&key, "secret\n").unwrap();
-        let config = directory.join("second.json");
-        std::fs::write(
-            &config,
-            format!(
-                r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_base_url":"https://stt.example.invalid"}}"#,
-                key.display()
-            ),
-        )
-        .unwrap();
-        for file in [&key, &config] {
-            std::fs::set_permissions(file, std::os::unix::fs::PermissionsExt::from_mode(0o600))
-                .unwrap();
-        }
+        let config = proxy_second_json(&directory);
         let own = [
             "Hanoi",
             "Da Nang",
@@ -1522,28 +1507,97 @@ mod tests {
         .unwrap();
         for (keyterm, before) in [(false, &[][..]), (true, crate::stop_words::KEY_TERMS)] {
             let stop = crate::stop_words::with_key_terms(loaded.clone(), keyterm);
-            let Stt::Autonomous { base_url, .. } = &stop.stt else {
-                panic!("the proxy's speech to text");
-            };
-            let asked = url(
-                Some(base_url),
-                stop.stt_language.as_deref(),
-                &super::super::key_terms::listening(&stop.stt_key_terms),
-            )
-            .unwrap();
-            let terms: Vec<String> = asked
-                .query_pairs()
-                .filter(|(name, _)| name == "keyterm")
-                .map(|(_, value)| value.into_owned())
-                .collect();
             let expected: Vec<&str> = ["Lamp"]
                 .into_iter()
                 .chain(before.iter().copied())
                 .chain(own)
                 .collect();
-            assert_eq!(terms, expected, "keyterm {keyterm}: {asked}");
+            assert_eq!(asked_terms(&stop), expected, "keyterm {keyterm}");
         }
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// #3068's P3: the wait words' stream (`RelayEars::for_waits`, which
+    /// connects with the coordinator's read as it is) asks with the unit's
+    /// key terms after the lamp's name.
+    #[test]
+    fn the_wait_words_stream_asks_with_the_units_key_terms() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-wait-key-terms-{}", std::process::id()));
+        let config = proxy_second_json(&directory);
+        let loaded = crate::second_config::from_setting(Some(config.into()), |name| {
+            (name == crate::second_config::KEY_TERMS_ENV).then(|| "Hanoi, desk lamp".into())
+        })
+        .unwrap()
+        .unwrap();
+        assert_eq!(asked_terms(&loaded), ["Lamp", "Hanoi", "desk lamp"]);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// #3068's P3: a `LAMP_SECOND_KEY_TERMS` the checker refuses (too many
+    /// terms, an empty one) does not fail the coordinator's read: the stop
+    /// and wait words stay heard, asking with the file's key terms alone.
+    #[test]
+    fn a_refused_units_key_terms_keeps_the_files() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-bad-key-terms-{}", std::process::id()));
+        let config = proxy_second_json(&directory);
+        let too_many = vec!["word"; 21].join(",");
+        for bad in [too_many.as_str(), "Hanoi,,desk lamp"] {
+            let loaded = crate::second_config::from_setting(Some(config.clone().into()), |name| {
+                (name == crate::second_config::KEY_TERMS_ENV).then(|| bad.into())
+            })
+            .unwrap_or_else(|error| panic!("{bad}: {error}"))
+            .unwrap();
+            assert!(loaded.stt_key_terms.is_empty(), "{bad}");
+            for (keyterm, before) in [(false, &[][..]), (true, crate::stop_words::KEY_TERMS)] {
+                let stop = crate::stop_words::with_key_terms(loaded.clone(), keyterm);
+                let expected: Vec<&str> =
+                    ["Lamp"].into_iter().chain(before.iter().copied()).collect();
+                assert_eq!(asked_terms(&stop), expected, "{bad}, keyterm {keyterm}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// A `second.json` on the proxy's speech to text, with no key terms of
+    /// its own, written in `directory`.
+    fn proxy_second_json(directory: &std::path::Path) -> std::path::PathBuf {
+        std::fs::create_dir_all(directory).unwrap();
+        let key = directory.join("llm.key");
+        std::fs::write(&key, "secret\n").unwrap();
+        let config = directory.join("second.json");
+        std::fs::write(
+            &config,
+            format!(
+                r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_base_url":"https://stt.example.invalid"}}"#,
+                key.display()
+            ),
+        )
+        .unwrap();
+        for file in [&key, &config] {
+            std::fs::set_permissions(file, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+                .unwrap();
+        }
+        config
+    }
+
+    /// The `keyterm`s of the URL [`SttStream::connect`] asks `config`'s
+    /// proxy with.
+    fn asked_terms(config: &SecondConfig) -> Vec<String> {
+        let Stt::Autonomous { base_url, .. } = &config.stt else {
+            panic!("the proxy's speech to text");
+        };
+        url(
+            Some(base_url),
+            config.stt_language.as_deref(),
+            &super::super::key_terms::listening(&config.stt_key_terms),
+        )
+        .unwrap()
+        .query_pairs()
+        .filter(|(name, _)| name == "keyterm")
+        .map(|(_, value)| value.into_owned())
+        .collect()
     }
 
     #[test]

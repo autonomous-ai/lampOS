@@ -960,7 +960,10 @@ It is to be decided again before home lamps ship.
   coordinator read the file alone, so the stream asked with the lamp's
   name only: the relay counted 1-term sessions beside the worker's
   10-term ones. The wait words' stream (`RelayEars::for_waits`) is read
-  the same way.
+  the same way. A `LAMP_SECOND_KEY_TERMS` the check refuses (more than 20
+  terms, an empty one) is refused in the journal and the file's key terms
+  are kept, so the stop and wait words are still heard (the second worker
+  still fails on it).
 - **When the stream is open:** from the start of each reply to its end. It
   is opened before it's needed (connecting takes 0.6 to 0.7 s) and carries
   no audio until a yield.
