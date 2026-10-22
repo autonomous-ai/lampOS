@@ -1,0 +1,24 @@
+{
+  "before": "1d03e57b531843a8abe39091d7d711437dab8b33",
+  "after": "6f603c138a12fe4337a886211b2c575403974f74",
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "before_sha256": "5c52d2e5bb0b5b488075fa51241fc3cb0a0291e796ae2bfd3383df679790538f",
+      "after_sha256": "a58dbcf89f1dbd4f3e647811a2f794e90a9197b7429dfdac5a723022f996aaa6",
+      "identical_when_comment_lines_removed": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/net/chat.rs",
+      "before_sha256": "c6d980af9e8fe45cd1123d0e0749be2bf1cb6e05e01af4c100cb6578ab06bc39",
+      "after_sha256": "7507fdc00a2e2a38caa6f874145e559e91adf3b07a3af4d6b9884d37a72bede1",
+      "identical_when_comment_lines_removed": true
+    },
+    {
+      "path": "lampOS/docs/second-voice.md",
+      "before_sha256": "730e583dee001e0618a0c8b368a179f52ce9e0b6d35d30449a973b7a298fbfb6",
+      "after_sha256": "17635c1b4c19719c7bb89dea82bd2a4f43231f40aa22a68102ade4554be8bc53"
+    }
+  ],
+  "note": "Line-comment-only source changes verified; no new Cargo run for wording."
+}

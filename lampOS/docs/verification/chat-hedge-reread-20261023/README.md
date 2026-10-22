@@ -3,7 +3,8 @@
 Second re-read public #3107 at
 `1d03e57b531843a8abe39091d7d711437dab8b33`, whose parent is `001a3d714`.
 The two independently reproduced P2 contracts now pass. No new P1 or P2
-was found in the scoped correction read; one diagnostic wording P3 remains.
+was found in the scoped correction read. The diagnostic wording P3 found
+on that head is closed by the wording-only carry described below.
 
 ## Source and counterexample parity
 
@@ -40,7 +41,7 @@ zero delayed requests. Its intact-scope control still observes one. The
 refusal case verifies the ordinary request first, then the fresh request;
 both use the configured relay and report the own-key refusal.
 
-## Remaining limits and P3
+## Wording finding and corrected carry
 
 The new outgoing diagnostic logs before `post(...).await`
 (`net/chat.rs:569`, before line 579). It proves a local send attempt, not
@@ -51,6 +52,18 @@ successful-response diagnostic. The definite causal wording at
 attempted rather than imply a lost request or a failed reused connection.
 The diagnostic itself contains fixed mode wording and elapsed time, not
 the prompt, credential or endpoint.
+
+The author corrected that wording in `6f603c138`. The range from tested
+`1d03e57b5` changes only line comments in `second_provider.rs` and
+`net/chat.rs`, plus `docs/second-voice.md`. Both Rust files are identical
+after removing line comments; `wording-carry.json` records their before
+and after hashes. The text now distinguishes an attempted dispatch from
+bytes leaving or reaching the relay and explicitly describes the winner
+as any first chat event. The P3 is closed. No additional Cargo command ran
+for these wording changes; the two-test execution above remains attributed
+to `1d03e57b5`, not a new execution on `6f603c138`.
+
+## Remaining integration limits
 
 Fourth's separate #3064 per-dispatch permission guard remains an integration
 gate. The two passing tests do not establish authority across later awaited

@@ -1,0 +1,30 @@
+{
+  "version": "0.13.5",
+  "crate_sha256": "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029",
+  "lock_checksum_matches": true,
+  "unpacked_client_matches_archive": true,
+  "client_sha256": "5b7e2556d122a75cd8d3ef62a33d45e430c8eff229a33bc3f53fc7e9af2d97de",
+  "source": "reqwest-0.13.5/src/async_impl/client.rs",
+  "defaults": [
+    {
+      "field": "pool_idle_timeout",
+      "seconds": 90,
+      "line": 302
+    },
+    {
+      "field": "tcp_keepalive",
+      "seconds": 15,
+      "line": 304
+    },
+    {
+      "field": "tcp_keepalive_interval",
+      "seconds": 15,
+      "line": 305
+    },
+    {
+      "field": "tcp_keepalive_retries",
+      "count": 3,
+      "line": 306
+    }
+  ]
+}
