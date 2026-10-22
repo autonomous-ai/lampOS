@@ -2651,6 +2651,23 @@ mod tests {
                 !listed.contains(name),
                 "{name} is installed: take it off LEFT_OUT"
             );
+            // A renamed or removed unit leaves no stale entry that passes.
+            assert!(
+                folder.join(name).is_file(),
+                "{name} is not in deploy/product: take it off LEFT_OUT"
+            );
+        }
+        // The Wi-Fi restore runs at boot; the helpers' templates start
+        // only from their sockets.
+        let on = enabled();
+        assert!(
+            on.iter()
+                .any(|name| name == "lamp-setup-wifi-restore.service"),
+            "{on:?}"
+        );
+        for template in ["lamp-setup-change@.service", "lamp-setup-wifi@.service"] {
+            assert!(listed.contains(&template), "{template} is not installed");
+            assert!(!on.iter().any(|name| name == template), "{on:?}");
         }
         for socket in listed.iter().filter(|name| name.ends_with(".socket")) {
             assert!(
