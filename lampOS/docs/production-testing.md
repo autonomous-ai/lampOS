@@ -215,6 +215,30 @@ with `--matrix`) and every file in the lamp's folder is its record, 1 not, 3
 the lamp has no records there, 2 an argument was refused or the place could
 not be read.
 
+### Every lamp's records against one matrix
+
+```sh
+lamp-station complete --records PLACE --matrix production/matrix-v1.toml [--device lamp-4ace]...
+```
+
+asks the pilot's question (#2795): is every lamp's record complete against
+that matrix version? It takes each lamp's folder in the place, or only the
+lamps named with `--device`, and judges each lamp's latest routine or retest
+record as `records --matrix` does. The latest is the one with the latest
+`started`, then `ended`, then run id: the record's own start by the station's
+clock, never a file's modified time, which a copy to a share or a restore
+changes. A qualification run is passed over. It prints one line per lamp:
+`<lamp> complete: run <run id> <verdict>`, or `<lamp> not complete: run
+<run id> <verdict>; gaps:` and each gap's kind and check only (as `missing
+privacy_switch`), the verdict being the one the run's checks give. A lamp
+with no such record is `<lamp> no record`. A file in a lamp's folder that
+isn't its record is named, and that lamp is not complete, since the file may
+be its latest run; an entry in the place that isn't a lamp's folder is
+listed and not judged. A last line says how many of the lamps are complete.
+It reads the place and changes nothing. Exit status: 0 every lamp is
+complete, 1 one is not or has no record, 3 there is no lamp, 2 an argument
+was refused or the place or the matrix could not be read.
+
 ### The record, field by field
 
 `<out>/<run id>.json`:

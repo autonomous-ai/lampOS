@@ -93,6 +93,33 @@ impl fmt::Display for Gap {
     }
 }
 
+impl Gap {
+    /// The gap's kind and the check or value it names, without the why: a
+    /// word for each kind, and for a check not judged its verdict, as
+    /// `missing privacy_switch`. For a line per lamp (`fleet`).
+    pub fn short(&self) -> String {
+        match self {
+            Gap::OtherMatrix { version } => format!("other_matrix {version}"),
+            Gap::NotApproved => "not_approved".into(),
+            Gap::UnknownRevision(revision) => format!("unknown_revision {revision}"),
+            Gap::Unknown(check) => format!("unknown {check}"),
+            Gap::Twice(check) => format!("twice {check}"),
+            Gap::NotAdmitted(check) => format!("not_admitted {check}"),
+            Gap::NotAsMatrix(check) => format!("not_as_matrix {check}"),
+            Gap::Unfinished { check, verdict } => {
+                let verdict = serde_json::to_value(verdict)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                format!("{verdict} {check}")
+            }
+            Gap::Misjudged { check, .. } => format!("misjudged {check}"),
+            Gap::Lists(_) => "lists".into(),
+            Gap::Verdict { .. } => "verdict".into(),
+        }
+    }
+}
+
 /// One record checked against one matrix.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Completeness {
