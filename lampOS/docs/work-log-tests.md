@@ -1,5 +1,22 @@
 # Tests work log
 
+## 2026-10-22 17:58 +0700 — full-library Voice flakes claimed
+
+Ready for lamp-voice: no
+
+Continuing #1569 at the owner's assignment, branch
+`tests/1569-voice-full-run-events`, baseline `69f2228338a8df63a81d23087c3e55308fa125ca`.
+#2954 / `2202bf2f5` is already an ancestor; the signed-out Tasks fix is not
+part of this work. Claim and exact scope are on #1569 and Queue #2602.
+
+The seven assigned cases cover requested audio crossing the Live worker,
+the policy-held timer, a reminder into a busy room, the oldest kept memory
+and room markers, Stop during music RPC, own answers not keeping a turn
+alive, and cancelled/gapped/expired music confirmation news. Only fixture
+synchronization may change; assertions, freshness and product deadlines stay.
+Independent source audits proceed while the untouched full x86 library and
+full ARM64 baseline are recorded. No baseline count is claimed yet.
+
 ## 2026-10-22 12:10:45 +0700 — final requested Skills and row 72 rebases green
 
 Ready for lamp-voice: yes (#2776). #2693 has green refreshed native checks but is draft pending the reviewer-required coordinated ancestry refresh. #2625 is merged; Reviewer-lead closed its pause P3 at 09:04.
