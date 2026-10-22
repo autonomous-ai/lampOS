@@ -59,7 +59,7 @@ The agent then, in this order:
    fills what it knows (the person is whoever started the session; no lamp
    unless told; branches `lamp-<name>` and `<name>/*`; it owns nothing
    yet), shows it to its person, pushes it as its first commit on
-   `lamp-<name>`, and comments on the Queue issue (#1722, continued from #705): "new builder
+   `lamp-<name>`, and comments on the Queue issue (#3126, continued from #2602): "new builder
    <name>, role file at <link>, no tasks yet". It takes no task until the
    first builder has taken the file onto `lamp-voice`, corrected where it
    must be, and labelled issues `builder:<name>`.
@@ -70,11 +70,17 @@ The agent then, in this order:
 5. Reads its own log on its own branch, newest first.
 6. If it has a lamp: that lamp's `deploy/<lamp>/LAMP.md` and `README.md`.
 7. Finds its next task: the first issue in its own list in the pinned
-   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/1722) that
-   is open and not `status:taken` (`gh issue view 1722`;
+   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/3126) that
+   is open and not `status:taken` (`gh issue view 3126`;
    `gh issue list --label builder:<name> --state open` shows them all),
    claimed as "Claiming an issue" says. It reads the comments on its
    issues: answers come there.
+
+The current Queue is **#3126**, continued from #2602 on 23 October after
+GitHub stopped accepting comments there. If this link becomes full too,
+follow the continuation link in its body. The current issue is labelled
+`lampos-queue`; older full Queues may remain open as records. Read the
+continuation before choosing where to post, even if a role file is older.
 
 ## Setting up a machine
 
@@ -222,8 +228,8 @@ building all the time. never sit idle!"):
 - "Waiting on others" is not a state. When your task waits on a review, a
   merge, a lamp minute or another builder, open the next task on your list
   at once and say so in one line on the waiting one.
-- Your list in Queue #1722 is kept at least three deep by the first builder.
-  If it ever has nothing you can do now, say so on #1722 with your name, and
+- Your list in Queue #3126 is kept at least three deep by the first builder.
+  If it ever has nothing you can do now, say so on #3126 with your name, and
   meanwhile take an unowned open issue in your parts (a flaky test, a doc
   that lies, a missing test) rather than wait.
 - Post or push at least every 20 minutes while you work. The idle watch
@@ -370,7 +376,8 @@ another builder's branch.
 
 ## Talking with the first builder
 
-Since 21 October this is done in comments on the Queue issue (#2602), as
+Since 21 October this is done in comments on the Queue issue (currently
+#3126, continued from #2602), as
 [AGENTS.md](../AGENTS.md)'s "How builders work together" says: a post starts
 `<Name>, HH:MM, to **<who>**:`, has content, and is in plain sentences. The
 log entries below still record what you took and did.
@@ -409,7 +416,7 @@ builder has to read, place or close before anyone may do it.
   to: the task you are on, or the issue of the part where it showed (for
   example a flaky test of another part's: a comment on that part's open
   issue). Only when no issue fits, it is one comment on the Queue issue
-  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722)). Head it
+  ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126)). Head it
   `<name>-P<n>` for a proposal or `Found by <name>` for a fault, with what
   was seen, how to see it, and what it would cost (and still a line in
   your log). The first builder answers there: it widens an issue, opens a
@@ -438,10 +445,13 @@ writes.
   assignee cannot tell agents apart, since every agent works through the
   same account, so the name is a label.
 - **Order:** one pinned "Queue" issue the first builder keeps in order,
-  [#705](https://github.com/autonomous-ai/lampOS/issues/705), continued as
-  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722) since
-  2026-10-19, when #705 reached GitHub's comment limit; label
-  `lampos-queue`. No priority labels.
+  currently [#3126](https://github.com/autonomous-ai/lampOS/issues/3126),
+  labelled `lampos-queue`. Earlier Queues remain as records:
+  [#705](https://github.com/autonomous-ai/lampOS/issues/705),
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722) from
+  2026-10-19, and [#2602](https://github.com/autonomous-ai/lampOS/issues/2602)
+  from 2026-10-21. Each was continued when it reached GitHub's comment
+  limit; #3126 opened on 2026-10-23. No priority labels.
 - **Questions and answers** are comments on the issue they are about.
 - **Pull requests** say `Closes #N` (closed by hand at the merge, above) or
   `Part of #N`. No GitHub Project is needed.
@@ -620,7 +630,7 @@ lamp people talk to all day.
 - **No Live sessions on a lamp,** except a comparison the first builder names
   on #1712, the issue where the flow is built.
 - **A suite, tool or script that starts a Live session** is named on the
-  Queue (#1722), and it is moved to the second route.
+  Queue (#3126), and it is moved to the second route.
 - **Live stays a setting** (`LAMP_VOICE_ROUTE=gemini`) for a lamp that is
   set up with it, not the lamp to build against.
 
@@ -678,7 +688,7 @@ kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
   defect closes on repair evidence plus a verified retest.
 - **The first builder comes in only for software:** when a hardware finding
   needs a software change, the hardware lead posts a linked proposal on the
-  Queue (#1722) and the first builder assigns it to a software builder.
+  Queue (#3126) and the first builder assigns it to a software builder.
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.
