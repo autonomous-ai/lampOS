@@ -61,6 +61,11 @@ Environment=LAMP_ATTENTION=busy-near
 Environment=LAMP_AIR_FACTS=on
 Environment=LAMP_RING_EYE=strong
 Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
+# The end-of-turn worker lowers itself to round-robin 10 and its ONNX Runtime threads don't spin while they wait,
+# so the voice's capture, playback and coordinator take a core back at once (#1608; on lamp-4ace since 19 Oct,
+# battery mon-te-0840 held 12 of 12; the first builder's yes for every lamp on #2602, 22 Oct 15:0x).
+Environment=LAMP_TURN_END_PRIORITY=10
+Environment=LAMP_TURN_END_NO_SPIN=on
 Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output
 # The lamp's voice is the second route since 19 Oct (the owner, #1712; lampOS/docs/second-voice.md, "Second only"):
 # speech to text, DeepSeek's text model and search, and the configured voice (ElevenLabs, eleven_v4_turbo) answer

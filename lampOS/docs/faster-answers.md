@@ -1063,7 +1063,8 @@ call.
 ### The turn-end switches kept on lamp-4ace (19 Oct, #1608)
 
 Both of #1608's switches for the end-of-turn worker are on in lamp-4ace's
-unit and stay: `LAMP_TURN_END_NO_SPIN=on` (its ONNX Runtime threads do not
+unit and stay, and since 22 Oct in the product and template units too (the
+first builder's yes on #2602, 15:0x): `LAMP_TURN_END_NO_SPIN=on` (its ONNX Runtime threads do not
 spin while they wait) and `LAMP_TURN_END_PRIORITY=10` (it lowers itself to
 round-robin 10 under the voice's 20), so the voice's capture and `lamp-name`
 get their cores back from a verdict at once. The first builder's battery
