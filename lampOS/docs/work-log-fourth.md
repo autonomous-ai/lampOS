@@ -6229,6 +6229,40 @@ Ready for lamp-voice: no (both PRs require their replacement-head native gates).
   Queue issuecomment-6334168716: product-unit activation does not itself
   migrate photo-face's Rust words into an installable skill.
 
+## 2026-10-22 13:54 ICT: onboarding native gate passed; callback final native still active
+
+Ready for lamp-voice: yes (#2899 for First's source read); no (#2782 replacement gate).
+
+- #2899 `a3f13a013c1ad850d6abf51704a039b0c6a8c0d3` passed ARM64
+  39734146637:10,289/0/66, all ten new regressions. Clippy39734146677,
+  four doctests,12separate process checks and relay passed. One unchanged
+  same-voice leaky pass, no rerun. Authored parentfb5d82a87; actual CI
+  mergebf481808e used645d2f554. Artifact12406559507 SHA-256
+  `a3202a4c2da4d9d5ca76b55770254550590844b053906d6ea7fc1f4613e7f4a1`.
+  Raw `/private/tmp/fourth-onboarding-skill-ci-20261022/rebase-a3f13a013/qualification.json`.
+  Ready receipt6334677135, issue6334677633, Queue6334678009. First's
+  source read, latest-base handoff and authorised52e6 same-steps walk
+  remain required. This code-readiness receipt does not close#2824.
+- #2782 `f0a5a12b7c1e464e4b9dcae92fff883262ae3541` is on
+  `07614f85214f2464746bba860ac545505063585f`, plain source replay
+ 4451c0334=7acfe1499 then evidence-only amendment. Reverse extraction
+  restores the entire current parent; fixture508lines remains unchanged.
+  Freshfmt11.168s,strictworkspaceClippy77.190s,focused24/0/0 and
+  workspacebuild69.805s all pass. Raw
+  `/private/tmp/fourth-kept-name-callback-checks/rebase-07614f852-20261022/`.
+  Clippy39735029380 passed; ARM6439735029328 remains active. Current
+  PR receipt6334453978; Queue6334475568. No previous count qualifies it.
+- Row evidence update from Jarvis/Friday, not Fourth executions:
+  #2510's correction run on06c1 at13:40 reports2of3 known-scope rounds;
+  the third was room-scoped and is not called a REPLACES failure. The
+  earlier-value query passed. KEEP_HEARD-on and FOLLOWS_FACE's own run
+  remain owed to Friday. No words are copied here. Remembers-you stays
+  at0.40 pending First's product acceptance, despite the separate accepted
+  six-minute retention and merged retry work.
+- #2867,#1670 and#2797 remain open, so photo and tone activation have not
+  bypassed their dependencies. #2789's reader/bus contract remains pending.
+  Fourth has no lamp and made no device actions.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
