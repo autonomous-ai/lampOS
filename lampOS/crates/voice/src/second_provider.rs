@@ -761,8 +761,8 @@ struct Shared {
     /// A line whose words end before a name waits for it
     /// ([`Engine::waiting_for_a_name`]).
     open_name: bool,
-    /// A line mostly of the lamp's own words heard back is held, and its
-    /// own words at a line's start or end are taken out
+    /// A line of nothing but the lamp's own words heard back is held, and
+    /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
     own_echo: bool,
     spare: Mutex<Option<Kept>>,
@@ -1618,10 +1618,11 @@ impl Engine {
     }
 
     /// `LAMP_SECOND_OWN_ECHO=on` ([`own_echo`], #2997): a spoken line begun
-    /// over the lamp's answer or just after it, mostly of the lamp's own
-    /// words, is held as its echo; fewer of them, one run at its start or
-    /// end, are taken out of what the model is sent. A person repeating it
-    /// is never held. Before any turn only.
+    /// over the lamp's answer or just after it, nothing but runs of the
+    /// lamp's own words in its answer's order, is held as its echo; one such
+    /// run at its start or end is taken out of what the model is sent. A
+    /// line adding words, or begun after its words and answering its offer
+    /// or question, is never held. Before any turn only.
     pub fn holding_own_echo(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.own_echo = on;
