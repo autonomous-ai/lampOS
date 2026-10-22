@@ -5099,9 +5099,9 @@ fn asked_unsaying(shared: &Shared, (request, joining): (u64, bool), parts: &[Par
         return !joining;
     };
     if joining
-        && !in_flight
+        && in_flight
             .as_ref()
-            .is_some_and(|held| held.request == request)
+            .is_none_or(|held| held.request != request)
     {
         return false;
     }
