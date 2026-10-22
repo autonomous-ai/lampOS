@@ -205,7 +205,7 @@ pub const ROOM_SOUNDS_GROUP: &str = "lampos";
 pub const NO_SLIDE: &str = "no-slide";
 /// The face expressions step (#2872): asked only with
 /// [`FACE_EXPRESSIONS_ASK_ENVIRONMENT`] on, a lamp whose eyes read how a face
-/// seems, and only with the person's yes. Kept as the room sounds yes is: a
+/// seems, and only with a yes for this lamp, covering everyone it sees. Kept as the room sounds yes is: a
 /// yes (`done`) as [`FACE_EXPRESSIONS_PATH`] for lamp-eyes, beside
 /// [`ROOM_SOUNDS_PATH`] and readable by the same group; no or silence keeps
 /// only the step's outcome, so it is asked once and stays off.
@@ -3869,7 +3869,7 @@ mod tests {
         assert!(!face_expressions_file(&room).exists());
         assert!(
             FACE_EXPRESSIONS_NOTE
-                .contains("you never say it aloud, and nothing of their face is kept")
+                .contains("a yes covers everyone at this lamp, you never say it aloud, and no picture of a face is kept")
         );
     }
 
