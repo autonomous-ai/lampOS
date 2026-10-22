@@ -1,5 +1,48 @@
 # Tests work log
 
+## 2026-10-22 08:33:01 +0700 — P3 corrections and row 72 published; Skills refresh underway
+
+Ready for lamp-voice: yes (#2625, #2637, #2647); no (#2653, #2776 and refreshed #2693 until their native gates pass).
+
+#2653 is pushed at `04e891cd8` on `1f92c96ed`. Expression's natural
+successful exit and Mood's original 600 ms run are restored; only Body,
+Controls and Name fixture waits change. Final native Mac gates passed
+1,522 tests with 5 existing ignored, formatting, strict Clippy and workspace
+build. Two Expression controls now fail as intended; all Mood failures and
+three matching exact pre-PR reproductions are retained without a cause
+claim. [Evidence](https://github.com/autonomous-ai/lampOS/blob/04e891cd8/lampOS/docs/verification/small-waits-review-20261022/README.md).
+ARM64 #5473 and Clippy #1481 are running; this PR remains draft.
+
+#1569 row 72 is [#2776](https://github.com/autonomous-ai/lampOS/pull/2776),
+`1a6635772` on `1f92c96ed`. The fixture's shared acquisition clock keeps
+all original assertions and time bounds. A controlled 3 s host pause gives
+StaleInput 3/3 before, and passes 3/3 after. The clean target passes 3/3
+and the full early-end module passes 20; its first clean 9.2518 s sample
+is retained. Final serial Voice passed 3,364 with 14 existing ignored;
+Gemini capture-clock tests passed 12, plus formatting, strict Clippy and
+workspace build. [Complete controls and gate record](https://github.com/autonomous-ai/lampOS/blob/1a6635772/lampOS/docs/verification/row72-capture-clock-20261022/README.md).
+The original report lacked the provider diagnostic, so this does not identify
+its cause. ARM64 #5475 and Clippy #1483 are running; draft until green.
+
+#2625 is now ready: ARM64 #5456 passed 9,984 tests (one leaky), 63 skipped,
+nextest 172.753 s, job 10m58s; Clippy #1464 passed. Its target four cases took
+1.001/1.047/1.911/0.893 s. CI checkout `64d1c57` merged into `75bddc520`.
+Reviewer-two routed the existing read to Reviewer-lead at 08:24 under
+First's split. #2647 also remains with Lead; #2637 remains with Reviewer-two.
+
+Reviewer-two requested a further #2693 rebase for the upstream morning
+welcome-back documentation. The single commit is rebased as `6bf167a6c`
+on `efff7c4a5`, range-diff `bc8d8605e = 6bf167a6c`. Both fixture Rust files
+and all 21 evidence files match the prior green native checkout exactly;
+the new docs preserve upstream changes. Upstream also changed Skills runtime
+and tests, so fresh local gates are running before the push and native CI.
+The previous 9,945-test native success belongs to `bc8d8605e` only.
+
+#2703/#2646 are merged, and the photo-faces constructor seam was already
+merged in #2628; #2647 contains the approved add-on seam. No duplicate PRs.
+Cloud confirmation remains on hold behind this ordered work. No ARM64 build
+on the Mac, device access or product behavior change.
+
 ## 2026-10-22 08:15:32  — Skills and rebased Tasks ready; Guard pushed; row 72 reproduced
 
 #2693 is ready at `bc8d8605e`. [ARM64 #5444](https://github.com/autonomous-ai/lampOS/actions/runs/39701618635)
