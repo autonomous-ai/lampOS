@@ -451,6 +451,8 @@ pub struct ExitNote {
 }
 
 /// The note for one stop: `None` for a `success`, or a unit not lampOS's.
+/// A listed template's instance becomes its fixed template name before
+/// storage. The caller still asks systemd about the actual instance.
 pub fn exit_note(
     unit_name: &str,
     result: &str,
@@ -461,7 +463,22 @@ pub fn exit_note(
     shown: &BTreeMap<String, String>,
 ) -> Option<ExitNote> {
     ExitResult::of(result)?;
-    let unit = unit(unit_name)?;
+    let unit = if let Some((prefix, suffix)) = unit_name.split_once('@') {
+        let instance = suffix.strip_suffix(".service")?;
+        if instance.is_empty()
+            || !instance
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b":_.\\-".contains(&byte))
+        {
+            return None;
+        }
+        UNITS
+            .iter()
+            .copied()
+            .find(|name| name.strip_suffix("@.service") == Some(prefix))?
+    } else {
+        unit(unit_name)?
+    };
     let number = |key: &str| shown.get(key).and_then(|v| v.trim().parse::<u64>().ok());
     let ran_s = match (
         number("ExecMainStartTimestampMonotonic"),
@@ -3267,6 +3284,156 @@ pub(crate) mod tests {
             shown("NRestarts=3\nExecMainStartTimestampMonotonic=5\n")["NRestarts"],
             "3"
         );
+    }
+
+    #[test]
+    fn template_exit_notes_keep_only_the_fixed_name_in_files_and_reports() {
+        let places = places("template-notes");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        let shown = shown(
+            "NRestarts=7\nExecMainStartTimestampMonotonic=1000000\nExecMainExitTimestampMonotonic=4000000\n",
+        );
+        let templates: Vec<_> = UNITS
+            .iter()
+            .copied()
+            .filter(|name| name.ends_with("@.service"))
+            .collect();
+        for (n, template) in templates.iter().enumerate() {
+            let actual = template.replace("@.service", "@private-instance-42.service");
+            let note = exit_note(
+                &actual,
+                "signal",
+                "killed",
+                "SEGV",
+                n as u64 + 1,
+                "boot-1",
+                &shown,
+            )
+            .unwrap();
+            assert_eq!(note.unit, *template);
+            assert_eq!((note.restarts, note.ran_s), (Some(7), Some(3)));
+            let path = write_exit_note(&places.exits, &note).unwrap();
+            assert!(
+                !path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .contains("private-instance")
+            );
+            assert!(
+                !fs::read_to_string(path)
+                    .unwrap()
+                    .contains("private-instance")
+            );
+        }
+        let notes = reports.new_notes();
+        assert_eq!(notes.len(), templates.len());
+        for note in notes {
+            reports.crash(NOW, None, &note).unwrap();
+        }
+        let sent = sent(&mut reports);
+        assert_eq!(sent.len(), templates.len());
+        for report in sent {
+            assert!(!report.to_string().contains("private-instance"));
+            assert!(UNITS.contains(&report["unit"].as_str().unwrap()));
+            assert_eq!(report["restarts_since_boot"], 7);
+            assert_eq!(report["ran_s"], 3);
+        }
+        // Different instances share one fixed name and its existing bound.
+        for n in 0..NOTES_PER_UNIT + 2 {
+            let actual =
+                templates[0].replace("@.service", &format!("@private-instance-{n}.service"));
+            let note = exit_note(
+                &actual,
+                "signal",
+                "killed",
+                "SEGV",
+                100 + n as u64,
+                "boot-1",
+                &shown,
+            )
+            .unwrap();
+            write_exit_note(&places.exits, &note).unwrap();
+        }
+        let files: Vec<_> = fs::read_dir(&places.exits)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(files.len(), templates.len() - 1 + NOTES_PER_UNIT);
+        assert!(
+            files
+                .iter()
+                .all(|name| !name.to_string_lossy().contains("private-instance"))
+        );
+        fs::remove_dir_all(places.own.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn only_nonempty_instances_of_listed_templates_are_exit_notes() {
+        let none = BTreeMap::new();
+        for name in [
+            "lamp-unlisted@private-instance.service",
+            "lamp-voice@private-instance.service",
+            "lamp-setup-change@.service",
+            "lamp-setup-change@private-instance.timer",
+            "lamp-setup-change@private@instance.service",
+            "lamp-setup-change@../private-instance.service",
+            "lamp-setup-change@private instance.service",
+        ] {
+            assert!(
+                exit_note(name, "signal", "killed", "SEGV", 1, "b", &none).is_none(),
+                "{name}"
+            );
+        }
+        for name in UNITS.iter().filter(|name| !name.contains('@')) {
+            assert_eq!(
+                exit_note(name, "signal", "killed", "SEGV", 1, "b", &none)
+                    .unwrap()
+                    .unit,
+                *name
+            );
+        }
+        let actual = "lamp-setup-change@private-instance.service";
+        assert!(exit_note(actual, "success", "exited", "0", 1, "b", &none).is_none());
+        // Canonicalization is confined to exit notes; the general unit
+        // allowlist and systemctl's caller keep taking the actual name.
+        assert!(unit(actual).is_none());
+        let escaped = r"lamp-setup-change@private\x20instance.service";
+        assert_eq!(
+            exit_note(escaped, "signal", "killed", "SEGV", 1, "b", &none)
+                .unwrap()
+                .unit,
+            "lamp-setup-change@.service"
+        );
+    }
+
+    #[test]
+    fn a_local_template_exit_note_cannot_grant_consent_to_send() {
+        let places = places("template-no");
+        let note = exit_note(
+            "lamp-setup-change@private-instance.service",
+            "signal",
+            "killed",
+            "SEGV",
+            1,
+            "boot-1",
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        write_exit_note(&places.exits, &note).unwrap();
+        let mut reports = Reports::open(places.clone());
+        let notes = reports.new_notes();
+        assert_eq!(
+            notes.len(),
+            1,
+            "local notes are consumed even without a yes"
+        );
+        assert!(reports.crash(NOW, None, &notes[0]).is_none());
+        assert_eq!(reports.queued(), 0);
+        assert!(reports.due(ID).is_empty());
+        assert!(!reports.consent().share);
+        fs::remove_dir_all(places.own.parent().unwrap()).unwrap();
     }
 
     #[test]

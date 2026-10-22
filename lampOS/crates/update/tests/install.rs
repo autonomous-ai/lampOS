@@ -492,6 +492,139 @@ fn run_twice_it_changes_nothing() {
 }
 
 #[test]
+fn the_exit_note_allowlist_is_exactly_clouds_product_services() {
+    // Cloud already uses update in its tests; read its literal allowlist
+    // without introducing the reverse crate dependency just for this check.
+    let source = include_str!("../../cloud/src/reports.rs");
+    let list = source
+        .split_once("pub const UNITS: &[&str] = &[")
+        .unwrap()
+        .1
+        .split_once("];")
+        .unwrap()
+        .0;
+    let names: Vec<&str> = list
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| line.strip_prefix('"').unwrap().strip_suffix("\",").unwrap())
+        .collect();
+    assert_eq!(install::EXIT_NOTE_UNITS, names);
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut services: Vec<_> = fs::read_dir(product)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.starts_with("lamp-") && name.ends_with(".service"))
+        .collect();
+    services.sort();
+    assert_eq!(services, names, "no duplicate, omitted or extra unit");
+    assert_eq!(
+        section(install::EXIT_NOTE, "Service"),
+        ["ExecStopPost=-+/opt/lampOS/cloud/current/lamp-cloud exit-note %n"]
+    );
+}
+
+#[test]
+fn install_places_every_exit_note_hook_and_keeps_other_drop_ins() {
+    let mut lamp = Lamp::new(188, &[]);
+    let other = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    let prefix = "/etc/systemd/system/lamp-.service.d/exit-note.conf";
+    for path in [other, prefix] {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+        fs::write(lamp.on(path), "# this lamp's existing drop-in\n").unwrap();
+    }
+    lamp.install().unwrap();
+    for name in install::EXIT_NOTE_UNITS {
+        let path = format!("/etc/systemd/system/{name}.d/exit-note.conf");
+        assert_eq!(
+            fs::read_to_string(lamp.on(&path)).unwrap(),
+            install::EXIT_NOTE
+        );
+        assert_eq!(mode_of(&lamp.on(&path)), 0o644, "{name}");
+    }
+    for path in [other, prefix] {
+        assert_eq!(
+            fs::read_to_string(lamp.on(path)).unwrap(),
+            "# this lamp's existing drop-in\n"
+        );
+    }
+    assert!(
+        !lamp
+            .on("/etc/systemd/system/ssh.service.d/exit-note.conf")
+            .exists()
+    );
+    assert!(
+        !lamp
+            .on("/etc/systemd/system/lamp-records.timer.d/exit-note.conf")
+            .exists()
+    );
+    // Installing the hooks neither runs them nor enables reporting consent.
+    for path in [
+        "/run/lampos-exits",
+        "/etc/lampOS/setup/reports.json",
+        "/var/lib/lampos-cloud/reports.json",
+    ] {
+        assert!(!lamp.on(path).exists(), "{path}");
+    }
+    let before = tree(&lamp.root);
+    let calls = lamp.host.calls.len();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(tree(&lamp.root), before);
+    assert_eq!(lamp.host.calls.len(), calls);
+
+    // A missing reserved hook is repaired and reload debt is paid, with
+    // every other drop-in kept. No service is restarted by installation.
+    let missing = "/etc/systemd/system/lamp-skills.service.d/exit-note.conf";
+    fs::remove_file(lamp.on(missing)).unwrap();
+    let done = lamp.install().unwrap();
+    assert_eq!(done.changed.len(), 2, "{:?}", done.changed);
+    assert_eq!(done.changed[0], format!("wrote {missing}"));
+    assert!(done.changed[1].starts_with("enabled "));
+    assert_eq!(tree(&lamp.root), before);
+    assert_eq!(
+        lamp.host.calls[calls..]
+            .iter()
+            .map(|call| call.split(' ').next().unwrap())
+            .collect::<Vec<_>>(),
+        ["tmpfiles", "enable"]
+    );
+}
+
+#[test]
+fn a_failed_exit_note_write_keeps_reload_debt_for_the_next_install() {
+    let mut lamp = Lamp::new(188, &[]);
+    let blocked = "/etc/systemd/system/lamp-addons.service.d/exit-note.conf";
+    fs::create_dir_all(lamp.on(blocked)).unwrap();
+    let why = lamp.install().unwrap_err();
+    assert!(why.contains(blocked), "{why}");
+    assert!(lamp.state().systemd_owed);
+    assert!(
+        lamp.on("/etc/systemd/system/lamp-actions.service.d/exit-note.conf")
+            .is_file()
+    );
+    assert!(
+        !lamp
+            .host
+            .calls
+            .iter()
+            .any(|call| call.starts_with("enable "))
+    );
+    fs::remove_dir(lamp.on(blocked)).unwrap();
+    lamp.install().unwrap();
+    assert!(!lamp.state().systemd_owed);
+    for name in install::EXIT_NOTE_UNITS {
+        assert_eq!(
+            fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{name}.d/exit-note.conf")))
+                .unwrap(),
+            install::EXIT_NOTE
+        );
+    }
+    let calls = lamp.host.calls.len();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(lamp.host.calls.len(), calls);
+}
+
+#[test]
 fn a_file_that_does_not_match_installs_nothing_of_it() {
     let mut lamp = Lamp::new(188, &[]);
     lamp.channel.files.insert(
