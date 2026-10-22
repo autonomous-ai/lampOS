@@ -13512,6 +13512,8 @@ async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later()
             cache.begin_refresh(),
             crate::known_faces::FaceObservation::read(&path),
         );
+        // The line's end, as `spoken` decides it.
+        lease.record_keeper(lease.face_at_end(Instant::now()));
         let keeper = lease.keeper_within(std::time::Duration::ZERO);
         if scoped && camera {
             assert_eq!(keeper.as_deref(), Some(a.as_str()));
@@ -13525,4 +13527,157 @@ async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later()
         );
     }
     std::fs::remove_file(&path).unwrap();
+}
+
+/// Eighth's P1 and P2 on #3108, through the second voice's own line end:
+/// after a restart the face cache holds nobody, so each first line is
+/// admitted as the room's. A (face `f1`) is named while the line is said.
+/// - Unknown B (`f2`) is seen speaking the line while A sits in view: the
+///   keep is not A's, it stays the room's.
+/// - A is seen speaking it alone: the keep is A's.
+/// - Nobody is named by the line's end plus `KEEPER_WAIT`; A walks in while
+///   the lamp answers, before the keep: the keep is not A's.
+#[tokio::test]
+async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
+    use crate::memory_scope::{FaceCache, KEEPER_WAIT, ScopeLease};
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let path = std::env::temp_dir().join(format!(
+        "keep-late-speaking-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "A").unwrap();
+    std::fs::write(known_face_of(&path), "f1\n").unwrap();
+    let a = crate::remember::person_id("A");
+    // (what, the face speaking the line, A named during the line or only
+    // after its end and the wait, the keeper the keep is given)
+    for (what, speaking, during, expected) in [
+        ("B speaks, A in view", "f2", true, None),
+        ("A speaks alone", "f1", true, Some(a.clone())),
+        ("A walks in during the answer", "f1", false, None),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [Ok(
+                    "Lamp, remember my sister's wedding is Saturday.".to_owned()
+                )]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "m1",
+                            "remember",
+                            json!({"text":"sister's wedding is Saturday"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Got it."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let cache = Arc::new(FaceCache::default());
+        let keepers: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+        let kept = keepers.clone();
+        let (late_cache, late_path) = (cache.clone(), path.clone());
+        let runner: ScopedToolRunner = Arc::new(move |_, _, _, _, lease: ScopeLease| {
+            let (kept, cache, path) = (kept.clone(), late_cache.clone(), late_path.clone());
+            Box::pin(async move {
+                if !during {
+                    // Past the line's end and the wait: A comes into view
+                    // only now, while the lamp answers.
+                    tokio::time::sleep(KEEPER_WAIT + Duration::from_millis(150)).await;
+                    cache.replace(
+                        cache.begin_refresh(),
+                        crate::known_faces::FaceObservation::read(&path),
+                    );
+                }
+                let keeper = tokio::task::spawn_blocking(move || lease.keeper_within(KEEPER_WAIT))
+                    .await
+                    .unwrap();
+                kept.lock().unwrap().push(keeper);
+                json!({"ok":true})
+            })
+        });
+        let eyes = Arc::new(SpeakingFaces::default());
+        let mut engine = engine
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([28; 16]).unwrap(),
+                cache.clone(),
+                runner,
+                Some(Arc::new(|lease: &ScopeLease| {
+                    Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+                })),
+            )
+            .seeing_who_speaks(eyes.clone(), path.clone())
+            .announcing(false);
+        engine.memory_camera(true, 1);
+        let done = Arc::new(AtomicBool::new(false));
+        let feeder = {
+            let (eyes, done) = (eyes.clone(), done.clone());
+            std::thread::spawn(move || {
+                let mut frame = 0u64;
+                while !done.load(Ordering::Acquire) {
+                    let faces = lamp_msgs::Faces {
+                        faces: ["f1", "f2"]
+                            .map(|id| lamp_msgs::Face {
+                                id: id.to_owned(),
+                                xmin: 0.1,
+                                ymin: 0.1,
+                                xmax: 0.3,
+                                ymax: 0.4,
+                                confidence: 1.0,
+                                yaw: None,
+                                facing: None,
+                                speaking: Some(lamp_msgs::Speaking {
+                                    state: if id == speaking {
+                                        lamp_msgs::SpeakingState::Yes
+                                    } else {
+                                        lamp_msgs::SpeakingState::No
+                                    },
+                                    score: 0.9,
+                                    from: None,
+                                }),
+                            })
+                            .into(),
+                    };
+                    frame += 1;
+                    eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            })
+        };
+        engine.submit(start(1));
+        let lease = engine
+            .turn
+            .as_ref()
+            .unwrap()
+            .memory_scope
+            .as_ref()
+            .unwrap()
+            .lease();
+        assert_eq!(lease.scope().unwrap().person(), None, "{what}: the room's");
+        assert!(lease.looks_later(), "{what}");
+        if during {
+            // The eyes name A while the line is said.
+            cache.replace(
+                cache.begin_refresh(),
+                crate::known_faces::FaceObservation::read(&path),
+            );
+        }
+        engine.submit(audio(1, 1));
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        done.store(true, Ordering::Release);
+        feeder.join().unwrap();
+        assert_eq!(*keepers.lock().unwrap(), [expected], "{what}");
+    }
+    std::fs::remove_file(known_face_of(&path)).unwrap();
+    std::fs::remove_file(path).unwrap();
 }

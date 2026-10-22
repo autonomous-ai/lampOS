@@ -2172,22 +2172,37 @@ start before the cache has their face, so it is admitted as the room's. On
 lamp-c0a4 on 23 October such a first line ("my sister's wedding is this
 Saturday") was kept as `everyone`'s, where the room's other people could be
 told it. With this switch, a line admitted as the room's while the camera
-was allowed keeps a `remember` for the known face the eyes name by the time
-of the keep, waiting at most 300 ms (`memory_scope::KEEPER_WAIT`, about one
-refresh) for one, inside the memory's 1.5 s
-(`ScopeLease::keeper_within`, `tools.rs`). Only the keep moves: the line's
-reads (its note, recall, history) stay the room's, as a lease is never
-widened. There is no late look for a line already narrowed to the room
-(another face seen speaking it), a revoked one, a privacy change since the
-line started, a face held only by its gap, or a person's line. When nobody
-known is named by then, the keep is the room's, as before: "said in this
-room; speaker unknown", and a dated one there is never followed up. The
-journal says `request N: a keep in a line admitted as the room's goes to the
-known face the eyes name now (T ms)`, with no words. Tests:
+was allowed has its keeper decided at the line's end, when its words were
+heard: the known face the cache names by then, waiting at most 300 ms past
+the end (`memory_scope::KEEPER_WAIT`, about one refresh;
+`ScopeLease::face_at_end`). The window is the line's end plus 300 ms, not
+the keep: a known face first named later, such as one walking in while the
+lamp answers, is never the keeper. The same speaking evidence as a known
+person's line then applies (`speaking_faces::someone_elses` over the line's
+start to its end): if the eyes saw a face other than the keeper's known face
+speaking the line, there is no keeper; if they saw nobody speaking it, the
+keeper stands, as a known person's line does. The decision runs beside the
+turn, never delaying its answer, and is recorded on the request; a
+`remember` in the line uses that record, waiting at most 300 ms for it,
+inside the memory's 1.5 s (`ScopeLease::keeper_within`, `tools.rs`). Only
+the keep moves: the line's reads (its note, recall, history) stay the
+room's, as a lease is never widened. There is no keeper for a revoked line,
+a privacy change since the line started, a face held only by its gap, or a
+person's line. When there is no keeper, the keep is the room's, as before:
+"said in this room; speaker unknown", and a dated one there is never
+followed up. An unknown speaker's keep still goes to the room, unchanged
+(the first builder, 23 October). A face just remembered that the eyes take
+longer than 300 ms past the line's end to name is kept in the room too; that
+gap is known and unverified on a lamp. The journal says `request N: a keep in
+a line admitted as the room's goes to the known face the eyes named by its
+end (T ms)`, or `request N: a face not the known face's was seen speaking
+it: its keep stays the room's`, with no words. Tests:
 `second_provider::tests::the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later`,
+`second_provider::tests::a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end`,
 `tools::tests::the_restarts_first_line_from_a_remembered_face_is_kept_as_theirs`,
 `tools::tests::an_unknown_speakers_keep_is_the_rooms_as_documented`,
-`memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face`
+`memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face`,
+`memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper`
 and
 `memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet`.
 
