@@ -8485,6 +8485,43 @@ fn off_is_kept_as_one_line_a_skill_and_a_snooze_is_not() {
     assert!(!nudges(&mut nowhere, 1));
 }
 
+/// The skills turned off as earlier builds kept them (`docs/updates.md`,
+/// "Every part's saved data, one version ahead",
+/// `tests/fixtures/stores/README.md`): a new engine reading each has the
+/// same skills off. The folder is `/var/lib`, so a restart in the same boot
+/// and one after a reboot read the same bytes: both are this read.
+#[test]
+fn each_kept_off_file_keeps_its_skills_off() {
+    let kept: [(&str, &str); 1] = [(
+        "2026-10-22",
+        include_str!("../fixtures/stores/off-2026-10-22"),
+    )];
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(dir.path())).unwrap();
+    for (day, text) in kept {
+        let state = tempfile::tempdir().unwrap();
+        fs::write(state.path().join(lamp_skills::OFF_FILE), text).unwrap();
+        let mut engine = Engine::new(vec![skill.clone()], true);
+        assert_eq!(engine.keep_off_in(state.path()).unwrap(), ["sip"], "{day}");
+        assert!(engine.stopped("sip", 0), "{day}");
+        assert!(!nudges(&mut engine, 13 * 3_600), "{day}");
+    }
+}
+
+/// Writes the off file as this build keeps it, with `sip` turned off by
+/// voice, to `LAMP_SKILLS_OFF_FIXTURE`, for the kept stores.
+#[test]
+#[ignore = "writes a fixture"]
+fn write_an_off_fixture() {
+    let target = std::env::var_os("LAMP_SKILLS_OFF_FIXTURE").expect("LAMP_SKILLS_OFF_FIXTURE");
+    let dir = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let mut engine = Engine::new(vec![load(&stoppable(dir.path())).unwrap()], true);
+    engine.keep_off_in(state.path()).unwrap();
+    stop(&mut engine, "off", 1).unwrap();
+    fs::copy(state.path().join(lamp_skills::OFF_FILE), target).unwrap();
+}
+
 /// The program on the host's clock with the skills in `root/skills` and
 /// its state in `root/state`, on a bus and a tools folder of its own for
 /// `start`, its trigger's topic subscribed to.
