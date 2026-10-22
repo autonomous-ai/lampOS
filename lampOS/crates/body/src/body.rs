@@ -5473,7 +5473,10 @@ fn run_on<P: PortIo, R: Runtime>(
             stalls: report.stalls,
             released: report.released.len().try_into().unwrap_or(u16::MAX),
             limp: false,
-            hand: held.iter().any(|held| *held),
+            // A hand from the test input is said as a push too, so what
+            // ends on a push (a skill's search, the voice's) can be run
+            // from it (#2904).
+            hand: held.iter().any(|held| *held) || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             looks_dropped,

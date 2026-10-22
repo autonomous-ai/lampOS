@@ -10912,7 +10912,7 @@ fn a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp() {
 
 /// One step of a run under the test input's hand (`--hold-from`): whether
 /// it held the head, the gesture, the three goals and the arm's.
-type HeldStep = (bool, Option<&'static str>, [u16; 3], [u16; 2]);
+type HeldStep = (bool, Option<&'static str>, [u16; 3], [u16; 2], bool);
 
 /// A folded lamp asked a skill's stretch at a second; the test input
 /// (`Asked::held_by_test`) holds the head over `held`, no hand on any servo.
@@ -10965,10 +10965,24 @@ fn held_from_test_input_run(
                 glimpse.gesture,
                 glimpse.goals,
                 glimpse.arm_goals,
+                glimpse.hand,
             ));
         },
     );
     (report, fates, seen, lamp)
+}
+
+/// `--hold-from` (#2904): each step the test input holds says a hand
+/// (`body/hand`), as a push does, so a search a push ends can be run from
+/// it; before it and once it lets go, never.
+#[test]
+fn a_hand_from_the_test_input_is_said_as_a_push() {
+    let ms = Duration::from_millis;
+    let (_, _, seen, _) = held_from_test_input_run(Some((ms(6_000), ms(10_000))), ms(1_000));
+    assert!(seen.iter().any(|step| step.0));
+    assert!(seen.iter().all(|step| step.4 == step.0), "{seen:?}");
+    let (_, _, free, _) = held_from_test_input_run(None, ms(1_000));
+    assert!(free.iter().all(|step| !step.4));
 }
 
 /// `--hold-from` (#2668): the test input's hand coming mid-stretch ends it
