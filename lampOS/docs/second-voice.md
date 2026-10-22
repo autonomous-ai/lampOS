@@ -1392,36 +1392,54 @@ order is kept. A written turn is the same from the chat on.
   - **Asked as the line begins, never on the worker's loop** (lamp-4ace,
     22 Oct 17:45: asked as the line ended, the note held the worker's one
     thread about 300 ms, missed its turn by 60 ms, and none was asked again
-    for 30 s). As a spoken line begins (the engine's `Start`), the run's
-    note is asked on a thread of its own when it is due: a new run
-    (`opens_anew`), the person changed, a failed note may be asked again,
-    it was quiet, or something was kept. It is asked for the person known
-    then, as memory's hits find it: the line's admitted scope with
-    `LAMP_SECOND_SCOPED_CONTEXT`, otherwise the session's person, the one
-    the turn's note is for (`Sessions::open_ahead`). The read may take up
-    to 2 s
-    (`NOTE_AHEAD_WITHIN`), so an answer that comes before the line ends is
-    the line's. At the line's end the turn waits for it off the loop, never
-    longer than what is left of 300 ms (`remember::FIRST_READ`) from the
-    ask, not 300 ms more from the end; building the context only takes the
-    answer (`Sessions::taken`). A scope that differs at the end (the line
-    narrowed to the room when another face was seen speaking it) lets the
-    early answer go and asks for the right one, and a turn with no line
-    (the lamp's own written ones) asks there, both waited for the same way.
-    Only one read runs at a time: while one is still going on no other
-    starts, and a turn whose person's read cannot start is told the
-    unavailable note. An answer is kept only for its scope, only until the
-    next line begins, and never after the camera or the microphone closes
-    or opens; a line held by a gap asks nothing, a revoked scope is told
-    nothing, and an answer read before a forget, while journalling waits
-    for a fresh context, is never told. A keep after a read began marks the
-    note again, so the next ask has it.
+    for 30 s). A line begins (the engine's `Start`) before the lamp knows
+    it is for it, so the note is asked then only for the scope the last
+    answered turn was told in, and only when it is due: a new run
+    (`opens_anew`), a failed note that may be asked again, a quiet, or
+    something kept. Someone else's talk in the room while the person talks
+    to the lamp asks nothing. An answered line whose scope is another (the
+    first turn, a person change, the line narrowed to the room when another
+    face was seen speaking it) asks for its own scope as the turn is told,
+    and a turn with no line (the lamp's own written ones) asks there too.
+    The read runs on a thread of its own and may take up to 2 s
+    (`NOTE_AHEAD_WITHIN`). At the line's end the turn waits for it off the
+    loop, never longer than what is left of 300 ms
+    (`remember::FIRST_READ`) from the ask, not 300 ms more from the end.
+    Only one read runs at a time: while one goes on no other starts, so a
+    read the camera or the microphone voided holds the next back for up to
+    its 2 s, and a turn whose own read cannot start keeps the note it had.
+  - **A read is not the memory's until a turn takes it**
+    (`remember::NoteRead`; the reviewer-lead's and reviewer-two's P2s on
+    #3016). The read opens its snapshots in the store under a new session
+    name and reads the rules and the follow-up, but the client's session,
+    its person, its sources, rules, carried links and offers are as they
+    were. Only an answered line's turn takes it (`NoteRead::adopt`, from
+    `Sessions::taken` once the turn waited for it): the session before is
+    closed then, the journal resumes then if it may, and the follow-up
+    joins the note then. A complete answer stands for its scope, however
+    late it came, until a turn takes it, for at most ten minutes
+    (`RETAINED_FOR`); an answered turn for another scope lets it go. A read
+    let go untold closes its own session in the store, and gives back the
+    kept mark it took as it began, so the next read covers that keep; a
+    worker stopping closes a read's session with the open one. With
+    `LAMP_MEMORY_THREADS`, the follow-up is read with the note: the memory
+    holds it until the lamp asks, so a read never told costs one of its
+    offers, never the thread.
+  - **A forget during the read** (El's and reviewer-two's P2s on #3016):
+    the Days client counts each forget or rule write sent, each stop of
+    journalling and each write whose answer was lost (`changes`). A read
+    stamps the count as it begins, and is taken only while the count is
+    the same: one the store may have changed under is let go and asked
+    again, whatever `LAMP_MEMORY_JOURNAL_RESUMES` or its backoff say. A
+    line held by a gap asks nothing and a revoked scope is told nothing.
   - **After a failed note read:** a refusal, timeout, or invalid snapshot
     leaves the note incomplete, and so does a note still not in by what is
     left of its 300 ms as the line ends (late). A room snapshot beside a
-    failed personal snapshot is also incomplete. The next turn asks again,
-    with a new Days session, as its line begins: a memory slow once costs
-    one turn its note. A second failure in a row is asked again no sooner
+    failed personal snapshot is also incomplete. A late read that then
+    completes is the next turn's, with no second read, and ends the
+    failure. Otherwise the next turn asks again, with a new Days session,
+    as its line begins: a memory slow once costs one turn its note. A
+    second failure in a row is asked again no sooner
     than 30 s (`FRESH_RETRY`) after that attempt began, and so on while
     they fail back to back; a complete note ends the spacing. There is no
     background poll. Keeps and person changes still invalidate immediately.
@@ -1440,13 +1458,16 @@ order is kept. A written turn is the same from the chat on.
     began; ready in N ms` (or `incomplete in N ms`, and `asked as the turn
     is told` for a read started at the end), `memory note late; retry on
     the next turn`, `memory note incomplete; retry on the next turn`,
-    `memory note incomplete again; retry after 30000 ms` and `memory note
-    retry complete`; they contain no note, name or person id. The host
-    regressions are `worker::memory_note_retries`, among them
-    `a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits`
-    (an answer 350 ms after the ask, a 1 s line, the loop's longest gap
-    measured) and
-    `a_late_note_is_asked_again_on_the_next_turn_not_thirty_seconds_later`;
+    `memory note incomplete again; retry after 30000 ms`, `memory note
+    retry complete` and `memory note let go: the memory changed while it
+    was read; asked again`; they contain no note, name or person id. The
+    host regressions are `worker::memory_note_retries` (among them the
+    loop's longest gap with an answer 350 ms after the ask on a 1 s line,
+    a late answer taken on the next turn, lines never answered asking
+    nothing, and a voided read holding the next),
+    `worker::kept_name_callback` (an abandoned refresh's keep reaching the
+    next turns, reviewer-two's reproduction, and its controls) and
+    `remember::tests::a_forget_during_a_note_read_keeps_it_from_being_told`;
     the six-minute spoken name-retention check on #2540 is a separate lamp
     gate.
   - **Nothing is split by it** (the first builder's P2 on #2615): the ask
