@@ -7008,6 +7008,36 @@ Ready for lamp-voice: #3072 only, at `f6affe231`
   AGENTS.md matches the Queue/PR protocol. No lamp, deployment, model call,
   physical memory-row acceptance or score increase is claimed.
 
+## 2026-10-23, 01:17: inactive controller published; store rebase requested
+
+Ready for lamp-voice: no new head; First owns the trains
+
+- #3097 is pushed at `a6c42ae92`: inactive controller core and actual-forget
+  cleanup P3. Mac formatting, strict workspace/all-target clippy and build
+  pass. Core 18/0/0, store 51/0/1, Eyes binary 8/0/0, Setup 178/0/1,
+  VoiceEval 623/0/0 (238 doctests included), Update plan 4/0/0: total
+  882 passed, zero failed, two existing ignores. Head contains `28f796223`;
+  main advanced during qualification. Linux clippy 39829201608 passed;
+  ARM64 39829201544 is still running. Source reads requested on the PR.
+- Three new forget controls inspect exact unfinished-file cleanup before
+  reopening. The controller also copies only the 128 validated print values;
+  its new actual five-frame/handoff test reproduced excess retained capacity
+  before the fix, then passed after it. Initial clippy and sandbox-local-socket
+  failures are retained, with the corrected runs, not waived.
+- First's 01:09 requested #3072 onto `c7003f01d` for train 5 after an Eyes
+  help conflict. The store is rebased locally at `69d0e6815`; its new host
+  gate is active and no new store head is published yet. Upstream help is
+  retained, as are both reset additions, all historic hashes and the combined
+  fixture hash; personal-store census is 37. The final range-diff audit is
+  being recorded before force-with-lease publication.
+- Common speaker source is frozen on `c7003f01d`. Its 22 authored Engine
+  tests include eight current-piece carry controls and four asynchronous
+  event-note controls after integrating upstream #3059. The event reader
+  checks proof before scheduling/reading and carries private provenance past
+  its await. Fresh qualification follows the urgent store rebase gate.
+- #3064, #3014 and #2988 remain draft; no lamp, model call, physical
+  acceptance or memory score increase is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
