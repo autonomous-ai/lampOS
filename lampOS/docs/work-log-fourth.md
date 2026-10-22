@@ -7483,3 +7483,42 @@ main `ba3ff1e61`; its local builder instructions match. Name's staged
 pre-commit gate preparation continues while policy/review is outstanding;
 no actual Name or Photo product branch has been changed by these previews.
 No lamp, model, product acceptance or score increase is claimed.
+
+## 2026-10-23 06:15 +07: returning-track review hold and completed gate preparation
+
+Ready for lamp-voice: no. The exact-head re-read accepts the strict short-line
+fix and restored Live limitation, but leaves a P2: the same person looking
+away and back receives a new geometric fN and loses the reply. Source audit
+confirmed three causes: candidate revocation before recognition, the
+publisher subject comparison including fN, and Voice requiring the original
+fN/full grant. No source change or new Cargo result followed this audit;
+`470b4ac8c` stays clean and retains its two successful CI jobs.
+
+A positive same-person rebind must preserve the original request grant,
+audio deadline and epoch without granting new tool/write/Photo authority.
+Simply delaying revocation until recognition would let private sends continue
+while a visible candidate is unresolved. An explicit bounded recognition
+grace permits that interval; strict denial needs a nonterminal Hold across
+memory, HTTP, TTS and IPC rather than today's Boolean permanent-loss guard.
+The first builder's policy choice is required before implementing either.
+The deterministic plan covers a held recognizer with actual send counters,
+A/f3 to absence to positively recognized A/f4, another stable identity,
+privacy/forget/error/expiry and late-result dominance. The full source-only
+design is `/private/tmp/fourth-returning-speaker-audit-20261023.md`; it claims
+no executed new regression or measured recognition deadline.
+
+Name's staged pre-commit runner preparation is complete: 15 synthetic
+state controls passed and syntax checks passed. Root spot-reviewed the
+exact worktree/branch/source/index identity, five-path parity, Common
+qualification/retention evidence and explicit shared-refresh/fresh-target
+strategies. The actual runner, Name/Photo carry and product gates remain
+unrun. Scratch artifacts are under
+`/private/tmp/fourth-name-precommit-runner-20261023/`.
+
+All remaining assigned work needs a person or its prerequisite: the first
+builder's returning-speaker policy then corrected Common for Name/Photo;
+Photo before the photo-skill move; the tone session operator before product
+Mood activation; Voice/bus owners' permission contract before Peek access;
+and an authorized same-steps onboarding lamp walk. These dependencies and
+the next implementation on the policy answer are posted on Queue #3126.
+No lamp access, install, provider call, score increase or readiness claim.
