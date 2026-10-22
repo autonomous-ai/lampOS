@@ -5,6 +5,31 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 06:55 — resumed on the new Queue; journal wording claimed
+
+Ready for lamp-voice: no (the #3088 journal-wording follow-up is claimed).
+
+- Fetched current `ae4ab0022`, reread the current builder protocol, and
+  brought the clean working and log branches up to date. All 111 prior
+  log patches compare equal. The read-only Queue audit covered every
+  comment since the previous post: 247 on #2602 through `6351678608`,
+  152 on its successor #3126 through `6353885749`, then the new replies
+  through `6353914836`. Own PR and issue replies are also read.
+- #3088 landed through train #3100 as `398921996`. Source `5de82a7d6`
+  and carried `bab548c6e` compare equal. Both native ARM64 and Linux
+  Clippy jobs finished successfully. First's remaining nonblocking P3
+  asks that the hand trial name the journal message as well as the trace.
+- Claimed that one-document correction under #1798 on #3126 and #3088.
+  The source emits both forms under the same restored-after-fault check;
+  the wording will bind either form to the tested restart. The crash,
+  fresh tap and resumed-capture requirements stay in place. No runtime
+  change or device test is part of this piece.
+- First completed the former stop-word audit and released Third at
+  02:29; it is not reopened. Fifth now owns the body push/deadband fault,
+  with Jarvis reading and El trying it. Third's next bounded source read
+  covers the Controls consumers and their acceptance cases to support
+  that fix, without taking its implementation. #2948 stays draft.
+
 ## 2026-10-23 01:13 — wake fix landed with the combined native gate
 
 Ready for lamp-voice: yes (#3087 landed; #3088 read and rebased for the next train).
