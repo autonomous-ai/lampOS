@@ -22,10 +22,14 @@ use tokio::time::Instant;
 pub const ENVIRONMENT: &str = "LAMP_SECOND_WEATHER";
 /// The function's name, as the model calls it.
 pub const NAME: &str = "weather";
-/// A call waits this long for its place and its forecast together, as a
-/// search's does ([`super::search::WITHIN`]), then answers that the weather
-/// couldn't be reached.
-pub const WITHIN: Duration = super::search::WITHIN;
+/// A call waits this long for its place and its forecast together, then
+/// answers that the weather couldn't be reached. Longer than a search's
+/// ([`super::search::WITHIN`], 3 s): on lamp-4ace on the night of 22 Oct, 2 of
+/// 5 Open-Meteo calls took past 3 s and one 2.4 s, and the person was told
+/// the weather wouldn't come through while it was on its way. The lamp says
+/// it is checking meanwhile, and a right answer a little later is the owner's
+/// choice ("quality first").
+pub const WITHIN: Duration = Duration::from_secs(6);
 /// A place's forecast is answered from what was kept while it is this
 /// fresh, never older.
 pub const KEPT_FOR: Duration = Duration::from_secs(10 * 60);
@@ -1056,8 +1060,8 @@ mod tests {
         );
     }
 
-    /// A fetch that never answers is cut at the call's bound, the search's
-    /// 3 s, and says the weather couldn't be reached.
+    /// A fetch that never answers is cut at the call's bound, 6 s, and says
+    /// the weather couldn't be reached.
     #[tokio::test(start_paused = true)]
     async fn the_weather_not_reached_in_time_is_an_error() {
         let slow: Fetch = Arc::new(|_| Box::pin(std::future::pending()));
@@ -1066,7 +1070,7 @@ mod tests {
             .answer(&json!({"place": "Hanoi"}))
             .await;
         assert_eq!(answered.told, json!({"error": UNREACHED}));
-        assert_eq!(answered.how, "not reached within 3000 ms");
+        assert_eq!(answered.how, "not reached within 6000 ms");
         assert_eq!(waited.elapsed(), WITHIN);
     }
 
