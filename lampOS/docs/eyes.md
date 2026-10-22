@@ -1403,7 +1403,9 @@ Then `lamp-seems-measure … --delete`, by reader and confidence.
 03:56):
 - `on`, on the lamp, adds both readers, the log and `LAMP_SEEMS_BROW_LOW`
   to the eyes' own unit, and `LAMP_MOOD_SEEMS` to Mood, through `/run`
-  drop-ins, and keeps `mood/state` for the session.
+  drop-ins, and keeps `mood/state` for the session. Without `FERPLUS`
+  (FER+'s model isn't shipped, #811) it runs Blendshape alone, and `read`
+  prints Blendshape's rows only.
 - `labels`, at the person's keyboard, says each stretch in turn. Space
   labels it, and p, n or u say how they feel instead. No camera frame is
   taken or kept.
