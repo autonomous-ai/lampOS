@@ -1432,7 +1432,8 @@ core = []       # a core skill's alone (kind = "core"): its core-only grants
   reads and the reserved `stay_plugged_in` tool; `"sleep"` (#940, Night
   sleep), the night's sleep: its runs ask nobody (no `[ask]`, whatever
   `LAMP_SKILLS_ASK` says), it has only `rest` steps and no tool, lamp-skills
-  claims the night for the folder `night-sleep` on `expression/sleep_claim`,
+  claims the night for the folder `night-sleep` on `expression/sleep_claim`
+  while its rest can be had (a fresh Expression, no repeating refusal),
   and Expression holds that skill's rest as its own sleep
   ([alive.md](alive.md#night-sleep-is-a-skill)). The runtime knows these by
   the declaration, never by the skill's name: a renamed copy without it is
