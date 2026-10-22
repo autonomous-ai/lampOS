@@ -11,6 +11,7 @@ mod name_carries;
 mod name_near;
 mod not_for_me_words;
 mod short_done;
+mod unplayed_join;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;

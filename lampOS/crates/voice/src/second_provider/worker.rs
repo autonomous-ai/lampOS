@@ -2968,12 +2968,15 @@ pub fn serve(
                 heeding.keeping_line_rooms();
             }
             let same = heeding.clone();
-            engine = engine.joining_cut_words(Arc::new(move |cut, request| {
-                same.lock().map_or(
-                    Joined::Not("the rule is not readable".to_owned()),
-                    |mut heeding| heeding.same_speaker(cut, request),
-                )
-            }));
+            engine = engine
+                .joining_cut_words(Arc::new(move |cut, request| {
+                    same.lock().map_or(
+                        Joined::Not("the rule is not readable".to_owned()),
+                        |mut heeding| heeding.same_speaker(cut, request),
+                    )
+                }))
+                // A joined line's answer was never played: not history.
+                .unsaying_joined(Arc::new(crate::thread::unsay));
         }
         // The lamp's name carries to the line after it only when one person
         // said both, as the join tells it (`LAMP_SECOND_NAME_CARRIES`): the
