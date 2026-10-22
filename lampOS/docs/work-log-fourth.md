@@ -6508,6 +6508,50 @@ Ready for lamp-voice: no, retry latest-base handoff and activation full/native g
   `/private/tmp/fourth-photo-product-activation-checks-20261022/host/`.
   Final checks precede code publication; Mobile0c89 acceptance stays open.
 
+## 2026-10-22 16:50 ICT: retry merged; photo activation published as draft
+
+Ready for lamp-voice: retry delivered; photo draft2965 awaits native/full host and First review.
+
+- #2936 final109988c2d on2202 passed ARM6439753149125:
+  10,366/0/67, all27focused plus corrected Tasks case,4docs12processrelay,
+  1samevoiceleaky; Clippy39753149220green, no rerun on109.
+  CImerge742145faeb9959a25bdda6a7c08e14422191538b on2202.
+  Artifact12414863540 SHA-256
+  `51bb1edcb2b837a21e2b812f9a863b9572450c0bd42842bc2de070ac79d834e7`.
+  Receipt6337476600. Reviewer-lead merged044a50052346e707d72a523223c398a11c6dfad7
+  at16:32:34ICT. Prior failed/authorised-rerun receipts retain3c attribution.
+- #2856 independent audit found a retainedlegacy postlookup lease gap.
+  Extended negativecontrol proved bothlegacyYes/No mutatedafterrevocation,
+  sharednone. The correction carries request+lease through legacy lookup
+  and shares the postlookup authoritycheck; all4variants nowlookup1/mutation0.
+  No extraRPC, function or admissionpolicy. Raw
+  `/private/tmp/fourth-photo-product-activation-checks-20261022/voice/legacy-authority-p2/`.
+- Final29/0/0 +fmt/strictworkspaceClippy/workspacebuild on26fb/06478:
+  newVoice9,legacy8,oldquestion1,census5,productfunctions5,actualcontract1.
+  Oldquestionfixture nowexplicitlyenablesphoto mode; staged failures kept.
+  Initial fullhost was intentionally interrupted for this correction; its
+  completedCloud187 and partialUpdate remain historical, not a fullpass.
+- First rebase conflict onlyEyesExecStart: retainedcurrentMouth/Mesh/Blendshape
+  flags and face-expressionconsentcomments, appendedonlyphoto-dir. All14Rust
+  patchIDs identical. Finalreplay ontoef1 added previouslyqualifiedmemory
+  retrytests/factoryshell/docs only;14Rust files+3units byte-identical.
+  Scopedcounts retain26fb/06478; publishedsource hashes independentlyaudited.
+- Published draft #2965,8ee3f50e958d4fb41ad71882f105ddac00bcc6a2,
+  parentef1eb0cf2350971fb110938fb07c12dd593fcc66,
+  onecleancommit, noattributionbody. Claim#2856 remains6335952379.
+  Raw verification/sourceJSON committed. ARM39757954474 and Clippy39757954593
+  running; fullserial Voice/Cloud/Memory/Keeper/Skills/Setup/Eval/Update host
+  gate runs separately onpublishedsource. Source is frozen during checks.
+- Currenthosttimings cold/repeat(ms): legacyYes4.597/4.937,
+  sharedYes3.075/2.717,legacyNo2.780/2.324,sharedNo4.892/2.482.
+  Under50ms hosttarget; no improvement claim. Slowlookup300.297ms,
+  nomutation. Same twoRPC boundary and300ms+6s existingbounds; no new
+  steadyturnIO. No provider/acoustic/lamp proof.
+- First owns activeproduct-unit merge; Mobile’s authorised0c89 fullupdate
+  selfie/onequestion/yes and priorrecognition/immediateanswer proofs remain.
+  No deviceactions, realphotos/persondata, backendretention proof orscoreincrease.
+  Sourceissue6337793934 and Queue6337795320. Installableskillmigration separate.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
