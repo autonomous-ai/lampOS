@@ -1082,7 +1082,13 @@ the unchanged legacy client, used unless the new Days client is selected.
   It is asked for after the turn has read the session's note, as the
   session's first line is the one that opens it and the offer is made as
   it opens (reviewer-two's P2 on #3059: asked before, a cold first
-  greeting had no offer yet and got no line). A greeting is decided by
+  greeting had no offer yet and got no line). A note the second route
+  reads as the line begins (#3016, [second-voice.md](second-voice.md),
+  "Asked as the line begins") asks its follow-up only once the turn is
+  answered, and the line is asked for only once the turn has taken that
+  read, so it comes after the session's note however the note was read;
+  a read given a dated follow-up and let go untold takes the offer back.
+  A greeting is decided by
   words alone, lower-cased, "’" as "'": at most eight words holding "hi",
   "hello", "hey", "hiya", "howdy", "morning", "afternoon", "evening",
   "chào", "how are you", "how's it going", "what's up", "I'm home" or

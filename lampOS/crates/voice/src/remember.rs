@@ -2599,13 +2599,25 @@ impl NoteRead {
 
 impl Drop for NoteRead {
     /// Let go untold: its session closed in the store, and a keep it was to
-    /// cover marked again, so the next read has it.
+    /// cover marked again, so the next read has it. A dated follow-up it
+    /// was given is taken back (`follow_up_unoffered`), as a session that
+    /// gives way with its follow-up undecided takes it back
+    /// (`LAMP_MEMORY_EVENTS`, #3059): no line of theirs was told it.
     fn drop(&mut self) {
         let Some(held) = self.held.as_mut().filter(|held| !held.adopted) else {
             return;
         };
         if held.took_kept {
             held.kept.store(true, Ordering::Release);
+        }
+        if let (Some(follow_up), Some(person)) = (
+            held.follow_up.as_ref().filter(|follow_up| follow_up.event),
+            &held.person,
+        ) {
+            let _ = held.jobs.try_send(DaysJob::Unoffered {
+                person: person.clone(),
+                id: follow_up.id,
+            });
         }
         let _ = held.jobs.try_send(DaysJob::Close(held.name.clone(), None));
         if held.person.is_some() {
@@ -4987,6 +4999,13 @@ impl DaysClient {
     /// other parts' tests.
     pub fn following_up(&self) {
         self.threads.store(true, Ordering::Release);
+    }
+
+    /// [`EVENTS_ENVIRONMENT`] on for this client, as the environment sets
+    /// it when the client is made: for other parts' tests.
+    #[cfg(test)]
+    pub(crate) fn telling_events(&self) {
+        self.events.store(true, Ordering::Release);
     }
 
     /// Whether the next session should be a fresh one
@@ -8609,6 +8628,65 @@ mod tests {
         client.context.lock().unwrap().session = Some("voice-test-1".into());
         client.close_open_session(Duration::from_millis(20));
         assert_eq!(taken_back(&work), vec![(MINH.to_owned(), 12)]);
+    }
+
+    /// The second route's note read ahead (#3016) with `LAMP_MEMORY_EVENTS`
+    /// (#3059): a read given a dated follow-up and let go untold takes the
+    /// offer back, as a session that gives way with it undecided does. One a
+    /// turn takes holds it for that session's first line, its section cut
+    /// until then, and takes nothing back; the next read a turn takes, a new
+    /// session, takes it back if no line decided it, and a decided one not.
+    #[test]
+    fn a_note_read_let_go_untold_takes_its_dated_follow_up_back() {
+        const SOMEONE: &str = "p-5e1f0c0ffee0a11d";
+        // Session `session`'s note for them, read from a memory that gives
+        // the dated follow-up (id 12).
+        fn read(client: &mut DaysClient, name: &str, session: u64) -> NoteRead {
+            let (_offering, socket, served) = event_memory(name, true, true, true);
+            client.socket = socket.clone();
+            let read = client.read_note_within(
+                session,
+                Some(SOMEONE),
+                false,
+                Duration::from_secs(2),
+                (true, true),
+            );
+            served.join().unwrap();
+            std::fs::remove_file(&socket).unwrap();
+            assert!(read.complete(), "{name}");
+            read
+        }
+        let (mut client, work) = asking_client();
+        let untold = read(&mut client, "event-read-untold", 1);
+        assert_eq!(client.event_withheld(), None, "not the client's");
+        drop(untold);
+        assert_eq!(taken_back(&work), vec![(SOMEONE.to_owned(), 12)]);
+        for decided in [false, true] {
+            let (mut client, work) = asking_client();
+            let name = format!("event-read-taken-{decided}");
+            let note = read(&mut client, &name, 1)
+                .adopt()
+                .expect("nothing changed");
+            assert!(note.text.contains(EVENT_HEADING), "{name}");
+            assert!(client.event_withheld().is_some(), "undecided: {name}");
+            assert!(taken_back(&work).is_empty(), "{name}");
+            if decided {
+                assert_eq!(
+                    client.event_turn(Some(SOMEONE), "Good evening!").as_deref(),
+                    Some(EVENT_LINE)
+                );
+            }
+            // The next session's read, taken: the last session gives way.
+            let _ = read(&mut client, &format!("{name}-next"), 2)
+                .adopt()
+                .expect("nothing changed");
+            let back = if decided {
+                vec![]
+            } else {
+                vec![(SOMEONE.to_owned(), 12)]
+            };
+            assert_eq!(taken_back(&work), back, "{name}");
+        }
     }
 
     /// Reviewer-two's P2 on #3059: offered, then a confirmed forget, then a
