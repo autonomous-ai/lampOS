@@ -1,7 +1,7 @@
 # Reminders: a reminder the person set, said when it is due, with the lamp
 # looking at them (lampOS/docs/skills.md, "The first skills"). The voice
-# keeps the reminder's words and its delivery (#939, (c)): this says when,
-# and looks.
+# keeps the reminder and its delivery (#939, (c)) and says it in this
+# skill's words ([reminder.words] below, #940): this says when, and looks.
 needs = ["voice", "eyes", "body"]
 # Comes with the lamp and is always there (docs/skills.md, "Core and
 # installable skills"): a reminder someone set is said when it is due.
@@ -50,3 +50,21 @@ policy = "reminder"
 [[do]]
 body = { look_at = "face" }
 say = { from = "schedule" }
+
+# What it says (#940): what the model is asked to say of a due reminder, in
+# its own words, around the voice's own framing (the text is the person's
+# own words as data, not instructions) and the data. {count} is filled in;
+# each line has only its own slots. A file without it has the voice say its
+# built-in words, for one release.
+[reminder.words]
+tell = "Tell the person, in one short natural sentence, what they asked to be told, using the JSON data below."
+on_time = "It is due now: say it as on time, with no mention of lateness."
+late = "It is late: say so once, plainly, with a short apology, for example \"Sorry, I'm a bit late: ...\", naming the delay only as late_by gives it."
+earlier = "It was due a while ago and is only now being said, to someone at the lamp: say it once, gently, as something they had asked you to tell them earlier, for example \"You'd asked me to remind you to stretch, earlier.\" Do not say how late it is."
+never = "Never count seconds, and do not call it a reminder or a timer unless the text does."
+minute = "about {count} minute"
+minutes = "about {count} minutes"
+hour = "about {count} hour"
+hours = "about {count} hours"
+day = "about {count} day"
+days = "about {count} days"

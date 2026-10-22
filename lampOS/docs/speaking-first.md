@@ -459,8 +459,10 @@ speak has asked the Policy's gate first ([skills.md](skills.md)).
 `{"skill":"reminders","from":"schedule","priority":8,"expires_in_ms":30000}`
 asks for the reminder Schedule has due; `"from":"tasks"` for the news of
 work handed over. The skill says when, and moves and lights with the
-words; the voice keeps the words and their delivery, as it always did: a
-reminder's durable acknowledgement, news told once. `lamp-skills` sends it
+words; the voice keeps their delivery, as it always did: a reminder's
+durable acknowledgement, news told once. The words are the skill's own
+(`[news.words]`, `[reminder.words]`, #940), read by the voice from the
+installed `skill.toml`. `lamp-skills` sends it
 for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
 - Such an ask is never said on its own: the general say passes it by, its
   quiet included. It waits for its source's turn, which takes it

@@ -70,10 +70,11 @@ when = "appears"
 [ask]                     # the Policy's moment question (#958), before anything is done
 policy = "news"
 
-# The words are the voice's: it keeps the news of work handed over (who did
-# it, what came back, what failed and whether to try again) and tells each
-# piece once (#1033, say = { from = "tasks" }). The skill says when, and
-# moves and lights with the words, which come at the say's begun.
+# The voice keeps the news of work handed over (who did it, what came
+# back, what failed and whether to try again) and tells each piece once
+# (#1033, say = { from = "tasks" }), in this skill's words ([news.words]
+# below, #940). The skill says when, and moves and lights with the words,
+# which come at the say's begun.
 
 # Done: look at the person if a face is in view (the runtime leaves the look
 # out with none), a small glad sway, and the news.
@@ -105,3 +106,48 @@ say = { from = "tasks" }
 on = "asking"
 body = { look_at = "face", gesture = "curious" }
 say = { from = "tasks" }
+
+# What it says (#940): the news the voice tells, in its own words, inside
+# the voice's "(Nobody has spoken. ...)". {who}, {when}, {asked}, {answer},
+# {computer}, {no_question}, {asks}, {waiting}, {how_many}, {each}, {first},
+# {goes_on}, {about}, {signs}, {time}, {minutes}, {name}, {description},
+# {uses}, {ask}, {put_on} and {why} are filled in by the voice, which quotes
+# and cuts the task's and the answer's words; each line has only its own
+# slots. A file without it has the voice say its built-in words, for one
+# release.
+[news.words]
+done = "News from work you handed over for the person. {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}\". Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question}"
+done_cut = "News from work you handed over for the person. {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}\". Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), then that the rest is on {computer}. Never only that. No code, lists, file paths or links, {no_question}"
+asking = "News from work you handed over for the person. {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {waiting}"
+asking_said = "News from work you handed over for the person. {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". What it last said: \"{answer}\". {waiting}"
+waiting = "Tell them once, in one short sentence, that {who} is waiting for them on {computer} and that they can answer it there. It did not say what it is asking: do not ask a question for it or guess one."
+waiting_said = "Tell them once, in one short sentence, that {who} is waiting for them on {computer} and that they can answer it there. If what it last said is a question to them, you may pass it on in your own words; otherwise do not ask a question for it or guess one."
+stopped = "News from work you handed over for the person. {who} stopped without finishing the task they gave it: \"{asked}\". What it last said: \"{answer}\". Tell them in one short, plain sentence, without alarm."
+just = "just"
+while_ago = "a while ago, and you have not told them yet:"
+no_question = "No question at the end."
+and_no_question = "and no question."
+no_question_asks = "No question of your own at the end. {asks}"
+and_no_question_asks = "and no question of your own. {asks}"
+asks = "If its answer asks them something, say what it asks, and that they answer it in {computer}."
+failed = "The work the person asked you to hand over, \"{asked}\", did not reach {who}: it could not be started just now. Tell them in one plain, light sentence, with no technical words, and offer to try again."
+failed_unsure = "The work the person asked you to hand over, \"{asked}\", may not have reached {who}: you cannot tell whether it started. Tell them in one plain, light sentence, with no technical words, and offer to try again."
+together = "News from {how_many} pieces of work you handed over for the person. {each} Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. No code, lists, file paths or links.{goes_on} No question."
+together_each = "{who} finished \"{asked}\" {when}: \"{answer}\"."
+two = "two"
+three = "three"
+just_now = "just now"
+a_while_ago = "a while ago"
+together_goes_on = " Where an answer goes on, give its gist in one plain line from that beginning, then that the rest is on their computer: never only that."
+progress = "Progress on work you handed over for the person: {who} is still working on the task they gave it: \"{asked}\". Its latest progress line: \"{about}\".{signs}{time} Tell them how it is going in one short, natural sentence, the way a good chief of staff mentions it in passing, starting with something like \"Oh, {who} has…\". Do not read the line out word for word, and no code, file paths or links. No question at the end."
+progress_signs = " Signs of a step forward in it: {signs}."
+progress_a_minute = " It has been at it for about a minute."
+progress_minutes = " It has been at it for about {minutes} minutes."
+tests_pass = "the tests pass"
+build_works = "the build works"
+fixed = "something was fixed"
+found = "something was found"
+part_done = "a part was done"
+pull_request = "a pull request was opened"
+made = "News from work you handed over for the person. {who} {when} made the skill they asked for, \"{name}\": {description} It would use {uses}. Tell them in one or two short sentences what it would do and what it would use, then ask exactly: \"{ask}\" It is not on the lamp yet. Put it on only if they then say yes ({put_on}). No file names."
+not_kept = "News from work you handed over for the person. {who} {when} made a skill for them, but the lamp can't keep it: {why}. Tell them so in one short sentence, and that the rest is on {computer}. No question."

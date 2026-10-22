@@ -229,9 +229,12 @@ give way in the product's `lamp-voice.service`: its hello stays off
 (`LAMP_SPEAK_FIRST` unset), and `LAMP_SCHEDULE_SPEAK=skill` and
 `LAMP_TASK_NEWS=skill` make a due reminder and the news of a task wait up
 to 10 s for the skill's ask (`from = "schedule"`, `from = "tasks"`). The
-voice still keeps the words: it says each once, with the skill's ticket
-when the skill asked, so the lamp looks up, sways or droops with them, or
-by itself when no ask came. Each skill asks once, and an ask is gone 20 s
+voice says each once, with the skill's ticket when the skill asked, so the
+lamp looks up, sways or droops with them, or by itself when no ask came,
+in the skill's own words either way: it reads `[news.words]` and
+`[reminder.words]` from the installed `skill.toml` each time (#940), and
+says its built-in words, with a journal line, for this release only, when
+the installed file has none. Each skill asks once, and an ask is gone 20 s
 later (`say::FROM_LIVES_US`), so the two are timed to meet (the reviewer's
 P2 on #1667). Reminders asks only while the voice rests (`voice/state`),
 keeping a reminder due during a talk until the talk ends (`wait`), when

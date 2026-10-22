@@ -329,54 +329,10 @@ impl Words {
     }
 }
 
-/// Each line of a skill's own words (`section`, #940) is words of 1 to
-/// [`crate::MOST_WORDS_BYTES`] bytes with no control characters, with
-/// exactly its slots, sorted, each once.
-pub(crate) fn checked_words(
-    section: &str,
-    lines: &[(&str, &String, &[&str])],
-) -> Result<(), String> {
-    for (name, text, slots) in lines {
-        if text.trim().is_empty()
-            || text.len() > crate::MOST_WORDS_BYTES
-            || text.chars().any(char::is_control)
-        {
-            return Err(format!(
-                "{section} {name} is words, 1 to {} bytes, with no control characters",
-                crate::MOST_WORDS_BYTES
-            ));
-        }
-        let mut found = slots_in(text)
-            .ok_or_else(|| format!("{section} {name} has a brace that opens no slot"))?;
-        found.sort_unstable();
-        if found != *slots {
-            return Err(format!(
-                "{section} {name} has the slots {slots:?}, each once, and no others"
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// The `{name}` slots in `text`, in order; none for a brace that opens no
-/// slot.
-fn slots_in(text: &str) -> Option<Vec<&str>> {
-    let mut slots = Vec::new();
-    let mut rest = text;
-    while let Some(open) = rest.find(['{', '}']) {
-        if rest[open..].starts_with('}') {
-            return None;
-        }
-        let close = rest[open..].find('}')? + open;
-        let name = &rest[open + 1..close];
-        if name.is_empty() || !name.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
-            return None;
-        }
-        slots.push(name);
-        rest = &rest[close + 1..];
-    }
-    Some(slots)
-}
+/// Each line of a skill's own words is checked as the voice checks its
+/// own skills' words (#940): one checker, so a line lamp-skills loads is
+/// one the voice reads.
+pub(crate) use lamp_voice::skill_words::checked_words;
 
 /// A watch as loaded.
 #[derive(Clone, Debug, PartialEq)]

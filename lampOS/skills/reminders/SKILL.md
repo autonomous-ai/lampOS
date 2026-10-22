@@ -20,7 +20,8 @@ five minutes", and says it. Nothing more: no gesture, no light.
   it should hold only while someone is talking to the lamp.
 - **Do:** look at the face, if one is in view, and ask the voice to say the
   reminder it keeps (`say = { from = "schedule" }`, #939). The voice keeps
-  the words and the delivery: it says the reminder as it always did, and
+  the reminder and the delivery: it says it in this skill's own words
+  (`[reminder.words]` in its `skill.toml`, #940, `docs/skills.md`), and
   acknowledges it to Schedule only once it was heard whole. With
   `LAMP_SCHEDULE_SPEAK=skill` the voice waits up to 10 s for this skill,
   then says the reminder itself, so a reminder never waits on this skill.
