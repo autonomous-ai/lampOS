@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 15:21 +07, all current changes merged
+
+Installer #2767 was carried with an equal range-diff into **#2945**, head
+`547ac88914554f410252f0cd33ee797e5dc4fe42`, and merged as
+`8dd69028a2799e1f534835911a404a5bdaab3e54`. This supersedes the previous
+checkpoint's request for First's merge. Its carried-head x86 Clippy passed;
+carried-head ARM64 was still running at the status check. The original
+`daa23b283` native result **10,337/0/67 skipped**, one leaky pass, remains
+attributed to that authored head and does not qualify the carried integration.
+
+Current work is merged: Music #1757, reports #2764, voice-state #2879,
+metadata via #2903, updater cuts via #2908, installer via #2945. No further
+source change is pending in these worktrees; no new item was started.
+
+Reviewer-lead's no-P1/P2 read on #2945 retained three P3 limitations: an earlier
+unignored ExecStopPost failure can skip the appended recorder; three helper
+names have reserved drop-in directories without a current PRODUCT unit; a
+missing lamp-cloud current executable logs a swallowed 203 and loses that
+note. These are recorded on #2945 for First's follow-up and are not claimed
+fixed here. Restart overhead remains unmeasured on a lamp. #2810's stronger
+all-updater-copy acceptance remains First's separate decision. No device
+access or deployment was performed.
+
+---
+
 ## Current checkpoint: 2026-10-22 15:20 +07, installer correction native green
 
 #2767 `daa23b283` now has [fresh ARM64/Clippy qualification](verification/install-exit-notes-doc-native-20261022/README.md):
