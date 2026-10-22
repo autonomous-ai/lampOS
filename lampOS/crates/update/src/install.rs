@@ -586,6 +586,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "a681f484a5e1cd404f5117fb0efb90eca93ae9bbd1862e6f447bed05e0986a24", // #2947 (face-expressions.json), 22 Oct
     "7c24a8315ceb8fa6ff9d119370989f30cdad6d9390610ab67a607a99729cc5d8", // #2754 (glance.log), 22 Oct
     "881c5fd156474fcd8484e41f77e34f952f69aa85c6d71f3e33ceb0d7bfb9bd9d", // 64cefadfc, 21 Oct
     "60be2ab39e759a6161d249710e5babfec042c944baa62450779ed7a4478eea22", // d06e9d53e, 21 Oct
