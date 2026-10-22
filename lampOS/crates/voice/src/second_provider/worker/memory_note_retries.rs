@@ -1013,11 +1013,14 @@ impl Turns {
     /// context callback composes it.
     fn told(&self, scope: &RequestScope) -> String {
         let socket = Some(PathBuf::from("/unused/the note is asked ahead"));
-        let context =
-            super::memory_context(self.sessions.clone(), socket, None, true, |_, _, note| {
-                Told::from(note)
-            });
-        context(Some(&scope.lease())).text
+        let context = super::memory_context(
+            self.sessions.clone(),
+            socket,
+            None,
+            true,
+            |_, _, _, note| Told::from(note),
+        );
+        context(Some(&scope.lease()), super::Chosen::ByLease).text
     }
 
     /// The line's end, for a line that is answered: waited for as the
