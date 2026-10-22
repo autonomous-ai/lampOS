@@ -7482,6 +7482,9 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
             "I've been feeling a bit tired lately. Like, every afternoon, Why could that be?"
         )
     );
+    // A two-person link no verdict judged: of the chain, only a piece one
+    // face or voice shows the last line's speaker said is kept, never one
+    // that passed only on no sign of a second person (reviewer-three's P2).
     assert_eq!(
         asked(
             TIRED,
@@ -7491,8 +7494,21 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
             })
         )
         .await,
+        Message::user("Why could that be?"),
+        "a two-person link: no piece shown the last speaker's"
+    );
+    assert_eq!(
+        asked(
+            TIRED,
+            Arc::new(|cut, request| match (cut, request) {
+                (1, 2) => Joined::Not("two voices (cosine 0.12)".to_owned()),
+                (2, 3) => Joined::Same("one face was seen speaking both"),
+                _ => Joined::NoSecond("no sign of a second person".to_owned()),
+            })
+        )
+        .await,
         Message::user("Like, every afternoon, Why could that be?"),
-        "a two-person link no verdict judged breaks the chain"
+        "a two-person link: the piece one face shows the last speaker said"
     );
     // A reviewer's P2 on the chain (22 Oct): "never mind" cut short before
     // it was asked withdraws what came before it.

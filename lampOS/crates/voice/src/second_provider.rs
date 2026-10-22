@@ -3806,10 +3806,20 @@ async fn spoken(
             }
         };
         if let Some(carried) = carried {
+            // In flight before any wait, so a line begun meanwhile carries
+            // them (the Reviewer on #2657; reviewer-three's P3 on the chain).
+            let holding = holding_while_joining(
+                &shared,
+                Carried {
+                    request,
+                    ..carried.clone()
+                },
+            );
             // A chain's links no verdict judged, judged for a held line:
-            // only the voices or one face join them.
-            // Against the chain's newest piece: words answered in a held
-            // line's place are that line's, not the held one's.
+            // only the voices or one face join them, against the chain's
+            // newest piece (words answered in a held line's place are that
+            // line's, not the held one's), all within one wait.
+            let bound = tokio::time::Instant::now() + JOIN_WAIT;
             let against = carried
                 .parts
                 .last()
@@ -3818,9 +3828,13 @@ async fn spoken(
                 shared.same_speaker.as_ref(),
                 request,
                 carried,
-                (false, against),
+                (false, against, bound),
+                None,
             )
             .await;
+            if holding && !still_holding(&shared, request) {
+                return;
+            }
             // The same person going on: its own words after them
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
@@ -3839,7 +3853,7 @@ async fn spoken(
                 );
                 let joined = joined_with_cut(
                     &shared,
-                    (request, false),
+                    (request, false, bound),
                     &marks,
                     carried.clone(),
                     text.clone(),
@@ -3939,7 +3953,9 @@ async fn spoken(
                 &shared,
                 waiting_chain(request, &marks, &carried, own.clone()),
             );
-            let joined = joined_with_cut(&shared, (request, true), &marks, carried, text).await;
+            let bound = tokio::time::Instant::now() + JOIN_WAIT;
+            let joined =
+                joined_with_cut(&shared, (request, true, bound), &marks, carried, text).await;
             if joining && !still_holding(&shared, request) {
                 return;
             }
@@ -4218,20 +4234,24 @@ fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> C
     }
 }
 
-/// `carried`'s chain judged for `request`, let out or held (`let_out`):
-/// first its links no verdict judged, then every older piece against
-/// `against`, the line the whole chain must be one person's with: a face
-/// or a voice two pieces apart is two people as much as one beside it (a
-/// reviewer's P2 on the chain, 22 Oct: X seen saying the first piece,
-/// nobody the middle one, Y the last, passed link by link). One that fails
-/// breaks the chain there, the pieces up to it let go, and the journal says
-/// how many. A print still to come is waited for ([`said_by_one`]). Without
-/// a judge, as it came.
+/// `carried`'s chain judged for `request`, let out or held (`let_out`),
+/// by `bound` (one wait for the verdict and the whole chain, a print still
+/// to come waited for until then): its links no verdict judged, and every
+/// older piece against `against`, the line the whole chain must be one
+/// person's with, each pair once; `known`, the pair the verdict judged
+/// already. While no pair says two people, all of it is kept. Once one
+/// does, only the pieces one face seen speaking both or one voice shows to
+/// be `against`'s speaker's are kept, never one that passed only on no sign
+/// of a second person (a reviewer's P2 on the chain, 22 Oct, and
+/// reviewer-three's: X seen saying the first piece, nobody the short
+/// middle one, Y the last; the middle one is not Y's for want of a sign).
+/// The journal says how many pieces go. Without a judge, as it came.
 async fn settled(
     same: Option<&SameSpeaker>,
     request: u64,
     mut carried: Carried,
-    (let_out, against): (bool, u64),
+    (let_out, against, bound): (bool, u64, tokio::time::Instant),
+    known: Option<((u64, u64), Joined)>,
 ) -> Carried {
     let Some(same) = same else {
         return carried;
@@ -4244,30 +4264,44 @@ async fn settled(
             .map(|part| (part.request, against))
             .filter(|(earlier, against)| earlier < against),
     );
-    for (earlier, later) in pairs {
-        // Gone with a break before it, or the link the verdict judges.
-        if !carried.parts.iter().any(|part| part.request == earlier)
-            || (later == against && earlier == carried.request && against != carried.request)
-        {
-            continue;
-        }
-        if let Err(why) = link_holds(same, (earlier, later), let_out).await {
-            let before = carried.parts.len();
-            carried.parts.retain(|part| part.request > earlier);
-            eprintln!(
-                "lamp-voice second: request {request}: the chain cut short breaks between requests {earlier} and {later}: {why}; its {} earlier pieces are let go (LAMP_JOIN_CUT_WORDS)",
-                before - carried.parts.len()
-            );
+    pairs.sort_unstable();
+    pairs.dedup();
+    let mut said: Vec<((u64, u64), Joined)> = known.into_iter().collect();
+    for pair in pairs {
+        if said.iter().all(|(judged, _)| *judged != pair) {
+            said.push((pair, said_by_one(same, pair, bound).await));
         }
     }
+    let refused = said.iter().find_map(|((earlier, later), joined)| {
+        link_holds(joined, let_out)
+            .err()
+            .map(|why| (*earlier, *later, why))
+    });
+    let Some((earlier, later, why)) = refused else {
+        return carried;
+    };
+    let before = carried.parts.len();
+    carried.parts.retain(|part| {
+        part.request == against
+            || said.iter().any(|(pair, joined)| {
+                *pair == (part.request, against) && matches!(joined, Joined::Same(_))
+            })
+    });
+    eprintln!(
+        "lamp-voice second: request {request}: the chain cut short has two people in it, requests {earlier} and {later}: {why}; of its pieces only those one face or voice shows the same speaker said are kept, {} let go (LAMP_JOIN_CUT_WORDS)",
+        before - carried.parts.len()
+    );
     carried
 }
 
 /// What `same` says of whether one person said `before` and `request`, a
-/// voice print still to come waited for up to [`JOIN_WAIT`], then what is
-/// known without it ([`Joined::Coming`]).
-async fn said_by_one(same: &SameSpeaker, (before, request): (u64, u64)) -> Joined {
-    let bound = tokio::time::Instant::now() + JOIN_WAIT;
+/// voice print still to come waited for until `bound`, then what is known
+/// without it ([`Joined::Coming`]).
+async fn said_by_one(
+    same: &SameSpeaker,
+    (before, request): (u64, u64),
+    bound: tokio::time::Instant,
+) -> Joined {
     loop {
         match same(before, request) {
             Joined::Coming(without) if tokio::time::Instant::now() >= bound => {
@@ -4285,19 +4319,14 @@ async fn said_by_one(same: &SameSpeaker, (before, request): (u64, u64)) -> Joine
     }
 }
 
-/// Whether one person said `earlier` and `later`, two pieces of a chain no
-/// verdict judged together, by `same`, a print still to come waited for. No
-/// sign of a second person joins only a line let out.
-async fn link_holds(
-    same: &SameSpeaker,
-    (earlier, later): (u64, u64),
-    let_out: bool,
-) -> Result<(), String> {
-    match said_by_one(same, (earlier, later)).await {
+/// Whether `joined` shows one person said both pieces of a link: no sign
+/// of a second person only for a line let out.
+fn link_holds(joined: &Joined, let_out: bool) -> Result<(), String> {
+    match joined {
         Joined::Same(_) => Ok(()),
         Joined::NoSecond(_) if let_out => Ok(()),
         Joined::NoSecond(why) => Err(format!("{why}, but this line was held")),
-        Joined::Not(why) => Err(why),
+        Joined::Not(why) => Err(why.clone()),
         Joined::Coming(_) => Err("a voice print still to come".to_owned()),
     }
 }
@@ -4316,7 +4345,7 @@ async fn link_holds(
 /// words let go if not joined, and the parts to keep in flight.
 async fn joined_with_cut(
     shared: &Shared,
-    (request, let_out): (u64, bool),
+    (request, let_out, bound): (u64, bool, tokio::time::Instant),
     marks: &Marks,
     carried: Carried,
     text: String,
@@ -4352,7 +4381,8 @@ async fn joined_with_cut(
         ));
         return (text, Some(carried), vec![own]);
     }
-    let said = said_by_one(same, (carried.request, request)).await;
+    let said = said_by_one(same, (carried.request, request), bound).await;
+    let verdict = said.clone();
     let why = match said {
         Joined::Same(why) => Ok(why.to_owned()),
         Joined::NoSecond(why) if let_out => Ok(why),
@@ -4370,9 +4400,15 @@ async fn joined_with_cut(
         }
     };
     // The chain's links no verdict judged: one that fails breaks it there.
-    let mut parts = settled(Some(same), request, carried.clone(), (let_out, request))
-        .await
-        .parts;
+    let mut parts = settled(
+        Some(same),
+        request,
+        carried.clone(),
+        (let_out, request, bound),
+        Some(((carried.request, request), verdict)),
+    )
+    .await
+    .parts;
     parts.push(own);
     // At most so many words, and so long since its oldest piece.
     let now = (shared.clock)();
