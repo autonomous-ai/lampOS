@@ -12870,37 +12870,56 @@ mod tests {
             tool(crate::second_provider::net::search::NAME),
             tool(crate::second_provider::net::search::FETCH),
         ];
-        let fill = lamp_gemini::MAX_TOOLS - lamp - search.len();
+        let fill = crate::second_provider::MAX_TOOLS - lamp - search.len();
         search.extend((0..fill).map(|n| tool(&format!("search_{n}"))));
         let names = |tools: &[lamp_gemini::Tool]| -> Vec<String> {
             tools.iter().map(|tool| tool.name.clone()).collect()
         };
         let plain = chat_tools(&settings, &search, false);
-        assert_eq!(plain.len(), lamp_gemini::MAX_TOOLS, "exactly at the bound");
+        assert_eq!(
+            plain.len(),
+            crate::second_provider::MAX_TOOLS,
+            "exactly at the bound"
+        );
         assert!(!names(&plain).contains(&crate::second_provider::LOOK_CALL.to_owned()));
         let looked = names(&chat_tools(&settings, &search, true));
-        assert_eq!(looked.len(), lamp_gemini::MAX_TOOLS);
+        assert_eq!(looked.len(), crate::second_provider::MAX_TOOLS);
         assert!(looked.contains(&crate::second_provider::LOOK_CALL.to_owned()));
         assert!(!looked.contains(&crate::second_provider::net::search::FETCH.to_owned()));
         assert!(looked.contains(&crate::second_provider::net::search::NAME.to_owned()));
         // With nothing left in the cut's order to cut, the last that isn't
         // core leaves, never the look.
-        let others: Vec<_> = (0..lamp_gemini::MAX_TOOLS - lamp)
+        let others: Vec<_> = (0..crate::second_provider::MAX_TOOLS - lamp)
             .map(|n| tool(&format!("other_{n}")))
             .collect();
         let past = names(&chat_tools(&settings, &others, true));
-        assert_eq!(past.len(), lamp_gemini::MAX_TOOLS);
+        assert_eq!(past.len(), crate::second_provider::MAX_TOOLS);
         assert!(past.contains(&crate::second_provider::LOOK_CALL.to_owned()));
-        assert!(!past.contains(&format!("other_{}", lamp_gemini::MAX_TOOLS - lamp - 1)));
+        assert!(!past.contains(&format!(
+            "other_{}",
+            crate::second_provider::MAX_TOOLS - lamp - 1
+        )));
         // Below the bound, nothing leaves for it.
         let room = chat_tools(&settings, &search[..2], true);
         assert_eq!(room.len(), lamp + 3);
+        // The route's own bound, not Live's: on lamp-4ace on 22 Oct the
+        // lamp's, the skills' and the search's came to five past Live's 32,
+        // and Live's bound left the search out. Here nothing leaves.
+        let past_live: Vec<_> = search[..2]
+            .iter()
+            .cloned()
+            .chain((0..lamp_gemini::MAX_TOOLS + 5 - lamp - 2).map(|n| tool(&format!("skill_{n}"))))
+            .collect();
+        let kept = names(&chat_tools(&settings, &past_live, false));
+        assert_eq!(kept.len(), lamp_gemini::MAX_TOOLS + 5);
+        assert!(kept.contains(&crate::second_provider::net::search::NAME.to_owned()));
+        assert!(kept.contains(&crate::second_provider::net::search::FETCH.to_owned()));
         // The probe's list, fitted already: the look kept, the last leaves.
-        let full: Vec<_> = (0..lamp_gemini::MAX_TOOLS)
+        let full: Vec<_> = (0..crate::second_provider::MAX_TOOLS)
             .map(|n| tool(&format!("f{n}")))
             .collect();
         let probed = names(&super::with_look(full));
-        assert_eq!(probed.len(), lamp_gemini::MAX_TOOLS);
+        assert_eq!(probed.len(), crate::second_provider::MAX_TOOLS);
         assert_eq!(
             probed.last().map(String::as_str),
             Some(crate::second_provider::LOOK_CALL)
