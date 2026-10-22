@@ -143,24 +143,27 @@ fn said_through(samples: usize, now_us: u64) {
     );
 }
 
-/// Whether a line now may be in a conversation going on as far as the
-/// lamp's own words go: with [`name_or_follow_up`], only when they ended
-/// no longer than [`crate::name_or_follow_up::FOLLOW_UP_FOR`] ago, or still
-/// play; without it, always, and the thread's window alone decides.
-fn follows_up_now() -> bool {
+/// Whether the line in hand, begun at `began_us` (the start of its
+/// window, [`crate::attention::Attention::window`]; now when that is not
+/// known), may be in a conversation going on as far as the lamp's own words
+/// go: with [`name_or_follow_up`], only when it began no longer than
+/// [`crate::name_or_follow_up::FOLLOW_UP_FOR`] after they ended, or while
+/// they played, however long it went on; without it, always, and the
+/// thread's window alone decides.
+fn follows_up_from(began_us: Option<u64>) -> bool {
     !name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
         || follows_up_at(
             said_until_us().load(std::sync::atomic::Ordering::Relaxed),
-            monotonic_us(),
+            began_us.unwrap_or_else(monotonic_us),
         )
 }
 
-/// [`follows_up_now`]'s reading of words played until `until_us` (zero:
-/// none), at `now_us`.
-fn follows_up_at(until_us: u64, now_us: u64) -> bool {
+/// [`follows_up_from`]'s reading of words played until `until_us` (zero:
+/// none), for a line begun at `began_us`.
+fn follows_up_at(until_us: u64, began_us: u64) -> bool {
     until_us != 0
         && crate::name_or_follow_up::follows_up(Some(Duration::from_micros(
-            now_us.saturating_sub(until_us),
+            began_us.saturating_sub(until_us),
         )))
 }
 /// Where the eyes keep their newest frame, when the lamp may take a look.
@@ -1207,9 +1210,8 @@ pub(crate) struct Options {
 /// How the room is and whether the lamp is in a conversation, now. With
 /// `--spoken-to`, none is once people have gone on talking to each other
 /// since the lamp last spoke ([`crate::room_told::RoomTold::talked_past_the_lamp`]).
-/// With `--name-or-follow-up`, none is once the lamp's own words ended
-/// more than [`crate::name_or_follow_up::FOLLOW_UP_FOR`] ago
-/// ([`follows_up_now`]).
+/// With `--name-or-follow-up` the line in hand is judged further by when it
+/// began ([`follows_up_from`]).
 fn attention_now() -> (crate::room_told::Room, bool) {
     let (room, talked_past) = crate::room_told::room()
         .lock()
@@ -1219,8 +1221,7 @@ fn attention_now() -> (crate::room_told::Room, bool) {
     let going_on = !talked_past
         && crate::thread::THREAD
             .lock()
-            .is_ok_and(|thread| thread.going_on(Instant::now()))
-        && follows_up_now();
+            .is_ok_and(|thread| thread.going_on(Instant::now()));
     (room, going_on)
 }
 #[cfg(test)]
@@ -2612,6 +2613,9 @@ async fn serve_with_visual<C: Connect>(
                         attention.policy_said(request, Some(says));
                     } else {
                         let (room, going_on) = now();
+                        // `LAMP_NAME_OR_FOLLOW_UP`: by when the line began.
+                        let going_on = going_on
+                            && follows_up_from(attention.window().map(|(began, _)| began));
                         let turned = eyes.as_ref().and_then(crate::bus_out::someone_turned_to_lamp);
                         // Whether it answers the lamp's own question, read as
                         // the judging reads it below: such a line never waits.
@@ -2758,6 +2762,11 @@ async fn serve_with_visual<C: Connect>(
                             if !matches!(event, Event::ToolCall { call, .. } if !crate::attention::answers(&call.name)) => {
                             let sampled_start_us = monotonic_us();
                             let (room, going_on) = now();
+                            // `LAMP_NAME_OR_FOLLOW_UP`: a follow-up is one
+                            // begun soon after the lamp's words, however
+                            // long it goes on before its answer.
+                            let going_on = going_on
+                                && follows_up_from(attention.window().map(|(began, _)| began));
                             let request = lineage.request.get();
                             let turned = (attention_busy && room == crate::room_told::Room::Busy
                                 || attention.sound_in_hand()
@@ -2821,13 +2830,13 @@ async fn serve_with_visual<C: Connect>(
                             // too: a question in the conversation's voice goes
                             // on, and a statement in it is talk past the lamp
                             // (the reviewer on #1636).
-                            // With `LAMP_NAME_OR_FOLLOW_UP`, only while the
-                            // lamp's words ended lately, as `attention_now`.
+                            // With `LAMP_NAME_OR_FOLLOW_UP`, only for a line
+                            // begun soon after the lamp's words, as above.
                             let under_the_mark = !going_on
                                 && intake.handoff.voices.is_some()
                                 && crate::room_told::room().lock().is_ok_and(|room| room.ended_only_by_another_voice())
                                 && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()))
-                                && follows_up_now();
+                                && follows_up_from(attention.window().map(|(began, _)| began));
                             let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
                                 voices.at_verdict(request, going_on || under_the_mark, attention.called_for_itself())
                             });
