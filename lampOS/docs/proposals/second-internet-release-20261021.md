@@ -1,14 +1,17 @@
-# Current preparation audit, 23 October 2026 00:21 +07
+# Current preparation audit, 23 October 2026 03:28 +07
 
 The publisher/workflow, three publication test suites and three updater
-entry points are byte-identical between `17167b1ba` and current integration
-`b8a9148bd` (nine files). The delivered preparation below remains current;
-no additional publisher or missing host preflight implementation was found.
-This was a source audit, not a rerun of those suites or a real release.
+entry points remain byte-identical from `17167b1ba` through `b8a9148bd` to
+audited integration `c5450ea97` (nine files). The [latest source delta](../verification/release-preflight-20261023/source-delta-c5450ea97.json)
+records the before/after hashes from `b8a9148bd`. The delivered preparation
+below remains current; no additional publisher or missing host preflight
+implementation was found. This was a source audit, not a rerun of those
+suites or a real release. Configuration metadata below retains its earlier
+00:21 observation time; it was not fetched again for this source audit.
 #3012's process/CLI checks have now merged through train #3078; they still
 provide no attended physical-cut, real-systemd or quiet/Body acceptance.
 
-[Fresh configuration metadata](../verification/release-preflight-20261023/metadata.json)
+[Configuration metadata](../verification/release-preflight-20261023/metadata.json)
 was read at 00:21 +07. The repository-variable API returned zero variables.
 The publication environment and its secret-name listing returned HTTP 404:
 absence cannot be distinguished from inaccessible configuration. No signing

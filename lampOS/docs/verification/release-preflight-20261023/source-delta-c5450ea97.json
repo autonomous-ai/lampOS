@@ -1,0 +1,62 @@
+{
+  "before": "b8a9148bdf434160d417e8cd6107579546f5d8a7",
+  "after": "c5450ea97bb0f3b0216cdc0435c52ce24379ca59",
+  "files": [
+    {
+      "path": ".github/workflows/lampos-arm64.yml",
+      "before_sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "after_sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "identical": true
+    },
+    {
+      "path": ".github/scripts/lampos-publish.py",
+      "before_sha256": "40040134e3d6754af39c1f98b74fd93e25c054834c535a7f1255faa4d8f68b3b",
+      "after_sha256": "40040134e3d6754af39c1f98b74fd93e25c054834c535a7f1255faa4d8f68b3b",
+      "identical": true
+    },
+    {
+      "path": ".github/scripts/lampos-publish-artifact.py",
+      "before_sha256": "831db6fc725c25eafd7c84010d7ba9569895cc048c48148fff3d35772ec929da",
+      "after_sha256": "831db6fc725c25eafd7c84010d7ba9569895cc048c48148fff3d35772ec929da",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/main.rs",
+      "before_sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+      "after_sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/publish.rs",
+      "before_sha256": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+      "after_sha256": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "before_sha256": "a9119a26010d799cb85a2a5f99a4509204e9b8f92f6fb2f10006cfdf314b49b9",
+      "after_sha256": "a9119a26010d799cb85a2a5f99a4509204e9b8f92f6fb2f10006cfdf314b49b9",
+      "identical": true
+    },
+    {
+      "path": ".github/scripts/lampos-publish-artifact-test.py",
+      "before_sha256": "ed37fc46e4e4e61481853cdc6a39addf4fd87e22693e967ace733ff10d703571",
+      "after_sha256": "ed37fc46e4e4e61481853cdc6a39addf4fd87e22693e967ace733ff10d703571",
+      "identical": true
+    },
+    {
+      "path": ".github/scripts/lampos-publish-cli-test.py",
+      "before_sha256": "1c79139ab2e87423839c20412618e34f9cb61a662cf4f2c9a0d17da1bd5c25ae",
+      "after_sha256": "1c79139ab2e87423839c20412618e34f9cb61a662cf4f2c9a0d17da1bd5c25ae",
+      "identical": true
+    },
+    {
+      "path": ".github/scripts/lampos-publish-test.py",
+      "before_sha256": "a2bd9f5401166d17d111ed002366b7b5dac04e404d6b403f887e68a216571a0b",
+      "after_sha256": "a2bd9f5401166d17d111ed002366b7b5dac04e404d6b403f887e68a216571a0b",
+      "identical": true
+    }
+  ],
+  "note": "Read-only source comparison; no suites, configuration, publication or device action.",
+  "observed_at_utc": "2026-10-22T20:28:47.594463+00:00"
+}
