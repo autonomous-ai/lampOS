@@ -6403,6 +6403,39 @@ Ready for lamp-voice: yes, #2936 tests and #2946 evidence only; photo activation
   Cross-unit0700/path/socket, privacy and native gates follow scoped code;
   Mobile/authorised0c89 full-update selfie/yes remains acceptance.
 
+## 2026-10-22 15:27 ICT: reviewed pieces rebased and pushed
+
+Ready for lamp-voice: #2946 evidence yes; #2936 draft for replacement native/full host; activation no.
+
+- Reviewer-two6336190662 read #2936 at3bbbb6cbc: P1/P2none,
+  no full host rerun claimed. Requested latest authored ancestry, and
+  will perform full serial Voice qualification after replacement check.
+- Pushed3c2d5487784ce32f2750c0c7a8da2e8fbe5520a0 on
+  8dd69028a2799e1f534835911a404a5bdaab3e54. Plain source replay
+  3bbbb6cbc=7e31615fd, then README/JSON-only evidence amendment.
+  Entire test bytes c062 unchanged; current parent's411-line prefix,
+  production worker/Remember/nextest exact with no upstream drift.
+  Root independently rechecked source equality after publication.
+- Fresh fmt11.809s;retry12/0/0 (115.521s compilation included),
+  strict workspaceClippy77.970s,workspacebuild60.578s all pass.
+  Retry300779us, same explicit300ms APIboundary. Repeats excluded from27;
+  prior10334/0/67 native remains historical. Raw
+  `/private/tmp/fourth-memory-retry-boundaries-checks-20261022/rebase-latest/`.
+  Native39747538858 and Clippy39747538905 running. Draft receipt6336269424.
+- Reviewer-two6336204877 read #2946: P1/P2none, counts/lists/method
+  independently parsed, no rerun/activation inferred. Requested plain
+  rebase pushed28d3b36f522a2ace178fd5e6437bc462b0b3f77f on8dd69028a;
+  range-diff dcb7b80d1=28d3b36f5, both files byte-identical. Historical
+  census retains8613304e4 attribution. Receipt6336231703; docs-only gate.
+- #2856 source-only readiness audit6336162618 records normal JPEG
+  cleanup is best effort; process-kill/unlink-failure/durable-deletion
+  and actual fullchain/privacy-close proof remain unshown. Cancellation
+  stops Voice watcher, not immediate pending erase; existing expiry applies.
+  Existing remember/forget are not photo-yes/no aliases: authority, fresh
+  camera capture, broad forget and held-gap semantics differ. First must
+  scope explicit routing/admission before code; nothing silently changed.
+  App/backend retention outside this Rust repo is not established.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
