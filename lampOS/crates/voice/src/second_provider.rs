@@ -1423,6 +1423,24 @@ struct Marks {
     /// Whether its words are back, and, when the line after it began first
     /// and waits for them, where they go ([`NameWords::Coming`]).
     words_back: Mutex<(bool, Option<tokio::sync::oneshot::Sender<Option<NameSaid>>>)>,
+    /// Begun while the lamp's name before it waited for it
+    /// (`LAMP_SECOND_NAME_CARRIES`): that name line's own link
+    /// ([`KeptSound::link`]), which a chain goes on across once it is said
+    /// by the name (`name_carried`).
+    name_link: Option<(u64, Duration)>,
+    /// Said by the name before it ([`said_by_the_name`]).
+    name_carried: AtomicBool,
+}
+
+/// The link a line's join goes by: the lamp's name's own when the line is
+/// said by it (`LAMP_SECOND_NAME_CARRIES`), so a chain goes on across a
+/// carried name; else its own ([`Marks::after_end`]).
+fn join_link(marks: &Marks) -> Option<(u64, Duration)> {
+    if marks.name_carried.load(Ordering::Acquire) {
+        marks.name_link
+    } else {
+        marks.after_end
+    }
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -2836,9 +2854,13 @@ impl Engine {
                 // The line before, cut short after its words came back but
                 // before it was asked, and not folded into this one: its
                 // words go on in the chain (`LAMP_JOIN_CUT_WORDS`).
+                // The lamp's name waiting for this line is carried by its
+                // own rule, never chained ([`said_by_the_name`]).
+                let name_waiting = name_of.as_ref().map(|name| name.request);
                 if !folded
                     && !after_stop
                     && let Some((of, words)) = heard_before
+                    && name_waiting != Some(of)
                     && let Some((before, before_link, before_began)) = before_link
                     && of == before
                 {
@@ -2861,6 +2883,11 @@ impl Engine {
                     name_of: Mutex::new(name_of),
                     ended_at: Mutex::new(None),
                     words_back: Mutex::default(),
+                    name_link: name_waiting
+                        .and(before_link)
+                        .filter(|(before, _, _)| name_waiting == Some(*before))
+                        .and_then(|(_, link, _)| link),
+                    name_carried: AtomicBool::new(false),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -4174,6 +4201,18 @@ async fn spoken(
         None => None,
     };
     let wordless = text.trim().is_empty();
+    if name_of.is_some() {
+        marks.name_carried.store(true, Ordering::Release);
+    }
+    // The name's words put before this line's own, when they are: a chain
+    // this line joins goes after them (`LAMP_JOIN_CUT_WORDS`).
+    let own_words = text.clone();
+    let name_prefix = match &name_of {
+        Some(_) if wordless || crate::attention::begins_with_the_name(&text) => None,
+        Some(name) if name_first(&name.words) => Some(name.words.trim().to_owned()),
+        Some(_) => Some(format!("{},", net::key_terms::NAME)),
+        None => None,
+    };
     let (text, called) = match &name_of {
         Some(name) if wordless && name_first(&name.words) => (
             name.words.clone(),
@@ -4564,13 +4603,29 @@ async fn spoken(
                 &shared,
                 waiting_chain(request, &marks, &carried, own.clone()),
             );
+            // Said by the name: the chain goes after the name's words, then
+            // this line's own (`LAMP_SECOND_NAME_CARRIES`).
+            let asked = if name_prefix.is_some() {
+                own_words.trim().to_owned()
+            } else {
+                text.clone()
+            };
             let bound = tokio::time::Instant::now() + JOIN_WAIT;
             let joined =
-                joined_with_cut(&shared, (request, true, bound), &marks, carried, text).await;
+                joined_with_cut(&shared, (request, true, bound), &marks, carried, asked).await;
             if joining && !still_holding(&shared, request) {
                 return;
             }
-            joined
+            match (joined, &name_prefix) {
+                ((joined, None, mut parts), Some(prefix)) => {
+                    if let Some(first) = parts.first_mut() {
+                        first.text = format!("{prefix} {}", first.text.trim());
+                    }
+                    (format!("{prefix} {joined}"), None, parts)
+                }
+                ((_, Some(carried), _), Some(_)) => (text, Some(carried), vec![own]),
+                (joined, None) => joined,
+            }
         }
         None => (text, None, vec![own]),
     };
@@ -4836,7 +4891,7 @@ fn own_part(request: u64, text: &str, marks: &Marks) -> Part {
         request,
         text: text.to_owned(),
         at: marks.began.unwrap_or_else(Instant::now),
-        lines: if marks.folded { 2 } else { 1 },
+        lines: 1 + u16::from(marks.folded) + u16::from(marks.name_carried.load(Ordering::Acquire)),
     }
 }
 
@@ -4847,9 +4902,7 @@ fn own_part(request: u64, text: &str, marks: &Marks) -> Part {
 /// else its own words alone.
 fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> Carried {
     let linked = carried.said_by == carried.request
-        && marks
-            .after_end
-            .is_some_and(|(of, gap)| of == carried.request && gap <= JOIN_WITHIN);
+        && join_link(marks).is_some_and(|(of, gap)| of == carried.request && gap <= JOIN_WITHIN);
     if !linked {
         return Carried::own(request, own.text, own.at, request);
     }
@@ -5085,7 +5138,7 @@ async fn joined_with_cut(
         ));
         return (text, Some(carried), vec![own]);
     }
-    let Some((_, gap)) = marks.after_end.filter(|(of, _)| *of == carried.request) else {
+    let Some((_, gap)) = join_link(marks).filter(|(of, _)| *of == carried.request) else {
         not_joined("its sound or words began this line already, or it was not the line before");
         return (text, Some(carried), vec![own]);
     };

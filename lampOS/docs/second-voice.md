@@ -2552,6 +2552,13 @@ after a take-over, but now for every turn:
     `its N oldest pieces let go past 60 words or 20 s` when cut. The rule
     keeps each line's faces and room for the last 8 lines (`SPOKE_KEPT`),
     so a 4-piece chain and the line after are judged link by link.
+    With `LAMP_SECOND_NAME_CARRIES` the chain goes on across a carried
+    name: a line said by the lamp's name goes on from the line before the
+    name (`Marks::name_link`), and is asked with the name's words first,
+    then the chain, then its own ("Lamp. / I've been tired lately. / Like,
+    every afternoon, / why?" is one named line). The name waiting for its
+    line is carried by its own rule, never chained, and a refused name's
+    words are never joined.
   - **No sign of a second person** (the same switch; the owner's test on
     lamp-4ace on 22 Oct, 19:04-19:08). lamp-4ace runs no same-voice model
     and its eyes saw nobody speaking, so nothing joined, and 5 of 28 lines
